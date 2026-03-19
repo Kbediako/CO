@@ -1,0 +1,34 @@
+[Codex-Orchestrator] prepareRun start for pipeline implementation-gate
+[Codex-Orchestrator] prepareRun resolving pipeline implementation-gate
+[Codex-Orchestrator] PipelineResolver.resolve start for implementation-gate
+[Codex-Orchestrator] [design-config] loaded repo file at /Users/kbediako/Code/CO/design.config.yaml
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline implementation-gate
+[Codex-Orchestrator] prepareRun resolved pipeline implementation-gate
+[Codex-Orchestrator] prepareRun loaded metadata for task 1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction-guard
+[Codex-Orchestrator] prepareRun running planner for pipeline implementation-gate
+[Codex-Orchestrator] prepareRun planner completed for pipeline implementation-gate
+[Codex-Orchestrator] prepareRun complete for pipeline implementation-gate
+{
+  "run_id": "2026-03-07T12-27-23-036Z-2d50593b",
+  "status": "failed",
+  "artifact_root": ".runs/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction-guard/cli/2026-03-07T12-27-23-036Z-2d50593b",
+  "manifest": ".runs/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction-guard/cli/2026-03-07T12-27-23-036Z-2d50593b/manifest.json",
+  "log_path": ".runs/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction-guard/cli/2026-03-07T12-27-23-036Z-2d50593b/runner.ndjson",
+  "summary": "Advanced mode (auto) enabled: auto enabled for non-trivial pipeline 'implementation-gate'.\nAuto scout: evidence recorded at .runs/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction-guard/cli/2026-03-07T12-27-23-036Z-2d50593b/auto-scout.json.\nStage 'node scripts/diff-budget.mjs' failed with exit code 1.\nGuardrails: spec-guard succeeded (1 passed).",
+  "runtime_mode_requested": "appserver",
+  "runtime_mode": "appserver",
+  "runtime_provider": "AppServerRuntimeProvider",
+  "runtime_fallback": {
+    "occurred": false,
+    "code": null,
+    "reason": null,
+    "from_mode": null,
+    "to_mode": null,
+    "checked_at": "2026-03-07T12:27:23.166Z"
+  },
+  "cloud_fallback_reason": null,
+  "issue_log": null,
+  "issue_log_error": null
+}

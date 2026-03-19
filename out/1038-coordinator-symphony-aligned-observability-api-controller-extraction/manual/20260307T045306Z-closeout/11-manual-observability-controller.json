@@ -1,0 +1,77 @@
+{
+  "route_resolution": {
+    "state": {
+      "kind": "state"
+    },
+    "dispatch": {
+      "kind": "dispatch"
+    },
+    "reserved_dispatch_alias": {
+      "kind": "not_found"
+    },
+    "issue": {
+      "kind": "issue",
+      "issueIdentifier": "task-1038"
+    },
+    "ui": {
+      "kind": "none"
+    }
+  },
+  "state_response": {
+    "statusCode": 200,
+    "headers": {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store"
+    },
+    "body": {
+      "generated_at": "2026-03-07T04:55:09.029Z",
+      "counts": {
+        "running": 1,
+        "retrying": 0
+      },
+      "running": [
+        {
+          "issue_identifier": "task-1038",
+          "session_id": "run-1",
+          "state": "in_progress"
+        }
+      ],
+      "retrying": [],
+      "codex_totals": null,
+      "rate_limits": null,
+      "selected": {
+        "issue_identifier": "task-1038",
+        "raw_status": "in_progress",
+        "display_status": "in_progress"
+      }
+    }
+  },
+  "method_not_allowed_response": {
+    "statusCode": 405,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "error": {
+        "code": "method_not_allowed",
+        "message": "Method not allowed",
+        "details": {
+          "surface": "api_v1",
+          "allowed_method": "GET"
+        }
+      },
+      "traceability": {
+        "task_id": "task-1038",
+        "run_id": "run-1",
+        "manifest_path": "/repo/.runs/task-1038/cli/run-1/manifest.json",
+        "surface": "api_v1",
+        "issue_identifier": null,
+        "requested_action": null,
+        "requested_tool": null,
+        "decision": "rejected",
+        "reason": "method_not_allowed",
+        "timestamp": "2026-03-07T04:55:09.030Z"
+      }
+    }
+  }
+}

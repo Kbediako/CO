@@ -1,0 +1,61 @@
+{
+  "task": "1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary",
+  "timestamp_utc": "2026-03-10T09:07:19Z",
+  "checks": [
+    {
+      "name": "active_manifest_and_runner_log_anchor_audit_startup",
+      "status": "passed",
+      "evidence": [
+        "scripts/lib/review-execution-state.ts",
+        "scripts/run-review.ts",
+        "tests/review-execution-state.spec.ts",
+        "tests/run-review.spec.ts",
+        "05-targeted-tests.log"
+      ]
+    },
+    {
+      "name": "detached_active_manifest_path_is_valid_anchor",
+      "status": "passed",
+      "evidence": [
+        "tests/review-execution-state.spec.ts",
+        "tests/run-review.spec.ts",
+        "05-targeted-tests.log"
+      ]
+    },
+    {
+      "name": "inline_manifest_rebinding_is_not_accepted",
+      "status": "passed",
+      "evidence": [
+        "tests/review-execution-state.spec.ts",
+        "05-targeted-tests.log"
+      ]
+    },
+    {
+      "name": "shell_wrapped_manifest_rebinding_is_not_accepted",
+      "status": "passed",
+      "evidence": [
+        "tests/review-execution-state.spec.ts",
+        "05-targeted-tests.log"
+      ]
+    },
+    {
+      "name": "ordinary_repo_manifest_json_not_classified_as_run_manifest",
+      "status": "passed",
+      "evidence": [
+        "tests/review-execution-state.spec.ts",
+        "05-targeted-tests.log"
+      ]
+    },
+    {
+      "name": "unavailable_runner_log_env_var_is_not_anchor",
+      "status": "passed",
+      "evidence": [
+        "tests/review-execution-state.spec.ts",
+        "05-targeted-tests.log"
+      ]
+    }
+  ],
+  "notes": [
+    "Shell-local export and multi-segment env propagation remain a follow-on seam and are not claimed by 1108."
+  ]
+}

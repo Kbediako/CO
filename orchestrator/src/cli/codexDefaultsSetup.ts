@@ -15,7 +15,8 @@ const toml = require('@iarna/toml') as {
 };
 const canonicalize = require('canonicalize') as (value: unknown) => string | undefined;
 
-export const BASELINE_MODEL = 'gpt-5.3-codex';
+export const BASELINE_MODEL = 'gpt-5.4';
+export const BASELINE_REVIEW_MODEL = BASELINE_MODEL;
 export const BASELINE_REASONING = 'xhigh';
 export const BASELINE_REASONING_MINIMUM = 'high';
 export const BASELINE_AGENTS = {
@@ -242,12 +243,11 @@ function mergeBaselineDefaults(
 ): Record<string, unknown> {
   const next = structuredClone(existing);
   next.model = BASELINE_MODEL;
+  next.review_model = BASELINE_REVIEW_MODEL;
   next.model_reasoning_effort = BASELINE_REASONING;
 
   const agents = isRecord(next.agents) ? structuredClone(next.agents as Record<string, unknown>) : {};
   agents.max_threads = BASELINE_AGENTS.max_threads;
-  agents.max_depth = BASELINE_AGENTS.max_depth;
-  agents.max_spawn_depth = BASELINE_AGENTS.max_spawn_depth;
 
   for (const role of roleDefinitions) {
     const existingRole = isRecord(agents[role.key])

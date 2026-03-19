@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { access, lstat, mkdir, readdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import type {
   CliManifest,
@@ -51,7 +51,6 @@ const HEARTBEAT_INTERVAL_SECONDS = 5;
 const HEARTBEAT_STALE_AFTER_SECONDS = 30;
 const MAX_ERROR_DETAIL_CHARS = 8 * 1024;
 const DEFAULT_MIN_EXPERIENCE_REWARD = 0.1;
-
 function createDefaultRuntimeFallback() {
   return {
     occurred: false,
@@ -491,17 +490,13 @@ async function createCompatibilityPointer(env: EnvironmentPaths, paths: RunPaths
 }
 
 async function resolveManifestPathForRunId(env: EnvironmentPaths, runId: string): Promise<string> {
-  const expectedPaths = resolveRunPaths(env, runId);
-  try {
-    await access(expectedPaths.manifestPath);
-    return expectedPaths.manifestPath;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error;
-    }
+  const safeRunId = sanitizeRunId(runId);
+  const expectedPaths = resolveRunPaths(env, safeRunId);
+  const expectedManifestPath = await validateRunManifestCandidate(expectedPaths.manifestPath, env.runsRoot, safeRunId);
+  if (expectedManifestPath) {
+    return expectedManifestPath;
   }
 
-  const safeRunId = sanitizeRunId(runId);
   const localCompatResolved = await resolveLocalCompatManifestPath(env, safeRunId);
   if (localCompatResolved) {
     return localCompatResolved;
@@ -540,29 +535,14 @@ async function resolveLocalCompatManifestPath(
   }
 
   if (stats.isSymbolicLink()) {
-    try {
-      return await realpath(localCompatManifestPath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return null;
-      }
-      throw error;
-    }
+    return await validateRunManifestCandidate(localCompatManifestPath, env.runsRoot, safeRunId);
   }
 
   const redirectPath = await resolveRedirectManifestPath(env, localCompatManifestPath);
   if (!redirectPath) {
     return null;
   }
-  try {
-    await access(redirectPath);
-    return redirectPath;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
+  return await validateRunManifestCandidate(redirectPath, env.runsRoot, safeRunId);
 }
 
 async function resolveRedirectManifestPath(
@@ -634,27 +614,129 @@ async function findManifestPathAcrossTasks(runsRoot: string, safeRunId: string):
     }
     const taskRoot = join(runsRoot, entry.name);
     const cliManifestPath = join(taskRoot, 'cli', safeRunId, 'manifest.json');
-    try {
-      await access(cliManifestPath);
-      return cliManifestPath;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
+    const validatedCliManifest = await validateRunManifestCandidate(cliManifestPath, runsRoot, safeRunId);
+    if (validatedCliManifest) {
+      return validatedCliManifest;
     }
 
     const legacyManifestPath = join(taskRoot, safeRunId, 'manifest.json');
-    try {
-      await access(legacyManifestPath);
-      return legacyManifestPath;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
+    const validatedLegacyManifest = await validateRunManifestCandidate(legacyManifestPath, runsRoot, safeRunId);
+    if (validatedLegacyManifest) {
+      return validatedLegacyManifest;
     }
   }
 
   return null;
+}
+
+async function validateRunManifestCandidate(
+  candidatePath: string,
+  runsRoot: string,
+  safeRunId: string
+): Promise<string | null> {
+  try {
+    await access(candidatePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+
+  const canonicalPath = await canonicalizePath(candidatePath);
+  const canonicalRunsRoot = await canonicalizePath(runsRoot);
+  if (!(await isPathWithinRoots(canonicalPath, [canonicalRunsRoot]))) {
+    return null;
+  }
+  try {
+    assertRunManifestPath(canonicalPath, canonicalRunsRoot, 'manifest_path');
+  } catch {
+    return null;
+  }
+  const runDir = dirname(canonicalPath);
+  if (basename(runDir) !== safeRunId) {
+    return null;
+  }
+  return canonicalPath;
+}
+
+function assertRunManifestPath(pathname: string, runsRoot: string, label: string): void {
+  try {
+    assertCliRunManifestPath(pathname, runsRoot, label);
+    return;
+  } catch {
+    assertLegacyRunManifestPath(pathname, runsRoot, label);
+  }
+}
+
+function assertCliRunManifestPath(pathname: string, runsRoot: string, label: string): void {
+  if (basename(pathname) !== 'manifest.json') {
+    throw new Error(`${label} invalid`);
+  }
+  const runDir = dirname(pathname);
+  const cliDir = dirname(runDir);
+  if (basename(cliDir) !== 'cli') {
+    throw new Error(`${label} invalid`);
+  }
+  const taskDir = dirname(cliDir);
+  const runsDir = dirname(taskDir);
+  const normalizedRunsDir = normalizePath(resolve(runsDir));
+  const normalizedRunsRoot = normalizePath(resolve(runsRoot));
+  if (!basename(runDir) || !basename(taskDir) || normalizedRunsDir !== normalizedRunsRoot) {
+    throw new Error(`${label} invalid`);
+  }
+}
+
+function assertLegacyRunManifestPath(pathname: string, runsRoot: string, label: string): void {
+  if (basename(pathname) !== 'manifest.json') {
+    throw new Error(`${label} invalid`);
+  }
+  const runDir = dirname(pathname);
+  const taskDir = dirname(runDir);
+  const runsDir = dirname(taskDir);
+  const normalizedRunsDir = normalizePath(resolve(runsDir));
+  const normalizedRunsRoot = normalizePath(resolve(runsRoot));
+  if (
+    !basename(runDir) ||
+    !basename(taskDir) ||
+    basename(taskDir) === 'local-mcp' ||
+    normalizedRunsDir !== normalizedRunsRoot
+  ) {
+    throw new Error(`${label} invalid`);
+  }
+}
+
+async function isPathWithinRoots(pathname: string, roots: string[]): Promise<boolean> {
+  const normalizedPath = normalizePath(await canonicalizePath(pathname));
+  for (const root of roots) {
+    const normalizedRoot = normalizePath(await canonicalizePath(root));
+    if (normalizedRoot === normalizedPath) {
+      return true;
+    }
+    const relativePath = relative(normalizedRoot, normalizedPath);
+    if (!relativePath) {
+      return true;
+    }
+    if (isAbsolute(relativePath)) {
+      continue;
+    }
+    if (!relativePath.startsWith(`..${sep}`) && relativePath !== '..') {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function canonicalizePath(pathname: string): Promise<string> {
+  try {
+    return await realpath(pathname);
+  } catch {
+    return resolve(pathname);
+  }
+}
+
+function normalizePath(pathname: string): string {
+  return process.platform === 'win32' ? pathname.toLowerCase() : pathname;
 }
 
 function resolveRunPathsForManifestPath(env: EnvironmentPaths, runId: string, manifestPath: string): RunPaths {

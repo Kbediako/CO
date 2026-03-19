@@ -1,0 +1,60 @@
+{
+  "generated_at": "2026-03-07T09:34:34.252Z",
+  "controller": "securityViolationController",
+  "results": [
+    {
+      "name": "defaults",
+      "handled": true,
+      "state": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "recorded"
+        }
+      },
+      "emitted": [
+        {
+          "kind": "unknown",
+          "summary": "security_violation",
+          "severity": "high",
+          "related_request_id": null,
+          "details_redacted": true
+        }
+      ]
+    },
+    {
+      "name": "explicit_values",
+      "handled": true,
+      "state": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "recorded"
+        }
+      },
+      "emitted": [
+        {
+          "kind": "sandbox_escape",
+          "summary": "blocked tool misuse",
+          "severity": "critical",
+          "related_request_id": "req-7",
+          "details_redacted": true
+        }
+      ]
+    },
+    {
+      "name": "fallthrough",
+      "handled": false,
+      "state": {
+        "statusCode": null,
+        "headers": null,
+        "body": null
+      },
+      "emitted": []
+    }
+  ]
+}

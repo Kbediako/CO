@@ -1,0 +1,116 @@
+{
+  "generated_at": "2026-03-07T07:53:06.155Z",
+  "scenarios": [
+    {
+      "scenario": "method_rejection",
+      "response": {
+        "statusCode": 405,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "rejected",
+          "reason": "method_not_allowed",
+          "timestamp": "2026-03-07T07:53:06.145Z"
+        }
+      }
+    },
+    {
+      "scenario": "timestamp_rejection",
+      "response": {
+        "statusCode": 401,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "rejected",
+          "reason": "linear_webhook_timestamp_invalid",
+          "timestamp": "2026-03-07T07:53:06.145Z"
+        }
+      },
+      "latest_result": "rejected",
+      "latest_reason": "linear_webhook_timestamp_invalid",
+      "emitted": [
+        {
+          "deliveryId": "delivery-invalid-timestamp",
+          "event": "Issue",
+          "action": "update",
+          "issueId": "lin-issue-1",
+          "outcome": "rejected",
+          "reason": "linear_webhook_timestamp_invalid"
+        }
+      ]
+    },
+    {
+      "scenario": "duplicate_delivery",
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "duplicate",
+          "reason": "linear_delivery_duplicate",
+          "timestamp": "2026-03-07T07:53:06.145Z"
+        }
+      },
+      "latest_result": "duplicate",
+      "latest_reason": "linear_delivery_duplicate",
+      "emitted": [
+        {
+          "deliveryId": "delivery-1",
+          "event": "Issue",
+          "action": "update",
+          "issueId": "lin-issue-1",
+          "outcome": "duplicate",
+          "reason": "linear_delivery_duplicate"
+        }
+      ]
+    },
+    {
+      "scenario": "accepted_delivery",
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "accepted",
+          "reason": "linear_delivery_accepted",
+          "timestamp": "2026-03-07T07:53:06.154Z"
+        }
+      },
+      "latest_result": "accepted",
+      "tracked_issue": {
+        "provider": "linear",
+        "id": "lin-issue-1",
+        "identifier": "PREPROD-101",
+        "title": "Investigate advisory routing",
+        "url": "https://linear.app/asabeko/issue/PREPROD-101",
+        "state": "In Progress",
+        "state_type": "started",
+        "workspace_id": "lin-workspace-1",
+        "team_id": "lin-team-live",
+        "team_key": "PREPROD",
+        "team_name": "PRE-PRO/PRODUCTION",
+        "project_id": "lin-project-1",
+        "project_name": "Icon Agency (Bookings)",
+        "updated_at": "2026-03-06T05:00:00.000Z",
+        "recent_activity": []
+      },
+      "emitted": [
+        {
+          "deliveryId": "delivery-accepted",
+          "event": "Issue",
+          "action": "update",
+          "issueId": "lin-issue-1",
+          "outcome": "accepted",
+          "reason": "linear_delivery_accepted"
+        },
+        {
+          "publishRuntime": true
+        }
+      ]
+    }
+  ]
+}

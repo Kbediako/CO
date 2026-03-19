@@ -1,0 +1,6 @@
+
+> @kbediako/codex-orchestrator@0.1.38 docs:archive-tasks
+> node scripts/tasks-archive.mjs
+
+Error: docs/TASKS.md exceeds max_lines (451/450) but no eligible tasks can be archived.
+    at main (file:///Users/kbediako/Code/CO/scripts/tasks-archive.mjs:373:11)

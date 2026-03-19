@@ -1,0 +1,680 @@
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc92e-5d54-77e0-aa6b-43349cb92707
+--------
+user
+Review task: 1054-coordinator-symphony-aligned-control-action-execution-extraction
+Evidence manifest: .runs/1054-coordinator-symphony-aligned-control-action-execution-extraction/cli/2026-03-07T16-16-25-934Z-015c9198/manifest.json
+
+Task context:
+- Task checklist: `tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md`
+- MCP Task ID: `1054-coordinator-symphony-aligned-control-action-execution-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-control-action-execution-extraction.md`
+- TECH_SPEC: `tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-execution-extraction.md`
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-control-action-execution-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-control-action-execution-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-execution-extraction.md`, `tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md`, `tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md`, `.agent/task/1054-coordinator-symphony-aligned-control-action-execution-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1054-control-action-execution-deliberation.md`.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md`, `docs/findings/1054-control-action-execution-deliberation.md`.
+- [x] docs-review approval/override captured for registered `1054`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/20260307T160831Z-docs-first/05-docs-review-override.md`.
+- [ ] The remaining post-resolution `/control/action` execution logic is extracted into a dedicated helper under `orchestrator/src/cli/control/`. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
+- [ ] Replay resolution moves out of `controlActionPreflight.ts`, and replay matching plus `controlStore.updateAction(...)` coordination now return a typed execution result without changing contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlActionPreflight.ts`, `orchestrator/tests/`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] `/control/action` replayed-versus-applied behavior, transport cancel replay precedence, and persist/publish decisions remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/`, `orchestrator/tests/ControlServer.test.ts`, `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/11-manual-control-action-execution.json`.
+- [ ] Route ordering, fast rejects, cancel-confirmation authority, transport preflight rejection, transport nonce consume/rollback durability, actual persistence/publish side effects, audit emission, and raw HTTP writes remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/00-summary.md`.
+- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/01-delegation-guard.log`.
+- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/02-spec-guard.log`.
+- [ ] `npm run build`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/03-build.log`.
+- [ ] `npm run lint`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/04-lint.log`.
+- [ ] `npm run test`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/05-test.log`.
+- [ ] `npm run docs:check`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/06-docs-check.log`.
+- [ ] `npm run docs:freshness`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/07-docs-freshness.log`.
+- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/08-diff-budget.log`, `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/13-override-notes.md`.
+- [ ] `npm run review`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/09-review.log`, `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/13-override-notes.md`.
+- [ ] `npm run pack:smoke` not required because no downstream-facing CLI/package/skills/review-wrapper paths changed. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/13-override-notes.md`.
+- [ ] Manual mock execution artifact captured. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/11-manual-control-action-execution.json`.
+- [ ] Elegance review completed. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/<pending>/12-elegance-review.md`.
+
+Agent notes:
+Goal: extract control action execution helper for 1054 | Summary: move replay resolution and post-preflight execution wiring into controlActionExecution while preserving cancel confirmation gating | Risks: replay/persist drift, transport cancel confirmation ordering
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 85]
+ M orchestrator/src/cli/control/controlActionPreflight.ts
+ M orchestrator/src/cli/control/controlServer.ts
+ M orchestrator/tests/ControlActionPreflight.test.ts
+?? orchestrator/src/cli/control/controlActionExecution.ts
+?? orchestrator/tests/ControlActionExecution.test.ts
+```
+
+Diff budget override: stacked branch scope for 1054 controller extraction
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+thinking
+**Planning code inspection**
+
+I’ll avoid looking at memory for now. I think I need to inspect the repository differences and maybe plan my next steps. It’s essential to review the relevant files to identify any bugs that might have been introduced. Checking the manifest might not be necessary unless I find documentation mismatches or guardrail violations. I need to confirm that the output schema accurately reflects my findings, noting if there are no issues detected. I'll also consider checking AGENTS and tasks if needed.
+thinking
+**Planning code inspection**
+
+I’ll avoid looking at memory for now. I think I need to inspect the repository differences and maybe plan my next steps. It’s essential to review the relevant files to identify any bugs that might have been introduced. Checking the manifest might not be necessary unless I find documentation mismatches or guardrail violations. I need to confirm that the output schema accurately reflects my findings, noting if there are no issues detected. I'll also consider checking AGENTS and tasks if needed.
+exec
+/bin/zsh -lc "git status --short && echo '---DIFF---' && git diff -- orchestrator/src/cli/control/controlActionPreflight.ts orchestrator/src/cli/control/controlServer.ts orchestrator/tests/ControlActionPreflight.test.ts orchestrator/src/cli/control/controlActionExecution.ts orchestrator/tests/ControlActionExecution.test.ts" in /Users/kbediako/Code/CO succeeded in 51ms:
+ M orchestrator/src/cli/control/controlActionPreflight.ts
+ M orchestrator/src/cli/control/controlServer.ts
+ M orchestrator/tests/ControlActionPreflight.test.ts
+?? orchestrator/src/cli/control/controlActionExecution.ts
+?? orchestrator/tests/ControlActionExecution.test.ts
+---DIFF---
+diff --git a/orchestrator/src/cli/control/controlActionPreflight.ts b/orchestrator/src/cli/control/controlActionPreflight.ts
+index e2387a0ee..a5f167251 100644
+--- a/orchestrator/src/cli/control/controlActionPreflight.ts
++++ b/orchestrator/src/cli/control/controlActionPreflight.ts
+@@ -1,10 +1,5 @@
+ import { isoTimestamp } from '../utils/time.js';
+-import type {
+-  ControlAction,
+-  ControlState,
+-  ControlTransport,
+-  TransportIdempotencyEntry
+-} from './controlState.js';
++import type { ControlAction, ControlState, ControlTransport } from './controlState.js';
+ 
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/controlActionExecution.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/ControlActionExecution.test.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+import { describe, expect, it, vi } from 'vitest';
+
+import type { ControlState, TransportIdempotencyEntry } from '../src/cli/control/controlState.js';
+import type { TransportMutationRequest } from '../src/cli/control/controlActionPreflight.js';
+import {
+  executeControlAction,
+  resolveControlActionReplay
+} from '../src/cli/control/controlActionExecution.js';
+
+function createSnapshot(input: Partial<ControlState> = {}): ControlState {
+  return {
+    run_id: 'run-1',
+    control_seq: 1,
+    latest_action: null,
+    feature_toggles: null,
+    transport_mutation: null,
+    ...input
+  };
+}
+
+ succeeded in 52ms:
+import type {
+  ControlAction,
+  ControlState,
+  ControlTransport,
+  TransportActionContext,
+  TransportIdempotencyEntry
+} from './controlState.js';
+import { buildCanonicalTraceability, type TransportMutationRequest } from './controlActionPreflight.js';
+
+export type ControlActionReplayResult =
+  | {
+      matched: false;
+    }
+  | {
+      matched: true;
+      requestId: string | null;
+      intentId: string | null;
+      traceability: Record<string, unknown> | null;
+    };
+
+ succeeded in 52ms:
+import http from 'node:http';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync, realpathSync } from 'node:fs';
+import { chmod, readFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { writeJsonAtomic } from '../utils/fs.js';
+import { isoTimestamp } from '../utils/time.js';
+import { logger } from '../../logger.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
+import {
+  ControlStateStore,
+  type ControlAction,
+  type ControlState
+} from './controlState.js';
+import { ConfirmationStore, type ConfirmationStoreSnapshot } from './confirmations.js';
+import { QuestionQueue, type QuestionRecord } from './questions.js';
+exec
+/bin/zsh -lc "sed -n '261,520p' orchestrator/tests/ControlActionExecution.test.ts && echo '---' && sed -n '520,760p' orchestrator/src/cli/control/controlServer.ts && echo '---' && sed -n '1,260p' orchestrator/src/cli/control/controlActionOutcome.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+      }),
+      idempotentReplay: false,
+      replayEntry: null
+    }));
+
+    const result = executeControlAction({
+      action: 'pause',
+      requestedBy: 'delegate',
+      requestId: 'req-applied',
+      intentId: 'intent-applied',
+      reason: 'transport',
+      taskId: 'task-0940',
+      manifestPath: '/tmp/manifest.json',
+      transportMutation: createTransportMutation(),
+      isTransportMutation: true,
+      transportIdempotencyWindowMs: 120_000,
+      readSnapshot: () => createSnapshot(),
+      updateAction
+    });
+
+
+thinking
+I need to further inspect the surrounding relevant control server after finalizing the execution and branches. It seems like there might be important details to consider, possibly adjustments or checks to ensure everything is functioning smoothly. This inspection step feels crucial, as I want to make sure that all parts are working correctly and nothing is overlooked. I'll get to it right away!
+thinking
+I need to further inspect the surrounding relevant control server after finalizing the execution and branches. It seems like there might be important details to consider, possibly adjustments or checks to ensure everything is functioning smoothly. This inspection step feels crucial, as I want to make sure that all parts are working correctly and nothing is overlooked. I'll get to it right away!
+exec
+/bin/zsh -lc "sed -n '760,940p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 696ms:
+        snapshot,
+        requestId: resolvedRequestId,
+        intentId,
+        taskId,
+        manifestPath: context.paths.manifestPath,
+        transportMutation,
+        idempotentReplay: execution.idempotentReplay,
+        replayEntry: execution.replayEntry
+      });
+      await emitControlActionAuditEvent(context, {
+        outcome: outcomeResponse.outcome,
+        action,
+        requestedBy,
+        reason: reason ?? null,
+        requestId: outcomeResponse.requestId,
+        intentId: outcomeResponse.intentId,
+        snapshot,
+        traceability: outcomeResponse.traceability
+      });
+      res.writeHead(outcomeResponse.status, { 'Content-Type': 'application/json' });
+exec
+/bin/zsh -lc "git show origin/main:orchestrator/src/cli/control/controlServer.ts | sed -n '640,860p' && echo '---' && git show origin/main:orchestrator/src/cli/control/controlActionPreflight.ts | sed -n '240,380p'" in /Users/kbediako/Code/CO succeeded in 52ms:
+      return;
+    }
+    await context.persist.confirmations();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(nonce));
+    return;
+  }
+
+  if (url.pathname === '/confirmations/validate' && req.method === 'POST') {
+    await expireConfirmations(context);
+    const body = await readJsonBody(req);
+    const confirmNonce = readStringValue(body, 'confirm_nonce', 'confirmNonce');
+    if (!confirmNonce) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'missing_confirm_nonce' }));
+      return;
+    }
+    const tool = readStringValue(body, 'tool') ?? 'unknown';
+    const params = readRecordValue(body, 'params') ?? {};
+    let validation;
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlState.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlActionCancelConfirmation.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "rg -n \"updateAction\\(|class ControlStateStore|consumeTransportNonce|rollbackTransportNonce|isTransportNonceConsumed|replayEntry|idempotentReplay\" orchestrator/src/cli/control/controlState.ts orchestrator/src/cli/control -g'*.ts'" in /Users/kbediako/Code/CO succeeded in 51ms:
+import type { ConfirmationValidationResult } from './confirmations.js';
+import type { ControlState } from './controlState.js';
+import {
+  buildCanonicalTraceability,
+  resolveTransportMutationRequestFromConfirmationScope,
+  type TransportMutationRequest
+} from './controlActionPreflight.js';
+
+type CancelConfirmationResolutionResult =
+  | {
+      ok: true;
+      requestId: string;
+      intentId: string | null;
+      transportMutation: TransportMutationRequest | null;
+    }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      traceability?: Record<string, unknown>;
+ succeeded in 51ms:
+import { createHash } from 'node:crypto';
+
+const TRANSPORT_STATE_MAX_ENTRIES = 512;
+
+export type ControlTransport = 'discord' | 'telegram';
+
+export interface ControlAction {
+  request_id?: string | null;
+  intent_id?: string | null;
+  requested_by: string;
+  requested_at: string;
+  action: 'pause' | 'resume' | 'cancel' | 'fail';
+  reason?: string | null;
+  transport?: ControlTransport | null;
+  actor_id?: string | null;
+  actor_source?: string | null;
+  transport_principal?: string | null;
+}
+
+export interface TransportNonceEntry {
+ succeeded in 52ms:
+orchestrator/src/cli/control/controlState.ts:75:export class ControlStateStore {
+orchestrator/src/cli/control/controlState.ts:90:  updateAction(input: {
+orchestrator/src/cli/control/controlState.ts:99:    idempotentReplay: boolean;
+orchestrator/src/cli/control/controlState.ts:100:    replayEntry?: TransportIdempotencyEntry | null;
+orchestrator/src/cli/control/controlState.ts:107:      const replayEntry = this.findTransportIdempotencyReplay({
+orchestrator/src/cli/control/controlState.ts:113:      if (replayEntry) {
+orchestrator/src/cli/control/controlState.ts:116:          idempotentReplay: true,
+orchestrator/src/cli/control/controlState.ts:117:          replayEntry
+orchestrator/src/cli/control/controlState.ts:132:      return { snapshot: this.snapshot(), idempotentReplay: true, replayEntry: null };
+orchestrator/src/cli/control/controlState.ts:160:    return { snapshot: this.snapshot(), idempotentReplay: false, replayEntry: null };
+orchestrator/src/cli/control/controlState.ts:163:  isTransportNonceConsumed(nonce: string): boolean {
+orchestrator/src/cli/control/controlState.ts:171:  consumeTransportNonce(input: {
+orchestrator/src/cli/control/controlState.ts:201:  rollbackTransportNonce(nonce: string): void {
+orchestrator/src/cli/control/controlState.ts:75:export class ControlStateStore {
+orchestrator/src/cli/control/controlState.ts:90:  updateAction(input: {
+orchestrator/src/cli/control/controlState.ts:99:    idempotentReplay: boolean;
+orchestrator/src/cli/control/controlState.ts:100:    replayEntry?: TransportIdempotencyEntry | null;
+orchestrator/src/cli/control/controlState.ts:107:      const replayEntry = this.findTransportIdempotencyReplay({
+orchestrator/src/cli/control/controlState.ts:113:      if (replayEntry) {
+orchestrator/src/cli/control/controlState.ts:116:          idempotentReplay: true,
+
+thinking
+I need to figure out the existing tests for the ControlServer. It seems like I might need to explore options related to replaying or canceling tests. It’s important I get a grasp of these aspects to proceed effectively. I’m curious about what specific tests are in place, and their functionalities. Let’s see how I can gather the necessary information to ensure everything runs smoothly!
+thinking
+I need to figure out the existing tests for the ControlServer. It seems like I might need to explore options related to replaying or canceling tests. It’s important I get a grasp of these aspects to proceed effectively. I’m curious about what specific tests are in place, and their functionalities. Let’s see how I can gather the necessary information to ensure everything runs smoothly!
+exec
+/bin/zsh -lc 'rg -n "control/action|confirmation_required|idempotent_replay|transport_mutation|cancel" orchestrator/tests/ControlServer.test.ts' in /Users/kbediako/Code/CO succeeded in 51ms:
+375:        body: JSON.stringify({ action: 'cancel', tool: 'ui.cancel', params: {} })
+576:          action: 'cancel',
+577:          tool: 'delegate.cancel',
+671:        body: JSON.stringify({ action: 'cancel', tool: 'delegate.cancel', params })
+714:        body: JSON.stringify({ confirm_nonce: confirmNonce, tool: 'delegate.cancel', params })
+744:      expect(events.some((entry) => entry.event === 'confirmation_required')).toBe(true);
+784:        body: JSON.stringify({ action: 'cancel', tool: 'delegate.cancel', params })
+1954:      const actionRes = await fetch(new URL('/control/action', baseUrl), {
+2066:          body: { action: 'refresh', tool: 'delegate.cancel' },
+2070:          requestedTool: 'delegate.cancel'
+3281:      const res = await fetch(new URL('/control/action', baseUrl), {
+3319:      const res = await fetch(new URL('/control/action', baseUrl), {
+3351:      const res = await fetch(new URL('/control/action', baseUrl), {
+3435:      const first = await fetch(new URL('/control/action', baseUrl), {
+3450:      const firstPayload = (await first.json()) as { control_seq?: number; idempotent_replay?: boolean };
+3452:      expect(firstPayload.idempotent_replay).toBeUndefined();
+3454:      const replayByRequest = await fetch(new URL('/control/action', baseUrl), {
+3471:        idempotent_replay?: boolean;
+3474:      expect(replayByRequestPayload.idempotent_replay).toBe(true);
+3476:      const replayByIntent = await fetch(new URL('/control/action', baseUrl), {
+
+
+thinking
+**Evaluating test strategies**
+
+I need to think about testing for ControlServer. Running huge test suites might not be the way to go. It seems better to focus on targeted tests, especially since the review suggests avoiding full runs. I could concentrate on changed files and relevant dependencies. I'm considering using vitest on those specific altered test files. It’s important to inspect relevant behavior, especially non-cancel actions and the new logic with finalizeExecution. There might be a concern regarding double snapshots.
+thinking
+**Inspecting old code versions**
+
+I’m looking to inspect the old code in ControlServer, particularly around the action branch. I noticed some differences and need to consider whether to base my comparison on the HEAD^ version or something from git stash. Since the file exists locally but not on origin/main, comparing it to HEAD seems like a good plan since I only have uncommitted changes. I think using `git show HEAD:...` will help me see the old version before those changes.
+thinking
+**Evaluating test strategies**
+
+I need to think about testing for ControlServer. Running huge test suites might not be the way to go. It seems better to focus on targeted tests, especially since the review suggests avoiding full runs. I could concentrate on changed files and relevant dependencies. I'm considering using vitest on those specific altered test files. It’s important to inspect relevant behavior, especially non-cancel actions and the new logic with finalizeExecution. There might be a concern regarding double snapshots.
+thinking
+**Inspecting old code versions**
+
+I’m looking to inspect the old code in ControlServer, particularly around the action branch. I noticed some differences and need to consider whether to base my comparison on the HEAD^ version or something from git stash. Since the file exists locally but not on origin/main, comparing it to HEAD seems like a good plan since I only have uncommitted changes. I think using `git show HEAD:...` will help me see the old version before those changes.
+exec
+/bin/zsh -lc "git show HEAD:orchestrator/src/cli/control/controlServer.ts | sed -n '620,860p' && echo '---' && git show HEAD:orchestrator/src/cli/control/controlActionPreflight.ts | sed -n '1,360p'" in /Users/kbediako/Code/CO succeeded in 52ms:
+    let intentId = initialIntentId;
+    let transportMutation: TransportMutationRequest | null = normalized.value.transportMutation;
+    let isTransportMutation = Boolean(transportMutation);
+    let transportIdempotencyWindowMs: number | null = null;
+
+    const validateTransportMutationRequest = (): boolean => {
+      const validation = validateTransportMutationPreflight({
+        action,
+        requestId: resolvedRequestId,
+        intentId,
+        taskId,
+        snapshot,
+        manifestPath: context.paths.manifestPath,
+        transportMutation,
+        isTransportNonceConsumed: (nonce) => context.controlStore.isTransportNonceConsumed(nonce)
+      });
+      if (!validation.ok) {
+        writeControlError(res, validation.status, validation.error, validation.traceability);
+        return false;
+      }
+
+
+
+thinking
+**Inspecting code for issues**
+
+I need to inspect the new file for any unused types or compile issues, particularly focusing on how it imports TransportActionContext. While maintainability might be minimal due to abstraction, I suspect there could be a mismatch with the documentation. I should confirm that the README/SOP accurately reflects the implemented behavior, especially related to commands. Additionally, I may need to look for any issues with concurrency or logic bugs in cancel replays associated with transport.
+thinking
+**Reviewing cancel replay logic**
+
+In the old code, there was a condition check before entering the cancel branch: if not deferring and `replayIfIdempotent()` would return. For generic cancel replays with a request ID matching the latest action and without a confirmNonce, replay occurred before a confirmation was needed. With a confirmNonce present, the `deferTransportResolutionToConfirmation` logic triggered. So, it seems that generic cancel replays with a confirmNonce now require validation before replaying, which remains true in the new structure. However, there could be an issue with `finalizeExecution` reading stale snapshots, especially regarding transport nonce validation.
+thinking
+**Analyzing execution logic**
+
+After the validation, `executeControlAction` retrieves a fresh snapshot using `readSnapshot`, which seems solid. Now, if it’s a post-update scenario and `persistRequired` is false, for an idempotent replay, the `updateAction` should return the snapshot from the store, assuming there were no changes. It looks like `persistRequired` becomes false when there’s no transport and `update.idempotentReplay` is true, meaning `finalizeExecution` wouldn’t persist, and `publishRequired` will also be false.
+thinking
+**Inspecting code for issues**
+
+I need to inspect the new file for any unused types or compile issues, particularly focusing on how it imports TransportActionContext. While maintainability might be minimal due to abstraction, I suspect there could be a mismatch with the documentation. I should confirm that the README/SOP accurately reflects the implemented behavior, especially related to commands. Additionally, I may need to look for any issues with concurrency or logic bugs in cancel replays associated with transport.
+thinking
+**Reviewing cancel replay logic**
+
+In the old code, there was a condition check before entering the cancel branch: if not deferring and `replayIfIdempotent()` would return. For generic cancel replays with a request ID matching the latest action and without a confirmNonce, replay occurred before a confirmation was needed. With a confirmNonce present, the `deferTransportResolutionToConfirmation` logic triggered. So, it seems that generic cancel replays with a confirmNonce now require validation before replaying, which remains true in the new structure. However, there could be an issue with `finalizeExecution` reading stale snapshots, especially regarding transport nonce validation.
+thinking
+**Analyzing execution logic**
+
+After the validation, `executeControlAction` retrieves a fresh snapshot using `readSnapshot`, which seems solid. Now, if it’s a post-update scenario and `persistRequired` is false, for an idempotent replay, the `updateAction` should return the snapshot from the store, assuming there were no changes. It looks like `persistRequired` becomes false when there’s no transport and `update.idempotentReplay` is true, meaning `finalizeExecution` wouldn’t persist, and `publishRequired` will also be false.
+exec
+/bin/zsh -lc "sed -n '220,320p' orchestrator/src/cli/control/controlActionExecution.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+}
+
+function findTransportIdempotencyReplayEntry(input: {
+  snapshot: ControlState;
+  action: ControlAction['action'];
+  transport: ControlTransport;
+  requestId: string | null;
+  intentId: string | null;
+}): TransportIdempotencyEntry | null {
+  const index = input.snapshot.transport_mutation?.idempotency_index ?? [];
+  for (const entry of index) {
+    if (entry.action !== input.action || entry.transport !== input.transport) {
+      continue;
+    }
+    if (entry.key_type === 'request' && input.requestId && entry.key === input.requestId) {
+      return entry;
+    }
+    if (entry.key_type === 'intent' && input.intentId && entry.key === input.intentId) {
+      return entry;
+    }
+
+
+thinking
+**Evaluating code issues**
+
+I’m considering if the observed behaviors are intentional or if they indicate a potential flaw in the code. The issue might be that the new helper is always returning replay kinds with `persistRequired` set to true, even when it's not needed. There’s also a concern about the replay path when executing control actions since it relies on the current snapshot after validating transport mutation requests. I really want to get to the bottom of this!
+thinking
+**Considering import issues**
+
+I’m noticing a potential issue with helper placement and circular imports. The `controlActionExecution` module imports `buildCanonicalTraceability` and `type TransportMutationRequest` from `controlActionPreflight`, but `controlActionPreflight` doesn’t import from `execution` anymore. Luckily, `controlServer` imports both, so I don’t see any cycles. I think it’ll be good to run some targeted tests, specifically focusing on changed behavior, using Vitest for those files—especially patterns in the `ControlServer` test.
+thinking
+**Evaluating code issues**
+
+I’m considering if the observed behaviors are intentional or if they indicate a potential flaw in the code. The issue might be that the new helper is always returning replay kinds with `persistRequired` set to true, even when it's not needed. There’s also a concern about the replay path when executing control actions since it relies on the current snapshot after validating transport mutation requests. I really want to get to the bottom of this!
+thinking
+**Considering import issues**
+
+I’m noticing a potential issue with helper placement and circular imports. The `controlActionExecution` module imports `buildCanonicalTraceability` and `type TransportMutationRequest` from `controlActionPreflight`, but `controlActionPreflight` doesn’t import from `execution` anymore. Luckily, `controlServer` imports both, so I don’t see any cycles. I think it’ll be good to run some targeted tests, specifically focusing on changed behavior, using Vitest for those files—especially patterns in the `ControlServer` test.
+exec
+/bin/zsh -lc "cat package.json | jq -r '.scripts.test' && echo '---' && npx vitest run orchestrator/tests/ControlActionExecution.test.ts orchestrator/tests/ControlActionPreflight.test.ts --reporter=dot" in /Users/kbediako/Code/CO succeeded in 845ms:
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/ControlActionPreflight.test.ts  (7 tests) 3ms
+ ✓ orchestrator/tests/ControlActionExecution.test.ts  (6 tests) 5ms
+
+ Test Files  2 passed (2)
+      Tests  13 passed (13)
+   Start at  03:45:13
+   Duration  259ms (transform 58ms, setup 0ms, collect 74ms, tests 8ms, environment 0ms, prepare 124ms)
+
+
+thinking
+**Considering testing strategies**
+
+I might need to conduct specific tests on the ControlServer to make sure everything works as expected. Running targeted tests could help identify any broken behaviors, especially in light of the changes made. I'll focus on relevant tests in ControlServer.test, particularly the ones that might have altered semantics. I'll review sections around line 4659 and possibly use grep to find specific titles, along with sed to edit those sections as needed.
+thinking
+**Considering testing strategies**
+
+I might need to conduct specific tests on the ControlServer to make sure everything works as expected. Running targeted tests could help identify any broken behaviors, especially in light of the changes made. I'll focus on relevant tests in ControlServer.test, particularly the ones that might have altered semantics. I'll review sections around line 4659 and possibly use grep to find specific titles, along with sed to edit those sections as needed.
+exec
+/bin/zsh -lc "sed -n '4620,4865p' orchestrator/tests/ControlServer.test.ts && echo '---' && sed -n '5190,5355p' orchestrator/tests/ControlServer.test.ts && echo '---' && sed -n '5690,6025p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+        control_seq?: number;
+        traceability?: Record<string, unknown>;
+      };
+      expect(replayPayload.idempotent_replay).toBe(true);
+      expect(replayPayload.control_seq).toBe(2);
+      expect(replayPayload.traceability).toMatchObject({
+        action: 'pause',
+        decision: 'replayed',
+        request_id: null,
+        intent_id: 'intent-only',
+        transport: 'discord',
+        actor_id: 'actor-intent-only',
+        actor_source: 'discord.oauth',
+        transport_principal: 'discord:channel:intent-only'
+      });
+      expect(replayPayload.traceability?.request_id).toBeNull();
+      expect(replayPayload.traceability?.request_id).not.toBe('req-injected');
+
+      const replayEvent = [...events]
+        .reverse()
+exec
+/bin/zsh -lc 'npx vitest run orchestrator/tests/ControlServer.test.ts -t "replays transport cancel requests before confirmation replay checks|replays request-only transport cancel duplicates before confirmation challenge|preserves canonical null intent_id for cancel replay responses when caller injects intent_id|replays request-only transport cancel duplicates after newer actions and preserves canonical null intent" --reporter=dot' in /Users/kbediako/Code/CO succeeded in 1.14s:
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/ControlServer.test.ts  (88 tests | 84 skipped) 79ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed | 84 skipped (88)
+   Start at  03:45:25
+   Duration  540ms (transform 210ms, setup 1ms, collect 268ms, tests 79ms, environment 0ms, prepare 47ms)
+
+
+
+thinking
+**Evaluating code and documentation**
+
+I think I should examine the code location in the changed file and see if the body references are mirrored in the checklist. It’s not ideal if there’s a location overlap. If there are no findings, I’ll need to patch the code if the change sounds correct.
+
+However, should I evaluate the documentation and evidence separately? Since the user specifically asked about confirming those requirements, it makes sense to inspect the task files to see if the checklist is still pending because the work isn’t complete. I'll call out any unsatisfied evidence and checklist mirroring requirements.
+thinking
+**Reviewing checklist and documentation**
+
+I need to consider whether to include task checklist lines if any changes were made. The review scope seems to hint that we should focus only on modified code files, but perhaps I should check the related documentation as well.
+
+Since the working tree changes don't involve docs, I wonder if updates are necessary due to behavioral changes or missing evidence. If the commit didn't modify any docs but introduced a new helper, I might need to mention that "checklist evidence is still pending." I'll look for potential hidden bugs by inspecting `controlActionExecution` against the old logic, particularly regarding the replay mechanisms.
+thinking
+**Evaluating code and documentation**
+
+I think I should examine the code location in the changed file and see if the body references are mirrored in the checklist. It’s not ideal if there’s a location overlap. If there are no findings, I’ll need to patch the code if the change sounds correct.
+
+However, should I evaluate the documentation and evidence separately? Since the user specifically asked about confirming those requirements, it makes sense to inspect the task files to see if the checklist is still pending because the work isn’t complete. I'll call out any unsatisfied evidence and checklist mirroring requirements.
+thinking
+**Reviewing checklist and documentation**
+
+I need to consider whether to include task checklist lines if any changes were made. The review scope seems to hint that we should focus only on modified code files, but perhaps I should check the related documentation as well.
+
+Since the working tree changes don't involve docs, I wonder if updates are necessary due to behavioral changes or missing evidence. If the commit didn't modify any docs but introduced a new helper, I might need to mention that "checklist evidence is still pending." I'll look for potential hidden bugs by inspecting `controlActionExecution` against the old logic, particularly regarding the replay mechanisms.
+exec
+/bin/zsh -lc 'rg -n "resolveControlActionReplay|ControlActionReplayResult" orchestrator/src orchestrator/tests' in /Users/kbediako/Code/CO succeeded in 52ms:
+orchestrator/src/cli/control/controlServer.ts:53:import { executeControlAction, resolveControlActionReplay } from './controlActionExecution.js';
+orchestrator/src/cli/control/controlServer.ts:703:      const replay = resolveControlActionReplay({
+orchestrator/src/cli/control/controlActionExecution.ts:10:export type ControlActionReplayResult =
+orchestrator/src/cli/control/controlActionExecution.ts:67:  const replay = resolveControlActionReplay({
+orchestrator/src/cli/control/controlActionExecution.ts:112:export function resolveControlActionReplay(input: {
+orchestrator/src/cli/control/controlActionExecution.ts:121:}): ControlActionReplayResult {
+orchestrator/tests/ControlActionExecution.test.ts:7:  resolveControlActionReplay
+orchestrator/tests/ControlActionExecution.test.ts:78:    const replay = resolveControlActionReplay({
+orchestrator/tests/ControlActionExecution.test.ts:135:    const replay = resolveControlActionReplay({
+orchestrator/tests/ControlActionExecution.test.ts:180:    const replay = resolveControlActionReplay({
+
+
+
+
+
+
+
+thinking
+I'm thinking there might be a bug related to the `replayIfIdempotent` function. It seems like it now uses `const replaySnapshot = ...` instead of fetching the snapshot with `snapshot = context.controlStore.snapshot()`. This change could potentially alter how the function behaves, but I need to confirm whether this impacts the functionality. I should check the surrounding context and how this update affects everything—let's ensure it works as intended!
+thinking
+**Clarifying code functionality**
+
+I need to clarify that this isn't a bug. After cancelResolution is executed, the validateTransportMutationRequest still uses the snapshot outer variable. This is important for managing feature toggles and maintaining traceability within the code. It seems like the expected behavior is actually functioning as intended, aligning with the design. I just want to ensure that everything is working smoothly and that any concerns about this functionality are addressed.
+thinking
+**Evaluating code patches**
+
+I’m considering overall explanations about a patch: while there are no code issues found in the changed files, we need to note that documentation and checklist items are still pending. That means the implementation isn’t ready to be marked complete. 
+
+I wonder if the patch is correct overall? The review guidelines state that "correct" implies existing code and tests won’t break, and that the patch is free of bugs. It seems like guardrail violations around unrun validations could affect correctness, especially since the user wants those highlighted.
+thinking
+**Investigating potential issues**
+
+I think I should inspect the task checklist to see if there are any references to a new helper location, although I'm not sure it's necessary. Before I conclude that I haven't found anything, I need to search for issues in this new helper. There might be subtle bugs regarding the control server and how snapshot initialization works with transport mutations and expired entries. I need to consider how generic replays are handled in the updated method and ensure that the current behavior aligns with expected outcomes.
+thinking
+**Identifying potential bugs**
+
+I’m noticing a potential subtle bug related to cancel actions with confirmation. It seems that if transport metadata is coming only from the confirmation scope (with defer set to true), the new code sets `transportMutation` and calls `validateTransportMutationRequest` after resolving the cancel confirmation, which feels like a crucial moment. Since `replayIfIdempotent` isn’t invoked before this, could it lead to transport cancel replays being processed after `updateAction`? That might not be the intended behavior.
+thinking
+**Analyzing potential conflicts**
+
+I'm considering if there's a conflict with the statement "patch is correct". Should I look into whether any guardrail violations can be linked with code locations in a new helper import? It seems like the functions may have moved, but maybe the documentation hasn't. I want to avoid flagging bugs unless the author is responsible for fixing them. The review output might show no findings, but since the user provided a manifest, they may be expecting documentation or review notes.
+thinking
+**Inspecting checklist for gaps**
+
+I'm thinking about inspecting the manifest or checklist to see if there's an obvious mismatch in documents, even though I suspect there might not be any since no documents were altered. Still, the user may want evidence mirrored in some way. Maybe it would help to review pending items in the checklist, but that might not lead to code findings. I could mention any process gaps in the overall explanation, so I'll take a look at the relevant task checklist.
+thinking
+I'm thinking there might be a bug related to the `replayIfIdempotent` function. It seems like it now uses `const replaySnapshot = ...` instead of fetching the snapshot with `snapshot = context.controlStore.snapshot()`. This change could potentially alter how the function behaves, but I need to confirm whether this impacts the functionality. I should check the surrounding context and how this update affects everything—let's ensure it works as intended!
+thinking
+**Clarifying code functionality**
+
+I need to clarify that this isn't a bug. After cancelResolution is executed, the validateTransportMutationRequest still uses the snapshot outer variable. This is important for managing feature toggles and maintaining traceability within the code. It seems like the expected behavior is actually functioning as intended, aligning with the design. I just want to ensure that everything is working smoothly and that any concerns about this functionality are addressed.
+thinking
+**Evaluating code patches**
+
+I’m considering overall explanations about a patch: while there are no code issues found in the changed files, we need to note that documentation and checklist items are still pending. That means the implementation isn’t ready to be marked complete. 
+
+I wonder if the patch is correct overall? The review guidelines state that "correct" implies existing code and tests won’t break, and that the patch is free of bugs. It seems like guardrail violations around unrun validations could affect correctness, especially since the user wants those highlighted.
+thinking
+**Investigating potential issues**
+
+I think I should inspect the task checklist to see if there are any references to a new helper location, although I'm not sure it's necessary. Before I conclude that I haven't found anything, I need to search for issues in this new helper. There might be subtle bugs regarding the control server and how snapshot initialization works with transport mutations and expired entries. I need to consider how generic replays are handled in the updated method and ensure that the current behavior aligns with expected outcomes.
+thinking
+**Identifying potential bugs**
+
+I’m noticing a potential subtle bug related to cancel actions with confirmation. It seems that if transport metadata is coming only from the confirmation scope (with defer set to true), the new code sets `transportMutation` and calls `validateTransportMutationRequest` after resolving the cancel confirmation, which feels like a crucial moment. Since `replayIfIdempotent` isn’t invoked before this, could it lead to transport cancel replays being processed after `updateAction`? That might not be the intended behavior.
+thinking
+**Analyzing potential conflicts**
+
+I'm considering if there's a conflict with the statement "patch is correct". Should I look into whether any guardrail violations can be linked with code locations in a new helper import? It seems like the functions may have moved, but maybe the documentation hasn't. I want to avoid flagging bugs unless the author is responsible for fixing them. The review output might show no findings, but since the user provided a manifest, they may be expecting documentation or review notes.
+thinking
+**Inspecting checklist for gaps**
+
+I'm thinking about inspecting the manifest or checklist to see if there's an obvious mismatch in documents, even though I suspect there might not be any since no documents were altered. Still, the user may want evidence mirrored in some way. Maybe it would help to review pending items in the checklist, but that might not lead to code findings. I could mention any process gaps in the overall explanation, so I'll take a look at the relevant task checklist.
+exec
+/bin/zsh -lc "sed -n '1,260p' tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+---
+id: 20260308-1054-coordinator-symphony-aligned-control-action-execution-extraction
+title: Coordinator Symphony-Aligned Control Action Execution Extraction
+relates_to: docs/PRD-coordinator-symphony-aligned-control-action-execution-extraction.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-03-08
+---
+
+# TECH_SPEC - Coordinator Symphony-Aligned Control Action Execution Extraction
+
+- Task ID: `1054-coordinator-symphony-aligned-control-action-execution-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-control-action-execution-extraction.md`
+- Action Plan: `docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-execution-extraction.md`
+
+## Summary
+
+- Objective: extract the remaining post-resolution `/control/action` execution orchestration into a dedicated helper.
+- Scope: replay resolution, `transportContext` assembly, `controlStore.updateAction(...)`, replay-entry handoff, and typed persist/publish requirements.
+ succeeded in 52ms:
+# Task Checklist - 1054-coordinator-symphony-aligned-control-action-execution-extraction
+
+- MCP Task ID: `1054-coordinator-symphony-aligned-control-action-execution-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-control-action-execution-extraction.md`
+- TECH_SPEC: `tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-execution-extraction.md`
+
+> This lane extracts the remaining post-resolution `/control/action` execution orchestration into `controlActionExecution.ts`, including replay resolution and `updateAction(...)` coordination, while leaving transport preflight rejects, transport nonce durability, actual persistence/publish side effects, audit emission, and raw HTTP writes in `controlServer.ts`.
+
+## Foundation
+
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-control-action-execution-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-control-action-execution-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-execution-extraction.md`, `tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md`, `tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md`, `.agent/task/1054-coordinator-symphony-aligned-control-action-execution-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1054-control-action-execution-deliberation.md`.
+
+## Shared Registry + Review Handoff
+
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1054-coordinator-symphony-aligned-control-action-execution-extraction.md`, `docs/findings/1054-control-action-execution-deliberation.md`.
+- [x] docs-review approval/override captured for registered `1054`. Evidence: `out/1054-coordinator-symphony-aligned-control-action-execution-extraction/manual/20260307T160831Z-docs-first/05-docs-review-override.md`.
+
+
+
+
+thinking
+**Analyzing feature toggles timing**
+
+I realize that confirm flows wait for user action, which creates a long gap between the starting point and when execution happens. It's interesting to note that if replayIfIdempotent is called right after the initial validation, it happens before the waiting period. This leads to a situation where a feature toggle might change in that tiny window, capturing only the old state. Alternatively, a toggle could change during the longer wait after confirmation, and again the old state wouldn’t be captured.
+thinking
+**Analyzing code issues**
+
+I’m considering whether `executeControlAction` is exported from the barrel or referenced in tests. It seems irrelevant for now. I'll check if `ControlActionReplayResult` is exported from the new helper, but it shouldn’t cause issues. There might be a hidden Node resolution problem with the relative import, though. I think it’s likely there are no findings, so I need to produce JSON noting empty findings and say the "patch is correct," while being cautious about mentioning any pending process items.
+thinking
+**Assessing extraction correctness**
+
+I didn’t find any correctness issues in the extraction itself. The targeted ControlActionExecution and ControlServer replay tests passed, and the updated code maintains persistence, publish, and audit ownership in controlServer.ts. While there are some follow-up validation and evidence items pending, they’re outside the code diff I reviewed. I think overall confidence should be around 0.82. No memory is used here, so I won't need a citation block. I'll ensure the JSON is valid and produce an empty findings array.
+thinking
+**Analyzing feature toggles timing**
+
+I realize that confirm flows wait for user action, which creates a long gap between the starting point and when execution happens. It's interesting to note that if replayIfIdempotent is called right after the initial validation, it happens before the waiting period. This leads to a situation where a feature toggle might change in that tiny window, capturing only the old state. Alternatively, a toggle could change during the longer wait after confirmation, and again the old state wouldn’t be captured.
+thinking
+**Analyzing code issues**
+
+I’m considering whether `executeControlAction` is exported from the barrel or referenced in tests. It seems irrelevant for now. I'll check if `ControlActionReplayResult` is exported from the new helper, but it shouldn’t cause issues. There might be a hidden Node resolution problem with the relative import, though. I think it’s likely there are no findings, so I need to produce JSON noting empty findings and say the "patch is correct," while being cautious about mentioning any pending process items.
+thinking
+**Assessing extraction correctness**
+
+I didn’t find any correctness issues in the extraction itself. The targeted ControlActionExecution and ControlServer replay tests passed, and the updated code maintains persistence, publish, and audit ownership in controlServer.ts. While there are some follow-up validation and evidence items pending, they’re outside the code diff I reviewed. I think overall confidence should be around 0.82. No memory is used here, so I won't need a citation block. I'll ensure the JSON is valid and produce an empty findings array.
+codex
+I did not find an actionable correctness bug in the extraction. The new helper keeps replay/update coordination narrow, preserves controller-owned side effects in `controlServer.ts`, and targeted `ControlActionExecution` plus relevant `ControlServer` replay/cancel tests passed; the remaining unchecked checklist items are process follow-ups outside this diff.

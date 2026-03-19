@@ -1,0 +1,62 @@
+{
+  "success": {
+    "ok": true,
+    "requestId": "req-confirmed",
+    "intentId": "intent-confirmed",
+    "transportMutation": {
+      "transport": "discord",
+      "actorId": "actor-confirmed",
+      "actorSource": "discord.oauth",
+      "principal": "discord:channel:confirmed",
+      "nonce": "nonce-top-level-1",
+      "nonceExpiresAt": "2026-03-08T00:15:00.000Z",
+      "nonceExpiresAtMs": 1772928900000
+    }
+  },
+  "success_calls": [
+    "success:persist",
+    {
+      "kind": "success:emit",
+      "payload": {
+        "request_id": "req-confirmation",
+        "nonce_id": "nonce-confirmation-1",
+        "outcome": "approved"
+      }
+    }
+  ],
+  "mismatch": {
+    "ok": false,
+    "status": 409,
+    "error": "confirmation_scope_mismatch",
+    "traceability": {
+      "actor_id": "actor-confirmed",
+      "actor_source": "discord.oauth",
+      "transport": "discord",
+      "transport_principal": "discord:channel:confirmed",
+      "intent_id": null,
+      "request_id": "req-confirmed-mismatch",
+      "task_id": "task-0940",
+      "run_id": "run-1",
+      "manifest_path": "/tmp/manifest.json",
+      "action": "cancel",
+      "decision": "rejected",
+      "timestamp": "2026-03-07T15:58:40.544Z"
+    }
+  },
+  "mismatch_calls": [
+    "mismatch:persist",
+    {
+      "kind": "mismatch:emit",
+      "payload": {
+        "request_id": "req-confirmation-mismatch",
+        "nonce_id": "nonce-confirmation-2",
+        "outcome": "approved"
+      }
+    }
+  ],
+  "validation_error": {
+    "ok": false,
+    "status": 409,
+    "error": "nonce_already_consumed"
+  }
+}

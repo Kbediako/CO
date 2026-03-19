@@ -1,0 +1,18 @@
+{
+  "task": "1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction",
+  "contract_file": "orchestrator/src/cli/control/controlOversightReadContract.ts",
+  "checks": {
+    "contractOwnsReadTypes": true,
+    "coordinatorFacadeUsesContract": true,
+    "coordinatorReadServiceUsesContract": true,
+    "telegramConsumersUseContract": true,
+    "bridgeConsumesNeutralContract": true
+  },
+  "focused_validation": {
+    "targeted_log": "out/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction/manual/20260313T051126Z-closeout/05b-targeted-tests.log",
+    "targeted_summary": [
+      "4 passed (4)",
+      "23 passed (23)"
+    ]
+  }
+}

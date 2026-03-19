@@ -5,7 +5,7 @@ relates_to: docs/PRD-metrics-pending-batch-cap.md
 risk: low
 owners:
   - Codex (top-level agent)
-last_review: 2026-02-13
+last_review: 2026-03-19
 ---
 
 ## Summary

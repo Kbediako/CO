@@ -1,5 +1,4 @@
 import { exec } from 'node:child_process';
-import { spawn } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import process from 'node:process';
@@ -8,18 +7,22 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 import { logger } from '../logger.js';
-import {
-  createRuntimeCodexCommandContext,
-  formatRuntimeSelectionSummary,
-  parseRuntimeMode,
-  resolveRuntimeCodexCommand,
-  type RuntimeCodexCommandContext
-} from './runtime/index.js';
 import { detectValidator } from './rlm/validator.js';
 import { buildRlmPrompt } from './rlm/prompt.js';
 import { runRlmLoop } from './rlm/runner.js';
 import { buildContextObject, ContextStore, type ContextSource } from './rlm/context.js';
 import { runSymbolicLoop, type SymbolicBudgets } from './rlm/symbolic.js';
+import {
+  COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL,
+  COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY,
+  COLLAB_FEATURE_LEGACY,
+  COLLAB_ROLE_POLICY_ENV_CANONICAL,
+  COLLAB_ROLE_POLICY_ENV_LEGACY,
+  createRlmCodexRuntimeShell,
+  resolveCollabAllowDefaultRoleConfig,
+  resolveCollabRolePolicyConfig,
+  type RlmCodexRuntimeShell
+} from './rlm/rlmCodexRuntimeShell.js';
 import type { AlignmentPolicy } from './rlm/alignment.js';
 import type {
   RlmAgentInput,
@@ -67,54 +70,13 @@ const DEFAULT_ALIGNMENT_SENTINEL_MODEL = 'gpt-5.3-spark';
 const DEFAULT_ALIGNMENT_HIGH_REASONING_MODEL = 'gpt-5.3-codex';
 const DEFAULT_ALIGNMENT_ARBITRATION_MODEL = 'gpt-5.3-codex';
 const DEFAULT_ALIGNMENT_HIGH_REASONING_AVAILABLE = true;
-const DEFAULT_COLLAB_ROLE_POLICY = 'enforce';
-const COLLAB_ROLE_POLICY_ENV_CANONICAL = 'RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY';
-const COLLAB_ROLE_POLICY_ENV_LEGACY = 'RLM_COLLAB_ROLE_POLICY';
-const COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL = 'RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE';
-const COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY = 'RLM_COLLAB_ALLOW_DEFAULT_ROLE';
 const UNBOUNDED_ITERATION_ALIASES = new Set(['unbounded', 'unlimited', 'infinite', 'infinity']);
-const COLLAB_FEATURE_CANONICAL = 'multi_agent';
-const COLLAB_FEATURE_LEGACY = 'collab';
-const COLLAB_ROLE_TAG_PATTERN = /^\s*\[(?:agent_type|role)\s*:\s*([a-z0-9._-]+)\]/i;
-const COLLAB_ROLE_TOKEN_PATTERN = /^[a-z0-9._-]+$/;
-let runtimeCodexContextPromise: Promise<RuntimeCodexCommandContext> | null = null;
-let runtimeCodexContextLogged = false;
 
-type CollabFeatureKey = typeof COLLAB_FEATURE_CANONICAL | typeof COLLAB_FEATURE_LEGACY;
-type CollabRolePolicy = 'enforce' | 'warn' | 'off';
 type SymbolicMultiAgentSource = 'canonical' | 'legacy' | null;
-type CollabLifecycleReasonCode =
-  | 'thread_limit'
-  | 'missing_wait'
-  | 'missing_close'
-  | 'close_before_wait'
-  | 'missing_role'
-  | 'default_role_disallowed'
-  | 'role_mismatch';
-
-type CollabLifecycleValidationResult =
-  | { ok: true }
-  | {
-      ok: false;
-      reason: string;
-      reasonCode: CollabLifecycleReasonCode;
-    };
 
 interface SymbolicMultiAgentConfig {
   enabled: boolean;
   source: SymbolicMultiAgentSource;
-}
-
-type EnvAliasSource = 'canonical' | 'legacy' | null;
-
-interface SymbolicMultiAgentRolePolicyConfig {
-  value: CollabRolePolicy;
-  source: EnvAliasSource;
-}
-
-interface SymbolicMultiAgentAllowDefaultRoleConfig {
-  value: boolean;
-  source: EnvAliasSource;
 }
 
 interface ParsedArgs {
@@ -433,612 +395,18 @@ async function writeTerminalState(runDir: string, state: RlmState): Promise<void
 
 async function runCodexAgent(
   input: RlmAgentInput,
-  env: NodeJS.ProcessEnv,
-  repoRoot: string,
+  codexRuntimeShell: RlmCodexRuntimeShell,
   nonInteractive: boolean,
   subagentsEnabled: boolean
 ): Promise<RlmAgentResult> {
   const prompt = buildRlmPrompt(input);
-  const output = await runCodexCompletion(prompt, env, repoRoot, nonInteractive, subagentsEnabled, true);
-  return { output };
-}
-
-async function runCodexExec(
-  args: string[],
-  env: NodeJS.ProcessEnv,
-  repoRoot: string,
-  nonInteractive: boolean,
-  subagentsEnabled: boolean,
-  mirrorOutput: boolean
-): Promise<{ stdout: string; stderr: string }> {
-  const runtimeContext = await resolveRlmRuntimeCodexContext(env, repoRoot);
-  const { command, args: resolvedArgs } = resolveRuntimeCodexCommand(args, runtimeContext);
-  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env, ...runtimeContext.env };
-
-  if (nonInteractive) {
-    childEnv.CODEX_NON_INTERACTIVE = childEnv.CODEX_NON_INTERACTIVE ?? '1';
-    childEnv.CODEX_NO_INTERACTIVE = childEnv.CODEX_NO_INTERACTIVE ?? '1';
-    childEnv.CODEX_INTERACTIVE = childEnv.CODEX_INTERACTIVE ?? '0';
-  }
-  childEnv.CODEX_SUBAGENTS = subagentsEnabled ? '1' : '0';
-
-  const child = spawn(command, resolvedArgs, { cwd: repoRoot, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
-  let stdout = '';
-  let stderr = '';
-
-  child.stdout?.on('data', (chunk) => {
-    const text = chunk.toString();
-    stdout += text;
-    if (mirrorOutput) {
-      process.stdout.write(chunk);
-    }
-  });
-  child.stderr?.on('data', (chunk) => {
-    const text = chunk.toString();
-    stderr += text;
-    if (mirrorOutput) {
-      process.stderr.write(chunk);
-    }
-  });
-
-  await new Promise<void>((resolvePromise, reject) => {
-    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('exit', (code) => {
-      if (code === 0) {
-        resolvePromise();
-      } else {
-        reject(new Error(`codex exec exited with code ${code ?? 'unknown'}`));
-      }
-    });
-  });
-
-  return { stdout, stderr };
-}
-
-async function resolveRlmRuntimeCodexContext(
-  env: NodeJS.ProcessEnv,
-  repoRoot: string
-): Promise<RuntimeCodexCommandContext> {
-  if (!runtimeCodexContextPromise) {
-    const requestedMode = parseRuntimeMode(
-      env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE ?? env.CODEX_ORCHESTRATOR_RUNTIME_MODE ?? null
-    );
-    const runId =
-      typeof env.CODEX_ORCHESTRATOR_RUN_ID === 'string' && env.CODEX_ORCHESTRATOR_RUN_ID.trim().length > 0
-        ? env.CODEX_ORCHESTRATOR_RUN_ID.trim()
-        : `rlm-${Date.now()}`;
-    runtimeCodexContextPromise = createRuntimeCodexCommandContext({
-      requestedMode,
-      executionMode: 'mcp',
-      repoRoot,
-      env: { ...process.env, ...env },
-      runId
-    });
-  }
-
-  const runtimeContext = await runtimeCodexContextPromise;
-  if (!runtimeCodexContextLogged) {
-    logger.info(`[rlm-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
-    runtimeCodexContextLogged = true;
-  }
-  return runtimeContext;
-}
-
-async function runCodexCompletion(
-  prompt: string,
-  env: NodeJS.ProcessEnv,
-  repoRoot: string,
-  nonInteractive: boolean,
-  subagentsEnabled: boolean,
-  mirrorOutput: boolean
-): Promise<string> {
-  const { stdout, stderr } = await runCodexExec(
-    ['exec', prompt],
-    env,
-    repoRoot,
+  const output = await codexRuntimeShell.runCompletion(prompt, {
     nonInteractive,
     subagentsEnabled,
-    mirrorOutput
-  );
-  return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
+    mirrorOutput: true
+  });
+  return { output };
 }
-
-async function runCodexJsonlCompletion(
-  prompt: string,
-  env: NodeJS.ProcessEnv,
-  repoRoot: string,
-  nonInteractive: boolean,
-  mirrorOutput: boolean,
-  extraArgs: string[] = [],
-  options: {
-    validateCollabLifecycle?: boolean;
-    collabRolePolicy?: CollabRolePolicy;
-    collabAllowDefaultRole?: boolean;
-  } = {}
-): Promise<string> {
-  const { stdout, stderr } = await runCodexExec(
-    ['exec', '--json', ...extraArgs, prompt],
-    env,
-    repoRoot,
-    nonInteractive,
-    false,
-    mirrorOutput
-  );
-  if (options.validateCollabLifecycle) {
-    const rolePolicy = options.collabRolePolicy ?? DEFAULT_COLLAB_ROLE_POLICY;
-    const validation = validateCollabLifecycle(stdout, {
-      requireSpawnRole: rolePolicy !== 'off',
-      allowDefaultRole: options.collabAllowDefaultRole ?? false
-    });
-    if (!validation.ok) {
-      const rolePolicyFailure = isRolePolicyValidationReason(validation.reasonCode);
-      if (rolePolicy === 'warn' && rolePolicyFailure) {
-        logger.warn(`Collab lifecycle validation warning: ${validation.reason}`);
-      } else {
-        throw new Error(`Collab lifecycle validation failed: ${validation.reason}`);
-      }
-    }
-  }
-  const message = extractAgentMessageFromJsonl(stdout);
-  if (message) {
-    return message;
-  }
-  return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
-}
-
-function parseFeatureFlagsFromText(raw: string): Record<string, boolean> {
-  const flags: Record<string, boolean> = {};
-  for (const line of raw.split(/\r?\n/u)) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const tokens = trimmed.split(/\s+/u);
-    if (tokens.length < 2) {
-      continue;
-    }
-    const name = tokens[0] ?? '';
-    const enabledToken = tokens[tokens.length - 1] ?? '';
-    if (!name) {
-      continue;
-    }
-    if (enabledToken === 'true') {
-      flags[name] = true;
-    } else if (enabledToken === 'false') {
-      flags[name] = false;
-    }
-  }
-  return flags;
-}
-
-function resolveCollabFeatureKeyFromFlags(flags: Record<string, boolean>): CollabFeatureKey {
-  if (Object.prototype.hasOwnProperty.call(flags, COLLAB_FEATURE_CANONICAL)) {
-    return COLLAB_FEATURE_CANONICAL;
-  }
-  if (Object.prototype.hasOwnProperty.call(flags, COLLAB_FEATURE_LEGACY)) {
-    return COLLAB_FEATURE_LEGACY;
-  }
-  return COLLAB_FEATURE_LEGACY;
-}
-
-async function resolveCollabFeatureKey(
-  env: NodeJS.ProcessEnv,
-  repoRoot: string,
-  nonInteractive: boolean
-): Promise<CollabFeatureKey> {
-  try {
-    const { stdout } = await runCodexExec(
-      ['features', 'list'],
-      env,
-      repoRoot,
-      nonInteractive,
-      false,
-      false
-    );
-    return resolveCollabFeatureKeyFromFlags(parseFeatureFlagsFromText(stdout));
-  } catch (error) {
-    logger.debug(
-      `Unable to resolve Codex collab feature key via \`codex features list\`: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-    return COLLAB_FEATURE_LEGACY;
-  }
-}
-
-function extractAgentMessageFromJsonl(raw: string): string | null {
-  let lastMessage: string | null = null;
-  const lines = raw.split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('{')) {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(trimmed) as { type?: string; item?: { type?: string; text?: string } };
-      if (
-        (parsed.type === 'item.completed' || parsed.type === 'item.updated') &&
-        parsed.item?.type === 'agent_message' &&
-        typeof parsed.item.text === 'string'
-      ) {
-        lastMessage = parsed.item.text;
-      }
-    } catch {
-      // ignore parse errors for non-json lines
-    }
-  }
-  return lastMessage;
-}
-
-interface ParsedCollabToolCall {
-  sequence: number;
-  eventType: 'item.started' | 'item.updated' | 'item.completed';
-  tool: string;
-  status: 'in_progress' | 'completed' | 'failed' | 'unknown';
-  receiverThreadIds: string[];
-  prompt: string | null;
-  agentType: string | null;
-  promptRole: string | null;
-}
-
-function normalizeCollabStatus(value: unknown): ParsedCollabToolCall['status'] {
-  if (value === 'in_progress' || value === 'completed' || value === 'failed') {
-    return value;
-  }
-  return 'unknown';
-}
-
-function parseCollabToolCallsFromJsonl(raw: string): ParsedCollabToolCall[] {
-  const lines = raw.split(/\r?\n/);
-  const calls: ParsedCollabToolCall[] = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]?.trim();
-    if (!line || !line.startsWith('{') || !line.includes('"collab_tool_call"')) {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(line) as {
-        type?: string;
-        item?: {
-          type?: string;
-          tool?: unknown;
-          status?: unknown;
-          receiver_thread_ids?: unknown;
-          prompt?: unknown;
-          agent_type?: unknown;
-        };
-      };
-      if (
-        (parsed.type !== 'item.started' && parsed.type !== 'item.updated' && parsed.type !== 'item.completed') ||
-        parsed.item?.type !== 'collab_tool_call' ||
-        typeof parsed.item.tool !== 'string'
-      ) {
-        continue;
-      }
-      const receiverThreadIds = Array.isArray(parsed.item.receiver_thread_ids)
-        ? parsed.item.receiver_thread_ids.filter((entry): entry is string => typeof entry === 'string')
-        : [];
-      const prompt = typeof parsed.item.prompt === 'string' ? parsed.item.prompt : null;
-      calls.push({
-        sequence: index,
-        eventType: parsed.type,
-        tool: parsed.item.tool,
-        status: normalizeCollabStatus(parsed.item.status),
-        receiverThreadIds,
-        prompt,
-        agentType: normalizeCollabRoleToken(parsed.item.agent_type),
-        promptRole: resolveCollabRoleFromPrompt(prompt)
-      });
-    } catch {
-      continue;
-    }
-  }
-  return calls;
-}
-
-function formatLifecycleIds(ids: string[]): string {
-  return ids.slice(0, 3).join(', ');
-}
-
-function normalizeCollabRoleToken(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const normalized = value.trim().toLowerCase();
-  if (!normalized || !COLLAB_ROLE_TOKEN_PATTERN.test(normalized)) {
-    return null;
-  }
-  return normalized;
-}
-
-function resolveCollabRoleFromPrompt(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const match = value.match(COLLAB_ROLE_TAG_PATTERN);
-  if (!match || typeof match[1] !== 'string') {
-    return null;
-  }
-  return normalizeCollabRoleToken(match[1]);
-}
-
-function resolveCollabRolePolicy(value: string | undefined): CollabRolePolicy {
-  const normalized = (value ?? '').trim().toLowerCase();
-  if (!normalized) {
-    return DEFAULT_COLLAB_ROLE_POLICY;
-  }
-  if (
-    normalized === 'off' ||
-    normalized === 'disabled' ||
-    normalized === 'none' ||
-    normalized === '0' ||
-    normalized === 'false'
-  ) {
-    return 'off';
-  }
-  if (normalized === 'warn' || normalized === 'warning' || normalized === 'soft') {
-    return 'warn';
-  }
-  if (normalized === 'enforce' || normalized === 'strict' || normalized === 'on' || normalized === 'true' || normalized === '1') {
-    return 'enforce';
-  }
-  logger.warn(
-    `Invalid multi-agent role policy value "${value}". Using "${DEFAULT_COLLAB_ROLE_POLICY}" ` +
-      `(expected: enforce|warn|off; canonical env ${COLLAB_ROLE_POLICY_ENV_CANONICAL}, ` +
-      `legacy alias ${COLLAB_ROLE_POLICY_ENV_LEGACY}).`
-  );
-  return DEFAULT_COLLAB_ROLE_POLICY;
-}
-
-function resolveSymbolicMultiAgentRolePolicyConfig(env: NodeJS.ProcessEnv): SymbolicMultiAgentRolePolicyConfig {
-  const canonical = env[COLLAB_ROLE_POLICY_ENV_CANONICAL];
-  const legacy = env[COLLAB_ROLE_POLICY_ENV_LEGACY];
-  if (canonical !== undefined) {
-    if (legacy !== undefined && legacy.trim().toLowerCase() !== canonical.trim().toLowerCase()) {
-      logger.warn(
-        `${COLLAB_ROLE_POLICY_ENV_LEGACY} is ignored because ${COLLAB_ROLE_POLICY_ENV_CANONICAL} is set.`
-      );
-    }
-    return { value: resolveCollabRolePolicy(canonical), source: 'canonical' };
-  }
-  if (legacy !== undefined) {
-    return { value: resolveCollabRolePolicy(legacy), source: 'legacy' };
-  }
-  return { value: resolveCollabRolePolicy(undefined), source: null };
-}
-
-function resolveSymbolicMultiAgentAllowDefaultRoleConfig(
-  env: NodeJS.ProcessEnv
-): SymbolicMultiAgentAllowDefaultRoleConfig {
-  const canonical = env[COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL];
-  const legacy = env[COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY];
-  if (canonical !== undefined) {
-    if (legacy !== undefined && envFlagEnabled(legacy) !== envFlagEnabled(canonical)) {
-      logger.warn(
-        `${COLLAB_ALLOW_DEFAULT_ROLE_ENV_LEGACY} is ignored because ${COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL} is set.`
-      );
-    }
-    return { value: envFlagEnabled(canonical), source: 'canonical' };
-  }
-  if (legacy !== undefined) {
-    return { value: envFlagEnabled(legacy), source: 'legacy' };
-  }
-  return { value: false, source: null };
-}
-
-function isRolePolicyValidationReason(reasonCode: CollabLifecycleReasonCode): boolean {
-  return (
-    reasonCode === 'missing_role' ||
-    reasonCode === 'default_role_disallowed' ||
-    reasonCode === 'role_mismatch'
-  );
-}
-
-function includesThreadLimit(text: string): boolean {
-  return text.toLowerCase().includes('agent thread limit reached');
-}
-
-function hasCollabSpawnThreadLimitError(raw: string): boolean {
-  const lines = raw.split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('{')) {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(trimmed) as { item?: Record<string, unknown>; error?: Record<string, unknown> };
-      const item = parsed.item;
-      if (
-        !item ||
-        item.type !== 'collab_tool_call' ||
-        item.tool !== 'spawn_agent'
-      ) {
-        continue;
-      }
-      const candidates: string[] = [];
-      if (typeof item.error === 'string') {
-        candidates.push(item.error);
-      }
-      if (typeof item.message === 'string') {
-        candidates.push(item.message);
-      }
-      if (typeof item.output === 'string') {
-        candidates.push(item.output);
-      }
-      if (typeof parsed.error?.message === 'string') {
-        candidates.push(parsed.error.message);
-      }
-      if (candidates.some((entry) => includesThreadLimit(entry))) {
-        return true;
-      }
-    } catch {
-      continue;
-    }
-  }
-  return false;
-}
-
-function validateCollabLifecycle(
-  raw: string,
-  options: { requireSpawnRole?: boolean; allowDefaultRole?: boolean } = {}
-): CollabLifecycleValidationResult {
-  const requireSpawnRole = options.requireSpawnRole !== false;
-  const allowDefaultRole = options.allowDefaultRole === true;
-  if (hasCollabSpawnThreadLimitError(raw)) {
-    return { ok: false, reason: 'collab spawn hit thread limit', reasonCode: 'thread_limit' };
-  }
-  const calls = parseCollabToolCallsFromJsonl(raw);
-  if (calls.length === 0) {
-    return { ok: true };
-  }
-
-  const spawnedAt = new Map<string, number>();
-  const waitedAt = new Map<string, number>();
-  const closedAt = new Map<string, number>();
-  const missingRoleIds = new Set<string>();
-  const disallowedDefaultRoleIds = new Set<string>();
-  const mismatchedRoleIds = new Set<string>();
-  const roleByThread = new Map<string, string>();
-
-  for (const call of calls) {
-    const isCompleted =
-      call.status === 'completed' || (call.status === 'unknown' && call.eventType === 'item.completed');
-    if (!isCompleted) {
-      continue;
-    }
-    if (call.tool === 'spawn_agent') {
-      const explicitRole = call.agentType;
-      const promptRole = call.promptRole;
-      const effectiveRole = explicitRole ?? promptRole;
-      const roleTargets = call.receiverThreadIds.length > 0 ? call.receiverThreadIds : [`spawn@${call.sequence}`];
-      if (requireSpawnRole && !effectiveRole) {
-        for (const target of roleTargets) {
-          missingRoleIds.add(target);
-        }
-      } else if (effectiveRole === 'default' && !allowDefaultRole) {
-        for (const target of roleTargets) {
-          disallowedDefaultRoleIds.add(target);
-        }
-      }
-      if (explicitRole && promptRole && explicitRole !== promptRole) {
-        for (const target of roleTargets) {
-          mismatchedRoleIds.add(target);
-        }
-      }
-      for (const threadId of call.receiverThreadIds) {
-        if (!spawnedAt.has(threadId)) {
-          spawnedAt.set(threadId, call.sequence);
-        }
-        if (!effectiveRole) {
-          continue;
-        }
-        const previous = roleByThread.get(threadId);
-        if (previous && previous !== effectiveRole) {
-          mismatchedRoleIds.add(threadId);
-          continue;
-        }
-        roleByThread.set(threadId, effectiveRole);
-      }
-      continue;
-    }
-
-    for (const threadId of call.receiverThreadIds) {
-      if (call.tool === 'wait') {
-        waitedAt.set(threadId, call.sequence);
-      } else if (call.tool === 'close_agent') {
-        closedAt.set(threadId, call.sequence);
-      }
-    }
-  }
-
-  const spawnedIds = Array.from(spawnedAt.keys());
-  if (spawnedIds.length > 0) {
-    const missingWait = spawnedIds.filter((threadId) => !waitedAt.has(threadId));
-    if (missingWait.length > 0) {
-      return {
-        ok: false,
-        reason: `missing wait for spawned agent(s): ${formatLifecycleIds(missingWait)}`,
-        reasonCode: 'missing_wait'
-      };
-    }
-
-    const missingClose = spawnedIds.filter((threadId) => !closedAt.has(threadId));
-    if (missingClose.length > 0) {
-      return {
-        ok: false,
-        reason: `missing close_agent for spawned agent(s): ${formatLifecycleIds(missingClose)}`,
-        reasonCode: 'missing_close'
-      };
-    }
-
-    const invalidOrder = spawnedIds.filter((threadId) => {
-      const waitSequence = waitedAt.get(threadId);
-      const closeSequence = closedAt.get(threadId);
-      if (waitSequence === undefined || closeSequence === undefined) {
-        return false;
-      }
-      return closeSequence < waitSequence;
-    });
-    if (invalidOrder.length > 0) {
-      return {
-        ok: false,
-        reason: `close_agent before wait for agent(s): ${formatLifecycleIds(invalidOrder)}`,
-        reasonCode: 'close_before_wait'
-      };
-    }
-  }
-
-  if (!requireSpawnRole) {
-    return { ok: true };
-  }
-
-  if (missingRoleIds.size > 0) {
-    return {
-      ok: false,
-      reason:
-        `missing explicit role for spawn_agent call(s): ${formatLifecycleIds(Array.from(missingRoleIds))}. ` +
-        'Prefix prompts with [agent_type:<role>] and set spawn_agent.agent_type when supported.',
-      reasonCode: 'missing_role'
-    };
-  }
-
-  if (disallowedDefaultRoleIds.size > 0) {
-    return {
-      ok: false,
-      reason:
-        `spawn_agent used disallowed default role for: ${formatLifecycleIds(Array.from(disallowedDefaultRoleIds))}. ` +
-        'Set a non-default agent_type explicitly.',
-      reasonCode: 'default_role_disallowed'
-    };
-  }
-
-  if (mismatchedRoleIds.size > 0) {
-    return {
-      ok: false,
-      reason: `spawn_agent role mismatch for agent(s): ${formatLifecycleIds(Array.from(mismatchedRoleIds))}`,
-      reasonCode: 'role_mismatch'
-    };
-  }
-
-  return { ok: true };
-}
-
-function buildCollabSubcallPrompt(prompt: string): string {
-  return [
-    'Use collab tools to run the sub-agent prompt below.',
-    'For every spawned agent id, execute this lifecycle in order:',
-    '1) spawn_agent with explicit agent_type (never omit it; omission defaults to `default`),',
-    '   and prefix the spawned prompt with [agent_type:<same-role>] on the first line',
-    '2) wait (for that same id)',
-    '3) close_agent (for that same id)',
-    'Never leave spawned agents unclosed, including timeout or error paths.',
-    'Return only the sub-agent response text and nothing else.',
-    '',
-    'Sub-agent prompt:',
-    prompt
-  ].join('\n');
-}
-
 function normalizeExitCode(code: number | string | undefined): number {
   if (typeof code === 'number' && Number.isInteger(code)) {
     return code;
@@ -1343,9 +711,9 @@ async function main(): Promise<void> {
   const subagentsEnabled = envFlagEnabled(env.CODEX_SUBAGENTS) || envFlagEnabled(env.RLM_SUBAGENTS);
   const symbolicMultiAgent = resolveSymbolicMultiAgentConfig(env);
   const symbolicCollabEnabled = symbolicMultiAgent.enabled;
-  const collabRolePolicyConfig = resolveSymbolicMultiAgentRolePolicyConfig(env);
+  const collabRolePolicyConfig = resolveCollabRolePolicyConfig(env);
   const collabRolePolicy = collabRolePolicyConfig.value;
-  const collabAllowDefaultRoleConfig = resolveSymbolicMultiAgentAllowDefaultRoleConfig(env);
+  const collabAllowDefaultRoleConfig = resolveCollabAllowDefaultRoleConfig(env);
   const collabAllowDefaultRole = collabAllowDefaultRoleConfig.value;
   const symbolicDeliberationEnabled =
     env.RLM_SYMBOLIC_DELIBERATION === undefined
@@ -1357,6 +725,7 @@ async function main(): Promise<void> {
       : envFlagEnabled(env.RLM_SYMBOLIC_DELIBERATION_INCLUDE_IN_PLANNER);
   const symbolicDeliberationLogArtifacts = envFlagEnabled(env.RLM_SYMBOLIC_DELIBERATION_LOG);
   const nonInteractive = shouldForceNonInteractive(env);
+  const codexRuntimeShell = createRlmCodexRuntimeShell({ env, repoRoot });
 
   if (mode === 'symbolic') {
     if (symbolicMultiAgent.source === 'legacy') {
@@ -1373,7 +742,7 @@ async function main(): Promise<void> {
       );
     }
     const collabFeatureKey = symbolicCollabEnabled
-      ? await resolveCollabFeatureKey(env, repoRoot, nonInteractive)
+      ? await codexRuntimeShell.resolveCollabFeatureKey(nonInteractive)
       : COLLAB_FEATURE_LEGACY;
     if (symbolicCollabEnabled) {
       logger.info(`Symbolic collab feature key: ${collabFeatureKey}`);
@@ -1636,21 +1005,17 @@ async function main(): Promise<void> {
         : undefined,
       runPlanner: (prompt, _attempt) => {
         void _attempt;
-        return runCodexJsonlCompletion(prompt, env, repoRoot, nonInteractive, false);
+        return codexRuntimeShell.runJsonlCompletion(prompt, {
+          nonInteractive,
+          mirrorOutput: false
+        });
       },
       runSubcall: (prompt, _meta) => {
         void _meta;
-        if (!symbolicCollabEnabled) {
-          return runCodexCompletion(prompt, env, repoRoot, nonInteractive, false, false);
-        }
-        const collabPrompt = buildCollabSubcallPrompt(prompt);
-        return runCodexJsonlCompletion(collabPrompt, env, repoRoot, nonInteractive, true, [
-          '--enable',
+        return codexRuntimeShell.runSymbolicPrompt(prompt, {
+          nonInteractive,
+          symbolicCollabEnabled,
           collabFeatureKey,
-          '--sandbox',
-          'read-only'
-        ], {
-          validateCollabLifecycle: true,
           collabRolePolicy,
           collabAllowDefaultRole
         });
@@ -1665,17 +1030,10 @@ async function main(): Promise<void> {
         logArtifacts: symbolicDeliberationLogArtifacts,
         run: (prompt, _meta) => {
           void _meta;
-          if (!symbolicCollabEnabled) {
-            return runCodexCompletion(prompt, env, repoRoot, nonInteractive, false, false);
-          }
-          const collabPrompt = buildCollabSubcallPrompt(prompt);
-          return runCodexJsonlCompletion(collabPrompt, env, repoRoot, nonInteractive, true, [
-            '--enable',
+          return codexRuntimeShell.runSymbolicPrompt(prompt, {
+            nonInteractive,
+            symbolicCollabEnabled,
             collabFeatureKey,
-            '--sandbox',
-            'read-only'
-          ], {
-            validateCollabLifecycle: true,
             collabRolePolicy,
             collabAllowDefaultRole
           });
@@ -1702,10 +1060,10 @@ async function main(): Promise<void> {
     subagentsEnabled,
     repoRoot,
     runDir: rlmRoot,
-    runAgent: (input) => runCodexAgent(input, env, repoRoot, nonInteractive, subagentsEnabled),
+    runAgent: (input) => runCodexAgent(input, codexRuntimeShell, nonInteractive, subagentsEnabled),
     runValidator: (command) => runValidatorCommand(command, repoRoot),
-    logger: (line) => logger.info(line)
-  });
+      logger: (line) => logger.info(line)
+    });
 
   const finalStatus = result.state.final?.status ?? 'unknown';
   const iterationCount = result.state.iterations.length;
@@ -1736,18 +1094,7 @@ export const __test__ = {
   resolveAlignmentCheckerEnabled,
   resolveAlignmentCheckerEnforce,
   resolveSymbolicMultiAgentConfig,
-  resolveSymbolicMultiAgentRolePolicyConfig,
-  resolveSymbolicMultiAgentAllowDefaultRoleConfig,
-  parseFeatureFlagsFromText,
-  resolveCollabFeatureKeyFromFlags,
-  resolveCollabRolePolicy,
-  isRolePolicyValidationReason,
   resolveRlmMode,
-  parseCollabToolCallsFromJsonl,
-  validateCollabLifecycle,
-  buildCollabSubcallPrompt,
-  COLLAB_FEATURE_CANONICAL,
-  COLLAB_FEATURE_LEGACY,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,
   DEFAULT_SYMBOLIC_MIN_BYTES,

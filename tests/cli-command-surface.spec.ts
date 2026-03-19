@@ -125,6 +125,12 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator status --run <id>');
   }, TEST_TIMEOUT);
 
+  it('requires a run id for status', async () => {
+    await expect(runCli(['status'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('status requires --run <run-id>.')
+    });
+  }, TEST_TIMEOUT);
+
   it('rejects skills install --only when no skill list is provided', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-only-'));
     await expect(runCli(['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'])).rejects.toMatchObject({
@@ -132,14 +138,46 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('emits skills install JSON output', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-json-'));
+
+    const { stdout } = await runCli(['skills', 'install', '--only', 'long-poll-wait', '--codex-home', tempDir, '--format', 'json']);
+    const payload = JSON.parse(stdout) as {
+      targetRoot?: string;
+      skills?: string[];
+      written?: string[];
+    };
+
+    expect(payload.targetRoot).toBe(join(tempDir, 'skills'));
+    expect(payload.skills).toEqual(['long-poll-wait']);
+    expect(payload.written).toEqual(
+      expect.arrayContaining([
+        join(tempDir, 'skills', 'long-poll-wait', 'SKILL.md')
+      ])
+    );
+  }, TEST_TIMEOUT);
+
   it('prints resume help without requiring a run id', async () => {
     const { stdout } = await runCli(['resume', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator resume --run <id>');
   }, TEST_TIMEOUT);
 
+  it('rejects resume without a run id through the binary shell', async () => {
+    await expect(runCli(['resume'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('resume requires --run <run-id>.')
+    });
+  }, TEST_TIMEOUT);
+
   it('prints delegate-server help', async () => {
     const { stdout } = await runCli(['delegate-server', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator delegate-server');
+    expect(stdout).toContain('--mode <full|question_only|status_only>');
+  }, TEST_TIMEOUT);
+
+  it('prints delegation-server help', async () => {
+    const { stdout } = await runCli(['delegation-server', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator delegate-server');
+    expect(stdout).toContain('--mode <full|question_only|status_only>');
   }, TEST_TIMEOUT);
 
   it('prints pr help', async () => {
@@ -147,6 +185,12 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('resolve-merge');
     expect(stdout).toContain('docs/guides/review-artifacts.md');
+  }, TEST_TIMEOUT);
+
+  it('prints pr help when no subcommand is provided', async () => {
+    const { stdout } = await runCli(['pr']);
+    expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
+    expect(stdout).toContain('watch-merge');
   }, TEST_TIMEOUT);
 
   it('prints pr watch-merge help', async () => {
@@ -160,10 +204,29 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('--exit-on-action-required');
   }, TEST_TIMEOUT);
 
+  it('rejects unknown pr subcommands through the binary shell', async () => {
+    await expect(runCli(['pr', 'ship-it'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown pr subcommand: ship-it')
+    });
+  }, TEST_TIMEOUT);
+
   it('prints setup help', async () => {
     const { stdout } = await runCli(['setup', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator setup');
     expect(stdout).toContain('--refresh-skills');
+  }, TEST_TIMEOUT);
+
+  it('prints frontend-test help', async () => {
+    const { stdout } = await runCli(['frontend-test', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator frontend-test [options]');
+    expect(stdout).toContain('Runs the frontend-testing pipeline.');
+    expect(stdout).toContain('--devtools');
+  }, TEST_TIMEOUT);
+
+  it('prints frontend-test help via positional help', async () => {
+    const { stdout } = await runCli(['frontend-test', 'help']);
+    expect(stdout).toContain('Usage: codex-orchestrator frontend-test [options]');
+    expect(stdout).toContain('--format json');
   }, TEST_TIMEOUT);
 
   it('prints codex subcommand help', async () => {
@@ -171,6 +234,45 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator codex <subcommand> [options]');
     expect(stdout).toContain('defaults');
     expect(stdout).toContain('--force');
+  }, TEST_TIMEOUT);
+
+  it('emits codex setup plan json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-codex-setup-json-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+
+    const { stdout } = await runCli(['codex', 'setup', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      plan?: { method?: string; installRoot?: string };
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.plan?.method).toBe('build');
+    expect(payload.plan?.installRoot).toBe(join(tempDir, 'orchestrator', 'codex-cli'));
+  }, TEST_TIMEOUT);
+
+  it('emits codex defaults plan json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-codex-defaults-json-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+
+    const { stdout } = await runCli(['codex', 'defaults', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      plan?: { configPath?: string };
+      changes?: Array<{ target?: string; status?: string }>;
+    };
+    expect(payload.status).toBe('planned');
+    expect(payload.plan?.configPath).toBe(join(tempDir, 'config.toml'));
+    expect(payload.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ target: 'config', status: 'pending' })
+      ])
+    );
   }, TEST_TIMEOUT);
 
   it('prints flow help', async () => {
@@ -191,6 +293,34 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Runs the standalone review wrapper');
     expect(stdout).toContain('--manifest <path>');
     expect(stdout).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+  }, TEST_TIMEOUT);
+
+  it('launches review via the CLI shell in non-interactive handoff mode', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-review-launch-'));
+    const taskId = 'review-cli-launch-shell';
+    const runDir = join(tempDir, '.runs', taskId, 'cli', 'sample-run');
+    await mkdir(runDir, { recursive: true });
+    const manifestPath = join(runDir, 'manifest.json');
+    await writeFile(manifestPath, JSON.stringify({ run: 'sample' }), 'utf8');
+    await writeFile(join(runDir, 'runner.ndjson'), '{"event":"sample"}\n', 'utf8');
+
+    const { stdout } = await runCli(
+      ['review', '--manifest', manifestPath, '--non-interactive', '--surface', 'audit', '--task', taskId],
+      {
+        ...process.env,
+        NOTES: 'Goal: launch review via CLI shell | Summary: non-interactive handoff | Risks: arg forwarding',
+        CODEX_REVIEW_MONITOR_INTERVAL_SECONDS: '0',
+        DIFF_BUDGET_OVERRIDE_REASON:
+          'cli command-surface review shell test exercises non-interactive handoff against the stacked branch baseline'
+      }
+    );
+
+    expect(stdout).toContain('Codex review handoff (non-interactive):');
+    expect(stdout).toContain(`Review task: ${taskId}`);
+    expect(stdout).toContain('Review surface: audit');
+    const prompt = await readFile(join(runDir, 'review', 'prompt.txt'), 'utf8');
+    expect(prompt).toContain('Evidence manifest:');
+    expect(prompt).toContain('sample-run/manifest.json');
   }, TEST_TIMEOUT);
 
   it('prints start help without preparing a run', async () => {
@@ -583,6 +713,51 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('codex.orchestrator.json');
   }, TEST_TIMEOUT);
 
+  it('rejects init without a template', async () => {
+    await expect(runCli(['init'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('init requires a template name (e.g. init codex).')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects unknown init templates', async () => {
+    await expect(runCli(['init', 'ship-it'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown init template: ship-it')
+    });
+  }, TEST_TIMEOUT);
+
+  it('writes init codex templates to the requested cwd', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-init-codex-'));
+
+    const { stdout } = await runCli(['init', 'codex', '--cwd', tempDir]);
+    const orchestratorConfig = await readFile(join(tempDir, 'codex.orchestrator.json'), 'utf8');
+    const agentsDoc = await readFile(join(tempDir, 'AGENTS.md'), 'utf8');
+
+    expect(stdout).toContain('Written:');
+    expect(stdout).toContain('codex.orchestrator.json');
+    expect(stdout).toContain('Next steps (recommended):');
+    expect(orchestratorConfig.trim().length).toBeGreaterThan(0);
+    expect(orchestratorConfig).toContain('"pipelines"');
+    expect(agentsDoc).toContain('codex:instruction-stamp');
+    expect(agentsDoc).toContain('# Agent Instructions (Template)');
+  }, TEST_TIMEOUT);
+
+  it('appends the managed codex setup summary when --codex-cli is requested', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-init-codex-cli-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: join(tempDir, 'codex-home')
+    };
+
+    const { stdout } = await runCli(['init', 'codex', '--cwd', tempDir, '--codex-cli'], env);
+    const writtenIndex = stdout.indexOf('Written:');
+    const codexSetupIndex = stdout.indexOf('Codex CLI setup: planned');
+
+    expect(writtenIndex).toBeGreaterThanOrEqual(0);
+    expect(codexSetupIndex).toBeGreaterThan(writtenIndex);
+    expect(stdout).toContain('cargo build -p codex-cli --release');
+    expect(stdout).toContain('Selection: stock `codex` stays default.');
+  }, TEST_TIMEOUT);
+
   it('accepts scoped aliases for the matching flow pipeline and rejects scope-mismatched aliases', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-flow-target-'));
     const config = {
@@ -695,6 +870,38 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('requires a goal for rlm runs', async () => {
+    await expect(runCli(['rlm'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('rlm requires a goal. Use: codex-orchestrator rlm "<goal>".')
+    });
+  }, TEST_TIMEOUT);
+
+  it('prints self-check text output through the binary shell', async () => {
+    const { stdout } = await runCli(['self-check']);
+    expect(stdout).toContain('Status: ok');
+    expect(stdout).toContain('Name: @kbediako/codex-orchestrator');
+    expect(stdout).toContain('Version: 0.1.38');
+    expect(stdout).toContain(`Node: ${process.version}`);
+    expect(stdout).toContain('Timestamp: ');
+  }, TEST_TIMEOUT);
+
+  it('prints self-check json output through the binary shell', async () => {
+    const { stdout } = await runCli(['self-check', '--format', 'json']);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      name?: string;
+      version?: string;
+      node?: string;
+      timestamp?: string;
+    };
+
+    expect(payload.status).toBe('ok');
+    expect(payload.name).toBe('@kbediako/codex-orchestrator');
+    expect(payload.version).toBe('0.1.38');
+    expect(payload.node).toBe(process.version);
+    expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
+  }, TEST_TIMEOUT);
+
   it('prints doctor apply plan when wiring is missing', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));
     const env = {
@@ -705,6 +912,65 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Doctor apply plan:');
     expect(stdout).toContain('chrome-devtools');
     expect(stdout).toContain('delegation');
+  }, TEST_TIMEOUT);
+
+  it('rejects doctor --apply with --format json', async () => {
+    await expect(runCli(['doctor', '--apply', '--format', 'json'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('doctor --apply does not support --format json.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects devtools without a subcommand', async () => {
+    await expect(runCli(['devtools'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('devtools requires a subcommand (setup).')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects unknown devtools subcommands', async () => {
+    await expect(runCli(['devtools', 'ship-it'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown devtools subcommand: ship-it')
+    });
+  }, TEST_TIMEOUT);
+
+  it('emits devtools setup plan json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-devtools-setup-json-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+
+    const { stdout } = await runCli(['devtools', 'setup', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      status?: string;
+      plan?: { commandLine?: string };
+    };
+
+    expect(payload.status).toBe('planned');
+    expect(payload.plan?.commandLine).toContain('chrome-devtools');
+  }, TEST_TIMEOUT);
+
+  it('rejects devtools setup --format json with --yes', async () => {
+    await expect(runCli(['devtools', 'setup', '--format', 'json', '--yes'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('devtools setup does not support --format json with --yes.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects doctor issue-log metadata flags without --issue-log', async () => {
+    await expect(runCli(['doctor', '--issue-title', 'Example issue'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('--issue-title/--issue-notes/--issue-log-path require --issue-log.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects doctor cloud override flags without --cloud-preflight', async () => {
+    await expect(runCli(['doctor', '--cloud-env-id', 'env_123'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('--cloud-env-id/--cloud-branch require --cloud-preflight.')
+    });
+  }, TEST_TIMEOUT);
+
+  it('rejects invalid doctor --window-days values', async () => {
+    await expect(runCli(['doctor', '--usage', '--window-days', '0'])).rejects.toMatchObject({
+      stderr: expect.stringContaining("Invalid --window-days value '0'. Expected a positive integer.")
+    });
   }, TEST_TIMEOUT);
 
   it('emits doctor cloud preflight payload in JSON output', async () => {
@@ -1623,6 +1889,18 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.steps?.guidance?.note).toContain('Agent-first default');
   }, TEST_TIMEOUT);
 
+  it('rejects setup --yes with --format json', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-apply-json-'));
+    const env = {
+      ...process.env,
+      CODEX_HOME: tempDir
+    };
+
+    await expect(runCli(['setup', '--yes', '--format', 'json'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('setup does not support --format json with --yes.')
+    });
+  }, TEST_TIMEOUT);
+
   it('treats setup --yes=false as plan mode', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-setup-yes-false-'));
     const env = {
@@ -1829,6 +2107,12 @@ describe('codex-orchestrator command surface', () => {
     };
     expect(payload.payload?.command?.argv?.[0]).toBe('echo');
     expect(payload.payload?.outputs?.stdout).toContain('quoted-smoke');
+  }, TEST_TIMEOUT);
+
+  it('rejects exec without a command through the binary shell', async () => {
+    await expect(runCli(['exec'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('exec requires a command to run.')
+    });
   }, TEST_TIMEOUT);
 
   it('preserves backslashes in quoted single-token exec commands', async () => {

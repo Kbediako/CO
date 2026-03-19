@@ -1,0 +1,2 @@
+Delegation guard override active.
+Reason: top-level orchestrator used bounded collab subagents instead of manifest-backed delegation for 1113 review reliability patching

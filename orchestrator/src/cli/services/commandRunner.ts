@@ -234,7 +234,11 @@ export async function runCommandStage(
     // Keep both keys during migration because downstream tools still read either name.
     baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE = baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE;
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
+    const timeoutMs = resolveStageTimeoutMs(stage, execEnv);
     const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;
+    if (timeoutMs !== null) {
+      writeEvent({ type: 'command:config', timeout_ms: timeoutMs });
+    }
 
     let result: UnifiedExecRunResult;
     const eventCapture =
@@ -250,6 +254,7 @@ export async function runCommandStage(
         invocationId,
         toolId: 'cli:command',
         description: stage.title,
+        ...(timeoutMs !== null ? { timeoutMs } : {}),
         eventCapture,
         metadata: {
           stageId: stage.id,
@@ -291,7 +296,15 @@ export async function runCommandStage(
       result.exitCode ?? (result.signal ? 128 : 0);
     const stdoutText = result.stdout.trim();
     const stderrText = result.stderr.trim();
-    const summary = buildSummary(stage, normalizedExitCode, stdoutText, stderrText, result.signal);
+    const timeoutBoundMs =
+      typeof result.timeoutMs === 'number' && Number.isFinite(result.timeoutMs) && result.timeoutMs > 0
+        ? Math.trunc(result.timeoutMs)
+        : timeoutMs;
+    const timedOut = result.timedOut === true;
+    const summary = buildSummary(stage, normalizedExitCode, stdoutText, stderrText, result.signal, {
+      timedOut,
+      timeoutMs: timeoutBoundMs
+    });
 
     entry.completed_at = isoTimestamp();
     entry.exit_code = normalizedExitCode;
@@ -306,14 +319,46 @@ export async function runCommandStage(
       collabBuffer = '';
     }
 
-    if (entry.status === 'failed') {
+    if (result.status !== 'succeeded' && entry.status === 'skipped') {
+      const fallbackReason = timedOut ? 'timed_out' : 'command_failed';
+      writeEvent({
+        type: 'command:fallback',
+        fallback: 'allow_failure',
+        reason: fallbackReason,
+        exit_code: normalizedExitCode,
+        signal: result.signal,
+        timeout_ms: timeoutBoundMs
+      });
+      events?.log({
+        stageId: stage.id,
+        stageIndex: index,
+        level: 'warn',
+        source: 'system',
+        message: timedOut
+          ? `Non-fatal fallback applied after timeout (${timeoutBoundMs !== null ? `${timeoutBoundMs}ms` : 'configured timeout'}).`
+          : 'Non-fatal fallback applied after command failure.'
+      });
+    }
+
+    if (result.status !== 'succeeded') {
+      const failureReason = timedOut ? 'timed_out' : 'command_failed';
       const errorDetails: Record<string, unknown> = {
         exit_code: normalizedExitCode,
         sandbox_state: result.sandboxState,
-        stderr: stderrText
+        stderr: stderrText,
+        failure_reason: failureReason
       };
       if (result.signal) {
         errorDetails.signal = result.signal;
+      }
+      if (timeoutBoundMs !== null) {
+        errorDetails.timeout_ms = timeoutBoundMs;
+      }
+      if (timedOut) {
+        errorDetails.timed_out = true;
+      }
+      if (entry.status === 'skipped') {
+        errorDetails.non_fatal_fallback = true;
       }
       if (stdoutTruncated) {
         errorDetails.stdout_truncated = true;
@@ -326,7 +371,7 @@ export async function runCommandStage(
         paths,
         manifest,
         entry,
-        'command-failed',
+        entry.status === 'skipped' ? 'command-allow-failure' : 'command-failed',
         errorDetails
       );
     }
@@ -553,10 +598,18 @@ function buildSummary(
   exitCode: number,
   stdout: string,
   stderr: string,
-  signal: NodeJS.Signals | null
+  signal: NodeJS.Signals | null,
+  options: { timedOut?: boolean; timeoutMs?: number | null } = {}
 ): string {
   if (stage.summaryHint) {
     return stage.summaryHint;
+  }
+  if (options.timedOut) {
+    const timeoutLabel =
+      typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
+        ? `${Math.trunc(options.timeoutMs)}ms`
+        : 'configured timeout';
+    return `Timed out after ${timeoutLabel}${stderr ? ` — ${truncate(stderr)}` : ''}`;
   }
   if (signal) {
     return `Terminated with signal ${signal}${stderr ? ` — ${truncate(stderr)}` : ''}`;
@@ -635,4 +688,31 @@ function normalizeCollabStatus(value: unknown): CollabToolCallRecord['status'] {
     return value;
   }
   return 'in_progress';
+}
+
+function resolveStageTimeoutMs(stage: CommandStage, env: NodeJS.ProcessEnv): number | null {
+  const stageTimeout = normalizeTimeoutMs(stage.timeoutMs);
+  if (stageTimeout !== null) {
+    return stageTimeout;
+  }
+  return normalizeTimeoutMs(parseNumber(env.CODEX_ORCHESTRATOR_STAGE_TIMEOUT_MS));
+}
+
+function parseNumber(value: string | undefined): number | undefined {
+  if (!value || !value.trim()) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeTimeoutMs(value: number | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  const normalized = Math.trunc(value);
+  if (normalized <= 0) {
+    return null;
+  }
+  return normalized;
 }

@@ -1,0 +1,2 @@
+Delegation guard override active.
+Reason: Used top-level gpt-5.4 subagents for bounded 1112 scout/audit support; no manifest-backed orchestrator delegation run was created in this local lane.

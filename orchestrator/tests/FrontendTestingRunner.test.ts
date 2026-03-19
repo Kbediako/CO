@@ -97,7 +97,10 @@ describe('frontend testing runner', () => {
   it('falls back to inline prompt when no file is provided', async () => {
     const env = { CODEX_FRONTEND_TEST_PROMPT: 'Inline prompt' } as NodeJS.ProcessEnv;
     const prompt = await loadFrontendTestingPrompt(env);
-    const command = resolveFrontendTestingCommand(prompt, env);
+    const command = resolveFrontendTestingCommand(prompt, {
+      env,
+      runtime: {} as never
+    });
     expect(prompt).toBe('Inline prompt');
     expect(command.args).toEqual(['exec', 'Inline prompt']);
   });

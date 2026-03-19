@@ -1,0 +1,86 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > derives task progress from a single live state owner without command drift
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > tracks same-stream fragmented startup lines and keeps cross-stream fragments separate
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > captures cross-stream commands after exec and clears pending command mode on progress lines
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat shell-wrapped touched-file reads as shell probes
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > allows one direct shell probe but flags a repeated shell probe
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > counts mixed probe plus touched-file reads as shell probes
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat active audit startup-anchor reads as shell probes
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > counts mixed probe plus active audit startup-anchor reads as shell probes while preserving the anchor
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > ignores literal MANIFEST_HINT echoes but counts printenv MANIFEST as shell probes
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat grep-based code searches over files as shell probes
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > counts nested shell payload probes
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > reports total shell probe count beyond the retained sample window
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > persists redacted and raw telemetry from the same live snapshot
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies bounded low-signal drift from repeated inspection targets
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies nearby drift from the recent inspection window even after broader exploration
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > tracks the recent inspection window by command sample, not raw target count
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not classify focused recent review when inspection signatures keep changing
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not classify same-file review when the inspection signature keeps moving forward
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > requires the drift shape to persist for the timeout window
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies bounded meta-surface expansion from sustained off-task review surfaces
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not classify incidental meta-surface lookups as sustained expansion
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > ignores rg patterns that only mention run manifests while searching non-meta docs files
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies variable-indirected manifest reads as meta-surface activity
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > triggers the startup-anchor boundary when repeated meta-surface reads happen before touched-path inspection
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > triggers the audit startup-anchor boundary when repeated off-surface reads happen before manifest or runner-log evidence
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats manifest and runner-log evidence as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats exported MANIFEST reads across sibling shell segments as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats self-reexported MANIFEST reads as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat leading assignment plus export as a MANIFEST rebinding in zsh audit shells
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat self-reexports after a prior rebinding as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat unset followed by self-reexport as a valid audit startup anchor
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not carry export state across pipeline operators when checking audit anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not carry export state across short-circuit operators when checking audit anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > fails closed when an executed || branch rebinds MANIFEST before the first anchor
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > fails closed when a successful && export rebinds MANIFEST before the first anchor
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > fails closed when bash same-key bare export rebinds MANIFEST before the first anchor
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > keeps unset-driven MANIFEST removal visible across a successful && chain
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > keeps bash export -n MANIFEST removal visible across a successful && chain
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > preserves parent-shell export state after a backgrounded command
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats exported RUN_LOG reads across sibling shell segments as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > fails closed when a leading temp RUNNER_LOG assignment rebinds an exported RUN_LOG alias
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats RUN_LOG alias reexports as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats env -u MANIFEST direct child reads as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats explicit audit startup anchor paths outside .runs as valid anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat unrelated run manifests as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat unavailable runner-log env vars as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > keeps unrelated run manifests visible to the meta-surface guard after an active audit anchor exists
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat ordinary repo manifest.json files as run-manifest meta-surface activity
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > keeps inline MANIFEST rebindings visible to generic run-manifest meta-surface tracking
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat exported ordinary repo manifest paths as generic run-manifest meta-surface activity
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat env -i nested shell reads as valid audit startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not allow rebinding MANIFEST away from the active audit evidence path
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not allow exported MANIFEST rebinding away from the active audit evidence path
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > preserves shell-wrapped MANIFEST rebinding when descending into nested audit payloads
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > allows one incidental meta-surface read before a touched-path anchor
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not count nearby review-support reads against the startup-anchor budget
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats scoped diff commands as valid startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat scoped diff commands as startup anchors outside uncommitted mode
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat off-scope uncommitted diff pathspecs as startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not treat same-suffix paths outside the repo root as touched-path anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not count meta-surface reads that happen after a scoped diff anchor in the same shell line
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > counts every disallowed pre-anchor meta read in a chained shell command before the first anchor
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats non-regex-matched touched paths such as shell scripts as valid startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > treats git show rev:path reads of touched files as valid startup anchors
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > counts mixed touched-path and meta-surface commands before the startup anchor is promoted
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies adjacent review-support test files as meta-surface activity
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > evicts early meta-surface bursts once later normal commands dominate the recent window
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > keeps startup-anchor violations visible even after later touched-path reads evict the recent meta-surface window
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies sustained adjacent review-system surfaces as meta-surface expansion
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > ignores review-system surfaces that are part of the touched diff scope
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies direct validation runners as command-intent boundary violations by default
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > allows direct validation runners when heavy review commands are explicitly allowed
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies package-manager validation suites as command-intent boundary violations by default
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > allows package-manager validation suites when heavy review commands are explicitly allowed
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies package-manager shorthand validation launches as command-intent violations
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > classifies nested review and mutating delegation control as command-intent violations but keeps status read-only
+ ✓ tests/review-execution-state.spec.ts > ReviewExecutionState > does not classify low-signal drift when the guard is disabled
+
+ Test Files  1 passed (1)
+      Tests  77 passed (77)
+   Start at  13:36:49
+   Duration  212ms (transform 53ms, setup 0ms, collect 59ms, tests 27ms, environment 0ms, prepare 27ms)
+

@@ -1,0 +1,11 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/UiSessionController.test.ts  (7 tests | 4 skipped) 2ms
+ ✓ orchestrator/tests/ControlServer.test.ts  (81 tests | 72 skipped) 49ms
+
+ Test Files  2 passed (2)
+      Tests  12 passed | 76 skipped (88)
+   Start at  17:38:00
+   Duration  313ms (transform 139ms, setup 0ms, collect 213ms, tests 51ms, environment 0ms, prepare 53ms)
+

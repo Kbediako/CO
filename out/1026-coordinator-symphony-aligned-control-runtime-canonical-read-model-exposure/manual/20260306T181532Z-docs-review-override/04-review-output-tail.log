@@ -1,0 +1,200 @@
+I'm noticing a potential mismatch in the PRD regarding local paths, as it only mentions them in tech considerations as read-only references. This appears to contradict corrections made in documentation about machine-specific paths. I should point out the exact lines to clarify the discrepancy, possibly flagging either the action plan or the spec. Since both address the same issue, I'll need to focus on one, maybe spec line 19, while also referencing the action plan to ensure clarity.
+thinking
+**Clarifying documentation issues**
+
+I'm noticing that the current documentation hard-codes a specific path, which was previously identified as a bug since it doesn't work for other machines or CI environments. It would be better to use a portable reference like a repo URL or a user-configurable path. I think this should be a priority issue, possibly P2, since inaccurately documented processes could lead to incorrect reviews. There’s also mention of the evidence manifest being available, but I wonder if the review is completed since the task checklist is still pending.
+thinking
+**Examining documentation discrepancies**
+
+I'm considering the planning status for 'gate.phase' in tasks/index that seems to be in progress. However, I might have noticed a mismatch since the docs/TASKS snapshot states that "guardrails required: ... pack:smoke," which doesn't align with repo policy or the task checklist. This seems like a discrete documentation issue that the author could likely fix. I think I should suggest a P3 priority, especially since this impacts maintainability and accuracy regarding downstream-facing eligibility related to running pack:smoke.
+thinking
+**Verifying documentation issues**
+
+I’m thinking about whether there’s something to fix in the documentation. It might require looking deeper if the specs mention "Delegated read-only review approval" when the evidence suggests otherwise. I need to confirm if there’s a snapshot or checklist indicating this or if it’s just about scout diagnostics. It’s interesting that it seems like there are some claims about delegation that don't match. Yet, the AGENTS mention that only one subagent manifest is necessary, so it seems there's no guardrail error.
+thinking
+**Investigating task ID and documentation**
+
+I’m considering if there’s an issue with the subagent task ID suffix not following the required format. The scout run appears to be correctly identified as `1026...-scout`, so that's a positive sign. I should check the documentation for "Delegated Review Synthesis," but it looks like there’s no clear evidence path. The spec's mention of "Initial review evidence" using absolute local paths instead of previous paths raises some concern. Plus, the ACTION_PLAN mention of a local clone might confuse others. I also need to verify if the README/SOP should be updated, although there aren't any implementation changes yet, so perhaps that's not an issue.
+thinking
+**Checking documentation structure and entries**
+
+I need to examine if the docs/TASKS snapshot has a new line inserted at the top, although it seems the archive index might not be separated by a blank line, which should be harmless. Next, I’m looking at the docs-freshness registry showing 853 docs and 863 entries, which indicates there might be 10 extra registry entries, but that’s not a problem. I'm also wondering if there’s an issue with `tasks/index.json` where the canonical registration isn't correctly pointing to the docs/TECH_SPEC instead of the PRD/ACTION_PLAN. That seems to show a similar pattern.
+exec
+/bin/zsh -lc "nl -ba docs/TASKS.md | sed -n '1,8p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "nl -ba docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md | sed -n '16,24p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "nl -ba tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md | sed -n '15,24p'" in /Users/kbediako/Code/CO succeeded in 53ms:
+    15	
+    16	## Pre-Implementation Review Note
+    17	- Decision: approved for docs-first planning and immediate implementation as the next slice after `1025`.
+    18	- Reasoning: `1025` unified snapshot shaping, but the runtime boundary still leans on compatibility HTTP envelopes. Real Symphony keeps orchestrator/runtime snapshot state primary and controller/presenter layers thin. The smallest next correction is therefore to expose the canonical selected-run seam directly from `ControlRuntime` and let Telegram consume it without another transport-shaped hop.
+    19	- Initial review evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/15-next-slice-note.md`, `/Users/kbediako/Code/symphony/SPEC.md`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir_web/presenter.ex`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir_web/controllers/observability_api_controller.ex`.
+    20	- Delegated review refinement: bounded `gpt-5.4` Symphony and CO-local explorer streams converged on the same minimal move: expose one runtime-owned selected-run read model, let Telegram consume it directly for status/issue/hash behavior, and leave compatibility HTTP state/issue routes as thin wrappers for now. The Symphony stream did not surface evidence strong enough to reopen earlier completed slices. Evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`.
+    21	
+    22	## Technical Requirements
+    23	- Functional requirements:
+    24	  - `ControlRuntimeSnapshot` exposes a canonical selected-run/read-model method for internal consumers,
+ succeeded in 53ms:
+    16	5) Run the validation chain, capture manual/elegance evidence, sync mirrors, and commit closeout.
+    17	
+    18	## Dependencies
+    19	- Completed slices `1015` through `1025`.
+    20	- Real `openai/symphony` local clone at `/Users/kbediako/Code/symphony`.
+    21	- Existing Telegram oversight bridge and runtime snapshot tests.
+    22	
+    23	## Validation
+    24	- Checks / tests:
+ succeeded in 53ms:
+     1	<!-- tasks-archive-index:begin -->
+     2	## Archive index - archived task snapshots live on the task-archives branch. 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md; 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
+     3	<!-- tasks-archive-index:end -->
+     4	# Task List Snapshot - Coordinator Symphony-Aligned Control Runtime Canonical Read Model Exposure (1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure) - Update 2026-03-06: task created; export `MCP_RUNNER_TASK_ID=1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`, `npm run pack:smoke`. Checklist mirror: `tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `.agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`.
+     5	# Task List Snapshot - Coordinator Symphony-Aligned Shared Observability Read Model + Telegram Projection Dedupe (1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe) - Update 2026-03-06: completed (shared selected-run snapshot builders now live in `observabilityReadModel.ts`; duplicate tracked Linear shaping was removed from the projection and observability layers; HTTP/UI/Telegram reuse the same runtime-owned snapshot fragments; Telegram projection dedupe now invalidates on prompt/urgency changes under a stable latest question id; and the closeout records explicit docs-review stall, full-test quiet-tail, stacked-branch diff-budget, and standalone-review wrapper overrides instead of hiding them). Evidence: `docs/PRD-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md`, `tasks/specs/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md`, `tasks/tasks-1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md`, `.agent/task/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe.md`, `docs/findings/1025-shared-observability-read-model-and-telegram-projection-dedupe-deliberation.md`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/00-summary.md`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/05-targeted-tests.log`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/11-manual-observability-parity.json`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/12-manual-telegram-question-hash.json`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/13-elegance-review.md`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/14-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+     6	# Task List Snapshot - Coordinator Symphony-Aligned Snapshot Reads + Live Linear Dispatch Separation (1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation) - Update 2026-03-06: completed (snapshot reads now stay provider-free behind a runtime-owned advisory cache, `/api/v1/dispatch` remains the only live advisory read path, snapshot `tracked` payloads stay bound to accepted advisory state, local credential/binding posture is surfaced synchronously without provider I/O, and the closeout records explicit branch-scope diff-budget, non-local full-test, and stalled standalone-review override evidence instead of overstating unrelated or low-signal wrapper failures). Evidence: `docs/PRD-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation.md`, `tasks/specs/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation.md`, `tasks/tasks-1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation.md`, `.agent/task/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation.md`, `docs/findings/1024-snapshot-reads-and-live-linear-dispatch-separation-deliberation.md`, `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/00-summary.md`, `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/04-targeted-tests.log`, `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/05-test.log`, `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/11-manual-snapshot-dispatch-separation.json`, `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/12-manual-credential-summary-check.json`, `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/13-elegance-review.md`, `out/1024-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation/manual/20260306T160352Z-closeout/14-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+     7	# Task List Snapshot - Coordinator Symphony-Aligned Telegram In-Process Read Model Reuse (1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse) - Update 2026-03-06: completed (Telegram read commands now consume an injected in-process adapter over the selected-run and observability boundaries instead of self-fetching local HTTP read routes; pause/resume stay on the existing hardened `/control/action` path; question expiry/resolution side effects and projection-push hashing remain coherent; Telegram `/dispatch` audits now classify correctly as `telegram_dispatch`; and the closeout records explicit branch-scope diff-budget plus stalled standalone-review overrides instead of hiding wrapper noise). Evidence: `docs/PRD-coordinator-symphony-aligned-telegram-in-process-read-model-reuse.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-telegram-in-process-read-model-reuse.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-in-process-read-model-reuse.md`, `tasks/specs/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse.md`, `tasks/tasks-1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse.md`, `.agent/task/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse.md`, `docs/findings/1021-telegram-in-process-read-model-reuse-deliberation.md`, `out/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse/manual/20260306T125623Z-closeout/00-summary.md`, `out/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse/manual/20260306T125623Z-closeout/11-manual-telegram-bridge-check.json`, `out/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse/manual/20260306T125623Z-closeout/12-elegance-review.md`, `out/1021-coordinator-symphony-aligned-telegram-in-process-read-model-reuse/manual/20260306T125623Z-closeout/13-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+     8	# Task List Snapshot - Coordinator Symphony-Aligned Dispatch Presenter/Controller Extraction (1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction) - Update 2026-03-06: completed (the dispatch seam is now closed: `observabilitySurface.ts` owns `/api/v1/dispatch` payload shaping plus semantic fail-closed classification, `controlServer.ts` keeps method/status/header/traceability/audit ownership, targeted dispatch regression coverage now locks down method gates plus audit/traceability semantics, implementation-gate passed through full test/docs validation, manual mock dispatch evidence stayed coherent across ready and fail-closed cases, and the closeout records explicit branch-scope diff-budget plus stalled standalone-review overrides instead of hiding wrapper noise). Evidence: `docs/PRD-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md`, `tasks/specs/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md`, `tasks/tasks-1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md`, `.agent/task/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction.md`, `docs/findings/1020-dispatch-presenter-controller-extraction-deliberation.md`, `out/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction/manual/20260306T121624Z-closeout/00-summary.md`, `out/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction/manual/20260306T121624Z-closeout/09-manual-dispatch-check.json`, `out/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction/manual/20260306T121624Z-closeout/10-elegance-review.md`, `out/1020-coordinator-symphony-aligned-dispatch-presenter-controller-extraction/manual/20260306T121624Z-closeout/11-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+
+thinking
+**Considering task checklist**
+
+I think I might need to add line numbers to my task checklist, especially around the pack and smoke conditional. It feels like this could help clarify things, particularly since it relates to the mismatch with the documentation. I want to make sure everything aligns and is easy to follow. Okay, let me see how I can implement those line numbers effectively to streamline the process!
+thinking
+**Considering task checklist**
+
+I think I might need to add line numbers to my task checklist, especially around the pack and smoke conditional. It feels like this could help clarify things, particularly since it relates to the mismatch with the documentation. I want to make sure everything aligns and is easy to follow. Okay, let me see how I can implement those line numbers effectively to streamline the process!
+exec
+/bin/zsh -lc "nl -ba tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md | sed -n '28,38p'" in /Users/kbediako/Code/CO succeeded in 52ms:
+    28	- [ ] `npm run build`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/03-build.log`.
+    29	- [ ] `npm run lint`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/04-lint.log`.
+    30	- [ ] `npm run test`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/05-test.log`.
+    31	- [ ] `npm run docs:check`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/06-docs-check.log`.
+    32	- [ ] `npm run docs:freshness`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/07-docs-freshness.log`.
+    33	- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/08-diff-budget.log`.
+    34	- [ ] `npm run review`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/09-review.log`.
+    35	- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/10-pack-smoke.log`.
+    36	- [ ] Manual simulated/mock Telegram status/issue evidence captured for the canonical runtime seam. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/11-manual-telegram-runtime-read-model.json`.
+    37	- [ ] Explicit elegance review captured. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/12-elegance-review.md`.
+    38	- [ ] Coherent `1026` commit recorded. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/00-summary.md`, git history for commit `<pending>`.
+
+thinking
+**Examining task inconsistencies**
+
+I'm noticing a possible mismatch between the docs/TASKS line 4 and the task checklist line 35. Since the code_location should overlap, line 4 seems fine. I can reference the task checklist and AGENTS in my body. It looks like I might need P3. Are there any other issues? I should probably check the docs/PRD or spec again for other inconsistencies and look for local path references in the new documents.
+thinking
+**Examining task inconsistencies**
+
+I'm noticing a possible mismatch between the docs/TASKS line 4 and the task checklist line 35. Since the code_location should overlap, line 4 seems fine. I can reference the task checklist and AGENTS in my body. It looks like I might need P3. Are there any other issues? I should probably check the docs/PRD or spec again for other inconsistencies and look for local path references in the new documents.
+exec
+/bin/zsh -lc "rg -n '/Users/kbediako/Code/symphony|pack:smoke' docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md docs/TASKS.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md:35:- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/10-pack-smoke.log`.
+docs/TASKS.md:4:# Task List Snapshot - Coordinator Symphony-Aligned Control Runtime Canonical Read Model Exposure (1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure) - Update 2026-03-06: task created; export `MCP_RUNNER_TASK_ID=1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`, `npm run pack:smoke`. Checklist mirror: `tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `.agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`.
+docs/TASKS.md:14:# Task List Snapshot - Codex 0.111 + GPT-5.4 Compatibility + Adoption Realignment (1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment) - Update 2026-03-06: completed (the live parser workaround remains in place for native Codex on this machine, repo defaults/docs/tests now target `gpt-5.4`, the authoritative implementation-gate succeeded, downstream `pack:smoke` passed, and the refreshed elegance review kept the 1012-specific solution minimal. Broader dirty-tree control-surface findings stay carried forward into the next coordinator slice rather than reopening this compatibility lane). Evidence: `docs/PRD-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md`, `docs/TECH_SPEC-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md`, `docs/ACTION_PLAN-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md`, `tasks/specs/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md`, `tasks/tasks-1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md`, `.agent/task/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment.md`, `docs/findings/1012-codex-0111-gpt-5-4-compatibility-deliberation.md`, `.runs/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment/cli/2026-03-06T00-27-39-186Z-2b3367e1/manifest.json`, `out/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment/manual/20260305T230358Z-local-compat/`, `out/1012-codex-0111-gpt-5-4-compatibility-and-adoption-realignment/manual/20260306T004500Z-closeout/00-closeout-summary.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md:48:- Initial review evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/15-next-slice-note.md`, `/Users/kbediako/Code/symphony/SPEC.md`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir_web/presenter.ex`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir_web/controllers/observability_api_controller.ex`.
+tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md:19:- Initial review evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/15-next-slice-note.md`, `/Users/kbediako/Code/symphony/SPEC.md`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir_web/presenter.ex`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir_web/controllers/observability_api_controller.ex`.
+docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md:20:- Real `openai/symphony` local clone at `/Users/kbediako/Code/symphony`.
+docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md:34:  - `npm run pack:smoke`
+
+thinking
+**Inspecting initial review evidence**
+
+I noticed that the document could have duplicated initial review evidence, especially around line 48. I should check the lines from 44 to 52 to see if anything looks off. It's crucial to ensure there aren't any redundant entries, as it could lead to confusion or errors in the review process. I'll get to that as soon as possible to clarify the situation!
+thinking
+**Inspecting initial review evidence**
+
+I noticed that the document could have duplicated initial review evidence, especially around line 48. I should check the lines from 44 to 52 to see if anything looks off. It's crucial to ensure there aren't any redundant entries, as it could lead to confusion or errors in the review process. I'll get to that as soon as possible to clarify the situation!
+exec
+/bin/zsh -lc "nl -ba docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md | sed -n '42,52p'" in /Users/kbediako/Code/CO succeeded in 53ms:
+    42	  - `orchestrator/tests/TelegramOversightBridge.test.ts`
+    43	  - `orchestrator/tests/ControlServer.test.ts` if route stability coverage needs adjustment
+    44	
+    45	## Pre-Implementation Review Note
+    46	- Decision: approved for docs-first planning and immediate implementation as the next slice after `1025`.
+    47	- Reasoning: `1025` unified snapshot shaping, but the runtime contract still leans on compatibility HTTP envelopes. Real Symphony keeps orchestrator/runtime snapshot state primary and presenter/controller layers thin. The narrowest remaining correction is therefore to expose the canonical runtime-owned selected-run seam directly from `ControlRuntime` and let Telegram consume it without another transport-shaped hop.
+    48	- Initial review evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/15-next-slice-note.md`, `/Users/kbediako/Code/symphony/SPEC.md`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir_web/presenter.ex`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir_web/controllers/observability_api_controller.ex`.
+    49	
+    50	## Technical Requirements
+    51	- Functional requirements:
+    52	  - `ControlRuntimeSnapshot` exposes a canonical selected-run/read-model method for internal consumers,
+
+thinking
+**Clarifying validation plans**
+
+I’m realizing that it’s not just about docs or tasks. The tasks checklist mentions a condition on line 35, which is important. I need to consider whether the specifications are included and if the validation plan contains the full validation chain. It might be that it isn't entirely conditional. I should take a moment to search for more clarity on this to make sure my understanding is accurate!
+thinking
+**Clarifying validation plans**
+
+I’m realizing that it’s not just about docs or tasks. The tasks checklist mentions a condition on line 35, which is important. I need to consider whether the specifications are included and if the validation plan contains the full validation chain. It might be that it isn't entirely conditional. I should take a moment to search for more clarity on this to make sure my understanding is accurate!
+exec
+/bin/zsh -lc "rg -n 'pack:smoke' docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md" in /Users/kbediako/Code/CO succeeded in 53ms:
+tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md:35:- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/10-pack-smoke.log`.
+docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md:34:  - `npm run pack:smoke`
+
+thinking
+**Evaluating task alignment**
+
+I’m looking into the action plan and the TASKS line. It seems the TECH_SPEC doesn't mention pack:smoke, which throws me off. There's a discrepancy between docs/TASKS and the ACTION_PLAN, especially regarding the task checklist/AGENTS. I might consider action plan line 34 for precision since it might influence the validation plan. I’ll need to check line numbers around 30-36 to get a clearer view of the situation.
+thinking
+**Evaluating task alignment**
+
+I’m looking into the action plan and the TASKS line. It seems the TECH_SPEC doesn't mention pack:smoke, which throws me off. There's a discrepancy between docs/TASKS and the ACTION_PLAN, especially regarding the task checklist/AGENTS. I might consider action plan line 34 for precision since it might influence the validation plan. I’ll need to check line numbers around 30-36 to get a clearer view of the situation.
+exec
+/bin/zsh -lc "nl -ba docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md | sed -n '28,36p'" in /Users/kbediako/Code/CO succeeded in 53ms:
+    28	  - `npm run lint`
+    29	  - `npm run test`
+    30	  - `npm run docs:check`
+    31	  - `npm run docs:freshness`
+    32	  - `node scripts/diff-budget.mjs`
+    33	  - `npm run review`
+    34	  - `npm run pack:smoke`
+    35	  - focused manual/mock Telegram status/issue evidence
+    36	- Rollback plan:
+exec
+/bin/zsh -lc 'test -f out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/15-next-slice-note.md && echo exists || echo missing' in /Users/kbediako/Code/CO succeeded in 53ms:
+exists
+
+
+
+
+thinking
+**Clarifying documentation issues**
+
+I need to clarify that “pack:smoke when required by downstream-facing paths” could be omitted from the necessary snapshot. There may also be a stronger issue because the checklist hasn’t been updated with the known docs-review manifest after the review wrapper run. It seems that the evidence placeholder is outdated at review time, which raises the question of whether the author should fix it. The review process is ongoing, so it’s not fair to expect the docs to know the final path yet.
+thinking
+**Exploring review requirements**
+
+The requirement states that evidence should be captured after the registered docs-review run, so it might still be pending until the review output is finished. There’s a concern about the spec indicating that initial review evidence uses a local path, and the previous task flagged this issue. I need to check if there are existing documents or tests suggesting that full validation suites should be avoided, as the user review prompt advises. However, it seems that the scout subtask ran the necessary tests independently, which may be separate from the current patch process.
+thinking
+**Reviewing evidence and claims**
+
+The author could fix their argument by either citing actual manifests or toning down their claims. I believe they should definitely provide evidence since it's essential for auditability. I need to avoid relying on unstated assumptions here. The task notes mention that a delegated review was captured, but the evidence only refers to a narrative markdown file; currently, the only manifest present is the diagnostics scout! I should verify if that's really the only one.
+thinking
+**Clarifying run evidence**
+
+I might need to mention something important: if this is relying on the scout run, that run conducted build, lint, test, and spec-guard, which means it doesn't back the "read-only review" claim. I can actually prove this from the run-summary.json file! That evidence seems stronger than just a local path. I should check tasks/spec line 20 or the task checklist line 14, focusing on the delegated read-only review approval captured.
+thinking
+**Clarifying documentation issues**
+
+I need to clarify that “pack:smoke when required by downstream-facing paths” could be omitted from the necessary snapshot. There may also be a stronger issue because the checklist hasn’t been updated with the known docs-review manifest after the review wrapper run. It seems that the evidence placeholder is outdated at review time, which raises the question of whether the author should fix it. The review process is ongoing, so it’s not fair to expect the docs to know the final path yet.
+thinking
+**Exploring review requirements**
+
+The requirement states that evidence should be captured after the registered docs-review run, so it might still be pending until the review output is finished. There’s a concern about the spec indicating that initial review evidence uses a local path, and the previous task flagged this issue. I need to check if there are existing documents or tests suggesting that full validation suites should be avoided, as the user review prompt advises. However, it seems that the scout subtask ran the necessary tests independently, which may be separate from the current patch process.
+thinking
+**Reviewing evidence and claims**
+
+The author could fix their argument by either citing actual manifests or toning down their claims. I believe they should definitely provide evidence since it's essential for auditability. I need to avoid relying on unstated assumptions here. The task notes mention that a delegated review was captured, but the evidence only refers to a narrative markdown file; currently, the only manifest present is the diagnostics scout! I should verify if that's really the only one.
+thinking
+**Clarifying run evidence**
+
+I might need to mention something important: if this is relying on the scout run, that run conducted build, lint, test, and spec-guard, which means it doesn't back the "read-only review" claim. I can actually prove this from the run-summary.json file! That evidence seems stronger than just a local path. I should check tasks/spec line 20 or the task checklist line 14, focusing on the delegated read-only review approval captured.
+exec
+/bin/zsh -lc "nl -ba tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md | sed -n '10,16p'" in /Users/kbediako/Code/CO succeeded in 53ms:
+    10	## Foundation
+    11	- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `.agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`.
+    12	- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`.
+    13	
+    14	## Shared Registry + Review Handoff
+    15	- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+    16	- [x] Delegated read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`.
+
+
+

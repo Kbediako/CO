@@ -17,7 +17,7 @@ export interface DelegationConfigLayer {
     allowNested?: boolean;
     toolProfile?: string[];
     allowedToolServers?: string[];
-    mode?: 'full' | 'question_only';
+    mode?: 'full' | 'question_only' | 'status_only';
     expiryFallback?: 'pause' | 'resume' | 'fail';
   };
   rlm?: {
@@ -65,7 +65,7 @@ export interface EffectiveDelegationConfig {
     allowNested: boolean;
     toolProfile: string[];
     allowedToolServers: string[];
-    mode: 'full' | 'question_only';
+    mode: 'full' | 'question_only' | 'status_only';
     expiryFallback: 'pause' | 'resume' | 'fail';
   };
   rlm: {
@@ -230,7 +230,7 @@ export function computeEffectiveDelegationConfig(options: {
     }
   };
 
-  if (effective.delegate.mode !== 'full' && effective.delegate.mode !== 'question_only') {
+  if (effective.delegate.mode !== 'full' && effective.delegate.mode !== 'question_only' && effective.delegate.mode !== 'status_only') {
     effective.delegate.mode = defaults.delegate.mode;
   }
 
@@ -386,7 +386,7 @@ function normalizeDelegate(value: unknown): DelegationConfigLayer['delegate'] {
     allowNested: asBoolean(record.allow_nested ?? record.allowNested),
     toolProfile: asStringArray(record.tool_profile ?? record.toolProfile),
     allowedToolServers: asStringArray(record.allowed_tool_servers ?? record.allowedToolServers),
-    mode: asString(record.mode) as 'full' | 'question_only' | undefined,
+    mode: asString(record.mode) as 'full' | 'question_only' | 'status_only' | undefined,
     expiryFallback: asString(record.question_expiry_fallback ?? record.expiryFallback) as
       | 'pause'
       | 'resume'

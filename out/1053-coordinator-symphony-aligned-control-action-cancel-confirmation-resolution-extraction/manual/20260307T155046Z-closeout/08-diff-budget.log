@@ -1,0 +1,17 @@
+❌ Diff budget exceeded (base=origin/main)
+ - changed files 511 > 25
+ - total lines changed 53412 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 6072
+  - docs/docs-freshness-registry.json: 5223
+  - tasks/index.json: 2610
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1457
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/controlActionPreflight.ts: 781
+
+To proceed, either split the change into smaller diffs or set an explicit justification:
+  DIFF_BUDGET_OVERRIDE_REASON="why this diff must be large" node scripts/diff-budget.mjs

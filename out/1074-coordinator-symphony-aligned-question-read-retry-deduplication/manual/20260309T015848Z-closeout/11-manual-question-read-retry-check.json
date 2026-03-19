@@ -1,0 +1,35 @@
+{
+  "task_id": "1074-coordinator-symphony-aligned-question-read-retry-deduplication",
+  "timestamp": "2026-03-09T01:58:48Z",
+  "scenarios": [
+    {
+      "name": "api_questions_read_excludes_fresh_expiry_retry",
+      "surface": "authenticated /questions",
+      "evidence": "orchestrator/tests/ControlServer.test.ts",
+      "assertions": [
+        "expired child-question reads emit one question_closed event",
+        "freshly expired child-question reads emit exactly one question.resolve_child_fallback event"
+      ]
+    },
+    {
+      "name": "telegram_questions_read_excludes_fresh_expiry_retry",
+      "surface": "telegram /questions polling",
+      "evidence": "orchestrator/tests/TelegramOversightBridge.test.ts",
+      "assertions": [
+        "telegram /questions returns no queued questions after expiry",
+        "child control endpoint is attempted exactly once",
+        "fallback audit emission count remains 1"
+      ]
+    },
+    {
+      "name": "helper_preserves_answered_or_dismissed_interleavings",
+      "surface": "shared question-read retry selector",
+      "evidence": "orchestrator/tests/QuestionReadRetryDeduplication.test.ts",
+      "assertions": [
+        "queued->answered transitions remain retry-eligible",
+        "queued->dismissed transitions remain retry-eligible",
+        "queued->expired transitions are excluded from same-read retries"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "generated_at": "2026-03-07T12:36:13.619Z",
+  "scenarios": {
+    "missing_request_id": {
+      "handled": true,
+      "steps": [
+        "expire",
+        "read"
+      ],
+      "response": {
+        "statusCode": 400,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "error": "missing_request_id"
+        }
+      }
+    },
+    "camel_request_id_default_actor": {
+      "handled": true,
+      "steps": [
+        "expire",
+        "read",
+        "approve:req-camel:ui",
+        "get:req-camel",
+        "persist-confirmations"
+      ],
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "approved"
+        }
+      }
+    },
+    "non_ui_approved": {
+      "handled": true,
+      "steps": [
+        "expire",
+        "read",
+        "approve:req-plain:operator",
+        "get:req-plain",
+        "persist-confirmations"
+      ],
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "approved"
+        }
+      }
+    },
+    "ui_cancel_success": {
+      "handled": true,
+      "steps": [
+        "expire",
+        "read",
+        "approve:req-ui-cancel:telegram",
+        "get:req-ui-cancel",
+        "persist-confirmations",
+        "issue:req-ui-cancel",
+        "validate:signed-nonce:ui.cancel:{}",
+        "persist-confirmations",
+        "emit:req-ui-cancel:nonce-1",
+        "update-control:req-ui-cancel:telegram",
+        "persist-control",
+        "publish"
+      ],
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "approved"
+        }
+      }
+    },
+    "ui_cancel_failure": {
+      "handled": true,
+      "steps": [
+        "expire",
+        "read",
+        "approve:req-ui-fail:ui",
+        "get:req-ui-fail",
+        "persist-confirmations",
+        "issue:req-ui-fail",
+        "validate:signed-nonce:ui.cancel:{}"
+      ],
+      "response": {
+        "statusCode": 409,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "error": "confirmation_invalid"
+        }
+      }
+    }
+  }
+}

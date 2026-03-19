@@ -30,7 +30,58 @@ async function makeManifestForTask(sandbox: string, taskId: string, runId: strin
   await mkdir(runDir, { recursive: true });
   const manifestPath = join(runDir, 'manifest.json');
   await writeFile(manifestPath, JSON.stringify({ run: 'sample' }), 'utf8');
+  await writeFile(join(runDir, 'runner.ndjson'), '{"event":"sample"}\n', 'utf8');
   return manifestPath;
+}
+
+async function makeDetachedManifest(sandbox: string): Promise<string> {
+  const runDir = join(sandbox, 'detached-review-run');
+  await mkdir(runDir, { recursive: true });
+  const manifestPath = join(runDir, 'manifest.json');
+  await writeFile(manifestPath, JSON.stringify({ run: 'detached' }), 'utf8');
+  await writeFile(join(runDir, 'runner.ndjson'), '{"event":"detached"}\n', 'utf8');
+  return manifestPath;
+}
+
+async function makeCloseoutBundle(
+  sandbox: string,
+  taskId: string,
+  bundleName = 'TODO-closeout'
+): Promise<string> {
+  const bundleDir = join(sandbox, 'out', taskId, 'manual', bundleName);
+  await mkdir(bundleDir, { recursive: true });
+  await writeFile(join(bundleDir, '09-review.log'), 'shellProbeCount\n', 'utf8');
+  await writeFile(join(bundleDir, '13-override-notes.md'), 'getShellProbeBoundaryState\n', 'utf8');
+  return bundleDir;
+}
+
+async function writeTaskDocsFirstContext(
+  sandbox: string,
+  taskId: string,
+  options: { includeArchitectureBaseline?: boolean } = {}
+): Promise<void> {
+  await mkdir(join(sandbox, 'tasks', 'specs'), { recursive: true });
+  await mkdir(join(sandbox, 'docs'), { recursive: true });
+  await writeFile(
+    join(sandbox, 'tasks', `tasks-${taskId}.md`),
+    [
+      `# Task Checklist - ${taskId}`,
+      '',
+      `- MCP Task ID: \`${taskId}\``,
+      `- Primary PRD: \`docs/PRD-${taskId}.md\``,
+      `- TECH_SPEC: \`tasks/specs/${taskId}.md\``,
+      `- ACTION_PLAN: \`docs/ACTION_PLAN-${taskId}.md\``,
+      ''
+    ].join('\n'),
+    'utf8'
+  );
+  await writeFile(join(sandbox, 'docs', `PRD-${taskId}.md`), '# PRD\n', 'utf8');
+  await writeFile(join(sandbox, 'tasks', 'specs', `${taskId}.md`), '# TECH_SPEC\n', 'utf8');
+  await writeFile(join(sandbox, 'docs', `ACTION_PLAN-${taskId}.md`), '# ACTION_PLAN\n', 'utf8');
+  if (options.includeArchitectureBaseline) {
+    await mkdir(join(sandbox, '.agent', 'system'), { recursive: true });
+    await writeFile(join(sandbox, '.agent', 'system', 'architecture.md'), '# Architecture\n', 'utf8');
+  }
 }
 
 async function runGit(args: string[], cwd: string): Promise<void> {
@@ -39,7 +90,8 @@ async function runGit(args: string[], cwd: string): Promise<void> {
 
 async function initGitRepoWithCommittedFiles(
   sandbox: string,
-  fileCount: number
+  fileCount: number,
+  extension = '.txt'
 ): Promise<{ files: string[] }> {
   await runGit(['init', '-q'], sandbox);
   await runGit(['config', 'user.email', 'run-review-tests@example.com'], sandbox);
@@ -47,13 +99,26 @@ async function initGitRepoWithCommittedFiles(
 
   const files: string[] = [];
   for (let index = 1; index <= fileCount; index += 1) {
-    const file = `file-${index}.txt`;
+    const file = `file-${index}${extension}`;
     files.push(file);
     await writeFile(join(sandbox, file), `baseline-${index}\n`, 'utf8');
   }
   await runGit(['add', '.'], sandbox);
   await runGit(['commit', '-m', 'seed'], sandbox);
   return { files };
+}
+
+async function initGitRepoWithTouchedPath(sandbox: string, relativePath: string): Promise<void> {
+  await runGit(['init', '-q'], sandbox);
+  await runGit(['config', 'user.email', 'run-review-tests@example.com'], sandbox);
+  await runGit(['config', 'user.name', 'run-review-tests'], sandbox);
+
+  const filePath = join(sandbox, relativePath);
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(filePath, 'baseline\n', 'utf8');
+  await runGit(['add', '.'], sandbox);
+  await runGit(['commit', '-m', 'seed touched path'], sandbox);
+  await writeFile(filePath, 'updated\n', 'utf8');
 }
 
 async function makeFakeCodex(sandbox: string): Promise<string> {
@@ -80,6 +145,9 @@ if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
   } > "\${RUN_REVIEW_ARGS_LOG}"
 fi
 if [[ "\${1:-}" == "--help" ]]; then
+  if [[ "\${RUN_REVIEW_MODE:-ok}" == "delete-after-help" ]]; then
+    rm -f "$0"
+  fi
   echo "OpenAI Codex CLI"
   echo "  review   Review changes"
   exit 0
@@ -87,6 +155,13 @@ fi
   if [[ "\${1:-}" == "review" ]]; then
     mode="\${RUN_REVIEW_MODE:-ok}"
     if [[ "$mode" == "hang" ]]; then
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "term-graceful-timeout" ]]; then
+      trap 'echo "term-sentinel"; exit 0' TERM
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,40p scripts/run-review.ts' in /Users/kbediako/Code/CO"
       while true; do sleep 1; done
     fi
     if [[ "$mode" == "delegation-loop" ]]; then
@@ -121,10 +196,520 @@ fi
         sleep 0.05
       done
     fi
+    if [[ "$mode" == "low-signal-drift" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p scripts/lib/review-execution-state.ts' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p tasks/tasks-1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "relevant-reinspection-dwell" ]]; then
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.05
+        done
+      done
+    fi
+    if [[ "$mode" == "relevant-reinspection-dwell-fast-exit" ]]; then
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      for command in "\${commands[@]}"; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+        sleep 0.01
+      done
+      sleep 0.15
+      exit 0
+    fi
+    if [[ "$mode" == "relevant-reinspection-concrete-output" ]]; then
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+      )
+      for command in "\${commands[@]}"; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      echo "Potential finding at file-1.py:1 indicates the touched diff now stays within the expected contract."
+      exit 0
+    fi
+    if [[ "$mode" == "relevant-reinspection-diverse" ]]; then
+      targets=(
+        "file-1.py"
+        "file-2.py"
+        "file-3.py"
+        "file-4.py"
+        "file-5.py"
+      )
+      for target in "\${targets[@]}"; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,20p \${target}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      exit 0
+    fi
+    if [[ "$mode" == "architecture-relevant-reinspection-dwell" ]]; then
+      commands=(
+        "sed -n 1,120p tasks/tasks-sample-task.md"
+        "sed -n 1,120p docs/PRD-sample-task.md"
+        "sed -n 1,120p tasks/specs/sample-task.md"
+        "sed -n 1,120p docs/ACTION_PLAN-sample-task.md"
+        "sed -n 1,120p .agent/system/architecture.md"
+        "sed -n 1,120p file-1.py"
+        "sed -n 1,120p file-2.py"
+        "sed -n 121,240p tasks/tasks-sample-task.md"
+        "sed -n 121,240p docs/PRD-sample-task.md"
+        "sed -n 121,240p tasks/specs/sample-task.md"
+        "sed -n 121,240p docs/ACTION_PLAN-sample-task.md"
+        "sed -n 121,240p .agent/system/architecture.md"
+        "sed -n 121,240p file-1.py"
+        "sed -n 121,240p file-2.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.05
+        done
+      done
+    fi
+    if [[ "$mode" == "verdict-stability-drift" ]]; then
+      targets=(
+        "scripts/run-review.ts"
+        "scripts/lib/review-execution-state.ts"
+        "tests/run-review.spec.ts"
+        "docs/standalone-review-guide.md"
+      )
+      for target in "\${targets[@]}"; do
+        echo "thinking"
+        echo "I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug."
+        echo "I need to inspect dist/tests/review-scope-paths.spec.js to confirm whether the generated test surface still exposes the bug."
+        echo "I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review."
+        echo "I am still considering whether scripts/lib/review-scope-paths.ts requires another parity change before I can finish the review."
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p \${target}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "generic-speculative-dwell" ]]; then
+      narratives=(
+        "Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict."
+        "Maybe the reviewer is still circling around ANSI stripping before reaching a final verdict."
+        "I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review."
+        "I am still considering whether the small-diff revisit policy needs another tweak before I can finish the review."
+      )
+      targets=(
+        "scripts/run-review.ts"
+        "scripts/lib/review-execution-state.ts"
+        "tests/run-review.spec.ts"
+        "docs/standalone-review-guide.md"
+      )
+      for index in 0 1 2 3; do
+        echo "thinking"
+        echo "\${narratives[$index]}"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p \${targets[$index]}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "verdict-stability-progress" ]]; then
+      targets=(
+        "scripts/run-review.ts"
+        "scripts/lib/review-execution-state.ts"
+        "tests/run-review.spec.ts"
+        "docs/standalone-review-guide.md"
+        "docs/PRD-coordinator-symphony-aligned-standalone-review-verdict-stability-guard.md"
+      )
+      for target in "\${targets[@]}"; do
+        echo "thinking"
+        echo "I need to inspect \${target} to verify the new concrete review surface before finalizing findings."
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p \${target}' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      exit 0
+    fi
+    if [[ "$mode" == "citation-contract-local" ]]; then
+      prompt="$*"
+      if [[ "$prompt" == *"Concrete same-diff progress can be shown by citing touched paths with explicit locations"* ]]; then
+        if [[ "$prompt" == *"do not search the wider repo for other examples of the rendering"* ]]; then
+          echo "thinking"
+          echo "The diff-local citation contract is explicit, so I can stay on the touched surface."
+          echo "exec"
+          echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+          echo "tests/run-review.spec.ts:2250 keeps the bounded runtime citation contract covered."
+          exit 0
+        fi
+      fi
+      echo "thinking"
+      echo "I need to search the repo for citation-style examples before I can trust the concrete-progress surface."
+      echo "exec"
+      echo "/bin/zsh -lc 'rg -n \"path#L123|path:123\" docs tests scripts' in /Users/kbediako/Code/CO"
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "meta-surface-expansion" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "tool delegation.delegate.status({\"pipeline\":\"docs-review\"})"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'cat .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "meta-surface-expansion-audit-unrelated" ]]; then
+      for _ in $(seq 1 2); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p docs/guides/review-artifacts.md' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      sleep 5
+    fi
+    if [[ "$mode" == "meta-surface-audit-evidence-only" ]]; then
+      for _ in $(seq 1 24); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,80p .runs/sample-task/cli/sample-run/manifest.json' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'tail -n 80 .runs/sample-task/cli/sample-run/runner.ndjson' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      exit 0
+    fi
+    if [[ "$mode" == "startup-anchor-drift" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "audit-explicit-manifest-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,80p \${MANIFEST}' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-exported-manifest-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'export MANIFEST=\$MANIFEST; sed -n 1,80p \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-leading-assignment-export" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'MANIFEST=/tmp/other.json export MANIFEST; sed -n 1,80p \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-pipeline-manifest-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'export MANIFEST=/tmp/other.json | cat >/dev/null; sed -n 1,80p \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-exported-run-log-alias-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'export RUN_LOG=\$RUNNER_LOG; tail -n 80 \"\$RUN_LOG\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "audit-env-unset-child-manifest-anchor" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'env -u MANIFEST sed -n 1,80p \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "shell-probe-single" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/bash -lc 'MANIFEST=/tmp/other.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      exit 0
+    fi
+    if [[ "$mode" == "shell-probe-repeat-fast-exit" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/bash -lc 'MANIFEST=/tmp/other.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'MANIFEST=/tmp/third.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      sleep 0.05
+      exit 0
+    fi
+    if [[ "$mode" == "shell-probe-repeat-hang" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/bash -lc 'MANIFEST=/tmp/other.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'MANIFEST=/tmp/third.json; export MANIFEST; printf \"%s\\n\" \"\$MANIFEST\"' in /Users/kbediako/Code/CO"
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "shell-probe-repeat-nested-fast-exit" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc '/bin/bash -lc \\\"printenv MANIFEST\\\"' in /Users/kbediako/Code/CO"
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc '/bin/bash -lc \\\"printenv MANIFEST\\\"' in /Users/kbediako/Code/CO"
+      sleep 0.05
+      exit 0
+    fi
+    if [[ "$mode" == "review-self-containment-drift" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p docs/guides/review-artifacts.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p scripts/pack-smoke.mjs' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p scripts/lib/run-manifests.js' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/prompt.txt' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/output.log' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "active-closeout-self-reference-search" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 6); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'grep -R \"shellProbeCount\\|getShellProbeBoundaryState\" -n .' in /Users/kbediako/Code/CO"
+        echo "out/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "active-closeout-self-reference-search-mixed" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 2); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p docs/standalone-review-guide.md' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p .runs/sample-task/cli/sample-run/review/output.log' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'grep -R \"shellProbeCount\\|getShellProbeBoundaryState\" -n .' in /Users/kbediako/Code/CO"
+        echo "out/sample-task/manual/TODO-closeout/09-review.log:278:shellProbeCount"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "active-closeout-self-reference-reread" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p file-1.txt' in /Users/kbediako/Code/CO"
+      closeout_targets=(
+        "out/sample-task/manual/TODO-closeout/09-review.log"
+        "$CODEX_ORCHESTRATOR_ROOT/out/sample-task/manual/TODO-closeout/13-override-notes.md"
+        "out/sample-task/manual/TODO-closeout/09-review.log"
+        "$CODEX_ORCHESTRATOR_ROOT/out/sample-task/manual/TODO-closeout/13-override-notes.md"
+        "out/sample-task/manual/TODO-closeout/09-review.log"
+      )
+      for target in "\${closeout_targets[@]}"; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p $target' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "active-completed-closeout-self-reference-search" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 6); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'grep -R \"shellProbeCount\\|getShellProbeBoundaryState\" -n .' in /Users/kbediako/Code/CO"
+        echo "out/sample-task/manual/20260311T000000Z-closeout/09-review.log:278:shellProbeCount"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "untouched-helper-review-support-drift" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 6); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-prompt-context.js' in /Users/kbediako/Code/CO"
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p tests/review-prompt-context.spec.ts' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "untouched-shell-env-helper-review-support-drift" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'sed -n 1,120p scripts/run-review.ts' in /Users/kbediako/Code/CO"
+      for _ in $(seq 1 6); do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,120p dist/scripts/lib/review-shell-env-interpreter.js' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+      while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "command-intent-validation" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "command-intent-validation-fast-exit" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+      sleep 0.05
+      exit 0
+    fi
+    if [[ "$mode" == "command-intent-validation-fast-exit-nonzero" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npx vitest run --config vitest.config.core.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+      sleep 0.05
+      exit 2
+    fi
+    if [[ "$mode" == "command-intent-validation-shorthand" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'pnpm vitest run tests/run-review.spec.ts' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "command-intent-review-orchestration" ]]; then
+      while true; do
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'codex-orchestrator start docs-review --task sample-task' in /Users/kbediako/Code/CO"
+        sleep 0.05
+      done
+    fi
+    if [[ "$mode" == "command-intent-delegation-control" ]]; then
+      while true; do
+        echo "tool delegation.delegate.status({\"pipeline\":\"docs-review\"})"
+        echo "tool delegation.delegate.spawn({\"pipeline\":\"docs-review\"})"
+        sleep 0.05
+      done
+    fi
     if [[ "$mode" == "heavy-hang" ]]; then
       echo "thinking"
       echo "exec"
       echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
+    if [[ "$mode" == "heavy-hang-typecheck" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run typecheck -- run-review' in /tmp/run-review-heavy"
       while true; do
         sleep 1
       done
@@ -146,11 +731,29 @@ fi
         sleep 1
       done
     fi
+    if [[ "$mode" == "heavy-hang-cross-stream-warning-typecheck" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "warning" >&2
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run typecheck -- run-review' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
     if [[ "$mode" == "heavy-hang-same-stream-warning" ]]; then
       echo "thinking"
       echo "exec"
       echo "warning: noisy line before command"
       echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
+    if [[ "$mode" == "heavy-hang-same-stream-warning-typecheck" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "warning: noisy line before command"
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run typecheck -- run-review' in /tmp/run-review-heavy"
       while true; do
         sleep 1
       done
@@ -166,16 +769,39 @@ fi
         sleep 1
       done
     fi
+    if [[ "$mode" == "heavy-hang-long-noise-typecheck" ]]; then
+      echo "thinking"
+      echo "exec"
+      for i in $(seq 1 8); do
+        echo "warning-$i: noisy line before command"
+      done
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run typecheck -- run-review' in /tmp/run-review-heavy"
+      while true; do
+        sleep 1
+      done
+    fi
     if [[ "$mode" == "heavy-fast-exit" ]]; then
       echo "thinking"
       echo "exec"
       echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy"
       exit 0
     fi
+    if [[ "$mode" == "heavy-fast-exit-typecheck" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run typecheck -- run-review' in /tmp/run-review-heavy"
+      exit 0
+    fi
     if [[ "$mode" == "heavy-fast-cross-stream-command" ]]; then
       echo "thinking"
       echo "exec"
       echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run test -- run-review' in /tmp/run-review-heavy" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "heavy-fast-cross-stream-command-typecheck" ]]; then
+      echo "thinking"
+      echo "exec"
+      echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run typecheck -- run-review' in /tmp/run-review-heavy" >&2
       exit 0
     fi
     if [[ "$mode" == "heavy-hang-workspaces-flag" ]]; then
@@ -287,6 +913,11 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
     CODEX_CLI_BIN: codexBin,
     CODEX_ORCHESTRATOR_ROOT: sandbox
   };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('RUN_REVIEW_')) {
+      delete env[key];
+    }
+  }
   delete env.CODEX_REVIEW_STALL_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS;
@@ -296,10 +927,19 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_DISABLE_DELEGATION_MCP;
   delete env.CODEX_REVIEW_ALLOW_HEAVY_COMMANDS;
   delete env.CODEX_REVIEW_ENFORCE_BOUNDED_MODE;
+  delete env.CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS;
+  delete env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS;
+  delete env.CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
+  delete env.CODEX_REVIEW_SURFACE;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
+  delete env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
   delete env.CODEX_ORCHESTRATOR_RUN_DIR;
+  delete env.MCP_RUNNER_TASK_ID;
+  delete env.TASK;
+  delete env.CODEX_ORCHESTRATOR_TASK_ID;
+  delete env.MANIFEST;
   delete env.SKIP_DIFF_BUDGET;
   delete env.DIFF_BUDGET_STAGE;
   delete env.DIFF_BUDGET_OVERRIDE_REASON;
@@ -407,8 +1047,20 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(boundedResult.stdout).toContain('bounded review guidance enabled by default');
     const boundedPromptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
     const boundedPrompt = await readFile(boundedPromptPath, 'utf8');
+    expect(boundedPrompt).toContain('Review surface: diff');
+    expect(boundedPrompt).not.toContain('Evidence manifest:');
+    expect(boundedPrompt).not.toContain('Task context:');
+    expect(boundedPrompt).not.toContain('Active closeout provenance:');
+    expect(boundedPrompt).not.toContain('Evidence + checklist mirroring requirements are satisfied');
     expect(boundedPrompt).toContain('Execution constraints (bounded review mode):');
     expect(boundedPrompt).toContain('Avoid full validation suites');
+    expect(boundedPrompt).toContain('Keep this pass diff-focused.');
+    expect(boundedPrompt).toContain(
+      'Concrete same-diff progress can be shown by citing touched paths with explicit locations'
+    );
+    expect(boundedPrompt).toContain(
+      'do not search the wider repo for other examples of the rendering'
+    );
 
     const heavyManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'sample-run-heavy-commands');
     const heavyResult = await runReviewCommand(heavyManifestPath, {
@@ -421,6 +1073,286 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const heavyPromptPath = join(dirname(heavyManifestPath), 'review', 'prompt.txt');
     const heavyPrompt = await readFile(heavyPromptPath, 'utf8');
     expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
+  });
+
+  it('uses a generated NOTES fallback when NOTES is absent', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      NOTES: ''
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain('[run-review] NOTES was not provided; using a generated fallback.');
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Agent notes:');
+    expect(prompt).toContain(
+      'Goal: standalone review handoff | Summary: auto-generated NOTES fallback (task=sample-task, surface=diff) | Risks: missing custom intent details may reduce review precision'
+    );
+  });
+
+  it('ignores ambient fake-codex harness env in baseEnv', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const previousMode = process.env.RUN_REVIEW_MODE;
+
+    process.env.RUN_REVIEW_MODE = 'delete-after-help';
+    try {
+      const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('bounded review guidance enabled by default');
+    } finally {
+      if (previousMode === undefined) {
+        delete process.env.RUN_REVIEW_MODE;
+      } else {
+        process.env.RUN_REVIEW_MODE = previousMode;
+      }
+    }
+  });
+
+  it('surfaces active closeout provenance in the diff-mode handoff for the direct task', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Active closeout provenance:');
+    expect(prompt).toContain('- Resolved active closeout root: `out/sample-task/manual/TODO-closeout`');
+    expect(prompt).toContain(
+      'do not re-derive or re-enumerate them unless directly necessary to assess code correctness'
+    );
+  });
+
+  it('surfaces parent-task active closeout provenance for delegated task ids', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, 'sample-task-scout', 'review-closeout-parent');
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: 'sample-task',
+            title: 'Sample Task',
+            relates_to: 'tasks/tasks-sample-task.md'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Active closeout provenance:');
+    expect(prompt).toContain('- Resolved active closeout root: `out/sample-task/manual/TODO-closeout`');
+    expect(prompt).not.toContain('out/sample-task-scout/manual/TODO-closeout');
+  });
+
+  it('surfaces TODO and latest completed closeout provenance together in the diff-mode handoff', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    await makeCloseoutBundle(sandbox, 'sample-task', '20260311T000000Z-closeout');
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('- Resolved active closeout root: `out/sample-task/manual/TODO-closeout`');
+    expect(prompt).toContain(
+      '- Resolved active closeout root: `out/sample-task/manual/20260311T000000Z-closeout`'
+    );
+  });
+
+  it('includes checklist and manifest context only on the explicit audit surface', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const taskId = 'sample-task';
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', `tasks-${taskId}.md`),
+      [
+        `# Task Checklist - ${taskId}`,
+        '',
+        `- MCP Task ID: \`${taskId}\``,
+        `- Primary PRD: \`docs/PRD-${taskId}.md\``,
+        `- TECH_SPEC: \`tasks/specs/${taskId}.md\``,
+        `- ACTION_PLAN: \`docs/ACTION_PLAN-${taskId}.md\``,
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'docs', `PRD-${taskId}.md`),
+      ['# PRD', '', '## Summary', '', '- audit bullet one', '- audit bullet two', ''].join('\n'),
+      'utf8'
+    );
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--task', taskId, '--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review surface: audit');
+    expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/sample-run/manifest.json');
+    expect(prompt).toContain('Evidence runner log: .runs/sample-task/cli/sample-run/runner.ndjson');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+    expect(prompt).toContain('Evidence + checklist mirroring requirements are satisfied');
+    expect(prompt).toContain(
+      'Start with the manifest or runner log before consulting memory, skills, or review docs'
+    );
+    expect(prompt).toContain(
+      'Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
+    );
+    expect(prompt).not.toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).not.toContain('- audit bullet one');
+    expect(prompt).not.toContain('- audit bullet two');
+    expect(prompt).not.toContain('tasks/specs/sample-task.md');
+    expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
+    expect(prompt).not.toContain('Keep this review focused on changed files and nearby dependencies.');
+  });
+
+  it('supports CODEX_REVIEW_SURFACE env fallback for audit mode', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const taskId = 'sample-task';
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', `tasks-${taskId}.md`),
+      [
+        `# Task Checklist - ${taskId}`,
+        '',
+        `- MCP Task ID: \`${taskId}\``,
+        `- Primary PRD: \`docs/PRD-${taskId}.md\``,
+        `- TECH_SPEC: \`tasks/specs/${taskId}.md\``,
+        `- ACTION_PLAN: \`docs/ACTION_PLAN-${taskId}.md\``,
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'docs', `PRD-${taskId}.md`),
+      ['# PRD', '', '## Summary', '', '- env fallback bullet', ''].join('\n'),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_REVIEW_SURFACE: 'audit'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review surface: audit');
+    expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/sample-run/manifest.json');
+    expect(prompt).toContain('Evidence runner log: .runs/sample-task/cli/sample-run/runner.ndjson');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+    expect(prompt).toContain(
+      'Start with the manifest or runner log before consulting memory, skills, or review docs'
+    );
+    expect(prompt).toContain(
+      'Keep this review focused on the requested audit surfaces, supporting evidence, and directly related code/docs paths.'
+    );
+    expect(prompt).not.toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).not.toContain('- env fallback bullet');
+    expect(prompt).not.toContain('tasks/specs/sample-task.md');
+    expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
+    expect(prompt).not.toContain('Keep this review focused on changed files and nearby dependencies.');
+  });
+
+  it('includes canonical docs-first context only on the explicit architecture surface', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const taskId = 'sample-task';
+    await writeTaskDocsFirstContext(sandbox, taskId, { includeArchitectureBaseline: true });
+
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--task', taskId, '--surface', 'architecture']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('bounded review guidance enabled by default');
+    expect(result.stdout).not.toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
+    expect(result.stdout).toContain(
+      'allowed architecture meta surfaces: architecture-context, review-support, review-docs'
+    );
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review surface: architecture');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+    expect(prompt).toContain('- TECH_SPEC: `tasks/specs/sample-task.md`');
+    expect(prompt).toContain('- ACTION_PLAN: `docs/ACTION_PLAN-sample-task.md`');
+    expect(prompt).toContain('- Repo architecture baseline: `.agent/system/architecture.md`');
+    expect(prompt).toContain(
+      'Use the canonical architecture inputs above as the primary review context before widening further'
+    );
+    expect(prompt).toContain(
+      'Keep this pass architecture-focused. Do not treat it as a generic evidence or closeout audit.'
+    );
+    expect(prompt).toContain(
+      'Keep this review focused on the requested architecture surfaces, canonical task docs, and directly relevant implementation paths.'
+    );
+    expect(prompt).not.toContain('Evidence manifest:');
+    expect(prompt).not.toContain('Evidence runner log:');
+    expect(prompt).not.toContain('Evidence + checklist mirroring requirements are satisfied');
+    expect(prompt).not.toContain('Keep this pass diff-focused.');
+  });
+
+  it('supports CODEX_REVIEW_SURFACE env fallback for architecture mode', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const taskId = 'sample-task';
+    await writeTaskDocsFirstContext(sandbox, taskId, { includeArchitectureBaseline: true });
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      TASK: taskId,
+      CODEX_REVIEW_SURFACE: 'architecture'
+    });
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review surface: architecture');
+    expect(prompt).toContain('- Repo architecture baseline: `.agent/system/architecture.md`');
+    expect(prompt).not.toContain('Evidence manifest:');
   });
 
   it('keeps delegation MCP enabled by default for wrapper review runs', async () => {
@@ -485,7 +1417,28 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review stalled with no output for 1s');
-  }, LONG_WAIT_TEST_TIMEOUT_MS);
+    expect(result.stderr).toContain('termination boundary: stall (output-stall).');
+    expect(result.stderr).toContain('Review output log (partial):');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'stall',
+      provenance: 'output-stall',
+      reason:
+        'codex review stalled with no output for 1s (set CODEX_REVIEW_STALL_TIMEOUT_SECONDS=0 to disable).',
+      sample: null
+    });
+  }, LONG_WAIT_TEST_TIMEOUT_MS * 2);
 
   it('persists timeout telemetry summaries for faster failure triage', async () => {
     const sandbox = await makeSandbox();
@@ -501,6 +1454,8 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).toContain('termination boundary: timeout (review-timeout).');
+    expect(result.stderr).toContain('Review output log (partial):');
     expect(result.stderr).toContain('[run-review] review telemetry:');
     expect(result.stderr).toContain('heavy command start(s)');
     expect(result.stderr).toContain('last command started: [redacted]');
@@ -510,14 +1465,53 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: { commandStarts: string[]; heavyCommandStarts: string[] };
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toContain('[redacted error');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'timeout',
+      provenance: 'review-timeout',
+      reason:
+        'codex review timed out after 1s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).',
+      sample: null
+    });
     expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
     expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
     expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('persists telemetry when review launch fails after the command probe', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'delete-after-help'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('ENOENT');
+    expect(result.stderr).toContain('[run-review] review telemetry:');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      summary: { commandStarts: string[]; heavyCommandStarts: string[]; reviewProgressSignals: number };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toContain('[redacted error');
+    expect(telemetry.summary.commandStarts).toEqual([]);
+    expect(telemetry.summary.heavyCommandStarts).toEqual([]);
+    expect(telemetry.summary.reviewProgressSignals).toBe(0);
+  });
 
   it('prints raw telemetry command/tail details only when debug telemetry env is enabled', async () => {
     const sandbox = await makeSandbox();
@@ -536,18 +1530,25 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('last command started: /bin/zsh -lc');
     expect(result.stderr).toContain('heavy commands detected: /bin/zsh -lc');
     expect(result.stderr).toContain('output tail:');
+    expect(result.stderr).not.toContain('bounded command-intent boundary');
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
-      summary: { commandStarts: string[]; heavyCommandStarts: string[]; lastLines: string[] };
+      summary: {
+        commandStarts: string[];
+        heavyCommandStarts: string[];
+        commandIntentViolationCount: number;
+        lastLines: string[];
+      };
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toBeTruthy();
     expect(telemetry.error).not.toContain('[redacted error');
     expect(telemetry.summary.commandStarts[0]).toContain('/bin/zsh -lc');
     expect(telemetry.summary.heavyCommandStarts[0]).toContain('run test');
+    expect(telemetry.summary.commandIntentViolationCount).toBe(0);
     expect(telemetry.summary.lastLines.length).toBeGreaterThan(0);
     expect(telemetry.summary.lastLines[0]).not.toContain('[redacted');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
@@ -558,7 +1559,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-hang',
+      RUN_REVIEW_MODE: 'heavy-hang-typecheck',
       CODEX_REVIEW_TIMEOUT_SECONDS: '1',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
@@ -574,7 +1575,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-hang',
+      RUN_REVIEW_MODE: 'heavy-hang-typecheck',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
@@ -602,7 +1603,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     const redactedResult = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-fast-exit',
+      RUN_REVIEW_MODE: 'heavy-fast-exit-typecheck',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
@@ -613,7 +1614,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     const debugResult = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-fast-exit',
+      RUN_REVIEW_MODE: 'heavy-fast-exit-typecheck',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
       CODEX_REVIEW_DEBUG_TELEMETRY: '1'
@@ -628,7 +1629,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-hang-long-noise',
+      RUN_REVIEW_MODE: 'heavy-hang-long-noise-typecheck',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '3',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
@@ -645,7 +1646,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-hang-long-noise',
+      RUN_REVIEW_MODE: 'heavy-hang-long-noise-typecheck',
       CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '1',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
@@ -669,7 +1670,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-hang-cross-stream-warning',
+      RUN_REVIEW_MODE: 'heavy-hang-cross-stream-warning-typecheck',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
@@ -695,7 +1696,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-hang-same-stream-warning',
+      RUN_REVIEW_MODE: 'heavy-hang-same-stream-warning-typecheck',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
@@ -721,7 +1722,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-fast-exit',
+      RUN_REVIEW_MODE: 'heavy-fast-exit-typecheck',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
@@ -770,7 +1771,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      RUN_REVIEW_MODE: 'heavy-fast-cross-stream-command',
+      RUN_REVIEW_MODE: 'heavy-fast-cross-stream-command-typecheck',
       CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
       CODEX_REVIEW_MONITOR_INTERVAL_SECONDS: '0'
@@ -789,123 +1790,110 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('treats npm --workspaces as a valueless flag for heavy command detection', async () => {
+  it('fails bounded review on npm --workspaces validation-suite launches', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-workspaces-flag',
-      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
-    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
+    expect(result.stderr).toContain('termination boundary: command-intent (validation-suite).');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('treats npm run-script aliases as heavy command targets', async () => {
+  it('fails bounded review on npm run-script validation-suite launches', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-run-script-alias',
-      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
-    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('treats npm test aliases as heavy command targets', async () => {
+  it('fails bounded review on npm test aliases by default', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-test-alias',
-      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
-    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('treats npm.cmd launcher aliases as heavy command targets', async () => {
+  it('fails bounded review on npm.cmd validation-suite launches', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-npm-cmd-launcher',
-      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
-    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('treats npm.ps1 launcher aliases as heavy command targets', async () => {
+  it('fails bounded review on npm.ps1 validation-suite launches', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-npm-ps1-launcher',
-      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
-    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('detects heavy commands wrapped by cmd /c', async () => {
+  it('fails bounded review on cmd /c wrapped validation-suite launches', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-cmd-wrapper',
-      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
-    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('detects heavy commands wrapped by cmd /C', async () => {
+  it('fails bounded review on cmd /C wrapped validation-suite launches', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-cmd-wrapper-uppercase-flag',
-      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
-    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('detects heavy commands executed as python -m pytest', async () => {
@@ -925,21 +1913,19 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('detects heavy commands wrapped by env with inline assignments', async () => {
+  it('fails bounded review on env-wrapped validation-suite launches', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang-env-wrapper',
-      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
       CODEX_REVIEW_TIMEOUT_SECONDS: '60',
       CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
     });
 
     expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
-    expect(result.stderr).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('detects heavy commands wrapped by /usr/bin/env', async () => {
@@ -1019,6 +2005,126 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain('Prioritize highest-risk findings first');
   });
 
+  it('uses path-only uncommitted scope notes in prompts', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 1);
+    const modifiedFile = files[0] ?? 'file-1.txt';
+    await writeFile(join(sandbox, modifiedFile), 'updated\n', 'utf8');
+    await writeFile(join(sandbox, 'notes.txt'), 'draft\n', 'utf8');
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review scope hint: uncommitted working tree changes (default).');
+    expect(prompt).toContain('Review scope paths (2):');
+    expect(prompt).toContain(modifiedFile);
+    expect(prompt).toContain('notes.txt');
+    expect(prompt).toContain(
+      'Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
+    expect(prompt).not.toContain('Git scope summary:');
+    expect(prompt).not.toContain('## ');
+    expect(prompt).not.toContain('?? notes.txt');
+  });
+
+  it('uses path-only commit scope notes in prompts', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 1);
+    const modifiedFile = files[0] ?? 'file-1.txt';
+    await writeFile(join(sandbox, modifiedFile), 'second pass\n', 'utf8');
+    await runGit(['commit', '-am', 'scope-only second'], sandbox);
+    const { stdout: commitStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const commitSha = commitStdout.trim();
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin), [
+      '--commit',
+      commitSha
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain(`Review scope hint: commit \`${commitSha}\``);
+    expect(prompt).toContain('Review scope paths (1):');
+    expect(prompt).toContain(modifiedFile);
+    expect(prompt).toContain(
+      'Start with touched paths or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
+    expect(prompt).not.toContain(
+      'Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
+    expect(prompt).not.toContain('Git scope summary:');
+    expect(prompt).not.toContain('Author:');
+    expect(prompt).not.toContain('Date:');
+    expect(prompt).not.toContain('scope-only second');
+  });
+
+  it('uses path-only base scope notes in prompts while preserving rename identity', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 1);
+    const originalFile = files[0] ?? 'file-1.txt';
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+
+    const renamedFile = 'renamed-from-base.txt';
+    await runGit(['mv', originalFile, renamedFile], sandbox);
+    await runGit(['commit', '-m', 'scope-only base rename'], sandbox);
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin), [
+      '--base',
+      baseRef
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain(`Review scope hint: diff vs base \`${baseRef}\``);
+    expect(prompt).toContain('Review scope paths (2):');
+    expect(prompt).toContain(`${originalFile} -> ${renamedFile}`);
+    expect(prompt).toContain(
+      'Start with touched paths or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
+    expect(prompt).not.toContain(
+      'Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts'
+    );
+    expect(prompt).not.toContain('Git scope summary:');
+    expect(prompt).not.toContain('scope-only base rename');
+    expect(prompt).not.toContain('R100\t');
+  });
+
+  it('renders uncommitted rename scope notes as paired paths', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 1);
+    const originalFile = files[0] ?? 'file-1.txt';
+    const renamedFile = 'renamed-working-tree.txt';
+    await runGit(['mv', originalFile, renamedFile], sandbox);
+
+    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review scope hint: uncommitted working tree changes (default).');
+    expect(prompt).toContain('Review scope paths (2):');
+    expect(prompt).toContain(`${originalFile} -> ${renamedFile}`);
+    expect(prompt).not.toContain(`\n${originalFile}\n`);
+    expect(prompt).not.toContain(`\n${renamedFile}\n`);
+  });
+
   it('counts untracked file lines when evaluating large uncommitted scope', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -1073,6 +2179,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).not.toContain('stalled with no output');
+    expect(result.stderr).not.toContain('termination boundary: stall (output-stall).');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('defaults manifest selection to active task env when --task is omitted', async () => {
@@ -1096,6 +2203,330 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stdout).not.toContain('evidence: .runs/0101/');
   });
 
+  it('prefers CODEX_ORCHESTRATOR_MANIFEST_PATH over stale MANIFEST and keeps artifacts on the active run dir', async () => {
+    const sandbox = await makeSandbox();
+    const staleManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'docs-review-old');
+    const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'implementation-gate-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      MANIFEST: staleManifestPath,
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: activeManifestPath,
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(activeManifestPath)
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const activePromptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
+    const activePrompt = await readFile(activePromptPath, 'utf8');
+    expect(activePrompt).toContain(
+      'Evidence manifest: .runs/sample-task/cli/implementation-gate-active/manifest.json'
+    );
+    expect(activePrompt).not.toContain('docs-review-old');
+  });
+
+  it('falls back to MANIFEST when CODEX_ORCHESTRATOR_MANIFEST_PATH is absent', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, 'sample-task', 'legacy-manifest-env');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      MANIFEST: manifestPath
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/legacy-manifest-env/manifest.json');
+  });
+
+  it('falls back to the run-dir manifest when explicit manifest envs are absent', async () => {
+    const sandbox = await makeSandbox();
+    await makeManifestForTask(sandbox, 'sample-task', 'docs-review-old');
+    const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'run-dir-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(activeManifestPath)
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Evidence manifest: .runs/sample-task/cli/run-dir-active/manifest.json');
+  });
+
+  it('prefers an explicit task over a stale CODEX_ORCHESTRATOR_RUN_DIR manifest', async () => {
+    const sandbox = await makeSandbox();
+    const staleRunManifestPath = await makeManifestForTask(sandbox, 'stale-task', 'stale-run-dir');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'requested-task', 'active-manifest');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
+    }, ['--task', 'requested-task', '--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const requestedPromptPath = join(dirname(requestedManifestPath), 'review', 'prompt.txt');
+    const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
+    const requestedPrompt = await readFile(requestedPromptPath, 'utf8');
+    expect(requestedPrompt).toContain(
+      'Evidence manifest: .runs/requested-task/cli/active-manifest/manifest.json'
+    );
+    expect(requestedPrompt).not.toContain('.runs/stale-task/');
+    expect(requestedPrompt).not.toContain('stale-run-dir');
+    await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('accepts an explicit CODEX_ORCHESTRATOR_RUN_DIR layout when the task cannot be inferred from path', async () => {
+    const sandbox = await makeSandbox();
+    const customRunDir = join(sandbox, 'custom-review-runs', 'orchestrator-run');
+    await mkdir(customRunDir, { recursive: true });
+    await writeFile(join(customRunDir, 'manifest.json'), JSON.stringify({ run: 'custom-layout' }), 'utf8');
+    await writeFile(join(customRunDir, 'runner.ndjson'), '{"event":"custom-layout"}\n', 'utf8');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'requested-task', 'in-band-fallback');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_ORCHESTRATOR_RUN_DIR: customRunDir
+    }, ['--task', 'requested-task', '--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const selectedPromptPath = join(customRunDir, 'review', 'prompt.txt');
+    const selectedPrompt = await readFile(selectedPromptPath, 'utf8');
+    expect(selectedPrompt).toContain('Evidence manifest: custom-review-runs/orchestrator-run/manifest.json');
+    expect(selectedPrompt).toContain('Review task: requested-task');
+    const fallbackPromptPath = join(dirname(requestedManifestPath), 'review', 'prompt.txt');
+    await expect(readFile(fallbackPromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('derives audit task context from the resolved run-dir manifest when task env is absent', async () => {
+    const sandbox = await makeSandbox();
+    const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'run-dir-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'tasks-sample-task.md'),
+      [
+        '# Task Checklist - sample-task',
+        '',
+        '- MCP Task ID: `sample-task`',
+        '- Primary PRD: `docs/PRD-sample-task.md`',
+        '- TECH_SPEC: `tasks/specs/sample-task.md`',
+        '- ACTION_PLAN: `docs/ACTION_PLAN-sample-task.md`',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'docs', 'PRD-sample-task.md'),
+      ['# PRD', '', '## Summary', '', '- run-dir context bullet', ''].join('\n'),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(activeManifestPath)
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review task: sample-task');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+    expect(prompt).not.toContain('PRD summary (`docs/PRD-sample-task.md`):');
+    expect(prompt).not.toContain('- run-dir context bullet');
+    expect(prompt).not.toContain('tasks/specs/sample-task.md');
+    expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
+  });
+
+  it('keeps audit task context checklist-only when no primary PRD is declared', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, 'sample-task', 'audit-no-prd');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'tasks-sample-task.md'),
+      [
+        '# Task Checklist - sample-task',
+        '',
+        '- MCP Task ID: `sample-task`',
+        '- TECH_SPEC: `tasks/specs/sample-task.md`',
+        '- ACTION_PLAN: `docs/ACTION_PLAN-sample-task.md`',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/tasks-sample-task.md`');
+    expect(prompt).not.toContain('- Primary PRD:');
+    expect(prompt).not.toContain('tasks/specs/sample-task.md');
+    expect(prompt).not.toContain('docs/ACTION_PLAN-sample-task.md');
+  });
+
+  it('derives audit task context from the registered parent task for delegated scout manifests', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, '1097-sample-task-scout', 'audit-scout');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks', 'custom'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '20260310-1097-sample-task',
+            title: 'Sample Task',
+            relates_to: 'tasks/custom/registered-parent-checklist.md'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'tasks', 'custom', 'registered-parent-checklist.md'),
+      [
+        '# Task Checklist - 1097-sample-task',
+        '',
+        '- MCP Task ID: `1097-sample-task`',
+        '- Primary PRD: `docs/PRD-sample-task.md`',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(join(sandbox, 'docs', 'PRD-sample-task.md'), '# PRD\n', 'utf8');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review task: 1097-sample-task-scout');
+    expect(prompt).toContain('Task context:');
+    expect(prompt).toContain('- Task checklist: `tasks/custom/registered-parent-checklist.md`');
+    expect(prompt).toContain('- Primary PRD: `docs/PRD-sample-task.md`');
+  });
+
+  it('ignores legacy task index path entries that are not checklist paths', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(
+      sandbox,
+      '0202-prd-orchestrator-hardening-scout',
+      'audit-legacy-path'
+    );
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: '0202',
+            slug: 'prd-orchestrator-hardening',
+            path: 'tasks/0202-prd-orchestrator-hardening.md'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(sandbox, 'tasks', '0202-prd-orchestrator-hardening.md'),
+      '# PRD Snapshot - legacy entry\n',
+      'utf8'
+    );
+
+    const result = await runReviewCommand(
+      manifestPath,
+      baseEnv(sandbox, codexBin),
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Review task: 0202-prd-orchestrator-hardening-scout');
+    expect(prompt).not.toContain('Task context:');
+    expect(prompt).not.toContain('tasks/0202-prd-orchestrator-hardening.md');
+  });
+
+  it('keeps review artifacts aligned with the resolved manifest when CODEX_ORCHESTRATOR_RUN_DIR is stale', async () => {
+    const sandbox = await makeSandbox();
+    const staleRunManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'stale-run-dir');
+    const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'active-manifest');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: activeManifestPath,
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const activePromptPath = join(dirname(activeManifestPath), 'review', 'prompt.txt');
+    const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
+    const activePrompt = await readFile(activePromptPath, 'utf8');
+    expect(activePrompt).toContain('Evidence manifest: .runs/sample-task/cli/active-manifest/manifest.json');
+    await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('ignores CODEX_ORCHESTRATOR_RUN_DIR when --task requests a different task', async () => {
+    const sandbox = await makeSandbox();
+    const staleRunManifestPath = await makeManifestForTask(sandbox, 'stale-task', 'stale-run-dir');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'requested-task-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
+    }, ['--task', 'sample-task', '--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const requestedPromptPath = join(dirname(requestedManifestPath), 'review', 'prompt.txt');
+    const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
+    const requestedPrompt = await readFile(requestedPromptPath, 'utf8');
+    expect(requestedPrompt).toContain(
+      'Evidence manifest: .runs/sample-task/cli/requested-task-active/manifest.json'
+    );
+    await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('ignores CODEX_ORCHESTRATOR_RUN_DIR when MCP_RUNNER_TASK_ID requests a different task', async () => {
+    const sandbox = await makeSandbox();
+    const staleRunManifestPath = await makeManifestForTask(sandbox, 'stale-task', 'stale-run-dir');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'env-task-active');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'sample-task',
+      CODEX_ORCHESTRATOR_RUN_DIR: dirname(staleRunManifestPath)
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const requestedPromptPath = join(dirname(requestedManifestPath), 'review', 'prompt.txt');
+    const stalePromptPath = join(dirname(staleRunManifestPath), 'review', 'prompt.txt');
+    const requestedPrompt = await readFile(requestedPromptPath, 'utf8');
+    expect(requestedPrompt).toContain('Evidence manifest: .runs/sample-task/cli/env-task-active/manifest.json');
+    await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('fails fast when delegation startup loops without review progress', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -1111,6 +2542,28 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review appears stuck in delegation startup loop');
+    expect(result.stderr).toContain('termination boundary: startup-loop (delegation-startup-loop).');
+    expect(result.stderr).toContain('Review output log (partial):');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'startup-loop',
+        provenance: 'delegation-startup-loop',
+        reason: expect.stringContaining('codex review appears stuck in delegation startup loop'),
+        sample: null
+      })
+    );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('still detects startup loops when non-progress banner lines appear before the loop', async () => {
@@ -1163,6 +2616,1624 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('codex review timed out after 1s');
     expect(result.stderr).not.toContain('delegation startup loop');
+    expect(result.stderr).toContain('termination boundary: timeout (review-timeout).');
+    expect(result.stderr).toContain('Review output log (partial):');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'timeout',
+      provenance: 'review-timeout',
+      reason:
+        'codex review timed out after 1s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).',
+      sample: null
+    });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when repetitive low-signal inspection persists', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'low-signal-drift',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('low-signal review drift detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        commandStarts: string[];
+        heavyCommandStarts: string[];
+        thinkingBlocks: number;
+        distinctInspectionTargets: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.heavyCommandStarts).toEqual([]);
+    expect(telemetry.summary.thinkingBlocks).toBeGreaterThan(0);
+    expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(4);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when repetitive relevant reinspection persists without concrete findings', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
+    expect(result.stderr).not.toContain('low-signal review drift detected');
+    expect(result.stderr).not.toContain('codex review timed out after');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        distinctInspectionTargets: number;
+        maxInspectionTargetHits: number;
+        metaSurfaceSignals: number;
+        concreteOutputSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.distinctInspectionTargets).toBe(1);
+    expect(telemetry.summary.maxInspectionTargetHits).toBeGreaterThanOrEqual(3);
+    expect(telemetry.summary.metaSurfaceSignals).toBe(0);
+    expect(telemetry.summary.concreteOutputSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('preserves relevant dwell termination provenance when the review exits naturally before the poller fires', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-fast-exit',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
+    expect(result.stderr).toContain(
+      'termination boundary: relevant-reinspection-dwell (post-startup-anchor).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows bounded review to complete when relevant reinspection produces concrete findings', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-concrete-output',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        concreteOutputSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.concreteOutputSignals).toBeGreaterThan(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows bounded review to complete when relevant inspection stays diverse across targets', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 5, '.py');
+    await writeFile(join(sandbox, 'file-1.py'), 'updated\n', 'utf8');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-diverse',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        distinctInspectionTargets: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.distinctInspectionTargets).toBeGreaterThan(4);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('disables the relevant reinspection dwell boundary when low-signal timeout is off', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).not.toContain('relevant-reinspection dwell boundary violated');
+    expect(result.stderr).toContain('codex review timed out after 1s');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded architecture review when in-bounds rereads keep revisiting canonical docs and touched files without a verdict', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await writeTaskDocsFirstContext(sandbox, 'sample-task', { includeArchitectureBaseline: true });
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 2, '.py');
+    const architectureRelevantTargets = [
+      'tasks/tasks-sample-task.md',
+      'docs/PRD-sample-task.md',
+      'tasks/specs/sample-task.md',
+      'docs/ACTION_PLAN-sample-task.md',
+      '.agent/system/architecture.md',
+      files[0] ?? 'file-1.py',
+      files[1] ?? 'file-2.py'
+    ];
+    await writeFile(join(sandbox, files[0] ?? 'file-1.py'), 'updated-1\n', 'utf8');
+    await writeFile(join(sandbox, files[1] ?? 'file-2.py'), 'updated-2\n', 'utf8');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'architecture-relevant-reinspection-dwell',
+        CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+      },
+      ['--task', 'sample-task', '--surface', 'architecture']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
+    expect(result.stderr).toContain('within the current bounded review surface');
+    expect(result.stderr).toContain(
+      'termination boundary: relevant-reinspection-dwell (bounded-surface).'
+    );
+    expect(result.stderr).not.toContain('codex review timed out after');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        metaSurfaceSignals: number;
+        distinctInspectionTargets: number;
+        maxInspectionTargetHits: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'bounded-surface',
+        reason: expect.stringContaining('relevant-reinspection dwell boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain(
+      '[redacted relevant-reinspection-dwell sample'
+    );
+    expect(telemetry.summary.metaSurfaceSignals).toBe(0);
+    expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(
+      architectureRelevantTargets.length
+    );
+    expect(telemetry.summary.maxInspectionTargetHits).toBeGreaterThanOrEqual(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when speculative output keeps repeating without new concrete progress', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'verdict-stability-drift',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('verdict-stability drift detected');
+    expect(result.stderr).toContain(
+      'termination boundary: verdict-stability (repeated-output-inspection).'
+    );
+    expect(result.stderr).not.toContain('Review output log (partial):');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        outputInspectionSignals: number;
+        distinctOutputInspectionTargets: number;
+        maxOutputNarrativeSignatureHits: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'verdict-stability',
+      provenance: 'repeated-output-inspection',
+      reason: expect.stringContaining('verdict-stability drift detected'),
+      sample: null
+    });
+    expect(telemetry.summary.outputInspectionSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctOutputInspectionTargets).toBeLessThanOrEqual(4);
+    expect(telemetry.summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('clears verdict-stability timeout env from shared wrapper test setup', async () => {
+    const sandbox = await makeSandbox();
+    const codexBin = await makeFakeCodex(sandbox);
+    const previous = process.env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS;
+    process.env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS = '99';
+    try {
+      const env = baseEnv(sandbox, codexBin);
+      expect(env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS).toBeUndefined();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS;
+      } else {
+        process.env.CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS = previous;
+      }
+    }
+  });
+
+  it('fails bounded review when repeated targetless speculative output persists without concrete findings', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'generic-speculative-dwell',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('verdict-stability drift detected');
+    expect(result.stderr).toContain(
+      'termination boundary: verdict-stability (targetless-speculative-narrative).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        outputInspectionSignals: number;
+        outputNarrativeSignals: number;
+        distinctOutputInspectionTargets: number;
+        maxOutputNarrativeSignatureHits: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'verdict-stability',
+      provenance: 'targetless-speculative-narrative',
+      reason: expect.stringContaining('verdict-stability drift detected'),
+      sample: null
+    });
+    expect(telemetry.summary.outputInspectionSignals).toBe(0);
+    expect(telemetry.summary.outputNarrativeSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctOutputInspectionTargets).toBe(0);
+    expect(telemetry.summary.maxOutputNarrativeSignatureHits).toBeGreaterThanOrEqual(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('disables verdict-stability termination when CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'verdict-stability-drift',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('verdict-stability drift detected');
+    expect(result.stderr).not.toContain(
+      'termination boundary: verdict-stability (repeated-output-inspection).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual({
+      kind: 'timeout',
+      provenance: 'review-timeout',
+      reason:
+        'codex review timed out after 1s (set CODEX_REVIEW_TIMEOUT_SECONDS=0 to disable).',
+      sample: null
+    });
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows bounded review to complete when speculative output keeps introducing new concrete targets', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'verdict-stability-progress',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        distinctOutputInspectionTargets: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.distinctOutputInspectionTargets).toBeGreaterThan(4);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows bounded review to stay diff-local when the concrete-progress citation contract is explicit', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'citation-contract-local',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '10'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).not.toContain('timed out');
+
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain(
+      'Concrete same-diff progress can be shown by citing touched paths with explicit locations'
+    );
+    expect(prompt).toContain(
+      'do not search the wider repo for other examples of the rendering'
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when meta-surface expansion persists', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'meta-surface-expansion-audit-unrelated',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+    expect(result.stderr).toContain(
+      'termination boundary: meta-surface-expansion (meta-surface-kinds).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        commandStarts: string[];
+        metaSurfaceSignals: number;
+        distinctMetaSurfaces: number;
+        maxMetaSurfaceHits: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'meta-surface-kinds',
+        reason: expect.stringContaining('meta-surface expansion detected'),
+        sample: expect.any(String)
+      })
+    );
+    expect(telemetry.summary.commandStarts.length).toBeGreaterThan(0);
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
+    expect(telemetry.summary.maxMetaSurfaceHits).toBeGreaterThanOrEqual(1);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when repeated meta-surface reads happen before the first startup anchor', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await runGit(['init', '-q'], sandbox);
+    await runGit(['config', 'user.email', 'run-review-tests@example.com'], sandbox);
+    await runGit(['config', 'user.name', 'run-review-tests'], sandbox);
+    await mkdir(join(sandbox, 'scripts'), { recursive: true });
+    await writeFile(join(sandbox, 'scripts', 'run-review.ts'), 'export const version = 1;\n', 'utf8');
+    await runGit(['add', '.'], sandbox);
+    await runGit(['commit', '-m', 'seed'], sandbox);
+    await writeFile(join(sandbox, 'scripts', 'run-review.ts'), 'export const version = 2;\n', 'utf8');
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'startup-anchor-drift',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('startup-anchor boundary violated');
+    expect(result.stderr).toContain('before the first startup anchor');
+    expect(result.stderr).toContain(
+      'termination boundary: startup-anchor (pre-anchor-meta-surface).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'startup-anchor',
+        provenance: 'pre-anchor-meta-surface',
+        reason: expect.stringContaining('startup-anchor boundary violated'),
+        sample: expect.any(String)
+      })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded audit review when repeated off-surface reads happen before the first audit startup anchor', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'startup-anchor-drift',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stdout).toContain('startup-anchor boundary enabled for audit mode');
+    expect(result.stderr).toContain('startup-anchor boundary violated');
+    expect(result.stderr).toContain(
+      'termination boundary: startup-anchor (pre-anchor-meta-surface).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+        preAnchorMetaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'startup-anchor',
+        provenance: 'pre-anchor-meta-surface',
+        reason: expect.stringContaining('startup-anchor boundary violated'),
+        sample: expect.any(String)
+      })
+    );
+    expect(telemetry.summary.startupAnchorObserved).toBe(false);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBeGreaterThanOrEqual(2);
+    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([
+      'codex-memories',
+      'codex-skills'
+    ]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when adjacent review-system surfaces persist', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'review-self-containment-drift',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        distinctMetaSurfaces: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
+    expect(telemetry.summary.metaSurfaceKinds).toEqual(
+      expect.arrayContaining(['review-artifacts', 'review-docs', 'review-support'])
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when repo-wide search results surface the active closeout bundle', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-search',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+    expect(result.stderr).toContain(
+      'termination boundary: meta-surface-expansion (active-closeout-self-reference-search).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        startupAnchorObserved: boolean;
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+        preAnchorMetaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'active-closeout-self-reference-search',
+        reason: expect.stringContaining('meta-surface expansion detected')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain(
+      '[redacted meta-surface-expansion sample'
+    );
+    expect(telemetry.summary.startupAnchorObserved).toBe(false);
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps mixed active closeout search drift on generic meta-surface provenance', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-search-mixed',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+    expect(result.stderr).toContain('termination boundary: meta-surface-expansion (meta-surface-kinds).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'meta-surface-kinds',
+        reason: expect.stringContaining('meta-surface expansion detected')
+      })
+    );
+    expect(telemetry.summary.metaSurfaceKinds).toEqual(
+      expect.arrayContaining(['review-artifacts', 'review-closeout-bundle', 'review-docs'])
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review promptly when post-anchor rereads hit the active closeout bundle', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.txt');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-reread',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('active-closeout-bundle reread boundary violated');
+    expect(result.stderr).not.toContain('codex review timed out after');
+    expect(result.stderr).toContain(
+      'termination boundary: active-closeout-bundle-reread (post-startup-anchor).'
+    );
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        startupAnchorObserved: boolean;
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+        preAnchorMetaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'active-closeout-bundle-reread',
+        provenance: 'post-startup-anchor',
+        reason: expect.stringContaining('active-closeout-bundle reread boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain(
+      '[redacted active-closeout-bundle-reread sample'
+    );
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+    expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('does not apply the closeout-bundle reread boundary when heavy review commands are explicitly allowed', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.txt');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-reread',
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('active-closeout-bundle reread boundary violated');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('inherits closeout roots from the registered parent task for delegated task ids', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifestForTask(sandbox, 'sample-task-scout', 'review-closeout-parent');
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: 'sample-task',
+            title: 'Sample Task',
+            relates_to: 'tasks/tasks-sample-task.md'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-closeout-self-reference-search',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps the latest completed closeout root active even when TODO-closeout exists', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    await makeCloseoutBundle(sandbox, 'sample-task', '20260311T000000Z-closeout');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'active-completed-closeout-self-reference-search',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when untouched adjacent prompt-context helpers keep expanding after the provenance hint', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'untouched-helper-review-support-drift',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-support');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded diff review when untouched shell-env helpers keep expanding after the provenance hint', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await makeCloseoutBundle(sandbox, 'sample-task');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'untouched-shell-env-helper-review-support-drift',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-support');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps the meta-surface guard active for audit mode when unrelated meta surfaces persist', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'meta-surface-expansion-audit-unrelated',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    }, ['--surface', 'audit']);
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        metaSurfaceSignals: number;
+        distinctMetaSurfaces: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.distinctMetaSurfaces).toBeGreaterThanOrEqual(3);
+    expect(telemetry.summary.metaSurfaceKinds).toContain('codex-memories');
+    expect(telemetry.summary.metaSurfaceKinds).toContain('codex-skills');
+    expect(telemetry.summary.metaSurfaceKinds).toContain('review-docs');
+    expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-manifest');
+    expect(telemetry.summary.metaSurfaceKinds).not.toContain('run-runner-log');
+  }, LONG_WAIT_TEST_TIMEOUT_MS * 2);
+
+  it('allows audit mode to inspect manifest and runner-log evidence without tripping the meta-surface guard', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'meta-surface-audit-evidence-only',
+        CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '1',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('allowed audit meta surfaces: run-manifest, run-runner-log');
+    expect(result.stdout).toContain('startup-anchor boundary enabled for audit mode');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+        metaSurfaceSignals: number;
+        distinctMetaSurfaces: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+    expect(telemetry.summary.metaSurfaceSignals).toBe(0);
+    expect(telemetry.summary.distinctMetaSurfaces).toBe(0);
+    expect(telemetry.summary.metaSurfaceKinds).toEqual([]);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('treats explicit audit manifest paths outside .runs as valid startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-explicit-manifest-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('treats exported audit MANIFEST reads inside the review shell payload as valid startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-exported-manifest-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps zsh leading assignment plus export on the active audit MANIFEST path', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-leading-assignment-export',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('does not carry export state across pipelines when checking audit startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-pipeline-manifest-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('treats RUN_LOG alias reexports inside the review shell payload as valid startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-exported-run-log-alias-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('treats env -u same-shell MANIFEST expansions as valid startup anchors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeDetachedManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'audit-env-unset-child-manifest-anchor',
+        CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+        CODEX_REVIEW_TIMEOUT_SECONDS: '60',
+        TASK: 'sample-task'
+      },
+      ['--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      summary: {
+        startupAnchorObserved: boolean;
+        preAnchorMetaSurfaceSignals: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.summary.startupAnchorObserved).toBe(true);
+    expect(telemetry.summary.preAnchorMetaSurfaceSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows a single direct shell probe during bounded review', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'shell-probe-single',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        shellProbeCount: number;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.termination_boundary).toBeNull();
+    expect(telemetry.summary.shellProbeCount).toBe(1);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on repeated direct shell probes even when the child exits quickly', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'shell-probe-repeat-fast-exit',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded review shell-probe boundary violated');
+    expect(result.stderr).toContain('termination boundary: shell-probe (direct-shell-verification).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        shellProbeCount: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'shell-probe',
+        provenance: 'direct-shell-verification',
+        reason: expect.stringContaining('shell-probe boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted shell-probe sample');
+    expect(telemetry.summary.shellProbeCount).toBe(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on repeated direct shell probes before child exit', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'shell-probe-repeat-hang',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded review shell-probe boundary violated');
+    expect(result.stderr).toContain('termination boundary: shell-probe (direct-shell-verification).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        shellProbeCount: number;
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'shell-probe',
+        provenance: 'direct-shell-verification',
+        reason: expect.stringContaining('shell-probe boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted shell-probe sample');
+    expect(telemetry.summary.shellProbeCount).toBe(2);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when it launches a package-manager validation suite', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
+    expect(result.stderr).not.toContain('Review output log (partial):');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        commandIntentViolationCount: number;
+        commandIntentViolationKinds: string[];
+        commandIntentViolationSamples: string[];
+        heavyCommandStarts: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-suite',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
+    expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
+    expect(telemetry.summary.commandIntentViolationKinds).toContain('validation-suite');
+    expect(telemetry.summary.commandIntentViolationSamples[0]).toContain('[redacted command-intent');
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review even when a forbidden validation suite exits before the interval tick', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-fast-exit'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (validation suite launch)');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows package-manager validation suites when heavy review commands are explicitly enabled', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'heavy-hang',
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('bounded command-intent boundary');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when it launches a direct validation runner', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+    expect(result.stderr).toContain('termination boundary: command-intent (validation-runner).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        commandIntentViolationCount: number;
+        commandIntentViolationKinds: string[];
+        commandIntentViolationSamples: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-runner',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
+    expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
+    expect(telemetry.summary.commandIntentViolationKinds).toContain('validation-runner');
+    expect(telemetry.summary.commandIntentViolationSamples[0]).toContain('[redacted command-intent');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('waits for graceful child termination before surfacing timeout failure', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'term-graceful-timeout',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    const outputLogPath = join(dirname(manifestPath), 'review', 'output.log');
+    const outputLog = await readFile(outputLogPath, 'utf8');
+    expect(outputLog).toContain('term-sentinel');
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+    };
+    expect(telemetry.status).toBe('failed');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review even when a forbidden validation runner exits before the interval tick', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation-fast-exit'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+    expect(result.stderr).toContain('termination boundary: command-intent (validation-runner).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-runner',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review when a forbidden validation runner exits non-zero before the interval tick', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation-fast-exit-nonzero'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on package-manager shorthand validation launches', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation-shorthand',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (direct validation runner launch)');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('allows direct validation runners when heavy review commands are explicitly enabled', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-validation',
+      CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '1'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review timed out after 1s');
+    expect(result.stderr).not.toContain('bounded command-intent boundary');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on nested review or pipeline launches', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-review-orchestration',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (nested review or pipeline launch)');
+    expect(result.stderr).toContain('termination boundary: command-intent (review-orchestration).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        commandIntentViolationKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'review-orchestration',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
+    expect(telemetry.summary.commandIntentViolationKinds).toContain('review-orchestration');
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails bounded review on mutating delegation control but not read-only status checks', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'command-intent-delegation-control',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded command-intent boundary (delegation control activity)');
+    expect(result.stderr).toContain('termination boundary: command-intent (delegation-control).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
+      summary: {
+        commandIntentViolationCount: number;
+        commandIntentViolationKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'delegation-control',
+        reason: expect.stringContaining('bounded review command-intent boundary violated')
+      })
+    );
+    expect(telemetry.termination_boundary?.sample).toContain('[redacted command-intent sample');
+    expect(telemetry.summary.commandIntentViolationCount).toBeGreaterThanOrEqual(1);
+    expect(telemetry.summary.commandIntentViolationKinds).toEqual(['delegation-control']);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('derives task context from explicit manifest instead of stale task env fallback', async () => {
@@ -1178,6 +4249,26 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('Review task: task-b');
     expect(result.stdout).not.toContain('Review task: task-a');
+  });
+
+  it('ignores a stale run-dir manifest when it conflicts with the requested task', async () => {
+    const sandbox = await makeSandbox();
+    const staleManifestPath = await makeManifestForTask(sandbox, 'task-a', 'run-a');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'task-b', 'run-b');
+    const codexBin = await makeFakeCodex(sandbox);
+    const staleRunDir = dirname(staleManifestPath).replace(`${sandbox}/`, '');
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      MCP_RUNNER_TASK_ID: 'task-b',
+      CODEX_ORCHESTRATOR_RUN_DIR: staleRunDir,
+      FORCE_CODEX_REVIEW: '0'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Review task: task-b');
+    expect(result.stdout).not.toContain('Review task: task-a');
+    expect(result.stdout).toContain('Review prompt saved to: .runs/task-b/cli/run-b/review/prompt.txt');
+    expect(result.stdout).not.toContain('.runs/task-a/cli/run-a/review/prompt.txt');
   });
 
   it('derives task context from legacy run-layout manifests', async () => {

@@ -43,4 +43,25 @@ describe.each(cases)('$label id sanitization', ({ label, sanitize }) => {
     const value = `${label}/path`;
     expect(() => sanitize(value)).toThrow(`${prefix} "${value}": slashes are not allowed.`);
   });
+
+  it('rejects trailing dots and spaces', () => {
+    const trailingDot = `${label}-bad.`;
+    expect(() => sanitize(trailingDot)).toThrow(
+      `${prefix} "${trailingDot}": trailing dots or spaces are not allowed.`
+    );
+
+    const trailingSpace = `${label}-bad `;
+    expect(() => sanitize(trailingSpace)).toThrow(
+      `${prefix} "${trailingSpace}": trailing dots or spaces are not allowed.`
+    );
+  });
+
+  it('rejects Windows reserved device names', () => {
+    const values = ['con', 'NUL.txt', 'lpt1.log', 'CONOUT$', 'CON .txt'];
+    for (const value of values) {
+      expect(() => sanitize(value)).toThrow(
+        `${prefix} "${value}": Windows reserved device names are not allowed.`
+      );
+    }
+  });
 });

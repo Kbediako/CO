@@ -1,0 +1,809 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:6378) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6378) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 342 > 25
+ - total lines changed 38355 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5280
+  - orchestrator/src/cli/control/controlServer.ts: 2142
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - tasks/index.json: 1972
+  - docs/docs-freshness-registry.json: 1940
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/tests/ControlRuntime.test.ts: 671
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1034 stacked-branch scope on long-running main; bounded slice validated with targeted and manual evidence.
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 15 files, 938 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/cli/2026-03-07T02-27-59-777Z-f19359d3/review/prompt.txt
+Review output log: .runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/cli/2026-03-07T02-27-59-777Z-f19359d3/review/output.log
+Launching Codex review (evidence: .runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/cli/2026-03-07T02-27-59-777Z-f19359d3/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc635-35a5-7ed1-8dcf-93a317c4dd66
+--------
+user
+Review task: 1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery
+Evidence manifest: .runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/cli/2026-03-07T02-27-59-777Z-f19359d3/manifest.json
+
+Task context:
+- Task checklist: `tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+- MCP Task ID: `1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+- TECH_SPEC: `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `.agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md`.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md`.
+- [x] docs-review approval/override captured for registered `1034`. Evidence: `.runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/cli/2026-03-07T02-27-59-777Z-f19359d3/manifest.json`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T023357Z-preimpl-review-and-docs-review-override/00-summary.md`.
+- [ ] The compatibility runtime snapshot discovers bounded `running` and `retrying` entries beyond the selected manifest. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/selectedRunProjection.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`.
+- [ ] The selected-run seam remains available for UI/Telegram consumers while the compatibility API uses discovered runtime collections. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/observabilitySurface.ts`, `orchestrator/src/cli/control/telegramOversightBridge.ts`.
+- [ ] Regression/manual evidence keeps the compatibility route contract stable while collection population becomes more Symphony-aligned. Evidence: `orchestrator/tests/ControlRuntime.test.ts`, `orchestrator/tests/ControlServer.test.ts`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/11-manual-runtime-compatibility-collection-discovery.json`.
+- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/01-delegation-guard.log`.
+- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/02-spec-guard.log`.
+- [ ] `npm run build`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/03-build.log`.
+- [ ] `npm run lint`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/04-lint.log`.
+- [ ] `npm run test`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/05-test.log`.
+- [ ] `npm run docs:check`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/06-docs-check.log`.
+- [ ] `npm run docs:freshness`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/07-docs-freshness.log`.
+- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/08-diff-budget.log`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/13-override-notes.md`.
+- [ ] `npm run review`. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/09-review.log`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/13-override-notes.md`.
+- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/<timestamp>-closeout/10-pack-smoke.log`.
+
+Agent notes:
+Goal: validate 1034 bounded runtime compatibility collection discovery. | Summary: compatibility state and issue routes now discover sibling runtime running/retrying entries while UI and Telegram stay on the selected-run seam. | Risks: sibling run discovery breadth, issue alias fanout, review-wrapper drift on large stacked branch.
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 41]
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M orchestrator/src/cli/control/controlRuntime.ts
+ M orchestrator/src/cli/control/observabilityReadModel.ts
+ M orchestrator/src/cli/control/selectedRunProjection.ts
+ M orchestrator/tests/ControlRuntime.test.ts
+ M orchestrator/tests/ControlServer.test.ts
+ M tasks/index.json
+?? .agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md
+?? tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+```
+
+Diff budget override: 1034 stacked-branch scope on long-running main; bounded slice validated with targeted and manual evidence.
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+exec
+/bin/zsh -lc "grep -nE '1034|review|ControlRuntime|runtime compatibility|observability' /Users/kbediako/.codex/memories/MEMORY.md | head -n 20" in /Users/kbediako/Code/CO succeeded in 53ms:
+19:- Risk pattern found here: some lane metadata/manifests diverged (for example docs-review vs implementation-gate outcomes and stale in-progress manifests), so audits should explicitly compare task index intent to manifest terminal states.
+35:- Guardrail maturity audits are stronger when run-summary evidence is included (selected stages, diff-budget overrides, runtime defaults, review outcomes) rather than policy prose alone.
+72:- windows, codex-orchestrator, process.platform === 'win32', codexCliSetup.ts, scripts/pack-smoke.mjs, scripts/runtime-mode-canary.mjs, scripts/run-review.ts, sanitizeIdentifier, codex.exe, .cmd, Node>=20
+253:- RCA quality check: lane counts must match across packet/examples/reports; reviewers found and fixed mismatches, so cross-file count consistency is mandatory.
+284:scope: Use for tower-defence PR closeout loops, bot-review handling, and docs-first hosting prep planning.
+286:## Task 1: PR #170/#171 completion loops with long-poll review handling
+299:- Stable PR loop: patch minimally for each review thread, rerun validations, push, retrigger bots, then long-poll until clean streak before merge.
+300:- Keep review-cycle evidence explicit (commit IDs, reviewDecision changes, and polling windows) for deterministic handoff.
+321:- Docs-first hosting sweep should explicitly include grep gates for localhost/ws literals, operator-only command boundaries, and preview smoke checks.
+342:- Use awaiter-style polling with explicit clean-streak thresholds for review stability before merging. [Task 1]
+412:scope: Use for auditing CO adoption signals and fixing CO workflow tooling regressions tied to review/merge automation.
+430:## Task 2: run-review and pr watch-merge regression fixes
+438:- run-review, heavy command detection, .ps1, env wrapper unwrapping, pr watch-merge, buildPrMergeArgs, gh pr merge --repo owner/repo, GraphQL error
+442:- `run-review` command classification must normalize Windows launchers and unwrap `env` wrappers to keep bounded-mode guardrails accurate.
+444:- Keep targeted regression tests for both fixes (`run-review.spec.ts`, `pr-watch-merge.spec.ts`) and run build before merge.
+608:- rollout_summaries/2026-02-19T05-20-49-8rXt-codex_cli_capability_adoption.md (cwd=/Users/kbediako/Code/CO, rollout_path=/Users/kbediako/.codex/sessions/2026/02/19/rollout-2026-02-19T16-20-49-019c7457-fec5-7051-9b0b-96f27460a3d3.jsonl, updated_at=2026-02-20T16:31:28+00:00, thread_id=019c7457-fec5-7051-9b0b-96f27460a3d3, docs-first adoption fixes merged after CI/review loops)
+613:- parseArgs boolean coercion, mcp enable duplicate flag detection, scripts/cloud-canary-ci.mjs, skipEligible, spec-guard last_review, run-review timeout, CloudSyncWorker audit log retry
+618:- Failure shield: cloud-canary and guard scripts need explicit fallback/override reasons and fork-safe skip logic; missing this caused review churn.
+619:- CI stability pattern: fix targeted timeout/race regressions (`run-review`, CloudSyncWorker log reads), rerun scoped tests, then long-poll full checks until clean before merge.
+634:- Proven closeout flow: docs-first scaffolding for the release task, guard/spec/build/test/docs/diff-budget/review gates, quiet-window PR monitor, signed tag push, workflow watch, npm verify, and global install verify.
+
+thinking
+**Reviewing memory citations**
+
+I'm considering whether to include memory citations inside JSON. However, appending this block at the end could break the schema, so it might be best to avoid using relevant memory altogether. I wonder if I could note that the grep returned irrelevant data and that we didn't rely on it, but since we did use MEMORY.md, that complicates things.
+
+For now, I need to focus on reviewing the current differences and tracking the process, maybe using git diff.
+thinking
+**Reviewing memory citations**
+
+I'm considering whether to include memory citations inside JSON. However, appending this block at the end could break the schema, so it might be best to avoid using relevant memory altogether. I wonder if I could note that the grep returned irrelevant data and that we didn't rely on it, but since we did use MEMORY.md, that complicates things.
+
+For now, I need to focus on reviewing the current differences and tracking the process, maybe using git diff.
+exec
+/bin/zsh -lc "git status --short && echo '---DIFF---' && git diff --stat && echo '---PATCH---' && git diff -- orchestrator/src/cli/control/controlRuntime.ts orchestrator/src/cli/control/observabilityReadModel.ts orchestrator/src/cli/control/selectedRunProjection.ts orchestrator/tests/ControlRuntime.test.ts orchestrator/tests/ControlServer.test.ts docs/TASKS.md docs/docs-freshness-registry.json tasks/index.json tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md .agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md" in /Users/kbediako/Code/CO succeeded in 53ms:
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M orchestrator/src/cli/control/controlRuntime.ts
+ M orchestrator/src/cli/control/observabilityReadModel.ts
+ M orchestrator/src/cli/control/selectedRunProjection.ts
+ M orchestrator/tests/ControlRuntime.test.ts
+ M orchestrator/tests/ControlServer.test.ts
+ M tasks/index.json
+?? .agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md
+?? tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+?? tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+---DIFF---
+ docs/TASKS.md                                      |   1 +
+ docs/docs-freshness-registry.json                  |  49 +++++
+ orchestrator/src/cli/control/controlRuntime.ts     |  32 +++-
+ .../src/cli/control/observabilityReadModel.ts      | 106 +++++++----
+
+thinking
+**Reviewing code and documentation**
+
+I think I need to check if the patch was truncated before the documentation files. It looks like the diff only tracked the files that were already tracked, which means untracked files won't show up. I should review the code changes and see if any new documentation wasn't committed. It might also help to inspect the relevant files, especially those I've touched and the tests. Additionally, I'll want to look at any surrounding code and dependent files. Let's open those files up!
+thinking
+**Reviewing code and documentation**
+
+I think I need to check if the patch was truncated before the documentation files. It looks like the diff only tracked the files that were already tracked, which means untracked files won't show up. I should review the code changes and see if any new documentation wasn't committed. It might also help to inspect the relevant files, especially those I've touched and the tests. Additionally, I'll want to look at any surrounding code and dependent files. Let's open those files up!
+exec
+/bin/zsh -lc "sed -n '1,340p' orchestrator/src/cli/control/selectedRunProjection.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlRuntime.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '330,540p' orchestrator/src/cli/control/observabilityReadModel.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/observabilitySurface.ts && printf '\\n---TELEGRAM---\\n' && sed -n '1,260p' orchestrator/src/cli/control/telegramOversightBridge.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+    turn_count: 0,
+    last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
+    last_message: selected.latestEvent?.message ?? selected.summary,
+    started_at: selected.startedAt,
+    last_event_at: selected.latestEvent?.at ?? selected.updatedAt,
+    tokens: {
+      input_tokens: null,
+      output_tokens: null,
+      total_tokens: null
+    }
+  };
+}
+
+export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourceContext): ControlRetryPayload {
+  return {
+    issue_id: selected.issueId,
+    issue_identifier: selected.issueIdentifier,
+    state: selected.rawStatus,
+    display_state: selected.displayStatus,
+    status_reason: selected.statusReason,
+ succeeded in 52ms:
+import type { RunPaths } from '../run/runPaths.js';
+import type { ControlState } from './controlState.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import {
+  buildCompatibilityProjectionSnapshot,
+  buildTrackedLinearPayload,
+  type ControlCompatibilitySourceContext,
+  type ControlCompatibilityProjectionSnapshot,
+  type ControlCompatibilityRuntimeSnapshot,
+  type ControlSelectedRunRuntimeSnapshot,
+} from './observabilityReadModel.js';
+import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
+import {
+  createObservabilityUpdateNotifier,
+  type ObservabilityUpdate,
+  type ObservabilityUpdateListener,
+  type ObservabilityUpdateNotifier
+} from './observabilityUpdateNotifier.js';
+import type { QuestionRecord } from './questions.js';
+import {
+ succeeded in 52ms:
+import { readdir, readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlAction, ControlState } from './controlState.js';
+import {
+  buildTrackedLinearPayload,
+  type ControlCompatibilitySourceContext,
+  type SelectedRunContext,
+  type SelectedRunLatestEvent,
+  type SelectedRunQuestionSummary
+} from './observabilityReadModel.js';
+import type { QuestionRecord } from './questions.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+
+export interface SelectedRunManifestSnapshot {
+  manifestRecord: Record<string, unknown>;
+  issueIdentifier: string;
+  issueId: string | null;
+ succeeded in 52ms:
+import { readFile } from 'node:fs/promises';
+import { relative, resolve } from 'node:path';
+
+import { isoTimestamp } from '../utils/time.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlState } from './controlState.js';
+import type {
+  ControlCompatibilityProjectionSnapshot,
+  ControlIssuePayload,
+  ControlSelectedRunRuntimeSnapshot,
+  ControlStatePayload
+} from './observabilityReadModel.js';
+import {
+  buildSelectedRunPublicPayload,
+  buildUiSelectedRunSharedFields,
+  findCompatibilityProjectionIssueRecord
+} from './observabilityReadModel.js';
+import type {
+  DispatchPilotEvaluation,
+
+thinking
+**Exploring observability options**
+
+I think I need to deepen my understanding of observabilitySurface and also look at selectedRunProjection more closely. Maybe I should open up more options and examine readCompatibilityIssue and route matching while I'm at it. It feels like expanding my view on these elements might give me better insights and help integrate everything properly. I'll see how I can approach these aspects together!
+thinking
+**Exploring observability options**
+
+I think I need to deepen my understanding of observabilitySurface and also look at selectedRunProjection more closely. Maybe I should open up more options and examine readCompatibilityIssue and route matching while I'm at it. It feels like expanding my view on these elements might give me better insights and help integrate everything properly. I'll see how I can approach these aspects together!
+exec
+/bin/zsh -lc "sed -n '260,520p' orchestrator/src/cli/control/selectedRunProjection.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '220,520p' orchestrator/src/cli/control/observabilitySurface.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -nR \"readCompatibilityIssue\\|findCompatibilityProjectionIssueRecord\\|/api/v1\" -n orchestrator/src/cli/control/observabilitySurface.ts orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control -n | head -n 80" in /Users/kbediako/Code/CO succeeded in 53ms:
+      statusReason: input.questionSummary.queuedCount > 0 ? 'queued_questions' : 'control_pause'
+    };
+  }
+  if (input.rawStatus === 'in_progress' && input.questionSummary.queuedCount > 0) {
+    return { displayStatus: 'awaiting_input', statusReason: 'queued_questions' };
+  }
+  return { displayStatus: input.rawStatus, statusReason: null };
+}
+
+function buildSelectedRunLatestEvent(input: {
+  controlAction: ControlAction | null;
+  updatedAt: string | null;
+  summary: string | null;
+  fallbackEvent: string;
+}): SelectedRunLatestEvent | null {
+  if (!input.controlAction && !input.updatedAt && !input.summary) {
+    return null;
+  }
+  return {
+    at: input.controlAction?.requested_at ?? input.updatedAt,
+ succeeded in 53ms:
+      evaluation,
+      failure: evaluation.failure,
+      details: {
+        surface: 'api_v1',
+        mode: 'read_only',
+        advisory_only: true,
+        reason: evaluation.failure.reason,
+        dispatch_pilot: evaluation.summary
+      }
+    };
+  }
+
+  return {
+    kind: 'ok',
+    issueIdentifier,
+    evaluation,
+    payload: {
+      generated_at: isoTimestamp(),
+      mode: 'read_only',
+      advisory_only: true,
+ succeeded in 53ms:
+orchestrator/src/cli/control/observabilitySurface.ts:17:  findCompatibilityProjectionIssueRecord
+orchestrator/src/cli/control/observabilitySurface.ts:209:// `/api/v1/dispatch` is a CO-specific extension over the Symphony-aligned
+orchestrator/src/cli/control/observabilitySurface.ts:323:export async function readCompatibilityIssue(
+orchestrator/src/cli/control/observabilitySurface.ts:328:  const issue = findCompatibilityProjectionIssueRecord(projection, issueIdentifier);
+orchestrator/src/cli/control/controlServer.ts:49:  readCompatibilityIssue,
+orchestrator/src/cli/control/controlServer.ts:72:const COMPATIBILITY_API_PREFIX = '/api/v1';
+orchestrator/src/cli/control/controlServer.ts:723:    const result = await readCompatibilityIssue(presenterContext, compatibilityIssueIdentifier);
+orchestrator/src/cli/control/observabilityReadModel.ts:431:export function findCompatibilityProjectionIssueRecord(
+orchestrator/src/cli/control/controlServer.ts:49:  readCompatibilityIssue,
+orchestrator/src/cli/control/controlServer.ts:72:const COMPATIBILITY_API_PREFIX = '/api/v1';
+orchestrator/src/cli/control/controlServer.ts:723:    const result = await readCompatibilityIssue(presenterContext, compatibilityIssueIdentifier);
+orchestrator/src/cli/control/observabilitySurface.ts:17:  findCompatibilityProjectionIssueRecord
+orchestrator/src/cli/control/observabilitySurface.ts:209:// `/api/v1/dispatch` is a CO-specific extension over the Symphony-aligned
+orchestrator/src/cli/control/observabilitySurface.ts:323:export async function readCompatibilityIssue(
+orchestrator/src/cli/control/observabilitySurface.ts:328:  const issue = findCompatibilityProjectionIssueRecord(projection, issueIdentifier);
+
+thinking
+**Inspecting code and documentation**
+
+I need to inspect the controlServer route—there might not be a bug, but I want to be sure. I’ll check the documentation to verify any potential mismatches. It seems like the code review is mostly focused on bugs, so I should look at tests and helper functions too. I think I need to check the base behavior and types as well, so searching for ControlCompatibilityRuntimeSnapshot and its types could help me understand the semantics better.
+thinking
+**Inspecting code and documentation**
+
+I need to inspect the controlServer route—there might not be a bug, but I want to be sure. I’ll check the documentation to verify any potential mismatches. It seems like the code review is mostly focused on bugs, so I should look at tests and helper functions too. I think I need to check the base behavior and types as well, so searching for ControlCompatibilityRuntimeSnapshot and its types could help me understand the semantics better.
+exec
+/bin/zsh -lc "sed -n '680,780p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -n \"interface ControlCompatibilityRuntimeSnapshot\\|interface ControlCompatibilitySourceContext\\|type ControlCompatibilityProjectionSnapshot\\|interface ControlIssuePayload\" -n orchestrator/src/cli/control/observabilityReadModel.ts && sed -n '1,220p' orchestrator/src/cli/control/observabilityReadModel.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+      headers: JSON_NO_STORE_HEADERS,
+      body: {
+        ...result.payload,
+        traceability
+      }
+    });
+    return;
+  }
+
+  if (url.pathname === COMPATIBILITY_REFRESH_PATH) {
+    if (method !== 'POST') {
+      writeObservabilityResponse(res, buildCompatibilityMethodNotAllowedResponse(context, 'POST'));
+      return;
+    }
+    const result = await readCompatibilityRefresh(
+      {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        requestRefresh: () => context.runtime.requestRefresh()
+      },
+ succeeded in 53ms:
+import http from 'node:http';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync, realpathSync } from 'node:fs';
+import { chmod, readFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { writeJsonAtomic } from '../utils/fs.js';
+import { isoTimestamp } from '../utils/time.js';
+import { logger } from '../../logger.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
+import {
+  ControlStateStore,
+  type ControlAction,
+  type ControlState,
+  type ControlTransport,
+  type TransportIdempotencyEntry
+} from './controlState.js';
+ succeeded in 52ms:
+166:export interface ControlCompatibilitySourceContext extends SharedSelectedProjectionFields {}
+168:export interface ControlCompatibilityRuntimeSnapshot {
+191:export interface ControlIssuePayload {
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { QuestionUrgency } from './questions.js';
+
+export interface SelectedRunQuestionSummary {
+  queuedCount: number;
+  latestQuestion: {
+    questionId: string;
+    prompt: string;
+    urgency: QuestionUrgency;
+    queuedAt: string;
+  } | null;
+}
+
+export interface SelectedRunLatestEvent {
+  at: string | null;
+  event: string | null;
+  message: string | null;
+[run-review] waiting on codex review (1m 0s elapsed, 15s idle; review progress observed).
+
+
+
+
+thinking
+**Verifying run directory path**
+
+I'm wondering if I need to issue a route for a sibling run and whether I should dispatch a pilot. It's not specified, so maybe that's okay. I need to verify that the `runDir` path is correct—it should be `.runs/task/cli/runid`. If I calculate the resolve function, it looks like `runDir` is `repo/.runs/task/cli/runid`, which leads to `repo/.runs` when resolving up three levels. So that’s correct and fine!
+thinking
+**Exploring compatibility issues**
+
+I’m thinking about runtime discovery in compatibility, which is good because the selected-run snapshot is still being used for the UI/Telegram. However, there could be potential issues with build compatibility projections. For example, I wonder if duplicates could happen across issues when sibling tasks share the same run ID but have different task IDs. It seems like run IDs are supposed to be unique, yet I’m questioning if duplicates could occur if they were provided manually.
+thinking
+**Analyzing compatibility issues**
+
+I need to understand the semantics of how the Symphony compatibility route uses the issue identifier as a primary key. This might allow for aggregation, but it's not clearly a bug. I see a potential issue where the function readLatestSiblingCompatibilityContext returns the first readable manifest without checking if it's the latest based on updated_at or status, sorting only by run directory names. I wonder about local-mcp and whether non-task directories might be skipped or overlooked. Scanning the metrics.json file could be a solution.
+thinking
+**Conducting targeted search**
+
+I think I might need to run a targeted search or inspect tests to see what existing conventions are out there. It’s possible that looking back at previous tasks, like task 1033, could help me compare sources and gather useful information. There’s definitely something to be gained by analyzing that context! I just want to ensure I have all the right details before moving forward.
+thinking
+**Verifying run directory path**
+
+I'm wondering if I need to issue a route for a sibling run and whether I should dispatch a pilot. It's not specified, so maybe that's okay. I need to verify that the `runDir` path is correct—it should be `.runs/task/cli/runid`. If I calculate the resolve function, it looks like `runDir` is `repo/.runs/task/cli/runid`, which leads to `repo/.runs` when resolving up three levels. So that’s correct and fine!
+thinking
+**Exploring compatibility issues**
+
+I’m thinking about runtime discovery in compatibility, which is good because the selected-run snapshot is still being used for the UI/Telegram. However, there could be potential issues with build compatibility projections. For example, I wonder if duplicates could happen across issues when sibling tasks share the same run ID but have different task IDs. It seems like run IDs are supposed to be unique, yet I’m questioning if duplicates could occur if they were provided manually.
+thinking
+**Analyzing compatibility issues**
+
+I need to understand the semantics of how the Symphony compatibility route uses the issue identifier as a primary key. This might allow for aggregation, but it's not clearly a bug. I see a potential issue where the function readLatestSiblingCompatibilityContext returns the first readable manifest without checking if it's the latest based on updated_at or status, sorting only by run directory names. I wonder about local-mcp and whether non-task directories might be skipped or overlooked. Scanning the metrics.json file could be a solution.
+thinking
+**Conducting targeted search**
+
+I think I might need to run a targeted search or inspect tests to see what existing conventions are out there. It’s possible that looking back at previous tasks, like task 1033, could help me compare sources and gather useful information. There’s definitely something to be gained by analyzing that context! I just want to ensure I have all the right details before moving forward.
+exec
+/bin/zsh -lc "git show HEAD~1:orchestrator/src/cli/control/selectedRunProjection.ts | sed -n '1,260p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "git show HEAD~1:orchestrator/src/cli/control/controlRuntime.ts | sed -n '100,220p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "git show HEAD~1:orchestrator/src/cli/control/observabilityReadModel.ts | sed -n '340,500p'" in /Users/kbediako/Code/CO succeeded in 52ms:
+
+    subscribe(listener) {
+      return notifier.subscribe(listener);
+    }
+  };
+}
+
+function createControlRuntimeSnapshot(
+  context: ControlRuntimeContext,
+  liveLinearAdvisoryRuntime: ReturnType<typeof createLiveLinearAdvisoryRuntime>
+): InternalControlRuntimeSnapshot {
+  const selectedRunProjection = createSelectedRunProjectionReader(context);
+  const compatibilityProjectionSource = createSelectedRunProjectionReader(context);
+  let selectedRunSnapshotPromise: Promise<ControlSelectedRunRuntimeSnapshot> | null = null;
+  let compatibilityRuntimeSnapshotPromise: Promise<ControlCompatibilityRuntimeSnapshot> | null = null;
+  let compatibilityProjectionPromise: Promise<ControlCompatibilityProjectionSnapshot> | null = null;
+  let dispatchEvaluationPromise: Promise<{
+    issueIdentifier: string | null;
+    evaluation: DispatchPilotEvaluation;
+  }> | null = null;
+ succeeded in 52ms:
+  };
+}
+
+export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourceContext): ControlRetryPayload {
+  return {
+    issue_id: selected.issueId,
+    issue_identifier: selected.issueIdentifier,
+    state: selected.rawStatus,
+    display_state: selected.displayStatus,
+    status_reason: selected.statusReason,
+    session_id: selected.runId,
+    attempt: 0,
+    last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
+    last_message: selected.latestEvent?.message ?? selected.summary,
+    started_at: selected.startedAt,
+    last_event_at: selected.latestEvent?.at ?? selected.updatedAt
+  };
+}
+
+export function buildCompatibilityProjectionSnapshot(
+ succeeded in 52ms:
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlAction, ControlState } from './controlState.js';
+import {
+  buildTrackedLinearPayload,
+  type ControlCompatibilitySourceContext,
+  type SelectedRunContext,
+  type SelectedRunLatestEvent,
+  type SelectedRunQuestionSummary
+} from './observabilityReadModel.js';
+import type { QuestionRecord } from './questions.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+
+export interface SelectedRunManifestSnapshot {
+  manifestRecord: Record<string, unknown>;
+  issueIdentifier: string;
+  issueId: string | null;
+exec
+/bin/zsh -lc "sed -n '1,220p' docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md" in /Users/kbediako/Code/CO succeeded in 53ms:
+# 1034 Deliberation
+
+- Real Symphony's compatibility controller/presenter path consumes a runtime snapshot whose `running` and `retrying` collections are first-class inputs from orchestrator state.
+- `1033` gave CO a dedicated compatibility source seam, but that source still represents at most one selected issue and an optional single running entry.
+- The smallest higher-value next slice is therefore:
+  - keep the selected-run seam for UI and Telegram,
+  - add a bounded runtime discovery layer for compatibility `running` and `retrying`,
+  - preserve the current projection-owned compatibility route surface,
+  - leave `/api/v1/dispatch`, Telegram control authority, and Linear advisory policy untouched.
+- A broader refactor is not justified yet because the current remaining gap is collection population, not control authority or scheduler ownership.
+ succeeded in 53ms:
+# Task Checklist - 1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery
+
+- MCP Task ID: `1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+- TECH_SPEC: `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+
+> This lane introduces bounded runtime discovery for compatibility `running` and `retrying` collections while keeping UI/Telegram on the existing selected-run seam.
+
+## Foundation
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `.agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md`.
+
+## Shared Registry + Review Handoff
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md`.
+- [x] docs-review approval/override captured for registered `1034`. Evidence: `.runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/cli/2026-03-07T02-27-59-777Z-f19359d3/manifest.json`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T023357Z-preimpl-review-and-docs-review-override/00-summary.md`.
+
+## Runtime Compatibility Collection Discovery
+- [ ] The compatibility runtime snapshot discovers bounded `running` and `retrying` entries beyond the selected manifest. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/selectedRunProjection.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`.
+ succeeded in 53ms:
+---
+id: 20260307-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery
+title: Coordinator Symphony-Aligned Runtime Compatibility Collection Discovery
+relates_to: docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-03-07
+---
+
+## Summary
+
+- Objective: populate the core compatibility projection from a bounded discovered set of runtime `running` and `retrying` entries rather than from a selected-manifest-only source.
+- Scope: runtime discovery boundaries, compatibility collection population, and regression/manual evidence updates.
+- Constraints: preserve the selected-run seam for UI/Telegram, keep `/api/v1/dispatch` separate, avoid scheduler/authority expansion, and avoid broad control-server rewrites.
+
+## Pre-Implementation Review Note
+
+- Decision: approved for docs-first planning as the immediate next slice after `1033`.
+- Reasoning: `1033` completed the dedicated compatibility source boundary, so the next higher-value remaining gap is that the compatibility source still only represents one selected manifest. The smallest next move is to introduce bounded runtime discovery for compatibility `running` and `retrying` collections while leaving the selected-run seam intact for UI/Telegram.
+ succeeded in 53ms:
+# TECH_SPEC - Coordinator Symphony-Aligned Runtime Compatibility Collection Discovery
+
+## Scope
+
+- Add a bounded runtime discovery layer for the Symphony-aligned core compatibility API.
+- Populate compatibility `running` and `retrying` collections from discovered runtime state rather than a selected-manifest-only source.
+- Keep `/api/v1/state` and `/api/v1/:issue_identifier` on the current projection-owned route seam, with `/ui/data.json`, Telegram, and `/api/v1/dispatch` unchanged.
+
+## Files / Modules
+
+- `orchestrator/src/cli/control/controlRuntime.ts`
+- `orchestrator/src/cli/control/selectedRunProjection.ts`
+- `orchestrator/src/cli/control/observabilityReadModel.ts`
+- `orchestrator/src/cli/control/observabilitySurface.ts`
+- `orchestrator/src/cli/run/runPaths.ts`
+- `orchestrator/tests/ControlRuntime.test.ts`
+- `orchestrator/tests/ControlServer.test.ts`
+
+## Design
+
+
+thinking
+**Evaluating run manifests**
+
+I need to enumerate recent or sibling run manifests from the `.runs` root, but I'm feeling a bit uncertain about that. It might not be bounded correctly, so I should check the runPaths for clues. If the code only uses the latest versions per task, it could be okay, but I still need to verify. There's been a potential docs mismatch where changes were mentioned but not really accounted for. I think I'll need to inspect the PRD and ACTION PLAN further.
+thinking
+**Evaluating run manifests**
+
+I need to enumerate recent or sibling run manifests from the `.runs` root, but I'm feeling a bit uncertain about that. It might not be bounded correctly, so I should check the runPaths for clues. If the code only uses the latest versions per task, it could be okay, but I still need to verify. There's been a potential docs mismatch where changes were mentioned but not really accounted for. I think I'll need to inspect the PRD and ACTION PLAN further.
+exec
+/bin/zsh -lc "sed -n '1,220p' .agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# PRD - Coordinator Symphony-Aligned Runtime Compatibility Collection Discovery
+
+## Summary
+
+After `1033`, CO's core compatibility routes own their projection and source seam, but the source still only represents the selected manifest plus an optional single running entry. This slice introduces a bounded runtime discovery layer so the Symphony-aligned core compatibility API can populate `running` and `retrying` collections from discovered runtime state instead of treating the selected run as the whole world.
+
+## Problem
+
+- `readCompatibilityProjection()` now owns its own runtime source, but that source still derives from one selected manifest snapshot.
+- `running` can contain at most one entry and `retrying` is always empty, even when sibling runs under `.runs/` expose more relevant compatibility state.
+- Real Symphony's snapshot contract is collection-backed from orchestrator state, and the presenter resolves `/api/v1/state` and `/api/v1/:issue_identifier` from those collections rather than a selected-run special case.
+- CO still needs the selected-run seam for UI and Telegram, but the core compatibility API should grow toward a bounded collection discovery model that is independent of that seam.
+
+## Goals
+
+- Introduce a bounded runtime discovery layer for compatibility `running` and `retrying` collections.
+- Keep the core compatibility API collection-backed while moving beyond a single selected manifest source.
+- Preserve the selected-run seam for UI, Telegram, and other selected-run consumers.
+- Keep `/api/v1/dispatch`, Telegram control authority, and Linear advisory policy unchanged.
+
+ succeeded in 52ms:
+# ACTION_PLAN - Coordinator Symphony-Aligned Runtime Compatibility Collection Discovery
+
+1. Register `1034` docs-first artifacts, checklist mirrors, task index entries, and freshness coverage.
+2. Capture the bounded deliberation showing why the next highest-value gap after `1033` is collection discovery beyond the selected manifest rather than a broader scheduler refactor.
+3. Introduce a bounded runtime discovery layer for compatibility `running` and `retrying` collections.
+4. Update the compatibility runtime snapshot path to consume discovered entries while leaving the selected-run seam intact for UI/Telegram.
+5. Keep `/api/v1/dispatch`, Telegram control authority, and Linear advisory policy unchanged.
+6. Run the ordered validation lane, elegance review, and closeout sync.
+ succeeded in 52ms:
+# Task Checklist - 1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery
+
+- MCP Task ID: `1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+- TECH_SPEC: `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`
+
+> This lane introduces bounded runtime discovery for compatibility `running` and `retrying` collections while keeping UI/Telegram on the existing selected-run seam.
+
+## Foundation
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `.agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md`.
+
+## Shared Registry + Review Handoff
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md`.
+- [x] docs-review approval/override captured for registered `1034`. Evidence: `.runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/cli/2026-03-07T02-27-59-777Z-f19359d3/manifest.json`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T023357Z-preimpl-review-and-docs-review-override/00-summary.md`.
+
+## Runtime Compatibility Collection Discovery
+- [ ] The compatibility runtime snapshot discovers bounded `running` and `retrying` entries beyond the selected manifest. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/selectedRunProjection.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`.
+exec
+/bin/zsh -lc 'grep -Rni "retrying" docs/findings docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md docs/TECH_SPEC-coordinator-symphony-aligned-collection-backed-compatibility-projection.md tasks/specs/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md tasks/specs/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection.md | head -n 120' in /Users/kbediako/Code/CO succeeded in 52ms:
+docs/findings/1032-collection-backed-compatibility-projection-deliberation.md:5:  - `presenter.ex` builds `running` and `retrying` collections, then resolves issue detail from those collections
+docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md:3:- Real Symphony's compatibility controller/presenter path consumes a runtime snapshot whose `running` and `retrying` collections are first-class inputs from orchestrator state.
+docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md:7:  - add a bounded runtime discovery layer for compatibility `running` and `retrying`,
+docs/findings/1033-runtime-compatibility-snapshot-source-deliberation.md:3:- Real Symphony’s compatibility controller/presenter path consumes a runtime snapshot whose `running` and `retrying` collections are first-class inputs rather than a selected-run derivative.
+docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md:19:1. Introduce a compatibility-oriented runtime snapshot source that reads the manifest/control/question state needed for `running`, `retrying`, issue lookup aliases, and selected compatibility metadata without requiring a `SelectedRunContext`.
+docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md:24:   - `retrying` may remain empty when no source data exists
+docs/TECH_SPEC-coordinator-symphony-aligned-collection-backed-compatibility-projection.md:20:   - `retrying` entries
+docs/TECH_SPEC-coordinator-symphony-aligned-collection-backed-compatibility-projection.md:26:   - `readCompatibilityState(...)` reads `running`/`retrying` from the projection
+exec
+/bin/zsh -lc 'grep -Rni "dispatch_pilot" docs tasks orchestrator/tests/ControlServer.test.ts orchestrator/tests/ControlRuntime.test.ts | head -n 80' in /Users/kbediako/Code/CO succeeded in 50ms:
+docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md:75:- Existing `dispatch_pilot` policy remains authoritative for whether the Linear advisory pilot is enabled; env values may fill provider credentials/bindings but may not auto-authorize mutation semantics.
+docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-and-live-linear-advisory-adapters.md:80:- Preserve current `dispatch_pilot.summary` semantics so existing callers do not lose the advisory-state contract.
+docs/TECH_SPEC-coordinator-symphony-aligned-snapshot-reads-and-live-linear-dispatch-separation.md:98:- Regressing snapshot-level `dispatch_pilot` visibility while removing provider reads.
+orchestrator/tests/ControlServer.test.ts:71:        dispatch_pilot: dispatchPilot
+orchestrator/tests/ControlServer.test.ts:790:        dispatch_pilot: {
+orchestrator/tests/ControlServer.test.ts:839:        dispatch_pilot?: { status?: string; source_status?: string };
+orchestrator/tests/ControlServer.test.ts:863:      expect(statePayload.dispatch_pilot).toMatchObject({
+orchestrator/tests/ControlServer.test.ts:1471:        dispatch_pilot?: { status?: string; source_status?: string };
+orchestrator/tests/ControlServer.test.ts:1476:      expect(dispatchPayload.dispatch_pilot).toMatchObject({
+orchestrator/tests/ControlServer.test.ts:1651:          dispatch_pilot?: {
+orchestrator/tests/ControlServer.test.ts:1664:              dispatch_pilot?: {
+orchestrator/tests/ControlServer.test.ts:1685:          expect(dispatchPayload.error?.details?.dispatch_pilot).toMatchObject({
+orchestrator/tests/ControlServer.test.ts:1691:          expect(dispatchPayload.dispatch_pilot).toMatchObject({
+orchestrator/tests/ControlServer.test.ts:1717:          dispatch_pilot?: { status?: string; source_status?: string };
+orchestrator/tests/ControlServer.test.ts:1719:        expect(statePayload.dispatch_pilot).toMatchObject({
+orchestrator/tests/ControlServer.test.ts:1732:          dispatch_pilot?: { status?: string; source_status?: string };
+orchestrator/tests/ControlServer.test.ts:1734:        expect(issuePayload.dispatch_pilot).toMatchObject({
+orchestrator/tests/ControlServer.test.ts:1747:        const evaluatedEvent = events.find((entry) => entry.event === 'dispatch_pilot_evaluated');
+orchestrator/tests/ControlServer.test.ts:1748:        const viewedEvent = events.find((entry) => entry.event === 'dispatch_pilot_viewed');
+orchestrator/tests/ControlRuntime.test.ts:151:    dispatch_pilot: {
+
+thinking
+**Investigating existing tests**
+
+I’m thinking I should take a look at the relevant existing tests regarding the dispatch pilot and how it handles issue payloads. There might be valuable insights there that could improve understanding or reveal any gaps in testing. I want to ensure I'm thorough in this step since it seems crucial for troubleshooting. My aim is to determine if these tests can sufficiently address potential issues with the payloads.
+thinking
+**Investigating existing tests**
+
+I’m thinking I should take a look at the relevant existing tests regarding the dispatch pilot and how it handles issue payloads. There might be valuable insights there that could improve understanding or reveal any gaps in testing. I want to ensure I'm thorough in this step since it seems crucial for troubleshooting. My aim is to determine if these tests can sufficiently address potential issues with the payloads.
+exec
+/bin/zsh -lc "sed -n '1700,1750p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+          } else {
+            expect(dispatchPayload.recommendation).toBeNull();
+          }
+        }
+        expect(dispatchPayload.traceability?.decision).toBe(
+          scenario.expectedFailureCode ? 'rejected' : 'acknowledged'
+        );
+        expect(dispatchPayload.traceability?.issue_identifier).toBe('task-0940');
+        expect(typeof dispatchPayload.traceability?.reason).toBe('string');
+
+        const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        expect(stateRes.status).toBe(200);
+        const statePayload = (await stateRes.json()) as {
+          dispatch_pilot?: { status?: string; source_status?: string };
+        };
+        expect(statePayload.dispatch_pilot).toMatchObject({
+[run-review] waiting on codex review (2m 0s elapsed, 1s idle; review progress observed).
+
+thinking
+**Evaluating compatibility issues**
+
+I’m thinking about how the compatibility API uses issue identifiers based on task IDs. It seems like if I run the same task multiple times, they would share the same identifier, but maybe it should still reflect the latest or selected version? I’m not certain if there’s an issue with the lookup alias fanout either. Since the `buildCompatibilityProjectionSnapshot` registers issues using issue identifiers, it gets tricky for sibling task runs when task IDs are included, especially with aliases that involve run IDs.
+thinking
+**Evaluating compatibility issues**
+
+I’m thinking about how the compatibility API uses issue identifiers based on task IDs. It seems like if I run the same task multiple times, they would share the same identifier, but maybe it should still reflect the latest or selected version? I’m not certain if there’s an issue with the lookup alias fanout either. Since the `buildCompatibilityProjectionSnapshot` registers issues using issue identifiers, it gets tricky for sibling task runs when task IDs are included, especially with aliases that involve run IDs.
+exec
+/bin/zsh -lc "grep -Rni \"compatibilityProjection\\.issues\\|readCompatibilityProjection\\|/api/v1/run-\" orchestrator/tests | head -n 80" in /Users/kbediako/Code/CO succeeded in 53ms:
+orchestrator/tests/ControlRuntime.test.ts:253:    const initialCompatibility = await snapshot.readCompatibilityProjection();
+orchestrator/tests/ControlRuntime.test.ts:275:    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+orchestrator/tests/ControlRuntime.test.ts:307:    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+orchestrator/tests/ControlRuntime.test.ts:364:    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+orchestrator/tests/ControlRuntime.test.ts:365:    const issueIdentifiers = compatibilityProjection.issues.map((issue) => issue.issueIdentifier);
+orchestrator/tests/ControlRuntime.test.ts:366:    const siblingRunning = compatibilityProjection.issues.find(
+orchestrator/tests/ControlRuntime.test.ts:369:    const siblingRetry = compatibilityProjection.issues.find(
+orchestrator/tests/ControlServer.test.ts:475:      const runAliasRes = await fetch(new URL('/api/v1/run-1', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:616:      const siblingRunAliasRes = await fetch(new URL('/api/v1/run-2', baseUrl), {
+exec
+/bin/zsh -lc "sed -n '220,330p' orchestrator/tests/ControlRuntime.test.ts && printf '\\n---\\n' && sed -n '430,520p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+  );
+}
+
+describe('ControlRuntime', () => {
+  it('reuses the cached snapshot across repeated reads until invalidated', async () => {
+    const fixture = await createFixture();
+    const initialSnapshot = fixture.runtime.snapshot();
+
+    const initialSelectedRun = await initialSnapshot.readSelectedRunSnapshot();
+    await seedManifest(fixture.paths, {
+      summary: 'updated summary',
+      updated_at: '2026-03-07T00:10:00.000Z'
+    });
+    fixture.controlStore.setLatestAction({
+      action: 'pause',
+      requestedBy: 'ui',
+      reason: 'manual pause'
+    });
+
+    const repeatedSnapshot = fixture.runtime.snapshot();
+
+thinking
+**Looking into task tests**
+
+I’m noticing that current tests are only covering sibling tasks. I might need to check the specifications around bounded discovery to figure out if running the same task multiple times is significant. It feels a bit unclear right now, so searching through the documentation could help clarify things! A solid understanding would definitely guide my next steps. Let's get to it and see what I can find!
+thinking
+**Looking into task tests**
+
+I’m noticing that current tests are only covering sibling tasks. I might need to check the specifications around bounded discovery to figure out if running the same task multiple times is significant. It feels a bit unclear right now, so searching through the documentation could help clarify things! A solid understanding would definitely guide my next steps. Let's get to it and see what I can find!
+exec
+/bin/zsh -lc "grep -Rni \"same task\\|sibling\" docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md" in /Users/kbediako/Code/CO succeeded in 53ms:
+docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md:10:- `running` can contain at most one entry and `retrying` is always empty, even when sibling runs under `.runs/` expose more relevant compatibility state.
+docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md:21:1. Introduce a bounded compatibility runtime discovery helper that can enumerate recent/sibling run manifests from the repo `.runs` root derived from the current run paths.
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/run/runPaths.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+import { join, relative } from 'node:path';
+import { sanitizeRunId } from '../../persistence/sanitizeRunId.js';
+import type { EnvironmentPaths } from './environment.js';
+
+export interface RunPaths {
+  runDir: string;
+  manifestPath: string;
+  heartbeatPath: string;
+  resumeTokenPath: string;
+  logPath: string;
+  eventsPath: string;
+  controlPath: string;
+  controlAuthPath: string;
+  controlEndpointPath: string;
+  confirmationsPath: string;
+  questionsPath: string;
+  delegationTokensPath: string;
+  commandsDir: string;
+  errorsDir: string;
+  compatDir: string;
+
+
+

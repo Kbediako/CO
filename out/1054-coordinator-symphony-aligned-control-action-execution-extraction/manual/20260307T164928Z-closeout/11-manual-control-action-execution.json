@@ -1,0 +1,51 @@
+{
+  "task_id": "1054-coordinator-symphony-aligned-control-action-execution-extraction",
+  "generated_at": "2026-03-07T16:54:22.463Z",
+  "replay_example": {
+    "kind": "replay",
+    "snapshot": {
+      "run_id": "run-manual",
+      "control_seq": 2,
+      "latest_action": {
+        "action": "pause",
+        "requested_by": "delegate",
+        "requested_at": "2026-03-07T16:49:28.000Z",
+        "request_id": "req-replay",
+        "intent_id": "intent-replay",
+        "reason": "manual"
+      },
+      "feature_toggles": null,
+      "transport_mutation": null
+    },
+    "requestId": "req-replay",
+    "intentId": "intent-replay",
+    "traceability": null,
+    "persistRequired": true,
+    "publishRequired": false
+  },
+  "applied_transport_example": {
+    "kind": "post-update",
+    "snapshot": {
+      "run_id": "run-manual",
+      "control_seq": 2,
+      "latest_action": {
+        "action": "pause",
+        "requested_by": "delegate",
+        "requested_at": "2026-03-07T16:49:28.000Z",
+        "request_id": "req-apply",
+        "intent_id": "intent-apply",
+        "reason": "transport",
+        "transport": "discord",
+        "actor_id": "actor-manual",
+        "actor_source": "discord.oauth",
+        "transport_principal": "discord:channel:manual"
+      },
+      "feature_toggles": null,
+      "transport_mutation": null
+    },
+    "idempotentReplay": false,
+    "replayEntry": null,
+    "persistRequired": true,
+    "publishRequired": true
+  }
+}

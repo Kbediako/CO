@@ -1,0 +1,5 @@
+# 1195 Override Notes
+
+- `diff-budget` required the standard stacked-branch waiver: `DIFF_BUDGET_OVERRIDE_REASON="1195 stacked-branch symphony alignment lane"`.
+- The docs-first registration turn recorded a separate `docs-review` wrapper override in `out/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction/manual/20260314T161006Z-docs-first/05-docs-review-override.md` after the wrapper stopped at `Run delegation guard`. That earlier registration-stop did not block final-tree correctness validation.
+- The forced bounded `npm run review` never produced a concrete diff-local finding for `1195`. After the explicit diff-budget waiver, it broadened into repeated abstraction-quality speculation and rereads of adjacent start-shell/test surfaces such as `orchestrator/tests/OrchestratorStartPreparationShell.test.ts`, then failed to return a bounded verdict. After an explicit watch window, that review was terminated and recorded as a low-signal review-surface override rather than treated as a clean pass.

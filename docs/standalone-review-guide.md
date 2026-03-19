@@ -54,25 +54,45 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - To force execution in those environments: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=<task-id> NOTES="..." MANIFEST=<path> codex-orchestrator review --manifest <path>`.
 - `codex-orchestrator review` keeps delegation MCP enabled by default; disable when needed with `CODEX_REVIEW_DISABLE_DELEGATION_MCP=1` or `--disable-delegation-mcp` (legacy control remains supported: `CODEX_REVIEW_ENABLE_DELEGATION_MCP=0` or `--enable-delegation-mcp=false`).
 - `codex-orchestrator review` does not enforce runtime limits by default (reviews can run as long as needed).
-- `codex-orchestrator review` uses bounded review guidance by default (focus on changed files, avoid full-suite validation commands) but remains advisory-only for agent autonomy/performance.
+- `codex-orchestrator review` uses bounded review guidance by default (default `diff` reviews stay on changed files, `audit` reviews stay on the requested evidence surfaces, and `architecture` reviews stay on the requested task-doc and architecture surfaces; all avoid full-suite validation commands).
+- `codex-orchestrator review` now defaults to the `diff` review surface, which keeps the prompt focused on changed code and nearby dependencies instead of checklist/docs/evidence audit surfaces.
+- Prompt-side scope notes now stay path-only; the wrapper no longer injects raw branch-history / commit-metadata git summaries into the review prompt.
+- Use `--surface audit` (or `CODEX_REVIEW_SURFACE=audit`) when you explicitly want checklist/manifest/canonical task-doc path/evidence validation in the prompt.
+- Use `--surface architecture` (or `CODEX_REVIEW_SURFACE=architecture`) when you explicitly want broader design/context review against the canonical docs-first inputs: task checklist, PRD, TECH_SPEC, ACTION_PLAN, and `.agent/system/architecture.md`. This surface does not add manifest/runner-log evidence lines by default.
+- In that default bounded path, an immediate command-intent boundary now fails closed on explicit package-manager validation suites (`npm` / `pnpm` / `yarn` / `bun` `run test|lint|build|docs:check|docs:freshness`), direct `vitest`/`jest`-style launches, nested `codex review` / `codex-orchestrator review` / `codex-orchestrator start docs-review|implementation-gate|diagnostics`, and mutating `delegation.delegate.spawn|pause|cancel` tool calls; `delegation.delegate.status` is not an immediate boundary violation, but repeated status-only meta inspection can still contribute to the sustained meta-surface guard.
+- In that default non-heavy path, a low-signal drift guard can fail closed when the review stays on repetitive nearby inspection for too long; disable it with `CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0` or shorten/extend it with an explicit seconds value.
+- In that same bounded path, a verdict-stability guard can fail closed when the review keeps emitting repeated speculative no-progress output, including repeated targetless narrative loops, without introducing new concrete progress signals; disable it with `CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0` or shorten/extend it with an explicit seconds value.
+- In that same bounded `diff` path, explicit touched-path citations with locations (`path:line`, `path:line:col`, `path#Lline`, `path#LlineCcol`) are already sufficient concrete same-diff progress; the reviewer should not widen into repo-wide example hunts just to prove that rendering shape.
+- In that same bounded path, one direct shell-probe verification command is tolerated when the reviewer genuinely needs to confirm env or shell semantics, but repeated shell-probe commands now fail closed instead of allowing open-ended shell experimentation.
+- In that same default `diff` path, a meta-surface expansion guard can fail closed when the review persistently broadens into off-task review-orchestration surfaces such as global skills/memory, run manifests/logs, or adjacent review-system docs/artifacts/helpers that are not part of the touched diff; disable it with `CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0` or shorten/extend it with an explicit seconds value.
+- In that same default `diff` path, the current task's active closeout bundle under `out/<task>/manual/*-closeout/` now counts as a self-referential review surface; pure repo-wide search drift focused on those paths uses `meta-surface-expansion` with active-closeout-specific provenance, mixed broader meta-surface drift stays on generic `meta-surface-kinds`, and post-anchor repeated direct rereads of that bundle fail closed as the first-class `active-closeout-bundle-reread` boundary.
+- When the wrapper can already resolve those active closeout root paths, the diff-mode handoff may surface them explicitly as already-resolved self-referential review surfaces so the reviewer does not need to rediscover or re-enumerate them.
+- In that same default `diff` path, untouched adjacent standalone-review-specific helper files such as `scripts/lib/review-scope-paths.ts` and `tests/review-scope-paths.spec.ts` count as the `review-support` meta-surface family. Cross-cutting shared helpers such as `scripts/lib/docs-helpers.js` stay ordinary nearby dependency reads instead of being elevated into `review-support`.
+- In `audit` mode, the wrapper keeps the meta-surface expansion guard active for unrelated drift but treats the explicit audit evidence surfaces (`run-manifest` and `run-runner-log`) as in-scope.
+- In that same bounded `audit` path, a startup-anchor boundary now fails closed only when repeated memory/skills/review-doc reads happen before the review first anchors on the active evidence manifest or active runner log; it does not fail merely because no audit anchor has been observed yet.
+- That audit startup anchor can arrive either through the explicit active manifest/runner-log path itself or through an exported review-shell env var that still resolves to that same active evidence path.
 - Heavy-command policy toggles:
-  - Allow unrestricted heavy command execution: `CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1`
-  - Enforce bounded mode (hard-stop on heavy command starts): `CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1`
+  - Allow unrestricted heavy command execution (including explicit validation suites and direct validation-runner launches): `CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1`
+  - Enforce bounded mode (hard-stop on remaining heavy command starts outside the default command-intent boundary): `CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1`
 - `codex-orchestrator review` emits patience-first runtime checkpoints every 60s by default (`elapsed` + `idle` visibility while waiting).
 - `codex-orchestrator review` auto-detects large uncommitted scopes and injects a prompt advisory to prioritize highest-risk findings early (helps CO-scale diffs where exhaustive traversal can take a long time).
 - Optional timeout/stall/startup-loop guards:
-  - `CODEX_REVIEW_TIMEOUT_SECONDS=<seconds>` (`0` disables when set)
-  - `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=<seconds>` (`0` disables when set)
-  - `CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=<seconds>` with optional `CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS` (default `8` when startup-loop timeout is set)
+  - `CODEX_REVIEW_TIMEOUT_SECONDS=<seconds>` (`0` disables when set); when this guard fires, runtime telemetry records a first-class `timeout` termination boundary
+  - `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=<seconds>` (`0` disables when set); when this guard fires, runtime telemetry records a first-class `stall` termination boundary
+  - `CODEX_REVIEW_STARTUP_LOOP_TIMEOUT_SECONDS=<seconds>` with optional `CODEX_REVIEW_STARTUP_LOOP_MIN_EVENTS` (default `8` when startup-loop timeout is set); when this guard fires, runtime telemetry records a first-class `startup-loop` termination boundary
+  - Those timeout-adjacent families continue to print `Review output log (partial)`; other first-class boundary violations do not.
+  - `CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded low-signal drift guard; default `180`)
+  - `CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded verdict-stability guard; default `180`)
+  - `CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=<seconds>` (`0` disables the bounded meta-surface expansion guard; default `180`)
 - Optional monitor tuning:
   - `CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=<seconds>` (`0` disables checkpoints)
 - Optional large-scope thresholds:
   - `CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD=<count>` (default `25`)
   - `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD=<count>` (default `1200`)
-- `codex-orchestrator review` writes artifacts under `<runDir>/review/` (`runDir` is `CODEX_ORCHESTRATOR_RUN_DIR` when set; otherwise `dirname(MANIFEST)`).
+- `codex-orchestrator review` writes artifacts under `<runDir>/review/`, where `<runDir>` tracks the resolved manifest lineage: it uses `CODEX_ORCHESTRATOR_RUN_DIR` only when that directory contains the resolved manifest, otherwise it falls back to `dirname(manifestPath)`.
 - Prompt artifact: `<runDir>/review/prompt.txt` (always).
 - Review transcript: `<runDir>/review/output.log` (when `codex review` runs, for example with `FORCE_CODEX_REVIEW=1`).
-- Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, and output tail).
+- Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, output tail, plus a first-class `termination_boundary` record when the current timeout, stall, bounded command-intent, shell-probe, active-closeout-bundle-reread, startup-anchor, startup-loop, meta-surface expansion, verdict-stability, or relevant-reinspection dwell guard fires).
 
 ## Expected outputs
 - `codex review`: prioritized findings; no working tree edits.

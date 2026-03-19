@@ -1,0 +1,721 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:22511) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:22511) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1663 > 25
+ - total lines changed 141083 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 13805
+  - tasks/index.json: 7760
+  - orchestrator/tests/ControlServer.test.ts: 7637
+  - scripts/lib/review-execution-state.ts: 4243
+  - tests/review-execution-state.spec.ts: 3522
+  - tests/run-review.spec.ts: 3110
+  - scripts/run-review.ts: 2221
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+  - orchestrator/src/cli/control/controlServer.ts: 1639
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1194 stacked-branch symphony alignment lane
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 3 files, 363 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction/cli/2026-03-14T15-37-50-726Z-384ba784/review/prompt.txt
+Review output log: .runs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction/cli/2026-03-14T15-37-50-726Z-384ba784/review/output.log
+Launching Codex review (evidence: .runs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction/cli/2026-03-14T15-37-50-726Z-384ba784/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] verdict-stability guard enabled after 3m 0s of repeated speculative no-progress output (set CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.
+[run-review] bounded relevant reinspection dwell boundary enabled after 3m 0s of repetitive on-task reinspection without concrete findings (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.114.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019ced11-96a7-72d2-a293-9add64b0b829
+--------
+user
+Review task: 1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction
+Review surface: diff
+
+Agent notes:
+Goal: extract the start preparation shell | Summary: move pre-handoff start bootstrap into orchestratorStartPreparationShell with focused regressions | Risks: startup manifest/bootstrap ordering, runtime-mode merge precedence, persister wiring
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.
+- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths (3):
+```
+orchestrator/src/cli/orchestrator.ts
+orchestrator/src/cli/services/orchestratorStartPreparationShell.ts
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts
+```
+
+Active closeout provenance:
+- Resolved active closeout root: `out/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction/manual/20260314T155015Z-closeout`
+- These roots are already-resolved self-referential review surfaces for this task; do not re-derive or re-enumerate them unless directly necessary to assess code correctness.
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+thinking
+**Reviewing code diff findings**
+
+I need to focus on reviewing the differences and outputting the JSON findings. It makes sense to start by inspecting the touched files and using scoped diff commands. I probably don’t need any memory for this, as this is a self-contained review centered on the diff. I shouldn’t use memory unless it’s directly relevant. I should check the git diff and potentially use the update_plan, though that may not be necessary. I’ll just run the scoped diff commands.
+thinking
+**Reviewing code diff findings**
+
+I need to focus on reviewing the differences and outputting the JSON findings. It makes sense to start by inspecting the touched files and using scoped diff commands. I probably don’t need any memory for this, as this is a self-contained review centered on the diff. I shouldn’t use memory unless it’s directly relevant. I should check the git diff and potentially use the update_plan, though that may not be necessary. I’ll just run the scoped diff commands.
+exec
+/bin/zsh -lc 'git diff -- orchestrator/src/cli/orchestrator.ts orchestrator/src/cli/services/orchestratorStartPreparationShell.ts orchestrator/tests/OrchestratorStartPreparationShell.test.ts' in /Users/kbediako/Code/CO succeeded in 0ms:
+diff --git a/orchestrator/src/cli/orchestrator.ts b/orchestrator/src/cli/orchestrator.ts
+index 8434f5bd5..04e6a4853 100644
+--- a/orchestrator/src/cli/orchestrator.ts
++++ b/orchestrator/src/cli/orchestrator.ts
+@@ -1,19 +1,10 @@
+-import process from 'node:process';
+ import { readFile } from 'node:fs/promises';
+ 
+ import type { TaskContext, ExecutionMode, PlanItem } from '../types.js';
+ import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
+ import { normalizeEnvironmentPaths } from './run/environment.js';
+ import type { EnvironmentPaths } from './run/environment.js';
+-import {
+-  bootstrapManifest,
+-  loadManifest,
+-  updateHeartbeat,
+-  appendSummary,
+-  finalizeStatus,
+-  resetForResume,
+-  recordResumeEvent
+
+thinking
+**Inspecting service file**
+
+I'm thinking I need to take a closer look at the new service file. It’s important to ensure everything is functioning as it should, and I want to catch any potential issues that might arise. I’ll go through its contents carefully and check for any errors or areas that need improvement. It seems like a straightforward task, but I want to be thorough to make sure the service runs smoothly!
+thinking
+**Inspecting service file**
+
+I'm thinking I need to take a closer look at the new service file. It’s important to ensure everything is functioning as it should, and I want to catch any potential issues that might arise. I’ll go through its contents carefully and check for any errors or areas that need improvement. It seems like a straightforward task, but I want to be thorough to make sure the service runs smoothly!
+exec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/services/orchestratorStartPreparationShell.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/OrchestratorStartPreparationShell.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import process from 'node:process';
+
+import { bootstrapManifest, appendSummary } from '../run/manifest.js';
+import {
+  ManifestPersister,
+  type ManifestPersisterOptions
+} from '../run/manifestPersister.js';
+import type { RunPaths } from '../run/runPaths.js';
+import { resolveRuntimeMode } from '../runtime/index.js';
+import type { RuntimeMode, RuntimeModeResolution } from '../runtime/types.js';
+import { prepareRun, type RunPreparationResult } from './runPreparation.js';
+import type { CliManifest, StartOptions } from '../types.js';
+import type { EnvironmentPaths } from '../run/environment.js';
+import { generateRunId } from '../utils/runId.js';
+
+export interface RunOrchestratorStartPreparationShellParams {
+  baseEnv: EnvironmentPaths;
+  options: StartOptions;
+  applyRequestedRuntimeMode: (manifest: CliManifest, mode: RuntimeMode) => void;
+  prepareRunImpl?: typeof prepareRun;
+ succeeded in 0ms:
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import type { ManifestPersister } from '../src/cli/run/manifestPersister.js';
+import { runOrchestratorStartPreparationShell } from '../src/cli/services/orchestratorStartPreparationShell.js';
+
+afterEach(() => {
+  delete process.env.CODEX_ORCHESTRATOR_START_PREP_TEST;
+  vi.restoreAllMocks();
+});
+
+describe('runOrchestratorStartPreparationShell', () => {
+  it('prepares start inputs, resolves runtime mode, bootstraps the manifest, and appends config notices', async () => {
+    process.env.CODEX_ORCHESTRATOR_START_PREP_TEST = 'ambient';
+
+    const preparation = {
+      env: {
+        repoRoot: '/tmp/repo',
+        taskId: 'task-1',
+        runsRoot: '/tmp/repo/.runs',
+        outRoot: '/tmp/repo/out'
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/runtime/index.ts && echo '---' && sed -n '1,220p' orchestrator/src/cli/services/runPreparation.ts && echo '---' && sed -n '1,220p' orchestrator/src/cli/run/manifest.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -n \"applyRequestedRuntimeMode\\|async start\\|class CodexOrchestrator\" -n orchestrator/src/cli/orchestrator.ts && sed -n '60,180p' orchestrator/src/cli/orchestrator.ts && sed -n '520,620p' orchestrator/src/cli/orchestrator.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+58:export class CodexOrchestrator {
+64:  async start(options: StartOptions = {}): Promise<PipelineExecutionResult> {
+69:        applyRequestedRuntimeMode: this.applyRequestedRuntimeMode.bind(this)
+146:    this.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
+296:  private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {
+  private readonly scheduler = new SchedulerService();
+
+  constructor(private readonly baseEnv: EnvironmentPaths = resolveBaseEnvironment()) {}
+
+  async start(options: StartOptions = {}): Promise<PipelineExecutionResult> {
+    const { preparation, runId, runtimeModeResolution, manifest, paths, persister } =
+      await runOrchestratorStartPreparationShell({
+        baseEnv: this.baseEnv,
+        options,
+        applyRequestedRuntimeMode: this.applyRequestedRuntimeMode.bind(this)
+      });
+
+    return await runOrchestratorControlPlaneLifecycleShell({
+      repoRoot: preparation.env.repoRoot,
+      paths,
+ succeeded in 0ms:
+export {
+  parseRuntimeMode,
+  resolveRuntimeMode,
+  DEFAULT_RUNTIME_MODE,
+  DEFAULT_RUNTIME_MODE_ENV_KEY
+} from './mode.js';
+export { resolveRuntimeSelection } from './provider.js';
+export {
+  createRuntimeCodexCommandContext,
+  resolveRuntimeCodexCommand,
+  formatRuntimeSelectionSummary,
+  type RuntimeCodexCommandContext,
+  type RuntimeCodexCommandContextOptions
+} from './codexCommand.js';
+export type {
+  RuntimeMode,
+  RuntimeModeResolution,
+  RuntimeModeSource,
+  RuntimeProviderName,
+  RuntimeFallbackMetadata,
+
+
+
+[run-review] waiting on codex review (1m 0s elapsed, 1s idle; review progress observed).
+thinking
+**Identifying regressions and tests**
+
+I need to identify concrete regressions or missing tests. Missing tests should only be noted if there's a real risk of bugs. Usually, actionable findings should refer to actual bugs, not just the absence of tests. So, I'll need to carefully review everything. Maybe I'll check the git status to see if there are uncommitted changes and focus on touched files. I should consider inspecting the diff against the index and take a look at the line numbers in nearby code changes around the service file.
+thinking
+**Evaluating test scenarios**
+
+I’m thinking about how we can flag this situation. I need a concrete scenario to illustrate it. If Vitest runs this suite before any test that depends on the default runtime mode environment being unset, those later tests inherit `CODEX_ORCHESTRATOR_RUNTIME_MODE=appserver`. This could potentially change the behavior of those tests, which is something I definitely want to avoid. So, I need to track these dependencies carefully!
+thinking
+**Verifying environment variable dependencies**
+
+I need to check if other tests refer to this environment variable or could be affected by its absence. It’s a good idea to search nearby because many tests might rely on it. To follow the guidelines properly, I'll aim to identify any tests or code that could be provably affected. I’ll start by searching for the environment variable in the tests to see if there are other runtime tests that depend on it.
+thinking
+**Identifying regressions and tests**
+
+I need to identify concrete regressions or missing tests. Missing tests should only be noted if there's a real risk of bugs. Usually, actionable findings should refer to actual bugs, not just the absence of tests. So, I'll need to carefully review everything. Maybe I'll check the git status to see if there are uncommitted changes and focus on touched files. I should consider inspecting the diff against the index and take a look at the line numbers in nearby code changes around the service file.
+thinking
+**Evaluating test scenarios**
+
+I’m thinking about how we can flag this situation. I need a concrete scenario to illustrate it. If Vitest runs this suite before any test that depends on the default runtime mode environment being unset, those later tests inherit `CODEX_ORCHESTRATOR_RUNTIME_MODE=appserver`. This could potentially change the behavior of those tests, which is something I definitely want to avoid. So, I need to track these dependencies carefully!
+thinking
+**Verifying environment variable dependencies**
+
+I need to check if other tests refer to this environment variable or could be affected by its absence. It’s a good idea to search nearby because many tests might rely on it. To follow the guidelines properly, I'll aim to identify any tests or code that could be provably affected. I’ll start by searching for the environment variable in the tests to see if there are other runtime tests that depend on it.
+exec
+/bin/zsh -lc "rg -n \"CODEX_ORCHESTRATOR_RUNTIME_MODE\" orchestrator/tests orchestrator/src | sed -n '1,160p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "rg -n \"default runtime mode|runtime mode|resolveRuntimeMode|appserver'|cli'\" orchestrator/tests | sed -n '1,220p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:178:    process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE = 'appserver';
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:191:      envOverrides: { CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli' },
+orchestrator/tests/RuntimeProvider.test.ts:8:    const env = { CODEX_ORCHESTRATOR_RUNTIME_MODE: 'appserver' } as NodeJS.ProcessEnv;
+orchestrator/src/cli/services/commandRunner.ts:232:    baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE =
+orchestrator/src/cli/services/commandRunner.ts:235:    baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE = baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE;
+orchestrator/src/cli/frontendTestingRunner.ts:118:    env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE ?? env.CODEX_ORCHESTRATOR_RUNTIME_MODE ?? null
+orchestrator/src/cli/runtime/provider.ts:211:        CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
+orchestrator/src/cli/runtime/provider.ts:212:        CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
+orchestrator/src/cli/runtime/provider.ts:234:        CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'appserver',
+orchestrator/src/cli/runtime/provider.ts:235:        CODEX_ORCHESTRATOR_RUNTIME_MODE: 'appserver',
+orchestrator/src/cli/runtime/provider.ts:258:      CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
+orchestrator/src/cli/runtime/provider.ts:259:      CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
+orchestrator/src/cli/runtime/mode.ts:5:const DEFAULT_RUNTIME_MODE_ENV_KEY = 'CODEX_ORCHESTRATOR_RUNTIME_MODE';
+orchestrator/src/cli/rlmRunner.ts:504:      env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE ?? env.CODEX_ORCHESTRATOR_RUNTIME_MODE ?? null
+ succeeded in 0ms:
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:59:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:119:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:197:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:229:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:269:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:316:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:385:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:435:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/CodexCloudTaskExecutor.test.ts:483:      runDir: join(root, '.runs', 'task', 'cli', 'run-1'),
+orchestrator/tests/OrchestratorRunLifecycleExecutionRegistration.test.ts:74:  const runtimeModeRequested = 'appserver' as const;
+orchestrator/tests/MetricsAggregator.test.ts:111:    runner: 'codex-cli',
+orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts:34:    runtimeModeRequested: 'appserver' as const,
+orchestrator/tests/ControlServer.test.ts:6915:    const childRunDir = join(childRoot, '.runs', 'child-task', 'cli', 'child-run');
+orchestrator/tests/ControlServer.test.ts:7035:    const childRunDir = join(root, 'custom_runs', 'child-task', 'cli', 'child-run');
+orchestrator/tests/ControlServer.test.ts:7154:    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+orchestrator/tests/ControlServer.test.ts:7300:    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+orchestrator/tests/ControlServer.test.ts:7445:    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+orchestrator/tests/ControlServer.test.ts:7569:    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+orchestrator/tests/ControlServer.test.ts:7706:    const childRunDir = join(childRoot, '.runs', 'child-task', 'cli', 'child-run');
+orchestrator/tests/ControlServer.test.ts:7821:    const childRunDir = join(root, '.runs', 'child-task', 'cli', 'child-run');
+exec
+/bin/zsh -lc "rg -n \"process\\.env\\.(CODEX_ORCHESTRATOR_RUNTIME_MODE|CODEX_ORCHESTRATOR_TARGET_STAGE)|process\\.env\\b\" orchestrator/tests | sed -n '1,220p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/TaskManager.test.ts:524:    const originalFlag = process.env.FEATURE_TFGRPO_GROUP;
+orchestrator/tests/TaskManager.test.ts:525:    process.env.FEATURE_TFGRPO_GROUP = '1';
+orchestrator/tests/TaskManager.test.ts:582:        delete process.env.FEATURE_TFGRPO_GROUP;
+orchestrator/tests/TaskManager.test.ts:584:        process.env.FEATURE_TFGRPO_GROUP = originalFlag;
+orchestrator/tests/TaskManager.test.ts:590:    const originalFlag = process.env.FEATURE_TFGRPO_GROUP;
+orchestrator/tests/TaskManager.test.ts:591:    process.env.FEATURE_TFGRPO_GROUP = '1';
+orchestrator/tests/TaskManager.test.ts:648:        delete process.env.FEATURE_TFGRPO_GROUP;
+orchestrator/tests/TaskManager.test.ts:650:        process.env.FEATURE_TFGRPO_GROUP = originalFlag;
+orchestrator/tests/MetricsAggregator.test.ts:598:    const previousLines = process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES;
+orchestrator/tests/MetricsAggregator.test.ts:600:      process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES = '2';
+orchestrator/tests/MetricsAggregator.test.ts:631:        delete process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES;
+orchestrator/tests/MetricsAggregator.test.ts:633:        process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES = previousLines;
+orchestrator/tests/MetricsAggregator.test.ts:649:    const previousLines = process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES;
+orchestrator/tests/MetricsAggregator.test.ts:651:      process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES = '2';
+orchestrator/tests/MetricsAggregator.test.ts:691:        delete process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES;
+orchestrator/tests/MetricsAggregator.test.ts:693:        process.env.CODEX_METRICS_PENDING_BATCH_MAX_LINES = previousLines;
+orchestrator/tests/OrchestratorCleanupOrder.test.ts:20:  configOverrides: process.env.CODEX_CONFIG_OVERRIDES
+orchestrator/tests/OrchestratorCleanupOrder.test.ts:27:  process.env.CODEX_CONFIG_OVERRIDES = 'ui.control_enabled=true';
+orchestrator/tests/OrchestratorCleanupOrder.test.ts:33:    delete process.env.CODEX_CONFIG_OVERRIDES;
+orchestrator/tests/OrchestratorCleanupOrder.test.ts:35:    process.env.CODEX_CONFIG_OVERRIDES = ORIGINAL_ENV.configOverrides;
+
+thinking
+**Searching for tests**
+
+I'm looking for tests related to `orchestrator.start`, especially those that rely on the default runtime mode. If they call the actual start without setting the environment, it could leak an environment that alters the manifest's `runtime_mode_requested`. The leaked value seems to be 'appserver', which matches the default mode, meaning many tests might not be affected. However, if the tests are checking sources when the environment is absent, they might fail. So, I need to search for instances of `source: 'default'` or checks related to runtime sources.
+thinking
+**Searching for tests**
+
+I'm looking for tests related to `orchestrator.start`, especially those that rely on the default runtime mode. If they call the actual start without setting the environment, it could leak an environment that alters the manifest's `runtime_mode_requested`. The leaked value seems to be 'appserver', which matches the default mode, meaning many tests might not be affected. However, if the tests are checking sources when the environment is absent, they might fail. So, I need to search for instances of `source: 'default'` or checks related to runtime sources.
+exec
+/bin/zsh -lc "rg -n \"source: 'default'|toEqual\\(\\{ mode: 'appserver', source: 'default'|runtimeModeResolution|runtime_mode_requested|requested_mode.*appserver\" orchestrator/tests | sed -n '1,220p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/OrchestratorExecutionLifecycle.test.ts:30:    source: 'default',
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:108:      runtimeModeResolution: { mode: 'cli', source: 'flag' },
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:157:      resolveRuntimeModeImpl: vi.fn(() => ({ mode: 'appserver', source: 'default' as const })),
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:224:    expect(result.runtimeModeResolution).toEqual({ mode: 'cli', source: 'env' });
+orchestrator/tests/OrchestratorCloudRouteFallbackContract.test.ts:10:    requested_mode: 'appserver',
+orchestrator/tests/OrchestratorCloudRouteFallbackContract.test.ts:12:    source: 'default',
+orchestrator/tests/OrchestratorCloudRouteFallbackContract.test.ts:50:          requested_mode: 'appserver',
+orchestrator/tests/OrchestratorCloudRouteFallbackContract.test.ts:52:          source: 'default'
+orchestrator/tests/RuntimeProvider.test.ts:49:      source: 'default'
+orchestrator/tests/RuntimeProvider.test.ts:82:    expect(selection.requested_mode).toBe('appserver');
+orchestrator/tests/RuntimeProvider.test.ts:105:      source: 'default',
+orchestrator/tests/OrchestratorExecutionRouteState.test.ts:26:    requested_mode: 'appserver',
+orchestrator/tests/OrchestratorExecutionRouteState.test.ts:28:    source: 'default',
+orchestrator/tests/OrchestratorExecutionRouteState.test.ts:94:      currentManifest.runtime_mode_requested = currentSelection.requested_mode;
+orchestrator/tests/OrchestratorExecutionRouteState.test.ts:110:    expect(manifest.runtime_mode_requested).toBe('appserver');
+orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts:53:    requested_mode: 'appserver',
+orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts:55:    source: 'default',
+orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts:107:      currentManifest.runtime_mode_requested = selection.requested_mode;
+orchestrator/tests/OrchestratorCloudRouteShell.test.ts:27:    requested_mode: 'appserver',
+orchestrator/tests/OrchestratorCloudRouteShell.test.ts:29:    source: 'default',
+
+thinking
+**Evaluating code inspections**
+
+I think I need to check the `OrchestratorStartPreparationShell` test line numbers and consider using process.env for leak detection. I should find at least one code location that overlaps with the diff, especially line 178 in the test file, which looks promising. I need to assess the severity, likely around P3 if there's test contamination. Overall, I should review the instructions for correctness, focusing on the patch correctness while ignoring any non-blocking issues.
+thinking
+**Evaluating code inspections**
+
+I think I need to check the `OrchestratorStartPreparationShell` test line numbers and consider using process.env for leak detection. I should find at least one code location that overlaps with the diff, especially line 178 in the test file, which looks promising. I need to assess the severity, likely around P3 if there's test contamination. Overall, I should review the instructions for correctness, focusing on the patch correctness while ignoring any non-blocking issues.
+exec
+/bin/zsh -lc "nl -ba orchestrator/src/cli/services/orchestratorStartPreparationShell.ts | sed -n '1,220p' && echo '---' && nl -ba orchestrator/tests/OrchestratorStartPreparationShell.test.ts | sed -n '1,260p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+     1	import process from 'node:process';
+     2	
+     3	import { bootstrapManifest, appendSummary } from '../run/manifest.js';
+     4	import {
+     5	  ManifestPersister,
+     6	  type ManifestPersisterOptions
+     7	} from '../run/manifestPersister.js';
+     8	import type { RunPaths } from '../run/runPaths.js';
+     9	import { resolveRuntimeMode } from '../runtime/index.js';
+    10	import type { RuntimeMode, RuntimeModeResolution } from '../runtime/types.js';
+    11	import { prepareRun, type RunPreparationResult } from './runPreparation.js';
+    12	import type { CliManifest, StartOptions } from '../types.js';
+    13	import type { EnvironmentPaths } from '../run/environment.js';
+    14	import { generateRunId } from '../utils/runId.js';
+    15	
+    16	export interface RunOrchestratorStartPreparationShellParams {
+    17	  baseEnv: EnvironmentPaths;
+    18	  options: StartOptions;
+    19	  applyRequestedRuntimeMode: (manifest: CliManifest, mode: RuntimeMode) => void;
+    20	  prepareRunImpl?: typeof prepareRun;
+
+thinking
+**Investigating potential test issues**
+
+I see there might be a leak at line 178 due to a lack of cleanup. I think I need stronger evidence, so maybe I'll look for other tests that snapshot the environment and restore original values. This issue could lead to problems if tests run serially across the suite. I'll focus on tests that use defaults when the environment is absent and search for code using `process.env`. To confirm this, I'll check `OrchestratorExecutionLifecycle.test.ts` at line 30 for calls that read `process.env`. Let's investigate this!
+thinking
+**Investigating potential test issues**
+
+I see there might be a leak at line 178 due to a lack of cleanup. I think I need stronger evidence, so maybe I'll look for other tests that snapshot the environment and restore original values. This issue could lead to problems if tests run serially across the suite. I'll focus on tests that use defaults when the environment is absent and search for code using `process.env`. To confirm this, I'll check `OrchestratorExecutionLifecycle.test.ts` at line 30 for calls that read `process.env`. Let's investigate this!
+exec
+/bin/zsh -lc "sed -n '1,120p' orchestrator/tests/OrchestratorExecutionLifecycle.test.ts && echo '---' && sed -n '1,120p' orchestrator/tests/OrchestratorCloudRouteFallbackContract.test.ts && echo '---' && sed -n '1,80p' orchestrator/tests/RuntimeProvider.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { runOrchestratorExecutionLifecycle } from '../src/cli/services/orchestratorExecutionLifecycle.js';
+
+const controlWatcher = {
+  sync: vi.fn(async () => undefined),
+  waitForResume: vi.fn(async () => undefined),
+  isCanceled: vi.fn(() => false)
+};
+
+vi.mock('../src/cli/control/controlWatcher.js', () => ({
+  ControlWatcher: vi.fn().mockImplementation(() => controlWatcher)
+}));
+
+vi.mock('../src/cli/events/runEvents.js', () => ({
+  snapshotStages: vi.fn(() => [{ id: 'stage-1', status: 'pending' }])
+}));
+
+vi.mock('../src/cli/metrics/metricsRecorder.js', () => ({
+  appendMetricsEntry: vi.fn(async () => undefined)
+exec
+/bin/zsh -lc "rg -n \"new CodexOrchestrator\\(|\\.start\\(\\{|\\.start\\(\\)|runtimeModeSource|source: 'default'|runtime_mode_source|requestedMode: 'appserver'\" orchestrator/tests | sed -n '1,260p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/CloudSyncWorker.test.ts:78:    worker.start();
+orchestrator/tests/CloudSyncWorker.test.ts:139:    worker.start();
+orchestrator/tests/CloudSyncWorker.test.ts:185:    worker.start();
+orchestrator/tests/CloudSyncWorker.test.ts:225:    worker.start();
+orchestrator/tests/CloudSyncWorker.test.ts:253:    worker.start();
+orchestrator/tests/CloudSyncWorker.test.ts:283:    worker.start();
+orchestrator/tests/CloudSyncWorker.test.ts:318:    worker.start();
+orchestrator/tests/OrchestratorRunLifecycleExecutionRegistration.test.ts:75:  const runtimeModeSource = 'default' as const;
+orchestrator/tests/OrchestratorRunLifecycleExecutionRegistration.test.ts:91:    runtimeModeSource,
+orchestrator/tests/OrchestratorRunLifecycleExecutionRegistration.test.ts:128:      runtimeModeSource: shared.runtimeModeSource,
+orchestrator/tests/ControlServerBootstrapLifecycle.test.ts:32:    await lifecycle.start({
+orchestrator/tests/ControlServerBootstrapLifecycle.test.ts:63:    await lifecycle.start({
+orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts:35:    runtimeModeSource: 'default' as const,
+orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts:75:      runtimeModeSource: shared.runtimeModeSource,
+orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts:94:      runtimeModeSource: shared.runtimeModeSource,
+orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts:146:        runtimeModeSource: shared.runtimeModeSource,
+orchestrator/tests/ControlExpiryLifecycle.test.ts:155:    lifecycle.start();
+orchestrator/tests/OrchestratorCleanupOrder.test.ts:92:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/OrchestratorCleanupOrder.test.ts:96:    await expect(orchestrator.start({})).rejects.toThrow('boom');
+orchestrator/tests/ControlServer.test.ts:182:    const server = await ControlServer.start({
+
+thinking
+**Evaluating orchestrator tests**
+
+I'm looking to search for actual tests related to orchestrator.start that might be impacted. It seems like I should check out OrchestratorCleanupOrder.test or maybe even OrchestratorCloudAutoScout. There’s some uncertainty here, so I'll gather more info to ensure I'm assessing the impact properly! It’s fascinating how interconnected these tests can be, and I want to make sure I don’t overlook anything critical while I dig into this.
+thinking
+**Evaluating orchestrator tests**
+
+I'm looking to search for actual tests related to orchestrator.start that might be impacted. It seems like I should check out OrchestratorCleanupOrder.test or maybe even OrchestratorCloudAutoScout. There’s some uncertainty here, so I'll gather more info to ensure I'm assessing the impact properly! It’s fascinating how interconnected these tests can be, and I want to make sure I don’t overlook anything critical while I dig into this.
+exec
+/bin/zsh -lc "sed -n '1,120p' orchestrator/tests/OrchestratorCloudAutoScout.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,180p' orchestrator/tests/OrchestratorCleanupOrder.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import process from 'node:process';
+
+import { CodexOrchestrator } from '../src/cli/orchestrator.js';
+import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
+import { bootstrapManifest } from '../src/cli/run/manifest.js';
+import type { PipelineDefinition } from '../src/cli/types.js';
+import { CodexCloudTaskExecutor } from '../src/cloud/CodexCloudTaskExecutor.js';
+import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
+
+const ORIGINAL_ENV = {
+  root: process.env.CODEX_ORCHESTRATOR_ROOT,
+  runs: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+  out: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+  task: process.env.MCP_RUNNER_TASK_ID
+};
+ succeeded in 0ms:
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+import { CodexOrchestrator } from '../src/cli/orchestrator.js';
+import type { EnvironmentPaths } from '../src/cli/run/environment.js';
+import type { PipelineDefinition } from '../src/cli/types.js';
+import type { RunPaths } from '../src/cli/run/runPaths.js';
+import type { CliManifest } from '../src/cli/types.js';
+import type { CommandPlanner } from '../src/cli/adapters/index.js';
+import type { PipelineResolver } from '../src/cli/services/pipelineResolver.js';
+import type { PlanResult } from '../src/types.js';
+import { RunEventStream } from '../src/cli/events/runEventStream.js';
+import { ControlServer } from '../src/cli/control/controlServer.js';
+import * as runPreparation from '../src/cli/services/runPreparation.js';
+import * as manifestModule from '../src/cli/run/manifest.js';
+
+const ORIGINAL_ENV = {
+  configOverrides: process.env.CODEX_CONFIG_OVERRIDES
+exec
+/bin/zsh -lc "sed -n '260,340p' orchestrator/tests/OrchestratorCloudAutoScout.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+      id: 'docs-review',
+      title: 'Docs Review',
+      stages: [{ kind: 'command', id: 'stage-1', title: 'Stage 1', command: 'echo ok' }]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-cloud-fallback-runtime-mode', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.heartbeat_interval_seconds = 1;
+    manifest.heartbeat_stale_after_seconds = 2;
+
+    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+      details: {
+        codexBin: 'codex',
+[run-review] waiting on codex review (2m 0s elapsed, 3s idle; review progress observed).
+
+
+thinking
+**Evaluating service options**
+
+I'm looking at the old code where `options.runEvents` and `executionMode` were used, while the new service manages full options but only utilizes a subset. It's not a big deal, yet I wonder if there might be an issue with `applyRequestedRuntimeMode` being bound on each call, which creates a new function each time, making it tough for spying? I suppose testing could involve spying on the private method, but it might not even be relevant to this task.
+thinking
+**Reviewing code context**
+
+I think there might not be any findings yet, but before I make that call, I should check if there’s a test for the start flow in orchestrator.ts. I also need to see if extraction failure resulted from losing the `this` context. It’s possible that `applyRequestedRuntimeMode` relies on `this.scheduler` or other fields. So, I really should inspect that method to clarify what's going on.
+thinking
+**Evaluating service options**
+
+I'm looking at the old code where `options.runEvents` and `executionMode` were used, while the new service manages full options but only utilizes a subset. It's not a big deal, yet I wonder if there might be an issue with `applyRequestedRuntimeMode` being bound on each call, which creates a new function each time, making it tough for spying? I suppose testing could involve spying on the private method, but it might not even be relevant to this task.
+thinking
+**Reviewing code context**
+
+I think there might not be any findings yet, but before I make that call, I should check if there’s a test for the start flow in orchestrator.ts. I also need to see if extraction failure resulted from losing the `this` context. It’s possible that `applyRequestedRuntimeMode` relies on `this.scheduler` or other fields. So, I really should inspect that method to clarify what's going on.
+exec
+/bin/zsh -lc "sed -n '284,320p' orchestrator/src/cli/orchestrator.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+    return await runOrchestratorRunLifecycle({
+      ...context,
+      executePipeline: (options) => this.executePipeline(options),
+      controlPlaneGuard: (options) => this.controlPlane.guard(options),
+      createSchedulerPlan: (options) => this.scheduler.createPlanForRun(options),
+      finalizePlan: (options) => this.scheduler.finalizePlan(options),
+      applySchedulerToRunSummary: (summary, plan) => this.scheduler.applySchedulerToRunSummary(summary, plan),
+      applyControlPlaneToRunSummary: (summary, result) =>
+        this.controlPlane.applyControlPlaneToRunSummary(summary, result)
+    });
+  }
+
+  private applyRequestedRuntimeMode(manifest: CliManifest, mode: RuntimeMode): void {
+    manifest.runtime_mode_requested = mode;
+    manifest.runtime_mode = mode;
+    manifest.runtime_provider = mode === 'appserver' ? 'AppServerRuntimeProvider' : 'CliRuntimeProvider';
+    manifest.runtime_fallback = {
+      occurred: false,
+      code: null,
+      reason: null,
+exec
+/bin/zsh -lc "rg -n \"resolveRuntimeMode\\(\" orchestrator/tests orchestrator/src | sed -n '1,200p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/RuntimeProvider.test.ts:11:      resolveRuntimeMode({
+orchestrator/tests/RuntimeProvider.test.ts:21:      resolveRuntimeMode({
+orchestrator/tests/RuntimeProvider.test.ts:30:      resolveRuntimeMode({
+orchestrator/tests/RuntimeProvider.test.ts:39:      resolveRuntimeMode({
+orchestrator/tests/RuntimeProvider.test.ts:47:    expect(resolveRuntimeMode({ env: {}, configDefault: null, manifestMode: null, preferManifest: true })).toEqual({
+orchestrator/src/cli/runtime/mode.ts:41:export function resolveRuntimeMode(options: ResolveRuntimeModeOptions = {}): RuntimeModeResolution {
+orchestrator/src/cli/runtime/codexCommand.ts:26:  const modeResolution = resolveRuntimeMode({
+orchestrator/src/cli/orchestrator.ts:139:    const runtimeModeResolution = resolveRuntimeMode({
+
+thinking
+**Evaluating environment variables**
+
+I'm thinking about how only orchestrator.ts relies on process.env. This makes me wonder if leaked environment variables could potentially impact tests that invoke resume or start. I should probably search specifically for tests related to start and resume to see what’s going on. It's important to understand how those dependencies might influence the outcomes. Let’s focus on this aspect to ensure everything runs smoothly in those tests.
+thinking
+**Evaluating environment variables**
+
+I'm thinking about how only orchestrator.ts relies on process.env. This makes me wonder if leaked environment variables could potentially impact tests that invoke resume or start. I should probably search specifically for tests related to start and resume to see what’s going on. It's important to understand how those dependencies might influence the outcomes. Let’s focus on this aspect to ensure everything runs smoothly in those tests.
+exec
+/bin/zsh -lc "rg -n \"orchestrator\\.start\\(|\\.resume\\(|new CodexOrchestrator\\(\" orchestrator/tests | sed -n '1,220p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/OrchestratorCleanupOrder.test.ts:92:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/OrchestratorCleanupOrder.test.ts:96:    await expect(orchestrator.start({})).rejects.toThrow('boom');
+orchestrator/tests/OrchestratorSubpipelineFailure.test.ts:66:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/OrchestratorSubpipelineFailure.test.ts:123:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/ExecCommand.test.ts:179:    stdout.resume();
+orchestrator/tests/ExecCommand.test.ts:180:    stderr.resume();
+orchestrator/tests/ExecCommand.test.ts:268:    stdout.resume();
+orchestrator/tests/ExecCommand.test.ts:269:    stderr.resume();
+orchestrator/tests/ExecCommand.test.ts:355:    stdout.resume();
+orchestrator/tests/ExecCommand.test.ts:356:    stderr.resume();
+orchestrator/tests/ExecCommand.test.ts:405:    stdout.resume();
+orchestrator/tests/ExecCommand.test.ts:406:    stderr.resume();
+orchestrator/tests/OrchestratorCloudAutoScout.test.ts:70:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/OrchestratorCloudAutoScout.test.ts:172:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/OrchestratorCloudAutoScout.test.ts:233:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/OrchestratorCloudAutoScout.test.ts:285:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/OrchestratorCloudAutoScout.test.ts:355:    const orchestrator = new CodexOrchestrator(env);
+orchestrator/tests/OrchestratorCloudAutoScout.test.ts:436:    const orchestrator = new CodexOrchestrator(env);
+exec
+/bin/zsh -lc "sed -n '1,180p' orchestrator/tests/OrchestratorSubpipelineFailure.test.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+import { CodexOrchestrator } from '../src/cli/orchestrator.js';
+import * as CommandRunner from '../src/cli/services/commandRunner.js';
+import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
+import { bootstrapManifest, updateCommandStatus } from '../src/cli/run/manifest.js';
+import type { PipelineDefinition } from '../src/cli/types.js';
+import { isoTimestamp } from '../src/cli/utils/time.js';
+
+const ORIGINAL_ENV = {
+  root: process.env.CODEX_ORCHESTRATOR_ROOT,
+  runs: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+  out: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+  task: process.env.MCP_RUNNER_TASK_ID
+};
+
+exec
+/bin/zsh -lc 'rg -n "orchestratorStartPreparationShell|runOrchestratorStartPreparationShell" -n orchestrator/src orchestrator/tests' in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/services/orchestratorStartPreparationShell.ts:37:export async function runOrchestratorStartPreparationShell(
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:4:import { runOrchestratorStartPreparationShell } from '../src/cli/services/orchestratorStartPreparationShell.js';
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:11:describe('runOrchestratorStartPreparationShell', () => {
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:54:    const result = await runOrchestratorStartPreparationShell({
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:151:    await runOrchestratorStartPreparationShell({
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:206:    const result = await runOrchestratorStartPreparationShell({
+orchestrator/src/cli/orchestrator.ts:51:import { runOrchestratorStartPreparationShell } from './services/orchestratorStartPreparationShell.js';
+orchestrator/src/cli/orchestrator.ts:66:      await runOrchestratorStartPreparationShell({
+[run-review] waiting on codex review (3m 0s elapsed, 9s idle; review progress observed).
+
+thinking
+**Evaluating Vitest behavior**
+
+I need to understand how Vitest handles spying on ESM. It involves replacing property values, which is subtle because imported bindings might not update due to immutability. I’ll check whether existing tests, like OrchestratorCleanupOrder.test, might be failing. It spies on `runPreparation.prepareRun` and `manifestModule.bootstrapManifest`. If the spy doesn't affect named imports, it could lead to test failures. I’m curious if existing tests around `orchestrator.start` broke due to these semantics. Let's verify if Vitest is doing what I think it is!
+thinking
+**Evaluating Vitest behavior**
+
+I need to understand how Vitest handles spying on ESM. It involves replacing property values, which is subtle because imported bindings might not update due to immutability. I’ll check whether existing tests, like OrchestratorCleanupOrder.test, might be failing. It spies on `runPreparation.prepareRun` and `manifestModule.bootstrapManifest`. If the spy doesn't affect named imports, it could lead to test failures. I’m curious if existing tests around `orchestrator.start` broke due to these semantics. Let's verify if Vitest is doing what I think it is!
+exec
+/bin/zsh -lc "sed -n '1,120p' orchestrator/src/cli/runtime/mode.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import type { RuntimeMode, RuntimeModeResolution } from './types.js';
+
+const RUNTIME_MODES = new Set<RuntimeMode>(['cli', 'appserver']);
+const DEFAULT_RUNTIME_MODE: RuntimeMode = 'appserver';
+const DEFAULT_RUNTIME_MODE_ENV_KEY = 'CODEX_ORCHESTRATOR_RUNTIME_MODE';
+
+function normalizeRuntimeMode(value: string): RuntimeMode | null {
+  const normalized = value.trim().toLowerCase();
+  return RUNTIME_MODES.has(normalized as RuntimeMode) ? (normalized as RuntimeMode) : null;
+}
+
+function parseRuntimeModeFromSource(
+  value: string,
+  sourceLabel: string
+): RuntimeMode {
+  const parsed = normalizeRuntimeMode(value);
+  if (!parsed) {
+    throw new Error(
+      `Invalid runtime mode "${value}" from ${sourceLabel}. Expected one of: cli, appserver.`
+    );
+
+
+thinking
+I’m considering whether any of the changed area tests call without the environment parameter. In the same file, the third test invokes `runOrchestratorStartPreparationShell` without injecting `resolveRuntimeModeImpl`, which means it defaults to using the actual `resolveRuntimeMode` with an explicit merged environment that includes `process.env`. I believe this is intentional for the test, as it looks like it's functioning as intended.
+thinking
+**Investigating code structure**
+
+I’m checking for other tests in the same file and considering if in the repo suite, direct calls to `resolveRuntimeMode()` without the env option only occur in `orchestrator.ts` during start/resume and in `runtime/codexCommand.ts`. I need to search through them to confirm. It looks like `runtime/codexCommand.ts` might involve the env option, so I should inspect that carefully to understand its usage in the context.
+thinking
+I’m considering whether any of the changed area tests call without the environment parameter. In the same file, the third test invokes `runOrchestratorStartPreparationShell` without injecting `resolveRuntimeModeImpl`, which means it defaults to using the actual `resolveRuntimeMode` with an explicit merged environment that includes `process.env`. I believe this is intentional for the test, as it looks like it's functioning as intended.
+thinking
+**Investigating code structure**
+
+I’m checking for other tests in the same file and considering if in the repo suite, direct calls to `resolveRuntimeMode()` without the env option only occur in `orchestrator.ts` during start/resume and in `runtime/codexCommand.ts`. I need to search through them to confirm. It looks like `runtime/codexCommand.ts` might involve the env option, so I should inspect that carefully to understand its usage in the context.
+exec
+/bin/zsh -lc "sed -n '1,80p' orchestrator/src/cli/runtime/codexCommand.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import type { ExecutionMode } from '../../types.js';
+import { resolveCodexCommand } from '../utils/devtools.js';
+import { resolveRuntimeMode } from './mode.js';
+import { resolveRuntimeSelection } from './provider.js';
+import type { RuntimeMode, RuntimeSelection } from './types.js';
+
+export interface RuntimeCodexCommandContext {
+  runtime: RuntimeSelection;
+  env: NodeJS.ProcessEnv;
+}
+
+export interface RuntimeCodexCommandContextOptions {
+  requestedMode?: RuntimeMode | string | null;
+  executionMode?: ExecutionMode;
+  repoRoot: string;
+  env?: NodeJS.ProcessEnv;
+  runId: string;
+  configDefault?: RuntimeMode | string | null;
+  allowFallback?: boolean;
+}
+
+thinking
+**Evaluating code impacts**
+
+I’m considering how a leaked environment variable might affect other code paths. For review, I need to focus on the changed test file and any ensuing tests that call `createRuntimeCodexCommandContext` or `orchestrator.start` without an environment override. If I need to pinpoint specific tests, I can search for `createRuntimeCodexCommandContext` using the `process.env` default. There’s a lot to think through here!
+thinking
+**Evaluating code impacts**
+
+I’m considering how a leaked environment variable might affect other code paths. For review, I need to focus on the changed test file and any ensuing tests that call `createRuntimeCodexCommandContext` or `orchestrator.start` without an environment override. If I need to pinpoint specific tests, I can search for `createRuntimeCodexCommandContext` using the `process.env` default. There’s a lot to think through here!
+exec
+/bin/zsh -lc "rg -n \"createRuntimeCodexCommandContext\\(|resolveRuntimeCodexCommand\\(|requestedMode: .*appserver|source: 'default'\" orchestrator/tests | sed -n '1,200p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/tests/OrchestratorExecutionLifecycle.test.ts:30:    source: 'default',
+orchestrator/tests/OrchestratorStartPreparationShell.test.ts:157:      resolveRuntimeModeImpl: vi.fn(() => ({ mode: 'appserver', source: 'default' as const })),
+orchestrator/tests/OrchestratorLocalRouteShell.test.ts:41:    source: 'default',
+orchestrator/tests/OrchestratorExecutionRouteState.test.ts:28:    source: 'default',
+orchestrator/tests/RuntimeProvider.test.ts:49:      source: 'default'
+orchestrator/tests/RuntimeProvider.test.ts:72:      requestedMode: 'appserver',
+orchestrator/tests/RuntimeProvider.test.ts:92:        requestedMode: 'appserver',
+orchestrator/tests/RuntimeProvider.test.ts:104:      requestedMode: 'appserver',
+orchestrator/tests/RuntimeProvider.test.ts:105:      source: 'default',
+orchestrator/tests/RuntimeProvider.test.ts:120:      requestedMode: 'appserver',
+orchestrator/tests/OrchestratorCloudRouteFallbackContract.test.ts:12:    source: 'default',
+orchestrator/tests/OrchestratorCloudRouteFallbackContract.test.ts:52:          source: 'default'
+orchestrator/tests/OrchestratorExecutionRouteDecisionShell.test.ts:55:    source: 'default',
+orchestrator/tests/OrchestratorCloudRouteShell.test.ts:29:    source: 'default',
+orchestrator/tests/OrchestratorCloudRouteShell.test.ts:98:          source: 'default'
+
+thinking
+**Evaluating TypeScript imports**
+
+I noticed that the `process from 'node:process'` import was removed from `orchestrator.ts`, but the file still references `process.env` in several functions like `resume` and `getResolvedConfig`. It’s possible they’re using the global `process` variable instead. Since Node ESM supports global `process`, TypeScript might compile with node types that allow this. But if the repository has `noImplicitGlobals`, it could potentially raise issues. I should check if `process` was only used as a global variable.
+thinking
+**Evaluating TypeScript imports**
+
+I noticed that the `process from 'node:process'` import was removed from `orchestrator.ts`, but the file still references `process.env` in several functions like `resume` and `getResolvedConfig`. It’s possible they’re using the global `process` variable instead. Since Node ESM supports global `process`, TypeScript might compile with node types that allow this. But if the repository has `noImplicitGlobals`, it could potentially raise issues. I should check if `process` was only used as a global variable.
+exec
+/bin/zsh -lc "rg -n \"process\\.env|process\\b\" orchestrator/src/cli/orchestrator.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+107:    const repoConfigRequired = isRepoConfigRequired(process.env);
+141:      env: { ...process.env, ...(preparation.envOverrides ?? {}) },
+199:      process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+[run-review] waiting on codex review (4m 0s elapsed, 6s idle; review progress observed).

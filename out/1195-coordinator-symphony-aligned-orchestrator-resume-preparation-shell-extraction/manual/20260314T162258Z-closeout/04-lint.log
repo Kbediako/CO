@@ -1,0 +1,8 @@
+
+> @kbediako/codex-orchestrator@0.1.38 prelint
+> node scripts/build-patterns-if-needed.mjs
+
+
+> @kbediako/codex-orchestrator@0.1.38 lint
+> eslint orchestrator/src orchestrator/tests packages/orchestrator/src packages/orchestrator/tests packages/shared adapters evaluation/harness evaluation/tests --ext .ts,.tsx
+

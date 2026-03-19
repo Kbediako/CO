@@ -1,0 +1,659 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:12215) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12215) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 349 > 25
+ - total lines changed 39117 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5490
+  - orchestrator/src/cli/control/controlServer.ts: 2142
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - tasks/index.json: 2004
+  - docs/docs-freshness-registry.json: 1989
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/tests/ControlRuntime.test.ts: 783
+  - orchestrator/src/cli/control/observabilityReadModel.ts: 674
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1035 stacked-branch scope on long-running main; bounded same-issue compatibility slice validated with targeted tests and manual evidence.
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 15 files, 889 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/cli/2026-03-07T03-09-31-041Z-52b863ef/review/prompt.txt
+Review output log: .runs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/cli/2026-03-07T03-09-31-041Z-52b863ef/review/output.log
+Launching Codex review (evidence: .runs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/cli/2026-03-07T03-09-31-041Z-52b863ef/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc657-e0dc-70c2-8db2-a102558151a3
+--------
+user
+Review task: 1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy
+Evidence manifest: .runs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/cli/2026-03-07T03-09-31-041Z-52b863ef/manifest.json
+
+Task context:
+- Task checklist: `tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`
+- MCP Task ID: `1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`
+- TECH_SPEC: `tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `.agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md`.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md`.
+- [ ] docs-review approval/override captured for registered `1035`. Evidence: `.runs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/cli/<run-id>/manifest.json`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-docs-first/`.
+- [ ] The compatibility discovery/runtime seam applies an explicit same-issue multi-run policy instead of stopping at one latest readable sibling run. Evidence: `orchestrator/src/cli/control/selectedRunProjection.ts`, `orchestrator/src/cli/control/controlRuntime.ts`.
+- [ ] Compatibility `state` / `issue` lookup remains issue-centered while preserving run-id secondary alias lookup. Evidence: `orchestrator/src/cli/control/observabilityReadModel.ts`, `orchestrator/tests/ControlRuntime.test.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] The selected-run seam remains current-run-only for `/ui/data.json`, Telegram oversight, and dispatch evaluation. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/observabilitySurface.ts`, `orchestrator/src/cli/control/telegramOversightBridge.ts`.
+- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/01-delegation-guard.log`.
+- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/02-spec-guard.log`.
+- [ ] `npm run build`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/03-build.log`.
+- [ ] `npm run lint`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/04-lint.log`.
+- [ ] `npm run test`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/05-test.log`.
+- [ ] `npm run docs:check`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/06-docs-check.log`.
+- [ ] `npm run docs:freshness`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/07-docs-freshness.log`.
+- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/08-diff-budget.log`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/13-override-notes.md`.
+- [ ] `npm run review`. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/09-review.log`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/13-override-notes.md`.
+- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-closeout/10-pack-smoke.log`.
+
+Agent notes:
+Goal: validate 1035 same-issue compatibility identity policy | Summary: bounded multi-run discovery with canonical issue lookup and run aliases | Risks: review wrapper may drift or hang under large stacked branch scope
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 42]
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M orchestrator/src/cli/control/controlRuntime.ts
+ M orchestrator/src/cli/control/observabilityReadModel.ts
+ M orchestrator/src/cli/control/selectedRunProjection.ts
+ M orchestrator/tests/ControlRuntime.test.ts
+ M orchestrator/tests/ControlServer.test.ts
+ M tasks/index.json
+?? .agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md
+?? tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+```
+
+Diff budget override: 1035 stacked-branch scope on long-running main; bounded same-issue compatibility slice validated with targeted tests and manual evidence.
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+tool codex.list_mcp_resources({})
+codex.list_mcp_resources({}) success in 327ms:
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"resources\":[]}"
+    }
+  ],
+  "isError": false
+}
+
+thinking
+**Considering update plans**
+
+I notice there are no MCP resources available right now. I’m thinking about inspecting the repository differences. Maybe I should update the plan since this seems non-trivial. So yes, definitely evaluating if we need to review the differences and possibly delegate tasks. I’ll start by inspecting the files to see what changes need to be addressed.
+thinking
+**Considering update plans**
+
+I notice there are no MCP resources available right now. I’m thinking about inspecting the repository differences. Maybe I should update the plan since this seems non-trivial. So yes, definitely evaluating if we need to review the differences and possibly delegate tasks. I’ll start by inspecting the files to see what changes need to be addressed.
+Plan update
+Reviewing the bounded 1035 diff for correctness, docs/guardrail alignment, and minimality.
+  → Inspect the diff and surrounding code/tests for the 1035 changes
+  • Check docs/checklist/guardrail evidence for mismatches introduced by the patch
+  • Summarize actionable findings and overall correctness in the required JSON format
+exec
+/bin/zsh -lc "git status --short && echo '---' && git diff --stat -- . ':(exclude).runs'" in /Users/kbediako/Code/CO succeeded in 53ms:
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M orchestrator/src/cli/control/controlRuntime.ts
+ M orchestrator/src/cli/control/observabilityReadModel.ts
+ M orchestrator/src/cli/control/selectedRunProjection.ts
+ M orchestrator/tests/ControlRuntime.test.ts
+ M orchestrator/tests/ControlServer.test.ts
+ M tasks/index.json
+?? .agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md
+?? tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+?? tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md
+---
+ docs/TASKS.md                                      |   1 +
+ docs/docs-freshness-registry.json                  |  49 +++++
+ orchestrator/src/cli/control/controlRuntime.ts     |  22 +--
+ .../src/cli/control/observabilityReadModel.ts      | 173 ++++++++++++++---
+
+thinking
+**Considering using git diff**
+
+I need to read the differences in specific files, and using git diff sounds like a good idea. It's such a handy tool for spotting changes, and I wonder if I should focus on particular files to get the most relevant information. I'll have to check which files I want to compare to ensure I'm looking at what matters most. Alright, it feels like a straightforward approach, but I’ll confirm the details before moving forward!
+thinking
+**Considering using git diff**
+
+I need to read the differences in specific files, and using git diff sounds like a good idea. It's such a handy tool for spotting changes, and I wonder if I should focus on particular files to get the most relevant information. I'll have to check which files I want to compare to ensure I'm looking at what matters most. Alright, it feels like a straightforward approach, but I’ll confirm the details before moving forward!
+exec
+/bin/zsh -lc 'git diff -- docs/TASKS.md docs/docs-freshness-registry.json tasks/index.json orchestrator/src/cli/control/controlRuntime.ts orchestrator/src/cli/control/observabilityReadModel.ts orchestrator/src/cli/control/selectedRunProjection.ts orchestrator/tests/ControlRuntime.test.ts orchestrator/tests/ControlServer.test.ts .agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md' in /Users/kbediako/Code/CO succeeded in 53ms:
+diff --git a/docs/TASKS.md b/docs/TASKS.md
+index c4544a74b..c730d8013 100644
+--- a/docs/TASKS.md
++++ b/docs/TASKS.md
+@@ -1,4 +1,5 @@
+ <!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md; 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md <!-- tasks-archive-index:end -->
++# Task List Snapshot - Coordinator Symphony-Aligned Compatibility Issue Identity and Multi-Run Policy (1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy) - **Update - 2026-03-07:** Task created; export `MCP_RUNNER_TASK_ID=1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy`; scope: define explicit issue-centered compatibility identity and bounded same-issue multi-run handling while keeping `/ui/data.json`, Telegram oversight, and `/api/v1/dispatch` on their current seams; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`, `npm run pack:smoke` when downstream-facing paths change. Docs-first evidence: `docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`. Checklist mirror: `tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `.agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Runtime Compatibility Collection Discovery (1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery) - Update 2026-03-07: completed (compatibility `state` / `issue` now discover bounded sibling runtime `running` and `retrying` entries from `.runs/*/cli/*`; `/ui/data.json`, Telegram oversight, and the selected-run seam remain current-run-only; targeted regressions passed `89/89`; the full suite passed `135/135` files and `990/990` tests; manual compatibility collection evidence passed; pack smoke passed; and the review wrapper is recorded as an honest override after a diff-budget wrapper failure plus a timed low-signal rerun). Evidence: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `.agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T023357Z-preimpl-review-and-docs-review-override/00-summary.md`, `.runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery-scout/cli/2026-03-07T02-23-39-241Z-cace2a6f/manifest.json`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/00-summary.md`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/05-targeted-tests.log`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/06-test.log`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/11-manual-compatibility-collection-discovery.json`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/13-elegance-review.md`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/14-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Runtime Compatibility Snapshot Source (1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source) - Update 2026-03-07: completed (the compatibility projection now reads from a dedicated runtime compatibility source rather than `readSelectedRunSnapshot()`, the selected-run seam remains intact for UI/Telegram consumers, the final suite passed `135/135` files and `988/988` tests, manual compatibility-source evidence passed, and pack smoke passed). Evidence: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md`, `tasks/specs/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md`, `tasks/tasks-1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md`, `.agent/task/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md`, `docs/findings/1033-runtime-compatibility-snapshot-source-deliberation.md`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010320Z-preimpl-review-and-docs-review-override/00-summary.md`, `.runs/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source-scout/cli/2026-03-07T00-54-58-252Z-fd5cda8d/manifest.json`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/00-summary.md`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/05-test.log`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/11-manual-runtime-compatibility-source.json`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/12-elegance-review.md`, `out/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source/manual/20260307T010851Z-closeout/13-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Collection-Backed Compatibility Projection (1032-coordinator-symphony-aligned-collection-backed-compatibility-projection) - Update 2026-03-06: completed (the core compatibility state and issue routes now read from a runtime-provided collection-backed projection instead of inspecting `snapshot.selected` directly; the selected-run seam remains intact for UI/Telegram consumers; terminal issue payloads now return `running: null` when no active running entry exists; the full suite passed `135/135` files and `985/985` tests; manual compatibility projection evidence passed; and pack smoke passed). Evidence: `docs/PRD-coordinator-symphony-aligned-collection-backed-compatibility-projection.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-collection-backed-compatibility-projection.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-collection-backed-compatibility-projection.md`, `tasks/specs/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection.md`, `tasks/tasks-1032-coordinator-symphony-aligned-collection-backed-compatibility-projection.md`, `.agent/task/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection.md`, `docs/findings/1032-collection-backed-compatibility-projection-deliberation.md`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T232904Z-preimpl-review-and-docs-review-override/00-summary.md`, `.runs/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection-scout/cli/2026-03-06T23-22-44-397Z-994b42e7/manifest.json`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/00-summary.md`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/05-test.log`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/11-manual-compatibility-projection.json`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/12-elegance-review.md`, `out/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection/manual/20260306T233750Z-closeout/13-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+diff --git a/docs/docs-freshness-registry.json b/docs/docs-freshness-registry.json
+index a9cf6eafa..cfc4dda88 100644
+--- a/docs/docs-freshness-registry.json
++++ b/docs/docs-freshness-registry.json
+@@ -5357,6 +5357,55 @@
+       "last_review": "2026-03-06",
+       "cadence_days": 90
+     },
++    {
++      "path": ".agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md",
+
+thinking
+**Inspecting documentation and code**
+
+I need to take a closer look at the documentation to check for any mismatches. It might also be helpful to inspect the surrounding code since that could be relevant to understanding the issues I'm facing. So, I'll open the relevant source files to see what's going on. There's a lot to unravel here, and I'm curious about any potential inconsistencies that need addressing!
+thinking
+**Inspecting documentation and code**
+
+I need to take a closer look at the documentation to check for any mismatches. It might also be helpful to inspect the surrounding code since that could be relevant to understanding the issues I'm facing. So, I'll open the relevant source files to see what's going on. There's a lot to unravel here, and I'm curious about any potential inconsistencies that need addressing!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/selectedRunProjection.ts && printf '\\n---FILE---\\n' && sed -n '1,260p' orchestrator/src/cli/control/observabilityReadModel.ts && printf '\\n---FILE---\\n' && sed -n '1,280p' orchestrator/src/cli/control/controlRuntime.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+import { readdir, readFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlAction, ControlState } from './controlState.js';
+import {
+  buildTrackedLinearPayload,
+  type ControlCompatibilitySourceContext,
+  type SelectedRunContext,
+  type SelectedRunLatestEvent,
+  type SelectedRunQuestionSummary
+} from './observabilityReadModel.js';
+import type { QuestionRecord } from './questions.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+
+export interface SelectedRunManifestSnapshot {
+  manifestRecord: Record<string, unknown>;
+  issueIdentifier: string;
+  issueId: string | null;
+
+thinking
+**Inspecting file behavior**
+
+I need to inspect the rest of the file to identify any impacted behavior. It's also a good idea to look at something like buildCompatibilityIssuePayload to understand the issues better. I'll make sure to be thorough in my inspection to catch anything that might affect functionality. Let’s check for all relevant elements that may impact how the implementation works! I want to ensure everything’s working smoothly.
+thinking
+**Inspecting file behavior**
+
+I need to inspect the rest of the file to identify any impacted behavior. It's also a good idea to look at something like buildCompatibilityIssuePayload to understand the issues better. I'll make sure to be thorough in my inspection to catch anything that might affect functionality. Let’s check for all relevant elements that may impact how the implementation works! I want to ensure everything’s working smoothly.
+exec
+/bin/zsh -lc "sed -n '260,620p' orchestrator/src/cli/control/observabilityReadModel.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+    latest_question: summary.latestQuestion
+      ? {
+          question_id: summary.latestQuestion.questionId,
+          prompt: summary.latestQuestion.prompt,
+          urgency: summary.latestQuestion.urgency,
+          queued_at: summary.latestQuestion.queuedAt
+        }
+      : null
+  };
+}
+
+export function buildSelectedRunLatestEventPayload(
+  latestEvent: SelectedRunLatestEvent | null,
+  options: {
+    includeRequestMetadata?: boolean;
+  } = {}
+): ControlLatestEventPayload | null {
+  if (!latestEvent) {
+    return null;
+  }
+
+thinking
+**Looking into server issues**
+
+I think I need to inspect the control server since there might be an issue with the route. It seems like a search is in order to figure out what’s going wrong or if there are routing problems. This could help pinpoint what needs fixing! Overall, my goal is to understand the specifics better so I can take appropriate action. Let’s see what I can find to clarify this situation.
+thinking
+**Looking into server issues**
+
+I think I need to inspect the control server since there might be an issue with the route. It seems like a search is in order to figure out what’s going wrong or if there are routing problems. This could help pinpoint what needs fixing! Overall, my goal is to understand the specifics better so I can take appropriate action. Let’s see what I can find to clarify this situation.
+exec
+/bin/zsh -lc "rg -n \"findCompatibilityProjectionIssueRecord|/api/v1/|compatibilityProjection\" orchestrator/src/cli/control -g'*.ts'" in /Users/kbediako/Code/CO succeeded in 52ms:
+orchestrator/src/cli/control/observabilitySurface.ts:17:  findCompatibilityProjectionIssueRecord
+orchestrator/src/cli/control/observabilitySurface.ts:209:// `/api/v1/dispatch` is a CO-specific extension over the Symphony-aligned
+orchestrator/src/cli/control/observabilitySurface.ts:328:  const issue = findCompatibilityProjectionIssueRecord(projection, issueIdentifier);
+orchestrator/src/cli/control/controlRuntime.ts:115:  const compatibilityProjectionSource = createSelectedRunProjectionReader(context);
+orchestrator/src/cli/control/controlRuntime.ts:118:  let compatibilityProjectionPromise: Promise<ControlCompatibilityProjectionSnapshot> | null = null;
+orchestrator/src/cli/control/controlRuntime.ts:141:      const selectedManifest = await compatibilityProjectionSource.readSelectedRunManifestSnapshot();
+orchestrator/src/cli/control/controlRuntime.ts:142:      const selected = await compatibilityProjectionSource.buildCompatibilitySourceContext(selectedManifest);
+orchestrator/src/cli/control/controlRuntime.ts:167:    compatibilityProjectionPromise ??= readCompatibilityRuntimeSnapshot().then((snapshot) =>
+orchestrator/src/cli/control/controlRuntime.ts:170:    return compatibilityProjectionPromise;
+orchestrator/src/cli/control/observabilityReadModel.ts:486:export function findCompatibilityProjectionIssueRecord(
+exec
+/bin/zsh -lc "sed -n '280,360p' orchestrator/src/cli/control/observabilitySurface.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+export function buildCompatibilityTraceability(
+  context: ObservabilityTraceabilityContext,
+  input: {
+    decision: 'acknowledged' | 'rejected';
+    reason: string;
+    issueIdentifier?: string | null;
+    requestAction?: string | null;
+    requestTool?: string | null;
+  }
+): Record<string, unknown> {
+  const snapshot = context.controlStore.snapshot();
+  return {
+    task_id: resolveTaskIdFromManifestPath(context.paths.manifestPath),
+    run_id: snapshot.run_id,
+    manifest_path: context.paths.manifestPath,
+    surface: 'api_v1',
+    issue_identifier: input.issueIdentifier ?? null,
+    requested_action: input.requestAction ?? null,
+    requested_tool: input.requestTool ?? null,
+    decision: input.decision,
+[run-review] waiting on codex review (1m 0s elapsed, 2s idle; review progress observed).
+
+
+
+
+thinking
+**Reviewing documentation and code**
+
+I’m considering if mismatches between documentation and code could be counted as findings. The user wants me to highlight these differences if they're clear and actionable. It seems like the documentation might be missing references to specific paths or files. I need to check if the documentation claims one behavior while the code reflects another. I should review the patch for correctness, as there might be bugs related to how tasks are managed across all runs.
+thinking
+**Analyzing compatibility state**
+
+I’m considering how the readCompatibilityState count reflects the number of issues instead of runs. It seems the running array is built by issueIdentifier and intended to collapse multiple runs for the same issue. I wonder if discoverCompatibilityCollectionContexts includes the same issue across different tasks. I also need to verify if the issue identifier remains consistent, especially when the manifest lacks it. It’s good that older runs with the same taskId get correctly collapsed based on that.
+thinking
+**Assessing task run policies**
+
+I'm contemplating whether there could be a scenario where multiple runs for the same issue across different tasks could lead to incorrect orderings. It's not necessarily a bug, but it might be a potential one. The way `readTaskCompatibilityContexts` iterates through all entries and checks states for each run could be costly, especially since it reads all runs without a bounded policy. This means the performance might degrade significantly on repositories with numerous historical runs. I need to evaluate if this implementation aligns with the requirements for a bounded same-issue multi-run policy.
+thinking
+**Inspecting multi-run limitations**
+
+I realized that the current implementation is not bounded. I’m wondering if there are any notes mentioning "bounded multi-run discovery," which might suggest that it’s expected to limit runs for the same issue only. However, determining if runs are for the same issue requires reading manifests. Nonetheless, I could potentially stop processing once a different issue is detected in the same task. I need to review the relevant PRD and TECH_SPEC documents to clarify the intended behavior and identify any discrepancies.
+thinking
+**Reviewing documentation and code**
+
+I’m considering if mismatches between documentation and code could be counted as findings. The user wants me to highlight these differences if they're clear and actionable. It seems like the documentation might be missing references to specific paths or files. I need to check if the documentation claims one behavior while the code reflects another. I should review the patch for correctness, as there might be bugs related to how tasks are managed across all runs.
+thinking
+**Analyzing compatibility state**
+
+I’m considering how the readCompatibilityState count reflects the number of issues instead of runs. It seems the running array is built by issueIdentifier and intended to collapse multiple runs for the same issue. I wonder if discoverCompatibilityCollectionContexts includes the same issue across different tasks. I also need to verify if the issue identifier remains consistent, especially when the manifest lacks it. It’s good that older runs with the same taskId get correctly collapsed based on that.
+thinking
+**Assessing task run policies**
+
+I'm contemplating whether there could be a scenario where multiple runs for the same issue across different tasks could lead to incorrect orderings. It's not necessarily a bug, but it might be a potential one. The way `readTaskCompatibilityContexts` iterates through all entries and checks states for each run could be costly, especially since it reads all runs without a bounded policy. This means the performance might degrade significantly on repositories with numerous historical runs. I need to evaluate if this implementation aligns with the requirements for a bounded same-issue multi-run policy.
+thinking
+**Inspecting multi-run limitations**
+
+I realized that the current implementation is not bounded. I’m wondering if there are any notes mentioning "bounded multi-run discovery," which might suggest that it’s expected to limit runs for the same issue only. However, determining if runs are for the same issue requires reading manifests. Nonetheless, I could potentially stop processing once a different issue is detected in the same task. I need to review the relevant PRD and TECH_SPEC documents to clarify the intended behavior and identify any discrepancies.
+exec
+/bin/zsh -lc "sed -n '1,240p' docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md && printf '\\n---FILE---\\n' && sed -n '1,260p' docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md && printf '\\n---FILE---\\n' && sed -n '1,260p' tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md && printf '\\n---FILE---\\n' && sed -n '1,260p' docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md && printf '\\n---FILE---\\n' && sed -n '1,260p' tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# PRD - Coordinator Symphony-Aligned Compatibility Issue Identity and Multi-Run Policy
+
+## Problem
+
+`1034` moved the Symphony-aligned compatibility `state` / `issue` surface beyond a selected-manifest-only source, but the current discovery path still picks the latest readable sibling run per task and relies on opportunistic task/run aliases. As multiple runs for the same task or issue identifier accumulate, compatibility lookup becomes heuristic rather than explicitly issue-centered.
+
+## Goal
+
+Make the core compatibility surface deterministic when multiple runs contribute to the same issue identity:
+
+- define issue-centered compatibility identity explicitly,
+- preserve run-id lookup as a secondary alias,
+- surface bounded multi-run state without moving UI/Telegram off the selected-run seam.
+
+## User Value
+
+- Symphony-aligned issue lookup remains stable as CO grows from “one selected run” toward “many autonomous runs”.
+- Operators and downstream users get deterministic compatibility route behavior even when multiple retries or reruns exist for one task.
+- CO keeps the harder current-run authority boundary while improving the read-only compatibility projection.
+
+
+
+thinking
+**Evaluating code and documentation**
+
+I need to check if the documentation mentions bounded tasks while the code handles unbounded ones. This could indicate a mismatch and potentially a bug. I should quantify the bug and consider flagging that readTaskCompatibilityContexts scans all historical runs instead of just the active same-issue runs. But I'm questioning if there's actual incorrect behavior since stale runs can count as running. Previous heuristics appeared to avoid these stale runs, but the new scanning method might include them all, complicating matters.
+thinking
+**Analyzing multi-run policy**
+
+It seems the same-issue multi-run policy is intended to surface the multi-run state. However, returning both running and retrying simultaneously for one issue could happen if there's an old failed run without a completed_at, while a new run exists. That seems fine, but scanning all historical runs might lead to accumulating run IDs from all of them. This aligns with the desire to preserve run ID aliases, which is good. I need to check the previous implementation in 1034 to see its intentions and look for possible regressions.
+thinking
+**Evaluating code and documentation**
+
+I need to check if the documentation mentions bounded tasks while the code handles unbounded ones. This could indicate a mismatch and potentially a bug. I should quantify the bug and consider flagging that readTaskCompatibilityContexts scans all historical runs instead of just the active same-issue runs. But I'm questioning if there's actual incorrect behavior since stale runs can count as running. Previous heuristics appeared to avoid these stale runs, but the new scanning method might include them all, complicating matters.
+thinking
+**Analyzing multi-run policy**
+
+It seems the same-issue multi-run policy is intended to surface the multi-run state. However, returning both running and retrying simultaneously for one issue could happen if there's an old failed run without a completed_at, while a new run exists. That seems fine, but scanning all historical runs might lead to accumulating run IDs from all of them. This aligns with the desire to preserve run ID aliases, which is good. I need to check the previous implementation in 1034 to see its intentions and look for possible regressions.
+exec
+/bin/zsh -lc "git show origin/main:orchestrator/src/cli/control/selectedRunProjection.ts | sed -n '90,430p'" in /Users/kbediako/Code/CO succeeded in 52ms:
+fatal: path 'orchestrator/src/cli/control/selectedRunProjection.ts' exists on disk, but not in 'origin/main'
+
+thinking
+**Considering Git Commands**
+
+I’m thinking about how to move forward with branch 42. I might need to refer to the previous commit using HEAD1 because I’m dealing with a stacked branch. So, using the command `git show HEAD1` could help me see what the last commit looks like. It’s crucial to get the right information so I don't mess anything up as I continue working on this!
+thinking
+**Considering Git Commands**
+
+I’m thinking about how to move forward with branch 42. I might need to refer to the previous commit using HEAD1 because I’m dealing with a stacked branch. So, using the command `git show HEAD1` could help me see what the last commit looks like. It’s crucial to get the right information so I don't mess anything up as I continue working on this!
+exec
+/bin/zsh -lc "git show HEAD~1:orchestrator/src/cli/control/selectedRunProjection.ts | sed -n '90,430p'" in /Users/kbediako/Code/CO succeeded in 51ms:
+
+async function buildSelectedRunContextFromSnapshot(
+  context: SelectedRunProjectionContext,
+  snapshot: SelectedRunManifestSnapshot | null
+): Promise<SelectedRunContext | null> {
+  return buildProjectionContextFromSnapshot(context, snapshot);
+}
+
+async function buildCompatibilitySourceContextFromSnapshot(
+  context: SelectedRunProjectionContext,
+  snapshot: SelectedRunManifestSnapshot | null
+): Promise<ControlCompatibilitySourceContext | null> {
+  return buildProjectionContextFromSnapshot(context, snapshot);
+}
+
+async function buildProjectionContextFromSnapshot(
+  context: SelectedRunProjectionContext,
+  snapshot: SelectedRunManifestSnapshot | null
+): Promise<SelectedRunContext | null> {
+  if (!snapshot) {
+exec
+/bin/zsh -lc "git show HEAD~1:orchestrator/src/cli/control/selectedRunProjection.ts | sed -n '1,120p'" in /Users/kbediako/Code/CO succeeded in 52ms:
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlAction, ControlState } from './controlState.js';
+import {
+  buildTrackedLinearPayload,
+  type ControlCompatibilitySourceContext,
+  type SelectedRunContext,
+  type SelectedRunLatestEvent,
+  type SelectedRunQuestionSummary
+} from './observabilityReadModel.js';
+import type { QuestionRecord } from './questions.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+
+export interface SelectedRunManifestSnapshot {
+  manifestRecord: Record<string, unknown>;
+  issueIdentifier: string;
+  issueId: string | null;
+
+thinking
+**Searching for functions**
+
+I'm thinking I need to find a complete pre-change discovery function, possibly from a HEAD1 file. It seems that a search is in order. I'll look for relevant functions that might help with my task. It's essential to explore this thoroughly so I can get a solid understanding. There’s likely a few details I need to take into account while searching. Let’s see what I can find!
+thinking
+**Searching for functions**
+
+I'm thinking I need to find a complete pre-change discovery function, possibly from a HEAD1 file. It seems that a search is in order. I'll look for relevant functions that might help with my task. It's essential to explore this thoroughly so I can get a solid understanding. There’s likely a few details I need to take into account while searching. Let’s see what I can find!
+exec
+/bin/zsh -lc 'git show HEAD~1:orchestrator/src/cli/control/selectedRunProjection.ts | rg -n "discoverCompatibilityCollectionContexts|readLatestSiblingCompatibilityContext" -n -C 3' in /Users/kbediako/Code/CO exited 1 in 52ms:
+
+
+thinking
+**Investigating git functions**
+
+I'm trying to figure out if a function was introduced in HEAD1 and whether I need a specific file from branch 1034. I think searching the git log may not be necessary because the current file has the discover function. But I might need to use grep to check the current content. It seems the current diff shows older modifications, so I need to look closely at changes to see if they align with my expectations. I might have to use sed on certain lines to make it work.
+thinking
+**Investigating git functions**
+
+I'm trying to figure out if a function was introduced in HEAD1 and whether I need a specific file from branch 1034. I think searching the git log may not be necessary because the current file has the discover function. But I might need to use grep to check the current content. It seems the current diff shows older modifications, so I need to look closely at changes to see if they align with my expectations. I might have to use sed on certain lines to make it work.
+exec
+/bin/zsh -lc "git show HEAD~1:orchestrator/src/cli/control/selectedRunProjection.ts | sed -n '60,170p'" in /Users/kbediako/Code/CO succeeded in 52ms:
+  ): Promise<SelectedRunContext | null> => {
+    if (snapshot) {
+      return buildSelectedRunContextFromSnapshot(context, snapshot);
+    }
+    selectedContextPromise ??= (async () => {
+      const selectedSnapshot = await readSelectedRunManifestSnapshot();
+      return buildSelectedRunContextFromSnapshot(context, selectedSnapshot);
+    })();
+    return selectedContextPromise;
+  };
+
+  const buildCompatibilitySourceContext = async (
+    snapshot: SelectedRunManifestSnapshot | null = null
+  ): Promise<ControlCompatibilitySourceContext | null> => {
+    if (snapshot) {
+      return buildCompatibilitySourceContextFromSnapshot(context, snapshot);
+    }
+    compatibilityContextPromise ??= (async () => {
+      const selectedSnapshot = await readSelectedRunManifestSnapshot();
+      return buildCompatibilitySourceContextFromSnapshot(context, selectedSnapshot);
+[run-review] waiting on codex review (2m 0s elapsed, 4s idle; review progress observed).
+
+thinking
+I'm trying to figure out why HEAD1 doesn't have the discover function. I wonder if it’s because the file is shorter than expected. It might be worth checking the surrounding context or the top of the file for more clues. I feel like I need to look a bit deeper to get to the bottom of this! Let’s explore what’s around it and see if that holds any answers.
+thinking
+I'm trying to figure out why HEAD1 doesn't have the discover function. I wonder if it’s because the file is shorter than expected. It might be worth checking the surrounding context or the top of the file for more clues. I feel like I need to look a bit deeper to get to the bottom of this! Let’s explore what’s around it and see if that holds any answers.
+exec
+/bin/zsh -lc "git show HEAD~1:orchestrator/src/cli/control/selectedRunProjection.ts | sed -n '1,80p'" in /Users/kbediako/Code/CO succeeded in 51ms:
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlAction, ControlState } from './controlState.js';
+import {
+  buildTrackedLinearPayload,
+  type ControlCompatibilitySourceContext,
+  type SelectedRunContext,
+  type SelectedRunLatestEvent,
+  type SelectedRunQuestionSummary
+} from './observabilityReadModel.js';
+import type { QuestionRecord } from './questions.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+
+export interface SelectedRunManifestSnapshot {
+  manifestRecord: Record<string, unknown>;
+  issueIdentifier: string;
+  issueId: string | null;
+
+thinking
+**Evaluating issue identifiers**
+
+I’m considering that in many systems, the issue_id serves as a numerical backend identifier while issue_identifier is more user-friendly. If the manifest only stores issue_id, maybe issue-centered processes should still utilize it. However, the route contract might expect the issue_identifier. I should inspect existing runs or the manifest fields, and perhaps search in the repository to clarify the usage of these identifiers. There’s a lot to consider!
+thinking
+**Evaluating issue identifiers**
+
+I’m considering that in many systems, the issue_id serves as a numerical backend identifier while issue_identifier is more user-friendly. If the manifest only stores issue_id, maybe issue-centered processes should still utilize it. However, the route contract might expect the issue_identifier. I should inspect existing runs or the manifest fields, and perhaps search in the repository to clarify the usage of these identifiers. There’s a lot to consider!
+exec
+/bin/zsh -lc "rg -n \"issue_identifier|issue_id\" -g'manifest.json' .runs | head -n 40" in /Users/kbediako/Code/CO succeeded in 255ms:
+
+exec
+/bin/zsh -lc "rg -n \"issue_identifier|issueId|issue_id\" orchestrator/src/cli/control orchestrator/src/cli -g'*.ts' | sed -n '1,220p'" in /Users/kbediako/Code/CO succeeded in 51ms:
+orchestrator/src/cli/control/observabilitySurface.ts:50:    issueIdentifier: string | null;
+orchestrator/src/cli/control/observabilitySurface.ts:81:      issueIdentifier: string | null;
+orchestrator/src/cli/control/observabilitySurface.ts:87:      issueIdentifier: string | null;
+orchestrator/src/cli/control/observabilitySurface.ts:123:  issueIdentifier?: string
+orchestrator/src/cli/control/observabilitySurface.ts:132:      ...(issueIdentifier ? { issue_identifier: issueIdentifier } : {})
+orchestrator/src/cli/control/observabilitySurface.ts:137:      ...(issueIdentifier ? { issueIdentifier } : {})
+orchestrator/src/cli/control/observabilitySurface.ts:144:  issueIdentifier: string
+orchestrator/src/cli/control/observabilitySurface.ts:152:      issue_identifier: issueIdentifier
+orchestrator/src/cli/control/observabilitySurface.ts:157:      issueIdentifier
+orchestrator/src/cli/control/observabilitySurface.ts:214:  const { issueIdentifier, evaluation } = await context.readDispatchEvaluation();
+orchestrator/src/cli/control/observabilitySurface.ts:219:      issueIdentifier,
+orchestrator/src/cli/control/observabilitySurface.ts:234:    issueIdentifier,
+orchestrator/src/cli/control/observabilitySurface.ts:285:    issueIdentifier?: string | null;
+orchestrator/src/cli/control/observabilitySurface.ts:296:    issue_identifier: input.issueIdentifier ?? null,
+orchestrator/src/cli/control/observabilitySurface.ts:325:  issueIdentifier: string
+orchestrator/src/cli/control/observabilitySurface.ts:328:  const issue = findCompatibilityProjectionIssueRecord(projection, issueIdentifier);
+orchestrator/src/cli/control/observabilitySurface.ts:50:    issueIdentifier: string | null;
+orchestrator/src/cli/control/observabilitySurface.ts:81:      issueIdentifier: string | null;
+orchestrator/src/cli/control/observabilitySurface.ts:87:      issueIdentifier: string | null;
+orchestrator/src/cli/control/observabilitySurface.ts:123:  issueIdentifier?: string
+
+thinking
+**Investigating function compatibility**
+
+I need to inspect similar functions elsewhere or check the documentation. I'll search for tests regarding discoverCompatibilityCollectionContexts, specifically for existing tests that address issues with alias collisions. It might be useful to look into old ControlServer tests to see if there are relevant test cases. There's a possibility that the tests for the issue might not have been found yet, so I'll keep that in mind as I investigate further.
+thinking
+**Investigating function compatibility**
+
+I need to inspect similar functions elsewhere or check the documentation. I'll search for tests regarding discoverCompatibilityCollectionContexts, specifically for existing tests that address issues with alias collisions. It might be useful to look into old ControlServer tests to see if there are relevant test cases. There's a possibility that the tests for the issue might not have been found yet, so I'll keep that in mind as I investigate further.
+exec
+/bin/zsh -lc "rg -n \"compatibility.*run-2|issue_identifier wins|readCompatibilityIssue|retrying\" orchestrator/tests/ControlServer.test.ts orchestrator/tests/ControlRuntime.test.ts | sed -n '1,220p'" in /Users/kbediako/Code/CO succeeded in 52ms:
+orchestrator/tests/ControlRuntime.test.ts:317:  it('discovers sibling running and retrying compatibility entries while keeping selected-run local', async () => {
+orchestrator/tests/ControlRuntime.test.ts:354:    await createSiblingRun(fixture.root, 'task-1034-retrying', 'run-3', {
+orchestrator/tests/ControlRuntime.test.ts:370:      (issue) => issue.issueIdentifier === 'task-1034-retrying'
+orchestrator/tests/ControlRuntime.test.ts:380:    expect(compatibilityProjection.retrying.map((entry) => entry.issue_identifier)).toEqual([
+orchestrator/tests/ControlRuntime.test.ts:381:      'task-1034-retrying'
+orchestrator/tests/ControlRuntime.test.ts:386:      'task-1034-retrying'
+orchestrator/tests/ControlRuntime.test.ts:396:      issue_identifier: 'task-1034-retrying',
+orchestrator/tests/ControlRuntime.test.ts:482:    expect(compatibilityProjection.retrying).toEqual([
+orchestrator/tests/ControlServer.test.ts:431:        counts?: { running?: number; retrying?: number };
+orchestrator/tests/ControlServer.test.ts:438:        retrying?: unknown[];
+orchestrator/tests/ControlServer.test.ts:441:      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+orchestrator/tests/ControlServer.test.ts:452:      expect(statePayload.retrying).toEqual([]);
+orchestrator/tests/ControlServer.test.ts:545:    await createSiblingRun(root, 'task-1034-retrying', 'run-3', {
+orchestrator/tests/ControlServer.test.ts:571:        counts?: { running?: number; retrying?: number };
+orchestrator/tests/ControlServer.test.ts:573:        retrying?: Array<{ issue_identifier?: string; state?: string }>;
+orchestrator/tests/ControlServer.test.ts:576:      expect(statePayload.counts).toEqual({ running: 2, retrying: 1 });
+orchestrator/tests/ControlServer.test.ts:586:      expect(statePayload.retrying?.map((entry) => entry.issue_identifier)).toEqual([
+orchestrator/tests/ControlServer.test.ts:587:        'task-1034-retrying'
+orchestrator/tests/ControlServer.test.ts:627:      const retryIssueRes = await fetch(new URL('/api/v1/task-1034-retrying', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:638:        issue_identifier: 'task-1034-retrying',
+
+thinking
+**Reviewing test assumptions**
+
+I'm thinking about opening existing tests around 1034 to evaluate them. I want to clarify the assumptions made in those tests to ensure they hold up. There’s a lot of potential for learning here! I guess I should check how reliable those assumptions are and if any adjustments need to be made. Doing this could provide valuable insights and improve overall accuracy as well. Let's see what I can find!
+thinking
+**Reviewing test assumptions**
+
+I'm thinking about opening existing tests around 1034 to evaluate them. I want to clarify the assumptions made in those tests to ensure they hold up. There’s a lot of potential for learning here! I guess I should check how reliable those assumptions are and if any adjustments need to be made. Doing this could provide valuable insights and improve overall accuracy as well. Let's see what I can find!
+exec
+/bin/zsh -lc "sed -n '300,420p' orchestrator/tests/ControlRuntime.test.ts && printf '\\n---FILE---\\n' && sed -n '520,660p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+      queued_at: '2026-03-07T00:14:00.000Z',
+      expires_at: null,
+      expires_in_ms: null,
+      auto_pause: true,
+      expiry_fallback: null
+    });
+
+    const compatibilityProjection = await snapshot.readCompatibilityProjection();
+
+    expect(initialSelectedRun.selected?.displayStatus).toBe('in_progress');
+    expect(initialSelectedRun.selected?.questionSummary.queuedCount).toBe(0);
+    expect(compatibilityProjection.selected?.display_status).toBe('paused');
+    expect(compatibilityProjection.selected?.status_reason).toBe('queued_questions');
+    expect(compatibilityProjection.selected?.question_summary.queued_count).toBe(1);
+    expect(compatibilityProjection.selected?.latest_action).toBe('pause');
+  });
+
+  it('discovers sibling running and retrying compatibility entries while keeping selected-run local', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1034-current'
+
+
+thinking
+**Evaluating document discrepancies**
+
+I’ve noticed potential mismatches with tasks and docs not being tracked properly, yet the checklist references docs/TECH_SPEC. The actual TECH_SPEC is stored in the docs/TECH_SPEC folder, and I should double-check if it’s consistent with tasks/specs. I suspect there may be duplicate files. I also need to check whether the docs-review approval is missing, as this was designated as a guardrail violation by the user. Since the checklist remains unchecked, should I mention this? I wonder if the author would find this helpful.
+thinking
+**Checking review guidelines**
+
+I need to consider the review guidelines, especially regarding maintainability and any evidence missing from the commit. It's possible that the required docs-review approval isn't mentioned, which points to a process issue. The code review should have overlapping diffs for proper findings, connected perhaps to the checklist line. Yet, if there's a guardrail violation, that could affect "overall correctness." I should inspect the evidence manifest provided by the user to see if the docs-review is captured there. It'll be good to confirm if checklist requirements are met.
+thinking
+**Evaluating document discrepancies**
+
+I’ve noticed potential mismatches with tasks and docs not being tracked properly, yet the checklist references docs/TECH_SPEC. The actual TECH_SPEC is stored in the docs/TECH_SPEC folder, and I should double-check if it’s consistent with tasks/specs. I suspect there may be duplicate files. I also need to check whether the docs-review approval is missing, as this was designated as a guardrail violation by the user. Since the checklist remains unchecked, should I mention this? I wonder if the author would find this helpful.
+thinking
+**Checking review guidelines**
+
+I need to consider the review guidelines, especially regarding maintainability and any evidence missing from the commit. It's possible that the required docs-review approval isn't mentioned, which points to a process issue. The code review should have overlapping diffs for proper findings, connected perhaps to the checklist line. Yet, if there's a guardrail violation, that could affect "overall correctness." I should inspect the evidence manifest provided by the user to see if the docs-review is captured there. It'll be good to confirm if checklist requirements are met.
+exec
+/bin/zsh -lc "jq '{run_id, pipeline, task_id, status, checklist, approvals, stages: [.stages[]? | {name, status}], artifacts, notes}' .runs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/cli/2026-03-07T03-09-31-041Z-52b863ef/manifest.json" in /Users/kbediako/Code/CO succeeded in 51ms:
+{
+  "run_id": "2026-03-07T03-09-31-041Z-52b863ef",
+  "pipeline": null,
+  "task_id": "1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy",
+  "status": "in_progress",
+  "checklist": null,
+  "approvals": [],
+  "stages": [],
+  "artifacts": null,
+  "notes": null
+}
+exec
+/bin/zsh -lc "sed -n '1,220p' .agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md && printf '\\n---FILE---\\n' && sed -n '1,220p' docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# Task Checklist - 1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy
+
+- MCP Task ID: `1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`
+- TECH_SPEC: `tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`
+
+> This lane defines compatibility issue identity and deterministic same-issue multi-run handling while keeping UI/Telegram on the existing selected-run seam.
+
+## Foundation
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `.agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md`.
+
+## Shared Registry + Review Handoff
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md`.
+- [ ] docs-review approval/override captured for registered `1035`. Evidence: `.runs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/cli/<run-id>/manifest.json`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/<timestamp>-docs-first/`.
+
+## Compatibility Issue Identity Policy
+- [ ] The compatibility discovery/runtime seam applies an explicit same-issue multi-run policy instead of stopping at one latest readable sibling run. Evidence: `orchestrator/src/cli/control/selectedRunProjection.ts`, `orchestrator/src/cli/control/controlRuntime.ts`.
+spawnSync npm ETIMEDOUT

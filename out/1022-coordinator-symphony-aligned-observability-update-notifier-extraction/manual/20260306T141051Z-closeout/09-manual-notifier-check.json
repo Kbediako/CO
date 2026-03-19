@@ -1,0 +1,68 @@
+{
+  "task": "1022-coordinator-symphony-aligned-observability-update-notifier-extraction",
+  "manual_check": "notifier-driven Telegram coherence",
+  "status": "ok",
+  "sources_exercised": [
+    "broadcast",
+    "questions.enqueue",
+    "questions.answer",
+    "linear.webhook"
+  ],
+  "steps": [
+    {
+      "source": "broadcast",
+      "message_count": 1,
+      "sample": "CO status\nIssue: task-1022-manual\nState: in_progress\nSession: run-1\nLast event: in_progress\nSummary: task is running\nDispatch: source_unavailable/unavailable (dispatch_source_issue_not_found)"
+    },
+    {
+      "source": "questions.enqueue",
+      "message_count": 2,
+      "sample": "CO status\nIssue: task-1022-manual\nState: awaiting_input (raw in_progress)\nReason: queued_questions\nSession: run-1\nLast event: in_progress\nSummary: task is running\nQueued questions: 1 (latest q-0001 [high]: Need operator approval)\nDispatch: source_unavailable/unavailable (dispatch_source_issue_not_found)",
+      "question_id": "q-0001"
+    },
+    {
+      "source": "questions.answer",
+      "message_count": 3,
+      "sample": "CO status\nIssue: task-1022-manual\nState: in_progress\nSession: run-1\nLast event: in_progress\nSummary: task is running\nDispatch: source_unavailable/unavailable (dispatch_source_issue_not_found)"
+    },
+    {
+      "source": "linear.webhook",
+      "message_count": 4,
+      "sample": "CO status\nIssue: task-1022-manual\nState: in_progress\nSession: run-1\nLast event: in_progress\nSummary: task is running\nLinear: PREPROD-101 - Investigate advisory routing\nLinear state: In Progress\nDispatch: source_unavailable/unavailable (dispatch_source_issue_not_found)",
+      "response": {
+        "status": "accepted",
+        "reason": "linear_delivery_accepted",
+        "timestamp": "2026-03-06T14:12:24.757Z"
+      }
+    }
+  ],
+  "sent_messages": [
+    {
+      "chat_id": "1234",
+      "text": "CO status\nIssue: task-1022-manual\nState: in_progress\nSession: run-1\nLast event: in_progress\nSummary: task is running\nDispatch: source_unavailable/unavailable (dispatch_source_issue_not_found)"
+    },
+    {
+      "chat_id": "1234",
+      "text": "CO status\nIssue: task-1022-manual\nState: awaiting_input (raw in_progress)\nReason: queued_questions\nSession: run-1\nLast event: in_progress\nSummary: task is running\nQueued questions: 1 (latest q-0001 [high]: Need operator approval)\nDispatch: source_unavailable/unavailable (dispatch_source_issue_not_found)"
+    },
+    {
+      "chat_id": "1234",
+      "text": "CO status\nIssue: task-1022-manual\nState: in_progress\nSession: run-1\nLast event: in_progress\nSummary: task is running\nDispatch: source_unavailable/unavailable (dispatch_source_issue_not_found)"
+    },
+    {
+      "chat_id": "1234",
+      "text": "CO status\nIssue: task-1022-manual\nState: in_progress\nSession: run-1\nLast event: in_progress\nSummary: task is running\nLinear: PREPROD-101 - Investigate advisory routing\nLinear state: In Progress\nDispatch: source_unavailable/unavailable (dispatch_source_issue_not_found)"
+    }
+  ],
+  "telegram_state": {
+    "next_update_id": 0,
+    "updated_at": "2026-03-06T14:12:24.757Z",
+    "push": {
+      "last_sent_projection_hash": "21f48cb5f686b5e5b463e6913c0d66d26c09556961cc616bcec35df31c12c786",
+      "last_sent_at": "2026-03-06T14:12:24.757Z",
+      "last_event_seq": 1,
+      "pending_projection_hash": null,
+      "pending_projection_observed_at": null
+    }
+  }
+}

@@ -1,0 +1,2 @@
+Delegation guard override active.
+Reason: 1110 used top-level Codex subagent audit evidence; repo delegation guard only recognizes manifest-backed orchestrator subruns in this shell session.

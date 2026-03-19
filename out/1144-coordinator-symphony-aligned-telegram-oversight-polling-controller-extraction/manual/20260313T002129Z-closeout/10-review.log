@@ -1,0 +1,365 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:62531) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:62531) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 1251 > 25
+ - total lines changed 115165 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 11024
+  - orchestrator/tests/ControlServer.test.ts: 7635
+  - tasks/index.json: 6968
+  - scripts/lib/review-execution-state.ts: 4243
+  - tests/review-execution-state.spec.ts: 3522
+  - tests/run-review.spec.ts: 3110
+  - scripts/run-review.ts: 2221
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1803
+  - orchestrator/src/cli/control/controlServer.ts: 1658
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1144 is a bounded stacked-branch Telegram polling-controller extraction on a long-lived Symphony-alignment branch; lane-local diff remains narrow even though branch-vs-origin scope is large.
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 5 files, 368 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/cli/2026-03-13T00-09-34-996Z-a13cefa9/review/prompt.txt
+Review output log: .runs/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/cli/2026-03-13T00-09-34-996Z-a13cefa9/review/output.log
+Launching Codex review (evidence: .runs/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/cli/2026-03-13T00-09-34-996Z-a13cefa9/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] verdict-stability guard enabled after 3m 0s of repeated speculative no-progress output (set CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.
+[run-review] bounded relevant reinspection dwell boundary enabled after 3m 0s of repetitive on-task reinspection without concrete findings (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.114.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019ce498-28b2-7fb1-873b-9795ced2ef05
+--------
+user
+Review task: 1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction
+Review surface: diff
+
+Agent notes:
+Goal: verify the bounded Telegram polling-controller extraction in 1144. | Summary: polling loop, update-offset advancement, and per-update isolation moved into controlTelegramPollingController while bridge-owned state persistence remains explicit. | Risks: next_update_id persistence, monotonic updated_at, shutdown abort behavior.
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.
+- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths (5):
+```
+orchestrator/src/cli/control/telegramOversightBridge.ts
+out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/00-summary.md
+out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/05-docs-review-override.md
+orchestrator/src/cli/control/controlTelegramPollingController.ts
+orchestrator/tests/ControlTelegramPollingController.test.ts
+```
+
+Active closeout provenance:
+- Resolved active closeout root: `out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T002129Z-closeout`
+- These roots are already-resolved self-referential review surfaces for this task; do not re-derive or re-enumerate them unless directly necessary to assess code correctness.
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+Plan update
+  → Inspect scoped diff for touched review files
+  • Analyze changed code for behavioral regressions and missing coverage
+  • Produce JSON review findings with precise locations
+exec
+/bin/zsh -lc 'git diff -- orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/src/cli/control/controlTelegramPollingController.ts orchestrator/tests/ControlTelegramPollingController.test.ts out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/00-summary.md out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/05-docs-review-override.md' in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'git status --short -- orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/src/cli/control/controlTelegramPollingController.ts orchestrator/tests/ControlTelegramPollingController.test.ts out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/00-summary.md out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/05-docs-review-override.md' in /Users/kbediako/Code/CO succeeded in 0ms:
+ M orchestrator/src/cli/control/telegramOversightBridge.ts
+ M out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/00-summary.md
+ M out/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction/manual/20260313T000149Z-docs-first/05-docs-review-override.md
+?? orchestrator/src/cli/control/controlTelegramPollingController.ts
+?? orchestrator/tests/ControlTelegramPollingController.test.ts
+ succeeded in 0ms:
+diff --git a/orchestrator/src/cli/control/telegramOversightBridge.ts b/orchestrator/src/cli/control/telegramOversightBridge.ts
+index 0a6322c8d..702a208dc 100644
+--- a/orchestrator/src/cli/control/telegramOversightBridge.ts
++++ b/orchestrator/src/cli/control/telegramOversightBridge.ts
+@@ -11,6 +11,10 @@ import {
+   createControlTelegramProjectionNotificationController,
+   type ControlTelegramProjectionNotificationController
+ } from './controlTelegramProjectionNotificationController.js';
++import {
++  createControlTelegramPollingController,
++  type ControlTelegramPollingController
++} from './controlTelegramPollingController.js';
+ import {
+   createControlTelegramUpdateHandler,
+   type ControlTelegramUpdateHandler
+@@ -26,8 +30,7 @@ import {
+ import {
+   createTelegramOversightApiClient,
+   type TelegramBotIdentity,
+-  type TelegramOversightApiClient,
+
+thinking
+I'm planning to inspect the content of a new file and possibly look at the surrounding original file as well. I think the first step is to open the relevant code files that have been modified. It's really important to make sure I understand the changes made and how they fit into the bigger picture. This way, I can be thorough in my review and ensure everything is working as intended. Let’s get to it!
+thinking
+I'm planning to inspect the content of a new file and possibly look at the surrounding original file as well. I think the first step is to open the relevant code files that have been modified. It's really important to make sure I understand the changes made and how they fit into the bigger picture. This way, I can be thorough in my review and ensure everything is working as intended. Let’s get to it!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlTelegramPollingController.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/ControlTelegramPollingController.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/telegramOversightBridge.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { logger } from '../../logger.js';
+import type { ControlTelegramUpdateHandler } from './controlTelegramUpdateHandler.js';
+import type { TelegramOversightApiClient, TelegramUpdate } from './telegramOversightApiClient.js';
+
+const DEFAULT_POLL_TIMEOUT_SECONDS = 20;
+
+export interface ControlTelegramPollingController {
+  run(input: {
+    isClosed: () => boolean;
+    readNextUpdateId: () => number;
+    persistNextUpdateId: (nextUpdateId: number, observedAt: string) => Promise<void>;
+    readBotUsername: () => string | null;
+  }): Promise<void>;
+  abort(): void;
+}
+
+export function createControlTelegramPollingController(input: {
+  pollIntervalMs: number;
+  telegramClient: TelegramOversightApiClient;
+  updateHandler: ControlTelegramUpdateHandler;
+ succeeded in 0ms:
+import { describe, expect, it, vi } from 'vitest';
+
+import { logger } from '../src/logger.js';
+import { createDefaultTelegramOversightState } from '../src/cli/control/controlTelegramPushState.js';
+import { createControlTelegramPollingController } from '../src/cli/control/controlTelegramPollingController.js';
+import type { ControlTelegramUpdateHandler } from '../src/cli/control/controlTelegramUpdateHandler.js';
+import type {
+  TelegramOversightApiClient,
+  TelegramUpdate
+} from '../src/cli/control/telegramOversightApiClient.js';
+
+function createTelegramClient(input: {
+  updates: TelegramUpdate[];
+  onGetUpdates?: () => void | Promise<void>;
+}): TelegramOversightApiClient {
+  return {
+    getMe: async () => ({ id: 1, username: 'co_test_advisory_bot' }),
+    getUpdates: async () => {
+      await input.onGetUpdates?.();
+      return input.updates;
+ succeeded in 0ms:
+import { logger } from '../../logger.js';
+import {
+  createControlTelegramCommandController,
+  type ControlTelegramCommandController
+} from './controlTelegramCommandController.js';
+import {
+  createControlTelegramReadController,
+  type ControlTelegramReadController
+} from './controlTelegramReadController.js';
+import {
+  createControlTelegramProjectionNotificationController,
+  type ControlTelegramProjectionNotificationController
+} from './controlTelegramProjectionNotificationController.js';
+import {
+  createControlTelegramPollingController,
+  type ControlTelegramPollingController
+} from './controlTelegramPollingController.js';
+import {
+  createControlTelegramUpdateHandler,
+  type ControlTelegramUpdateHandler
+
+thinking
+**Inspecting code dependencies**
+
+I need to check for possibly omitted lines after 260, as they might not be needed for parsing the config. It’ll be essential to review the nearby dependencies, likely focusing on the controlTelegramPushState state store. I should also take a look at advanceTelegramOversightBridgeStateNextUpdateId and its monotonic updated_at. Additionally, I want to examine the update handler and relevant nearby dependencies. The user has allowed changes to the code, so I must focus on the diff files and those functions.
+thinking
+**Inspecting code dependencies**
+
+I need to check for possibly omitted lines after 260, as they might not be needed for parsing the config. It’ll be essential to review the nearby dependencies, likely focusing on the controlTelegramPushState state store. I should also take a look at advanceTelegramOversightBridgeStateNextUpdateId and its monotonic updated_at. Additionally, I want to examine the update handler and relevant nearby dependencies. The user has allowed changes to the code, so I must focus on the diff files and those functions.
+exec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/controlTelegramUpdateHandler.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+import { logger } from '../../logger.js';
+import type { ControlTelegramCommandController } from './controlTelegramCommandController.js';
+import type { ControlTelegramReadController } from './controlTelegramReadController.js';
+import type {
+  TelegramUpdate,
+  TelegramUser
+} from './telegramOversightApiClient.js';
+
+export interface ControlTelegramUpdateHandler {
+  handleUpdate(input: {
+    update: TelegramUpdate;
+    botUsername?: string | null;
+  }): Promise<void>;
+}
+
+export function createControlTelegramUpdateHandler(input: {
+  allowedChatIds: ReadonlySet<string>;
+  readController: ControlTelegramReadController;
+  commandController: ControlTelegramCommandController;
+  sendMessage: (chatId: string, text: string) => Promise<void>;
+ succeeded in 0ms:
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { writeJsonAtomic } from '../utils/fs.js';
+import {
+  createDefaultTelegramOversightState,
+  type TelegramOversightBridgeState,
+  type TelegramOversightStatePatch
+} from './controlTelegramPushState.js';
+
+const TELEGRAM_STATE_FILE = 'telegram-oversight-state.json';
+
+export interface TelegramOversightBridgeStateStore {
+  loadState(): Promise<TelegramOversightBridgeState>;
+  saveState(state: TelegramOversightBridgeState): Promise<void>;
+}
+
+export function createTelegramOversightBridgeStateStore(runDir: string): TelegramOversightBridgeStateStore {
+  const statePath = join(runDir, TELEGRAM_STATE_FILE);
+  return {
+exec
+/bin/zsh -lc "grep -R \"function advanceTelegramOversightBridgeStateNextUpdateId\\|export function advanceTelegramOversightBridgeStateNextUpdateId\\|const advanceTelegramOversightBridgeStateNextUpdateId\" -n orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts orchestrator/src/cli/control/controlTelegramPushState.ts orchestrator/src/cli/control" in /Users/kbediako/Code/CO succeeded in 0ms:
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:26:export function advanceTelegramOversightBridgeStateNextUpdateId(
+orchestrator/src/cli/control/telegramOversightBridgeStateStore.ts:26:export function advanceTelegramOversightBridgeStateNextUpdateId(
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+thinking
+**Inspecting bridge tests**
+
+I’m reviewing existing bridge tests, which seem to cover monotonic and overlap well, so it looks like I might not be missing any essential tests. However, I’m thinking I should inspect the bridge close tests, particularly around abort long poll scenarios. Maybe I should search for "hang" since that seems relevant. This might help clarify things and ensure thorough testing coverage. Let's see what I can find!
+thinking
+**Inspecting bridge tests**
+
+I’m reviewing existing bridge tests, which seem to cover monotonic and overlap well, so it looks like I might not be missing any essential tests. However, I’m thinking I should inspect the bridge close tests, particularly around abort long poll scenarios. Maybe I should search for "hang" since that seems relevant. This might help clarify things and ensure thorough testing coverage. Let's see what I can find!
+exec
+/bin/zsh -lc "rg -n \"close\\(\\)|getUpdates.*signal|signal.aborted|AbortController|long poll|poll interval|CO_TELEGRAM_POLL_INTERVAL_MS\" orchestrator/tests/TelegramOversightBridge.test.ts | sed -n '1,120p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+388:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+486:      await server.close();
+508:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+591:      await server.close();
+690:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+731:      await server.close();
+823:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+863:      await server.close();
+888:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+934:      await server.close();
+978:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+1065:      await server.close();
+1109:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+1208:      await server.close();
+1272:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+1353:      await server.close();
+1404:      CO_TELEGRAM_POLL_INTERVAL_MS: '5'
+1430:      await bridge?.close();
+1450:    vi.stubEnv('CO_TELEGRAM_POLL_INTERVAL_MS', '10');
+1522:      await server.close();
+
+
+
+
+
+thinking
+**Inspecting potential issues**
+
+I think I should use `git diff --unified` to check for new files in case there's a hidden bug caused by omitted context. I already have the complete file, so I want to inspect it for any uncommitted documentation modifications. I might compare `TelegramOversightBridge.test.ts` with other files that aren't in the diff but are involved in the behavior.
+
+The user is looking for a diff and nearby dependencies, so I'll check if `createControlTelegramPollingController` is not exported from the barrel or if the import path is missing. I'll investigate the package files, though it may not be a packaging issue because direct TypeScript compilation includes `src/**/*`.
+thinking
+**Evaluating potential issues**
+
+I’m considering a potential issue with `readNextUpdateId` in handleUpdates. It might be better to use the current state after each update, especially since old mutable locals are used from the state at the start. I should also think about the lifecycle ordering in `bridge.start`. It constructs `pollingController` in the constructor, but using `this.pollingController.run({...})` without passing the config reference could create a disconnect. 
+
+I need to inspect the controller tests, as they might not cover essential edge cases. However, I wonder if existing bridge tests sufficiently address these concerns.
+thinking
+**Investigating compile issues**
+
+I'm wondering if there's a new test causing compile issues due to the `TelegramMessage` interface missing a `date` property. I see that in line 1364 of the bridge test, there’s a `date: 1`, even though the `TelegramMessage` interface in `telegramOversightApiClient.ts` doesn't have `date`. Wait, why isn’t TypeScript complaining? Maybe it's because the object literal assigned to `harness.updates.push` is being treated as any type. I should check the definition of `createTelegramHarness`. But perhaps it's not relevant to the tests compiling issues.
+thinking
+**Evaluating potential issues**
+
+I'm considering the maintainability of the new controller. I should check `ControlTelegramPollingController.test.ts` for the absence of `export type`. There's not a bug, but it seems like the new controller's `run` method may face issues after aborting since `activeController` remains null, and `runtime.isClosed` could still return false. The bridge only starts once, so that aspect shouldn't be a bug. I need to confirm if pollingController is instantiated after updateHandler. I'll also look for bugs in generated `observedAt` data.
+thinking
+**Increasing confidence in findings**
+
+I feel I need to build my confidence here. Before concluding there are no findings, I should conduct a thorough local review, especially by comparing it with the old `handleUpdates` semantics. I need to consider the actual data flow in the `run` loop: fetching updates, reading the next update ID, and handling updates if the length is greater than zero. I wonder if the `updateHandler` might trigger a side effect like `persistNextUpdateId` indirectly, but it seems like the `updateHandler` doesn't know the current state.
+thinking
+**Inspecting potential issues**
+
+I think I should use `git diff --unified` to check for new files in case there's a hidden bug caused by omitted context. I already have the complete file, so I want to inspect it for any uncommitted documentation modifications. I might compare `TelegramOversightBridge.test.ts` with other files that aren't in the diff but are involved in the behavior.
+
+The user is looking for a diff and nearby dependencies, so I'll check if `createControlTelegramPollingController` is not exported from the barrel or if the import path is missing. I'll investigate the package files, though it may not be a packaging issue because direct TypeScript compilation includes `src/**/*`.
+thinking
+**Evaluating potential issues**
+
+I’m considering a potential issue with `readNextUpdateId` in handleUpdates. It might be better to use the current state after each update, especially since old mutable locals are used from the state at the start. I should also think about the lifecycle ordering in `bridge.start`. It constructs `pollingController` in the constructor, but using `this.pollingController.run({...})` without passing the config reference could create a disconnect. 
+
+I need to inspect the controller tests, as they might not cover essential edge cases. However, I wonder if existing bridge tests sufficiently address these concerns.
+thinking
+**Investigating compile issues**
+
+I'm wondering if there's a new test causing compile issues due to the `TelegramMessage` interface missing a `date` property. I see that in line 1364 of the bridge test, there’s a `date: 1`, even though the `TelegramMessage` interface in `telegramOversightApiClient.ts` doesn't have `date`. Wait, why isn’t TypeScript complaining? Maybe it's because the object literal assigned to `harness.updates.push` is being treated as any type. I should check the definition of `createTelegramHarness`. But perhaps it's not relevant to the tests compiling issues.
+thinking
+**Evaluating potential issues**
+
+I'm considering the maintainability of the new controller. I should check `ControlTelegramPollingController.test.ts` for the absence of `export type`. There's not a bug, but it seems like the new controller's `run` method may face issues after aborting since `activeController` remains null, and `runtime.isClosed` could still return false. The bridge only starts once, so that aspect shouldn't be a bug. I need to confirm if pollingController is instantiated after updateHandler. I'll also look for bugs in generated `observedAt` data.
+thinking
+**Increasing confidence in findings**
+
+I feel I need to build my confidence here. Before concluding there are no findings, I should conduct a thorough local review, especially by comparing it with the old `handleUpdates` semantics. I need to consider the actual data flow in the `run` loop: fetching updates, reading the next update ID, and handling updates if the length is greater than zero. I wonder if the `updateHandler` might trigger a side effect like `persistNextUpdateId` indirectly, but it seems like the `updateHandler` doesn't know the current state.
+exec
+/bin/zsh -lc "nl -ba orchestrator/tests/TelegramOversightBridge.test.ts | sed -n '940,1070p'" in /Users/kbediako/Code/CO succeeded in 0ms:
+   940	    const { root, env, paths } = await createRunRoot('task-1016-telegram-push');
+   941	    await seedManifest(paths, {
+   942	      summary: 'task is running',
+   943	      updated_at: '2026-03-06T04:00:00.000Z'
+   944	    });
+   945	    await seedControlState(paths, {
+   946	      control_seq: 1,
+   947	      latest_action: {
+   948	        action: 'pause',
+   949	        requested_at: '2026-03-06T04:01:00.000Z',
+   950	        requested_by: 'operator',
+   951	        reason: 'manual_pause'
+   952	      }
+   953	    });
+   954	    await writeFile(
+   955	      join(paths.runDir, 'telegram-oversight-state.json'),
+   956	      JSON.stringify({
+   957	        next_update_id: 41,
+   958	        updated_at: '2026-03-06T04:00:30.000Z',
+   959	        push: {
+
+[run-review] waiting on codex review (2m 0s elapsed, 352ms idle; review progress observed).

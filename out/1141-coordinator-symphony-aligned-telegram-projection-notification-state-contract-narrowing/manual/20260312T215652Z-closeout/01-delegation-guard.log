@@ -1,0 +1,2 @@
+Delegation guard override active.
+Reason: 1141 uses bounded gpt-5.4 scouts while docs-review remains blocked at its own delegation guard in the current local appserver posture.

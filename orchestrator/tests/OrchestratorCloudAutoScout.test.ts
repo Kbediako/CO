@@ -324,6 +324,87 @@ describe('CodexOrchestrator cloud auto scout', () => {
     expect(result.manifest.status).toBe('succeeded');
   });
 
+  it('routes child subpipelines through the fallback-adjusted mode after cloud preflight failure', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'docs-review',
+      title: 'Docs Review',
+      stages: [{ kind: 'subpipeline', id: 'child-stage', title: 'Child stage', pipeline: 'child-pipeline' }]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-cloud-fallback-child-routing', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.heartbeat_interval_seconds = 1;
+    manifest.heartbeat_stale_after_seconds = 2;
+
+    vi.spyOn(cloudPreflight, 'runCloudPreflight').mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
+      details: {
+        codexBin: 'codex',
+        environmentId: null,
+        branch: null
+      }
+    });
+
+    const orchestrator = new CodexOrchestrator(env);
+    const startSpy = vi.spyOn(orchestrator, 'start').mockResolvedValue({
+      manifest: { run_id: 'child-run', status: 'succeeded' } as never,
+      runSummary: { review: { summary: 'child ok' } } as never
+    });
+
+    const result = await (
+      orchestrator as unknown as {
+        executePipeline: (options: unknown) => Promise<{
+          notes: string[];
+          success: boolean;
+          manifest: {
+            runtime_mode?: string;
+            cloud_fallback?: { mode_used?: string };
+          };
+        }>;
+      }
+    ).executePipeline({
+      env,
+      pipeline,
+      manifest,
+      paths,
+      mode: 'cloud',
+      runtimeModeRequested: 'appserver',
+      runtimeModeSource: 'default',
+      envOverrides: {
+        CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
+        CODEX_ORCHESTRATOR_APPSERVER_FORCE_PRECHECK_FAIL: '1'
+      },
+      task: { id: env.taskId, title: 'Task' },
+      target: {
+        id: 'docs-review:child-stage',
+        description: 'Child stage',
+        metadata: { stageId: 'child-stage' }
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.notes[0]).toContain('Cloud preflight failed; falling back to mcp.');
+    expect(result.manifest.cloud_fallback?.mode_used).toBe('mcp');
+    expect(result.manifest.runtime_mode).toBe('cli');
+    expect(startSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: env.taskId,
+        pipelineId: 'child-pipeline',
+        parentRunId: manifest.run_id,
+        format: 'json',
+        executionMode: 'mcp',
+        runtimeMode: 'cli'
+      })
+    );
+  });
+
   it('fails fast on preflight failure when cloud fallback is disabled', async () => {
     const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {

@@ -72,6 +72,18 @@ export function normalizeTaskKey(item) {
   }
   const id = typeof item.id === 'string' ? item.id.trim() : '';
   const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
+  const taskPath =
+    typeof item.path === 'string'
+      ? item.path.trim()
+      : typeof item.relates_to === 'string'
+      ? item.relates_to.trim()
+      : '';
+  const taskPathMatch = taskPath.match(
+    /(?:^|\/)(?:tasks-)?([0-9]{4}-[A-Za-z0-9-]+)\.md$/u
+  );
+  const taskPathSlug = taskPathMatch?.[1] ?? '';
+  const datePrefixedIdMatch = id.match(/^\d{8}-([0-9]{4}-[A-Za-z0-9-]+)$/u);
+  const datePrefixedSlug = datePrefixedIdMatch?.[1] ?? '';
   if (slug && id && slug.startsWith(`${id}-`)) {
     return slug;
   }
@@ -80,6 +92,12 @@ export function normalizeTaskKey(item) {
   }
   if (slug) {
     return slug;
+  }
+  if (taskPathSlug) {
+    return taskPathSlug;
+  }
+  if (datePrefixedSlug) {
+    return datePrefixedSlug;
   }
   if (id) {
     return id;

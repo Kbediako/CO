@@ -1,0 +1,26 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+stderr | orchestrator/tests/OrchestratorCloudRouteShell.test.ts > executeOrchestratorCloudRouteShell > reroutes to mcp with effective env overrides when cloud preflight fails and fallback is allowed
+[Codex-Orchestrator] Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId). Cloud branch 'router-preflight' was not found on origin. Push it first or set CODEX_CLOUD_BRANCH to an existing remote branch.
+
+ ✓ orchestrator/tests/OrchestratorCloudRouteShell.test.ts  (3 tests) 4ms
+ ✓ orchestrator/tests/OrchestratorExecutionRouter.test.ts  (10 tests) 6ms
+stderr | orchestrator/tests/OrchestratorExecutionRouter.test.ts > routeOrchestratorExecution > fails fast on runtime selection errors without invoking downstream execution
+[Codex-Orchestrator] Runtime selection failed: provider missing
+
+stderr | orchestrator/tests/OrchestratorExecutionRouter.test.ts > routeOrchestratorExecution > falls back from cloud preflight failure to the local execution route when allowed
+[Codex-Orchestrator] Cloud preflight failed; falling back to mcp. CODEX_CLOUD_ENV_ID is not configured. CODEX_CLOUD_BRANCH is not configured.
+
+stderr | orchestrator/tests/OrchestratorExecutionRouter.test.ts > routeOrchestratorExecution > fails fast when cloud preflight fails and fallback is disabled
+[Codex-Orchestrator] Cloud preflight failed and cloud fallback is disabled. CODEX_CLOUD_ENV_ID is not configured. CODEX_CLOUD_BRANCH is not configured.
+
+stderr | orchestrator/tests/OrchestratorExecutionRouter.test.ts > routeOrchestratorExecution > forwards fallback-adjusted execution and runtime modes to local subpipelines
+[Codex-Orchestrator] Cloud preflight failed; falling back to mcp. CODEX_CLOUD_ENV_ID is not configured.
+
+
+ Test Files  2 passed (2)
+      Tests  13 passed (13)
+   Start at  18:18:33
+   Duration  220ms (transform 97ms, setup 0ms, collect 164ms, tests 10ms, environment 0ms, prepare 57ms)
+

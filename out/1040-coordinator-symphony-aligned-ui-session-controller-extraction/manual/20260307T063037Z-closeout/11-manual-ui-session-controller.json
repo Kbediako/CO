@@ -1,0 +1,36 @@
+{
+  "post_success": {
+    "handled": true,
+    "response": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      },
+      "body": {
+        "token": "manual-token",
+        "expires_at": "2026-03-07T06:45:00.000Z"
+      }
+    }
+  },
+  "put_fallthrough": {
+    "handled": false,
+    "response": {
+      "statusCode": null,
+      "headers": null,
+      "body": null
+    }
+  },
+  "non_loopback_reject": {
+    "handled": true,
+    "response": {
+      "statusCode": 403,
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "error": "loopback_only"
+      }
+    }
+  }
+}

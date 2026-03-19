@@ -1,0 +1,12 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ tests/review-execution-telemetry.spec.ts  (4 tests) 21ms
+ ↓ tests/review-launch-attempt.spec.ts  (3 tests | 3 skipped)
+ ✓ tests/run-review.spec.ts  (115 tests | 113 skipped) 4628ms
+
+ Test Files  2 passed | 1 skipped (3)
+      Tests  6 passed | 116 skipped (122)
+   Start at  16:03:46
+   Duration  4.92s (transform 381ms, setup 0ms, collect 684ms, tests 4.65s, environment 0ms, prepare 154ms)
+

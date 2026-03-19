@@ -1,0 +1,54 @@
+{
+  "verified_at_utc": "2026-03-11T01:37:05Z",
+  "task_id": "1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation",
+  "audit_startup_expectations": [
+    {
+      "case": "successful && export rebind before first anchor",
+      "status": "fails_closed",
+      "evidence": "tests/review-execution-state.spec.ts"
+    },
+    {
+      "case": "bash same-key bare export rebind before first anchor",
+      "status": "fails_closed",
+      "evidence": "tests/review-execution-state.spec.ts"
+    },
+    {
+      "case": "unset-driven MANIFEST removal across successful && chain",
+      "status": "keeps_blocked_env_visible_without_raw_run_manifest_fallback",
+      "evidence": "tests/review-execution-state.spec.ts"
+    },
+    {
+      "case": "bash export -n MANIFEST across successful && chain",
+      "status": "keeps_unexported_shell_var_local_and_out_of_child_env",
+      "evidence": "tests/review-execution-state.spec.ts"
+    },
+    {
+      "case": "runtime review wrapper accepts valid exported-env active manifest startup form",
+      "status": "passes",
+      "evidence": "tests/run-review.spec.ts"
+    }
+  ],
+  "shell_semantics": {
+    "bash_same_key_bare_export_with_existing_shell_value": {
+      "command": "/bin/bash -lc 'MANIFEST=/tmp/active.json; MANIFEST=/tmp/other.json export MANIFEST; printf \"%s\\n\" \"$MANIFEST\"'",
+      "stdout": "/tmp/other.json"
+    },
+    "zsh_same_key_bare_export_with_existing_shell_value": {
+      "command": "/bin/zsh -lc 'MANIFEST=/tmp/active.json; MANIFEST=/tmp/other.json export MANIFEST; printf \"%s\\n\" \"$MANIFEST\"'",
+      "stdout": "/tmp/active.json"
+    },
+    "bash_export_n_removes_child_env_but_keeps_shell_var": {
+      "command": "/bin/bash -lc 'MANIFEST=/tmp/active.json; export MANIFEST; export -n MANIFEST; (env | grep \"^MANIFEST=\" || true); printf \"shell=<%s>\\n\" \"$MANIFEST\"'",
+      "stdout": "shell=</tmp/active.json>"
+    },
+    "zsh_export_n_is_unsupported_and_leaves_exported_env_intact": {
+      "command": "/bin/zsh -lc 'MANIFEST=/tmp/active.json; export MANIFEST; export -n MANIFEST; (env | grep \"^MANIFEST=\" || true); printf \"shell=<%s>\\n\" \"$MANIFEST\"'",
+      "stdout": "zsh:export:1: bad option: -n\nMANIFEST=/tmp/active.json\nshell=</tmp/active.json>"
+    }
+  },
+  "validation_logs": {
+    "targeted_state_tests": "out/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation/manual/20260310T105152Z-closeout/05-targeted-tests.log",
+    "targeted_wrapper_tests": "out/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation/manual/20260310T105152Z-closeout/05b-targeted-run-review.log",
+    "full_suite": "out/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation/manual/20260310T105152Z-closeout/05-test.log"
+  }
+}

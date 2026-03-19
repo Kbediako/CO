@@ -1,0 +1,17 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/ConfirmationApproveController.test.ts  (5 tests) 3ms
+stderr | orchestrator/tests/ControlServer.test.ts > ControlServer > responds even when event stream append fails
+[Codex-Orchestrator] Failed to append control event confirmation_required: append failed
+
+stderr | orchestrator/tests/ControlServer.test.ts > ControlServer > updates pause reason when questions expire with pause fallback
+[Codex-Orchestrator] Failed to resolve child question: fetch failed
+
+ ✓ orchestrator/tests/ControlServer.test.ts  (87 tests) 420ms
+
+ Test Files  2 passed (2)
+      Tests  92 passed (92)
+   Start at  23:33:26
+   Duration  765ms (transform 242ms, setup 0ms, collect 298ms, tests 423ms, environment 0ms, prepare 55ms)
+

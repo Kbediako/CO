@@ -1,0 +1,16 @@
+{
+  "classLocalHelperDelegated": true,
+  "createTaskManagerArgsVerified": [
+    "runId",
+    "pipeline",
+    "executePipeline",
+    "getResult",
+    "planner",
+    "env",
+    "executionModeOverride"
+  ],
+  "getResultInitiallyNull": true,
+  "attachPlanTargetTrackerArgsVerified": true,
+  "createTaskManagerFailureSkipsTracker": true,
+  "reviewVerdict": "no concrete correctness regression identified"
+}

@@ -1,0 +1,2 @@
+Delegation guard override active.
+Reason: bounded MCP subagent scout/review used for 1129; repo guard only recognizes manifest-backed orchestrator subruns

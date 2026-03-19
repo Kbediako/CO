@@ -29,8 +29,9 @@ describe('initCodexTemplates', () => {
     const pipelineConfig = await readFile(path.join(tempDir, 'codex.orchestrator.json'), 'utf8');
     expect(pipelineConfig).toContain('"pipelines"');
     const codexConfig = await readFile(path.join(tempDir, '.codex', 'config.toml'), 'utf8');
-    expect(codexConfig).toContain('max_depth = 4');
-    expect(codexConfig).toContain('max_spawn_depth = 4');
+    expect(codexConfig).toContain('max_threads = 12');
+    expect(codexConfig).not.toContain('max_depth = 4');
+    expect(codexConfig).not.toContain('max_spawn_depth = 4');
 
     const second = await initCodexTemplates({ template: 'codex', cwd: tempDir, force: false });
     expect(second.written).toHaveLength(0);

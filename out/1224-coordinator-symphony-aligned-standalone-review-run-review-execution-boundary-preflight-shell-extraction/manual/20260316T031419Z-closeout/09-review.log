@@ -1,0 +1,10 @@
+# 1224 Bounded Review Log Summary
+
+- Initial bounded review on the extracted execution-boundary preflight tree surfaced two concrete P2 findings:
+  - missing direct `review-support` classification for `scripts/lib/review-execution-boundary-preflight.js`
+  - missing touched-family parity between the extracted helper and its nearby `review-launch-attempt` / `review-execution-state` dependency surface
+- The shipped tree fixed both findings and added focused regressions in `tests/review-meta-surface-normalization.spec.ts`.
+- A follow-on rerun then exposed one real widening regression introduced during that repair:
+  - `tests/review-execution-state.spec.ts` incorrectly made `tests/review-launch-attempt.spec.ts` appear touched through the new helper family
+- The shipped tree narrowed that widening by splitting the execution-state-spec relation into its own execution-boundary family and by adding an explicit negative regression.
+- Final bounded reruns then drifted into speculative source-host/package-path reinspection around `ts-node/esm` and source `.js` hosts without returning another concrete diff-local defect, so the final review state is recorded as an explicit wrapper-drift override in `13-override-notes.md`.

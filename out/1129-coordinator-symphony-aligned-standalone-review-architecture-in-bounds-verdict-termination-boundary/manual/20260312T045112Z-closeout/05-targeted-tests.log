@@ -1,0 +1,22 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ tests/review-execution-state.spec.ts  (105 tests | 102 skipped) 9ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 102 skipped (105)
+   Start at  16:18:17
+   Duration  214ms (transform 74ms, setup 0ms, collect 80ms, tests 9ms, environment 0ms, prepare 40ms)
+
+
+=====
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ tests/run-review.spec.ts  (110 tests | 107 skipped) 8337ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 107 skipped (110)
+   Start at  16:18:17
+   Duration  8.50s (transform 47ms, setup 0ms, collect 50ms, tests 8.34s, environment 0ms, prepare 25ms)
+

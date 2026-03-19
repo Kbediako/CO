@@ -1,49 +1,52 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { opendir, readFile } from 'node:fs/promises';
+import { opendir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
-import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
-import {
-  executeExecCommand,
-  type ExecOutputMode
-} from '../orchestrator/src/cli/exec/command.js';
+import { type ExecOutputMode } from '../orchestrator/src/cli/exec/command.js';
+import { runExecCliShell, type RunExecCliShellParams } from '../orchestrator/src/cli/execCliShell.js';
 import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
-import { runPrWatchMerge } from '../scripts/lib/pr-watch-merge.js';
 import { normalizeEnvironmentPaths, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
 import { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
 import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
 import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interactive.js';
 import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
-import { initCodexTemplates, formatInitSummary } from '../orchestrator/src/cli/init.js';
 import {
-  runDoctor,
-  runDoctorCloudPreflight,
-  formatDoctorSummary,
-  formatDoctorCloudPreflightSummary
+  runDoctor
 } from '../orchestrator/src/cli/doctor.js';
-import { formatDoctorUsageSummary, runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
+import { runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
+import { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';
 import {
   formatDoctorIssueLogSummary,
   type DoctorIssueLogResult,
   writeDoctorIssueLog
 } from '../orchestrator/src/cli/doctorIssueLog.js';
-import { formatDevtoolsSetupSummary, runDevtoolsSetup } from '../orchestrator/src/cli/devtoolsSetup.js';
-import { formatCodexCliSetupSummary, runCodexCliSetup } from '../orchestrator/src/cli/codexCliSetup.js';
-import { formatCodexDefaultsSetupSummary, runCodexDefaultsSetup } from '../orchestrator/src/cli/codexDefaultsSetup.js';
-import { formatDelegationSetupSummary, runDelegationSetup } from '../orchestrator/src/cli/delegationSetup.js';
-import { formatSkillsInstallSummary, installSkills, listBundledSkills } from '../orchestrator/src/cli/skills.js';
+import { runInitCliShell } from '../orchestrator/src/cli/initCliShell.js';
+import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
+import { runDevtoolsCliShell } from '../orchestrator/src/cli/devtoolsCliShell.js';
+import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
+import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
+import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
+import { runFlowCliRequestShell } from '../orchestrator/src/cli/flowCliRequestShell.js';
+import { runStartCliRequestShell } from '../orchestrator/src/cli/startCliRequestShell.js';
+import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
+import { runFrontendTestCliRequestShell } from '../orchestrator/src/cli/frontendTestCliRequestShell.js';
+import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
+import { runDoctorCliRequestShell } from '../orchestrator/src/cli/doctorCliRequestShell.js';
+import { runRlmCliRequestShell } from '../orchestrator/src/cli/rlmCliRequestShell.js';
+import { runRlmCompletionCliShell } from '../orchestrator/src/cli/rlmCompletionCliShell.js';
+import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
+import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
+import { runSelfCheckCliShell } from '../orchestrator/src/cli/selfCheckCliShell.js';
+import { printSetupCliHelp, runSetupCliShell } from '../orchestrator/src/cli/setupCliShell.js';
+import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
 import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
-import { formatMcpEnableSummary, runMcpEnable } from '../orchestrator/src/cli/mcpEnable.js';
-import { startDelegationServer } from '../orchestrator/src/cli/delegationServer.js';
-import { splitDelegationConfigOverrides } from '../orchestrator/src/cli/config/delegationConfig.js';
-import { buildCommandPreview } from '../orchestrator/src/cli/utils/commandPreview.js';
+import { runMcpEnableCliShell } from '../orchestrator/src/cli/mcpEnableCliShell.js';
+import { runDelegationServerCliShell } from '../orchestrator/src/cli/delegationServerCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -73,21 +76,6 @@ interface RunOutputPayload {
   cloud_fallback_reason: string | null;
   issue_log: DoctorIssueLogResult | null;
   issue_log_error: string | null;
-}
-
-interface FlowOutputPayload {
-  status: string;
-  failed_stage: 'docs-review' | 'implementation-gate' | null;
-  docs_review: RunOutputPayload;
-  implementation_gate: RunOutputPayload | null;
-  issue_log: DoctorIssueLogResult | null;
-  issue_log_error: string | null;
-}
-
-interface SetupGuidancePayload {
-  note: string;
-  references: string[];
-  recommended_commands: string[];
 }
 
 async function main(): Promise<void> {
@@ -265,200 +253,6 @@ function resolveTargetStageId(flags: ArgMap): string | undefined {
     return alias.trim();
   }
   return undefined;
-}
-
-interface FlowTargetStageSelection {
-  docsReviewTargetStageId?: string;
-  implementationGateTargetStageId?: string;
-}
-
-interface FlowPlanItem {
-  id: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface FlowPlanPreview {
-  plan: {
-    items: FlowPlanItem[];
-  };
-}
-
-interface NormalizedFlowTargetToken {
-  literal: string;
-  literalLower: string;
-  stageTokenLower: string;
-  scopeLower: string | null;
-  scoped: boolean;
-}
-
-const FLOW_TARGET_PIPELINE_SCOPES = new Set(['docs-review', 'implementation-gate']);
-
-function isFlowTargetPipelineScope(scope: string): boolean {
-  return FLOW_TARGET_PIPELINE_SCOPES.has(scope);
-}
-
-function normalizeFlowTargetToken(candidate: string): NormalizedFlowTargetToken | null {
-  const trimmed = candidate.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const tokens = trimmed.split(':');
-  if (tokens.length > 1 && !(tokens[0] ?? '').trim()) {
-    return null;
-  }
-
-  let scoped = false;
-  let scopeToken: string | null = null;
-  let suffixToken = trimmed;
-  if (tokens.length > 1) {
-    const candidateScope = (tokens[0] ?? '').trim().toLowerCase();
-    if (isFlowTargetPipelineScope(candidateScope)) {
-      scoped = true;
-      scopeToken = candidateScope;
-      suffixToken = (tokens[tokens.length - 1] ?? '').trim();
-    }
-  }
-
-  if (!suffixToken) {
-    return null;
-  }
-  return {
-    literal: trimmed,
-    literalLower: trimmed.toLowerCase(),
-    stageTokenLower: suffixToken.toLowerCase(),
-    scopeLower: scopeToken,
-    scoped
-  };
-}
-
-function flowPlanItemPipelineId(item: FlowPlanItem): string | null {
-  const metadataPipelineId =
-    item.metadata && typeof item.metadata['pipelineId'] === 'string'
-      ? (item.metadata['pipelineId'] as string).trim().toLowerCase()
-      : '';
-  if (metadataPipelineId) {
-    return metadataPipelineId;
-  }
-  const delimiterIndex = item.id.indexOf(':');
-  if (delimiterIndex <= 0) {
-    return null;
-  }
-  return item.id.slice(0, delimiterIndex).trim().toLowerCase() || null;
-}
-
-function flowPlanItemMatchesTarget(item: FlowPlanItem, candidate: string): boolean {
-  const normalized = normalizeFlowTargetToken(candidate);
-  if (!normalized) {
-    return false;
-  }
-  if (item.id.toLowerCase() === normalized.literalLower) {
-    return true;
-  }
-
-  if (normalized.scoped && normalized.scopeLower) {
-    const itemPipelineId = flowPlanItemPipelineId(item);
-    if (itemPipelineId && itemPipelineId !== normalized.scopeLower) {
-      return false;
-    }
-  }
-
-  const metadataStageId =
-    item.metadata && typeof item.metadata['stageId'] === 'string'
-      ? (item.metadata['stageId'] as string).toLowerCase()
-      : null;
-
-  const aliases = Array.isArray(item.metadata?.['aliases'])
-    ? (item.metadata?.['aliases'] as unknown[])
-    : [];
-  const aliasTokens = aliases.filter((alias): alias is string => typeof alias === 'string')
-    .map((alias) => alias.toLowerCase());
-
-  if (normalized.scoped) {
-    if (
-      metadataStageId
-      && (metadataStageId === normalized.literalLower || metadataStageId === normalized.stageTokenLower)
-    ) {
-      return true;
-    }
-    return aliasTokens.some(
-      (alias) => alias === normalized.literalLower || alias === normalized.stageTokenLower
-    );
-  }
-
-  if (item.id.toLowerCase().endsWith(`:${normalized.stageTokenLower}`)) {
-    return true;
-  }
-
-  if (
-    metadataStageId
-    && (
-      metadataStageId === normalized.stageTokenLower
-      || metadataStageId.endsWith(`:${normalized.stageTokenLower}`)
-    )
-  ) {
-    return true;
-  }
-
-  return aliasTokens.some(
-    (alias) => alias === normalized.stageTokenLower || alias.endsWith(`:${normalized.stageTokenLower}`)
-  );
-}
-
-function planIncludesStageId(
-  plan: FlowPlanPreview,
-  stageId: string
-): boolean {
-  if (!stageId.trim()) {
-    return false;
-  }
-  return plan.plan.items.some((item) => flowPlanItemMatchesTarget(item, stageId));
-}
-
-function resolveFlowTargetScope(stageId: string): string | null {
-  const delimiterIndex = stageId.indexOf(':');
-  if (delimiterIndex <= 0) {
-    return null;
-  }
-  const scope = stageId.slice(0, delimiterIndex).trim().toLowerCase();
-  if (!isFlowTargetPipelineScope(scope)) {
-    return null;
-  }
-  return scope;
-}
-
-async function resolveFlowTargetStageSelection(
-  orchestrator: CodexOrchestrator,
-  taskId: string | undefined,
-  requestedTargetStageId: string | undefined
-): Promise<FlowTargetStageSelection> {
-  if (!requestedTargetStageId) {
-    return {};
-  }
-
-  const [docsPlan, implementationPlan] = (await Promise.all([
-    orchestrator.plan({ pipelineId: 'docs-review', taskId }),
-    orchestrator.plan({ pipelineId: 'implementation-gate', taskId })
-  ])) as [FlowPlanPreview, FlowPlanPreview];
-
-  const requestedScope = resolveFlowTargetScope(requestedTargetStageId);
-  const docsScopeMatch = !requestedScope || requestedScope === 'docs-review';
-  const implementationScopeMatch = !requestedScope || requestedScope === 'implementation-gate';
-
-  const docsReviewTargetStageId = docsScopeMatch && planIncludesStageId(docsPlan, requestedTargetStageId)
-    ? requestedTargetStageId
-    : undefined;
-  const implementationGateTargetStageId =
-    implementationScopeMatch && planIncludesStageId(implementationPlan, requestedTargetStageId)
-    ? requestedTargetStageId
-    : undefined;
-
-  if (!docsReviewTargetStageId && !implementationGateTargetStageId) {
-    throw new Error(
-      `Target stage "${requestedTargetStageId}" is not defined in docs-review or implementation-gate.`
-    );
-  }
-
-  return { docsReviewTargetStageId, implementationGateTargetStageId };
 }
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
@@ -673,31 +467,6 @@ function resolveRlmTaskId(taskFlag?: string): string {
   return sanitizeTaskId(`rlm-${slug}`);
 }
 
-async function waitForManifestCompletion(manifestPath: string, intervalMs = 2000): Promise<any> {
-  const terminal = new Set(['succeeded', 'failed', 'cancelled']);
-  while (true) {
-    const raw = await readFile(manifestPath, 'utf8');
-    const manifest = JSON.parse(raw);
-    if (terminal.has(manifest.status)) {
-      return manifest;
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-}
-
-async function readRlmState(statePath: string): Promise<{ exitCode: number; status: string } | null> {
-  try {
-    const raw = await readFile(statePath, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!parsed?.final) {
-      return null;
-    }
-    return { exitCode: parsed.final.exitCode, status: parsed.final.status };
-  } catch {
-    return null;
-  }
-}
-
 interface AutoIssueLogCaptureResult {
   issueLog: DoctorIssueLogResult | null;
   issueLogError: string | null;
@@ -767,111 +536,53 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
     printStartHelp();
     return;
   }
-  const pipelineId = positionals[0];
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const executionMode = resolveExecutionModeFlag(flags);
-  const runtimeMode = resolveRuntimeModeFlag(flags);
-  applyRepoConfigRequiredPolicy(flags);
-  const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
-  if (pipelineId === 'rlm') {
-    const goal = readStringFlag(flags, 'goal');
-    const warnLegacyEnvAlias = shouldWarnLegacyMultiAgentEnv(flags, process.env);
-    applyRlmEnvOverrides(flags, goal);
-    if (warnLegacyEnvAlias) {
-      console.warn('Warning: RLM_SYMBOLIC_COLLAB is a legacy alias; prefer RLM_SYMBOLIC_MULTI_AGENT.');
+  await runStartCliRequestShell({
+    orchestrator,
+    positionals,
+    flags,
+    runWithUi: async (format, action) => await withRunUi(flags, format, action),
+    emitRunOutput,
+    maybeCaptureAutoIssueLog,
+    resolveTaskFilter,
+    withAutoIssueLogContext,
+    maybeEmitRunAdoptionHint,
+    resolveExecutionModeFlag,
+    resolveRuntimeModeFlag,
+    applyRepoConfigRequiredPolicy,
+    resolveAutoIssueLogEnabled,
+    resolveTargetStageId,
+    readStringFlag,
+    shouldWarnLegacyMultiAgentEnv: (requestFlags) => shouldWarnLegacyMultiAgentEnv(requestFlags, process.env),
+    applyRlmEnvOverrides,
+    resolveRlmTaskId,
+    setTaskEnvironment: (taskId) => {
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+    },
+    log: (line) => console.log(line),
+    warn: (line) => console.warn(line),
+    setExitCode: (code) => {
+      process.exitCode = code;
     }
-  }
-  let taskIdOverride = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
-  try {
-    await withRunUi(flags, format, async (runEvents) => {
-      if (pipelineId === 'rlm') {
-        taskIdOverride = resolveRlmTaskId(taskIdOverride);
-        process.env.MCP_RUNNER_TASK_ID = taskIdOverride;
-        if (format !== 'json') {
-          console.log(`Task: ${taskIdOverride}`);
-        }
-      }
-      const result = await orchestrator.start({
-        pipelineId,
-        taskId: taskIdOverride,
-        parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-        approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-        targetStageId: resolveTargetStageId(flags),
-        executionMode,
-        runtimeMode,
-        runEvents
-      });
-      const issueLogCapture =
-        result.manifest.status !== 'succeeded'
-          ? await maybeCaptureAutoIssueLog({
-              enabled: autoIssueLogEnabled,
-              issueTitle: `Auto issue log: start ${pipelineId ?? 'diagnostics'} failed`,
-              issueNotes: `Automatic failure capture for run ${result.manifest.run_id} (${result.manifest.status}).`,
-              taskFilter: resolveTaskFilter(result.manifest.task_id, taskIdOverride)
-            })
-          : { issueLog: null, issueLogError: null };
-      emitRunOutput(result, format, 'Run started', issueLogCapture);
-      if (result.manifest.status === 'failed' || result.manifest.status === 'cancelled') {
-        process.exitCode = 1;
-      }
-      if (result.manifest.status === 'succeeded' && result.manifest.pipeline_id !== 'rlm') {
-        await maybeEmitRunAdoptionHint({
-          format,
-          taskFilter: resolveTaskFilter(result.manifest.task_id, taskIdOverride)
-        });
-      }
-    });
-  } catch (error) {
-    const issueLogCapture = await maybeCaptureAutoIssueLog({
-      enabled: autoIssueLogEnabled,
-      issueTitle: `Auto issue log: start ${pipelineId ?? 'diagnostics'} failed before run manifest`,
-      issueNotes: 'Automatic failure capture for start setup failure before run manifest creation.',
-      taskFilter: resolveTaskFilter(undefined, taskIdOverride)
-    });
-    throw withAutoIssueLogContext(error, issueLogCapture);
-  }
+  });
 }
 
 async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const devtools = Boolean(flags['devtools']);
-  const runtimeMode = resolveRuntimeModeFlag(flags);
-  applyRepoConfigRequiredPolicy(flags);
-  if (positionals.length > 0) {
-    console.error(`[frontend-test] ignoring extra arguments: ${positionals.join(' ')}`);
+  if (isHelpRequest(positionals, flags)) {
+    printFrontendTestHelp();
+    return;
   }
-
-  const originalDevtools = process.env.CODEX_REVIEW_DEVTOOLS;
-  if (devtools) {
-    process.env.CODEX_REVIEW_DEVTOOLS = '1';
-  }
-
-  try {
-    await withRunUi(flags, format, async (runEvents) => {
-      const result = await orchestrator.start({
-        pipelineId: 'frontend-testing',
-        taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
-        parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-        approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-        targetStageId: resolveTargetStageId(flags),
-        runtimeMode,
-        runEvents
-      });
-      emitRunOutput(result, format, 'Run started');
-      if (result.manifest.status === 'failed' || result.manifest.status === 'cancelled') {
-        process.exitCode = 1;
-      }
-    });
-  } finally {
-    if (devtools) {
-      if (originalDevtools === undefined) {
-        delete process.env.CODEX_REVIEW_DEVTOOLS;
-      } else {
-        process.env.CODEX_REVIEW_DEVTOOLS = originalDevtools;
-      }
-    }
-  }
+  await runFrontendTestCliRequestShell({
+    orchestrator,
+    positionals,
+    flags,
+    resolveRuntimeModeFlag,
+    applyRepoConfigRequiredPolicy,
+    resolveTargetStageId,
+    runWithUi: async (format, action) => await withRunUi(flags, format, action),
+    emitRunOutput,
+    warn: (line) => console.error(line)
+  });
 }
 
 async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
@@ -880,198 +591,23 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
     printFlowHelp();
     return;
   }
-  if (positionals.length > 0) {
-    throw new Error(`flow does not accept positional arguments: ${positionals.join(' ')}`);
-  }
-
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const executionMode = resolveExecutionModeFlag(flags);
-  const runtimeMode = resolveRuntimeModeFlag(flags);
-  applyRepoConfigRequiredPolicy(flags);
-  const autoIssueLogEnabled = resolveAutoIssueLogEnabled(flags);
-  const taskId = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
-  const parentRunId = typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined;
-  const approvalPolicy = typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined;
-  const targetStageId = resolveTargetStageId(flags);
-  try {
-    const { docsReviewTargetStageId, implementationGateTargetStageId } =
-      await resolveFlowTargetStageSelection(orchestrator, taskId, targetStageId);
-
-    await withRunUi(flags, format, async (runEvents) => {
-      const docsReviewResult = await orchestrator.start({
-        pipelineId: 'docs-review',
-        taskId,
-        parentRunId,
-        approvalPolicy,
-        targetStageId: docsReviewTargetStageId,
-        executionMode,
-        runtimeMode,
-        runEvents
-      });
-      const docsPayload = toRunOutputPayload(docsReviewResult);
-      if (format === 'text') {
-        emitRunOutput(docsReviewResult, format, 'Docs-review run');
-      }
-
-      if (docsReviewResult.manifest.status !== 'succeeded') {
-        const issueLogCapture = await maybeCaptureAutoIssueLog({
-          enabled: autoIssueLogEnabled,
-          issueTitle: 'Auto issue log: flow docs-review failed',
-          issueNotes: `Automatic failure capture for docs-review run ${docsReviewResult.manifest.run_id} (${docsReviewResult.manifest.status}).`,
-          taskFilter: resolveTaskFilter(docsReviewResult.manifest.task_id, taskId)
-        });
-        process.exitCode = 1;
-        if (format === 'json') {
-          const payload: FlowOutputPayload = {
-            status: docsReviewResult.manifest.status,
-            failed_stage: 'docs-review',
-            docs_review: docsPayload,
-            implementation_gate: null,
-            issue_log: issueLogCapture.issueLog,
-            issue_log_error: issueLogCapture.issueLogError
-          };
-          console.log(JSON.stringify(payload, null, 2));
-        } else {
-          console.log('Flow halted: docs-review failed.');
-          if (issueLogCapture.issueLog) {
-            for (const line of formatDoctorIssueLogSummary(issueLogCapture.issueLog)) {
-              console.log(line);
-            }
-          }
-          if (issueLogCapture.issueLogError) {
-            console.log(`Auto issue log: failed (${issueLogCapture.issueLogError})`);
-          }
-        }
-        return;
-      }
-
-      const implementationGateResult = await orchestrator.start({
-        pipelineId: 'implementation-gate',
-        taskId,
-        parentRunId: docsReviewResult.manifest.run_id,
-        approvalPolicy,
-        targetStageId: implementationGateTargetStageId,
-        executionMode,
-        runtimeMode,
-        runEvents
-      });
-      const implementationPayload = toRunOutputPayload(implementationGateResult);
-      const issueLogCapture =
-        implementationGateResult.manifest.status !== 'succeeded'
-          ? await maybeCaptureAutoIssueLog({
-              enabled: autoIssueLogEnabled,
-              issueTitle: 'Auto issue log: flow implementation-gate failed',
-              issueNotes: `Automatic failure capture for implementation-gate run ${implementationGateResult.manifest.run_id} (${implementationGateResult.manifest.status}).`,
-              taskFilter: resolveTaskFilter(implementationGateResult.manifest.task_id, taskId)
-            })
-          : { issueLog: null, issueLogError: null };
-
-      if (format === 'json') {
-        const payload: FlowOutputPayload = {
-          status: implementationGateResult.manifest.status,
-          failed_stage: implementationGateResult.manifest.status === 'succeeded' ? null : 'implementation-gate',
-          docs_review: docsPayload,
-          implementation_gate: implementationPayload,
-          issue_log: issueLogCapture.issueLog,
-          issue_log_error: issueLogCapture.issueLogError
-        };
-        console.log(JSON.stringify(payload, null, 2));
-        if (implementationGateResult.manifest.status !== 'succeeded') {
-          process.exitCode = 1;
-        }
-        return;
-      }
-
-      emitRunOutput(implementationGateResult, format, 'Implementation-gate run');
-      if (implementationGateResult.manifest.status !== 'succeeded') {
-        process.exitCode = 1;
-        console.log('Flow halted: implementation-gate failed.');
-        if (issueLogCapture.issueLog) {
-          for (const line of formatDoctorIssueLogSummary(issueLogCapture.issueLog)) {
-            console.log(line);
-          }
-        }
-        if (issueLogCapture.issueLogError) {
-          console.log(`Auto issue log: failed (${issueLogCapture.issueLogError})`);
-        }
-        return;
-      }
-      console.log('Flow complete: docs-review -> implementation-gate.');
-      await maybeEmitRunAdoptionHint({
-        format,
-        taskFilter: resolveTaskFilter(implementationGateResult.manifest.task_id, taskId)
-      });
-    });
-  } catch (error) {
-    const issueLogCapture = await maybeCaptureAutoIssueLog({
-      enabled: autoIssueLogEnabled,
-      issueTitle: 'Auto issue log: flow failed before run manifest',
-      issueNotes: 'Automatic failure capture for flow setup failure before run manifest creation.',
-      taskFilter: resolveTaskFilter(undefined, taskId)
-    });
-    throw withAutoIssueLogContext(error, issueLogCapture);
-  }
-}
-
-interface ExternalReviewRunner {
-  command: string;
-  args: string[];
-}
-
-function runningFromSourceRuntime(): boolean {
-  return fileURLToPath(import.meta.url).endsWith('.ts');
-}
-
-function resolveReviewRunner(): ExternalReviewRunner {
-  const packageRoot = findPackageRoot(import.meta.url);
-  const sourceRunner = join(packageRoot, 'scripts', 'run-review.ts');
-  const distRunner = join(packageRoot, 'dist', 'scripts', 'run-review.js');
-
-  if (runningFromSourceRuntime() && existsSync(sourceRunner)) {
-    return {
-      command: process.execPath,
-      args: ['--loader', 'ts-node/esm', sourceRunner]
-    };
-  }
-
-  if (existsSync(distRunner)) {
-    return {
-      command: process.execPath,
-      args: [distRunner]
-    };
-  }
-
-  if (existsSync(sourceRunner)) {
-    return {
-      command: process.execPath,
-      args: ['--loader', 'ts-node/esm', sourceRunner]
-    };
-  }
-
-  throw new Error(
-    'Unable to locate review runner. Expected dist/scripts/run-review.js (npm) or scripts/run-review.ts (source checkout).'
-  );
-}
-
-async function runPassthroughCommand(
-  command: string,
-  args: string[],
-  options: { env?: NodeJS.ProcessEnv; cwd?: string } = {}
-): Promise<number> {
-  return await new Promise<number>((resolve, reject) => {
-    const child = spawn(command, args, {
-      env: options.env ?? process.env,
-      cwd: options.cwd ?? process.cwd(),
-      stdio: 'inherit'
-    });
-    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('close', (code, signal) => {
-      if (signal) {
-        resolve(1);
-        return;
-      }
-      resolve(typeof code === 'number' ? code : 1);
-    });
+  await runFlowCliRequestShell({
+    orchestrator,
+    positionals,
+    flags,
+    runWithUi: async (format, action) => await withRunUi(flags, format, action),
+    emitRunOutput,
+    formatIssueLogSummary: formatDoctorIssueLogSummary,
+    toRunOutputPayload,
+    maybeCaptureAutoIssueLog,
+    resolveTaskFilter,
+    withAutoIssueLogContext,
+    maybeEmitRunAdoptionHint,
+    resolveExecutionModeFlag,
+    resolveRuntimeModeFlag,
+    applyRepoConfigRequiredPolicy,
+    resolveAutoIssueLogEnabled,
+    resolveTargetStageId
   });
 }
 
@@ -1081,12 +617,7 @@ async function handleReview(rawArgs: string[]): Promise<void> {
     printReviewHelp();
     return;
   }
-
-  const runner = resolveReviewRunner();
-  const exitCode = await runPassthroughCommand(runner.command, [...runner.args, ...rawArgs], {
-    cwd: process.cwd(),
-    env: process.env
-  });
+  const exitCode = await runReviewCliLaunchShell({ rawArgs });
   if (exitCode !== 0) {
     process.exitCode = exitCode;
   }
@@ -1101,16 +632,13 @@ async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): P
   applyRepoConfigRequiredPolicy(flags);
   const pipelineId = positionals[0];
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const result = await orchestrator.plan({
+  await runPlanCliShell({
+    orchestrator,
     pipelineId,
     taskId: typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined,
-    targetStageId: resolveTargetStageId(flags)
+    targetStageId: resolveTargetStageId(flags),
+    format
   });
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-  process.stdout.write(`${formatPlanPreview(result)}\n`);
 }
 
 async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
@@ -1119,78 +647,37 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
     printRlmHelp();
     return;
   }
-  const runtimeMode = resolveRuntimeModeFlag(flags);
-  applyRepoConfigRequiredPolicy(flags);
-  const goalFromArgs = positionals.length > 0 ? positionals.join(' ') : undefined;
-  const goal = goalFromArgs ?? readStringFlag(flags, 'goal') ?? process.env.RLM_GOAL?.trim();
-  if (!goal) {
-    throw new Error('rlm requires a goal. Use: codex-orchestrator rlm \"<goal>\".');
-  }
-
-  const taskFlag = typeof flags['task'] === 'string' ? (flags['task'] as string) : undefined;
-  const taskId = resolveRlmTaskId(taskFlag);
-  process.env.MCP_RUNNER_TASK_ID = taskId;
-  const warnLegacyEnvAlias = shouldWarnLegacyMultiAgentEnv(flags, process.env);
-  applyRlmEnvOverrides(flags, goal);
-  if (warnLegacyEnvAlias) {
-    console.warn('Warning: RLM_SYMBOLIC_COLLAB is a legacy alias; prefer RLM_SYMBOLIC_MULTI_AGENT.');
-  }
-
-  console.log(`Task: ${taskId}`);
-
-  const collabUserChoice =
-    flags['collab'] !== undefined ||
-    flags['multi-agent'] !== undefined ||
-    process.env.RLM_SYMBOLIC_COLLAB !== undefined ||
-    process.env.RLM_SYMBOLIC_MULTI_AGENT !== undefined;
-  if (!collabUserChoice) {
-    const doctor = runDoctor();
-    if (doctor.collab.status === 'ok') {
-      console.log(
-        'Tip: multi-agent collab is enabled. Try: codex-orchestrator rlm --multi-agent auto \"<goal>\" (legacy: --collab auto).'
-      );
-    } else if (doctor.collab.status === 'disabled') {
-      console.log(
-        'Tip: multi-agent collab is available but disabled. Enable with: codex features enable multi_agent (legacy alias: collab).'
-      );
-    }
-  }
-
-  let startResult: { manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null } } | null = null;
-  await withRunUi(flags, 'text', async (runEvents) => {
-    startResult = await orchestrator.start({
-      pipelineId: 'rlm',
-      taskId,
-      parentRunId: typeof flags['parent-run'] === 'string' ? (flags['parent-run'] as string) : undefined,
-      approvalPolicy: typeof flags['approval-policy'] === 'string' ? (flags['approval-policy'] as string) : undefined,
-      runtimeMode,
-      runEvents
-    });
-    emitRunOutput(startResult, 'text', 'Run started');
+  await runRlmCliRequestShell({
+    orchestrator,
+    positionals,
+    flags,
+    env: process.env,
+    runWithUi: async (action) => await withRunUi(flags, 'text', action),
+    emitRunOutput,
+    resolveRuntimeModeFlag,
+    applyRepoConfigRequiredPolicy,
+    readStringFlag,
+    applyRlmEnvOverrides,
+    shouldWarnLegacyEnvAlias: shouldWarnLegacyMultiAgentEnv,
+    resolveRlmTaskId,
+    setTaskEnvironment: (taskId) => {
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+    },
+    runDoctor,
+    resolveRepoRoot: () => resolveEnvironmentPaths().repoRoot,
+    runCompletionShell: async ({ repoRoot, artifactRoot }) =>
+      await runRlmCompletionCliShell({
+        repoRoot,
+        artifactRoot,
+        log: (line) => console.log(line),
+        error: (line) => console.error(line),
+        setExitCode: (code) => {
+          process.exitCode = code;
+        }
+      }),
+    log: (line) => console.log(line),
+    warn: (line) => console.warn(line)
   });
-
-  if (!startResult) {
-    throw new Error('rlm run failed to start.');
-  }
-
-  const resolvedStart = startResult as {
-    manifest: { run_id: string; status: string; artifact_root: string; log_path: string | null };
-  };
-  const { repoRoot } = resolveEnvironmentPaths();
-  const manifestPath = join(repoRoot, resolvedStart.manifest.artifact_root, 'manifest.json');
-  const manifest = await waitForManifestCompletion(manifestPath);
-  const statePath = join(repoRoot, resolvedStart.manifest.artifact_root, 'rlm', 'state.json');
-  const rlmState = await readRlmState(statePath);
-
-  if (rlmState) {
-    console.log(`RLM status: ${rlmState.status}`);
-    process.exitCode = rlmState.exitCode;
-    return;
-  }
-
-  console.log(`RLM status: ${manifest.status}`);
-  console.error('RLM state file missing; treating as internal error.');
-  process.exitCode = 10;
 }
 
 async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]): Promise<void> {
@@ -1206,17 +693,17 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
     throw new Error('resume requires --run <run-id>.');
   }
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  await withRunUi(flags, format, async (runEvents) => {
-    const result = await orchestrator.resume({
-      runId,
-      resumeToken: typeof flags['token'] === 'string' ? (flags['token'] as string) : undefined,
-      actor: typeof flags['actor'] === 'string' ? (flags['actor'] as string) : undefined,
-      reason: typeof flags['reason'] === 'string' ? (flags['reason'] as string) : undefined,
-      targetStageId: resolveTargetStageId(flags),
-      runtimeMode,
-      runEvents
-    });
-    emitRunOutput(result, format, 'Run resumed');
+  await runResumeCliShell({
+    orchestrator,
+    runId,
+    format,
+    runtimeMode,
+    resumeToken: typeof flags['token'] === 'string' ? (flags['token'] as string) : undefined,
+    actor: typeof flags['actor'] === 'string' ? (flags['actor'] as string) : undefined,
+    reason: typeof flags['reason'] === 'string' ? (flags['reason'] as string) : undefined,
+    targetStageId: resolveTargetStageId(flags),
+    runWithUi: async (action) => await withRunUi(flags, format, action),
+    emitRunOutput
   });
 }
 
@@ -1233,18 +720,7 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
   const watch = Boolean(flags['watch']);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const interval = parseInt((flags['interval'] as string | undefined) ?? '10', 10);
-  if (!watch) {
-    await orchestrator.status({ runId, format });
-    return;
-  }
-  const terminal = new Set(['succeeded', 'failed', 'cancelled']);
-  while (true) {
-    const manifest = await orchestrator.status({ runId, format });
-    if (terminal.has(manifest.status)) {
-      break;
-    }
-    await new Promise((resolve) => setTimeout(resolve, interval * 1000));
-  }
+  await runStatusCliShell({ orchestrator, runId, watch, format, interval });
 }
 
 async function maybeStartHud(
@@ -1394,57 +870,10 @@ function toRunOutputPayload(
   };
 }
 
-interface ParsedExecArgs {
-  commandTokens: string[];
-  notifyTargets: string[];
-  otelEndpoint: string | null;
-  requestedMode: ExecOutputMode | null;
-  jsonPretty: boolean;
-  cwd?: string;
-  taskId?: string;
-}
-
 async function handleExec(rawArgs: string[]): Promise<void> {
-  const parsed = parseExecArgs(rawArgs);
-  if (parsed.commandTokens.length === 0) {
-    throw new Error('exec requires a command to run.');
-  }
-
-  const isInteractive = process.stdout.isTTY === true && process.stderr.isTTY === true;
-  const outputMode: ExecOutputMode =
-    parsed.requestedMode ?? (isInteractive ? 'interactive' : 'jsonl');
-
-  const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
-  if (parsed.taskId) {
-    env.taskId = sanitizeTaskId(parsed.taskId);
-  }
-
-  const context = {
-    env,
-    stdout: process.stdout,
-    stderr: process.stderr
-  };
-
-  const invocation = {
-    command: parsed.commandTokens[0]!,
-    args: parsed.commandTokens.slice(1),
-    cwd: parsed.cwd,
-    outputMode,
-    notifyTargets: parsed.notifyTargets,
-    otelEndpoint: parsed.otelEndpoint,
-    jsonPretty: parsed.jsonPretty
-  };
-
-  const result = await executeExecCommand(context, invocation);
-  if (result.exitCode !== null) {
-    process.exitCode = result.exitCode;
-  } else if (result.status !== 'succeeded') {
-    process.exitCode = 1;
-  }
-
-  if (outputMode === 'interactive') {
-    await maybeEmitExecAdoptionHint(env.taskId);
-  }
+  await runExecCliShell(parseExecArgs(rawArgs), {
+    maybeEmitAdoptionHint: maybeEmitExecAdoptionHint
+  });
 }
 
 async function shouldScanAdoptionHint(taskFilter: string | null | undefined): Promise<boolean> {
@@ -1506,16 +935,11 @@ async function maybeEmitExecAdoptionHint(taskFilter: string | null | undefined):
 async function handleSelfCheck(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const result = buildSelfCheckResult();
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-  console.log(`Status: ${result.status}`);
-  console.log(`Name: ${result.name}`);
-  console.log(`Version: ${result.version}`);
-  console.log(`Node: ${result.node}`);
-  console.log(`Timestamp: ${result.timestamp}`);
+  await runSelfCheckCliShell({
+    format,
+    buildResult: buildSelfCheckResult,
+    log: (line) => console.log(line)
+  });
 }
 
 async function handleInit(rawArgs: string[]): Promise<void> {
@@ -1524,474 +948,42 @@ async function handleInit(rawArgs: string[]): Promise<void> {
     printInitHelp();
     return;
   }
-  const template = positionals[0];
-  if (!template) {
-    throw new Error('init requires a template name (e.g. init codex).');
-  }
-  if (template !== 'codex') {
-    throw new Error(`Unknown init template: ${template}`);
-  }
-  const cwd = typeof flags['cwd'] === 'string' ? (flags['cwd'] as string) : process.cwd();
-  const force = Boolean(flags['force']);
-  const result = await initCodexTemplates({ template, cwd, force });
-  const summary = formatInitSummary(result, cwd);
-  for (const line of summary) {
-    console.log(line);
-  }
-
-  if (flags['codex-cli'] === true) {
-    const apply = Boolean(flags['yes']);
-    const source = readStringFlag(flags, 'codex-source');
-    const ref = readStringFlag(flags, 'codex-ref');
-    const downloadUrl = readStringFlag(flags, 'codex-download-url');
-    const downloadSha256 = readStringFlag(flags, 'codex-download-sha256');
-    const cliForce = Boolean(flags['codex-force']);
-    const setupResult = await runCodexCliSetup({
-      apply,
-      force: cliForce,
-      source,
-      ref,
-      downloadUrl,
-      downloadSha256
-    });
-    for (const line of formatCodexCliSetupSummary(setupResult)) {
-      console.log(line);
-    }
-  }
+  await runInitCliShell({ positionals, flags });
 }
 
 async function handleSetup(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
-    console.log(`Usage: codex-orchestrator setup [--yes] [--refresh-skills] [--format json]
-
-One-shot bootstrap for downstream users. Installs bundled skills and configures
-delegation + DevTools MCP wiring.
-
-Options:
-  --yes                 Apply setup (otherwise plan only).
-  --refresh-skills      Overwrite bundled skills in $CODEX_HOME/skills during setup.
-  --repo <path>         Repo root for delegation wiring (default cwd).
-  --format json         Emit machine-readable output (dry-run only).
-`);
+    printSetupCliHelp();
     return;
   }
 
-  const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const apply = Boolean(flags['yes']);
-  const refreshSkills = Boolean(flags['refresh-skills']);
-  if (format === 'json' && apply) {
-    throw new Error('setup does not support --format json with --yes.');
-  }
-
-  const repoFlag = readStringFlag(flags, 'repo');
-  const repoRoot = repoFlag ?? process.cwd();
-  const delegationCommandPreview = repoFlag
-    ? buildCommandPreview('codex-orchestrator', ['delegation', 'setup', '--yes', '--repo', repoFlag])
-    : 'codex-orchestrator delegation setup --yes';
-  const bundledSkills = await listBundledSkills();
-  if (bundledSkills.length === 0) {
-    throw new Error('No bundled skills detected; cannot run setup.');
-  }
-  const guidance = buildSetupGuidance();
-
-  if (!apply) {
-    const installCommand = `codex-orchestrator skills install ${refreshSkills ? '--force ' : ''}--only ${bundledSkills.join(',')}`;
-    const skillsNote = refreshSkills
-      ? 'Installs bundled skills into $CODEX_HOME/skills with overwrite enabled via --refresh-skills.'
-      : 'Installs bundled skills into $CODEX_HOME/skills without overwriting existing files by default. Add --refresh-skills to force overwrite.';
-
-    const delegation = await runDelegationSetup({ repoRoot });
-    const devtools = await runDevtoolsSetup();
-    const payload = {
-      status: 'planned' as const,
-      steps: {
-        skills: {
-          commandLines: [installCommand],
-          note: skillsNote
-        },
-        delegation,
-        devtools,
-        guidance
-      }
-    };
-
-    if (format === 'json') {
-      console.log(JSON.stringify(payload, null, 2));
-      return;
-    }
-
-    console.log('Setup plan:');
-    console.log('- Skills:');
-    for (const commandLine of payload.steps.skills.commandLines) {
-      console.log(`  - ${commandLine}`);
-    }
-    console.log(`- Delegation: ${delegationCommandPreview}`);
-    console.log('- DevTools: codex-orchestrator devtools setup --yes');
-    for (const line of formatSetupGuidanceSummary(guidance)) {
-      console.log(line);
-    }
-    console.log('Run with --yes to apply this setup.');
-    return;
-  }
-
-  const skills = await installSkills({ force: refreshSkills, only: bundledSkills });
-  const delegation = await runDelegationSetup({ apply: true, repoRoot });
-  const devtools = await runDevtoolsSetup({ apply: true });
-
-  for (const line of formatSkillsInstallSummary(skills)) {
-    console.log(line);
-  }
-  for (const line of formatDelegationSetupSummary(delegation)) {
-    console.log(line);
-  }
-  for (const line of formatDevtoolsSetupSummary(devtools)) {
-    console.log(line);
-  }
-  for (const line of formatSetupGuidanceSummary(guidance)) {
-    console.log(line);
-  }
-  console.log('Next: codex-orchestrator doctor --usage');
-}
-
-function buildSetupGuidance(): SetupGuidancePayload {
-  return {
-    note: 'Agent-first default: run docs-review before implementation and implementation-gate before handoff.',
-    references: [
-      'https://github.com/Kbediako/CO#downstream-usage-cheatsheet-agent-first',
-      'https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md',
-      'https://github.com/Kbediako/CO/blob/main/docs/guides/collab-vs-mcp.md',
-      'https://github.com/Kbediako/CO/blob/main/docs/guides/rlm-recursion-v2.md'
-    ],
-    recommended_commands: [
-      'codex-orchestrator flow --task <task-id>',
-      'codex-orchestrator doctor --usage',
-      'codex-orchestrator rlm --multi-agent auto "<goal>"',
-      'codex-orchestrator codex defaults --yes',
-      'codex-orchestrator mcp enable --servers delegation --yes'
-    ]
-  };
-}
-
-function formatSetupGuidanceSummary(guidance: SetupGuidancePayload): string[] {
-  const lines: string[] = ['Setup guidance:', `- ${guidance.note}`];
-  if (guidance.recommended_commands.length > 0) {
-    lines.push('- Recommended commands:');
-    for (const command of guidance.recommended_commands) {
-      lines.push(`  - ${command}`);
-    }
-  }
-  if (guidance.references.length > 0) {
-    lines.push('- References:');
-    for (const reference of guidance.references) {
-      lines.push(`  - ${reference}`);
-    }
-  }
-  return lines;
+  await runSetupCliShell({ flags });
 }
 
 async function handleDoctor(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const includeUsage = Boolean(flags['usage']);
-  const includeCloudPreflight = Boolean(flags['cloud-preflight']);
-  const includeIssueLog = Boolean(flags['issue-log']);
-  const cloudEnvIdOverride = readStringFlag(flags, 'cloud-env-id');
-  const cloudBranchOverride = readStringFlag(flags, 'cloud-branch');
-  const issueTitle = readStringFlag(flags, 'issue-title');
-  const issueNotes = readStringFlag(flags, 'issue-notes');
-  const issueLogPath = readStringFlag(flags, 'issue-log-path');
-  if (!includeCloudPreflight && (cloudEnvIdOverride || cloudBranchOverride)) {
-    throw new Error('--cloud-env-id/--cloud-branch require --cloud-preflight.');
-  }
-  if (!includeIssueLog && (issueTitle || issueNotes || issueLogPath)) {
-    throw new Error('--issue-title/--issue-notes/--issue-log-path require --issue-log.');
-  }
-  const wantsApply = Boolean(flags['apply']);
-  const apply = Boolean(flags['yes']);
-  if (wantsApply && format === 'json') {
-    throw new Error('doctor --apply does not support --format json.');
-  }
-  const windowDaysRaw = readStringFlag(flags, 'window-days');
-  let windowDays: number | undefined = undefined;
-  if (windowDaysRaw) {
-    if (!/^\d+$/u.test(windowDaysRaw)) {
-      throw new Error(`Invalid --window-days value '${windowDaysRaw}'. Expected a positive integer.`);
-    }
-    const parsed = Number(windowDaysRaw);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      throw new Error(`Invalid --window-days value '${windowDaysRaw}'. Expected a positive integer.`);
-    }
-    windowDays = parsed;
-  }
-  const taskFilter = readStringFlag(flags, 'task') ?? null;
-
-  const doctorResult = runDoctor();
-  const usageResult = includeUsage ? await runDoctorUsage({ windowDays, taskFilter }) : null;
-  const cloudPreflightResult = includeCloudPreflight
-    ? await runDoctorCloudPreflight({
-        cwd: process.cwd(),
-        environmentId: cloudEnvIdOverride,
-        branch: cloudBranchOverride,
-        taskId: taskFilter
-      })
-    : null;
-  const issueLogResult = includeIssueLog
-    ? await writeDoctorIssueLog({
-        doctor: doctorResult,
-        usage: usageResult,
-        cloudPreflight: cloudPreflightResult,
-        issueTitle,
-        issueNotes,
-        issueLogPath,
-        taskFilter
-      })
-    : null;
-
-  if (format === 'json') {
-    const payload: Record<string, unknown> = { ...doctorResult };
-    if (usageResult) {
-      payload.usage = usageResult;
-    }
-    if (cloudPreflightResult) {
-      payload.cloud_preflight = cloudPreflightResult;
-    }
-    if (issueLogResult) {
-      payload.issue_log = issueLogResult;
-    }
-    console.log(JSON.stringify(payload, null, 2));
-    return;
-  }
-
-  for (const line of formatDoctorSummary(doctorResult)) {
-    console.log(line);
-  }
-  if (usageResult) {
-    for (const line of formatDoctorUsageSummary(usageResult)) {
-      console.log(line);
-    }
-  }
-  if (cloudPreflightResult) {
-    for (const line of formatDoctorCloudPreflightSummary(cloudPreflightResult)) {
-      console.log(line);
-    }
-  }
-  if (issueLogResult) {
-    for (const line of formatDoctorIssueLogSummary(issueLogResult)) {
-      console.log(line);
-    }
-  }
-
-  if (!wantsApply) {
-    return;
-  }
-
-  const repoRoot = process.cwd();
-  const delegationPlan = await runDelegationSetup({ repoRoot });
-  const devtoolsPlan = await runDevtoolsSetup();
-  const needsDelegation = !delegationPlan.readiness.configured;
-  const needsDevtoolsSkill = devtoolsPlan.readiness.skill.status !== 'ok';
-  const devtoolsConfigStatus = devtoolsPlan.readiness.config.status;
-  const needsDevtoolsConfig = devtoolsConfigStatus === 'missing';
-  const hasInvalidDevtoolsConfig = devtoolsConfigStatus === 'invalid';
-
-  if (!needsDelegation && !needsDevtoolsSkill && !needsDevtoolsConfig && !hasInvalidDevtoolsConfig) {
-    console.log('Doctor apply: nothing to do.');
-    return;
-  }
-
-  console.log('Doctor apply plan:');
-  if (needsDevtoolsSkill) {
-    console.log('- Install skill: chrome-devtools (codex-orchestrator skills install --only chrome-devtools)');
-  }
-  if (hasInvalidDevtoolsConfig) {
-    console.log(
-      `- DevTools MCP config is invalid: ${devtoolsPlan.readiness.config.path} (fix config.toml then rerun doctor --apply)`
-    );
-  }
-  if (needsDevtoolsConfig) {
-    console.log('- Configure DevTools MCP: codex-orchestrator devtools setup --yes');
-  }
-  if (needsDelegation) {
-    console.log('- Configure delegation MCP: codex-orchestrator delegation setup --yes');
-  }
-
-  if (!apply) {
-    console.log('Run with --apply --yes to apply these fixes.');
-    return;
-  }
-
-  if (needsDevtoolsSkill) {
-    const skills = await installSkills({ only: ['chrome-devtools'] });
-    for (const line of formatSkillsInstallSummary(skills)) {
-      console.log(line);
-    }
-  }
-  if (needsDelegation) {
-    const delegation = await runDelegationSetup({ apply: true, repoRoot });
-    for (const line of formatDelegationSetupSummary(delegation)) {
-      console.log(line);
-    }
-  }
-  if (hasInvalidDevtoolsConfig) {
-    console.log(
-      `DevTools setup: skipped (config.toml is invalid: ${devtoolsPlan.readiness.config.path}). Fix it and rerun doctor --apply --yes.`
-    );
-  } else if (needsDevtoolsConfig) {
-    const devtools = await runDevtoolsSetup({ apply: true });
-    for (const line of formatDevtoolsSetupSummary(devtools)) {
-      console.log(line);
-    }
-  }
-
-  const doctorAfter = runDoctor();
-  for (const line of formatDoctorSummary(doctorAfter)) {
-    console.log(line);
-  }
+  await runDoctorCliRequestShell({ flags });
 }
 
 async function handleDevtools(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const subcommand = positionals.shift();
-  if (!subcommand) {
-    throw new Error('devtools requires a subcommand (setup).');
-  }
-  if (subcommand !== 'setup') {
-    throw new Error(`Unknown devtools subcommand: ${subcommand}`);
-  }
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const apply = Boolean(flags['yes']);
-  if (format === 'json' && apply) {
-    throw new Error('devtools setup does not support --format json with --yes.');
-  }
-  const result = await runDevtoolsSetup({ apply });
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-  const summary = formatDevtoolsSetupSummary(result);
-  for (const line of summary) {
-    console.log(line);
-  }
+  await runDevtoolsCliShell({ positionals, flags });
 }
 
 async function handleDelegation(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const subcommand = positionals.shift();
-  if (!subcommand) {
-    throw new Error('delegation requires a subcommand (setup).');
-  }
-  if (subcommand !== 'setup') {
-    throw new Error(`Unknown delegation subcommand: ${subcommand}`);
-  }
-
-  const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-  const apply = Boolean(flags['yes']);
-  if (format === 'json' && apply) {
-    throw new Error('delegation setup does not support --format json with --yes.');
-  }
-
-  const repoRoot = readStringFlag(flags, 'repo') ?? process.cwd();
-  const result = await runDelegationSetup({ apply, repoRoot });
-
-  if (format === 'json') {
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-  for (const line of formatDelegationSetupSummary(result)) {
-    console.log(line);
-  }
+  await runDelegationCliShell({ positionals, flags });
 }
 
 async function handleCodex(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const subcommand = positionals.shift();
-  if (flags['help'] === true || flags['--help'] === true || flags['h'] === true || !subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
-    printCodexHelp();
-    return;
-  }
-  if (subcommand === 'setup') {
-    const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-    const apply = Boolean(flags['yes']);
-    const source = readStringFlag(flags, 'source');
-    const ref = readStringFlag(flags, 'ref');
-    const downloadUrl = readStringFlag(flags, 'download-url');
-    const downloadSha256 = readStringFlag(flags, 'download-sha256');
-    const force = Boolean(flags['force']);
-    const result = await runCodexCliSetup({
-      apply,
-      force,
-      source,
-      ref,
-      downloadUrl,
-      downloadSha256
-    });
-    if (format === 'json') {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-    const summary = formatCodexCliSetupSummary(result);
-    for (const line of summary) {
-      console.log(line);
-    }
-    return;
-  }
-
-  if (subcommand === 'defaults') {
-    const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-    const apply = Boolean(flags['yes']);
-    const force = Boolean(flags['force']);
-    const result = await runCodexDefaultsSetup({
-      apply,
-      force
-    });
-    if (format === 'json') {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-    const summary = formatCodexDefaultsSetupSummary(result);
-    for (const line of summary) {
-      console.log(line);
-    }
-    return;
-  }
-
-  throw new Error(`Unknown codex subcommand: ${subcommand}`);
+  await runCodexCliShell({ positionals, flags, printHelp: printCodexHelp });
 }
 
 async function handleSkills(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  const subcommand = positionals[0];
-  const wantsHelp = flags['help'] === true || subcommand === 'help' || subcommand === '--help';
-  if (!subcommand || wantsHelp) {
-    printSkillsHelp();
-    return;
-  }
-
-  switch (subcommand) {
-    case 'install': {
-      const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
-      const force = flags['force'] === true;
-      const codexHome = readStringFlag(flags, 'codex-home');
-      const onlyRaw = flags['only'];
-      let only: string[] | undefined;
-      if (onlyRaw !== undefined) {
-        if (typeof onlyRaw !== 'string') {
-          throw new Error('--only requires a comma-separated list of skill names.');
-        }
-        only = onlyRaw.split(',').map((entry) => entry.trim()).filter(Boolean);
-      }
-      const result = await installSkills({ force, codexHome, only });
-      if (format === 'json') {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log(formatSkillsInstallSummary(result).join('\n'));
-      }
-      return;
-    }
-    default:
-      throw new Error(`Unknown skills command: ${subcommand}`);
-  }
+  await runSkillsCliShell({ positionals, flags, printHelp: printSkillsHelp });
 }
 
 async function handleMcp(rawArgs: string[]): Promise<void> {
@@ -2011,124 +1003,7 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
     return;
   }
   if (subcommand === 'enable') {
-    const allowedEnableFlags = new Set(['yes', 'format', 'servers']);
-    let yesFlag: string | boolean | undefined;
-    let formatFlag: string | boolean | undefined;
-    let serversFlag: string | boolean | undefined;
-    const unexpectedPositionals: string[] = [];
-    const enableTokens = rawArgs.slice(1);
-
-    for (let index = 0; index < enableTokens.length; index += 1) {
-      const token = enableTokens[index];
-      if (!token) {
-        continue;
-      }
-      if (token === '--') {
-        unexpectedPositionals.push(...enableTokens.slice(index + 1));
-        break;
-      }
-      if (!token.startsWith('--')) {
-        unexpectedPositionals.push(token);
-        continue;
-      }
-      const [key, inlineValue] = token.slice(2).split('=', 2);
-      if (!allowedEnableFlags.has(key)) {
-        throw new Error(`Unknown mcp enable flag: --${key}`);
-      }
-      let resolvedValue: string | boolean = true;
-      if (inlineValue !== undefined) {
-        resolvedValue = inlineValue;
-      } else {
-        const nextToken = enableTokens[index + 1];
-        if (nextToken && !nextToken.startsWith('--')) {
-          resolvedValue = nextToken;
-          index += 1;
-        }
-      }
-      if (key === 'yes') {
-        if (yesFlag !== undefined) {
-          throw new Error('--yes specified multiple times.');
-        }
-        yesFlag = resolvedValue;
-        continue;
-      }
-      if (key === 'format') {
-        if (formatFlag !== undefined) {
-          throw new Error('--format specified multiple times.');
-        }
-        formatFlag = resolvedValue;
-        continue;
-      }
-      if (serversFlag !== undefined) {
-        throw new Error('--servers specified multiple times.');
-      }
-      serversFlag = resolvedValue;
-    }
-    if (positionals.length > 0 || unexpectedPositionals.length > 0) {
-      throw new Error(
-        `mcp enable does not accept positional arguments: ${[...positionals, ...unexpectedPositionals].join(' ')}`
-      );
-    }
-
-    let apply = false;
-    if (yesFlag === true) {
-      apply = true;
-    } else if (typeof yesFlag === 'string') {
-      const normalizedYes = yesFlag.trim().toLowerCase();
-      if (normalizedYes === 'true' || normalizedYes === '1' || normalizedYes === 'yes' || normalizedYes === 'on') {
-        apply = true;
-      } else if (
-        normalizedYes === 'false'
-        || normalizedYes === '0'
-        || normalizedYes === 'no'
-        || normalizedYes === 'off'
-      ) {
-        apply = false;
-      } else {
-        throw new Error('--yes expects true/false when provided as --yes=<value>.');
-      }
-    }
-
-    let format: OutputFormat = 'text';
-    if (formatFlag !== undefined) {
-      if (formatFlag === true) {
-        throw new Error('--format requires a value of "text" or "json".');
-      }
-      if (formatFlag === 'json') {
-        format = 'json';
-      } else if (formatFlag === 'text') {
-        format = 'text';
-      } else {
-        throw new Error('--format must be "text" or "json".');
-      }
-    }
-
-    let serverNames: string[] | undefined;
-    if (serversFlag !== undefined) {
-      if (typeof serversFlag !== 'string') {
-        throw new Error('--servers must include a comma-separated list of MCP server names.');
-      }
-      serverNames = serversFlag
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0);
-      if (serverNames.length === 0) {
-        throw new Error('--servers must include a comma-separated list of MCP server names.');
-      }
-    }
-    const result = await runMcpEnable({ apply, serverNames });
-    const hasApplyFailures = apply
-      && result.actions.some((action) => action.status !== 'enabled' && action.status !== 'already_enabled');
-    if (format === 'json') {
-      console.log(JSON.stringify(result, null, 2));
-    } else {
-      for (const line of formatMcpEnableSummary(result)) {
-        console.log(line);
-      }
-    }
-    if (hasApplyFailures) {
-      process.exitCode = 1;
-    }
+    await runMcpEnableCliShell({ rawArgs: rawArgs.slice(1) });
     return;
   }
   throw new Error(`Unknown mcp subcommand: ${subcommand}`);
@@ -2139,60 +1014,19 @@ async function handlePr(rawArgs: string[]): Promise<void> {
     printPrHelp();
     return;
   }
-  const [subcommand, ...subcommandArgs] = rawArgs;
-  const modeBySubcommand: Record<string, { usage: string; defaultAutoMerge?: boolean; defaultExitOnActionRequired?: boolean }> = {
-    'watch-merge': {
-      usage: 'codex-orchestrator pr watch-merge'
-    },
-    'resolve-merge': {
-      usage: 'codex-orchestrator pr resolve-merge',
-      defaultExitOnActionRequired: true
-    }
-  };
-  const mode = modeBySubcommand[subcommand];
-  if (!mode) {
-    throw new Error(`Unknown pr subcommand: ${subcommand}`);
-  }
-  const exitCode = await runPrWatchMerge(subcommandArgs, mode);
-  if (exitCode !== 0) {
-    process.exitCode = exitCode;
-  }
+  await runPrCliShell({ rawArgs });
 }
 
 async function handleDelegationServer(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
-  if (isHelpRequest(positionals, flags)) {
-    printDelegationServerHelp();
-    return;
-  }
-  const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : process.cwd();
-  const modeFlag = typeof flags['mode'] === 'string' ? (flags['mode'] as string) : undefined;
-  const overrideFlag =
-    typeof flags['config'] === 'string'
-      ? (flags['config'] as string)
-      : typeof flags['config-override'] === 'string'
-        ? (flags['config-override'] as string)
-        : undefined;
-  const envMode = process.env.CODEX_DELEGATE_MODE?.trim();
-  const resolvedMode = modeFlag ?? envMode;
-  let mode: 'full' | 'question_only' | undefined;
-  if (resolvedMode) {
-    if (resolvedMode === 'full' || resolvedMode === 'question_only') {
-      mode = resolvedMode;
-    } else {
-      console.warn(`Invalid delegate mode "${resolvedMode}". Falling back to config default.`);
-    }
-  }
-  const configOverrides = overrideFlag
-    ? splitDelegationConfigOverrides(overrideFlag).map((value) => ({
-        source: 'cli' as const,
-        value
-      }))
-    : [];
-  await startDelegationServer({ repoRoot, mode, configOverrides });
+  await runDelegationServerCliShell({
+    positionals,
+    flags,
+    printHelp: printDelegationServerHelp
+  });
 }
 
-function parseExecArgs(rawArgs: string[]): ParsedExecArgs {
+function parseExecArgs(rawArgs: string[]): RunExecCliShellParams {
   const notifyTargets: string[] = [];
   let otelEndpoint: string | null = null;
   let requestedMode: ExecOutputMode | null = null;
@@ -2555,7 +1389,7 @@ Commands:
     Use \`codex-orchestrator pr resolve-merge --help\` for full options.
   delegate-server         Run the delegation MCP server (stdio).
     --repo <path>         Repo root for config + manifests (default cwd).
-    --mode <full|question_only>  Limit tool surface for child runs.
+    --mode <full|question_only|status_only>  Limit tool surface for child runs.
     --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   version | --version
 
@@ -2647,7 +1481,7 @@ function printDelegationServerHelp(): void {
 
 Options:
   --repo <path>                    Repo root for config + manifests (default cwd).
-  --mode <full|question_only>      Limit tool surface for child runs.
+  --mode <full|question_only|status_only>      Limit tool surface for child runs.
   --config "<key>=<value>[;...]"   Apply config overrides.
   --help                           Show this message.
 `);
@@ -2718,6 +1552,30 @@ Tips:
 `);
 }
 
+function printFrontendTestHelp(): void {
+  console.log(`Usage: codex-orchestrator frontend-test [options]
+
+Runs the frontend-testing pipeline.
+
+Options:
+  --devtools              Enable Chrome DevTools MCP for this run.
+  --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
+  --runtime-mode <cli|appserver>  Force runtime mode for this run.
+  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --parent-run <id>       Link run to parent run id.
+  --approval-policy <p>   Record approval policy metadata.
+  --format json           Emit machine-readable output.
+  --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
+  --interactive | --ui    Enable read-only HUD when running in a TTY.
+  --no-interactive        Force disable HUD.
+  --help                  Show this message.
+
+Examples:
+  codex-orchestrator frontend-test
+  codex-orchestrator frontend-test --devtools --format json
+`);
+}
+
 function printFlowHelp(): void {
   console.log(`Usage: codex-orchestrator flow [options]
 
@@ -2756,6 +1614,7 @@ Common options:
   --manifest <path>                Explicit manifest path for review evidence.
   --runs-dir <path>                Root runs directory when auto-resolving manifest.
   --task <id>                      Task id used for prompt context.
+  --surface <diff|audit|architecture>  Select review surface (default: diff).
   --uncommitted                    Review uncommitted diff scope.
   --base <branch>                  Review against a base branch.
   --commit <sha>                   Review a specific commit.

@@ -1,0 +1,531 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout/cli/2026-03-09T15-06-41-086Z-e3264e35/manifest.json
+
+(node:98058) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:98058) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 854 > 25
+ - total lines changed 84639 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 8394
+  - orchestrator/tests/ControlServer.test.ts: 7570
+  - tasks/index.json: 5792
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1695
+  - scripts/lib/review-execution-state.ts: 1618
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1480
+  - scripts/run-review.ts: 1172
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch continuation for 1092 symphony alignment lane
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 3 files, 341 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout/cli/2026-03-09T15-06-41-086Z-e3264e35/review/prompt.txt
+Review output log: .runs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout/cli/2026-03-09T15-06-41-086Z-e3264e35/review/output.log
+Launching Codex review (evidence: .runs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout/cli/2026-03-09T15-06-41-086Z-e3264e35/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.112.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cd32e-eaec-72d1-a976-b5fe9fbb4130
+--------
+user
+Review task: 1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout
+Evidence manifest: .runs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout/cli/2026-03-09T15-06-41-086Z-e3264e35/manifest.json
+
+Agent notes:
+Goal: verify the authenticated-route handoff extraction remains behavior-preserving and properly bounded. | Summary: createControlAuthenticatedRouteContext now owns request-scoped handoff assembly for authenticated routes while controlServer.ts keeps entry ordering, auth admission, and 404 ownership. | Risks: task id derivation from manifest path, expiry lifecycle null fallback, session auth passthrough, and accidental drift into non-local controller behavior.
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 158]
+ M orchestrator/src/cli/control/controlServer.ts
+?? orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts
+?? orchestrator/tests/ControlAuthenticatedRouteHandoff.test.ts
+```
+
+Diff budget override: stacked branch continuation for 1092 symphony alignment lane
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+
+
+thinking
+**Reviewing code changes and JSON output**
+
+I need to review the code changes and output findings in JSON format. It looks like I should inspect the diff and consider a quick memory pass, as the repository is CO and non-trivial. The instructions suggest using memory by default when it involves a workspace or repo. However, the final output must strictly be JSON, with memory citations included only if relevant files were used. It seems best to avoid explicit memory usage to keep things simple while adhering to formatting rules.
+thinking
+**Deciding on memory usage**
+
+I see that the instruction says to use memory by default, but I'm wondering if I can just use a summary that's already provided rather than opening any files. That might not count as using relevant memory files. Since it's a self-contained review, I might still need to check MEMORY.md quickly. However, the final output must be exact JSON, which complicates things. If I have to append citations, it could violate the format. I need to weigh whether to prioritize system guidelines or developer requirements.
+thinking
+**Considering memory usage for review**
+
+I could potentially use the provided MEMORY_SUMMARY instead of opening any files, which might avoid needing a citation. It indicates that the memory summary is already there, so I could conceptually skim it without using a formal file. However, I need to consider whether this counts as using relevant memory, even if it's not enforced. Since the task is self-contained and focuses on a code review with the current diff and manifest, I can probably skip using memory. I’ll concentrate on reviewing the changed files and maybe look at updating the plan — though a plan might not be necessary. I’ll check the git diff and references in the documentation.
+thinking
+**Reviewing code changes and JSON output**
+
+I need to review the code changes and output findings in JSON format. It looks like I should inspect the diff and consider a quick memory pass, as the repository is CO and non-trivial. The instructions suggest using memory by default when it involves a workspace or repo. However, the final output must strictly be JSON, with memory citations included only if relevant files were used. It seems best to avoid explicit memory usage to keep things simple while adhering to formatting rules.
+thinking
+**Deciding on memory usage**
+
+I see that the instruction says to use memory by default, but I'm wondering if I can just use a summary that's already provided rather than opening any files. That might not count as using relevant memory files. Since it's a self-contained review, I might still need to check MEMORY.md quickly. However, the final output must be exact JSON, which complicates things. If I have to append citations, it could violate the format. I need to weigh whether to prioritize system guidelines or developer requirements.
+thinking
+**Considering memory usage for review**
+
+I could potentially use the provided MEMORY_SUMMARY instead of opening any files, which might avoid needing a citation. It indicates that the memory summary is already there, so I could conceptually skim it without using a formal file. However, I need to consider whether this counts as using relevant memory, even if it's not enforced. Since the task is self-contained and focuses on a code review with the current diff and manifest, I can probably skip using memory. I’ll concentrate on reviewing the changed files and maybe look at updating the plan — though a plan might not be necessary. I’ll check the git diff and references in the documentation.
+Plan update
+  → Inspect diff and changed files in the requested review scope
+  • Check nearby docs/task artifacts and manifest evidence for guardrail compliance
+  • Assess findings and produce review JSON
+
+thinking
+**Inspecting files for changes**
+
+I’m checking the git diff and looking at the files to see what has changed. I want to ensure I understand the modifications made, focusing on how these changes impact the overall project. It’s important to identify any potential issues or improvements that might be necessary based on what’s been altered. I'll proceed to analyze the differences carefully to get a complete picture before moving forward.
+thinking
+**Inspecting files for changes**
+
+I’m checking the git diff and looking at the files to see what has changed. I want to ensure I understand the modifications made, focusing on how these changes impact the overall project. It’s important to identify any potential issues or improvements that might be necessary based on what’s been altered. I'll proceed to analyze the differences carefully to get a complete picture before moving forward.
+exec
+/bin/zsh -lc 'cat .runs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout/cli/2026-03-09T15-06-41-086Z-e3264e35/manifest.json' in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'git diff -- orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts orchestrator/tests/ControlAuthenticatedRouteHandoff.test.ts' in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'git status --short' in /Users/kbediako/Code/CO succeeded in 52ms:
+Total output lines: 3083
+
+{
+  "version": 1,
+  "task_id": "1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout",
+  "task_slug": "1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction-scout",
+  "run_id": "2026-03-09T15-06-41-086Z-e3264e35",
+  "parent_run_id": null,
+  "pipeline_id": "diagnostics",
+  "pipeline_title": "Diagnostics Pipeline",
+  "runner": "codex-cli",
+  "approval_policy": null,
+  "status": "succeeded",
+  "status_detail": null,
+  "started_at": "2026-03-09T15:06:41.088Z",
+  "completed_at": "2026-03-09T15:11:11.536Z",
+  "updated_at": "2026-03-09T15:11:11.552Z",
+  "heartbeat_at": "2026-03-09T15:11:11.536Z",
+  "heartbeat_interval_seconds": 5,
+  "heartbeat_stale_after_seconds": 30,
+ succeeded in 51ms:
+diff --git a/orchestrator/src/cli/control/controlServer.ts b/orchestrator/src/cli/control/controlServer.ts
+index c11147ba6..2ac6e2ef7 100644
+--- a/orchestrator/src/cli/control/controlServer.ts
++++ b/orchestrator/src/cli/control/controlServer.ts
+@@ -1,6 +1,5 @@
+ import http from 'node:http';
+ import { randomBytes } from 'node:crypto';
+-import { basename, dirname } from 'node:path';
+ 
+ import type { RunPaths } from '../run/runPaths.js';
+ import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
+@@ -18,18 +17,16 @@ import {
+   type ControlRequestContext,
+   type ControlRequestSharedContext
+ } from './controlRequestContext.js';
+-import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
++import { createControlAuthenticatedRouteContext } from './controlAuthenticatedRouteHandoff.js';
+ import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
+ import { createControlServerRequestShell } from './controlServerRequestShell.js';
+ import { readControlServerSeeds } from './controlServerSeedLoading.js';
+ succeeded in 51ms:
+ M orchestrator/src/cli/control/controlServer.ts
+?? orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts
+?? orchestrator/tests/ControlAuthenticatedRouteHandoff.test.ts
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/ControlAuthenticatedRouteHandoff.test.ts" in /Users/kbediako/Code/CO succeeded in 51ms:
+import http from 'node:http';
+import { randomBytes } from 'node:crypto';
+
+import type { RunPaths } from '../run/runPaths.js';
+import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
+import type { RunEventStream, RunEventStreamEntry } from '../events/runEventStream.js';
+import { handleControlUiSessionAdmission } from './uiSessionController.js';
+import { admitAuthenticatedControlRoute } from './authenticatedControlRouteGate.js';
+import { handleAuthenticatedRouteRequest } from './authenticatedRouteController.js';
+import { handleLinearWebhookRequest } from './linearWebhookController.js';
+import { type ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
+import { type ControlServerBootstrapLifecycle } from './controlServerBootstrapLifecycle.js';
+import { createControlBootstrapAssembly } from './controlBootstrapAssembly.js';
+import { startControlServerStartupSequence } from './controlServerStartupSequence.js';
+import {
+  buildControlPresenterRuntimeContext,
+  type ControlRequestContext,
+  type ControlRequestSharedContext
+} from './controlRequestContext.js';
+import { createControlAuthenticatedRouteContext } from './controlAuthenticatedRouteHandoff.js';
+ succeeded in 51ms:
+import http from 'node:http';
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createControlAuthenticatedRouteContext } from '../src/cli/control/controlAuthenticatedRouteHandoff.js';
+import { createControlQuestionChildResolutionAdapter } from '../src/cli/control/controlQuestionChildResolution.js';
+import {
+  emitControlActionAuditEvent,
+  emitDispatchPilotAuditEvents,
+  writeControlError
+} from '../src/cli/control/controlServerAuditAndErrorHelpers.js';
+
+vi.mock('../src/cli/control/controlQuestionChildResolution.js', () => ({
+  createControlQuestionChildResolutionAdapter: vi.fn()
+}));
+
+vi.mock('../src/cli/control/controlServerAuditAndErrorHelpers.js', () => ({
+  emitControlActionAuditEvent: vi.fn(),
+  emitDispatchPilotAuditEvents: vi.fn(),
+  writeControlError: vi.fn()
+ succeeded in 51ms:
+import http from 'node:http';
+import { basename, dirname } from 'node:path';
+
+import type { ControlRequestContext, ControlPresenterContext } from './controlRequestContext.js';
+import type { ControlRuntimeSnapshot } from './controlRuntime.js';
+import type { AuthenticatedRouteCompositionContext } from './authenticatedRouteComposition.js';
+import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
+import {
+  emitControlActionAuditEvent,
+  emitDispatchPilotAuditEvents,
+  writeControlError
+} from './controlServerAuditAndErrorHelpers.js';
+import { readJsonBody } from './controlServerRequestBodyHelpers.js';
+
+export interface ControlAuthenticatedRouteHandoffInput {
+  pathname: string;
+  authKind: 'control' | 'session';
+  req: http.IncomingMessage;
+  res: http.ServerResponse;
+  context: ControlRequestContext;
+exec
+/bin/zsh -lc "rg -n \"1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction|authenticated-route handoff|createControlAuthenticatedRouteContext|controlAuthenticatedRouteHandoff\" tasks docs .agent orchestrator -g '"'!dist'"'" in /Users/kbediako/Code/CO succeeded in 51ms:
+orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts:25:export function createControlAuthenticatedRouteContext(
+orchestrator/src/cli/control/controlServer.ts:20:import { createControlAuthenticatedRouteContext } from './controlAuthenticatedRouteHandoff.js';
+orchestrator/src/cli/control/controlServer.ts:191:    createControlAuthenticatedRouteContext({
+tasks/index.json:4:      "id": "20260309-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction",
+tasks/index.json:6:      "relates_to": "tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
+tasks/index.json:13:        "spec": "tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
+tasks/index.json:14:        "task": "tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
+tasks/index.json:15:        "agent_task": ".agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md",
+tasks/tasks-1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md:8:> This lane extracts the post-gate authenticated-route handoff while leaving `controlServer.ts` as the outer public-route/admission/fallback surface.
+.agent/task/1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md:8:> This lane extracts the post-gate authenticated-route handoff while leaving `controlServer.ts` as the outer public-route/admission/fallback surface.
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:1:# Task Checklist - 1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:3:- MCP Task ID: `1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction`
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:5:- TECH_SPEC: `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:8:> This lane extracts the remaining authenticated-route handoff assembly from `controlServer.ts` into the authenticated-route controller boundary so the file keeps request-entry ordering, authenticated admission, and fallback ownership without carrying the large request-scoped controller context bag inline.
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:12:- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`.
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:18:- [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/findings/1092-authenticated-route-handoff-assembly-extraction-deliberation.md`.
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:19:- [x] docs-review approval/override captured for registered `1092`. Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/00-summary.md`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/04-scout-summary.md`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/05-docs-review-override.md`.
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:23:- [ ] Shared authenticated-route handoff assembly extracted behind one bounded controller-owned seam.
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:24:- [ ] `controlServer.ts` delegates authenticated-route handoff construction without changing branch ordering or authority ownership.
+.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md:39:- [ ] Manual/mock authenticated-route handoff evidence captured.
+exec
+/bin/zsh -lc "find . -maxdepth 3 \\( -path './tasks/*1092*' -o -path './docs/*1092*' -o -path './.agent/*1092*' \\) -print" in /Users/kbediako/Code/CO succeeded in 109ms:
+./tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md
+./tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md
+./docs/findings/1092-authenticated-route-handoff-assembly-extraction-deliberation.md
+./.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/authenticatedRouteComposition.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,320p' orchestrator/src/cli/control/controlQuestionChildResolution.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,340p' orchestrator/src/cli/control/authenticatedRouteController.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+import {
+  createAuthenticatedRouteDispatcherContext,
+  type AuthenticatedRouteCompositionContext
+} from './authenticatedRouteComposition.js';
+import { handleAuthenticatedRouteDispatcher } from './authenticatedRouteDispatcher.js';
+
+export type AuthenticatedRouteControllerContext = AuthenticatedRouteCompositionContext;
+
+export async function handleAuthenticatedRouteRequest(
+  context: AuthenticatedRouteControllerContext
+): Promise<boolean> {
+  return handleAuthenticatedRouteDispatcher(createAuthenticatedRouteDispatcherContext(context));
+}
+ succeeded in 52ms:
+import type { ControlRequestContext } from './controlRequestContext.js';
+import type { QuestionChildResolutionFallbackEvent } from './questionChildResolutionAdapter.js';
+import {
+  createQuestionChildResolutionAdapter,
+  type QuestionChildResolutionAdapter
+} from './questionChildResolutionAdapter.js';
+
+export interface ControlQuestionChildResolutionContext
+  extends Pick<ControlRequestContext, 'config' | 'controlStore' | 'delegationTokens' | 'eventTransport'> {}
+
+export function createControlQuestionChildResolutionAdapter(
+  context: ControlQuestionChildResolutionContext
+): QuestionChildResolutionAdapter {
+  return createQuestionChildResolutionAdapter({
+    allowedRunRoots: context.config.ui.allowedRunRoots,
+    allowedBindHosts: context.config.ui.allowedBindHosts,
+    expiryFallback: context.config.delegate.expiryFallback,
+    readParentRunId: () => context.controlStore.snapshot().run_id,
+    validateDelegationToken: (token, parentRunId, childRunId) =>
+      Boolean(context.delegationTokens.validate(token, parentRunId, childRunId)),
+ succeeded in 52ms:
+import http from 'node:http';
+
+import type { CliManifest } from '../types.js';
+import type { ControlRuntime } from './controlRuntime.js';
+import { handleObservabilityApiRequest } from './observabilityApiController.js';
+import { handleUiDataRequest } from './uiDataController.js';
+import { handleEventsSseRequest } from './eventsSseController.js';
+import { handleQuestionQueueRequest } from './questionQueueController.js';
+import { handleDelegationRegisterRequest } from './delegationRegisterController.js';
+import { handleConfirmationListRequest } from './confirmationListController.js';
+import { handleConfirmationCreateRequest } from './confirmationCreateController.js';
+import { handleConfirmationApproveRequest } from './confirmationApproveController.js';
+import { handleConfirmationIssueConsumeRequest } from './confirmationIssueConsumeController.js';
+import { handleConfirmationValidateRequest } from './confirmationValidateController.js';
+import { handleControlActionRequest } from './controlActionController.js';
+import { handleSecurityViolationRequest } from './securityViolationController.js';
+import { type AuthenticatedRouteDispatcherContext } from './authenticatedRouteDispatcher.js';
+import type { DispatchPilotEvaluation } from './trackerDispatchPilot.js';
+import type { ControlStateStore } from './controlState.js';
+import type { ConfirmationStore } from './confirmations.js';
+[run-review] waiting on codex review (1m 0s elapsed, 9s idle; review progress observed).
+
+thinking
+**Inspecting task specifications**
+
+I need to check the tasks and specifications to see if they include an updated file path. It seems like the specification may have tracked the implementation paths. If the new helper file isn’t listed in the spec, it could create confusion. I should inspect both the spec and tasks to ensure they align correctly with the current implementation paths. It feels important to search thoroughly to avoid any potential issues down the line.
+thinking
+**Inspecting task specifications**
+
+I need to check the tasks and specifications to see if they include an updated file path. It seems like the specification may have tracked the implementation paths. If the new helper file isn’t listed in the spec, it could create confusion. I should inspect both the spec and tasks to ensure they align correctly with the current implementation paths. It feels important to search thoroughly to avoid any potential issues down the line.
+exec
+/bin/zsh -lc "sed -n '1,220p' tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' .agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+---
+id: 20260309-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction
+title: Coordinator Symphony-Aligned Authenticated Route Handoff Assembly Extraction
+status: active
+owners:
+  - Codex
+created: 2026-03-09
+last_review: 2026-03-09
+review_cadence_days: 30
+related_prd: docs/PRD-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md
+related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md
+related_tasks:
+  - tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md
+---
+
+# Task Spec - Coordinator Symphony-Aligned Authenticated Route Handoff Assembly Extraction
+
+## Summary
+
+Extract the control-specific authenticated-route handoff assembly from `controlServer.ts` into the authenticated-route controller boundary so the file keeps request-entry orchestration responsibility while the large `handleAuthenticatedRouteRequest(...)` context bag moves out of the shell.
+ succeeded in 52ms:
+# Task Checklist - 1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction
+
+- MCP Task ID: `1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`
+- TECH_SPEC: `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`
+
+> This lane extracts the remaining authenticated-route handoff assembly from `controlServer.ts` into the authenticated-route controller boundary so the file keeps request-entry ordering, authenticated admission, and fallback ownership without carrying the large request-scoped controller context bag inline.
+
+## Foundation
+
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1092-authenticated-route-handoff-assembly-extraction-deliberation.md`, `out/1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction/manual/20260309T142435Z-closeout/14-next-slice-note.md`.
+
+## Shared Registry + Review Handoff
+
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/findings/1092-authenticated-route-handoff-assembly-extraction-deliberation.md`.
+- [x] docs-review approval/override captured for registered `1092`. Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/00-summary.md`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/04-scout-summary.md`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/05-docs-review-override.md`.
+
+ succeeded in 51ms:
+# Task Checklist - 1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction
+
+- MCP Task ID: `1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`
+- TECH_SPEC: `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`
+
+> This lane extracts the remaining authenticated-route handoff assembly from `controlServer.ts` into the authenticated-route controller boundary so the file keeps request-entry ordering, authenticated admission, and fallback ownership without carrying the large request-scoped controller context bag inline.
+
+## Foundation
+
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `tasks/tasks-1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `.agent/task/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1092-authenticated-route-handoff-assembly-extraction-deliberation.md`, `out/1091-coordinator-symphony-aligned-control-server-ui-session-admission-helper-extraction/manual/20260309T142435Z-closeout/14-next-slice-note.md`.
+
+## Shared Registry + Review Handoff
+
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction.md`, `docs/findings/1092-authenticated-route-handoff-assembly-extraction-deliberation.md`.
+- [x] docs-review approval/override captured for registered `1092`. Evidence: `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/00-summary.md`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/04-scout-summary.md`, `out/1092-coordinator-symphony-aligned-authenticated-route-handoff-assembly-extraction/manual/20260309T145637Z-docs-first/05-docs-review-override.md`.
+
+
+
+
+
+thinking
+**Inspecting technical issues**
+
+It looks like the checklist hasn’t been updated, but that might be because there are uncommitted changes. I should check if the tests adequately cover the `readJsonBody` passthrough or if the new helper affects the event ordering. I’m wondering if there’s a bug related to `createControlAuthenticatedRouteContext` using a specific runtime property improperly. I need to compare the current version with previous ones because it could uncover hidden issues or duplicate logic. I'll take some time to address these concerns!
+thinking
+**Addressing potential technical issues**
+
+I'm looking at lines 57-58 concerning `expireQuestions` and whether it could return `void`. If that's the case, it might just resolve to a promise. I should review the broader documentation to see if there's any mention of non-interactive evidence, but it looks like there aren't any changes there. The user is asking for confirmation, so I need to check if there's any documentation mismatch too. I also need to inspect related files and test if they are included properly. Finally, the `createControlAuthenticatedRouteContext` might have a captured `adapter` that could lead to dynamic changes. I’ll keep all these factors in mind!
+thinking
+**Identifying testing issues**
+
+I've noticed a potential bug related to mocking modules after imports in the tests. In Vitest, it seems that `vi.mock` gets hoisted, which can lead to unexpected behavior. This could affect the overall reliability of the tests, so I need to address it carefully. I’ll confirm the setup by reviewing the test structure to ensure that mocks are properly placed before any imports to avoid these issues. It's essential to have a solid testing framework!
+thinking
+I’m wondering if there’s an issue with using `input.context.paths.manifestPath` for both `taskId` and `manifestPath`. It seems a bit confusing. Maybe the control server was created with a compatibility `mcp` path? I'm not completely sure how that affects things. It feels like I should clarify this to prevent any potential mix-ups later. Alright, I’ll take a closer look to ensure everything is set up correctly!
+thinking
+**Inspecting technical issues**
+
+It looks like the checklist hasn’t been updated, but that might be because there are uncommitted changes. I should check if the tests adequately cover the `readJsonBody` passthrough or if the new helper affects the event ordering. I’m wondering if there’s a bug related to `createControlAuthenticatedRouteContext` using a specific runtime property improperly. I need to compare the current version with previous ones because it could uncover hidden issues or duplicate logic. I'll take some time to address these concerns!
+thinking
+**Addressing potential technical issues**
+
+I'm looking at lines 57-58 concerning `expireQuestions` and whether it could return `void`. If that's the case, it might just resolve to a promise. I should review the broader documentation to see if there's any mention of non-interactive evidence, but it looks like there aren't any changes there. The user is asking for confirmation, so I need to check if there's any documentation mismatch too. I also need to inspect related files and test if they are included properly. Finally, the `createControlAuthenticatedRouteContext` might have a captured `adapter` that could lead to dynamic changes. I’ll keep all these factors in mind!
+thinking
+**Identifying testing issues**
+
+I've noticed a potential bug related to mocking modules after imports in the tests. In Vitest, it seems that `vi.mock` gets hoisted, which can lead to unexpected behavior. This could affect the overall reliability of the tests, so I need to address it carefully. I’ll confirm the setup by reviewing the test structure to ensure that mocks are properly placed before any imports to avoid these issues. It's essential to have a solid testing framework!
+thinking
+I’m wondering if there’s an issue with using `input.context.paths.manifestPath` for both `taskId` and `manifestPath`. It seems a bit confusing. Maybe the control server was created with a compatibility `mcp` path? I'm not completely sure how that affects things. It feels like I should clarify this to prevent any potential mix-ups later. Alright, I’ll take a closer look to ensure everything is set up correctly!
+exec
+/bin/zsh -lc "rg -n \"manifestPath\" orchestrator/src/cli -g '*.ts' | head -n 80" in /Users/kbediako/Code/CO succeeded in 52ms:
+orchestrator/src/cli/services/pipelineExperience.ts:78:    await store.recordBatch([record], relativeToRepo(env, paths.manifestPath));
+orchestrator/src/cli/services/commandRunner.ts:225:      CODEX_ORCHESTRATOR_MANIFEST_PATH: paths.manifestPath,
+orchestrator/src/cli/control/controlActionController.ts:19:  manifestPath: string;
+orchestrator/src/cli/control/controlActionController.ts:82:    manifestPath: context.manifestPath
+orchestrator/src/cli/control/controlActionController.ts:98:    manifestPath: context.manifestPath,
+orchestrator/src/cli/control/controlActionPreflight.ts:100:  manifestPath: string;
+orchestrator/src/cli/control/controlActionPreflight.ts:136:        manifestPath: input.manifestPath,
+orchestrator/src/cli/control/controlActionPreflight.ts:166:  manifestPath: string;
+orchestrator/src/cli/control/controlActionPreflight.ts:182:    manifestPath: input.manifestPath,
+orchestrator/src/cli/control/controlActionPreflight.ts:475:  manifestPath: string;
+orchestrator/src/cli/control/controlActionPreflight.ts:492:    manifest_path: input.manifestPath,
+orchestrator/src/cli/control/controlActionPreflight.ts:568:    'manifestPath'
+orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts:39:    taskId: resolveTaskIdFromManifestPath(input.context.paths.manifestPath),
+orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts:40:    manifestPath: input.context.paths.manifestPath,
+orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts:70:function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
+orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts:71:  const runDir = dirname(manifestPath);
+orchestrator/src/cli/control/observabilitySurface.ts:31:  paths: Pick<RunPaths, 'manifestPath' | 'runDir' | 'logPath'>;
+orchestrator/src/cli/control/observabilitySurface.ts:282:    task_id: resolveTaskIdFromManifestPath(context.paths.manifestPath),
+orchestrator/src/cli/control/observabilitySurface.ts:284:    manifest_path: context.paths.manifestPath,
+orchestrator/src/cli/control/observabilitySurface.ts:399:function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
+
+
+
+[run-review] waiting on codex review (2m 0s elapsed, 5s idle; review progress observed).
+
+
+
+thinking
+**Analyzing path normalization**
+
+I’m noticing that `observabilitySurface`'s `resolveTaskId` is handling `normalizedPath.replace(/\\/g,'/')`, while a new helper copied the old unnormalized version. The previous `controlServer.ts` didn’t normalize paths, so I’m wondering if there’s a potential issue on Windows. The new helper just retains that old function. It looks like there’s an existing bug in the code, especially since the function uses `basename` and `dirname` on raw Windows paths, which may not behave correctly.
+thinking
+**Examining platform issues**
+
+I’m diving into the details regarding how POSIX handles Windows path strings. The runtime should use the actual platform path without any issues. I need to inspect any untracked changes in the new file to export types, but it seems there aren’t any. There might be a subtle issue with `createControlAuthenticatedRouteContext` capturing `context.clients` by reference, which is the same as before. Should this extraction have been in `authenticatedRouteController.ts`? I wonder if I should run targeted tests, but the user mentioned avoiding direct validation runners.
+thinking
+**Reviewing minimality expectations**
+
+It seems that the user might be expecting a review focused on minimality. I should consider including an overall explanation that connects this to the documentation. I need to inspect the PRD and TECH_SPEC documents against the implementation, especially regarding the "controller boundary." It might not be exact since the helper resides outside the `authenticatedRouteController` boundary. However, the documentation specifies that it should be within that boundary or a small adjacent helper. Let's explore this further!
+thinking
+**Inspecting git tasks**
+
+I’m considering checking the git diff of tasks thoroughly, but I want to take my time. I'll also think about whether there could be any untracked files that aren’t included in the diff, especially if it's a new file. Plus, there’s this function name: should `createControlAuthenticatedRouteContext` be renamed to `createControlAuthenticatedRouteHandoffContext`? But then again, maybe that’s more about style, and I'm unsure if it's necessary.
+thinking
+**Evaluating file imports and tests**
+
+I'm considering changing the import in controlServer to `readRawBody` and confirming helper uses `readJsonBody`. There might be a bug where the tests in the manifest don't run the new test file because it’s an untracked file. The manifest’s date seems to predate the current work. I need to check if the manifest corresponds to the current patch. It’s crucial since untracked files aren't included in manifest-based evidence or documentation.
+thinking
+**Inspecting task checklist and paths**
+
+I notice the task checklist is still unchecked, which means evidence for this implementation is currently missing. It’s not a code bug, but I might want to mention that evidence or checklist mirroring is still an open concern. I should check whether the new helper file is included in the tests compile—and it seems to be. I wonder if there’s a bug from using `basename/dirname` from `node:path` instead of `path.posix`, especially since it works on Windows. Comparing the new implementation directly to previous code could help.
+thinking
+**Analyzing path normalization**
+
+I’m noticing that `observabilitySurface`'s `resolveTaskId` is handling `normalizedPath.replace(/\\/g,'/')`, while a new helper copied the old unnormalized version. The previous `controlServer.ts` didn’t normalize paths, so I’m wondering if there’s a potential issue on Windows. The new helper just retains that old function. It looks like there’s an existing bug in the code, especially since the function uses `basename` and `dirname` on raw Windows paths, which may not behave correctly.
+thinking
+**Examining platform issues**
+
+I’m diving into the details regarding how POSIX handles Windows path strings. The runtime should use the actual platform path without any issues. I need to inspect any untracked changes in the new file to export types, but it seems there aren’t any. There might be a subtle issue with `createControlAuthenticatedRouteContext` capturing `context.clients` by reference, which is the same as before. Should this extraction have been in `authenticatedRouteController.ts`? I wonder if I should run targeted tests, but the user mentioned avoiding direct validation runners.
+thinking
+**Reviewing minimality expectations**
+
+It seems that the user might be expecting a review focused on minimality. I should consider including an overall explanation that connects this to the documentation. I need to inspect the PRD and TECH_SPEC documents against the implementation, especially regarding the "controller boundary." It might not be exact since the helper resides outside the `authenticatedRouteController` boundary. However, the documentation specifies that it should be within that boundary or a small adjacent helper. Let's explore this further!
+thinking
+**Inspecting git tasks**
+
+I’m considering checking the git diff of tasks thoroughly, but I want to take my time. I'll also think about whether there could be any untracked files that aren’t included in the diff, especially if it's a new file. Plus, there’s this function name: should `createControlAuthenticatedRouteContext` be renamed to `createControlAuthenticatedRouteHandoffContext`? But then again, maybe that’s more about style, and I'm unsure if it's necessary.
+thinking
+**Evaluating file imports and tests**
+
+I'm considering changing the import in controlServer to `readRawBody` and confirming helper uses `readJsonBody`. There might be a bug where the tests in the manifest don't run the new test file because it’s an untracked file. The manifest’s date seems to predate the current work. I need to check if the manifest corresponds to the current patch. It’s crucial since untracked files aren't included in manifest-based evidence or documentation.
+thinking
+**Inspecting task checklist and paths**
+
+I notice the task checklist is still unchecked, which means evidence for this implementation is currently missing. It’s not a code bug, but I might want to mention that evidence or checklist mirroring is still an open concern. I should check whether the new helper file is included in the tests compile—and it seems to be. I wonder if there’s a bug from using `basename/dirname` from `node:path` instead of `path.posix`, especially since it works on Windows. Comparing the new implementation directly to previous code could help.
+exec
+/bin/zsh -lc "python - <<'PY'
+from pathlib import Path
+old = Path('/tmp/oldcontrol.txt')
+PY" in /Users/kbediako/Code/CO exited 127 in 51ms:
+zsh:1: command not found: python
+
+thinking
+**Inspecting Python Usage**
+
+I’m thinking about whether to use the python3 alias, but maybe it's not necessary. I could compare the old context using `git show origin/main:file`. It feels like a good idea to inspect the code around the old `handleRequest`, just to see if I can catch anything that stands out. It’s all about making sure I understand how everything fits together!
+The final 1092 standalone review was terminated after broadening from the bounded authenticated-route handoff diff into checklist/spec synchronization, manifest-age speculation, and environment/tooling dead ends (`python` availability) without surfacing a concrete diff-local defect. This wrapper behavior remains the known review reliability issue tracked separately. Final-tree build, targeted regressions, and full-suite evidence passed for the active lane.
+thinking
+**Inspecting Python Usage**
+
+I’m thinking about whether to use the python3 alias, but maybe it's not necessary. I could compare the old context using `git show origin/main:file`. It feels like a good idea to inspect the code around the old `handleRequest`, just to see if I can catch anything that stands out. It’s all about making sure I understand how everything fits together!

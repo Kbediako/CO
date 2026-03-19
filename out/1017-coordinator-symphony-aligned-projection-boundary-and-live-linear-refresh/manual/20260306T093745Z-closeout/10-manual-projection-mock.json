@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-03-06T09:40:17.014Z",
+  "scenario": "selected-run projection boundary manual mock",
+  "assertions": {
+    "ui_selected_issue_identifier": "task-1017-manual",
+    "state_selected_issue_identifier": "task-1017-manual",
+    "issue_issue_identifier": "task-1017-manual",
+    "ui_selected_display_status": "paused",
+    "state_selected_display_status": "paused",
+    "issue_display_status": "paused",
+    "queued_count": 1,
+    "tracked_identifier_from_ui": "PREPROD-101",
+    "tracked_identifier_from_state": "PREPROD-101",
+    "tracked_identifier_from_issue": "PREPROD-101",
+    "dispatch_http_status": 200,
+    "dispatch_status": "ready",
+    "dispatch_source_status": "ready",
+    "dispatch_recommendation_identifier": "PREPROD-101",
+    "dispatch_linear_fetch_count": 1
+  }
+}

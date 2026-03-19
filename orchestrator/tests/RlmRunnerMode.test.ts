@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { __test__ as rlmRunnerTest } from '../src/cli/rlmRunner.js';
+import {
+  COLLAB_FEATURE_CANONICAL,
+  COLLAB_FEATURE_LEGACY,
+  parseFeatureFlagsFromText,
+  resolveCollabAllowDefaultRoleConfig,
+  resolveCollabFeatureKeyFromFlags,
+  resolveCollabRolePolicyConfig
+} from '../src/cli/rlm/rlmCodexRuntimeShell.js';
 
 const { resolveRlmMode, DEFAULT_SYMBOLIC_MIN_BYTES } = rlmRunnerTest;
-const {
-  resolveSymbolicMultiAgentConfig,
-  resolveSymbolicMultiAgentRolePolicyConfig,
-  resolveSymbolicMultiAgentAllowDefaultRoleConfig,
-  parseFeatureFlagsFromText,
-  resolveCollabFeatureKeyFromFlags,
-  COLLAB_FEATURE_CANONICAL,
-  COLLAB_FEATURE_LEGACY
-} = rlmRunnerTest;
+const { resolveSymbolicMultiAgentConfig } = rlmRunnerTest;
 
 describe('rlmRunner mode resolution', () => {
   it('keeps iterative when delegated in auto but context is below large-context threshold', () => {
@@ -108,7 +108,7 @@ describe('rlmRunner symbolic multi-agent env resolution', () => {
 
 describe('rlmRunner symbolic multi-agent role-policy env resolution', () => {
   it('prefers canonical role-policy env key when present', () => {
-    const resolved = resolveSymbolicMultiAgentRolePolicyConfig({
+    const resolved = resolveCollabRolePolicyConfig({
       RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY: 'warn',
       RLM_COLLAB_ROLE_POLICY: 'off'
     } as NodeJS.ProcessEnv);
@@ -116,7 +116,7 @@ describe('rlmRunner symbolic multi-agent role-policy env resolution', () => {
   });
 
   it('falls back to legacy role-policy env key when canonical is absent', () => {
-    const resolved = resolveSymbolicMultiAgentRolePolicyConfig({
+    const resolved = resolveCollabRolePolicyConfig({
       RLM_COLLAB_ROLE_POLICY: 'off'
     } as NodeJS.ProcessEnv);
     expect(resolved).toEqual({ value: 'off', source: 'legacy' });
@@ -125,7 +125,7 @@ describe('rlmRunner symbolic multi-agent role-policy env resolution', () => {
 
 describe('rlmRunner symbolic multi-agent allow-default-role env resolution', () => {
   it('prefers canonical allow-default-role env key when present', () => {
-    const resolved = resolveSymbolicMultiAgentAllowDefaultRoleConfig({
+    const resolved = resolveCollabAllowDefaultRoleConfig({
       RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE: '1',
       RLM_COLLAB_ALLOW_DEFAULT_ROLE: '0'
     } as NodeJS.ProcessEnv);
@@ -133,7 +133,7 @@ describe('rlmRunner symbolic multi-agent allow-default-role env resolution', () 
   });
 
   it('falls back to legacy allow-default-role env key when canonical is absent', () => {
-    const resolved = resolveSymbolicMultiAgentAllowDefaultRoleConfig({
+    const resolved = resolveCollabAllowDefaultRoleConfig({
       RLM_COLLAB_ALLOW_DEFAULT_ROLE: '1'
     } as NodeJS.ProcessEnv);
     expect(resolved).toEqual({ value: true, source: 'legacy' });

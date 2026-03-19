@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 254 > 25
+ - total lines changed 31155 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 4827
+  - orchestrator/src/cli/control/controlServer.ts: 2292
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - docs/docs-freshness-registry.json: 1352
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 1036
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1009
+  - tasks/index.json: 880
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 643
+  - orchestrator/src/cli/control/observabilitySurface.ts: 568
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1022 validation is running on a branch with the previously approved 1019-1021 Symphony-alignment stack already present; the owned notifier extraction delta is small, but the branch-scope diff against origin/main exceeds the generic budget.

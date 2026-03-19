@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 412 > 25
+ - total lines changed 45233 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5565
+  - docs/docs-freshness-registry.json: 4594
+  - tasks/index.json: 2346
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1330
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1042 is being closed on a stacked Symphony-alignment branch; the local slice is bounded even though the cumulative branch diff exceeds the repo baseline against origin/main.

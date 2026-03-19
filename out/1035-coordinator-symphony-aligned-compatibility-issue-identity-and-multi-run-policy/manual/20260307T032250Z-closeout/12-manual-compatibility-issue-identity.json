@@ -1,0 +1,443 @@
+{
+  "selected": {
+    "issue_id": "task-1035-current",
+    "issue_identifier": "ISSUE-1035",
+    "task_id": "task-1035-current",
+    "run_id": "run-1",
+    "raw_status": "in_progress",
+    "display_status": "in_progress",
+    "status_reason": null,
+    "started_at": "2026-03-07T00:00:00.000Z",
+    "updated_at": "2026-03-07T00:15:00.000Z",
+    "completed_at": null,
+    "summary": "selected run remains current authority",
+    "last_error": null,
+    "latest_action": null,
+    "latest_event": {
+      "at": "2026-03-07T00:15:00.000Z",
+      "event": "in_progress",
+      "message": "selected run remains current authority",
+      "requested_by": null,
+      "reason": null
+    },
+    "workspace": {
+      "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-runtime-1035-manual-RNiIFz"
+    },
+    "question_summary": {
+      "queued_count": 0,
+      "latest_question": null
+    }
+  },
+  "running": [
+    {
+      "issue_id": "task-1035-current",
+      "issue_identifier": "ISSUE-1035",
+      "state": "in_progress",
+      "display_state": "paused",
+      "status_reason": "queued_questions",
+      "session_id": "run-3",
+      "turn_count": 0,
+      "last_event": "pause",
+      "last_message": "newer run is awaiting operator input",
+      "started_at": "2026-03-07T00:00:00.000Z",
+      "last_event_at": "2026-03-07T00:18:10.000Z",
+      "tokens": {
+        "input_tokens": null,
+        "output_tokens": null,
+        "total_tokens": null
+      }
+    }
+  ],
+  "retrying": [
+    {
+      "issue_id": "task-1035-current",
+      "issue_identifier": "ISSUE-1035",
+      "state": "failed",
+      "display_state": "failed",
+      "status_reason": null,
+      "session_id": "run-2",
+      "attempt": 0,
+      "last_event": "failed",
+      "last_message": "retryable failure pending rerun",
+      "started_at": "2026-03-07T00:00:00.000Z",
+      "last_event_at": "2026-03-07T00:17:00.000Z"
+    }
+  ],
+  "issue": {
+    "issueIdentifier": "ISSUE-1035",
+    "aliases": [
+      "ISSUE-1035",
+      "task-1035-current",
+      "run-1",
+      "run-3",
+      "run-2"
+    ],
+    "payload": {
+      "issue_identifier": "ISSUE-1035",
+      "issue_id": "task-1035-current",
+      "status": "in_progress",
+      "raw_status": "in_progress",
+      "display_status": "paused",
+      "status_reason": "queued_questions",
+      "workspace": {
+        "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-runtime-1035-manual-RNiIFz"
+      },
+      "attempts": {
+        "restart_count": 0,
+        "current_retry_attempt": 0
+      },
+      "running": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "in_progress",
+        "display_state": "paused",
+        "status_reason": "queued_questions",
+        "session_id": "run-3",
+        "turn_count": 0,
+        "last_event": "pause",
+        "last_message": "newer run is awaiting operator input",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:18:10.000Z",
+        "tokens": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null
+        }
+      },
+      "retry": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "failed",
+        "display_state": "failed",
+        "status_reason": null,
+        "session_id": "run-2",
+        "attempt": 0,
+        "last_event": "failed",
+        "last_message": "retryable failure pending rerun",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:17:00.000Z"
+      },
+      "logs": {
+        "codex_session_logs": []
+      },
+      "summary": "newer run is awaiting operator input",
+      "latest_event": {
+        "at": "2026-03-07T00:18:10.000Z",
+        "event": "pause",
+        "message": "newer run is awaiting operator input"
+      },
+      "question_summary": {
+        "queued_count": 1,
+        "latest_question": {
+          "question_id": "q-1035-1",
+          "prompt": "Approve deploy?",
+          "urgency": "high",
+          "queued_at": "2026-03-07T00:18:20.000Z"
+        }
+      },
+      "recent_events": [
+        {
+          "at": "2026-03-07T00:18:10.000Z",
+          "event": "pause",
+          "message": "newer run is awaiting operator input"
+        }
+      ],
+      "last_error": null,
+      "tracked": {}
+    }
+  },
+  "lookups": {
+    "canonical_issue": {
+      "issue_identifier": "ISSUE-1035",
+      "issue_id": "task-1035-current",
+      "status": "in_progress",
+      "raw_status": "in_progress",
+      "display_status": "paused",
+      "status_reason": "queued_questions",
+      "workspace": {
+        "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-runtime-1035-manual-RNiIFz"
+      },
+      "attempts": {
+        "restart_count": 0,
+        "current_retry_attempt": 0
+      },
+      "running": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "in_progress",
+        "display_state": "paused",
+        "status_reason": "queued_questions",
+        "session_id": "run-3",
+        "turn_count": 0,
+        "last_event": "pause",
+        "last_message": "newer run is awaiting operator input",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:18:10.000Z",
+        "tokens": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null
+        }
+      },
+      "retry": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "failed",
+        "display_state": "failed",
+        "status_reason": null,
+        "session_id": "run-2",
+        "attempt": 0,
+        "last_event": "failed",
+        "last_message": "retryable failure pending rerun",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:17:00.000Z"
+      },
+      "logs": {
+        "codex_session_logs": []
+      },
+      "summary": "newer run is awaiting operator input",
+      "latest_event": {
+        "at": "2026-03-07T00:18:10.000Z",
+        "event": "pause",
+        "message": "newer run is awaiting operator input"
+      },
+      "question_summary": {
+        "queued_count": 1,
+        "latest_question": {
+          "question_id": "q-1035-1",
+          "prompt": "Approve deploy?",
+          "urgency": "high",
+          "queued_at": "2026-03-07T00:18:20.000Z"
+        }
+      },
+      "recent_events": [
+        {
+          "at": "2026-03-07T00:18:10.000Z",
+          "event": "pause",
+          "message": "newer run is awaiting operator input"
+        }
+      ],
+      "last_error": null,
+      "tracked": {}
+    },
+    "task_alias": {
+      "issue_identifier": "ISSUE-1035",
+      "issue_id": "task-1035-current",
+      "status": "in_progress",
+      "raw_status": "in_progress",
+      "display_status": "paused",
+      "status_reason": "queued_questions",
+      "workspace": {
+        "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-runtime-1035-manual-RNiIFz"
+      },
+      "attempts": {
+        "restart_count": 0,
+        "current_retry_attempt": 0
+      },
+      "running": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "in_progress",
+        "display_state": "paused",
+        "status_reason": "queued_questions",
+        "session_id": "run-3",
+        "turn_count": 0,
+        "last_event": "pause",
+        "last_message": "newer run is awaiting operator input",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:18:10.000Z",
+        "tokens": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null
+        }
+      },
+      "retry": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "failed",
+        "display_state": "failed",
+        "status_reason": null,
+        "session_id": "run-2",
+        "attempt": 0,
+        "last_event": "failed",
+        "last_message": "retryable failure pending rerun",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:17:00.000Z"
+      },
+      "logs": {
+        "codex_session_logs": []
+      },
+      "summary": "newer run is awaiting operator input",
+      "latest_event": {
+        "at": "2026-03-07T00:18:10.000Z",
+        "event": "pause",
+        "message": "newer run is awaiting operator input"
+      },
+      "question_summary": {
+        "queued_count": 1,
+        "latest_question": {
+          "question_id": "q-1035-1",
+          "prompt": "Approve deploy?",
+          "urgency": "high",
+          "queued_at": "2026-03-07T00:18:20.000Z"
+        }
+      },
+      "recent_events": [
+        {
+          "at": "2026-03-07T00:18:10.000Z",
+          "event": "pause",
+          "message": "newer run is awaiting operator input"
+        }
+      ],
+      "last_error": null,
+      "tracked": {}
+    },
+    "run_2_alias": {
+      "issue_identifier": "ISSUE-1035",
+      "issue_id": "task-1035-current",
+      "status": "in_progress",
+      "raw_status": "in_progress",
+      "display_status": "paused",
+      "status_reason": "queued_questions",
+      "workspace": {
+        "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-runtime-1035-manual-RNiIFz"
+      },
+      "attempts": {
+        "restart_count": 0,
+        "current_retry_attempt": 0
+      },
+      "running": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "in_progress",
+        "display_state": "paused",
+        "status_reason": "queued_questions",
+        "session_id": "run-3",
+        "turn_count": 0,
+        "last_event": "pause",
+        "last_message": "newer run is awaiting operator input",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:18:10.000Z",
+        "tokens": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null
+        }
+      },
+      "retry": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "failed",
+        "display_state": "failed",
+        "status_reason": null,
+        "session_id": "run-2",
+        "attempt": 0,
+        "last_event": "failed",
+        "last_message": "retryable failure pending rerun",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:17:00.000Z"
+      },
+      "logs": {
+        "codex_session_logs": []
+      },
+      "summary": "newer run is awaiting operator input",
+      "latest_event": {
+        "at": "2026-03-07T00:18:10.000Z",
+        "event": "pause",
+        "message": "newer run is awaiting operator input"
+      },
+      "question_summary": {
+        "queued_count": 1,
+        "latest_question": {
+          "question_id": "q-1035-1",
+          "prompt": "Approve deploy?",
+          "urgency": "high",
+          "queued_at": "2026-03-07T00:18:20.000Z"
+        }
+      },
+      "recent_events": [
+        {
+          "at": "2026-03-07T00:18:10.000Z",
+          "event": "pause",
+          "message": "newer run is awaiting operator input"
+        }
+      ],
+      "last_error": null,
+      "tracked": {}
+    },
+    "run_3_alias": {
+      "issue_identifier": "ISSUE-1035",
+      "issue_id": "task-1035-current",
+      "status": "in_progress",
+      "raw_status": "in_progress",
+      "display_status": "paused",
+      "status_reason": "queued_questions",
+      "workspace": {
+        "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-runtime-1035-manual-RNiIFz"
+      },
+      "attempts": {
+        "restart_count": 0,
+        "current_retry_attempt": 0
+      },
+      "running": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "in_progress",
+        "display_state": "paused",
+        "status_reason": "queued_questions",
+        "session_id": "run-3",
+        "turn_count": 0,
+        "last_event": "pause",
+        "last_message": "newer run is awaiting operator input",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:18:10.000Z",
+        "tokens": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null
+        }
+      },
+      "retry": {
+        "issue_id": "task-1035-current",
+        "issue_identifier": "ISSUE-1035",
+        "state": "failed",
+        "display_state": "failed",
+        "status_reason": null,
+        "session_id": "run-2",
+        "attempt": 0,
+        "last_event": "failed",
+        "last_message": "retryable failure pending rerun",
+        "started_at": "2026-03-07T00:00:00.000Z",
+        "last_event_at": "2026-03-07T00:17:00.000Z"
+      },
+      "logs": {
+        "codex_session_logs": []
+      },
+      "summary": "newer run is awaiting operator input",
+      "latest_event": {
+        "at": "2026-03-07T00:18:10.000Z",
+        "event": "pause",
+        "message": "newer run is awaiting operator input"
+      },
+      "question_summary": {
+        "queued_count": 1,
+        "latest_question": {
+          "question_id": "q-1035-1",
+          "prompt": "Approve deploy?",
+          "urgency": "high",
+          "queued_at": "2026-03-07T00:18:20.000Z"
+        }
+      },
+      "recent_events": [
+        {
+          "at": "2026-03-07T00:18:10.000Z",
+          "event": "pause",
+          "message": "newer run is awaiting operator input"
+        }
+      ],
+      "last_error": null,
+      "tracked": {}
+    }
+  }
+}

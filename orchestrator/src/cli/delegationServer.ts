@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { access, chmod, readFile, readdir, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -14,6 +14,31 @@ import {
 } from './config/delegationConfig.js';
 import { logger } from '../logger.js';
 import { writeJsonAtomic } from './utils/fs.js';
+import {
+  evaluateDynamicToolBridgeRequest,
+  type DynamicToolBridgeAction
+} from './control/dynamicToolBridgePolicy.js';
+import {
+  buildToolList,
+  createDelegationServerRpcHandler,
+  handleDelegationServerToolCall
+} from './delegationServerToolDispatchShell.js';
+import {
+  applyDelegationQuestionFallback,
+  clampQuestionPollWaitMs,
+  handleDelegationServerQuestionEnqueue,
+  handleDelegationServerQuestionPoll,
+  MAX_QUESTION_POLL_WAIT_MS,
+  QUESTION_POLL_INTERVAL_MS,
+  resolveDelegationTokenValue,
+  type DelegationServerQuestionFlowDeps
+} from './delegationServerQuestionFlowShell.js';
+import {
+  MAX_MCP_HEADER_BYTES,
+  MAX_MCP_MESSAGE_BYTES,
+  parseContentLengthHeader,
+  runJsonRpcServer
+} from './delegationServerTransport.js';
 
 interface McpRequest {
   jsonrpc: '2.0';
@@ -23,22 +48,13 @@ interface McpRequest {
   codex_private?: Record<string, unknown>;
 }
 
-interface McpResponse {
-  jsonrpc: '2.0';
-  id: string | number | null;
-  result?: unknown;
-  error?: { code: number; message: string; data?: unknown };
-}
-
 interface DelegationServerOptions {
   repoRoot: string;
-  mode?: 'full' | 'question_only';
+  mode?: DelegationMode;
   configOverrides?: ConfigOverride[];
 }
 
 const PROTOCOL_VERSION = '2024-11-05';
-const QUESTION_POLL_INTERVAL_MS = 500;
-const MAX_QUESTION_POLL_WAIT_MS = 10_000;
 const DEFAULT_SPAWN_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_SPAWN_START_TIMEOUT_MS = 10_000;
 const DEFAULT_SPAWN_START_POLL_INTERVAL_MS = 200;
@@ -46,18 +62,29 @@ const DEFAULT_GH_TIMEOUT_MS = 60_000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_MS = 2000;
 const DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS = 200;
 const DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS = 15_000;
-const MAX_MCP_MESSAGE_BYTES = 1024 * 1024;
-const MAX_MCP_HEADER_BYTES = 16 * 1024;
-const MCP_HEADER_DELIMITER = '\r\n\r\n';
-const MCP_HEADER_DELIMITER_BYTES = MCP_HEADER_DELIMITER.length;
-const MCP_HEADER_DELIMITER_BUFFER = Buffer.from(MCP_HEADER_DELIMITER, 'utf8');
-const MAX_MCP_BUFFER_BYTES =
-  (MAX_MCP_MESSAGE_BYTES + MAX_MCP_HEADER_BYTES + MCP_HEADER_DELIMITER_BYTES) * 2;
 const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
 const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
 const DELEGATION_TOKEN_FILE = 'delegation_token.json';
 const CSRF_HEADER = 'x-csrf-token';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+const DYNAMIC_TOOL_BRIDGE_PUBLIC_TOKEN_KEYS = [
+  'dynamic_tool_bridge_token',
+  'dynamicToolBridgeToken',
+  'bridge_token',
+  'bridgeToken'
+] as const;
+const DYNAMIC_TOOL_BRIDGE_PUBLIC_ATTESTATION_KEYS = [
+  'dynamic_tool_bridge_attestation',
+  'dynamicToolBridgeAttestation',
+  'bridge_attestation',
+  'bridgeAttestation'
+] as const;
+const DYNAMIC_TOOL_BRIDGE_PRIVATE_ATTESTATION_KEYS = [
+  'dynamic_tool_bridge_attestation',
+  'dynamicToolBridgeAttestation',
+  'bridge_attestation',
+  'bridgeAttestation'
+] as const;
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const CONFIRMATION_ERROR_CODES = new Set([
   'confirmation_required',
@@ -77,7 +104,7 @@ interface ConfigOverride {
   value: string;
 }
 
-type ResponseFormat = 'framed' | 'jsonl';
+type DelegationMode = 'full' | 'question_only' | 'status_only';
 
 export async function startDelegationServer(options: DelegationServerOptions): Promise<void> {
   const repoRoot = resolve(options.repoRoot);
@@ -96,18 +123,11 @@ export async function startDelegationServer(options: DelegationServerOptions): P
 
   const tools = buildToolList({ mode, githubEnabled, allowedGithubOps });
 
-  const handler = async (request: McpRequest): Promise<unknown> => {
-    switch (request.method) {
-      case 'initialize':
-        return {
-          protocolVersion: PROTOCOL_VERSION,
-          serverInfo: { name: 'codex-delegation', version: '0.1.0' },
-          capabilities: { tools: {} }
-        };
-      case 'tools/list':
-        return { tools };
-    case 'tools/call':
-      return await handleToolCall(request, {
+  const handler = createDelegationServerRpcHandler({
+    protocolVersion: PROTOCOL_VERSION,
+    tools,
+    handleToolCall: (request) =>
+      handleToolCall(request, {
         repoRoot,
         mode,
         allowNested,
@@ -117,162 +137,17 @@ export async function startDelegationServer(options: DelegationServerOptions): P
         allowedHosts,
         toolProfile,
         expiryFallback: effectiveConfig.delegate.expiryFallback
-      });
-      default:
-        throw new Error(`Unsupported method: ${request.method}`);
-    }
-  };
+      })
+  });
 
   await runJsonRpcServer(handler);
-}
-
-function buildToolList(options: {
-  mode: 'full' | 'question_only';
-  githubEnabled: boolean;
-  allowedGithubOps: Set<string>;
-}): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {
-  const tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> = [];
-  const includeFull = options.mode !== 'question_only';
-
-  if (includeFull) {
-    tools.push(toolDefinition('delegate.spawn', 'Spawn a delegated run', {
-      type: 'object',
-      properties: {
-        task_id: { type: 'string' },
-        pipeline: { type: 'string' },
-        repo: { type: 'string' },
-        parent_run_id: { type: 'string' },
-        parent_manifest_path: { type: 'string' },
-        env: { type: 'object', additionalProperties: { type: 'string' } },
-        delegate_mode: { type: 'string', enum: ['full', 'question_only'] },
-        start_only: { type: 'boolean' }
-      },
-      required: ['pipeline', 'repo']
-    }));
-    tools.push(toolDefinition('delegate.pause', 'Pause or resume a run', {
-      type: 'object',
-      properties: {
-        manifest_path: { type: 'string' },
-        paused: { type: 'boolean' }
-      },
-      required: ['manifest_path', 'paused']
-    }));
-    tools.push(toolDefinition('delegate.cancel', 'Cancel a run (confirmation required)', {
-      type: 'object',
-      properties: {
-        manifest_path: { type: 'string' }
-      },
-      required: ['manifest_path']
-    }));
-  }
-
-  tools.push(toolDefinition('delegate.status', 'Fetch run status', {
-    type: 'object',
-    properties: {
-      manifest_path: { type: 'string' }
-    },
-    required: ['manifest_path']
-  }));
-
-  tools.push(toolDefinition('delegate.question.enqueue', 'Enqueue a question to the parent run', {
-    type: 'object',
-    properties: {
-      parent_manifest_path: { type: 'string' },
-      parent_run_id: { type: 'string' },
-      parent_task_id: { type: 'string' },
-      from_manifest_path: { type: 'string' },
-      prompt: { type: 'string' },
-      urgency: { type: 'string', enum: ['low', 'med', 'high'] },
-      expires_in_ms: { type: 'number' },
-      auto_pause: { type: 'boolean' }
-    },
-    required: ['parent_manifest_path', 'prompt']
-  }));
-  tools.push(toolDefinition('delegate.question.poll', 'Poll for a question answer', {
-    type: 'object',
-    properties: {
-      parent_manifest_path: { type: 'string' },
-      question_id: { type: 'string' },
-      wait_ms: { type: 'number' }
-    },
-    required: ['parent_manifest_path', 'question_id']
-  }));
-
-  if (options.githubEnabled) {
-    if (options.allowedGithubOps.has('open_pr')) {
-      tools.push(toolDefinition('github.open_pr', 'Open a pull request', {
-        type: 'object',
-        properties: {
-          repo: { type: 'string' },
-          title: { type: 'string' },
-          body: { type: 'string' },
-          base: { type: 'string' },
-          head: { type: 'string' },
-          draft: { type: 'boolean' }
-        },
-        required: ['title']
-      }));
-    }
-    if (options.allowedGithubOps.has('comment')) {
-      tools.push(toolDefinition('github.comment', 'Create a PR/issue comment', {
-        type: 'object',
-        properties: {
-          repo: { type: 'string' },
-          issue_number: { type: 'number' },
-          body: { type: 'string' }
-        },
-        required: ['issue_number', 'body']
-      }));
-    }
-    if (options.allowedGithubOps.has('review')) {
-      tools.push(toolDefinition('github.review', 'Submit a PR review', {
-        type: 'object',
-        properties: {
-          repo: { type: 'string' },
-          pull_number: { type: 'number' },
-          event: { type: 'string', enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'] },
-          body: { type: 'string' }
-        },
-        required: ['pull_number', 'event']
-      }));
-    }
-    if (options.allowedGithubOps.has('get_checks')) {
-      tools.push(toolDefinition('github.get_checks', 'Fetch PR checks', {
-        type: 'object',
-        properties: {
-          repo: { type: 'string' },
-          pull_number: { type: 'number' }
-        },
-        required: ['pull_number']
-      }));
-    }
-    if (options.allowedGithubOps.has('merge')) {
-      tools.push(toolDefinition('github.merge', 'Merge a PR', {
-        type: 'object',
-        properties: {
-          manifest_path: { type: 'string' },
-          repo: { type: 'string' },
-          pull_number: { type: 'number' },
-          method: { type: 'string', enum: ['merge', 'squash', 'rebase'] },
-          delete_branch: { type: 'boolean' }
-        },
-        required: ['pull_number']
-      }));
-    }
-  }
-
-  return tools;
-}
-
-function toolDefinition(name: string, description: string, inputSchema: Record<string, unknown>) {
-  return { name, description, inputSchema };
 }
 
 async function handleToolCall(
   request: McpRequest,
   context: {
     repoRoot: string;
-    mode: 'full' | 'question_only';
+    mode: DelegationMode;
     allowNested: boolean;
     githubEnabled: boolean;
     allowedGithubOps: Set<string>;
@@ -282,96 +157,21 @@ async function handleToolCall(
     expiryFallback: 'pause' | 'resume' | 'fail';
   }
 ): Promise<unknown> {
-  const params = asRecord(request.params);
-  const toolName = readStringValue(params, 'name');
-  if (!toolName) {
-    throw new Error('Invalid tool call: missing name');
-  }
-  const input = asRecord(params.arguments);
-
-  if (context.mode === 'question_only' && isRestrictedTool(toolName)) {
-    await reportSecurityViolation(
-      'delegate_mode_violation',
-      `Tool ${toolName} blocked in question_only mode.`,
-      toolName,
-      context.allowedHosts
-    );
-    throw new Error('delegate_mode_forbidden');
-  }
-
-  if (containsSecret(input, 'confirm_nonce') || containsSecret(input, 'confirmNonce')) {
-    await reportSecurityViolation('confirm_nonce_present', 'Model supplied confirm_nonce.', toolName, context.allowedHosts);
-    throw new Error('confirm_nonce must be injected by the runner');
-  }
-  if (containsSecret(input, 'delegation_token') || containsSecret(input, 'delegationToken')) {
-    await reportSecurityViolation(
-      'delegation_token_present',
-      'Model supplied delegation_token.',
-      toolName,
-      context.allowedHosts
-    );
-    throw new Error('delegation_token must be injected by the runner');
-  }
-
-  switch (toolName) {
-    case 'delegate.status':
-      return wrapResult(await handleDelegateStatus(input, context.allowedRoots, context.allowedHosts));
-    case 'delegate.pause':
-      return wrapResult(await handleDelegatePause(input, context.allowedRoots, context.allowedHosts));
-    case 'delegate.cancel':
-      return wrapResult(await handleDelegateCancel(input, request, context.allowedRoots, context.allowedHosts));
-    case 'delegate.spawn':
-      return wrapResult(
-        await handleDelegateSpawn(
-          input,
-          context.repoRoot,
-          context.allowNested,
-          context.allowedRoots,
-          context.allowedHosts,
-          context.toolProfile
-        )
-      );
-    case 'delegate.question.enqueue':
-      return wrapResult(
-        await handleQuestionEnqueue(
-          input,
-          request,
-          context.allowedRoots,
-          context.allowedHosts,
-          context.expiryFallback
-        )
-      );
-    case 'delegate.question.poll':
-      return wrapResult(
-        await handleQuestionPoll(
-          input,
-          request,
-          context.allowedRoots,
-          context.allowedHosts,
-          context.expiryFallback
-        )
-      );
-    case 'github.open_pr':
-    case 'github.comment':
-    case 'github.review':
-    case 'github.get_checks':
-    case 'github.merge':
-      return wrapResult(await handleGithubCall(toolName, input, request, context));
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
-  }
-}
-
-function wrapResult(payload: unknown): { content: Array<{ type: 'text'; text: string }>; isError: false } {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2)
-      }
-    ],
-    isError: false
-  };
+  return handleDelegationServerToolCall(request, context, {
+    asRecord,
+    readStringValue,
+    containsSecret,
+    reportSecurityViolation,
+    getDelegateModeViolationMessage,
+    handleDelegateStatus,
+    handleDelegatePause,
+    handleDelegateCancel,
+    handleDelegateSpawn,
+    handleQuestionEnqueue,
+    handleQuestionPoll,
+    handleCoordinatorDynamicToolCall,
+    handleGithubCall
+  });
 }
 
 async function handleDelegateStatus(
@@ -380,18 +180,14 @@ async function handleDelegateStatus(
   allowedHosts: string[]
 ): Promise<Record<string, unknown>> {
   const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as {
-    status: string;
-    run_id: string;
-    task_id: string;
-    status_detail?: string;
-    log_path?: string | null;
-  };
+  const manifest = await loadRunManifest(manifestPath);
   const eventsPath = resolve(dirname(manifestPath), 'events.jsonl');
+  const intentId = readStringValue(input, 'intent_id', 'intentId') ?? null;
+  const requestId = readStringValue(input, 'request_id', 'requestId') ?? null;
   if (!TERMINAL_RUN_STATUSES.has(manifest.status)) {
     await assertControlEndpoint(manifestPath, allowedHosts);
   }
+  const control = await loadControlSnapshot(manifestPath);
   return {
     run_id: manifest.run_id,
     task_id: manifest.task_id,
@@ -399,7 +195,15 @@ async function handleDelegateStatus(
     status_detail: manifest.status_detail ?? null,
     manifest_path: manifestPath,
     events_path: eventsPath,
-    log_path: manifest.log_path ?? null
+    log_path: manifest.log_path ?? null,
+    control,
+    traceability: {
+      intent_id: intentId,
+      task_id: manifest.task_id ?? null,
+      run_id: manifest.run_id ?? null,
+      manifest_path: manifestPath,
+      request_id: requestId
+    }
   };
 }
 
@@ -409,17 +213,54 @@ async function handleDelegatePause(
   allowedHosts: string[]
 ): Promise<unknown> {
   const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const manifest = await loadRunManifest(manifestPath);
   const paused = readBooleanValue(input, 'paused') ?? false;
-  return await callControlEndpoint(
+  const action = paused ? 'pause' : 'resume';
+  const intentId = readStringValue(input, 'intent_id', 'intentId') ?? null;
+  const requestId =
+    readStringValue(input, 'request_id', 'requestId') ??
+    deriveIdempotentRequestId(action, intentId, manifestPath);
+  const transportMetadata = readTransportMutationMetadata(input);
+  const result = await callControlEndpoint(
     manifestPath,
     '/control/action',
     {
-      action: paused ? 'pause' : 'resume',
-      requested_by: 'delegate'
+      action,
+      requested_by: 'delegate',
+      intent_id: intentId,
+      request_id: requestId,
+      ...(transportMetadata ?? {})
     },
     undefined,
     { allowedHosts }
   );
+  const resultRecord = asRecord(result);
+  const latestAction = asRecord(resultRecord.latest_action);
+  const resultRequestId =
+    readStringValue(resultRecord, 'request_id', 'requestId') ??
+    readStringValue(latestAction, 'request_id', 'requestId') ??
+    requestId;
+  const canonicalTraceability = readCanonicalTraceability(resultRecord);
+  return {
+    ...resultRecord,
+    traceability:
+      canonicalTraceability ??
+      ({
+        intent_id: intentId,
+        task_id: manifest.task_id ?? null,
+        run_id: manifest.run_id ?? null,
+        manifest_path: manifestPath,
+        request_id: resultRequestId,
+        ...(transportMetadata
+          ? {
+              transport: transportMetadata.transport,
+              actor_id: transportMetadata.actor_id,
+              actor_source: transportMetadata.actor_source,
+              transport_principal: transportMetadata.transport_principal
+            }
+          : {})
+      } as Record<string, unknown>)
+  };
 }
 
 async function handleDelegateCancel(
@@ -429,51 +270,458 @@ async function handleDelegateCancel(
   allowedHosts: string[]
 ): Promise<unknown> {
   const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const manifest = await loadRunManifest(manifestPath);
+  const intentId = readStringValue(input, 'intent_id', 'intentId') ?? null;
+  const requestId =
+    readStringValue(input, 'request_id', 'requestId') ??
+    deriveIdempotentRequestId('cancel', intentId, manifestPath);
+  const transportMetadata = readTransportMutationMetadata(input);
   const privateNonce = request.codex_private?.confirm_nonce;
   if (!privateNonce) {
-    return await callControlEndpoint(
+    const confirmation = await callControlEndpoint(
       manifestPath,
       '/confirmations/create',
       {
         action: 'cancel',
         tool: 'delegate.cancel',
-        params: { manifest_path: manifestPath }
+        params: {
+          manifest_path: manifestPath,
+          intent_id: intentId,
+          request_id: requestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        }
       },
       undefined,
       { allowedHosts }
     );
+    const confirmationRequestId = readStringValue(confirmation, 'request_id', 'requestId') ?? requestId;
+    const confirmationRecord = asRecord(confirmation);
+    const canonicalTraceability = readCanonicalTraceability(confirmationRecord);
+    return {
+      ...confirmationRecord,
+      traceability:
+        canonicalTraceability ??
+        ({
+          intent_id: intentId,
+          task_id: manifest.task_id ?? null,
+          run_id: manifest.run_id ?? null,
+          manifest_path: manifestPath,
+          request_id: confirmationRequestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        } as Record<string, unknown>)
+    };
   }
 
   try {
-    return await callControlEndpoint(
+    const result = await callControlEndpoint(
       manifestPath,
       '/control/action',
       {
         action: 'cancel',
         requested_by: 'delegate',
+        intent_id: intentId,
+        request_id: requestId,
         confirm_nonce: String(privateNonce),
         tool: 'delegate.cancel',
-        params: { manifest_path: manifestPath }
+        params: {
+          manifest_path: manifestPath,
+          intent_id: intentId,
+          request_id: requestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        },
+        ...(transportMetadata ?? {})
       },
       undefined,
       { allowedHosts }
     );
+    const resultRecord = asRecord(result);
+    const latestAction = asRecord(resultRecord.latest_action);
+    const resultRequestId =
+      readStringValue(resultRecord, 'request_id', 'requestId') ??
+      readStringValue(latestAction, 'request_id', 'requestId') ??
+      requestId;
+    const canonicalTraceability = readCanonicalTraceability(resultRecord);
+    return {
+      ...resultRecord,
+      traceability:
+        canonicalTraceability ??
+        ({
+          intent_id: intentId,
+          task_id: manifest.task_id ?? null,
+          run_id: manifest.run_id ?? null,
+          manifest_path: manifestPath,
+          request_id: resultRequestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        } as Record<string, unknown>)
+    };
   } catch (error) {
     if (!isConfirmationError(error)) {
       throw error;
     }
-    return await callControlEndpoint(
+    const confirmation = await callControlEndpoint(
       manifestPath,
       '/confirmations/create',
       {
         action: 'cancel',
         tool: 'delegate.cancel',
-        params: { manifest_path: manifestPath }
+        params: {
+          manifest_path: manifestPath,
+          intent_id: intentId,
+          request_id: requestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        }
       },
       undefined,
       { allowedHosts }
     );
+    const confirmationRequestId = readStringValue(confirmation, 'request_id', 'requestId') ?? requestId;
+    const confirmationRecord = asRecord(confirmation);
+    const canonicalTraceability = readCanonicalTraceability(confirmationRecord);
+    return {
+      ...confirmationRecord,
+      traceability:
+        canonicalTraceability ??
+        ({
+          intent_id: intentId,
+          task_id: manifest.task_id ?? null,
+          run_id: manifest.run_id ?? null,
+          manifest_path: manifestPath,
+          request_id: confirmationRequestId,
+          ...(transportMetadata
+            ? {
+                transport: transportMetadata.transport,
+                actor_id: transportMetadata.actor_id,
+                actor_source: transportMetadata.actor_source,
+                transport_principal: transportMetadata.transport_principal
+              }
+            : {})
+        } as Record<string, unknown>)
+    };
   }
+}
+
+async function handleCoordinatorDynamicToolCall(
+  toolName: 'coordinator.status' | 'coordinator.pause' | 'coordinator.resume' | 'coordinator.cancel',
+  input: Record<string, unknown>,
+  request: McpRequest,
+  allowedRoots: string[],
+  allowedHosts: string[]
+): Promise<unknown> {
+  if (containsAnySecret(input, DYNAMIC_TOOL_BRIDGE_PUBLIC_TOKEN_KEYS)) {
+    await reportSecurityViolation(
+      'dynamic_tool_bridge_token_present',
+      'Model supplied dynamic tool bridge token.',
+      toolName,
+      allowedHosts
+    );
+    throw new Error('dynamic_tool_bridge_token_missing');
+  }
+  if (containsAnySecret(input, DYNAMIC_TOOL_BRIDGE_PUBLIC_ATTESTATION_KEYS)) {
+    await reportSecurityViolation(
+      'dynamic_tool_bridge_attestation_present',
+      'Model supplied dynamic tool bridge attestation.',
+      toolName,
+      allowedHosts
+    );
+    throw new Error('dynamic_tool_bridge_attestation_missing');
+  }
+
+  const manifestPath = resolveManifestPath(readStringValue(input, 'manifest_path', 'manifestPath'), allowedRoots);
+  const controlSnapshot = await loadControlSnapshot(manifestPath);
+  const featureToggles = asRecord(controlSnapshot?.feature_toggles);
+  const bridgeAction = resolveCoordinatorDynamicToolAction(toolName);
+  const bridgeEvaluation = evaluateDynamicToolBridgeRequest({
+    featureToggles,
+    action: bridgeAction,
+    args: input
+  });
+  if (!bridgeEvaluation.ok) {
+    throw new Error(bridgeEvaluation.error ?? 'dynamic_tool_bridge_disabled');
+  }
+  verifyDynamicToolBridgeAttestation(request, featureToggles, bridgeEvaluation.sourceId ?? 'appserver_dynamic_tool');
+
+  let result: unknown;
+  if (bridgeAction === 'status') {
+    result = await handleDelegateStatus(
+      {
+        ...input,
+        manifest_path: manifestPath
+      },
+      allowedRoots,
+      allowedHosts
+    );
+  } else if (bridgeAction === 'pause' || bridgeAction === 'resume') {
+    result = await handleDelegatePause(
+      {
+        ...input,
+        manifest_path: manifestPath,
+        paused: bridgeAction === 'pause'
+      },
+      allowedRoots,
+      allowedHosts
+    );
+  } else {
+    result = await handleDelegateCancel(
+      {
+        ...input,
+        manifest_path: manifestPath
+      },
+      request,
+      allowedRoots,
+      allowedHosts
+    );
+  }
+
+  return appendCoordinatorBridgeTraceability(result, {
+    action: bridgeAction,
+    sourceId: bridgeEvaluation.sourceId ?? 'appserver_dynamic_tool'
+  });
+}
+
+function resolveCoordinatorDynamicToolAction(toolName: string): DynamicToolBridgeAction {
+  switch (toolName) {
+    case 'coordinator.status':
+      return 'status';
+    case 'coordinator.pause':
+      return 'pause';
+    case 'coordinator.resume':
+      return 'resume';
+    case 'coordinator.cancel':
+      return 'cancel';
+    default:
+      throw new Error('dynamic_tool_bridge_action_not_allowed');
+  }
+}
+
+function appendCoordinatorBridgeTraceability(
+  payload: unknown,
+  input: { action: DynamicToolBridgeAction; sourceId: string }
+): Record<string, unknown> {
+  const record = asRecord(payload);
+  const traceability = asRecord(record.traceability);
+  return {
+    ...record,
+    traceability: {
+      ...traceability,
+      bridge_surface: 'coordinator_dynamic_tool',
+      bridge_action: input.action,
+      bridge_source_id: input.sourceId,
+      bridge_token_validated: true
+    }
+  };
+}
+
+interface DynamicToolBridgePrivateAttestation {
+  token: string;
+  sourceId: string;
+  principal: string;
+}
+
+interface DynamicToolBridgeExpectedAttestation {
+  tokenSha256: string;
+  sourceId: string;
+  principal: string;
+  expiresAt: string | null;
+  revoked: boolean;
+}
+
+function verifyDynamicToolBridgeAttestation(
+  request: McpRequest,
+  featureToggles: Record<string, unknown>,
+  sourceId: string
+): DynamicToolBridgePrivateAttestation {
+  const hiddenAttestation = readDynamicToolBridgePrivateAttestation(request);
+  if (!hiddenAttestation) {
+    throw new Error('dynamic_tool_bridge_attestation_missing');
+  }
+  const expectedAttestation = readDynamicToolBridgeExpectedAttestation(featureToggles);
+  if (!expectedAttestation) {
+    throw new Error('dynamic_tool_bridge_attestation_invalid');
+  }
+  if (expectedAttestation.revoked) {
+    throw new Error('dynamic_tool_bridge_attestation_revoked');
+  }
+  if (expectedAttestation.expiresAt) {
+    const expiresAtMs = Date.parse(expectedAttestation.expiresAt);
+    if (!Number.isFinite(expiresAtMs)) {
+      throw new Error('dynamic_tool_bridge_attestation_malformed');
+    }
+    if (expiresAtMs <= Date.now()) {
+      throw new Error('dynamic_tool_bridge_attestation_expired');
+    }
+  }
+  const normalizedSourceId = normalizeDynamicToolBridgeSourceId(sourceId);
+  if (
+    hiddenAttestation.sourceId !== normalizedSourceId ||
+    hiddenAttestation.sourceId !== expectedAttestation.sourceId ||
+    expectedAttestation.sourceId !== normalizedSourceId
+  ) {
+    throw new Error('dynamic_tool_bridge_attestation_source_mismatch');
+  }
+  if (hiddenAttestation.principal !== expectedAttestation.principal) {
+    throw new Error('dynamic_tool_bridge_attestation_principal_mismatch');
+  }
+  const tokenSha256 = createHash('sha256').update(hiddenAttestation.token).digest('hex');
+  if (tokenSha256 !== expectedAttestation.tokenSha256) {
+    throw new Error('dynamic_tool_bridge_attestation_invalid');
+  }
+  return hiddenAttestation;
+}
+
+function readDynamicToolBridgePrivateAttestation(request: McpRequest): DynamicToolBridgePrivateAttestation | null {
+  const privateRecord = request.codex_private;
+  if (!privateRecord) {
+    return null;
+  }
+  for (const key of DYNAMIC_TOOL_BRIDGE_PRIVATE_ATTESTATION_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(privateRecord, key)) {
+      continue;
+    }
+    const attestation = asRecord(privateRecord[key]);
+    const token = readStringValue(attestation, 'token', 'bridge_token', 'bridgeToken');
+    const sourceId = readStringValue(attestation, 'source_id', 'sourceId');
+    const principal = readStringValue(attestation, 'principal');
+    if (!token || !sourceId || !principal) {
+      throw new Error('dynamic_tool_bridge_attestation_malformed');
+    }
+    return {
+      token,
+      sourceId: normalizeDynamicToolBridgeSourceId(sourceId),
+      principal
+    };
+  }
+  return null;
+}
+
+function readDynamicToolBridgeExpectedAttestation(
+  featureToggles: Record<string, unknown>
+): DynamicToolBridgeExpectedAttestation | null {
+  const bridgePolicy = readDynamicToolBridgePolicyRecord(featureToggles);
+  const rawAttestation = bridgePolicy.attestation;
+  if (rawAttestation === undefined) {
+    return null;
+  }
+  const attestation = asRecord(rawAttestation);
+  const tokenSha256 = readStringValue(attestation, 'token_sha256', 'tokenSha256');
+  const sourceId = readStringValue(attestation, 'source_id', 'sourceId');
+  const principal = readStringValue(attestation, 'principal');
+  const expiresAt = readStringValue(attestation, 'expires_at', 'expiresAt');
+  const revoked = readBooleanValue(attestation, 'revoked') ?? false;
+  const revokedAt = readStringValue(attestation, 'revoked_at', 'revokedAt');
+  if (!tokenSha256 || !sourceId || !principal) {
+    throw new Error('dynamic_tool_bridge_attestation_malformed');
+  }
+  if (!/^[a-f0-9]{64}$/i.test(tokenSha256)) {
+    throw new Error('dynamic_tool_bridge_attestation_malformed');
+  }
+  return {
+    tokenSha256: tokenSha256.toLowerCase(),
+    sourceId: normalizeDynamicToolBridgeSourceId(sourceId),
+    principal,
+    expiresAt: expiresAt ?? null,
+    revoked: revoked || Boolean(revokedAt)
+  };
+}
+
+function readDynamicToolBridgePolicyRecord(featureToggles: Record<string, unknown>): Record<string, unknown> {
+  const coordinatorPolicy = asRecord(asRecord(featureToggles.coordinator).dynamic_tool_bridge);
+  if (Object.keys(coordinatorPolicy).length > 0) {
+    return coordinatorPolicy;
+  }
+  return asRecord(featureToggles.dynamic_tool_bridge);
+}
+
+function normalizeDynamicToolBridgeSourceId(sourceId: string): string {
+  return sourceId.trim().toLowerCase();
+}
+
+interface DelegationManifestSnapshot {
+  status: string;
+  run_id: string;
+  task_id: string;
+  status_detail?: string;
+  log_path?: string | null;
+}
+
+interface TransportMutationMetadata {
+  transport: 'discord' | 'telegram';
+  actor_id?: string;
+  actor_source?: string;
+  transport_principal?: string;
+  transport_nonce?: string;
+  transport_nonce_expires_at?: string;
+}
+
+async function loadRunManifest(manifestPath: string): Promise<DelegationManifestSnapshot> {
+  const raw = await readFile(manifestPath, 'utf8');
+  return JSON.parse(raw) as DelegationManifestSnapshot;
+}
+
+async function loadControlSnapshot(manifestPath: string): Promise<Record<string, unknown> | null> {
+  const controlPath = resolve(dirname(manifestPath), 'control.json');
+  try {
+    const raw = await readFile(controlPath, 'utf8');
+    const parsed = safeJsonParse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    return null;
+  }
+}
+
+function deriveIdempotentRequestId(
+  action: 'pause' | 'resume' | 'cancel',
+  intentId: string | null,
+  manifestPath: string
+): string | undefined {
+  if (!intentId) {
+    return undefined;
+  }
+  const digest = createHash('sha256')
+    .update(`${action}:${intentId}:${manifestPath}`)
+    .digest('hex')
+    .slice(0, 24);
+  return `intent-${digest}`;
 }
 
 async function handleDelegateSpawn(
@@ -506,7 +754,7 @@ async function handleDelegateSpawn(
     args.push('--parent-run', parentRunId);
   }
   const requestedMode = readStringValue(input, 'delegate_mode', 'delegateMode') ?? 'question_only';
-  const childMode = allowNested && requestedMode === 'full' ? 'full' : 'question_only';
+  const childMode = resolveChildDelegateMode(requestedMode, allowNested);
 
   const envOverrides = readStringMap(input, 'env');
   const delegationToken = randomBytes(32).toString('hex');
@@ -689,70 +937,14 @@ async function handleQuestionEnqueue(
   allowedHosts: string[],
   expiryFallback: 'pause' | 'resume' | 'fail'
 ): Promise<unknown> {
-  const parentManifestPath = resolveParentManifestPath(input, allowedRoots);
-  if (!parentManifestPath) {
-    throw new Error('parent_manifest_path is required');
-  }
-
-  const delegationToken = await resolveDelegationToken(request, allowedRoots, {
-    retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
-    intervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
-  });
-  const childRunId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? readStringValue(input, 'from_run_id', 'fromRunId') ?? '';
-
-  if (!delegationToken) {
-    throw new Error('delegation_token missing');
-  }
-
-  const autoPause = readBooleanValue(input, 'auto_pause', 'autoPause') ?? true;
-  const manifestFromEnv = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
-  const manifestFromInput = readStringValue(input, 'from_manifest_path', 'fromManifestPath');
-  const childManifestPath = manifestFromEnv ?? manifestFromInput;
-  const result = await callControlEndpointWithRetry(
-    parentManifestPath,
-    '/questions/enqueue',
-    {
-      parent_run_id: readStringValue(input, 'parent_run_id', 'parentRunId') ?? '',
-      parent_task_id: readStringValue(input, 'parent_task_id', 'parentTaskId') ?? null,
-      from_run_id: childRunId,
-      from_manifest_path: childManifestPath ?? null,
-      prompt: requireString(readStringValue(input, 'prompt'), 'prompt'),
-      urgency: readStringValue(input, 'urgency') ?? 'med',
-      expires_in_ms: readNumberValue(input, 'expires_in_ms', 'expiresInMs'),
-      auto_pause: autoPause,
-      expiry_fallback: expiryFallback
-    },
-    {
-      [DELEGATION_TOKEN_HEADER]: delegationToken,
-      [DELEGATION_RUN_HEADER]: childRunId
-    },
-    {
-      allowedHosts,
-      allowedRoots,
-      retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
-      retryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
-    }
+  return handleDelegationServerQuestionEnqueue(
+    input,
+    request,
+    allowedRoots,
+    allowedHosts,
+    expiryFallback,
+    questionFlowDeps
   );
-
-  if (autoPause && manifestFromEnv) {
-    const resolvedManifest = resolveRunManifestPath(manifestFromEnv, allowedRoots, 'manifest_path');
-    await callControlEndpoint(
-      resolvedManifest,
-      '/control/action',
-      {
-        action: 'pause',
-        requested_by: 'delegate',
-        reason: 'awaiting_question_answer'
-      },
-      undefined,
-      { allowedHosts, allowedRoots }
-    );
-  }
-
-  return {
-    ...result,
-    fallback_action: expiryFallback
-  };
 }
 
 async function handleQuestionPoll(
@@ -762,85 +954,14 @@ async function handleQuestionPoll(
   allowedHosts: string[],
   expiryFallback: 'pause' | 'resume' | 'fail'
 ): Promise<unknown> {
-  const parentManifestPath = resolveParentManifestPath(input, allowedRoots);
-  if (!parentManifestPath) {
-    throw new Error('parent_manifest_path is required');
-  }
-
-  const delegationToken = await resolveDelegationToken(request, allowedRoots, {
-    retryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
-    intervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS
-  });
-  const childRunId = process.env.CODEX_ORCHESTRATOR_RUN_ID ?? readStringValue(input, 'from_run_id', 'fromRunId') ?? '';
-
-  if (!delegationToken) {
-    throw new Error('delegation_token missing');
-  }
-
-  const questionId = requireString(readStringValue(input, 'question_id', 'questionId'), 'question_id');
-  const requestedWaitMs = readNumberValue(input, 'wait_ms', 'waitMs') ?? 0;
-  const waitMs = clampQuestionPollWaitMs(requestedWaitMs);
-  const deadline = Date.now() + waitMs;
-  const maxIterations = waitMs > 0 ? Math.max(1, Math.ceil(waitMs / QUESTION_POLL_INTERVAL_MS)) : 1;
-
-  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
-    const remainingMs = waitMs > 0 ? Math.max(0, deadline - Date.now()) : null;
-    const timeoutMs =
-      remainingMs === null ? undefined : Math.max(1, Math.min(DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS, remainingMs));
-    const retryMs =
-      remainingMs === null ? DEFAULT_DELEGATION_TOKEN_RETRY_MS : Math.min(DEFAULT_DELEGATION_TOKEN_RETRY_MS, remainingMs);
-    const record = await callControlEndpointWithRetry(
-      parentManifestPath,
-      `/questions/${questionId}`,
-      null,
-      {
-        [DELEGATION_TOKEN_HEADER]: delegationToken,
-        [DELEGATION_RUN_HEADER]: childRunId
-      },
-      {
-        allowedHosts,
-        allowedRoots,
-        retryMs,
-        retryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS,
-        ...(timeoutMs !== undefined ? { timeoutMs } : {})
-      }
-    );
-    const status = readStringValue(record, 'status');
-    if (status !== 'queued' || waitMs <= 0 || Date.now() >= deadline) {
-      const expiresAt = readStringValue(record, 'expires_at', 'expiresAt');
-      if (status === 'expired') {
-        await applyQuestionFallback(expiryFallback, allowedHosts, allowedRoots);
-      }
-      return {
-        ...record,
-        expired_at: status === 'expired' ? expiresAt ?? null : null,
-        fallback_action: status === 'expired' ? expiryFallback : null
-      };
-    }
-    await delay(QUESTION_POLL_INTERVAL_MS);
-  }
-
-  const remainingMs = waitMs > 0 ? Math.max(0, deadline - Date.now()) : null;
-  const timeoutMs =
-    remainingMs === null ? undefined : Math.max(1, Math.min(DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS, remainingMs));
-  const record = await callControlEndpoint(
-    parentManifestPath,
-    `/questions/${questionId}`,
-    null,
-    {
-      [DELEGATION_TOKEN_HEADER]: delegationToken,
-      [DELEGATION_RUN_HEADER]: childRunId
-    },
-    {
-      allowedHosts,
-      ...(timeoutMs !== undefined ? { timeoutMs } : {})
-    }
+  return handleDelegationServerQuestionPoll(
+    input,
+    request,
+    allowedRoots,
+    allowedHosts,
+    expiryFallback,
+    questionFlowDeps
   );
-  return {
-    ...record,
-    expired_at: null,
-    fallback_action: null
-  };
 }
 
 async function handleGithubCall(
@@ -1175,226 +1296,6 @@ async function runGh(args: string[], timeoutMs = DEFAULT_GH_TIMEOUT_MS): Promise
   });
 }
 
-async function runJsonRpcServer(
-  handler: (request: McpRequest) => Promise<unknown>,
-  options: { stdin?: NodeJS.ReadableStream; stdout?: NodeJS.WritableStream } = {}
-): Promise<void> {
-  let buffer = Buffer.alloc(0);
-  let expectedLength: number | null = null;
-  let processing = Promise.resolve();
-  let halted = false;
-  const input = options.stdin ?? process.stdin;
-  const output = options.stdout ?? process.stdout;
-
-  const handleProtocolViolation = (message: string) => {
-    if (halted) {
-      return;
-    }
-    halted = true;
-    logger.warn(message);
-    process.exitCode = 1;
-    buffer = Buffer.alloc(0);
-    expectedLength = null;
-    if (typeof (input as { pause?: () => void }).pause === 'function') {
-      input.pause();
-    }
-  };
-
-  input.on('data', (chunk) => {
-    if (halted) {
-      return;
-    }
-    buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
-    if (buffer.length > MAX_MCP_BUFFER_BYTES) {
-      handleProtocolViolation(`Rejecting MCP buffer larger than ${MAX_MCP_BUFFER_BYTES} bytes`);
-      return;
-    }
-    processing = processing
-      .then(() => processBuffer())
-      .catch((error) => {
-        logger.error(`Failed to process MCP buffer: ${(error as Error)?.message ?? error}`);
-      });
-  });
-
-  async function processBuffer() {
-    while (buffer.length > 0) {
-      if (halted) {
-        return;
-      }
-      if (expectedLength !== null) {
-        if (buffer.length < expectedLength) {
-          return;
-        }
-        const body = buffer.slice(0, expectedLength);
-        buffer = buffer.slice(expectedLength);
-        expectedLength = null;
-        await handleMessage(body.toString('utf8'), 'framed');
-        continue;
-      }
-
-      const headerEnd = buffer.indexOf('\r\n\r\n');
-      if (headerEnd === -1) {
-        const newlineIndex = buffer.indexOf('\n');
-        if (newlineIndex !== -1) {
-          const lineBuffer = buffer.slice(0, newlineIndex);
-          const line = lineBuffer.toString('utf8').trim();
-          buffer = buffer.slice(newlineIndex + 1);
-          if (!line) {
-            continue;
-          }
-          const normalizedLine = line.trimStart();
-          const looksLikeHeaderLine = /^[A-Za-z0-9-]+:/.test(normalizedLine);
-          const looksLikeJson = normalizedLine.startsWith('{') || normalizedLine.startsWith('[');
-          const isContentLength = normalizedLine.toLowerCase().startsWith('content-length:');
-          let restoredHeader = false;
-          if (!looksLikeJson && looksLikeHeaderLine) {
-            // Fall through to header-size checks for partial Content-Length frames (and other header lines).
-            buffer = Buffer.concat([Buffer.from(lineBuffer), Buffer.from('\n'), buffer]);
-            restoredHeader = true;
-          } else if (!isContentLength) {
-            const lineBytes = Buffer.byteLength(line, 'utf8');
-            if (lineBytes > MAX_MCP_MESSAGE_BYTES) {
-              handleProtocolViolation(
-                `Rejecting MCP payload (${lineBytes} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`
-              );
-              return;
-            }
-            await handleMessage(line, 'jsonl');
-            continue;
-          }
-          if (!restoredHeader && isContentLength) {
-            // Fall through to header-size checks for partial Content-Length frames.
-            buffer = Buffer.concat([Buffer.from(lineBuffer), Buffer.from('\n'), buffer]);
-          }
-        } else if (buffer.length > MAX_MCP_MESSAGE_BYTES) {
-          handleProtocolViolation(
-            `Rejecting MCP payload (${buffer.length} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`
-          );
-          return;
-        }
-
-        if (buffer.length > MAX_MCP_HEADER_BYTES) {
-          const overflow = buffer.slice(MAX_MCP_HEADER_BYTES);
-          const allowedPrefix = MCP_HEADER_DELIMITER_BUFFER.subarray(0, overflow.length);
-          if (overflow.length > MCP_HEADER_DELIMITER_BYTES || !overflow.equals(allowedPrefix)) {
-            handleProtocolViolation(`Rejecting MCP header larger than ${MAX_MCP_HEADER_BYTES} bytes`);
-          }
-        }
-        return;
-      }
-      if (headerEnd > MAX_MCP_HEADER_BYTES) {
-        handleProtocolViolation(`Rejecting MCP header larger than ${MAX_MCP_HEADER_BYTES} bytes`);
-        return;
-      }
-      const header = buffer.slice(0, headerEnd).toString('utf8');
-      const parsed = parseContentLengthHeader(header);
-      if (parsed.error) {
-        handleProtocolViolation(parsed.error);
-        return;
-      }
-      if (parsed.length === null) {
-        const lines = header.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-        if (lines.length === 0) {
-          buffer = buffer.slice(headerEnd + 4);
-          continue;
-        }
-        const allJsonLike = lines.every((line) => line.startsWith('{') || line.startsWith('['));
-        if (allJsonLike) {
-          buffer = buffer.slice(headerEnd + 4);
-          for (const line of lines) {
-            await handleMessage(line, 'jsonl');
-          }
-          continue;
-        }
-        handleProtocolViolation('Missing Content-Length header in MCP message');
-        return;
-      }
-      const length = parsed.length;
-      if (!Number.isFinite(length) || length < 0) {
-        handleProtocolViolation('Invalid Content-Length for MCP payload');
-        return;
-      }
-      if (length > MAX_MCP_MESSAGE_BYTES) {
-        handleProtocolViolation(`Rejecting MCP payload (${length} bytes) larger than ${MAX_MCP_MESSAGE_BYTES}`);
-        return;
-      }
-      expectedLength = length;
-      buffer = buffer.slice(headerEnd + 4);
-    }
-  }
-
-  async function handleMessage(raw: string, format: ResponseFormat) {
-    let request: McpRequest;
-    try {
-      request = JSON.parse(raw) as McpRequest;
-    } catch (error) {
-      logger.error(`Failed to parse MCP message: ${(error as Error)?.message ?? error}`);
-      return;
-    }
-    if (typeof request.method !== 'string') {
-      return;
-    }
-    const id = request.id ?? null;
-    try {
-      const result = await handler(request);
-      if (id !== null && typeof id !== 'undefined') {
-        sendResponse({ jsonrpc: '2.0', id, result }, output, format);
-      }
-    } catch (error) {
-      if (id !== null && typeof id !== 'undefined') {
-        sendResponse(
-          {
-            jsonrpc: '2.0',
-            id,
-            error: { code: -32603, message: (error as Error)?.message ?? String(error) }
-          },
-          output,
-          format
-        );
-      }
-    }
-  }
-}
-
-function parseContentLengthHeader(header: string): { length: number | null; error?: string } {
-  const lines = header.split(/\r?\n/);
-  let contentLength: number | null = null;
-  for (const line of lines) {
-    const separator = line.indexOf(':');
-    if (separator === -1) {
-      continue;
-    }
-    const name = line.slice(0, separator).trim().toLowerCase();
-    if (name !== 'content-length') {
-      continue;
-    }
-    if (contentLength !== null) {
-      return { length: null, error: 'Multiple Content-Length headers in MCP message' };
-    }
-    const value = line.slice(separator + 1).trim();
-    if (!/^\d+$/.test(value)) {
-      return { length: null, error: 'Invalid Content-Length header in MCP message' };
-    }
-    contentLength = Number(value);
-  }
-  return { length: contentLength };
-}
-
-function sendResponse(
-  response: McpResponse,
-  output: NodeJS.WritableStream = process.stdout,
-  format: ResponseFormat = 'framed'
-): void {
-  const payload = JSON.stringify(response);
-  if (format === 'jsonl') {
-    output.write(`${payload}\n`);
-    return;
-  }
-  const buffer = Buffer.from(payload, 'utf8');
-  const header = Buffer.from(`Content-Length: ${buffer.length}\r\n\r\n`, 'utf8');
-  output.write(Buffer.concat([header, buffer]));
-}
-
 function safeJsonParse(text: string): unknown | null {
   try {
     return JSON.parse(text);
@@ -1434,6 +1335,9 @@ function parseSpawnOutput(stdout: string): Record<string, unknown> {
 export const __test__ = {
   runJsonRpcServer,
   handleToolCall,
+  buildToolList,
+  createDelegationServerRpcHandler,
+  resolveChildDelegateMode,
   parseContentLengthHeader,
   parseSpawnOutput,
   handleDelegateSpawn,
@@ -1444,16 +1348,29 @@ export const __test__ = {
   clampQuestionPollWaitMs
 };
 
-function clampQuestionPollWaitMs(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    return 0;
-  }
-  return Math.min(value, MAX_QUESTION_POLL_WAIT_MS);
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+const questionFlowDeps: DelegationServerQuestionFlowDeps = {
+  resolveParentManifestPath,
+  readStringValue,
+  readNumberValue,
+  readBooleanValue,
+  requireString,
+  callControlEndpoint,
+  callControlEndpointWithRetry,
+  resolveRunManifestPath,
+  isPathWithinRoots,
+  safeJsonParse,
+  delay,
+  defaultDelegationTokenRetryMs: DEFAULT_DELEGATION_TOKEN_RETRY_MS,
+  defaultDelegationTokenRetryIntervalMs: DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS,
+  defaultControlEndpointTimeoutMs: DEFAULT_CONTROL_ENDPOINT_TIMEOUT_MS,
+  delegationTokenHeader: DELEGATION_TOKEN_HEADER,
+  delegationRunHeader: DELEGATION_RUN_HEADER,
+  delegationTokenFile: DELEGATION_TOKEN_FILE
+};
 
 function resolveRepoRootForRuns(repoRoot: string, env: NodeJS.ProcessEnv): string {
   const configured = env.CODEX_ORCHESTRATOR_ROOT?.trim();
@@ -1711,6 +1628,72 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function readCanonicalTraceability(record: Record<string, unknown>): Record<string, unknown> | null {
+  const traceability = asRecord(record.traceability);
+  return Object.keys(traceability).length > 0 ? traceability : null;
+}
+
+const TRANSPORT_MUTATION_METADATA_KEYS = [
+  'actor_id',
+  'actorId',
+  'actor_source',
+  'actorSource',
+  'transport_principal',
+  'transportPrincipal',
+  'principal',
+  'transport_nonce',
+  'transportNonce',
+  'nonce',
+  'transport_nonce_expires_at',
+  'transportNonceExpiresAt',
+  'nonce_expires_at',
+  'nonceExpiresAt'
+] as const;
+
+function hasTransportMutationMetadata(input: Record<string, unknown>): boolean {
+  return TRANSPORT_MUTATION_METADATA_KEYS.some((key) => Object.prototype.hasOwnProperty.call(input, key));
+}
+
+function readTransportMutationMetadata(input: Record<string, unknown>): TransportMutationMetadata | null {
+  if (!Object.prototype.hasOwnProperty.call(input, 'transport')) {
+    if (hasTransportMutationMetadata(input)) {
+      throw new Error('transport_required');
+    }
+    return null;
+  }
+  const rawTransport = input.transport;
+  if (typeof rawTransport !== 'string') {
+    throw new Error('transport_invalid');
+  }
+  const normalizedTransport = rawTransport.trim();
+  if (!normalizedTransport) {
+    throw new Error('transport_invalid');
+  }
+  if (normalizedTransport !== 'discord' && normalizedTransport !== 'telegram') {
+    throw new Error('transport_unsupported');
+  }
+  const transport = normalizedTransport;
+  const actorId = readStringValue(input, 'actor_id', 'actorId');
+  const actorSource = readStringValue(input, 'actor_source', 'actorSource');
+  const principal = readStringValue(input, 'transport_principal', 'transportPrincipal', 'principal');
+  const nonce = readStringValue(input, 'transport_nonce', 'transportNonce', 'nonce');
+  const nonceExpiresAt = readStringValue(
+    input,
+    'transport_nonce_expires_at',
+    'transportNonceExpiresAt',
+    'nonce_expires_at',
+    'nonceExpiresAt'
+  );
+  return {
+    transport,
+    ...(actorId ? { actor_id: actorId } : {}),
+    ...(actorSource ? { actor_source: actorSource } : {}),
+    ...(principal ? { transport_principal: principal } : {}),
+    ...(nonce ? { transport_nonce: nonce } : {}),
+    ...(nonceExpiresAt ? { transport_nonce_expires_at: nonceExpiresAt } : {})
+  };
+}
+
 function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
@@ -1775,12 +1758,51 @@ function requireNumber(value: number | undefined, field: string): number {
   return value;
 }
 
+function getDelegateModeViolationMessage(mode: DelegationMode, toolName: string): string | null {
+  if (toolName.startsWith('coordinator.') && mode !== 'full') {
+    if (mode === 'status_only') {
+      return `Tool ${toolName} blocked in status_only mode; only delegate.status is allowed.`;
+    }
+    return `Tool ${toolName} blocked in question_only mode.`;
+  }
+  if (mode === 'question_only' && isRestrictedTool(toolName)) {
+    return `Tool ${toolName} blocked in question_only mode.`;
+  }
+  if (mode === 'status_only' && toolName !== 'delegate.status' && isDelegationOrGithubTool(toolName)) {
+    return `Tool ${toolName} blocked in status_only mode; only delegate.status is allowed.`;
+  }
+  return null;
+}
+
 function isRestrictedTool(toolName: string): boolean {
   return toolName === 'delegate.spawn' || toolName === 'delegate.pause' || toolName === 'delegate.cancel';
 }
 
+function isDelegationOrGithubTool(toolName: string): boolean {
+  return toolName.startsWith('delegate.') || toolName.startsWith('github.') || toolName.startsWith('coordinator.');
+}
+
+function resolveChildDelegateMode(requestedMode: string, allowNested: boolean): DelegationMode {
+  if (requestedMode === 'status_only') {
+    return 'status_only';
+  }
+  if (allowNested && requestedMode === 'full') {
+    return 'full';
+  }
+  return 'question_only';
+}
+
 function containsSecret(record: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function containsAnySecret(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  for (const key of keys) {
+    if (containsSecret(record, key)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function reportSecurityViolation(
@@ -1815,76 +1837,7 @@ export async function resolveDelegationToken(
   allowedRoots?: string[],
   options: { retryMs?: number; intervalMs?: number } = {}
 ): Promise<string | null> {
-  const privateToken = request.codex_private?.delegation_token;
-  if (privateToken) {
-    return String(privateToken);
-  }
-  const tokenPath = resolveDelegationTokenPath(allowedRoots);
-  if (!tokenPath) {
-    return null;
-  }
-  const retryMs = options.retryMs ?? 0;
-  const intervalMs = options.intervalMs ?? DEFAULT_DELEGATION_TOKEN_RETRY_INTERVAL_MS;
-  const deadline = Date.now() + retryMs;
-  let token = await readDelegationTokenFile(tokenPath);
-  while (!token && Date.now() < deadline) {
-    await delay(intervalMs);
-    token = await readDelegationTokenFile(tokenPath);
-  }
-  return token;
-}
-
-function resolveDelegationTokenPath(allowedRoots?: string[]): string | null {
-  const explicit = process.env.CODEX_DELEGATION_TOKEN_PATH?.trim();
-  const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH?.trim();
-  let runDir: string | null = null;
-
-  if (manifestPath) {
-    try {
-      const resolvedManifest = resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path');
-      runDir = dirname(resolvedManifest);
-    } catch {
-      return null;
-    }
-  }
-
-  if (explicit) {
-    if (!runDir && !isAbsolute(explicit)) {
-      return null;
-    }
-    const resolvedToken =
-      runDir && !isAbsolute(explicit) ? resolve(runDir, explicit) : resolve(explicit);
-    if (runDir) {
-      if (!isPathWithinRoots(resolvedToken, [runDir])) {
-        return null;
-      }
-    } else if (allowedRoots && allowedRoots.length > 0 && !isPathWithinRoots(resolvedToken, allowedRoots)) {
-      return null;
-    }
-    return resolvedToken;
-  }
-
-  if (runDir) {
-    return resolve(runDir, DELEGATION_TOKEN_FILE);
-  }
-
-  return null;
-}
-
-async function readDelegationTokenFile(tokenPath: string): Promise<string | null> {
-  try {
-    const raw = await readFile(tokenPath, 'utf8');
-    const parsed = safeJsonParse(raw);
-    const tokenValue =
-      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>).token
-        : null;
-    const token =
-      typeof tokenValue === 'string' && tokenValue.trim().length > 0 ? tokenValue.trim() : raw.trim();
-    return token || null;
-  } catch {
-    return null;
-  }
+  return resolveDelegationTokenValue(request, allowedRoots, options, questionFlowDeps);
 }
 
 function buildDelegateMcpOverrides(toolProfile: string[]): string[] {
@@ -1965,25 +1918,27 @@ export function resolveRunManifestPath(
   label = 'manifest_path'
 ): string {
   const resolved = resolve(rawPath);
-  assertRunManifestPath(resolved, label);
-  if (allowedRoots && !isPathWithinRoots(resolved, allowedRoots)) {
+  const canonicalPath = realpathSafe(resolved);
+  assertRunManifestPath(canonicalPath, label);
+  if (allowedRoots && !isPathWithinRoots(canonicalPath, allowedRoots)) {
     throw new Error(`${label} not permitted`);
   }
-  return resolved;
+  return canonicalPath;
 }
 
 function assertRunManifestPath(pathname: string, label: string): void {
-  if (basename(pathname) !== 'manifest.json') {
+  const resolvedPath = resolve(pathname);
+  if (basename(resolvedPath) !== 'manifest.json') {
     throw new Error(`${label} invalid`);
   }
-  const runDir = dirname(pathname);
+  const runDir = dirname(resolvedPath);
   const cliDir = dirname(runDir);
   if (basename(cliDir) !== 'cli') {
     throw new Error(`${label} invalid`);
   }
   const taskDir = dirname(cliDir);
   const runsDir = dirname(taskDir);
-  if (!basename(runDir) || !basename(taskDir) || !basename(runsDir)) {
+  if (!basename(runDir) || !basename(taskDir) || dirname(runsDir) === runsDir) {
     throw new Error(`${label} invalid`);
   }
 }
@@ -2028,11 +1983,7 @@ function resolveSpawnManifestPath(
   }
   const resolved = isAbsolute(manifestPath) ? manifestPath : resolve(repoRoot, manifestPath);
   try {
-    assertRunManifestPath(resolved, 'manifest_path');
-    if (allowedRoots && !isPathWithinRoots(resolved, allowedRoots)) {
-      return null;
-    }
-    return resolved;
+    return resolveRunManifestPath(resolved, allowedRoots, 'manifest_path');
   } catch {
     return null;
   }
@@ -2057,55 +2008,10 @@ async function persistDelegationToken(
   }
 }
 
-async function isRunAwaitingQuestion(
-  manifestPath: string,
-  allowedRoots?: string[]
-): Promise<boolean> {
-  try {
-    const resolvedManifest = resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path');
-    const controlPath = resolve(dirname(resolvedManifest), 'control.json');
-    const raw = await readFile(controlPath, 'utf8');
-    const snapshot = safeJsonParse(raw) as Record<string, unknown> | null;
-    const latest =
-      snapshot && snapshot.latest_action && typeof snapshot.latest_action === 'object'
-        ? (snapshot.latest_action as Record<string, unknown>)
-        : null;
-    if (!latest) {
-      return false;
-    }
-    return latest.action === 'pause' && latest.reason === 'awaiting_question_answer';
-  } catch {
-    return false;
-  }
-}
-
 export async function applyQuestionFallback(
   fallback: 'pause' | 'resume' | 'fail',
   allowedHosts?: string[],
   allowedRoots?: string[]
 ): Promise<void> {
-  const manifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
-  if (!manifestPath) {
-    return;
-  }
-  const shouldResolve = await isRunAwaitingQuestion(manifestPath, allowedRoots);
-  if (!shouldResolve) {
-    return;
-  }
-  const action = fallback === 'pause' ? 'pause' : fallback === 'resume' ? 'resume' : 'fail';
-  try {
-    await callControlEndpoint(
-      resolveRunManifestPath(manifestPath, allowedRoots, 'manifest_path'),
-      '/control/action',
-      {
-        action,
-        requested_by: 'delegate',
-        reason: 'question_expired'
-      },
-      undefined,
-      { allowedHosts, allowedRoots }
-    );
-  } catch {
-    // ignore
-  }
+  return applyDelegationQuestionFallback(fallback, allowedHosts, allowedRoots, questionFlowDeps);
 }

@@ -1,0 +1,13 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/OrchestratorRunLifecycleCompletion.test.ts  (2 tests) 6ms
+ ✓ orchestrator/tests/OrchestratorRunLifecycleGuardAndPlanning.test.ts  (2 tests) 3ms
+ ✓ orchestrator/tests/OrchestratorRunLifecycleExecutionAndRunError.test.ts  (3 tests) 3ms
+ ✓ orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts  (2 tests) 3ms
+
+ Test Files  4 passed (4)
+      Tests  9 passed (9)
+   Start at  09:09:14
+   Duration  514ms (transform 321ms, setup 0ms, collect 1.14s, tests 15ms, environment 0ms, prepare 160ms)
+

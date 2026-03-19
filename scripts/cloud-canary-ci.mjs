@@ -77,6 +77,13 @@ function classifyFailure(signal) {
   };
 }
 
+function hasCredentialEnv(env) {
+  return (
+    String(env.CODEX_API_KEY ?? '').trim().length > 0 ||
+    String(env.OPENAI_API_KEY ?? '').trim().length > 0
+  );
+}
+
 function normalizeCloudBranch(rawBranch) {
   const trimmed = String(rawBranch ?? '').trim();
   if (!trimmed) {
@@ -301,6 +308,24 @@ async function main() {
     if (required || expectFallback) {
       process.exitCode = 1;
     }
+    return;
+  }
+
+  const runningInGithubActions = String(process.env.GITHUB_ACTIONS ?? '').trim().toLowerCase() === 'true';
+  if (expectFallback && !required && runningInGithubActions && !hasCredentialEnv(process.env)) {
+    const summaryLines = [
+      '## Cloud Canary Fallback Contract (Credential-Gated Skip)',
+      '',
+      '- GitHub Actions fallback canary has no CODEX_API_KEY/OPENAI_API_KEY available for the downstream review-dependent gate.',
+      '- This event does not require the fallback contract, so the run is skipped instead of failing under missing CI review credentials.',
+      '',
+      `Expected contract: ${expectFallback ? 'fallback' : 'cloud execution'}`,
+      `Cloud branch: ${cloudBranch || '<unset>'}`,
+      '',
+      `Required mode: ${required ? 'yes' : 'no'}`
+    ];
+    console.log(summaryLines.join('\n'));
+    await appendStepSummary(summaryLines);
     return;
   }
 

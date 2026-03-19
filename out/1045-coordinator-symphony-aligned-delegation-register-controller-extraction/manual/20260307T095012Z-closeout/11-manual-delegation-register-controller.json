@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-03-07T09:59:08Z",
+  "controller": "delegationRegisterController",
+  "results": [
+    {
+      "name": "missing_fields",
+      "handled": true,
+      "state": {
+        "statusCode": 400,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "error": "missing_delegation_fields"
+        }
+      },
+      "register_calls": [],
+      "persist_calls": 0
+    },
+    {
+      "name": "alias_normalization",
+      "handled": true,
+      "state": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "registered",
+          "token_id": "dlt-123"
+        }
+      },
+      "register_calls": [
+        {
+          "token": "delegation-token",
+          "parent_run_id": "parent-run",
+          "child_run_id": "child-run"
+        }
+      ],
+      "persist_calls": 1
+    },
+    {
+      "name": "fallthrough",
+      "handled": false,
+      "state": {
+        "statusCode": null,
+        "headers": null,
+        "body": null
+      },
+      "register_calls": [],
+      "persist_calls": 0
+    }
+  ]
+}

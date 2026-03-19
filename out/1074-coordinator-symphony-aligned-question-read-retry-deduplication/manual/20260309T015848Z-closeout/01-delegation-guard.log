@@ -1,0 +1,2 @@
+Delegation guard override active.
+Reason: Top-level lane used native gpt-5.4 subagents for bounded read-only review/elegance streams; current guard only counts manifest-backed delegation artifacts.

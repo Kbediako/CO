@@ -1,0 +1,449 @@
+
+> @kbediako/codex-orchestrator@0.1.38 test
+> npm run test:orchestrator
+
+
+> @kbediako/codex-orchestrator@0.1.38 test:orchestrator
+> vitest run --config vitest.config.core.ts
+
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/DoctorUsage.test.ts  (8 tests) 65ms
+ ✓ tests/review-execution-state.spec.ts  (114 tests) 74ms
+ ✓ orchestrator/tests/RlmSymbolic.test.ts  (15 tests) 180ms
+ ✓ orchestrator/tests/ControlRuntime.test.ts  (13 tests) 133ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > renders selected-run status issue and queued questions through the integrated polling bridge
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ tests/pr-watch-merge.spec.ts  (35 tests) 9ms
+ ✓ orchestrator/tests/TaskManager.test.ts  (12 tests) 185ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > routes pause and resume through transport-mutating control policy
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > does not immediately retry freshly expired child questions during Telegram /questions reads
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > does not immediately retry freshly expired child questions during Telegram /questions reads
+<empty line>
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > retries answered child questions during Telegram /questions reads
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ orchestrator/tests/ControlWatcher.test.ts  (9 tests) 40ms
+ ✓ orchestrator/tests/RlmAlignment.test.ts  (16 tests) 115ms
+ ✓ orchestrator/tests/MetricsAggregator.test.ts  (14 tests) 442ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+<empty line>
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends deduped projection-driven push notifications when enabled
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ orchestrator/tests/LinearWebhookController.test.ts  (8 tests) 11ms
+ ✓ orchestrator/tests/TrackerDispatchPilot.test.ts  (14 tests) 22ms
+ ✓ orchestrator/tests/CodexCloudTaskExecutor.test.ts  (10 tests) 30ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > persists a pending projection during cooldown and flushes it on the next signal
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ packages/shared/tests/ManifestWriter.test.ts  (9 tests) 20ms
+ ✓ orchestrator/tests/Manifest.test.ts  (9 tests) 70ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > preserves next_update_id and monotonic updated_at when projection delivery overlaps update persistence
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > keeps top-level updated_at monotonic when update polling only advances next_update_id
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ orchestrator/tests/ExecCommand.test.ts  (7 tests) 289ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends projection-driven push notifications when queued questions are added and cleared
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ orchestrator/tests/DelegationServer.test.ts  (78 tests) 1574ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends a new projection push when prompt or urgency changes under the same latest question id
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > renders no-selected status and issue fallbacks through the polling bridge
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends projection-driven push notifications when an accepted live Linear advisory update changes the projection
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ orchestrator/tests/TelegramOversightBridge.test.ts  (15 tests) 1279ms
+ ✓ orchestrator/tests/AuthenticatedRouteComposition.test.ts  (6 tests) 11ms
+ ✓ orchestrator/tests/_reproIssueLogTask.test.ts  (5 tests) 57ms
+ ✓ orchestrator/tests/McpEnable.test.ts  (13 tests) 6ms
+ ✓ orchestrator/tests/ControlServer.test.ts  (94 tests) 1658ms
+ ✓ orchestrator/tests/ControlPlaneValidator.test.ts  (6 tests) 10ms
+ ✓ orchestrator/tests/CloudSyncWorker.test.ts  (8 tests) 345ms
+ ✓ orchestrator/tests/ControlActionControllerSequencing.test.ts  (5 tests) 6ms
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > returns design env overrides without mutating process.env
+[Codex-Orchestrator] PipelineResolver.resolve start for design-reference
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > returns design env overrides without mutating process.env
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/pipeline-resolver-fu9n2k/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline design-reference
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > does not override DESIGN_PIPELINE when already set
+[Codex-Orchestrator] PipelineResolver.resolve start for design-reference
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/pipeline-resolver-EvirCm/design.config.yaml)
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > does not override DESIGN_PIPELINE when already set
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline design-reference
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > respects caller-provided processEnv when deciding DESIGN_PIPELINE override
+[Codex-Orchestrator] PipelineResolver.resolve start for design-reference
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/pipeline-resolver-xcOTKi/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline design-reference
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > fails fast when strict repo-config mode is enabled and repo config is missing
+[Codex-Orchestrator] PipelineResolver.resolve start for docs-review
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/pipeline-resolver-UfeuIZ/design.config.yaml)
+
+ ✓ orchestrator/tests/QuestionQueueController.test.ts  (9 tests) 9ms
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > fails closed for rlm when strict repo-config mode is enabled and repo config omits rlm
+[Codex-Orchestrator] PipelineResolver.resolve start for rlm
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/pipeline-resolver-jYrzGh/design.config.yaml)
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > fails closed for rlm when strict repo-config mode is enabled and repo config omits rlm
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/pipeline-resolver-jYrzGh/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > wires frontend testing pipeline with explicit devtools opt-in
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] PipelineResolver.resolve start for frontend-testing-devtools
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > wires frontend testing pipeline with explicit devtools opt-in
+[Codex-Orchestrator] [design-config] loaded repo file at /Users/kbediako/Code/CO/design.config.yaml
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > wires frontend testing pipeline with explicit devtools opt-in
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline frontend-testing
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > scrubs inherited review control env in implementation-gate test stage
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+
+stdout | orchestrator/tests/PipelineResolverEnvOverrides.test.ts > PipelineResolver env overrides > forces deterministic codex review execution in gate review stages
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+
+ ✓ orchestrator/tests/PipelineResolverEnvOverrides.test.ts  (10 tests) 45ms
+ ✓ orchestrator/tests/QuestionChildResolutionAdapter.test.ts  (11 tests) 103ms
+ ✓ orchestrator/tests/ControlActionExecution.test.ts  (6 tests) 7ms
+ ✓ orchestrator/tests/SchedulerPlan.test.ts  (7 tests) 12ms
+ ✓ orchestrator/tests/RlmRunnerCollabLifecycle.test.ts  (17 tests) 6ms
+ ✓ orchestrator/tests/ConfirmationApproveController.test.ts  (5 tests) 5ms
+ ✓ orchestrator/tests/ControlTelegramReadController.test.ts  (6 tests) 4ms
+ ✓ orchestrator/tests/ControlServerSeededRuntimeAssembly.test.ts  (3 tests) 33ms
+ ✓ orchestrator/tests/RunEvents.test.ts  (2 tests) 53ms
+ ✓ orchestrator/tests/RlmSymbolicAlignment.test.ts  (3 tests) 64ms
+ ✓ packages/orchestrator/tests/UnifiedExec.test.ts  (9 tests) 1338ms
+ ✓ tests/docs-hygiene.spec.ts  (4 tests) 50ms
+ ✓ orchestrator/tests/RunEventStream.test.ts  (4 tests) 42ms
+ ✓ orchestrator/tests/ControlActionController.test.ts  (3 tests) 5ms
+ ✓ packages/orchestrator/tests/OtelExporter.test.ts  (5 tests) 7ms
+ ✓ orchestrator/tests/ControlTelegramDispatchRead.test.ts  (3 tests) 2ms
+ ✓ orchestrator/tests/ControlActionFinalization.test.ts  (4 tests) 5ms
+ ✓ orchestrator/tests/ManifestPersister.test.ts  (5 tests) 72ms
+ ✓ orchestrator/tests/ControlServerStartupInputPreparation.test.ts  (2 tests) 19ms
+ ✓ orchestrator/tests/DelegationConfig.test.ts  (17 tests) 14ms
+ ✓ orchestrator/tests/ConfirmationCreateController.test.ts  (5 tests) 4ms
+ ✓ orchestrator/tests/CommandRunnerCollabCaptureLimit.test.ts  (2 tests) 48ms
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > runs the simple pipeline and writes manifest, metrics, and summary
+[Codex-Orchestrator] prepareRun start for pipeline simple
+[Codex-Orchestrator] prepareRun resolving pipeline simple
+[Codex-Orchestrator] PipelineResolver.resolve start for simple
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-cTxe7j/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-cTxe7j/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline simple
+[Codex-Orchestrator] prepareRun resolved pipeline simple
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline simple
+[Codex-Orchestrator] prepareRun planner completed for pipeline simple
+[Codex-Orchestrator] prepareRun complete for pipeline simple
+
+ ✓ orchestrator/tests/Doctor.test.ts  (23 tests) 3376ms
+ ✓ orchestrator/tests/CommandRunnerTimeoutObservability.test.ts  (2 tests) 36ms
+ ✓ orchestrator/tests/UiSessionController.test.ts  (9 tests) 5ms
+ ✓ orchestrator/tests/ControlAuthenticatedRouteHandoff.test.ts  (3 tests) 6ms
+ ✓ tests/mirror-site.spec.ts  (9 tests) 15ms
+ ✓ orchestrator/tests/ControlServerSeedLoading.test.ts  (3 tests) 28ms
+ ✓ orchestrator/tests/ControlRequestRouteDispatch.test.ts  (4 tests) 5ms
+ ✓ orchestrator/tests/LearningValidator.test.ts  (3 tests) 533ms
+ ✓ orchestrator/tests/CodexDefaultsSetup.test.ts  (4 tests) 43ms
+ ✓ packages/orchestrator/tests/ToolOrchestrator.test.ts  (7 tests) 4ms
+ ✓ orchestrator/tests/ExecutionModeResolution.test.ts  (11 tests) 4ms
+ ✓ orchestrator/tests/ControlTelegramUpdateHandler.test.ts  (6 tests) 4ms
+ ✓ packages/shared/tests/DesignConfig.test.ts  (5 tests) 30ms
+ ✓ packages/shared/tests/DesignArtifactWriter.test.ts  (1 test) 16ms
+ ✓ packages/orchestrator/tests/HandleService.test.ts  (3 tests) 6ms
+ ✓ orchestrator/tests/OrchestratorCloudAutoScout.test.ts  (5 tests) 2744ms
+ ✓ orchestrator/tests/ControlActionCancelConfirmation.test.ts  (3 tests) 3ms
+ ✓ orchestrator/tests/ControlServerRequestShell.test.ts  (3 tests) 28ms
+ ✓ orchestrator/tests/ExperienceStore.test.ts  (8 tests) 73ms
+ ✓ orchestrator/tests/ControlActionOutcome.test.ts  (3 tests) 4ms
+ ✓ orchestrator/tests/CloudPrompt.test.ts  (5 tests) 5ms
+ ✓ orchestrator/tests/ControlServerAuditAndErrorHelpers.test.ts  (4 tests) 5ms
+ ✓ orchestrator/tests/ControlActionPreflight.test.ts  (7 tests) 4ms
+ ✓ orchestrator/tests/TaskStateStore.test.ts  (6 tests) 36ms
+ ✓ orchestrator/tests/ArtifactStager.test.ts  (6 tests) 39ms
+ ✓ orchestrator/tests/ControlRequestContext.test.ts  (3 tests) 3ms
+ ✓ orchestrator/tests/ControlTelegramProjectionNotificationController.test.ts  (4 tests) 2ms
+ ✓ orchestrator/tests/ConfirmationValidateController.test.ts  (4 tests) 6ms
+ ✓ orchestrator/tests/CloudModeAdapters.test.ts  (4 tests) 4ms
+ ✓ orchestrator/tests/AuthenticatedRouteDispatcher.test.ts  (5 tests) 5ms
+ ✓ packages/sdk-node/tests/orchestrator.exec.test.ts  (3 tests) 38ms
+ ✓ orchestrator/tests/ControlExpiryLifecycle.test.ts  (2 tests) 4ms
+ ✓ orchestrator/tests/LearningHarvester.test.ts  (2 tests) 268ms
+stdout | orchestrator/tests/PipelineExperience.test.ts > pipeline experience persistence > records a success experience for pipeline runs
+[Codex-Orchestrator] [experience] Recorded pipeline experience (domain=diagnostics, words=5) for diagnostics run run-pipeline-exp.
+
+ ✓ orchestrator/tests/ControlBootstrapAssembly.test.ts  (1 test) 2ms
+ ✓ orchestrator/tests/PipelineExperience.test.ts  (4 tests) 47ms
+ ✓ orchestrator/tests/RlmRunnerMode.test.ts  (15 tests) 4ms
+ ✓ orchestrator/tests/ControlEventTransport.test.ts  (5 tests) 4ms
+ ✓ orchestrator/tests/PersistenceCoordinator.test.ts  (6 tests) 1530ms
+ ✓ orchestrator/tests/LinearDispatchSource.test.ts  (3 tests) 6ms
+ ✓ orchestrator/tests/SelectedRunPresenter.test.ts  (2 tests) 2ms
+ ✓ orchestrator/tests/ControlServerBootstrapLifecycle.test.ts  (3 tests) 19ms
+ ✓ orchestrator/tests/ControlServerAuthenticatedRouteBranch.test.ts  (3 tests) 3ms
+ ✓ packages/orchestrator/tests/InstructionsLoader.test.ts  (4 tests) 37ms
+ ✓ tests/delegation-guard.spec.ts  (5 tests) 270ms
+ ✓ orchestrator/tests/SkillsInstall.test.ts  (5 tests) 111ms
+ ✓ orchestrator/tests/RlmContextStoreOffsets.test.ts  (5 tests) 24ms
+ ✓ orchestrator/tests/ControlState.test.ts  (4 tests) 205ms
+ ✓ orchestrator/tests/DelegationGuardRunner.test.ts  (10 tests) 2ms
+ ✓ orchestrator/tests/ConfirmationIssueConsumeController.test.ts  (5 tests) 2ms
+ ✓ orchestrator/tests/CommandRunnerFailure.test.ts  (1 test) 19ms
+ ✓ orchestrator/tests/RunSummaryWriter.test.ts  (4 tests) 1ms
+ ✓ orchestrator/tests/CommandRunnerEnvPropagation.test.ts  (1 test) 21ms
+ ✓ orchestrator/tests/CloudRunsHttpClient.test.ts  (5 tests) 8ms
+ ✓ orchestrator/tests/ControlServerStartupSequence.test.ts  (4 tests) 4ms
+ ✓ orchestrator/tests/ControlServerReadyInstanceStartup.test.ts  (3 tests) 2ms
+ ✓ orchestrator/tests/ControlTelegramPollingController.test.ts  (2 tests) 3ms
+ ✓ orchestrator/tests/RuntimeActivity.test.ts  (2 tests) 8ms
+ ✓ orchestrator/tests/UiDataController.test.ts  (3 tests) 3ms
+ ✓ orchestrator/tests/ControlTelegramCommandController.test.ts  (4 tests) 4ms
+ ✓ tests/implementation-docs-archive.spec.ts  (2 tests) 131ms
+ ✓ tests/diff-budget.spec.ts  (4 tests) 1297ms
+ ✓ orchestrator/tests/RuntimeProvider.test.ts  (6 tests) 3ms
+ ✓ orchestrator/tests/ControlTelegramQuestionRead.test.ts  (1 test) 2ms
+ ✓ orchestrator/tests/AuthenticatedControlRouteGate.test.ts  (5 tests) 2ms
+ ✓ orchestrator/tests/DelegationRegisterController.test.ts  (5 tests) 4ms
+ ✓ orchestrator/tests/FrontendTestingRunner.test.ts  (6 tests) 19ms
+ ✓ orchestrator/tests/ControlTelegramBridgeBootstrapLifecycle.test.ts  (1 test) 2ms
+ ✓ packages/control-plane-schemas/tests/RunRequest.test.ts  (3 tests) 4ms
+ ✓ packages/orchestrator/tests/ExecSessionManager.test.ts  (5 tests) 7ms
+ ✓ orchestrator/tests/HudStore.test.ts  (3 tests) 7ms
+ ✓ tests/spec-guard.spec.ts  (4 tests) 1614ms
+ ✓ orchestrator/tests/ControlServerRequestShellBinding.test.ts  (4 tests) 6ms
+ ✓ orchestrator/tests/OrchestratorSubpipelineFailure.test.ts  (2 tests) 1372ms
+ ✓ orchestrator/tests/ObservabilityApiController.test.ts  (2 tests) 2ms
+ ✓ packages/orchestrator/tests/instructions/PromptPackLoader.test.ts  (3 tests) 44ms
+ ✓ orchestrator/tests/OrchestratorCleanupOrder.test.ts  (1 test) 15ms
+ ✓ orchestrator/tests/ConfirmationListController.test.ts  (2 tests) 3ms
+ ✓ orchestrator/tests/TelegramOversightApiClient.test.ts  (5 tests) 4ms
+ ✓ orchestrator/tests/SecurityViolationController.test.ts  (3 tests) 2ms
+ ✓ orchestrator/tests/McpServe.test.ts  (3 tests) 8ms
+ ✓ packages/shared/tests/EnvUtils.test.ts  (15 tests) 5ms
+ ✓ orchestrator/tests/ServiceAdapters.test.ts  (2 tests) 3ms
+ ✓ orchestrator/tests/QuestionQueue.test.ts  (5 tests) 2ms
+ ✓ orchestrator/tests/LearningRunner.test.ts  (2 tests) 6ms
+ ✓ orchestrator/tests/AdvancedAutopilot.test.ts  (6 tests) 2ms
+ ✓ orchestrator/tests/ConfirmationStore.test.ts  (4 tests) 4ms
+ ✓ orchestrator/tests/RlmRunnerConfig.test.ts  (8 tests) 1ms
+ ✓ orchestrator/tests/ControlServerPublicRouteHelpers.test.ts  (5 tests) 7ms
+ ✓ orchestrator/tests/LearningCrystalizer.test.ts  (2 tests) 56ms
+ ✓ orchestrator/tests/ControlTelegramReadAdapter.test.ts  (1 test) 3ms
+ ✓ orchestrator/tests/DynamicToolBridgePolicy.test.ts  (6 tests) 3ms
+ ✓ orchestrator/tests/ControlQuestionChildResolution.test.ts  (1 test) 3ms
+ ✓ orchestrator/tests/MetricsRecorderPrivacy.test.ts  (1 test) 48ms
+ ✓ orchestrator/tests/ControlTelegramBridgeLifecycle.test.ts  (3 tests) 3ms
+ ✓ tests/status-ui-build.spec.ts  (8 tests) 3ms
+ ✓ orchestrator/tests/QuestionReadRetryDeduplication.test.ts  (2 tests) 5ms
+ ✓ orchestrator/tests/EnvironmentPathsResolution.test.ts  (2 tests) 4ms
+ ✓ tests/subagent-edit-guard.spec.ts  (12 tests) 7094ms
+ ✓ orchestrator/tests/AuthenticatedRouteController.test.ts  (2 tests) 2ms
+stdout | orchestrator/tests/UserConfigStageSets.test.ts > loadUserConfig stage sets > expands stage-set references into concrete stages
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/user-config-stagesets-1WRntS/codex.orchestrator.json
+
+ ✓ orchestrator/tests/UserConfigStageSets.test.ts  (1 test) 24ms
+ ✓ packages/shared/tests/StdioTracker.test.ts  (5 tests) 2ms
+ ✓ orchestrator/tests/CodexCliResolution.test.ts  (3 tests) 16ms
+ ✓ orchestrator/tests/ManifestCommandStatus.test.ts  (1 test) 11ms
+ ✓ orchestrator/tests/QuestionReadSequence.test.ts  (1 test) 2ms
+ ✓ orchestrator/tests/ControlRequestPredispatch.test.ts  (2 tests) 4ms
+ ✓ orchestrator/tests/TelegramOversightBridgeStateStore.test.ts  (3 tests) 4ms
+ ✓ packages/orchestrator/tests/Notifications.test.ts  (2 tests) 4ms
+ ✓ tests/pack-smoke.spec.ts  (1 test) 13ms
+ ✓ orchestrator/tests/MetricsAggregatorFlush.test.ts  (1 test) 30ms
+ ✓ orchestrator/tests/RlmLoop.test.ts  (2 tests) 26ms
+ ✓ orchestrator/tests/SanitizeIdentifier.test.ts  (16 tests) 3ms
+ ✓ orchestrator/tests/CrystalizerClient.test.ts  (2 tests) 9ms
+ ✓ orchestrator/tests/ControlTelegramPushState.test.ts  (2 tests) 1ms
+ ✓ tests/review-scope-paths.spec.ts  (9 tests) 4ms
+ ✓ orchestrator/tests/InitTemplates.test.ts  (1 test) 14ms
+ ✓ orchestrator/tests/RunManifestsCollection.test.ts  (2 tests) 24ms
+ ✓ orchestrator/tests/PromptExperienceInjection.test.ts  (2 tests) 2ms
+ ✓ orchestrator/tests/InteractiveGating.test.ts  (7 tests) 1ms
+ ✓ orchestrator/tests/PrivacyGuard.test.ts  (3 tests) 3ms
+ ✓ orchestrator/tests/OptionalDeps.test.ts  (3 tests) 14ms
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > resumes a failed run and clears resume flag
+[Codex-Orchestrator] prepareRun start for pipeline failable
+[Codex-Orchestrator] prepareRun resolving pipeline failable
+[Codex-Orchestrator] PipelineResolver.resolve start for failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > resumes a failed run and clears resume flag
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-HeiUuj/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-HeiUuj/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline failable
+[Codex-Orchestrator] prepareRun resolved pipeline failable
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline failable
+[Codex-Orchestrator] prepareRun planner completed for pipeline failable
+[Codex-Orchestrator] prepareRun complete for pipeline failable
+
+ ✓ orchestrator/tests/EventsSseController.test.ts  (2 tests) 1ms
+ ✓ packages/orchestrator/tests/instructions/InstructionGuard.test.ts  (3 tests) 18ms
+ ✓ orchestrator/tests/TrajectorySummary.test.ts  (2 tests) 2ms
+ ✓ orchestrator/tests/AtomicWrite.test.ts  (4 tests) 24ms
+ ✓ orchestrator/tests/ControlRequestController.test.ts  (2 tests) 3ms
+ ✓ orchestrator/tests/RlmValidator.test.ts  (3 tests) 16ms
+ ✓ orchestrator/tests/ErrorFormatting.test.ts  (3 tests) 7ms
+ ✓ orchestrator/tests/ResolvePipeline.test.ts  (3 tests) 3ms
+ ✓ orchestrator/tests/SpecGuardRunner.test.ts  (4 tests) 5ms
+ ✓ orchestrator/tests/RunPaths.test.ts  (4 tests) 2ms
+ ✓ orchestrator/tests/ControlServerRequestBodyHelpers.test.ts  (5 tests) 4ms
+ ✓ tests/cli-build-config.spec.ts  (3 tests) 1ms
+ ✓ orchestrator/tests/ObservabilityUpdateNotifier.test.ts  (2 tests) 121ms
+ ✓ tests/runtime-mode-canary.spec.ts  (2 tests) 3ms
+ ✓ patterns/codemods/__tests__/structured-event-emit.test.ts  (3 tests) 18ms
+ ✓ patterns/codemods/__tests__/ensure-run-summary-fields.test.ts  (2 tests) 13ms
+ ✓ orchestrator/tests/SelfCheck.test.ts  (2 tests) 3ms
+ ✓ orchestrator/tests/CodexCliSetup.test.ts  (1 test) 2ms
+ ✓ orchestrator/tests/CommandPreview.test.ts  (3 tests) 1ms
+ ✓ patterns/linters/__tests__/prefer-logger-over-console.test.ts  (3 tests) 18ms
+ ✓ orchestrator/tests/DevtoolsSetup.test.ts  (1 test) 3ms
+ ✓ orchestrator/tests/CloudFailureDiagnostics.test.ts  (3 tests) 1ms
+ ✓ orchestrator/tests/EnforcementModeParsing.test.ts  (4 tests) 2ms
+ ✓ tests/designToolkit/textNormalization.spec.ts  (4 tests) 3ms
+ ✓ packages/shared/tests/ArtifactUtils.test.ts  (2 tests) 1ms
+ ✓ packages/shared/tests/ManifestSchemaResolver.test.ts  (2 tests) 2ms
+ ✓ orchestrator/tests/CliExecRuntime.test.ts  (1 test) 35ms
+ ✓ orchestrator/tests/LearningCrystalizerCliClient.test.ts  (1 test) 523ms
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > resumes a failed run and clears resume flag
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-HeiUuj/codex.orchestrator.json
+[Codex-Orchestrator] prepareRun start for pipeline failable
+[Codex-Orchestrator] prepareRun resolving pipeline <default>
+[Codex-Orchestrator] prepareRun resolved pipeline failable
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline failable
+[Codex-Orchestrator] prepareRun planner completed for pipeline failable
+[Codex-Orchestrator] prepareRun complete for pipeline failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > retains failure status_detail after heartbeat flush
+[Codex-Orchestrator] prepareRun start for pipeline failable
+[Codex-Orchestrator] prepareRun resolving pipeline failable
+[Codex-Orchestrator] PipelineResolver.resolve start for failable
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-HUwCaz/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-HUwCaz/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline failable
+[Codex-Orchestrator] prepareRun resolved pipeline failable
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline failable
+[Codex-Orchestrator] prepareRun planner completed for pipeline failable
+[Codex-Orchestrator] prepareRun complete for pipeline failable
+
+ ✓ tests/cli-frontend-test.spec.ts  (2 tests) 16025ms
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > records child runs for sub-pipeline stages
+[Codex-Orchestrator] prepareRun start for pipeline parent
+[Codex-Orchestrator] prepareRun resolving pipeline parent
+[Codex-Orchestrator] PipelineResolver.resolve start for parent
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-dCAtnF/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-dCAtnF/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline parent
+[Codex-Orchestrator] prepareRun resolved pipeline parent
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline parent
+[Codex-Orchestrator] prepareRun planner completed for pipeline parent
+[Codex-Orchestrator] prepareRun complete for pipeline parent
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > records child runs for sub-pipeline stages
+[Codex-Orchestrator] prepareRun start for pipeline simple
+[Codex-Orchestrator] prepareRun resolving pipeline simple
+[Codex-Orchestrator] PipelineResolver.resolve start for simple
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-dCAtnF/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-dCAtnF/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline simple
+[Codex-Orchestrator] prepareRun resolved pipeline simple
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline simple
+[Codex-Orchestrator] prepareRun planner completed for pipeline simple
+[Codex-Orchestrator] prepareRun complete for pipeline simple
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > propagates actual child run status for optional failures
+[Codex-Orchestrator] prepareRun start for pipeline optional-parent
+[Codex-Orchestrator] prepareRun resolving pipeline optional-parent
+[Codex-Orchestrator] PipelineResolver.resolve start for optional-parent
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-iCQT8E/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-iCQT8E/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline optional-parent
+[Codex-Orchestrator] prepareRun resolved pipeline optional-parent
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline optional-parent
+[Codex-Orchestrator] prepareRun planner completed for pipeline optional-parent
+[Codex-Orchestrator] prepareRun complete for pipeline optional-parent
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > propagates actual child run status for optional failures
+[Codex-Orchestrator] prepareRun start for pipeline failable
+[Codex-Orchestrator] prepareRun resolving pipeline failable
+[Codex-Orchestrator] PipelineResolver.resolve start for failable
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-iCQT8E/design.config.yaml)
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > propagates actual child run status for optional failures
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-iCQT8E/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline failable
+[Codex-Orchestrator] prepareRun resolved pipeline failable
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline failable
+[Codex-Orchestrator] prepareRun planner completed for pipeline failable
+[Codex-Orchestrator] prepareRun complete for pipeline failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > previews pipeline plans in JSON and text formats
+[Codex-Orchestrator] prepareRun start for pipeline parent
+[Codex-Orchestrator] prepareRun resolving pipeline parent
+[Codex-Orchestrator] PipelineResolver.resolve start for parent
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-m39ah8/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-m39ah8/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline parent
+[Codex-Orchestrator] prepareRun resolved pipeline parent
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline parent
+[Codex-Orchestrator] prepareRun planner completed for pipeline parent
+[Codex-Orchestrator] prepareRun complete for pipeline parent
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > validates manifest structure via telemetry helper
+[Codex-Orchestrator] prepareRun start for pipeline simple
+[Codex-Orchestrator] prepareRun resolving pipeline simple
+[Codex-Orchestrator] PipelineResolver.resolve start for simple
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-c1aiCY/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-c1aiCY/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline simple
+[Codex-Orchestrator] prepareRun resolved pipeline simple
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline simple
+[Codex-Orchestrator] prepareRun planner completed for pipeline simple
+[Codex-Orchestrator] prepareRun complete for pipeline simple
+
+ ✓ tests/cli-orchestrator.spec.ts  (7 tests) 46333ms

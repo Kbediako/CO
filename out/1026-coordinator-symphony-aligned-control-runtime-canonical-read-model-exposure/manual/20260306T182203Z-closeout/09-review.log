@@ -1,0 +1,761 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:19568) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19568) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 286 > 25
+ - total lines changed 34623 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5029
+  - orchestrator/src/cli/control/controlServer.ts: 2256
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - docs/docs-freshness-registry.json: 1548
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1205
+  - tasks/index.json: 1008
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 897
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+  - orchestrator/tests/ControlRuntime.test.ts: 651
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1026 scoped diff on stacked branch
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 16 files, 836 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/cli/2026-03-06T18-08-53-172Z-94291389/review/prompt.txt
+Review output log: .runs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/cli/2026-03-06T18-08-53-172Z-94291389/review/output.log
+Launching Codex review (evidence: .runs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/cli/2026-03-06T18-08-53-172Z-94291389/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc474-4901-75e0-9b4f-4c6ca0a06915
+--------
+user
+Review task: 1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure
+Evidence manifest: .runs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/cli/2026-03-06T18-08-53-172Z-94291389/manifest.json
+
+Task context:
+- Task checklist: `tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`
+- MCP Task ID: `1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`
+- TECH_SPEC: `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `.agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`.
+- [x] docs-review manifest captured for registered `1026`. Evidence: `.runs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/cli/2026-03-06T18-08-53-172Z-94291389/manifest.json`, `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/20260306T181532Z-docs-review-override/00-summary.md`.
+- [ ] `ControlRuntime` exposes a canonical selected-run/read model directly for internal consumers. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`.
+- [ ] Telegram read-side status/issue rendering consumes the canonical runtime model instead of compatibility `state`/`issue` envelopes. Evidence: `orchestrator/src/cli/control/telegramOversightBridge.ts`, `orchestrator/src/cli/control/controlServer.ts`.
+- [ ] Telegram projection-push hashing consumes the canonical runtime model while keeping visible status semantics coherent. Evidence: `orchestrator/src/cli/control/telegramOversightBridge.ts`, `orchestrator/tests/TelegramOversightBridge.test.ts`.
+- [ ] Compatibility HTTP state/issue/dispatch/refresh behavior remains unchanged. Evidence: `orchestrator/src/cli/control/observabilitySurface.ts`, `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/01-delegation-guard.log`.
+- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/02-spec-guard.log`.
+- [ ] `npm run build`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/03-build.log`.
+- [ ] `npm run lint`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/04-lint.log`.
+- [ ] `npm run test`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/05-test.log`.
+- [ ] `npm run docs:check`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/06-docs-check.log`.
+- [ ] `npm run docs:freshness`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/07-docs-freshness.log`.
+- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/08-diff-budget.log`.
+- [ ] `npm run review`. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/09-review.log`.
+- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/10-pack-smoke.log`.
+- [ ] Manual simulated/mock Telegram status/issue evidence captured for the canonical runtime seam. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/11-manual-telegram-runtime-read-model.json`.
+- [ ] Explicit elegance review captured. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/12-elegance-review.md`.
+- [ ] Coherent `1026` commit recorded. Evidence: `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/<pending>/00-summary.md`, git history for commit `<pending>`.
+
+PRD summary (`docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`):
+- Problem Statement: after `1025`, CO has a shared observability read-model module, but `ControlRuntime` still exposes transport-facing compatibility methods as its primary internal read contract. Telegram status and issue rendering still consume compatibility `state`/`issue` envelopes rather than a runtime-owned canonical selected-run model, which keeps the runtime boundary more HTTP-shaped than Symphony's orchestrator-first pattern.
+- Desired Outcome: expose a canonical selected-run/read-model seam directly from `ControlRuntime`, let Telegram consume that in-process model for `/status`, `/issue`, and projection-push dedupe, and keep HTTP compatibility routes as thin transport shells over the existing runtime/surface layers.
+- Scope Status: docs-first implementation stream for task `1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure`; runtime implementation is in scope for this lane.
+
+Agent notes:
+Goal: expose canonical runtime-owned selected-run read model | Summary: ControlRuntime now refreshes via a fresh advisory runtime and Telegram consumes the canonical selected-run seam directly | Risks: runtime seam is still presenter-shaped; review should focus on remaining stale coupling and regressions
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 22]
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M orchestrator/src/cli/control/controlRuntime.ts
+ M orchestrator/src/cli/control/controlServer.ts
+ M orchestrator/src/cli/control/observabilityReadModel.ts
+ M orchestrator/src/cli/control/telegramOversightBridge.ts
+ M orchestrator/tests/ControlRuntime.test.ts
+ M orchestrator/tests/TelegramOversightBridge.test.ts
+ M tasks/index.json
+?? .agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md
+?? docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md
+?? docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md
+?? tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md
+?? tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md
+```
+
+Diff budget override: 1026 scoped diff on stacked branch
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+
+
+thinking
+**Evaluating code review process**
+
+I need to review code changes and output findings in JSON format. I'll inspect the repository differences and relevant files, but I also have to consider the memory that might be relevant. The task is a non-trivial code review, likely involving workflows I’m familiar with. Since the output is supposed to be pure JSON, I should avoid any extra prose or citations in the final output to stick to the output schema.
+thinking
+**Addressing memory citation conflicts**
+
+I’m wrestling with the memory citation requirement that says if any relevant memory files are used, I need to append a block as the last content. This feels like a conflict with the strict JSON output format. It might be better to avoid using memory files altogether since the provided summary is enough. Even though the task mentions the repo, I think I can manage without citing memory to keep the output in compliance.
+thinking
+**Balancing memory usage and output format**
+
+The system states I should use memory by default when discussing a repo, but I also need to prioritize the output format. It might be best to rely only on the provided memory summary, as it’s included in the prompt and likely doesn’t count as an external file use. My focus should be on reviewing changed files to identify bugs and potential guardrail violations. I’ll run a git diff to inspect the relevant code closely while considering meaningful documentation mismatches if they arise. Delegation could be explored but isn't strictly necessary.
+thinking
+**Evaluating code review process**
+
+I need to review code changes and output findings in JSON format. I'll inspect the repository differences and relevant files, but I also have to consider the memory that might be relevant. The task is a non-trivial code review, likely involving workflows I’m familiar with. Since the output is supposed to be pure JSON, I should avoid any extra prose or citations in the final output to stick to the output schema.
+thinking
+**Addressing memory citation conflicts**
+
+I’m wrestling with the memory citation requirement that says if any relevant memory files are used, I need to append a block as the last content. This feels like a conflict with the strict JSON output format. It might be better to avoid using memory files altogether since the provided summary is enough. Even though the task mentions the repo, I think I can manage without citing memory to keep the output in compliance.
+thinking
+**Balancing memory usage and output format**
+
+The system states I should use memory by default when discussing a repo, but I also need to prioritize the output format. It might be best to rely only on the provided memory summary, as it’s included in the prompt and likely doesn’t count as an external file use. My focus should be on reviewing changed files to identify bugs and potential guardrail violations. I’ll run a git diff to inspect the relevant code closely while considering meaningful documentation mismatches if they arise. Delegation could be explored but isn't strictly necessary.
+Plan update
+  → Inspect diff and task docs for 1026 review scope
+  • Analyze changed control runtime and telegram paths for regressions
+  • Produce review findings JSON
+
+thinking
+**Inspecting changes in Git**
+
+I need to check the Git diff to see what changes have been made. It’s a crucial part of reviewing code, making sure I understand all the updates. I’ll probably want to look for specific lines that have been modified, added, or deleted. This will help me grasp how the code has evolved and if everything aligns with the project requirements. Let’s dig into that diff and see what’s going on!
+thinking
+**Inspecting changes in Git**
+
+I need to check the Git diff to see what changes have been made. It’s a crucial part of reviewing code, making sure I understand all the updates. I’ll probably want to look for specific lines that have been modified, added, or deleted. This will help me grasp how the code has evolved and if everything aligns with the project requirements. Let’s dig into that diff and see what’s going on!
+exec
+/bin/zsh -lc "git diff --stat && echo '
+---
+' && git diff -- orchestrator/src/cli/control/controlRuntime.ts orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/observabilityReadModel.ts orchestrator/src/cli/control/telegramOversightBridge.ts orchestrator/tests/ControlRuntime.test.ts orchestrator/tests/TelegramOversightBridge.test.ts docs/TASKS.md docs/docs-freshness-registry.json tasks/index.json docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md .agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md" in /Users/kbediako/Code/CO succeeded in 53ms:
+ docs/TASKS.md                                      |   1 +
+ docs/docs-freshness-registry.json                  |  49 ++++++++
+ orchestrator/src/cli/control/controlRuntime.ts     |  46 ++++++--
+ orchestrator/src/cli/control/controlServer.ts      |  12 +-
+ .../src/cli/control/observabilityReadModel.ts      |  36 +++---
+ .../src/cli/control/telegramOversightBridge.ts     |  61 +++++-----
+ orchestrator/tests/ControlRuntime.test.ts          |  51 ++++++++
+ orchestrator/tests/TelegramOversightBridge.test.ts | 128 +++++++++++++++------
+ tasks/index.json                                   |  32 ++++++
+ 9 files changed, 315 insertions(+), 101 deletions(-)
+
+---
+
+diff --git a/docs/TASKS.md b/docs/TASKS.md
+index 6eeef021b..cbcedbf73 100644
+--- a/docs/TASKS.md
++++ b/docs/TASKS.md
+@@ -1,6 +1,7 @@
+ <!-- tasks-archive-index:begin -->
+ ## Archive index - archived task snapshots live on the task-archives branch. 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md; 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md
+
+thinking
+**Looking into bug context**
+
+I need to gather more context from files beyond just the differences. It’s essential to inspect the surrounding code to potentially find a hidden bug. I’m thinking about the need to examine the full relevant files and possibly compare them with preexisting adapter expectations. This search for different types could help clarify what’s going wrong, so I want to make sure I'm thorough in my investigation. Let's see what I can find!
+thinking
+**Looking into bug context**
+
+I need to gather more context from files beyond just the differences. It’s essential to inspect the surrounding code to potentially find a hidden bug. I’m thinking about the need to examine the full relevant files and possibly compare them with preexisting adapter expectations. This search for different types could help clarify what’s going wrong, so I want to make sure I'm thorough in my investigation. Let's see what I can find!
+exec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/controlRuntime.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/telegramOversightBridge.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '380,520p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/observabilityReadModel.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+import { createHash, randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { logger } from '../../logger.js';
+import { writeJsonAtomic } from '../utils/fs.js';
+import type {
+  ControlDispatchPilotPayload,
+  ControlQuestionSummaryPayload,
+  ControlSelectedRunReadModel,
+} from './observabilityReadModel.js';
+import { buildSelectedRunReadModelFingerprintInput } from './observabilityReadModel.js';
+
+const TELEGRAM_API_ROOT = 'https://api.telegram.org';
+const DEFAULT_POLL_INTERVAL_MS = 1_000;
+const DEFAULT_POLL_TIMEOUT_SECONDS = 20;
+const DEFAULT_PUSH_COOLDOWN_MS = 30_000;
+const TELEGRAM_STATE_FILE = 'telegram-oversight-state.json';
+
+interface TelegramOversightBridgeConfig {
+ succeeded in 53ms:
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { QuestionUrgency } from './questions.js';
+
+export interface SelectedRunQuestionSummary {
+  queuedCount: number;
+  latestQuestion: {
+    questionId: string;
+    prompt: string;
+    urgency: QuestionUrgency;
+    queuedAt: string;
+  } | null;
+}
+
+export interface SelectedRunLatestEvent {
+  at: string | null;
+  event: string | null;
+  message: string | null;
+  requestedBy: string | null;
+  reason: string | null;
+}
+ succeeded in 53ms:
+  }
+
+  getBaseUrl(): string | null {
+    return this.baseUrl;
+  }
+
+  broadcast(entry: RunEventStreamEntry): void {
+    const payload = `data: ${JSON.stringify(entry)}\n\n`;
+    for (const client of this.clients) {
+      client.write(payload, (error) => {
+        if (error) {
+          this.clients.delete(client);
+        }
+      });
+    }
+    this.controlRuntime.publish({
+      eventSeq: entry.seq,
+      source: entry.event
+    });
+  }
+ succeeded in 53ms:
+import type { RunPaths } from '../run/runPaths.js';
+import type { ControlState } from './controlState.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import {
+  buildSelectedRunReadModel,
+  buildTrackedLinearPayload,
+  type ControlSelectedRunReadModel,
+  type ControlStatePayload,
+} from './observabilityReadModel.js';
+import {
+  createObservabilitySurface,
+  type CompatibilityDispatchResult,
+  type CompatibilityIssueResult,
+  type CompatibilityRefreshResult
+} from './observabilitySurface.js';
+import { createLiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
+import {
+  createObservabilityUpdateNotifier,
+  type ObservabilityUpdate,
+  type ObservabilityUpdateListener,
+
+thinking
+**Examining observability models**
+
+I need to take a closer look at the concept of observability, particularly regarding model fingerprint functions and read adapters. There’s a lot to explore here, and I'm curious about the connections and implications they may have on performance. I'll dive deeper into how these elements work together and what insights I can uncover. This could lead to better understanding and improvements in my approach. Let's see what best practices emerge!
+thinking
+**Examining observability models**
+
+I need to take a closer look at the concept of observability, particularly regarding model fingerprint functions and read adapters. There’s a lot to explore here, and I'm curious about the connections and implications they may have on performance. I'll dive deeper into how these elements work together and what insights I can uncover. This could lead to better understanding and improvements in my approach. Let's see what best practices emerge!
+exec
+/bin/zsh -lc "sed -n '260,430p' orchestrator/src/cli/control/observabilityReadModel.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -R \"readSelectedRunReadModel\\|resolveIssueIdentifier\\|readCompatibilityIssue\\|readCompatibilityState\" -n orchestrator/src/cli/control | sed -n '1,220p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -R \"readSelectedRun()\\|readIssue()\\|readState()\" -n orchestrator/src/cli/control orchestrator/tests | sed -n '1,240p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -R \"buildSelectedRunReadModelFingerprintInput\\|buildStateProjectionFingerprintInput\" -n orchestrator/src orchestrator/tests" in /Users/kbediako/Code/CO succeeded in 52ms:
+    started_at: selected.startedAt,
+    updated_at: selected.updatedAt,
+    completed_at: selected.completedAt,
+    summary: selected.summary,
+    last_error: selected.lastError,
+    latest_action: selected.latestAction,
+    latest_event: buildSelectedRunLatestEventPayload(selected.latestEvent, {
+      includeRequestMetadata: true
+    }),
+    workspace: {
+      path: selected.workspacePath
+    },
+    question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
+    ...(selected.tracked ? { tracked: selected.tracked } : {})
+  };
+}
+
+export function buildCompatibilityRunningEntry(selected: SelectedRunContext): ControlRunningPayload {
+  return {
+    issue_id: selected.issueId,
+ succeeded in 52ms:
+orchestrator/src/cli/control/controlServer.ts:451:      readSelectedRun: async () => this.controlRuntime.snapshot().readSelectedRunReadModel(),
+orchestrator/src/cli/control/controlServer.ts:616:      body: await runtimeSnapshot.readCompatibilityState()
+orchestrator/src/cli/control/controlServer.ts:697:    const result = await runtimeSnapshot.readCompatibilityIssue(compatibilityIssueIdentifier);
+orchestrator/src/cli/control/controlRuntime.ts:41:  readSelectedRunReadModel(): Promise<ControlSelectedRunReadModel>;
+orchestrator/src/cli/control/controlRuntime.ts:43:  readCompatibilityState(): Promise<ControlStatePayload>;
+orchestrator/src/cli/control/controlRuntime.ts:46:  readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;
+orchestrator/src/cli/control/controlRuntime.ts:47:  resolveIssueIdentifier(): Promise<string | null>;
+orchestrator/src/cli/control/controlRuntime.ts:131:  const readSelectedRunReadModel = async (): Promise<ControlSelectedRunReadModel> => {
+orchestrator/src/cli/control/controlRuntime.ts:147:    readSelectedRunReadModel,
+orchestrator/src/cli/control/controlRuntime.ts:149:    readCompatibilityState: () => observability.readCompatibilityState(),
+orchestrator/src/cli/control/controlRuntime.ts:152:    readCompatibilityIssue: (issueIdentifier) => observability.readCompatibilityIssue(issueIdentifier),
+orchestrator/src/cli/control/controlRuntime.ts:153:    async resolveIssueIdentifier(): Promise<string | null> {
+orchestrator/src/cli/control/controlRuntime.ts:154:      const selectedRun = await readSelectedRunReadModel();
+orchestrator/src/cli/control/controlRuntime.ts:158:      await readSelectedRunReadModel();
+orchestrator/src/cli/control/observabilitySurface.ts:90:  readCompatibilityState(): Promise<ControlStatePayload>;
+orchestrator/src/cli/control/observabilitySurface.ts:93:  readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult>;
+orchestrator/src/cli/control/observabilitySurface.ts:100:    async readCompatibilityState(): Promise<ControlStatePayload> {
+orchestrator/src/cli/control/observabilitySurface.ts:167:    async readCompatibilityIssue(issueIdentifier: string): Promise<CompatibilityIssueResult> {
+ succeeded in 52ms:
+orchestrator/src/cli/control/telegramOversightBridge.ts:132:  readSelectedRun(): Promise<ControlSelectedRunReadModel>;
+orchestrator/src/cli/control/telegramOversightBridge.ts:381:    const payload = await this.readAdapter.readSelectedRun();
+orchestrator/src/cli/control/telegramOversightBridge.ts:428:    const payload = await this.readAdapter.readSelectedRun();
+orchestrator/src/cli/control/telegramOversightBridge.ts:583:    const payload = await this.readAdapter.readSelectedRun();
+ succeeded in 53ms:
+orchestrator/src/cli/control/observabilityReadModel.ts:320:export function buildSelectedRunReadModelFingerprintInput(
+orchestrator/src/cli/control/telegramOversightBridge.ts:12:import { buildSelectedRunReadModelFingerprintInput } from './observabilityReadModel.js';
+orchestrator/src/cli/control/telegramOversightBridge.ts:840:  const fingerprint = buildSelectedRunReadModelFingerprintInput(payload);
+
+thinking
+**Investigating observability surface**
+
+I need to look into the observabilitySurface and selectedRunProjection to better understand their semantics. It's important to grasp how they interact and what exactly they signify in the context I'm working with. I wonder if there are specific nuances or features that I’m missing. Let’s take a systematic approach so I can ensure that I truly understand these elements and their implications. I'm curious to see what insights I can gather from this inspection!
+thinking
+**Investigating observability surface**
+
+I need to look into the observabilitySurface and selectedRunProjection to better understand their semantics. It's important to grasp how they interact and what exactly they signify in the context I'm working with. I wonder if there are specific nuances or features that I’m missing. Let’s take a systematic approach so I can ensure that I truly understand these elements and their implications. I'm curious to see what insights I can gather from this inspection!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/observabilitySurface.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,320p' orchestrator/src/cli/control/selectedRunProjection.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -R \"dispatch_source_live_deferred\\|configured\" -n orchestrator/src/cli/control/liveLinearAdvisoryRuntime.ts orchestrator/src/cli/control | sed -n '1,260p'" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -R \"No active running projection\\|No issue identifier is available\" -n orchestrator/src/cli/control orchestrator/tests" in /Users/kbediako/Code/CO succeeded in 52ms:
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlAction, ControlState } from './controlState.js';
+import {
+  buildTrackedLinearPayload,
+  type SelectedRunContext,
+  type SelectedRunLatestEvent,
+  type SelectedRunQuestionSummary
+} from './observabilityReadModel.js';
+import type { QuestionRecord } from './questions.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+
+export interface SelectedRunManifestSnapshot {
+  manifestRecord: Record<string, unknown>;
+  issueIdentifier: string;
+  issueId: string | null;
+  taskId: string | null;
+ succeeded in 52ms:
+import { readFile } from 'node:fs/promises';
+import { relative, resolve } from 'node:path';
+
+import { isoTimestamp } from '../utils/time.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlState } from './controlState.js';
+import type { LiveLinearAdvisoryRuntime } from './liveLinearAdvisoryRuntime.js';
+import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type {
+  ControlIssuePayload,
+  ControlStatePayload,
+  SelectedRunContext
+} from './observabilityReadModel.js';
+import {
+  buildCompatibilityRunningEntry,
+  buildSelectedRunLatestEventPayload,
+  buildSelectedRunPublicPayload,
+  buildTrackedLinearPayload,
+  buildUiSelectedRunSharedFields
+ succeeded in 52ms:
+orchestrator/src/cli/control/controlServer.ts:1821:  if (!evaluation.summary.configured) {
+orchestrator/src/cli/control/controlRuntime.ts:139:        dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
+orchestrator/src/cli/control/dynamicToolBridgePolicy.ts:12:  configured: boolean;
+orchestrator/src/cli/control/dynamicToolBridgePolicy.ts:81:    configured: Boolean(nested || direct),
+orchestrator/src/cli/control/trackerDispatchPilot.ts:21:  configured: boolean;
+orchestrator/src/cli/control/trackerDispatchPilot.ts:101:    return buildDisabledEvaluation(resolved.configured, killSwitch);
+orchestrator/src/cli/control/trackerDispatchPilot.ts:105:    return buildKillSwitchedEvaluation(resolved.configured, source);
+orchestrator/src/cli/control/trackerDispatchPilot.ts:112:        configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:123:        configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:133:      configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:144:      configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:155:      configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:165:    configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:181:    return buildDisabledSummary(resolved.configured, killSwitch);
+orchestrator/src/cli/control/trackerDispatchPilot.ts:185:    return buildKillSwitchedSummary(resolved.configured, source);
+orchestrator/src/cli/control/trackerDispatchPilot.ts:190:      configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:199:      configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:210:        configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:219:        configured: resolved.configured,
+orchestrator/src/cli/control/trackerDispatchPilot.ts:227:      configured: resolved.configured,
+ succeeded in 51ms:
+orchestrator/src/cli/control/telegramOversightBridge.ts:388:        'No active running projection.',
+orchestrator/src/cli/control/telegramOversightBridge.ts:431:      return 'No issue identifier is available for the current run.';
+orchestrator/tests/TelegramOversightBridge.test.ts:1078:      expect(telegram.sentMessages[0]?.text).toContain('No active running projection.');
+orchestrator/tests/TelegramOversightBridge.test.ts:1080:      expect(telegram.sentMessages[1]?.text).toContain('No issue identifier is available for the current run.');
+[run-review] waiting on codex review (1m 0s elapsed, 4s idle; review progress observed).
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/trackerDispatchPilot.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/liveLinearAdvisoryRuntime.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '260,520p' orchestrator/src/cli/control/liveLinearAdvisoryRuntime.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+
+ succeeded in 53ms:
+import type { ControlState } from './controlState.js';
+import {
+  summarizeTrackerDispatchPilotPolicy,
+  evaluateTrackerDispatchPilotAsync,
+  type DispatchPilotEvaluation,
+  type DispatchPilotSummary
+} from './trackerDispatchPilot.js';
+
+interface AdvisoryRuntimeContext {
+  controlStore: {
+    snapshot(): ControlState;
+  };
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+}
+
+interface CachedDispatchEvaluation {
+  issueIdentifier: string | null;
+  evaluation: DispatchPilotEvaluation;
+}
+ succeeded in 53ms:
+import {
+  hasLinearApiCredentials,
+  hasLinearSourceBinding,
+  resolveLinearSourceSetup,
+  resolveLiveLinearDispatchRecommendation,
+  type LiveLinearTrackedActivity,
+  type LiveLinearTrackedIssue
+} from './linearDispatchSource.js';
+
+export type DispatchPilotStatus =
+  | 'disabled'
+  | 'kill_switched'
+  | 'ready'
+  | 'source_unavailable'
+  | 'source_malformed';
+
+export type DispatchPilotSourceStatus = 'disabled' | 'blocked' | 'ready' | 'unavailable' | 'malformed';
+
+export interface DispatchPilotSummary {
+  advisory_only: true;
+
+
+
+
+
+thinking
+**Identifying potential bugs**
+
+I’m thinking about whether I need more of a tracker. There's a potential bug in `createControlRuntimeSnapshot` where `readSelectedRunReadModel` caches `selected` and dispatchPilot summary. Now, `readCompatibilityState` and other observability methods still call `projection.buildSelectedRunContext()` separately, so there could be divergence. However, both are lazy and could have diverged before. 
+
+I realized that `prime()` only awaits `readSelectedRunReadModel`, which is priming the projection's selected context but doesn't prime `readCompatibilityDispatch`. Ideally, it should address this on requestRefresh.
+thinking
+**Analyzing snapshot behavior**
+
+I'm considering how things work when an existing dispatch evaluation is done, and `requestRefresh` is accepted. The new snapshot's `selectedRunReadModel` dispatch pilot might be built from `readSnapshotSummary` of the new advisory runtime, potentially showing `dispatch_source_live_deferred` instead of the actual evaluation summary from before. 
+
+I'm realizing the `requestRefresh` behavior refreshes the projection but doesn't necessarily refresh the dispatch evaluation itself. The new snapshot might then only contain a summary from the policy, while the compatibility dispatch might compute the live evaluation asynchronously later. 
+
+Before the change, `requestRefresh` invalidated the existing runtime and used the same runtime object for the new snapshot. However, the cached evaluation would remain if `readCompatibilityDispatch()` was called initially.
+thinking
+**Evaluating snapshot caching**
+
+I'm thinking about how the new snapshot used the existing advisory runtime object, but then it was invalidated after caching. This raises some questions for me about the effectiveness of using the old runtime. If the runtime is invalidated, does that mean we're losing important context? I want to ensure that any new computations take into account the latest information while also respecting the integrity of previous evaluations. It seems like a delicate balancing act!
+thinking
+**Inspecting task documentation**
+
+I think I need to thoroughly inspect the full task documents, as there might be some implementations that aren’t reflected yet. A targeted inspection on the manifest could be useful, but maybe not necessary. I should review the task to ensure everything mirrors correctly and that the index is updated. I’ve noticed there’s an untracked docs/TECH_SPEC file, alongside other evidence. I’ll also have to check the structure around certain tasks to confirm they align properly.
+thinking
+**Investigating untracked files**
+
+I just realized that the git diff command doesn't show untracked files because they haven't been staged. I need to read through those untracked files manually, especially if there’s a chance of a mismatch in documentation. I might have to use sed on those files to help check for inconsistencies. It’s a bit cumbersome, but this inspection could clarify whether the documentation aligns properly or not. Let’s dig in!
+thinking
+**Identifying potential bugs**
+
+I’m thinking about whether I need more of a tracker. There's a potential bug in `createControlRuntimeSnapshot` where `readSelectedRunReadModel` caches `selected` and dispatchPilot summary. Now, `readCompatibilityState` and other observability methods still call `projection.buildSelectedRunContext()` separately, so there could be divergence. However, both are lazy and could have diverged before. 
+
+I realized that `prime()` only awaits `readSelectedRunReadModel`, which is priming the projection's selected context but doesn't prime `readCompatibilityDispatch`. Ideally, it should address this on requestRefresh.
+thinking
+**Analyzing snapshot behavior**
+
+I'm considering how things work when an existing dispatch evaluation is done, and `requestRefresh` is accepted. The new snapshot's `selectedRunReadModel` dispatch pilot might be built from `readSnapshotSummary` of the new advisory runtime, potentially showing `dispatch_source_live_deferred` instead of the actual evaluation summary from before. 
+
+I'm realizing the `requestRefresh` behavior refreshes the projection but doesn't necessarily refresh the dispatch evaluation itself. The new snapshot might then only contain a summary from the policy, while the compatibility dispatch might compute the live evaluation asynchronously later. 
+
+Before the change, `requestRefresh` invalidated the existing runtime and used the same runtime object for the new snapshot. However, the cached evaluation would remain if `readCompatibilityDispatch()` was called initially.
+thinking
+**Evaluating snapshot caching**
+
+I'm thinking about how the new snapshot used the existing advisory runtime object, but then it was invalidated after caching. This raises some questions for me about the effectiveness of using the old runtime. If the runtime is invalidated, does that mean we're losing important context? I want to ensure that any new computations take into account the latest information while also respecting the integrity of previous evaluations. It seems like a delicate balancing act!
+thinking
+**Inspecting task documentation**
+
+I think I need to thoroughly inspect the full task documents, as there might be some implementations that aren’t reflected yet. A targeted inspection on the manifest could be useful, but maybe not necessary. I should review the task to ensure everything mirrors correctly and that the index is updated. I’ve noticed there’s an untracked docs/TECH_SPEC file, alongside other evidence. I’ll also have to check the structure around certain tasks to confirm they align properly.
+thinking
+**Investigating untracked files**
+
+I just realized that the git diff command doesn't show untracked files because they haven't been staged. I need to read through those untracked files manually, especially if there’s a chance of a mismatch in documentation. I might have to use sed on those files to help check for inconsistencies. It’s a bit cumbersome, but this inspection could clarify whether the documentation aligns properly or not. Let’s dig in!
+exec
+/bin/zsh -lc "sed -n '1,240p' tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md" in /Users/kbediako/Code/CO succeeded in 51ms:
+---
+id: 20260306-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure
+title: Coordinator Symphony-Aligned Control Runtime Canonical Read Model Exposure
+relates_to: docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-03-06
+---
+
+## Summary
+- Objective: expose a canonical selected-run/read-model seam directly from `ControlRuntime` and move Telegram read-side status/issue rendering plus projection-push hashing onto it.
+- Scope: one runtime contract addition, one Telegram adapter/remap, and focused regression/manual evidence.
+- Constraints: keep compatibility HTTP behavior stable, keep snapshot reads provider-free, and preserve CO's authority/auth posture.
+
+## Pre-Implementation Review Note
+- Decision: approved for docs-first planning and immediate implementation as the next slice after `1025`.
+- Reasoning: `1025` unified snapshot shaping, but the runtime boundary still leans on compatibility HTTP envelopes. Real Symphony keeps orchestrator/runtime snapshot state primary and controller/presenter layers thin. The smallest next correction is therefore to expose the canonical selected-run seam directly from `ControlRuntime` and let Telegram consume it without another transport-shaped hop.
+- Initial review evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`, `out/1025-coordinator-symphony-aligned-shared-observability-read-model-and-telegram-projection-dedupe/manual/20260306T173344Z-closeout/15-next-slice-note.md`, `https://github.com/openai/symphony/blob/b0e0ff0082236a73c12a48483d0c6036fdd31fe1/SPEC.md`, `https://github.com/openai/symphony/blob/b0e0ff0082236a73c12a48483d0c6036fdd31fe1/elixir/lib/symphony_elixir/orchestrator.ex`, `https://github.com/openai/symphony/blob/b0e0ff0082236a73c12a48483d0c6036fdd31fe1/elixir/lib/symphony_elixir_web/presenter.ex`, `https://github.com/openai/symphony/blob/b0e0ff0082236a73c12a48483d0c6036fdd31fe1/elixir/lib/symphony_elixir_web/controllers/observability_api_controller.ex`.
+- Delegated review refinement: bounded `gpt-5.4` Symphony and CO-local explorer streams converged on the same minimal move: expose one runtime-owned selected-run read model, let Telegram consume it directly for status/issue/hash behavior, and leave compatibility HTTP state/issue routes as thin wrappers for now. The Symphony stream did not surface evidence strong enough to reopen earlier completed slices. Evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`.
+ succeeded in 51ms:
+# Task Checklist - 1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure
+
+- MCP Task ID: `1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`
+- TECH_SPEC: `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`
+
+> This lane exposes the canonical selected-run/read-model seam directly from `ControlRuntime` after `1025` and moves Telegram read-side rendering onto it.
+
+## Foundation
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `tasks/tasks-1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `.agent/task/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`.
+
+## Shared Registry + Review Handoff
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`, `docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md`.
+- [x] docs-review manifest captured for registered `1026`. Evidence: `.runs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/cli/2026-03-06T18-08-53-172Z-94291389/manifest.json`, `out/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure/manual/20260306T181532Z-docs-review-override/00-summary.md`.
+
+## Runtime Implementation
+- [ ] `ControlRuntime` exposes a canonical selected-run/read model directly for internal consumers. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/observabilityReadModel.ts`.
+ succeeded in 51ms:
+# TECH_SPEC - Coordinator Symphony-Aligned Control Runtime Canonical Read Model Exposure (1026)
+
+Canonical TECH_SPEC: `tasks/specs/1026-coordinator-symphony-aligned-control-runtime-canonical-read-model-exposure.md`.
+
+## Summary
+- Objective: expose a canonical selected-run/read-model seam directly from `ControlRuntime` and move Telegram read-side status/issue rendering plus projection-push dedupe onto that seam.
+- Scope: one runtime contract addition, one Telegram read-adapter/remap, small shared read-model helper additions where needed, and focused regression/manual evidence.
+- Constraints: keep compatibility HTTP route behavior unchanged, keep snapshot reads provider-free, and keep CO's control/auth/authority posture intact.
+
+## Architecture
+- `ControlRuntimeSnapshot` should stop being effectively HTTP-first for internal consumers.
+- The runtime should expose a canonical selected-run model derived from:
+  - `selectedRunProjection.ts` selected-run context,
+  - runtime-owned tracked Linear snapshot state,
+  - runtime-owned dispatch pilot snapshot summary.
+- Telegram should consume that canonical model directly for:
+  - `/status`,
+  - `/issue`,
+  - projection-push fingerprinting.
+- Compatibility HTTP state/issue routes may continue returning transport-facing payloads, but they should no longer be required as Telegram's internal read contract.
+exec
+/bin/zsh -lc "sed -n '1,220p' docs/findings/1026-control-runtime-canonical-read-model-exposure-deliberation.md" in /Users/kbediako/Code/CO succeeded in 53ms:
+# Findings - 1026 Control Runtime Canonical Read Model Exposure
+
+## Decision
+- Proceed with a bounded follow-up slice that exposes a canonical selected-run/read model directly from `ControlRuntime` and moves Telegram read-side status/issue rendering plus projection-push hashing onto that seam.
+
+## Why This Slice Next
+- `1025` closed shared snapshot/read-model duplication, but the runtime contract is still transport-shaped because `ControlRuntimeSnapshot` continues to center compatibility HTTP payload methods.
+- Telegram remains the clearest consumer of that mismatch:
+  - it reads in-process now,
+  - but it still depends on compatibility `state` and `issue` envelopes,
+  - so the runtime boundary is still more HTTP-shaped than orchestration-shaped.
+- Real Symphony reinforces the next move:
+  - orchestrator snapshot/runtime state first,
+  - presenter/controller shells second,
+  - optional surfaces consume shared runtime state rather than becoming the runtime contract.
+
+## Local Evidence
+- `orchestrator/src/cli/control/controlRuntime.ts` exposes `readCompatibilityState()` and `readCompatibilityIssue()` as the main internal read contract.
+- `orchestrator/src/cli/control/controlServer.ts` builds the Telegram adapter from those compatibility runtime methods.
+- `orchestrator/src/cli/control/telegramOversightBridge.ts` renders `/status` and `/issue` from compatibility payload types rather than directly from a runtime-owned selected-run model.
+exec
+/bin/zsh -lc "grep -n \"function resolveSelectedDispatchPilotSummary\\|resolveSelectedDispatchPilotSummary\" -n orchestrator/src/cli/control/observabilitySurface.ts && sed -n '380,450p' orchestrator/src/cli/control/observabilitySurface.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+182:      const dispatchPilotSummary = resolveSelectedDispatchPilotSummary(context, selected);
+219:  const dispatchPilotSummary = resolveSelectedDispatchPilotSummary(context, selected);
+414:function resolveSelectedDispatchPilotSummary(
+  const toolValue = readStringValue(body, 'tool');
+  const normalizedTool = toolValue ? toolValue.toLowerCase() : null;
+
+  if (hasAction && !normalizedAction) {
+    return {
+      reason: 'malformed_action_request',
+      requestAction: null,
+      requestTool: normalizedTool
+    };
+  }
+  if (normalizedAction && COMPATIBILITY_MUTATING_ACTIONS.has(normalizedAction)) {
+    return {
+      reason: 'forbidden_mutating_action',
+      requestAction: normalizedAction,
+      requestTool: normalizedTool
+    };
+  }
+[run-review] waiting on codex review (2m 0s elapsed, 1s idle; review progress observed).
+
+thinking
+**Investigating fetch issues**
+
+I'm thinking about potential problems with the `live_deferred` state or if the source might be unavailable or malformed when the fetch fails. If that's the case, a stale summary could be displayed, which isn't ideal. I should consider checking the `trackerDispatchPilot` async implementation to troubleshoot this further. There’s definitely something here that requires a deeper look to ensure everything's functioning as it should!
+thinking
+**Investigating fetch issues**
+
+I'm thinking about potential problems with the `live_deferred` state or if the source might be unavailable or malformed when the fetch fails. If that's the case, a stale summary could be displayed, which isn't ideal. I should consider checking the `trackerDispatchPilot` async implementation to troubleshoot this further. There’s definitely something here that requires a deeper look to ensure everything's functioning as it should!
+exec
+/bin/zsh -lc "grep -n \"buildReadySummary\\|recommendation_available\\|dispatch_source_live_deferred\\|buildFailureEvaluation\" -n orchestrator/src/cli/control/trackerDispatchPilot.ts && sed -n '220,380p' orchestrator/src/cli/control/trackerDispatchPilot.ts" in /Users/kbediako/Code/CO succeeded in 51ms:
+111:      return buildFailureEvaluation({
+122:      return buildFailureEvaluation({
+132:    return buildFailureEvaluation({
+143:    return buildFailureEvaluation({
+154:    return buildFailureEvaluation({
+226:    return buildReadySummary({
+229:      reason: 'dispatch_source_live_deferred'
+233:  return buildReadySummary({
+236:    reason: 'recommendation_available'
+260:    return buildFailureEvaluation({
+271:    return buildFailureEvaluation({
+298:    return buildFailureEvaluation({
+349:    summary: buildReadySummary({
+352:      reason: 'recommendation_available'
+359:function buildFailureEvaluation(input: {
+412:function buildReadySummary(input: {
+        sourceStatus: 'unavailable',
+        reason: 'dispatch_source_credentials_missing',
+        sourceSetup
+      });
+
+
+
+
+thinking
+**Evaluating testing options**
+
+I'm thinking about running a targeted node with the existing test helper—maybe that's fine. But, it might not be essential. High confidence might call for a quick bespoke JS, so I want to check the test fixture helper names in ControlRuntime.test to see if I can invoke them easily using vitest. A targeted test could be useful, but I need to weigh that against the need to avoid full suites. However, I mustn't edit any code.
+thinking
+**Evaluating documentation mismatch**
+
+I'm reviewing the guidelines, which highlight the need for actionable bugs related to maintainability and architecture. The user wanted a minimal solution, avoiding unnecessary complexities. There’s a documentation mismatch between the TECH_SPEC, which stresses a transport-agnostic model, and the implementation using `ControlSelectedRunPayload`, which isn't transport-agnostic. Is this a finding that needs addressing? I might need to reference the relevant parts in `observabilityReadModel.ts`, but I'm unsure of its actual impact on maintainability.
+thinking
+**Assessing internal dependencies**
+
+I need to consider a scenario where the internal consumers depend on snake_case/presenter fields. This reliance could complicate future route refactors and contradict claims about a transport-agnostic seam, although it doesn't cause an immediate break. Maybe this should be a P3 priority, but I question whether we should include only definite fixes. The author has already noted a risk regarding presenter shape, which the user specifically wants to address. Still, the guidelines suggest ignoring non-blocking issues. Is P3 suitable here?
+thinking
+**Evaluating snapshot behavior**
+
+I’m considering how new code interacts with old snapshots. It seems that if an old snapshot uses an outdated runtime object, it could lead to stale evaluations. Is that a serious issue? Old snapshots might not be intended for use after publishing, and since the API likely documents snapshots as immutable, it's intriguing. If consumers continue using an old snapshot after publication, there may be existing bugs. I should check if tests confirm that the new snapshot is being utilized.
+thinking
+**Evaluating testing options**
+
+I'm thinking about running a targeted node with the existing test helper—maybe that's fine. But, it might not be essential. High confidence might call for a quick bespoke JS, so I want to check the test fixture helper names in ControlRuntime.test to see if I can invoke them easily using vitest. A targeted test could be useful, but I need to weigh that against the need to avoid full suites. However, I mustn't edit any code.
+thinking
+**Evaluating documentation mismatch**
+
+I'm reviewing the guidelines, which highlight the need for actionable bugs related to maintainability and architecture. The user wanted a minimal solution, avoiding unnecessary complexities. There’s a documentation mismatch between the TECH_SPEC, which stresses a transport-agnostic model, and the implementation using `ControlSelectedRunPayload`, which isn't transport-agnostic. Is this a finding that needs addressing? I might need to reference the relevant parts in `observabilityReadModel.ts`, but I'm unsure of its actual impact on maintainability.
+thinking
+**Assessing internal dependencies**
+
+I need to consider a scenario where the internal consumers depend on snake_case/presenter fields. This reliance could complicate future route refactors and contradict claims about a transport-agnostic seam, although it doesn't cause an immediate break. Maybe this should be a P3 priority, but I question whether we should include only definite fixes. The author has already noted a risk regarding presenter shape, which the user specifically wants to address. Still, the guidelines suggest ignoring non-blocking issues. Is P3 suitable here?
+thinking
+**Evaluating snapshot behavior**
+
+I’m considering how new code interacts with old snapshots. It seems that if an old snapshot uses an outdated runtime object, it could lead to stale evaluations. Is that a serious issue? Old snapshots might not be intended for use after publishing, and since the API likely documents snapshots as immutable, it's intriguing. If consumers continue using an old snapshot after publication, there may be existing bugs. I should check if tests confirm that the new snapshot is being utilized.
+exec
+/bin/zsh -lc "grep -n \"not_found\" -n orchestrator/src/cli/control/telegramOversightBridge.ts && sed -n '240,360p' orchestrator/src/cli/control/telegramOversightBridge.ts" in /Users/kbediako/Code/CO exited 1 in 53ms:
+
+[run-review] waiting on codex review (3m 0s elapsed, 3s idle; review progress observed).
+
+thinking
+I'm looking into the command handling related to renderIssue. It seems like I need to check for any issues that might cause a "not found" error. I want to make sure that the command is being processed correctly, as I don’t want any hiccups. Ensuring proper handling here is crucial for smooth functionality, so I’ll investigate this thoroughly and see how I can improve it. Let's dig deeper into any possible issues!
+thinking
+I'm looking into the command handling related to renderIssue. It seems like I need to check for any issues that might cause a "not found" error. I want to make sure that the command is being processed correctly, as I don’t want any hiccups. Ensuring proper handling here is crucial for smooth functionality, so I’ll investigate this thoroughly and see how I can improve it. Let's dig deeper into any possible issues!
+exec
+/bin/zsh -lc "grep -n \"renderIssue\\|/issue\\|Issue not found\" -n orchestrator/src/cli/control/telegramOversightBridge.ts && sed -n '260,420p' orchestrator/src/cli/control/telegramOversightBridge.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+366:      case '/issue':
+367:        return this.renderIssue();
+427:  private async renderIssue(): Promise<string> {
+781:    '/issue',
+        }
+      } catch (error) {
+        if (this.closed || isAbortError(error)) {
+          break;
+        }
+        logger.warn(`[telegram-oversight] polling failed: ${(error as Error)?.message ?? String(error)}`);
+      }
+      if (this.closed) {
+        break;
+      }
+      await delay(this.config.pollIntervalMs);
+    }
+  }
+
+  private async fetchUpdates(): Promise<TelegramUpdate[]> {
+    const controller = new AbortController();
+
+thinking
+**Evaluating state changes**
+
+I’m considering what happens when `linearAdvisoryState.tracked_issue` changes within the same snapshot due to background updates. I notice the selected-run read model remains unchanged, while the compatibilityState reads would reflect the latest tracked state. That’s because `projection.buildSelectedRunContext()` caches the selected with a tracked build. So, there’s a stale state that exists, something preexisting and not introduced recently. I need to think through the implications of that further.
+thinking
+**Evaluating state changes**
+
+I’m considering what happens when `linearAdvisoryState.tracked_issue` changes within the same snapshot due to background updates. I notice the selected-run read model remains unchanged, while the compatibilityState reads would reflect the latest tracked state. That’s because `projection.buildSelectedRunContext()` caches the selected with a tracked build. So, there’s a stale state that exists, something preexisting and not introduced recently. I need to think through the implications of that further.
+exec
+/bin/zsh -lc "grep -R \"ControlSelectedRunReadModel\" -n . | sed -n '1,200p'" in /Users/kbediako/Code/CO

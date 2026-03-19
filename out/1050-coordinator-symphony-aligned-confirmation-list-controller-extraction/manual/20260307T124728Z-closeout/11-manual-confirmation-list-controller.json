@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-03-07T12:55:01.331Z",
+  "scenarios": {
+    "non_route": {
+      "handled": false,
+      "steps": [],
+      "response": {
+        "statusCode": null,
+        "headers": null,
+        "body": null
+      }
+    },
+    "listed_pending": {
+      "handled": true,
+      "steps": [
+        "expire",
+        "list"
+      ],
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "pending": [
+            {
+              "request_id": "req-visible",
+              "action": "cancel",
+              "tool": "delegate.cancel",
+              "action_params_digest": "digest-1",
+              "digest_alg": "sha256",
+              "requested_at": "2026-03-07T10:00:00.000Z",
+              "expires_at": "2026-03-07T10:05:00.000Z",
+              "approved_by": null,
+              "approved_at": null
+            }
+          ]
+        }
+      }
+    },
+    "empty_pending": {
+      "handled": true,
+      "steps": [
+        "expire",
+        "list"
+      ],
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "pending": []
+        }
+      }
+    }
+  }
+}

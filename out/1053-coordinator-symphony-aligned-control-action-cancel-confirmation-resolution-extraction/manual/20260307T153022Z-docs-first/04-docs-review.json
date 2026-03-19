@@ -1,0 +1,16 @@
+{
+  "attempts": [
+    {
+      "run_id": "2026-03-07T15-32-30-168Z-873443f8",
+      "status": "failed",
+      "manifest": ".runs/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction/cli/2026-03-07T15-32-30-168Z-873443f8/manifest.json",
+      "summary": "Stage 'Run delegation guard' failed with exit code 1."
+    },
+    {
+      "run_id": "2026-03-07T15-33-37-514Z-1a866a55",
+      "status": "failed",
+      "manifest": ".runs/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction/cli/2026-03-07T15-33-37-514Z-1a866a55/manifest.json",
+      "summary": "Delegation-guard override active; spec-guard, docs:check, and docs:freshness passed; npm run review was terminated after low-signal reinspection drift and surfaced no concrete docs defect."
+    }
+  ]
+}

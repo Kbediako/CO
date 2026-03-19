@@ -1,0 +1,591 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/cli/2026-03-09T01-16-15-040Z-67469a98/manifest.json
+
+(node:37332) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:37332) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 687 > 25
+ - total lines changed 73192 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 7331
+  - docs/docs-freshness-registry.json: 6193
+  - tasks/index.json: 5346
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1676
+  - scripts/lib/review-execution-state.ts: 1618
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - scripts/run-review.ts: 1172
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1073 is part of the approved stacked Symphony-alignment branch; cumulative branch size exceeds the nominal budget while the task-local child-resolution extraction remains bounded.
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 4 files, 446 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/cli/2026-03-09T01-16-15-040Z-67469a98/review/prompt.txt
+Review output log: .runs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/cli/2026-03-09T01-16-15-040Z-67469a98/review/output.log
+Launching Codex review (evidence: .runs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/cli/2026-03-09T01-16-15-040Z-67469a98/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cd02c-25fd-7382-9037-7683658f0ce6
+--------
+user
+Review task: 1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction
+Evidence manifest: .runs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/cli/2026-03-09T01-16-15-040Z-67469a98/manifest.json
+
+Task context:
+- Task checklist: `tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+- MCP Task ID: `1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+- TECH_SPEC: `tasks/specs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `tasks/specs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `.agent/task/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1073-question-child-resolution-adapter-extraction-deliberation.md`.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `docs/findings/1073-question-child-resolution-adapter-extraction-deliberation.md`, `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/14-next-slice-note.md`.
+- [ ] docs-review approval/override captured for registered `1073`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-docs-first/00-summary.md`.
+- [ ] Child-resolution adapter assembly ownership moved out of `controlServer.ts` into a dedicated control-local module. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/src/cli/control/`.
+- [ ] The extracted seam preserves fallback event emission, delegation/run-root policy, and helper behavior. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] Question/expiry behavior remains intact after the extraction. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
+- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
+- [ ] `npm run build`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/03-build.log`.
+- [ ] `npm run lint`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/04-lint.log`.
+- [ ] `npm run test`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/05-test.log`.
+- [ ] `npm run docs:check`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
+- [ ] `npm run docs:freshness`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
+- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/08-diff-budget.log`.
+- [ ] `npm run review`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/09-review.log`.
+- [ ] `npm run pack:smoke`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
+- [ ] Manual/mock child-resolution seam evidence captured. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/11-manual-question-child-resolution-check.json`.
+- [ ] Elegance review completed. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+
+Agent notes:
+Goal: confirm the 1073 child-resolution wrapper extraction stays minimal and preserves fallback semantics. | Summary: extracted controlQuestionChildResolution.ts, removed the leftover server wrapper, and added direct fallback regressions for answered and expired child-resolution failures. | Risks: child-question fallback audit payload drift, expiry/list sequencing regressions, and controlServer shell widening.
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 118]
+ M orchestrator/src/cli/control/controlServer.ts
+ M orchestrator/tests/ControlServer.test.ts
+?? orchestrator/src/cli/control/controlQuestionChildResolution.ts
+?? orchestrator/tests/ControlQuestionChildResolution.test.ts
+```
+
+Diff budget override: 1073 is part of the approved stacked Symphony-alignment branch; cumulative branch size exceeds the nominal budget while the task-local child-resolution extraction remains bounded.
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+thinking
+**Analyzing findings and discrepancies**
+
+I need to focus on the findings that the author would want to fix. I should review any documents that might have mismatches or guardrail violations, possibly due to changes in files. However, the instructions say to focus on the changed files and nearby dependencies, so I might not have to run full suites. I probably need to analyze the diff and check nearby code. It seems like I might need to update my plan, and I’m thinking of breaking it down into a few steps: inspect the diff, analyze semantics/tests/docs, and produce findings.
+thinking
+**Analyzing findings and discrepancies**
+
+I need to focus on the findings that the author would want to fix. I should review any documents that might have mismatches or guardrail violations, possibly due to changes in files. However, the instructions say to focus on the changed files and nearby dependencies, so I might not have to run full suites. I probably need to analyze the diff and check nearby code. It seems like I might need to update my plan, and I’m thinking of breaking it down into a few steps: inspect the diff, analyze semantics/tests/docs, and produce findings.
+Plan update
+  → Inspect the task diff and relevant surrounding code/tests
+  • Analyze changed behavior for regressions and guardrail/doc mismatches
+  • Summarize qualifying findings in required JSON format
+
+thinking
+**Inspecting git diff**
+
+I need to take a closer look at the git diff. I might start with the command `git diff --stat`, which should give me a summary of changes made, including which files have been modified. This will help me understand what I've worked on before getting into the specifics of the actual differences in content. It’s a good first step before diving deeper!
+thinking
+**Inspecting git diff**
+
+I need to take a closer look at the git diff. I might start with the command `git diff --stat`, which should give me a summary of changes made, including which files have been modified. This will help me understand what I've worked on before getting into the specifics of the actual differences in content. It’s a good first step before diving deeper!
+exec
+/bin/zsh -lc 'git diff --stat -- orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/controlQuestionChildResolution.ts orchestrator/tests/ControlServer.test.ts orchestrator/tests/ControlQuestionChildResolution.test.ts' in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'git status --short -- orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/controlQuestionChildResolution.ts orchestrator/tests/ControlServer.test.ts orchestrator/tests/ControlQuestionChildResolution.test.ts' in /Users/kbediako/Code/CO succeeded in 53ms:
+ orchestrator/src/cli/control/controlServer.ts |  34 +--
+ orchestrator/tests/ControlServer.test.ts      | 297 ++++++++++++++++++++++++++
+ 2 files changed, 301 insertions(+), 30 deletions(-)
+ succeeded in 53ms:
+ M orchestrator/src/cli/control/controlServer.ts
+ M orchestrator/tests/ControlServer.test.ts
+?? orchestrator/src/cli/control/controlQuestionChildResolution.ts
+?? orchestrator/tests/ControlQuestionChildResolution.test.ts
+
+thinking
+**Inspecting new files**
+
+It seems like I may have omitted new files because the default `diff --stat` command in Git doesn’t show untracked files. I think I need to inspect the full contents of my project to understand what’s going on. I can use `git diff` to see changes and also `cat` to check the contents of those new files. Let's figure this out to ensure I don't miss anything crucial!
+thinking
+**Inspecting new files**
+
+It seems like I may have omitted new files because the default `diff --stat` command in Git doesn’t show untracked files. I think I need to inspect the full contents of my project to understand what’s going on. I can use `git diff` to see changes and also `cat` to check the contents of those new files. Let's figure this out to ensure I don't miss anything crucial!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/ControlQuestionChildResolution.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/controlQuestionChildResolution.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'git diff -- orchestrator/src/cli/control/controlServer.ts orchestrator/tests/ControlServer.test.ts' in /Users/kbediako/Code/CO succeeded in 53ms:
+import type { ControlRequestContext } from './controlRequestContext.js';
+import type { QuestionChildResolutionFallbackEvent } from './questionChildResolutionAdapter.js';
+import {
+  createQuestionChildResolutionAdapter,
+  type QuestionChildResolutionAdapter
+} from './questionChildResolutionAdapter.js';
+
+export interface ControlQuestionChildResolutionContext
+  extends Pick<ControlRequestContext, 'config' | 'controlStore' | 'delegationTokens' | 'eventTransport'> {}
+
+export function createControlQuestionChildResolutionAdapter(
+  context: ControlQuestionChildResolutionContext
+): QuestionChildResolutionAdapter {
+  return createQuestionChildResolutionAdapter({
+    allowedRunRoots: context.config.ui.allowedRunRoots,
+    allowedBindHosts: context.config.ui.allowedBindHosts,
+    expiryFallback: context.config.delegate.expiryFallback,
+    readParentRunId: () => context.controlStore.snapshot().run_id,
+    validateDelegationToken: (token, parentRunId, childRunId) =>
+      Boolean(context.delegationTokens.validate(token, parentRunId, childRunId)),
+ succeeded in 53ms:
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createControlQuestionChildResolutionAdapter } from '../src/cli/control/controlQuestionChildResolution.js';
+import { createQuestionChildResolutionAdapter } from '../src/cli/control/questionChildResolutionAdapter.js';
+
+vi.mock('../src/cli/control/questionChildResolutionAdapter.js', () => ({
+  createQuestionChildResolutionAdapter: vi.fn()
+}));
+
+describe('ControlQuestionChildResolution', () => {
+  const mockAdapter = {
+    readDelegationHeaders: vi.fn(),
+    validateDelegation: vi.fn(),
+    resolveManifestPath: vi.fn(),
+    readManifest: vi.fn(),
+    resolveChildQuestion: vi.fn(),
+    queueQuestionResolutions: vi.fn()
+  };
+
+  beforeEach(() => {
+ succeeded in 52ms:
+diff --git a/orchestrator/src/cli/control/controlServer.ts b/orchestrator/src/cli/control/controlServer.ts
+index d1c65c143..74e47ba23 100644
+--- a/orchestrator/src/cli/control/controlServer.ts
++++ b/orchestrator/src/cli/control/controlServer.ts
+@@ -39,10 +39,6 @@ import {
+   type LinearAdvisoryState,
+   type LinearWebhookAuditEventInput
+ } from './linearWebhookController.js';
+-import {
+-  createQuestionChildResolutionAdapter,
+-  type QuestionChildResolutionFallbackEvent
+-} from './questionChildResolutionAdapter.js';
+ import {
+   createControlExpiryLifecycle,
+   type ControlExpiryLifecycle
+@@ -63,6 +59,7 @@ import {
+   type ControlRequestPersist,
+   type ControlRequestSharedContext
+ } from './controlRequestContext.js';
++import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
+
+thinking
+**Inspecting code issues**
+
+I need to check the surrounding code for any potential issues. It seems like I should focus on the parts I changed and how they might affect the existing behavior of questionChildResolutionAdapter. I'll search through the relevant file to see what's going on there. It's important to ensure nothing is broken or behaving unexpectedly, so I'll be thorough in my inspection to catch any issues early on. This might take a bit of time, but it's necessary!
+thinking
+**Inspecting code issues**
+
+I need to check the surrounding code for any potential issues. It seems like I should focus on the parts I changed and how they might affect the existing behavior of questionChildResolutionAdapter. I'll search through the relevant file to see what's going on there. It's important to ensure nothing is broken or behaving unexpectedly, so I'll be thorough in my inspection to catch any issues early on. This might take a bit of time, but it's necessary!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/questionChildResolutionAdapter.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/controlRequestContext.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'rg -n "createControlQuestionChildResolutionAdapter|question.resolve_child_fallback|createQuestionChildResolutionAdapter|QuestionChildResolutionFallbackEvent" -S orchestrator/src orchestrator/tests' in /Users/kbediako/Code/CO succeeded in 52ms:
+import http from 'node:http';
+import { realpathSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+
+import { logger } from '../../logger.js';
+import type { CliManifest } from '../types.js';
+import type { ControlState } from './controlState.js';
+import type { QuestionRecord } from './questions.js';
+
+const CHILD_CONTROL_TIMEOUT_MS = 15_000;
+const CSRF_HEADER = 'x-csrf-token';
+const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
+const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+
+export interface DelegationAuth {
+  token: string;
+  childRunId: string;
+}
+ succeeded in 51ms:
+import http from 'node:http';
+
+import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { ConfirmationStore } from './confirmations.js';
+import type { ControlExpiryLifecycle } from './controlExpiryLifecycle.js';
+import type { ControlEventTransport } from './controlEventTransport.js';
+import type { ControlRuntime, ControlRuntimeSnapshot } from './controlRuntime.js';
+import type { ControlStateStore } from './controlState.js';
+import type { DelegationTokenStore } from './delegationTokens.js';
+import type { LinearAdvisoryState } from './linearWebhookController.js';
+import type {
+  ObservabilityPresenterContext
+} from './observabilitySurface.js';
+import type { QuestionQueue } from './questions.js';
+import type { SelectedRunPresenterContext } from './selectedRunPresenter.js';
+
+export interface ControlRequestPersist {
+  control(): Promise<void>;
+  confirmations(): Promise<void>;
+ succeeded in 51ms:
+orchestrator/tests/ControlServer.test.ts:7007:        if (record.event === 'question.resolve_child_fallback') {
+orchestrator/tests/ControlServer.test.ts:7152:        if (record.event === 'question.resolve_child_fallback') {
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:2:import type { QuestionChildResolutionFallbackEvent } from './questionChildResolutionAdapter.js';
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:4:  createQuestionChildResolutionAdapter,
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:11:export function createControlQuestionChildResolutionAdapter(
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:14:  return createQuestionChildResolutionAdapter({
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:22:      emitControlQuestionChildResolutionFallbackEvent(context, payload)
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:26:async function emitControlQuestionChildResolutionFallbackEvent(
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:28:  payload: QuestionChildResolutionFallbackEvent
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:31:    event: 'question.resolve_child_fallback',
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:32:  createQuestionChildResolutionAdapter(): QuestionExpiryResolutionAdapter;
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:42:  private readonly createQuestionChildResolutionAdapter:
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:43:    ControlExpiryLifecycleOptions['createQuestionChildResolutionAdapter'];
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:54:    this.createQuestionChildResolutionAdapter = options.createQuestionChildResolutionAdapter;
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:92:    questionChildResolutionAdapter = this.createQuestionChildResolutionAdapter()
+orchestrator/tests/ControlExpiryLifecycle.test.ts:81:      createQuestionChildResolutionAdapter: () => ({
+orchestrator/tests/ControlExpiryLifecycle.test.ts:148:      createQuestionChildResolutionAdapter: () => ({
+orchestrator/src/cli/control/questionChildResolutionAdapter.ts:24:export interface QuestionChildResolutionFallbackEvent {
+orchestrator/src/cli/control/questionChildResolutionAdapter.ts:45:export function createQuestionChildResolutionAdapter(input: {
+orchestrator/src/cli/control/questionChildResolutionAdapter.ts:51:  emitResolutionFallback(payload: QuestionChildResolutionFallbackEvent): Promise<void>;
+
+thinking
+**Evaluating code documentation**
+
+I need to inspect the surrounding code, specifically regarding controlExpiryLifecycle and the eventTransport documents to check for any issues. There seems to be a mismatch related to documentation requests and guardrail violations. I should review the changed files to see if the documentation is updated, but since there may not be documentation changes, I wonder if it's okay if it still references the old module. I need to search the docs for any mentions of questionChildResolutionAdapter or controlServer wrapper.
+thinking
+**Evaluating code documentation**
+
+I need to inspect the surrounding code, specifically regarding controlExpiryLifecycle and the eventTransport documents to check for any issues. There seems to be a mismatch related to documentation requests and guardrail violations. I should review the changed files to see if the documentation is updated, but since there may not be documentation changes, I wonder if it's okay if it still references the old module. I need to search the docs for any mentions of questionChildResolutionAdapter or controlServer wrapper.
+exec
+/bin/zsh -lc "sed -n '1,220p' tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' tasks/specs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'rg -n "questionChildResolutionAdapter|controlQuestionChildResolution|question.resolve_child_fallback|controlServer" docs tasks .agent orchestrator/src/cli/control -S' in /Users/kbediako/Code/CO succeeded in 52ms:
+---
+id: 20260308-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction
+title: Coordinator Symphony-Aligned Question Child-Resolution Adapter Extraction
+status: draft
+owners:
+  - Codex
+created: 2026-03-08
+last_review: 2026-03-08
+review_cadence_days: 30
+relates_to: docs/PRD-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md
+---
+
+# Spec Snapshot
+
+- Task ID: `1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction`
+- Canonical PRD: `docs/PRD-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+- Canonical TECH_SPEC: `docs/TECH_SPEC-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+- Canonical ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+
+## Scope
+ succeeded in 52ms:
+# Task Checklist - 1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction
+
+- MCP Task ID: `1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+- TECH_SPEC: `tasks/specs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`
+
+> This lane continues the Symphony-alignment mainline by extracting the child-run question-resolution adapter assembly from `controlServer.ts`.
+
+## Foundation
+
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `tasks/specs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `.agent/task/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1073-question-child-resolution-adapter-extraction-deliberation.md`.
+
+## Shared Registry + Review Handoff
+
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md`, `docs/findings/1073-question-child-resolution-adapter-extraction-deliberation.md`, `out/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction/manual/20260308T220352Z-closeout/14-next-slice-note.md`.
+- [ ] docs-review approval/override captured for registered `1073`. Evidence: `out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/<timestamp>-docs-first/00-summary.md`.
+
+ succeeded in 53ms:
+Total output lines: 961
+
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:2:import type { QuestionChildResolutionFallbackEvent } from './questionChildResolutionAdapter.js';
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:6:} from './questionChildResolutionAdapter.js';
+orchestrator/src/cli/control/controlQuestionChildResolution.ts:31:    event: 'question.resolve_child_fallback',
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:3:import type { QuestionChildResolutionAdapter } from './questionChildResolutionAdapter.js';
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:15:  expireQuestions(questionChildResolutionAdapter?: QuestionExpiryResolutionAdapter): Promise<void>;
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:92:    questionChildResolutionAdapter = this.createQuestionChildResolutionAdapter()
+orchestrator/src/cli/control/controlExpiryLifecycle.ts:111:      await questionChildResolutionAdapter.resolveChildQuestion(record, 'expired');
+orchestrator/src/cli/control/controlServer.ts:49:} from './controlServerBootstrapLifecycle.js';
+orchestrator/src/cli/control/controlServer.ts:62:import { createControlQuestionChildResolutionAdapter } from './controlQuestionChildResolution.js';
+orchestrator/src/cli/control/controlServer.ts:404:        const questionChildResolutionAdapter = createControlQuestionChildResolutionAdapter(context);
+orchestrator/src/cli/control/controlServer.ts:405:        await (this.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve());
+orchestrator/src/cli/control/controlServer.ts:407:        questionChildResolutionAdapter.queueQuestionResolutions(questions);
+orchestrator/src/cli/control/controlServer.ts:477:  const questionChildResolutionAdapter = createControlQuestionChildResolutionAdapter(context);
+orchestrator/src/cli/control/controlServer.ts:504:      context.expiryLifecycle?.expireQuestions(questionChildResolutionAdapter) ?? Promise.resolve(),
+orchestrator/src/cli/control/controlServer.ts:505:    queueQuestionResolutions: (records) => questionChildResolutionAdapter.queueQuestionResolutions(records),
+orchestrator/src/cli/control/controlServer.ts:506:    readDelegationHeaders: () => questionChildResolutionAdapter.readDelegationHeaders(req),
+orchestrator/src/cli/control/controlServer.ts:507:    validateDelegation: (delegationAuth) => questionChildResolutionAdapter.validateDelegation(delegationAuth),
+orchestrator/src/cli/control/controlServer.ts:508:    resolveManifestPath: (rawPath) => questionChildResolutionAdapter.resolveManifestPath(rawPath),
+[run-review] waiting on codex review (1m 0s elapsed, 11s idle; review progress observed).
+
+
+
+
+thinking
+**Inspecting test imports**
+
+I’m thinking there might be an issue with the new test import for `createQuestionChildResolutionAdapter` that’s mocked with `vi.mock`, especially if it doesn’t restore defaults. I should check the lines around `createControlExpiryLifecycle` and `handleRequest` to make sure there aren't any difference locations that are larger than expected. It may not even be a bug. I might also want to look into the question queue controller or `controlExpiryLifecycle` for any documentation mismatches, but that seems unlikely.
+thinking
+**Evaluating review criteria**
+
+I’m trying to understand how to review the output, focusing on code findings with overlapping diff locations. The task checklist isn’t changed and doesn’t seem to match the diff, so I can’t flag a mismatch. If findings are based only on the diff, that might not include documentation. I’m also pondering whether to confirm evidence requirements, but the patch could still be deemed correct even if documents aren’t updated, as long as there are no code bugs. Yet, the user specifically asked about guardrail violations.
+thinking
+**Assessing patch correctness**
+
+I’m considering whether I can use findings from the changed file even if there’s a documentation mismatch. However, the absence of code_location overlap makes it tricky. If there are no qualifying bugs, findings may be empty. I can still mention that there are no blocking issues in the diff, but overall correctness might lean toward “patch is correct” if there aren’t any bugs. I need to be cautious about inspecting nearby dependencies for simplification opportunities while noting that style issues aren’t bugs.
+thinking
+**Inspecting untracked files**
+
+It seems like the new test file isn't showing up in the git diff stat because it's untracked. That's something I really want to double-check to see if there's an issue there. I need to look at the status to confirm if this file needs to be added or if there are no problems at all. Let's make sure everything is in order!
+thinking
+**Inspecting test imports**
+
+I’m thinking there might be an issue with the new test import for `createQuestionChildResolutionAdapter` that’s mocked with `vi.mock`, especially if it doesn’t restore defaults. I should check the lines around `createControlExpiryLifecycle` and `handleRequest` to make sure there aren't any difference locations that are larger than expected. It may not even be a bug. I might also want to look into the question queue controller or `controlExpiryLifecycle` for any documentation mismatches, but that seems unlikely.
+thinking
+**Evaluating review criteria**
+
+I’m trying to understand how to review the output, focusing on code findings with overlapping diff locations. The task checklist isn’t changed and doesn’t seem to match the diff, so I can’t flag a mismatch. If findings are based only on the diff, that might not include documentation. I’m also pondering whether to confirm evidence requirements, but the patch could still be deemed correct even if documents aren’t updated, as long as there are no code bugs. Yet, the user specifically asked about guardrail violations.
+thinking
+**Assessing patch correctness**
+
+I’m considering whether I can use findings from the changed file even if there’s a documentation mismatch. However, the absence of code_location overlap makes it tricky. If there are no qualifying bugs, findings may be empty. I can still mention that there are no blocking issues in the diff, but overall correctness might lean toward “patch is correct” if there aren’t any bugs. I need to be cautious about inspecting nearby dependencies for simplification opportunities while noting that style issues aren’t bugs.
+thinking
+**Inspecting untracked files**
+
+It seems like the new test file isn't showing up in the git diff stat because it's untracked. That's something I really want to double-check to see if there's an issue there. I need to look at the status to confirm if this file needs to be added or if there are no problems at all. Let's make sure everything is in order!
+exec
+/bin/zsh -lc "sed -n '1,260p' docs/findings/1073-question-child-resolution-adapter-extraction-deliberation.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' docs/PRD-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' docs/TECH_SPEC-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md && printf '\\n---ACTION_PLAN---\\n' && sed -n '1,220p' docs/ACTION_PLAN-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+# 1073 Deliberation - Question Child-Resolution Adapter Extraction
+
+## Decision
+
+Take the child-run question-resolution adapter boundary next.
+
+## Why this seam
+
+- It is the remaining internal autonomy boundary still assembled inline by `controlServer.ts`.
+- It is more aligned with the long-term “manage work instead of supervising agents” goal than a Telegram/provider-specific extraction.
+- It stays bounded: adapter composition and fallback emission wiring can move without widening into route/controller extraction.
+
+## Keep in `controlServer.ts`
+
+- Request admission and authenticated dispatch.
+- Expiry/bootstrap lifecycle ownership.
+- Telegram/provider sequencing.
+- Higher-level audit emitters outside the child-resolution assembly seam.
+ succeeded in 52ms:
+# PRD - Coordinator Symphony-Aligned Question Child-Resolution Adapter Extraction
+
+## Summary
+
+After `1072`, `controlServer.ts` still owns the server-specific composition that turns request-context state into the child-run question-resolution adapter used by expiry handling and authenticated question routes. This slice extracts that composition into a dedicated control-local module so the server shell keeps HTTP/provider orchestration while autonomous child-run coordination moves behind a narrower boundary.
+
+## Problem
+
+`controlServer.ts` still directly wires:
+- allowed run-root and bind-host policy,
+- delegation-token validation,
+- parent-run identity lookup,
+- fallback audit emission for child-question resolution,
+- helper creation for expiry and authenticated question flows.
+
+That is a core autonomy boundary, not raw HTTP shell logic. Leaving it inline keeps the server shell coupled to child-run coordination details that should be reusable and easier to reason about independently.
+
+## Goals
+
+- Extract the control-local child-resolution adapter assembly out of `controlServer.ts`.
+ succeeded in 51ms:
+---
+id: 20260308-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction
+title: Coordinator Symphony-Aligned Question Child-Resolution Adapter Extraction
+status: draft
+owners:
+  - Codex
+created: 2026-03-08
+last_review: 2026-03-08
+review_cadence_days: 30
+related_prd: docs/PRD-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md
+related_tasks:
+  - tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md
+---
+
+# TECH_SPEC - Coordinator Symphony-Aligned Question Child-Resolution Adapter Extraction
+
+## Summary
+
+Extract the child-run question-resolution adapter assembly from `controlServer.ts` into a dedicated control-local module. The extracted seam should own request-context-to-adapter composition plus fallback audit emission wiring, while `controlServer.ts` keeps route admission, helper sequencing, and provider-facing behavior explicit.
+
+
+[run-review] waiting on codex review (2m 0s elapsed, 6s idle; review progress observed).
+
+thinking
+**Evaluating patch validity**
+
+I'm considering whether to mention that there are no blocking issues in the code diff. There are still some outstanding items in the validation checklist, but they aren’t part of this patch. I think I should still say the patch is correct. However, I’m wondering if we risk violating the concept of overall correctness because some documentation and evidence are missing. The definition of "correct" implies that existing code and tests won’t break, and that the patch is free of bugs.
+thinking
+**Checking for updates**
+
+Before I finalize, I need to check if there's an untracked new test file that's not included in the git diff, which would mean it isn't part of the review. I should search for any documentation or task file modifications that might not be in the diff. Reviewing manifest.json or the evidence manifest for checklists could help. I only need to output the code location if I find something. If not, that's fine. I want to ensure I don’t have stale memory updates since we skipped that.
+thinking
+**Evaluating patch validity**
+
+I'm considering whether to mention that there are no blocking issues in the code diff. There are still some outstanding items in the validation checklist, but they aren’t part of this patch. I think I should still say the patch is correct. However, I’m wondering if we risk violating the concept of overall correctness because some documentation and evidence are missing. The definition of "correct" implies that existing code and tests won’t break, and that the patch is free of bugs.
+thinking
+**Checking for updates**
+
+Before I finalize, I need to check if there's an untracked new test file that's not included in the git diff, which would mean it isn't part of the review. I should search for any documentation or task file modifications that might not be in the diff. Reviewing manifest.json or the evidence manifest for checklists could help. I only need to output the code location if I find something. If not, that's fine. I want to ensure I don’t have stale memory updates since we skipped that.
+exec
+/bin/zsh -lc 'rg -n "resolve_child_fallback|child resolution fails|emits a fallback audit event" orchestrator/tests/ControlServer.test.ts orchestrator/tests/QuestionChildResolutionAdapter.test.ts orchestrator/tests/ControlQuestionChildResolution.test.ts -S' in /Users/kbediako/Code/CO succeeded in 53ms:
+orchestrator/tests/ControlQuestionChildResolution.test.ts:68:      event: 'question.resolve_child_fallback',
+orchestrator/tests/ControlServer.test.ts:6982:  it('emits a fallback audit event when child resolution fails for answered questions', async () => {
+orchestrator/tests/ControlServer.test.ts:7007:        if (record.event === 'question.resolve_child_fallback') {
+orchestrator/tests/ControlServer.test.ts:7127:  it('emits a fallback audit event when child resolution fails for expired questions', async () => {
+orchestrator/tests/ControlServer.test.ts:7152:        if (record.event === 'question.resolve_child_fallback') {
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/src/cli/control/controlExpiryLifecycle.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+import type { ConfirmationStore } from './confirmations.js';
+import type { ControlRuntime } from './controlRuntime.js';
+import type { QuestionChildResolutionAdapter } from './questionChildResolutionAdapter.js';
+import type { QuestionQueue } from './questions.js';
+
+export type QuestionExpiryResolutionAdapter = Pick<
+  QuestionChildResolutionAdapter,
+  'resolveChildQuestion'
+>;
+
+export interface ControlExpiryLifecycle {
+  start(): void;
+  close(): void;
+  expireConfirmations(): Promise<void>;
+  expireQuestions(questionChildResolutionAdapter?: QuestionExpiryResolutionAdapter): Promise<void>;
+}
+
+interface ControlExpiryLifecycleOptions {
+  intervalMs: number;
+  confirmationStore: ConfirmationStore;
+
+thinking
+**Inspecting question management**
+
+I’m thinking about the existing behavior where it might duplicate child resolution for expired questions when using the GET /questions endpoint. The new test suggests that one fallback event could support two scenarios? I should check the controlServer constructor, where the GET /questions path likely interacts with handlers for expiring questions and queueing resolutions. In addition, it seems that questionQueue.expire() marks expired records as closed, so inspecting the questions queue could be informative.
+thinking
+**Inspecting question management**
+
+I’m thinking about the existing behavior where it might duplicate child resolution for expired questions when using the GET /questions endpoint. The new test suggests that one fallback event could support two scenarios? I should check the controlServer constructor, where the GET /questions path likely interacts with handlers for expiring questions and queueing resolutions. In addition, it seems that questionQueue.expire() marks expired records as closed, so inspecting the questions queue could be informative.
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/questions.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+export type QuestionStatus = 'queued' | 'answered' | 'expired' | 'dismissed';
+export type QuestionUrgency = 'low' | 'med' | 'high';
+
+export interface QuestionRecord {
+  question_id: string;
+  parent_run_id: string;
+  from_run_id: string;
+  from_manifest_path?: string | null;
+  prompt: string;
+  urgency: QuestionUrgency;
+  status: QuestionStatus;
+  queued_at: string;
+  expires_at?: string | null;
+  expires_in_ms?: number | null;
+  auto_pause?: boolean;
+  expiry_fallback?: 'pause' | 'resume' | 'fail' | null;
+  answer?: string | null;
+  answered_by?: string | null;
+  answered_at?: string | null;
+  dismissed_by?: string | null;
+[run-review] waiting on codex review (3m 0s elapsed, 23s idle; review progress observed).
+
+
+thinking
+**Reviewing code paths**
+
+I need to consider if there's any hidden regression around module paths and packaging. Could `controlQuestionChildResolution.ts` be unimportable elsewhere? It seems `controlServer.ts` is located in `orchestrator/src/cli/control`, and the build relies on TypeScript project references. I'm wondering if `context.controlStore.snapshot().run_id` could be costly now, compared to previously being read-only on validateDelegation. Also, could `context.eventTransport` be undefined during `ControlServer.start` if it's not initialized? My focus here is on keeping things minimal and efficient.
+thinking
+**Clarifying validation and confidence**
+
+I could mention in the overall explanation that I didn't run broad validation suites per bounded-review instructions, and the follow-up commands are part of the checklist closeout bundle. They did ask to highlight guardrail violations, so I might note that there are no blocking diff-local mismatches, but the checklist still shows pending docs-review and closeout validations. I should justify the overall correctness by stating that I didn’t find any diff-local regression and the touched files match the new `controlQuestionChildResolution` seam. For overall confidence, I might adjust it to around 0.32 since we didn't run tests.
+thinking
+**Reviewing code paths**
+
+I need to consider if there's any hidden regression around module paths and packaging. Could `controlQuestionChildResolution.ts` be unimportable elsewhere? It seems `controlServer.ts` is located in `orchestrator/src/cli/control`, and the build relies on TypeScript project references. I'm wondering if `context.controlStore.snapshot().run_id` could be costly now, compared to previously being read-only on validateDelegation. Also, could `context.eventTransport` be undefined during `ControlServer.start` if it's not initialized? My focus here is on keeping things minimal and efficient.
+thinking
+**Clarifying validation and confidence**
+
+I could mention in the overall explanation that I didn't run broad validation suites per bounded-review instructions, and the follow-up commands are part of the checklist closeout bundle. They did ask to highlight guardrail violations, so I might note that there are no blocking diff-local mismatches, but the checklist still shows pending docs-review and closeout validations. I should justify the overall correctness by stating that I didn’t find any diff-local regression and the touched files match the new `controlQuestionChildResolution` seam. For overall confidence, I might adjust it to around 0.32 since we didn't run tests.
+Plan update
+Reviewed the extraction diff, the new adapter module/unit test, surrounding child-resolution logic, and the task/spec docs for diff-local mismatches.
+  ✓ Inspect the task diff and relevant surrounding code/tests
+  ✓ Analyze changed behavior for regressions and guardrail/doc mismatches
+  → Summarize qualifying findings in required JSON format
+
+thinking
+**Reviewing patch correctness**
+
+I’m working on this patch and feel pretty confident that it's correct. I've checked the `controlQuestionChildResolution` seam and its added coverage, and didn’t find any regressions. The task specs I looked at still align with what’s implemented. However, there are some process follow-ups about unchecked docs-review and closeout evidence. I should note that no non-interactive commands were introduced, and I also need to avoid any references to memory citations since they weren’t used.
+thinking
+**Reviewing patch correctness**
+
+I’m working on this patch and feel pretty confident that it's correct. I've checked the `controlQuestionChildResolution` seam and its added coverage, and didn’t find any regressions. The task specs I looked at still align with what’s implemented. However, there are some process follow-ups about unchecked docs-review and closeout evidence. I should note that no non-interactive commands were introduced, and I also need to avoid any references to memory citations since they weren’t used.
+codex
+I did not find a diff-local regression in the extracted `controlQuestionChildResolution` seam or its added coverage. The task/spec docs I checked still match the implemented behavior; the remaining unchecked docs-review and closeout evidence items are process follow-ups outside this code diff.
+Review output saved to: .runs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/cli/2026-03-09T01-16-15-040Z-67469a98/review/output.log
+Review telemetry saved to: .runs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/cli/2026-03-09T01-16-15-040Z-67469a98/review/telemetry.json

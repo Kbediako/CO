@@ -1,0 +1,523 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:13876) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13876) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 376 > 25
+ - total lines changed 41117 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5490
+  - docs/docs-freshness-registry.json: 2638
+  - tasks/index.json: 2242
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1782
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch contains previously validated Symphony-alignment slices; 1038-owned delta is the bounded /api/v1 observability API controller extraction plus archive-parser/docs sync cleanup
+[run-review] NOTES was not provided; using a generated fallback. Set NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." for higher-signal review context.
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 14 files, 991 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1038-coordinator-symphony-aligned-observability-api-controller-extraction/cli/2026-03-07T04-46-30-758Z-87a0e5f9/review/prompt.txt
+Review output log: .runs/1038-coordinator-symphony-aligned-observability-api-controller-extraction/cli/2026-03-07T04-46-30-758Z-87a0e5f9/review/output.log
+Launching Codex review (evidence: .runs/1038-coordinator-symphony-aligned-observability-api-controller-extraction/cli/2026-03-07T04-46-30-758Z-87a0e5f9/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc6b5-9574-7d02-8e26-2a607eb385e1
+--------
+user
+Review task: unknown-task
+Evidence manifest: .runs/1038-coordinator-symphony-aligned-observability-api-controller-extraction/cli/2026-03-07T04-46-30-758Z-87a0e5f9/manifest.json
+
+Agent notes:
+Goal: standalone review handoff | Summary: auto-generated NOTES fallback (task=unknown-task, manifest=.runs/1038-coordinator-symphony-aligned-observability-api-controller-extraction/cli/2026-03-07T04-46-30-758Z-87a0e5f9/manifest.json) | Risks: missing custom intent details may reduce review precision
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 45]
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M orchestrator/src/cli/control/controlServer.ts
+ M scripts/tasks-archive.mjs
+ M tasks/index.json
+?? .agent/task/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? docs/PRD-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? docs/findings/1038-observability-api-controller-extraction-deliberation.md
+?? orchestrator/src/cli/control/observabilityApiController.ts
+?? orchestrator/tests/ObservabilityApiController.test.ts
+?? tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md
+```
+
+Diff budget override: stacked branch contains previously validated Symphony-alignment slices; 1038-owned delta is the bounded /api/v1 observability API controller extraction plus archive-parser/docs sync cleanup
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+
+
+
+thinking
+**Evaluating memory usage for review**
+
+I need to review current changes and output JSON with my findings. Inspecting differences is necessary. I’m also thinking about whether to use memory since the task involves a review in the CO repository. There’s a chance that I should quickly check MEMORY.md for relevant keywords like "review" or "1038". The policy says to use memory by default, but I must ensure my output is just exact JSON without any extra prose. It's a tough balance!
+thinking
+**Deciding on memory usage and JSON output**
+
+The final answer has to be exact JSON, and I’m wondering if I should include a memory citation in my overall explanation. However, since the review task output requires exact JSON, it might be better to avoid using memory if it could lead to a citation conflict. The guidelines say to use memory by default for repo-related tasks, but it seems skipping it may be safer to meet output requirements. I’ll review the patch and inspect the git diff without relying on memory.
+thinking
+**Planning the review task**
+
+The review task seems non-trivial, so I might need to create a plan. I should inspect the changed files and compare the old and new versions. I wonder if I need to read the AGENTS document. Since delegation is mandatory for top-level tasks, I should consider delegating at least one subagent early on, especially for complex tasks. I think it’s best to use delegation tools for this. The user wants to review current changes, so I can spawn a delegated run to inspect the docs independently.
+thinking
+**Evaluating memory usage for review**
+
+I need to review current changes and output JSON with my findings. Inspecting differences is necessary. I’m also thinking about whether to use memory since the task involves a review in the CO repository. There’s a chance that I should quickly check MEMORY.md for relevant keywords like "review" or "1038". The policy says to use memory by default, but I must ensure my output is just exact JSON without any extra prose. It's a tough balance!
+thinking
+**Deciding on memory usage and JSON output**
+
+The final answer has to be exact JSON, and I’m wondering if I should include a memory citation in my overall explanation. However, since the review task output requires exact JSON, it might be better to avoid using memory if it could lead to a citation conflict. The guidelines say to use memory by default for repo-related tasks, but it seems skipping it may be safer to meet output requirements. I’ll review the patch and inspect the git diff without relying on memory.
+thinking
+**Planning the review task**
+
+The review task seems non-trivial, so I might need to create a plan. I should inspect the changed files and compare the old and new versions. I wonder if I need to read the AGENTS document. Since delegation is mandatory for top-level tasks, I should consider delegating at least one subagent early on, especially for complex tasks. I think it’s best to use delegation tools for this. The user wants to review current changes, so I can spawn a delegated run to inspect the docs independently.
+Plan update
+Reviewing the uncommitted patch for correctness, minimality, docs/guardrail alignment, and any actionable bugs before producing JSON findings.
+  → Inspect the diff and identify changed files relevant to the review scope
+  • Cross-check implementation, tests, and docs/checklist updates for mismatches or guardrail violations
+  • Summarize actionable findings with priorities and overall correctness verdict
+
+thinking
+**Considering delegation tools**
+
+I'm thinking about the need to delegate tasks using a tool that requires a manifest path. I need to check if there’s a parent manifest available since we already have an evidence manifest. It seems like I could create a delegate in the same repository. Maybe I should look into doing a bounded independent review stream, possibly regarding documentation and guardrails. It seems straightforward to use the delegation skill for this.
+thinking
+**Considering delegation tools**
+
+I'm thinking about the need to delegate tasks using a tool that requires a manifest path. I need to check if there’s a parent manifest available since we already have an evidence manifest. It seems like I could create a delegate in the same repository. Maybe I should look into doing a bounded independent review stream, possibly regarding documentation and guardrails. It seems straightforward to use the delegation skill for this.
+exec
+/bin/zsh -lc 'pwd && git status --short && git diff --stat && git rev-parse --show-toplevel' in /Users/kbediako/Code/CO succeeded in 51ms:
+/Users/kbediako/Code/CO/
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M orchestrator/src/cli/control/controlServer.ts
+ M scripts/tasks-archive.mjs
+ M tasks/index.json
+?? .agent/task/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? docs/PRD-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? docs/findings/1038-observability-api-controller-extraction-deliberation.md
+?? orchestrator/src/cli/control/observabilityApiController.ts
+?? orchestrator/tests/ObservabilityApiController.test.ts
+?? tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md
+?? tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md
+ docs/TASKS.md                                 |   9 +-
+ docs/docs-freshness-registry.json             |  49 ++++++
+ orchestrator/src/cli/control/controlServer.ts | 206 +++-----------------------
+ scripts/tasks-archive.mjs                     |  76 +++++++---
+ tasks/index.json                              |  32 ++++
+
+thinking
+**Considering delegation options**
+
+I need to make sure I understand the task of delegating within the specified environment. It looks like the tool requires both a pipeline and a repository, and I wonder if there's a delegation service available. I’m thinking of using delegate_spawn with either the "review" or "docs-review" pipeline. However, the documentation might limit my options, so it makes sense to look for any existing manifests or examples that can help clarify the usage.
+thinking
+**Considering delegation options**
+
+I need to make sure I understand the task of delegating within the specified environment. It looks like the tool requires both a pipeline and a repository, and I wonder if there's a delegation service available. I’m thinking of using delegate_spawn with either the "review" or "docs-review" pipeline. However, the documentation might limit my options, so it makes sense to look for any existing manifests or examples that can help clarify the usage.
+exec
+/bin/zsh -lc "rg -n \"delegate_spawn|delegate spawn|delegate_spawn|delegation\" -g '*.md' -g '*.ts' -g '*.mjs' . | head -n 40" in /Users/kbediako/Code/CO succeeded in 53ms:
+./archives/REPORT.mcp_code_mode.md:2:The current orchestrator manages local CLI runs reliably, yet it cannot spin up or coordinate additional Codex instances, so autonomy stalls whenever a single runner is saturated. Shell-based MCP access and inline stdout logging increase latency and prevent the parent agent from supervising remote executors. The fastest path to higher performance and autonomy is (1) codifying a typed MCP control surface so the orchestrator can launch and steer sibling Codex runners, (2) adding a multi-instance scheduler plus manifest fan-out, and (3) trimming prompt payloads via handle-based streaming and privacy-safe redaction so delegation stays lightweight.
+./archives/REPORT.mcp_code_mode.md:42:  Why it matters: Need visibility into queue depth, time-to-first-useful-IO, and avoided tokens to prove that delegation pays off.  
+./orchestrator/src/cli/doctorUsage.ts:64:  delegation: {
+./orchestrator/src/cli/doctorUsage.ts:89:    delegation_task_coverage_pct: number;
+./orchestrator/src/cli/doctorUsage.ts:357:  const delegationErrors: string[] = [];
+./orchestrator/src/cli/doctorUsage.ts:365:        delegationErrors.push(result.error);
+./orchestrator/src/cli/doctorUsage.ts:376:  const delegationTaskCoveragePct =
+./orchestrator/src/cli/doctorUsage.ts:431:    delegation: {
+./orchestrator/src/cli/doctorUsage.ts:437:      errors: delegationErrors
+./orchestrator/src/cli/doctorUsage.ts:456:      delegation_task_coverage_pct: delegationTaskCoveragePct
+./orchestrator/src/cli/doctorUsage.ts:516:  if (result.delegation.active_top_level_tasks > 0) {
+./orchestrator/src/cli/doctorUsage.ts:518:      `  - delegation: ${result.delegation.active_with_subagents}/${result.delegation.active_top_level_tasks} top-level tasks have subagent manifests (${result.delegation.total_subagent_manifests} total); child_runs=${result.delegation.total_child_runs} over ${result.delegation.tasks_with_child_runs} tasks`
+./orchestrator/src/cli/doctorUsage.ts:521:    lines.push('  - delegation: no top-level tasks detected in tasks/index.json for this window');
+./orchestrator/src/cli/doctorUsage.ts:538:      `collab=${result.kpis.collab_share_pct}%, delegation-task-coverage=${result.kpis.delegation_task_coverage_pct}%`
+./orchestrator/src/cli/doctorUsage.ts:547:  if (result.delegation.errors.length > 0) {
+./orchestrator/src/cli/doctorUsage.ts:549:    for (const warning of result.delegation.errors.slice(0, 3)) {
+./orchestrator/src/cli/init.ts:118:  lines.push('  - codex-orchestrator setup --yes  # installs bundled skills + configures delegation/devtools wiring');
+./orchestrator/src/cli/delegationServer.ts:14:} from './config/delegationConfig.js';
+./orchestrator/src/cli/delegationServer.ts:60:const DELEGATION_TOKEN_HEADER = 'x-codex-delegation-token';
+./orchestrator/src/cli/delegationServer.ts:61:const DELEGATION_RUN_HEADER = 'x-codex-delegation-run-id';
+
+thinking
+**Exploring delegate usage**
+
+I'm searching the docs for delegate_spawn usage, even though it might be more about memories than the repo. I could use the tool directly, but maybe it's better to skip it this time. It seems okay not to delegate since it hasn't been implemented yet. Although, the instructions mention a default. I should look into the review mode to see if it allows for independent reasoning. Next, I need to inspect the diff details and get a combined diff.
+thinking
+**Exploring delegate usage**
+
+I'm searching the docs for delegate_spawn usage, even though it might be more about memories than the repo. I could use the tool directly, but maybe it's better to skip it this time. It seems okay not to delegate since it hasn't been implemented yet. Although, the instructions mention a default. I should look into the review mode to see if it allows for independent reasoning. Next, I need to inspect the diff details and get a combined diff.
+exec
+/bin/zsh -lc "git diff -- docs/TASKS.md docs/docs-freshness-registry.json orchestrator/src/cli/control/controlServer.ts scripts/tasks-archive.mjs tasks/index.json && printf '\\n===== NEW FILES =====\\n' && for f in .agent/task/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md docs/ACTION_PLAN-coordinator-symphony-aligned-observability-api-controller-extraction.md docs/PRD-coordinator-symphony-aligned-observability-api-controller-extraction.md docs/TECH_SPEC-coordinator-symphony-aligned-observability-api-controller-extraction.md docs/findings/1038-observability-api-controller-extraction-deliberation.md orchestrator/src/cli/control/observabilityApiController.ts orchestrator/tests/ObservabilityApiController.test.ts tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md; do echo \"===== "'$f ====="; sed -n '"'1,240p' \""'$f"; echo; done' in /Users/kbediako/Code/CO succeeded in 53ms:
+diff --git a/docs/TASKS.md b/docs/TASKS.md
+index f5a3ce38e..2c41d03df 100644
+--- a/docs/TASKS.md
++++ b/docs/TASKS.md
+@@ -1,4 +1,6 @@
+-<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md; 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md <!-- tasks-archive-index:end --> # Task List Snapshot - Coordinator Symphony-Aligned Selected-Run Presenter Extraction (1037-coordinator-symphony-aligned-selected-run-presenter-extraction) - Update 2026-03-07: completed (selected-run payload shaping, shared selected-run UI fields, and `/ui/data.json` dataset assembly now live in `selectedRunPresenter.ts`; `controlServer.ts` routes `/ui/data.json` through the extracted presenter; compatibility routes, runtime caching, Telegram rendering/fingerprint behavior, and `/api/v1/dispatch` remain on their existing seams. Full validation passed with `996/996` tests, build, lint, docs checks, diff-budget override, pack smoke, manual selected-run presenter evidence, and an explicit elegance pass; docs-review and standalone review are recorded as honest timeout overrides rather than clean terminal gates). Evidence: `docs/PRD-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `tasks/specs/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `tasks/tasks-1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `.agent/task/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/findings/1037-selected-run-presenter-extraction-deliberation.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T041423Z-docs-first/00-summary.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/00-summary.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/11-manual-selected-run-presenter.json`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/12-elegance-review.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/13-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
++<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md; 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md <!-- tasks-archive-index:end -->
++# Task List Snapshot - Coordinator Symphony-Aligned Observability API Controller Extraction (1038-coordinator-symphony-aligned-observability-api-controller-extraction) - **Update - 2026-03-07:** Task created; export `MCP_RUNNER_TASK_ID=1038-coordinator-symphony-aligned-observability-api-controller-extraction`; scope: extract core `/api/v1/*` route matching, method guards, and route-local response writing into a dedicated observability API controller while keeping presenter/read-model helpers stable and leaving `/ui/data.json` plus auth/session/webhook/control endpoints in `controlServer.ts`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`, `npm run pack:smoke` when downstream-facing paths change. Docs-first evidence: `docs/PRD-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/findings/1038-observability-api-controller-extraction-deliberation.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`. Checklist mirror: `tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `.agent/task/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`.
++# Task List Snapshot - Coordinator Symphony-Aligned Selected-Run Presenter Extraction (1037-coordinator-symphony-aligned-selected-run-presenter-extraction) - Update 2026-03-07: completed (selected-run payload shaping, shared selected-run UI fields, and `/ui/data.json` dataset assembly now live in `selectedRunPresenter.ts`; `controlServer.ts` routes `/ui/data.json` through the extracted presenter; compatibility routes, runtime caching, Telegram rendering/fingerprint behavior, and `/api/v1/dispatch` remain on their existing seams. Full validation passed with `996/996` tests, build, lint, docs checks, diff-budget override, pack smoke, manual selected-run presenter evidence, and an explicit elegance pass; docs-review and standalone review are recorded as honest timeout overrides rather than clean terminal gates). Evidence: `docs/PRD-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `tasks/specs/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `tasks/tasks-1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `.agent/task/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/findings/1037-selected-run-presenter-extraction-deliberation.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T041423Z-docs-first/00-summary.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/00-summary.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/11-manual-selected-run-presenter.json`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/12-elegance-review.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/13-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Compatibility Issue Presenter Extraction (1036-coordinator-symphony-aligned-compatibility-issue-index-extraction) - Update 2026-03-07: completed (compatibility-only issue aggregation, representative selection, canonical-before-alias lookup, and compatibility issue payload assembly now live in `compatibilityIssuePresenter.ts`; `controlRuntime.ts` and `observabilitySurface.ts` call the extracted presenter directly; selected-run payload shaping, `/ui/data.json`, Telegram oversight, and `/api/v1/dispatch` remain on the current-run seam. Focused runtime/server regressions passed `93/93`; build, lint, docs checks, docs freshness, diff-budget override, manual presenter evidence, and pack smoke all passed; docs-review, the full-suite wrapper tail, and standalone review are recorded as honest overrides rather than clean terminal gates). Evidence: `docs/PRD-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `tasks/specs/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `tasks/tasks-1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `.agent/task/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `docs/findings/1036-compatibility-issue-index-extraction-deliberation.md`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T034204Z-docs-first/00-summary.md`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/00-summary.md`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/05b-targeted-tests.log`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/11-manual-compatibility-presenter.json`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/12-elegance-review.md`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/13-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Compatibility Issue Identity and Multi-Run Policy (1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy) - Update 2026-03-07: completed (compatibility discovery now considers all bounded sibling runs for the same issue, the compatibility `state` / `issue` surface now prefers canonical `issue_identifier` lookup before alias fallback, one deterministic `running` and `retrying` representative is exposed per issue, contributing run ids remain valid aliases, and `/ui/data.json` stays on the selected-run seam. Focused runtime/server regressions passed `92/92`; build, lint, docs checks, docs freshness, diff-budget override, manual compatibility evidence, and pack smoke all passed; docs-review, the full-suite wrapper/direct-vitest tail, and standalone review are recorded as honest overrides rather than clean terminal gates). Evidence: `docs/PRD-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `.agent/task/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md`, `docs/findings/1035-compatibility-issue-identity-and-multi-run-policy-deliberation.md`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/20260307T030736Z-docs-first/00-summary.md`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/20260307T032250Z-closeout/00-summary.md`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/20260307T032250Z-closeout/05-targeted-tests.log`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/20260307T032250Z-closeout/12-manual-compatibility-issue-identity.json`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/20260307T032250Z-closeout/13-elegance-review.md`, `out/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy/manual/20260307T032250Z-closeout/14-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Runtime Compatibility Collection Discovery (1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery) - Update 2026-03-07: completed (compatibility `state` / `issue` now discover bounded sibling runtime `running` and `retrying` entries from `.runs/*/cli/*`; `/ui/data.json`, Telegram oversight, and the selected-run seam remain current-run-only; targeted regressions passed `89/89`; the full suite passed `135/135` files and `990/990` tests; manual compatibility collection evidence passed; pack smoke passed; and the review wrapper is recorded as an honest override after a diff-budget wrapper failure plus a timed low-signal rerun). Evidence: `docs/PRD-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `.agent/task/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md`, `docs/findings/1034-runtime-compatibility-collection-discovery-deliberation.md`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T023357Z-preimpl-review-and-docs-review-override/00-summary.md`, `.runs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery-scout/cli/2026-03-07T02-23-39-241Z-cace2a6f/manifest.json`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/00-summary.md`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/05-targeted-tests.log`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/06-test.log`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/11-manual-compatibility-collection-discovery.json`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/13-elegance-review.md`, `out/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery/manual/20260307T024437Z-closeout/14-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+@@ -205,11 +207,6 @@
+ - [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0950-delegation-mermaid-archive-subagent/cli/2026-01-13T03-29-58-878Z-0e70d537/manifest.json`, `.runs/0950-delegation-mermaid-archive/cli/2026-01-13T05-22-27-840Z-75c4686f/manifest.json`, `docs/TASKS.md`, `.agent/task/0950-delegation-mermaid-archive.md`, `tasks/tasks-0950-delegation-mermaid-archive.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+ - [x] Implementation: delegation skill guidance + README mermaid + task archive trim. Evidence: `skills/delegation-usage/SKILL.md`, `skills/delegation-usage/DELEGATION_GUIDE.md`, `docs/delegation-runner-workflow.md`, `README.md`, `out/0950-delegation-mermaid.md`, `docs/TASKS.md`.
+ - [x] Validation: implementation-gate manifest captured. Evidence: `.runs/0950-delegation-mermaid-archive/cli/2026-01-13T05-23-06-540Z-e7ce1041/manifest.json`.
+-# Task List Snapshot — Release README + Notes Follow-ups (0949-release-readme-followups)
+-- **Update — 2026-01-13:** Docs-review complete via `.runs/0949-release-readme-followups/cli/2026-01-13T02-26-19-647Z-2684eb72/manifest.json`; implementation-gate via `.runs/0949-release-readme-followups/cli/2026-01-13T02-26-54-969Z-dd0727c2/manifest.json`; subagent diagnostics via `.runs/0949-release-readme-followups-subagent/cli/2026-01-13T02-22-59-108Z-9d9cde36/manifest.json`. Notes: export `MCP_RUNNER_TASK_ID=0949-release-readme-followups`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`. Checklist mirror: `tasks/tasks-0949-release-readme-followups.md`, `.agent/task/0949-release-readme-followups.md`.
+-- [x] Foundation: subagent + docs-review + mirrors + docs registry updates. Evidence: `.runs/0949-release-readme-followups-subagent/cli/2026-01-13T02-22-59-108Z-9d9cde36/manifest.json`, `.runs/0949-release-readme-followups/cli/2026-01-13T02-26-19-647Z-2684eb72/manifest.json`, `docs/TASKS.md`, `.agent/task/0949-release-readme-followups.md`, `tasks/tasks-0949-release-readme-followups.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+-- [x] Implementation: README + repo guide wording + short alias + release notes parsing fix + archive auto-merge fallback. Evidence: `README.md`, `docs/README.md`, `package.json`, `package-lock.json`, `.github/workflows/release.yml`, `.github/workflows/archive-automation-base.yml`.
+exec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/observabilityApiController.ts && printf '\\n===== ControlServer relevant =====\\n' && sed -n '560,700p' orchestrator/src/cli/control/controlServer.ts && printf '\\n===== Existing ControlServer tests api scope =====\\n' && rg -n \"/api/v1|dispatch|ui/data.json|state|refresh\" orchestrator/tests/ControlServer.test.ts | head -n 120" in /Users/kbediako/Code/CO succeeded in 53ms:
+import http from 'node:http';
+
+import {
+  buildCompatibilityErrorResponse,
+  buildCompatibilityIssueNotFoundResponse,
+  buildCompatibilityMethodNotAllowedResponse,
+  buildCompatibilityNotFoundResponse,
+  buildCompatibilityRefreshRejectedResponse,
+  buildCompatibilityTraceability,
+  readCompatibilityIssue,
+  readCompatibilityRefresh,
+  readCompatibilityState,
+  readDispatchExtension,
+  type DispatchExtensionResult,
+  type ObservabilityPresenterContext,
+  type ObservabilitySurfaceResponse
+} from './observabilitySurface.js';
+
+const COMPATIBILITY_API_PREFIX = '/api/v1';
+const COMPATIBILITY_STATE_PATH = `${COMPATIBILITY_API_PREFIX}/state`;
+exec
+/bin/zsh -lc "sed -n '240,360p' orchestrator/src/cli/control/observabilityApiController.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+function writeObservabilityResponse(
+  res: http.ServerResponse,
+  response: ObservabilitySurfaceResponse
+): void {
+  res.writeHead(response.status, response.headers);
+  res.end(JSON.stringify(response.body));
+}
+
+function writeDispatchExtensionMethodNotAllowed(
+  res: http.ServerResponse,
+  context: Parameters<typeof buildCompatibilityTraceability>[0]
+): void {
+  writeObservabilityResponse(
+    res,
+    buildCompatibilityErrorResponse({
+      status: 405,
+      code: 'method_not_allowed',
+      message: 'Method not allowed',
+      details: {
+        surface: 'api_v1',
+
+thinking
+I'm looking into the script tasks-archive and the surrounding functions to understand the potential for bugs. I also think the documentation on TASKS might have changed due to the script updates. It's important for me to examine the policy regarding these changes. I'll make sure to thoroughly inspect everything to figure out what might be going wrong or what adjustments may be necessary. Getting to the root of this is key!
+thinking
+I'm looking into the script tasks-archive and the surrounding functions to understand the potential for bugs. I also think the documentation on TASKS might have changed due to the script updates. It's important for me to examine the policy regarding these changes. I'll make sure to thoroughly inspect everything to figure out what might be going wrong or what adjustments may be necessary. Getting to the root of this is key!
+exec
+/bin/zsh -lc "sed -n '1,260p' scripts/tasks-archive.mjs && printf '\\n===== more =====\\n' && sed -n '260,520p' scripts/tasks-archive.mjs && printf '\\n===== policy =====\\n' && cat docs/tasks-archive-policy.json" in /Users/kbediako/Code/CO succeeded in 51ms:
+#!/usr/bin/env node
+
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import process from 'node:process';
+import { parseArgs, hasFlag } from './lib/cli-args.js';
+import { normalizeTaskKey, parseDateString } from './lib/docs-helpers.js';
+import { parseRunIdTimestamp, resolveEnvironmentPaths } from './lib/run-manifests.js';
+
+const DEFAULT_POLICY_PATH = 'docs/tasks-archive-policy.json';
+const TASKS_PATH = 'docs/TASKS.md';
+const SNAPSHOT_HEADER_PREFIX = '# Task List Snapshot';
+const SNAPSHOT_HEADER_SPLIT_PATTERN = /(?=# Task List Snapshot(?: —|-)\s+)/g;
+
+function showUsage() {
+  console.log(`Usage: node scripts/tasks-archive.mjs [--policy <path>] [--out <path>] [--dry-run]
+
+Moves completed task snapshots from docs/TASKS.md into a year-based archive payload
+when the line-count threshold is exceeded.
+
+[run-review] waiting on codex review (1m 0s elapsed, 129ms idle; review progress observed).
+
+thinking
+**Inspecting task formatting**
+
+I need to take a closer look at the formatting for tasks and the TASKS inline. There might be an issue with the archive index that's affecting things. It could help to check the documentation for the TASKS headlines to see if everything is aligned correctly. I want to make sure everything is functioning as it should be, so a careful inspection seems necessary!
+thinking
+**Inspecting task formatting**
+
+I need to take a closer look at the formatting for tasks and the TASKS inline. There might be an issue with the archive index that's affecting things. It could help to check the documentation for the TASKS headlines to see if everything is aligned correctly. I want to make sure everything is functioning as it should be, so a careful inspection seems necessary!
+exec
+/bin/zsh -lc "sed -n '1,30p' docs/TASKS.md" in /Users/kbediako/Code/CO succeeded in 53ms:
+Total output lines: 30
+
+<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md; 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md <!-- tasks-archive-index:end -->
+# Task List Snapshot - Coordinator Symphony-Aligned Observability API Controller Extraction (1038-coordinator-symphony-aligned-observability-api-controller-extraction) - **Update - 2026-03-07:** Task created; export `MCP_RUNNER_TASK_ID=1038-coordinator-symphony-aligned-observability-api-controller-extraction`; scope: extract core `/api/v1/*` route matching, method guards, and route-local response writing into a dedicated observability API controller while keeping presenter/read-model helpers stable and leaving `/ui/data.json` plus auth/session/webhook/control endpoints in `controlServer.ts`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`, `npm run pack:smoke` when downstream-facing paths change. Docs-first evidence: `docs/PRD-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/findings/1038-observability-api-controller-extraction-deliberation.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`. Checklist mirror: `tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `.agent/task/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`.
+# Task List Snapshot - Coordinator Symphony-Aligned Selected-Run Presenter Extraction (1037-coordinator-symphony-aligned-selected-run-presenter-extraction) - Update 2026-03-07: completed (selected-run payload shaping, shared selected-run UI fields, and `/ui/data.json` dataset assembly now live in `selectedRunPresenter.ts`; `controlServer.ts` routes `/ui/data.json` through the extracted presenter; compatibility routes, runtime caching, Telegram rendering/fingerprint behavior, and `/api/v1/dispatch` remain on their existing seams. Full validation passed with `996/996` tests, build, lint, docs checks, diff-budget override, pack smoke, manual selected-run presenter evidence, and an explicit elegance pass; docs-review and standalone review are recorded as honest timeout overrides rather than clean terminal gates). Evidence: `docs/PRD-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `tasks/specs/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `tasks/tasks-1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `.agent/task/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/findings/1037-selected-run-presenter-extraction-deliberation.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T041423Z-docs-first/00-summary.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/00-summary.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/11-manual-selected-run-presenter.json`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/12-elegance-review.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/13-override-notes.md`, `tasks/in…13828 tokens truncated…ator-telegram-setup-canary-and-runbook-implementation.md`, `docs/findings/1009-telegram-setup-canary-deliberation.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/1009-coordinator-telegram-setup-canary-and-runbook-implementation/cli/2026-03-05T13-57-38-457Z-39cc3edc/manifest.json`, `.runs/1009-coordinator-telegram-setup-canary-and-runbook-implementation/cli/2026-03-05T14-10-26-672Z-dd7191f1/manifest.json`, `out/1009-coordinator-telegram-setup-canary-and-runbook-implementation/manual/20260305T135709Z-authoritative-gates/12-summary.md`, `out/1009-coordinator-telegram-setup-canary-and-runbook-implementation/manual/20260305T135122Z-manual-sim/05-pass-fail-matrix.md`, `out/1009-coordinator-telegram-setup-canary-and-runbook-implementation/manual/20260305T135505Z-impl-feasibility/`.
+# Task List Snapshot - Coordinator Staged External Surfaces Onboarding + Runbook Readiness (1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness) - Update 2026-03-05: completed (planning/readiness scope is complete with docs-review and implementation-gate rerun evidence; this closeout is readiness-only and does not enable production onboarding by itself). Evidence: `docs/PRD-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md`, `docs/TECH_SPEC-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md`, `docs/ACTION_PLAN-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md`, `tasks/specs/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md`, `tasks/tasks-1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md`, `.agent/task/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness.md`, `docs/findings/1008-transport-readiness-deliberation.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness/cli/2026-03-05T12-40-28-913Z-4151892c/manifest.json`, `.runs/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness/cli/2026-03-05T13-20-53-232Z-cb1a0b34/manifest.json`, `out/1008-coordinator-staged-external-surfaces-onboarding-and-runbook-readiness/manual/20260305T132020Z-post-remediation-gates/`.
+# Task List Snapshot - Codex 0.110 Post-Change Audit Refresh + Drift Closure (1007-codex-0110-post-change-audit-refresh-and-drift-closure) - Update 2026-03-05: completed (placeholder docs-review references are replaced with terminal manifests; docs-review and implementation-gate runs succeeded, and 1007 sequencing closure was recorded before 1008 closeout). Evidence: `docs/PRD-codex-0110-post-change-audit-refresh-and-drift-closure.md`, `docs/TECH_SPEC-codex-0110-post-change-audit-refresh-and-drift-closure.md`, `docs/ACTION_PLAN-codex-0110-post-change-audit-refresh-and-drift-closure.md`, `tasks/specs/1007-codex-0110-post-change-audit-refresh-and-drift-closure.md`, `tasks/tasks-1007-codex-0110-post-change-audit-refresh-and-drift-closure.md`, `.agent/task/1007-codex-0110-post-change-audit-refresh-and-drift-closure.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`, `.runs/1007-codex-0110-post-change-audit-refresh-and-drift-closure/cli/2026-03-05T12-15-20-371Z-b8f1ad87/manifest.json`, `.runs/1007-codex-0110-post-change-audit-refresh-and-drift-closure/cli/2026-03-05T12-26-56-479Z-7acd1a28/manifest.json`, `out/1007-codex-0110-post-change-audit-refresh-and-drift-closure/manual/20260305T115658Z-docs-first/01-spec-guard.log`, `out/1007-codex-0110-post-change-audit-refresh-and-drift-closure/manual/20260305T115658Z-docs-first/02-docs-check.log`, `out/1007-codex-0110-post-change-audit-refresh-and-drift-closure/manual/20260305T115658Z-docs-first/03-docs-freshness.log`, `out/1007-codex-0110-post-change-audit-refresh-and-drift-closure/manual/20260305T115658Z-docs-first/04-mirror-parity.log`, `out/1007-codex-0110-post-change-audit-refresh-and-drift-closure/manual/20260305T115658Z-docs-first/05-elegance-review.md`.
+
+
+
+
+
+
+
+
+[run-review] waiting on codex review (2m 0s elapsed, 2s idle; review progress observed).
+
+
+
+thinking
+**Evaluating review process**
+
+I'm focused on the bounded review mode, which emphasizes looking at changed files and nearby dependencies. Running a targeted test might be beneficial to improve confidence, but it's not required for the review phase. I should inspect the test file and consider running `vitest` for specific tests. While running targeted tests could help find bugs, the review should primarily focus on the code differences. I'll consider commands for the targeted tests without conflating validation with review.
+thinking
+**Identifying potential issues**
+
+I need to examine the behavior of other functions, especially `readJsonBody`. Could there be a problem with passing `readRequestBody: () => readJsonBody(req)` that impacts body reading after route resolution? I'm considering a potential bug: the new controller manages all `/api/v1` routes post-auth and CSRF, which seems fine. Another possible issue is that `resolveObservabilityApiRoute('/api/v1/%64ispatch')` intentionally returns not found, while the old code could normalize the suffix to 'dispatch' and return null.
+thinking
+**Investigating potential bugs**
+
+I'm noticing a potential bug related to the new controller tests. I have to review the findings; it seems that a bug may have been introduced. The issue could be in the tasks-archive script, which normalizes lines with multiple snapshot headers. However, the updateArchiveIndex writes archive blocks inline. I need to think about discrete actionable bugs and examine the overall logic of the tasks-archive system to see if this design leads to line count mismatches.
+thinking
+**Analyzing possible bugs**
+
+I suspect there might be a bug with the `normalizeInlineSnapshotHeaders` function, which uses `.split(SNAPSHOT_HEADER_SPLIT_PATTERN)` on every line. The regex pattern has a zero-width positive lookahead that could create leading empty string segments, potentially preserving matches. When splitting a line that includes multiple snapshot headers, the segments should trim correctly, but I’m unsure if normalization is needed since the archive index and first snapshot typically appear on separate lines in the current docs/TASKS. I need to confirm this.
+thinking
+**Reviewing changes in snapshots**
+
+The diff indicates that the previous first line contained both the archive index and the first snapshot on the same line, probably because the whole file was formatted this way. However, the sed output shows that each snapshot is now on its own line, suggesting that normalization might be necessary for archived snapshots that originally contained multiple headers in one line. I need to inspect the git diff for the untracked controller and compare it to previous code to identify any behavioral changes. I can try using `git diff -U20` around the controlServer block to check for exact semantics.
+thinking
+**Identifying a potential bug**
+
+I'm noticing a possible issue with the `normalizeInlineSnapshotHeaders` function being applied too early, before `parseTaskSections` and the line count is determined. If the `docs/TASKS` file contains an inline archive index on the same line as the first snapshot header, this normalization could split those into separate lines. That would inadvertently increase the `totalLines`, which could create problems. I need to think about how to address this.
+thinking
+**Inspecting task handling**
+
+I’m wondering about archiving tasks and the `updatedContent`. It seems like it doesn’t preserve normalized newlines for lines that aren’t affected if it's not a dry run. If there are more lines than the limit, it rewrites everything fine, but if it’s within the limits with certain headers, it might not fix formatting—hmm. I need to check the removal of old archived task 0949 in the docs/TASKS. Perhaps there's a mismatch because the index or archive isn’t updated? I’ll compare files to see if 0949 still exists.
+thinking
+**Reviewing task archival issues**
+
+I’m considering that if the review scope includes cleanup for tasks-archive.mjs, there might be a problem since the 0949 snapshot section was manually deleted from docs/TASKS. This shouldn’t happen if the archive script is designed to remove only when over a limit. Maybe the status of 0949 was marked as succeeded and should be archived. It’s possible there’s a missing docs update for the new controller file in the registry. I’ll check `controlServer.ts` and `observabilityApiController.ts` for changes in request methods and ensure everything's functioning as intended, especially around `readJsonBody`.
+thinking
+**Inspecting compatibility traces**
+
+I’m looking into the `buildCompatibilityTraceability` function to see if it uses the controlStore snapshot at call time, but maybe that's not directly relevant. I wonder if `context.presenterContext` might be missing some fields, though it seems to work fine. Another thought is whether there’s a difference in handling routes, especially with trailing slashes or encoded slashes in `/api/v1/`. The old code returns null if the path includes a '/', so I need to consider how that works with encoded slashes like `'/api/v1/%2F'`.
+thinking
+I see that all snapshot lines are formatted like `# Task List Snapshot - Coordinator ... (1037...) - Update 2026-03-07: completed ...`. It makes me wonder if the old regex has already become outdated or broken due to recent changes. I suppose I need to reconsider how to approach this and possibly adjust the regex to align with the current format of the snapshot lines. It's crucial to ensure accuracy moving forward!
+thinking
+**Investigating archive scripts**
+
+I'm considering how the archive script might work. It seems there are docs-sync markers around task sections in docs/TASKS. So, the function parseTaskSections uses these markers, and headerLine acts as a fallback. But what about sections that only have headers without docs-sync blocks? They would rely on parseHeaderSections and extractSnapshotKey. I’m now curious if task sections in docs/TASKS are indeed wrapped in docs-sync. I’ll need to inspect further around the top or check another task using rg docs-sync.
+thinking
+**Evaluating review process**
+
+I'm focused on the bounded review mode, which emphasizes looking at changed files and nearby dependencies. Running a targeted test might be beneficial to improve confidence, but it's not required for the review phase. I should inspect the test file and consider running `vitest` for specific tests. While running targeted tests could help find bugs, the review should primarily focus on the code differences. I'll consider commands for the targeted tests without conflating validation with review.
+thinking
+**Identifying potential issues**
+
+I need to examine the behavior of other functions, especially `readJsonBody`. Could there be a problem with passing `readRequestBody: () => readJsonBody(req)` that impacts body reading after route resolution? I'm considering a potential bug: the new controller manages all `/api/v1` routes post-auth and CSRF, which seems fine. Another possible issue is that `resolveObservabilityApiRoute('/api/v1/%64ispatch')` intentionally returns not found, while the old code could normalize the suffix to 'dispatch' and return null.
+thinking
+**Investigating potential bugs**
+
+I'm noticing a potential bug related to the new controller tests. I have to review the findings; it seems that a bug may have been introduced. The issue could be in the tasks-archive script, which normalizes lines with multiple snapshot headers. However, the updateArchiveIndex writes archive blocks inline. I need to think about discrete actionable bugs and examine the overall logic of the tasks-archive system to see if this design leads to line count mismatches.
+thinking
+**Analyzing possible bugs**
+
+I suspect there might be a bug with the `normalizeInlineSnapshotHeaders` function, which uses `.split(SNAPSHOT_HEADER_SPLIT_PATTERN)` on every line. The regex pattern has a zero-width positive lookahead that could create leading empty string segments, potentially preserving matches. When splitting a line that includes multiple snapshot headers, the segments should trim correctly, but I’m unsure if normalization is needed since the archive index and first snapshot typically appear on separate lines in the current docs/TASKS. I need to confirm this.
+thinking
+**Reviewing changes in snapshots**
+
+The diff indicates that the previous first line contained both the archive index and the first snapshot on the same line, probably because the whole file was formatted this way. However, the sed output shows that each snapshot is now on its own line, suggesting that normalization might be necessary for archived snapshots that originally contained multiple headers in one line. I need to inspect the git diff for the untracked controller and compare it to previous code to identify any behavioral changes. I can try using `git diff -U20` around the controlServer block to check for exact semantics.
+thinking
+**Identifying a potential bug**
+
+I'm noticing a possible issue with the `normalizeInlineSnapshotHeaders` function being applied too early, before `parseTaskSections` and the line count is determined. If the `docs/TASKS` file contains an inline archive index on the same line as the first snapshot header, this normalization could split those into separate lines. That would inadvertently increase the `totalLines`, which could create problems. I need to think about how to address this.
+thinking
+**Inspecting task handling**
+
+I’m wondering about archiving tasks and the `updatedContent`. It seems like it doesn’t preserve normalized newlines for lines that aren’t affected if it's not a dry run. If there are more lines than the limit, it rewrites everything fine, but if it’s within the limits with certain headers, it might not fix formatting—hmm. I need to check the removal of old archived task 0949 in the docs/TASKS. Perhaps there's a mismatch because the index or archive isn’t updated? I’ll compare files to see if 0949 still exists.
+thinking
+**Reviewing task archival issues**
+
+I’m considering that if the review scope includes cleanup for tasks-archive.mjs, there might be a problem since the 0949 snapshot section was manually deleted from docs/TASKS. This shouldn’t happen if the archive script is designed to remove only when over a limit. Maybe the status of 0949 was marked as succeeded and should be archived. It’s possible there’s a missing docs update for the new controller file in the registry. I’ll check `controlServer.ts` and `observabilityApiController.ts` for changes in request methods and ensure everything's functioning as intended, especially around `readJsonBody`.
+thinking
+**Inspecting compatibility traces**
+
+I’m looking into the `buildCompatibilityTraceability` function to see if it uses the controlStore snapshot at call time, but maybe that's not directly relevant. I wonder if `context.presenterContext` might be missing some fields, though it seems to work fine. Another thought is whether there’s a difference in handling routes, especially with trailing slashes or encoded slashes in `/api/v1/`. The old code returns null if the path includes a '/', so I need to consider how that works with encoded slashes like `'/api/v1/%2F'`.
+thinking
+I see that all snapshot lines are formatted like `# Task List Snapshot - Coordinator ... (1037...) - Update 2026-03-07: completed ...`. It makes me wonder if the old regex has already become outdated or broken due to recent changes. I suppose I need to reconsider how to approach this and possibly adjust the regex to align with the current format of the snapshot lines. It's crucial to ensure accuracy moving forward!
+thinking
+**Investigating archive scripts**
+
+I'm considering how the archive script might work. It seems there are docs-sync markers around task sections in docs/TASKS. So, the function parseTaskSections uses these markers, and headerLine acts as a fallback. But what about sections that only have headers without docs-sync blocks? They would rely on parseHeaderSections and extractSnapshotKey. I’m now curious if task sections in docs/TASKS are indeed wrapped in docs-sync. I’ll need to inspect further around the top or check another task using rg docs-sync.
+exec
+/bin/zsh -lc 'rg -n "docs-sync:begin 1038|docs-sync:begin 1037|docs-sync:begin 0949|docs-sync:begin" docs/TASKS.md | head -n 30' in /Users/kbediako/Code/CO succeeded in 51ms:
+
+
+
+
+thinking
+**Investigating file changes**
+
+I'm looking at the current file format, which might have changed due to some automation. Maybe I should check the git history, though it might not be necessary. It seems like the recent diff in the doc formatting has caused an issue with extractSnapshotKey. I'm pondering whether it relates to the normalize/updateArchiveIndex or just editing docs. If the lines in docs/TASKS were already formatted this way, then it could be preexisting. I need to check all modifications in the tasks-archive script.
+thinking
+**Identifying potential bugs**
+
+I'm considering that if docs/TASKS has inline headers and `normalizeInlineSnapshotHeaders` is designed to split them, there might be an issue with `updateArchiveIndex`. It could return an inline block that makes `updatedLineCount` one line smaller than the actual file after writing. It seems that `updatedContent` counts the inline block as one line, so the actual file string remains unchanged. There's a more serious concern where `normalizeInlineSnapshotHeaders` might split lines that shouldn't be altered due to its regex not being anchored. This could lead to unexpected content mutations during archiving.
+thinking
+**Investigating a potential bug**
+
+I’m thinking there might be a bug related to the new controller using `context.presenterContext.controlStore` and `.paths`, instead of the original `context.controlStore` and `context.paths`. I wonder if they are actually referencing the same underlying objects. It seems like `presenterContext` might be built from the original context. I really need to inspect the creation of `presenterContext` to get a clearer picture. Time to do some searching!
+thinking
+**Investigating file changes**
+
+I'm looking at the current file format, which might have changed due to some automation. Maybe I should check the git history, though it might not be necessary. It seems like the recent diff in the doc formatting has caused an issue with extractSnapshotKey. I'm pondering whether it relates to the normalize/updateArchiveIndex or just editing docs. If the lines in docs/TASKS were already formatted this way, then it could be preexisting. I need to check all modifications in the tasks-archive script.
+thinking
+**Identifying potential bugs**
+
+I'm considering that if docs/TASKS has inline headers and `normalizeInlineSnapshotHeaders` is designed to split them, there might be an issue with `updateArchiveIndex`. It could return an inline block that makes `updatedLineCount` one line smaller than the actual file after writing. It seems that `updatedContent` counts the inline block as one line, so the actual file string remains unchanged. There's a more serious concern where `normalizeInlineSnapshotHeaders` might split lines that shouldn't be altered due to its regex not being anchored. This could lead to unexpected content mutations during archiving.
+thinking
+**Investigating a potential bug**
+
+I’m thinking there might be a bug related to the new controller using `context.presenterContext.controlStore` and `.paths`, instead of the original `context.controlStore` and `context.paths`. I wonder if they are actually referencing the same underlying objects. It seems like `presenterContext` might be built from the original context. I really need to inspect the creation of `presenterContext` to get a clearer picture. Time to do some searching!
+exec
+/bin/zsh -lc "rg -n \"const presenterContext|presenterContext:\" orchestrator/src/cli/control/controlServer.ts | head -n 20 && sed -n '500,570p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+504:  const presenterContext = {
+  const { req, res } = context;
+  const method = req.method ?? 'GET';
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  const runtimeSnapshot = context.runtime.snapshot();
+  const presenterContext = {
+    controlStore: context.controlStore,
+    paths: context.paths,
+    readSelectedRunSnapshot: () => runtimeSnapshot.readSelectedRunSnapshot(),
+    readCompatibilityProjection: () => runtimeSnapshot.readCompatibilityProjection()
+  };
+  if (url.pathname === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', timestamp: isoTimestamp() }));
+    return;
+  }
+
+  if (url.pathname === '/' || url.pathname === '') {
+    const search = url.search ? url.search : '';
+    res.writeHead(302, { Location: `/ui${search}` });
+
+thinking
+I think there might be some run information or reviews that could help, especially in assessing any guardrail violations. I should inspect the manifest to check for documents like reviews. That said, they might not be necessary for ensuring code correctness. The user has asked for evidence and a checklist that mirrors requirements, so it seems important to examine the manifest contents, particularly if this run lacks documentation reviews. Let’s take a look!
+thinking
+I think there might be some run information or reviews that could help, especially in assessing any guardrail violations. I should inspect the manifest to check for documents like reviews. That said, they might not be necessary for ensuring code correctness. The user has asked for evidence and a checklist that mirrors requirements, so it seems important to examine the manifest contents, particularly if this run lacks documentation reviews. Let’s take a look!
+exec
+/bin/zsh -lc 'cat .runs/1038-coordinator-symphony-aligned-observability-api-controller-extraction/cli/2026-03-07T04-46-30-758Z-87a0e5f9/manifest.json' in /Users/kbediako/Code/CO succeeded in 53ms:
+{
+  "version": 1,
+  "task_id": "1038-coordinator-symphony-aligned-observability-api-controller-extraction",
+  "task_slug": "1038-coordinator-symphony-aligned-observability-api-controller-extraction",
+  "run_id": "2026-03-07T04-46-30-758Z-87a0e5f9",
+  "parent_run_id": null,
+  "pipeline_id": "docs-review",
+  "pipeline_title": "Docs Review Gate",
+  "runner": "codex-cli",
+  "approval_policy": null,
+  "status": "in_progress",
+  "status_detail": null,
+  "started_at": "2026-03-07T04:46:30.760Z",
+  "completed_at": null,
+  "updated_at": "2026-03-07T04:46:55.877Z",
+  "heartbeat_at": "2026-03-07T04:46:55.877Z",
+  "heartbeat_interval_seconds": 5,
+  "heartbeat_stale_after_seconds": 30,
+  "artifact_root": ".runs/1038-coordinator-symphony-aligned-observability-api-controller-extraction/cli/2026-03-07T04-46-30-758Z-87a0e5f9",
+  "compat_path": ".runs/1038-coordinator-symphony-aligned-observability-api-controller-extraction/mcp/2026-03-07T04-46-30-758Z-87a0e5f9",
+exec
+/bin/zsh -lc 'node scripts/tasks-archive.mjs --dry-run' in /Users/kbediako/Code/CO succeeded in 53ms:
+docs/TASKS.md is within limit (447/450).
+
+thinking
+**Evaluating archive script limits**
+
+Interesting, I see that the archive script is within the limit of 447 out of 450. But what if the actual file doesn't include normalization? It seems to count lines after normalization too, still at 447. That might be okay. I could run targeted tests for a new controller and any relevant existing control server tests. Alright, let’s proceed with a limited Vitest file.
+thinking
+**Evaluating archive script limits**
+
+Interesting, I see that the archive script is within the limit of 447 out of 450. But what if the actual file doesn't include normalization? It seems to count lines after normalization too, still at 447. That might be okay. I could run targeted tests for a new controller and any relevant existing control server tests. Alright, let’s proceed with a limited Vitest file.
+exec
+/bin/zsh -lc 'npx vitest run orchestrator/tests/ObservabilityApiController.test.ts -t "ObservabilityApiController"' in /Users/kbediako/Code/CO succeeded in 557ms:
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/ObservabilityApiController.test.ts  (2 tests) 1ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  16:14:48
+   Duration  151ms (transform 28ms, setup 0ms, collect 28ms, tests 1ms, environment 0ms, prepare 37ms)
+
+exec
+/bin/zsh -lc 'npx vitest run orchestrator/tests/ControlServer.test.ts -t "rejects unsupported methods for ui data, Symphony-aligned compatibility routes, and the CO dispatch extension|acknowledges read-only refresh requests without mutating control state|projects read-only compatibility state and issue payloads"' in /Users/kbediako/Code/CO succeeded in 585ms:
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/ControlServer.test.ts  (80 tests | 77 skipped) 37ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 77 skipped (80)
+   Start at  16:14:52
+   Duration  332ms (transform 145ms, setup 0ms, collect 178ms, tests 37ms, environment 0ms, prepare 23ms)
+

@@ -1,0 +1,40 @@
+[Codex-Orchestrator] prepareRun start for pipeline docs-review
+[Codex-Orchestrator] prepareRun resolving pipeline docs-review
+[Codex-Orchestrator] PipelineResolver.resolve start for docs-review
+[Codex-Orchestrator] [design-config] loaded repo file at /Users/kbediako/Code/CO/design.config.yaml
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline docs-review
+[Codex-Orchestrator] prepareRun resolved pipeline docs-review
+[Codex-Orchestrator] prepareRun loaded metadata for task 1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction
+[Codex-Orchestrator] prepareRun running planner for pipeline docs-review
+[Codex-Orchestrator] prepareRun planner completed for pipeline docs-review
+[Codex-Orchestrator] prepareRun complete for pipeline docs-review
+[Codex-Orchestrator] Task state snapshot failed for task 1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction (run 2026-03-13T05-43-19-850Z-0fdda032) Error: Invalid snapshot contents for task 1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction
+    at TaskStateStore.loadSnapshot (file:///opt/homebrew/lib/node_modules/@kbediako/codex-orchestrator/dist/orchestrator/src/persistence/TaskStateStore.js:78:23)
+    at async TaskStateStore.recordRun (file:///opt/homebrew/lib/node_modules/@kbediako/codex-orchestrator/dist/orchestrator/src/persistence/TaskStateStore.js:46:30)
+    at async Promise.allSettled (index 0)
+    at async PersistenceCoordinator.handleRunCompleted (file:///opt/homebrew/lib/node_modules/@kbediako/codex-orchestrator/dist/orchestrator/src/persistence/PersistenceCoordinator.js:36:47)
+[Codex-Orchestrator] Task state snapshot not recorded for task 1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction (run 2026-03-13T05-43-19-850Z-0fdda032)
+{
+  "run_id": "2026-03-13T05-43-19-850Z-0fdda032",
+  "status": "failed",
+  "artifact_root": ".runs/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/cli/2026-03-13T05-43-19-850Z-0fdda032",
+  "manifest": ".runs/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/cli/2026-03-13T05-43-19-850Z-0fdda032/manifest.json",
+  "log_path": ".runs/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/cli/2026-03-13T05-43-19-850Z-0fdda032/runner.ndjson",
+  "summary": "Advanced mode (auto) enabled: auto enabled for non-trivial pipeline 'docs-review'.\nAuto scout: evidence recorded at .runs/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction/cli/2026-03-13T05-43-19-850Z-0fdda032/auto-scout.json.\nStage 'Run delegation guard' failed with exit code 1.\nGuardrails: spec-guard partial (1 pending of 1).",
+  "runtime_mode_requested": "appserver",
+  "runtime_mode": "appserver",
+  "runtime_provider": "AppServerRuntimeProvider",
+  "runtime_fallback": {
+    "occurred": false,
+    "code": null,
+    "reason": null,
+    "from_mode": null,
+    "to_mode": null,
+    "checked_at": "2026-03-13T05:43:19.940Z"
+  },
+  "cloud_fallback_reason": null,
+  "issue_log": null,
+  "issue_log_error": null
+}

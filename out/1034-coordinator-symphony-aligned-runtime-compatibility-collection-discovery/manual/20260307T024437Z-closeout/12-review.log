@@ -1,0 +1,27 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:5000) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5000) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+❌ Diff budget exceeded (base=origin/main)
+ - changed files 342 > 25
+ - total lines changed 38355 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5280
+  - orchestrator/src/cli/control/controlServer.ts: 2142
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - tasks/index.json: 1972
+  - docs/docs-freshness-registry.json: 1940
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/tests/ControlRuntime.test.ts: 671
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+To proceed, either split the change into smaller diffs or set an explicit justification:
+  DIFF_BUDGET_OVERRIDE_REASON="why this diff must be large" node scripts/diff-budget.mjs
+[run-review] failed: diff budget exited with code 1

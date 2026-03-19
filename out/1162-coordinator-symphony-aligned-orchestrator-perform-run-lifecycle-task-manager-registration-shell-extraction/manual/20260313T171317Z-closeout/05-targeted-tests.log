@@ -1,0 +1,159 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/OrchestratorRunLifecycleExecutionRegistration.test.ts  (3 tests) 4ms
+ ✓ orchestrator/tests/OrchestratorRunLifecycleTaskManagerRegistration.test.ts  (2 tests) 3ms
+ ✓ orchestrator/tests/OrchestratorCleanupOrder.test.ts  (1 test) 13ms
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > runs the simple pipeline and writes manifest, metrics, and summary
+[Codex-Orchestrator] prepareRun start for pipeline simple
+[Codex-Orchestrator] prepareRun resolving pipeline simple
+[Codex-Orchestrator] PipelineResolver.resolve start for simple
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-ix4fdR/design.config.yaml)
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > runs the simple pipeline and writes manifest, metrics, and summary
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-ix4fdR/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline simple
+[Codex-Orchestrator] prepareRun resolved pipeline simple
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > runs the simple pipeline and writes manifest, metrics, and summary
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline simple
+[Codex-Orchestrator] prepareRun planner completed for pipeline simple
+[Codex-Orchestrator] prepareRun complete for pipeline simple
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > resumes a failed run and clears resume flag
+[Codex-Orchestrator] prepareRun start for pipeline failable
+[Codex-Orchestrator] prepareRun resolving pipeline failable
+[Codex-Orchestrator] PipelineResolver.resolve start for failable
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-NJh6L6/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-NJh6L6/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline failable
+[Codex-Orchestrator] prepareRun resolved pipeline failable
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline failable
+[Codex-Orchestrator] prepareRun planner completed for pipeline failable
+[Codex-Orchestrator] prepareRun complete for pipeline failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > resumes a failed run and clears resume flag
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-NJh6L6/codex.orchestrator.json
+[Codex-Orchestrator] prepareRun start for pipeline failable
+[Codex-Orchestrator] prepareRun resolving pipeline <default>
+[Codex-Orchestrator] prepareRun resolved pipeline failable
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline failable
+[Codex-Orchestrator] prepareRun planner completed for pipeline failable
+[Codex-Orchestrator] prepareRun complete for pipeline failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > retains failure status_detail after heartbeat flush
+[Codex-Orchestrator] prepareRun start for pipeline failable
+[Codex-Orchestrator] prepareRun resolving pipeline failable
+[Codex-Orchestrator] PipelineResolver.resolve start for failable
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-6jp5ss/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-6jp5ss/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline failable
+[Codex-Orchestrator] prepareRun resolved pipeline failable
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline failable
+[Codex-Orchestrator] prepareRun planner completed for pipeline failable
+[Codex-Orchestrator] prepareRun complete for pipeline failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > records child runs for sub-pipeline stages
+[Codex-Orchestrator] prepareRun start for pipeline parent
+[Codex-Orchestrator] prepareRun resolving pipeline parent
+[Codex-Orchestrator] PipelineResolver.resolve start for parent
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-KboELm/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-KboELm/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline parent
+[Codex-Orchestrator] prepareRun resolved pipeline parent
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline parent
+[Codex-Orchestrator] prepareRun planner completed for pipeline parent
+[Codex-Orchestrator] prepareRun complete for pipeline parent
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > records child runs for sub-pipeline stages
+[Codex-Orchestrator] prepareRun start for pipeline simple
+[Codex-Orchestrator] prepareRun resolving pipeline simple
+[Codex-Orchestrator] PipelineResolver.resolve start for simple
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-KboELm/design.config.yaml)
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > records child runs for sub-pipeline stages
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-KboELm/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline simple
+[Codex-Orchestrator] prepareRun resolved pipeline simple
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline simple
+[Codex-Orchestrator] prepareRun planner completed for pipeline simple
+[Codex-Orchestrator] prepareRun complete for pipeline simple
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > propagates actual child run status for optional failures
+[Codex-Orchestrator] prepareRun start for pipeline optional-parent
+[Codex-Orchestrator] prepareRun resolving pipeline optional-parent
+[Codex-Orchestrator] PipelineResolver.resolve start for optional-parent
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-yBaSji/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-yBaSji/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline optional-parent
+[Codex-Orchestrator] prepareRun resolved pipeline optional-parent
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline optional-parent
+[Codex-Orchestrator] prepareRun planner completed for pipeline optional-parent
+[Codex-Orchestrator] prepareRun complete for pipeline optional-parent
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > propagates actual child run status for optional failures
+[Codex-Orchestrator] prepareRun start for pipeline failable
+[Codex-Orchestrator] prepareRun resolving pipeline failable
+[Codex-Orchestrator] PipelineResolver.resolve start for failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > propagates actual child run status for optional failures
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-yBaSji/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-yBaSji/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline failable
+[Codex-Orchestrator] prepareRun resolved pipeline failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > propagates actual child run status for optional failures
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline failable
+[Codex-Orchestrator] prepareRun planner completed for pipeline failable
+[Codex-Orchestrator] prepareRun complete for pipeline failable
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > previews pipeline plans in JSON and text formats
+[Codex-Orchestrator] prepareRun start for pipeline parent
+[Codex-Orchestrator] prepareRun resolving pipeline parent
+[Codex-Orchestrator] PipelineResolver.resolve start for parent
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-QFqN5y/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-QFqN5y/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline parent
+[Codex-Orchestrator] prepareRun resolved pipeline parent
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline parent
+[Codex-Orchestrator] prepareRun planner completed for pipeline parent
+[Codex-Orchestrator] prepareRun complete for pipeline parent
+
+stdout | tests/cli-orchestrator.spec.ts > CodexOrchestrator CLI > validates manifest structure via telemetry helper
+[Codex-Orchestrator] prepareRun start for pipeline simple
+[Codex-Orchestrator] prepareRun resolving pipeline simple
+[Codex-Orchestrator] PipelineResolver.resolve start for simple
+[Codex-Orchestrator] [design-config] using defaults (missing file at /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-m3nmJi/design.config.yaml)
+[Codex-Orchestrator] [codex-config] Loaded user config from /var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/codex-cli-m3nmJi/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline simple
+[Codex-Orchestrator] prepareRun resolved pipeline simple
+[Codex-Orchestrator] prepareRun loaded metadata for task 0101
+[Codex-Orchestrator] prepareRun running planner for pipeline simple
+[Codex-Orchestrator] prepareRun planner completed for pipeline simple
+[Codex-Orchestrator] prepareRun complete for pipeline simple
+
+ ✓ tests/cli-orchestrator.spec.ts  (7 tests) 46246ms
+
+ Test Files  4 passed (4)
+      Tests  13 passed (13)
+   Start at  04:25:07
+   Duration  47.22s (transform 532ms, setup 1ms, collect 2.20s, tests 46.27s, environment 0ms, prepare 194ms)
+

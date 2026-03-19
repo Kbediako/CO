@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0958-cloud-canary-ci.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-02-13
+last_review: 2026-03-19
 ---
 
 ## Added by Bootstrap (refresh as needed)
@@ -24,6 +24,7 @@ last_review: 2026-02-13
   - Deterministic timeout/retry bounds.
   - Credential-safe logging.
   - Explicit behavior when credentials are unavailable.
+  - PR/CI fallback-contract runs without CI review credentials should report a credential-gated skip instead of failing after the local reroute succeeds.
 - Interfaces / contracts:
   - CI workflow contract and manifest assertion contract.
 

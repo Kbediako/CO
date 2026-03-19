@@ -1,0 +1,33 @@
+❌ Diff budget exceeded (base=origin/main)
+ - changed files 493 > 25
+ - total lines changed 52041 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 6047
+  - docs/docs-freshness-registry.json: 5125
+  - tasks/index.json: 2560
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1441
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/controlActionPreflight.ts: 782
+
+To proceed, either split the change into smaller diffs or set an explicit justification:
+  DIFF_BUDGET_OVERRIDE_REASON="why this diff must be large" node scripts/diff-budget.mjs
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 493 > 25
+ - total lines changed 52041 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 6047
+  - docs/docs-freshness-registry.json: 5125
+  - tasks/index.json: 2560
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1441
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/controlActionPreflight.ts: 782
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch scope; 1051 delta remains bounded to control-action preflight extraction

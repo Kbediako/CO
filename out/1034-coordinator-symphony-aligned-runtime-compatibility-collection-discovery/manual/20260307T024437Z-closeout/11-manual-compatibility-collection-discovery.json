@@ -1,0 +1,292 @@
+{
+  "state": {
+    "generated_at": "2026-03-07T02:50:38.903Z",
+    "counts": {
+      "running": 2,
+      "retrying": 1
+    },
+    "running": [
+      {
+        "issue_id": "task-1034-current",
+        "issue_identifier": "task-1034-current",
+        "state": "in_progress",
+        "display_state": "in_progress",
+        "status_reason": null,
+        "session_id": "run-1",
+        "turn_count": 0,
+        "last_event": "in_progress",
+        "last_message": "task is running",
+        "started_at": "2026-03-07T02:44:37.000Z",
+        "last_event_at": "2026-03-07T02:44:37.000Z",
+        "tokens": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null
+        }
+      },
+      {
+        "issue_id": "task-1034-running",
+        "issue_identifier": "task-1034-running",
+        "state": "in_progress",
+        "display_state": "paused",
+        "status_reason": "queued_questions",
+        "session_id": "run-2",
+        "turn_count": 0,
+        "last_event": "pause",
+        "last_message": "sibling run is paused for approval",
+        "started_at": "2026-03-07T02:44:37.000Z",
+        "last_event_at": "2026-03-07T02:45:12.000Z",
+        "tokens": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null
+        }
+      }
+    ],
+    "retrying": [
+      {
+        "issue_id": "task-1034-retrying",
+        "issue_identifier": "task-1034-retrying",
+        "state": "failed",
+        "display_state": "failed",
+        "status_reason": null,
+        "session_id": "run-3",
+        "attempt": 0,
+        "last_event": "failed",
+        "last_message": "retryable failure pending rerun",
+        "started_at": "2026-03-07T02:44:37.000Z",
+        "last_event_at": "2026-03-07T02:45:30.000Z"
+      }
+    ],
+    "codex_totals": null,
+    "rate_limits": null,
+    "selected": {
+      "issue_id": "task-1034-current",
+      "issue_identifier": "task-1034-current",
+      "task_id": "task-1034-current",
+      "run_id": "run-1",
+      "raw_status": "in_progress",
+      "display_status": "in_progress",
+      "status_reason": null,
+      "started_at": "2026-03-07T02:44:37.000Z",
+      "updated_at": "2026-03-07T02:44:37.000Z",
+      "completed_at": null,
+      "summary": "task is running",
+      "last_error": null,
+      "latest_action": null,
+      "latest_event": {
+        "at": "2026-03-07T02:44:37.000Z",
+        "event": "in_progress",
+        "message": "task is running",
+        "requested_by": null,
+        "reason": null
+      },
+      "workspace": {
+        "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-gvU2S7"
+      },
+      "question_summary": {
+        "queued_count": 0,
+        "latest_question": null
+      }
+    }
+  },
+  "siblingRunning": {
+    "issue_identifier": "task-1034-running",
+    "issue_id": "task-1034-running",
+    "status": "in_progress",
+    "raw_status": "in_progress",
+    "display_status": "paused",
+    "status_reason": "queued_questions",
+    "workspace": {
+      "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-gvU2S7"
+    },
+    "attempts": {
+      "restart_count": 0,
+      "current_retry_attempt": 0
+    },
+    "running": {
+      "issue_id": "task-1034-running",
+      "issue_identifier": "task-1034-running",
+      "state": "in_progress",
+      "display_state": "paused",
+      "status_reason": "queued_questions",
+      "session_id": "run-2",
+      "turn_count": 0,
+      "last_event": "pause",
+      "last_message": "sibling run is paused for approval",
+      "started_at": "2026-03-07T02:44:37.000Z",
+      "last_event_at": "2026-03-07T02:45:12.000Z",
+      "tokens": {
+        "input_tokens": null,
+        "output_tokens": null,
+        "total_tokens": null
+      }
+    },
+    "retry": null,
+    "logs": {
+      "codex_session_logs": []
+    },
+    "summary": "sibling run is paused for approval",
+    "latest_event": {
+      "at": "2026-03-07T02:45:12.000Z",
+      "event": "pause",
+      "message": "sibling run is paused for approval"
+    },
+    "question_summary": {
+      "queued_count": 1,
+      "latest_question": {
+        "question_id": "q-0001",
+        "prompt": "Approve deploy?",
+        "urgency": "high",
+        "queued_at": "2026-03-07T02:45:15.000Z"
+      }
+    },
+    "recent_events": [
+      {
+        "at": "2026-03-07T02:45:12.000Z",
+        "event": "pause",
+        "message": "sibling run is paused for approval"
+      }
+    ],
+    "last_error": null,
+    "tracked": {}
+  },
+  "siblingRetry": {
+    "issue_identifier": "task-1034-retrying",
+    "issue_id": "task-1034-retrying",
+    "status": "failed",
+    "raw_status": "failed",
+    "display_status": "failed",
+    "status_reason": null,
+    "workspace": {
+      "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-gvU2S7"
+    },
+    "attempts": {
+      "restart_count": 0,
+      "current_retry_attempt": 0
+    },
+    "running": null,
+    "retry": {
+      "issue_id": "task-1034-retrying",
+      "issue_identifier": "task-1034-retrying",
+      "state": "failed",
+      "display_state": "failed",
+      "status_reason": null,
+      "session_id": "run-3",
+      "attempt": 0,
+      "last_event": "failed",
+      "last_message": "retryable failure pending rerun",
+      "started_at": "2026-03-07T02:44:37.000Z",
+      "last_event_at": "2026-03-07T02:45:30.000Z"
+    },
+    "logs": {
+      "codex_session_logs": []
+    },
+    "summary": "retryable failure pending rerun",
+    "latest_event": {
+      "at": "2026-03-07T02:45:30.000Z",
+      "event": "failed",
+      "message": "retryable failure pending rerun"
+    },
+    "question_summary": {
+      "queued_count": 0,
+      "latest_question": null
+    },
+    "recent_events": [
+      {
+        "at": "2026-03-07T02:45:30.000Z",
+        "event": "failed",
+        "message": "retryable failure pending rerun"
+      }
+    ],
+    "last_error": "retryable failure pending rerun",
+    "tracked": {}
+  },
+  "ui": {
+    "generated_at": "2026-03-07T02:50:38.908Z",
+    "tasks": [
+      {
+        "task_id": "task-1034-current",
+        "title": "task-1034-current",
+        "bucket": "active",
+        "bucket_reason": "running",
+        "status": "in_progress",
+        "raw_status": "in_progress",
+        "display_status": "in_progress",
+        "status_reason": null,
+        "last_update": "2026-03-07T02:44:37.000Z",
+        "latest_run_id": "run-1",
+        "approvals_pending": 0,
+        "approvals_total": 0,
+        "summary": "task is running",
+        "question_summary": {
+          "queued_count": 0,
+          "latest_question": null
+        }
+      }
+    ],
+    "runs": [
+      {
+        "run_id": "run-1",
+        "task_id": "task-1034-current",
+        "status": "in_progress",
+        "raw_status": "in_progress",
+        "display_status": "in_progress",
+        "status_reason": null,
+        "started_at": "2026-03-07T02:44:37.000Z",
+        "updated_at": "2026-03-07T02:44:37.000Z",
+        "completed_at": null,
+        "stages": [],
+        "links": {
+          "manifest": ".runs/task-1034-current/cli/run-1/manifest.json",
+          "log": ".runs/task-1034-current/cli/run-1/runner.ndjson",
+          "metrics": null,
+          "state": null
+        },
+        "approvals_pending": 0,
+        "approvals_total": 0,
+        "heartbeat_stale": false,
+        "latest_event": {
+          "at": "2026-03-07T02:44:37.000Z",
+          "event": "in_progress",
+          "message": "task is running"
+        },
+        "question_summary": {
+          "queued_count": 0,
+          "latest_question": null
+        }
+      }
+    ],
+    "codebase": null,
+    "activity": [],
+    "selected": {
+      "issue_id": "task-1034-current",
+      "issue_identifier": "task-1034-current",
+      "task_id": "task-1034-current",
+      "run_id": "run-1",
+      "raw_status": "in_progress",
+      "display_status": "in_progress",
+      "status_reason": null,
+      "started_at": "2026-03-07T02:44:37.000Z",
+      "updated_at": "2026-03-07T02:44:37.000Z",
+      "completed_at": null,
+      "summary": "task is running",
+      "last_error": null,
+      "latest_action": null,
+      "latest_event": {
+        "at": "2026-03-07T02:44:37.000Z",
+        "event": "in_progress",
+        "message": "task is running",
+        "requested_by": null,
+        "reason": null
+      },
+      "workspace": {
+        "path": "/var/folders/r8/ss2mqz1n5wgcph4gnh_894600000gn/T/control-server-manual-gvU2S7"
+      },
+      "question_summary": {
+        "queued_count": 0,
+        "latest_question": null
+      }
+    }
+  }
+}

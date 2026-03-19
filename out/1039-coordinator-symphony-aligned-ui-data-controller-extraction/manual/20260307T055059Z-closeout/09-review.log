@@ -1,0 +1,779 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:31955) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31955) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 385 > 25
+ - total lines changed 43359 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5490
+  - docs/docs-freshness-registry.json: 4457
+  - tasks/index.json: 2268
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1751
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1039 is landing on a stacked branch; origin/main includes prior approved Symphony-aligned slices, while the task-owned delta remains a small controller extraction plus docs/mirror sync
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 13 files, 556 lines.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/2026-03-07T05-44-06-301Z-3c91d73a/review/prompt.txt
+Review output log: .runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/2026-03-07T05-44-06-301Z-3c91d73a/review/output.log
+Launching Codex review (evidence: .runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/2026-03-07T05-44-06-301Z-3c91d73a/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc6e5-1b6c-7672-a61d-3ebe4f7e55f0
+--------
+user
+Review task: 1039-coordinator-symphony-aligned-ui-data-controller-extraction
+Evidence manifest: .runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/2026-03-07T05-44-06-301Z-3c91d73a/manifest.json
+
+Task context:
+- Task checklist: `tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+- MCP Task ID: `1039-coordinator-symphony-aligned-ui-data-controller-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+- TECH_SPEC: `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `.agent/task/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1039-ui-data-controller-extraction-deliberation.md`.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/findings/1039-ui-data-controller-extraction-deliberation.md`.
+- [ ] docs-review approval/override captured for registered `1039`. Evidence: `.runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/<run-id>/manifest.json`, `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-docs-first/`.
+- [ ] `/ui/data.json` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
+- [ ] `/ui/data.json` method guards and route-local response writing move with the new controller without changing route contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] `selectedRunPresenter.ts` remains the UI dataset builder after extraction. Evidence: `orchestrator/src/cli/control/selectedRunPresenter.ts`, `orchestrator/tests/SelectedRunPresenter.test.ts`.
+- [ ] `/api/v1/*`, auth/session/webhook/control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
+- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
+- [ ] `npm run build`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/03-build.log`.
+- [ ] `npm run lint`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/04-lint.log`.
+- [ ] `npm run test`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/05-test.log`.
+- [ ] `npm run docs:check`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
+- [ ] `npm run docs:freshness`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
+- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/08-diff-budget.log`, `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
+- [ ] `npm run review`. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/09-review.log`, `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
+- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
+- [ ] Manual mock UI-data artifact captured. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/11-manual-ui-data-controller.json`.
+- [ ] Elegance review completed. Evidence: `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+
+Agent notes:
+Goal: validate the bounded /ui/data.json controller extraction | Summary: standalone UI controller plus direct tests and docs-first corrections | Risks: stacked-branch diff noise and review-wrapper drift
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 46]
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M orchestrator/src/cli/control/controlServer.ts
+ M tasks/index.json
+?? .agent/task/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md
+?? docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-ui-data-controller-extraction.md
+?? docs/findings/1039-ui-data-controller-extraction-deliberation.md
+?? orchestrator/src/cli/control/uiDataController.ts
+?? orchestrator/tests/UiDataController.test.ts
+?? tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md
+?? tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md
+```
+
+Diff budget override: 1039 is landing on a stacked branch; origin/main includes prior approved Symphony-aligned slices, while the task-owned delta remains a small controller extraction plus docs/mirror sync
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: openaiDeveloperDocs starting
+mcp: delegation starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+Plan update
+  → Inspect changed files and diff for task 1039
+  • Analyze behavior for bugs and guardrail/doc mismatches
+  • Produce review findings JSON
+exec
+/bin/zsh -lc "git diff --stat && echo '---' && git diff -- orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/uiDataController.ts orchestrator/tests/UiDataController.test.ts docs/TASKS.md docs/docs-freshness-registry.json tasks/index.json docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md docs/TECH_SPEC-coordinator-symphony-aligned-ui-data-controller-extraction.md docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md docs/findings/1039-ui-data-controller-extraction-deliberation.md tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md .agent/task/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md" in /Users/kbediako/Code/CO succeeded in 52ms:
+ docs/TASKS.md                                 |  1 +
+ docs/docs-freshness-registry.json             | 49 +++++++++++++++++++++++++++
+ orchestrator/src/cli/control/controlServer.ts | 47 +++++--------------------
+ tasks/index.json                              | 32 +++++++++++++++++
+ 4 files changed, 90 insertions(+), 39 deletions(-)
+---
+diff --git a/docs/TASKS.md b/docs/TASKS.md
+index 5ef72f83c..d371aca92 100644
+--- a/docs/TASKS.md
++++ b/docs/TASKS.md
+@@ -1,4 +1,5 @@
+ <!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. 2025: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2025.md; 2026: https://github.com/Kbediako/CO/blob/task-archives/docs/TASKS-archive-2026.md <!-- tasks-archive-index:end -->
++# Task List Snapshot - Coordinator Symphony-Aligned UI Data Controller Extraction (1039-coordinator-symphony-aligned-ui-data-controller-extraction) - **Update - 2026-03-07:** Task created; export `MCP_RUNNER_TASK_ID=1039-coordinator-symphony-aligned-ui-data-controller-extraction`; scope: extract the standalone `/ui/data.json` route handling into a dedicated controller helper while keeping `selectedRunPresenter.ts` as the UI dataset builder and leaving `/api/v1/*`, auth/session/webhook handling, and mutating control endpoints in `controlServer.ts`; guardrails required: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `npm run review`, `npm run pack:smoke` when downstream-facing paths change. Docs-first evidence: `docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/findings/1039-ui-data-controller-extraction-deliberation.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`. Checklist mirror: `tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `.agent/task/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Observability API Controller Extraction (1038-coordinator-symphony-aligned-observability-api-controller-extraction) - Update 2026-03-07: completed (the inline `/api/v1/*` observability route tree now lives in `observabilityApiController.ts`; `state`, `issue`, `refresh`, and the explicit CO-only `/api/v1/dispatch` extension all route through the extracted controller; `/ui/data.json` plus auth/session/webhook/control surfaces remain in `controlServer.ts`; full validation passed with `998/998` tests, build, lint, docs checks, diff-budget override, pack smoke, and manual controller evidence; and `scripts/tasks-archive.mjs` plus `docs/TASKS.md` were corrected so compact snapshot headers remain archive-safe and the task list returns under the line cap. docs-review and standalone review are recorded as honest timeout overrides rather than clean terminal gates). Evidence: `docs/PRD-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `.agent/task/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md`, `docs/findings/1038-observability-api-controller-extraction-deliberation.md`, `out/1038-coordinator-symphony-aligned-observability-api-controller-extraction/manual/20260307T043733Z-docs-first/00-summary.md`, `out/1038-coordinator-symphony-aligned-observability-api-controller-extraction/manual/20260307T045306Z-closeout/00-summary.md`, `out/1038-coordinator-symphony-aligned-observability-api-controller-extraction/manual/20260307T045306Z-closeout/11-manual-observability-controller.json`, `out/1038-coordinator-symphony-aligned-observability-api-controller-extraction/manual/20260307T045306Z-closeout/12-elegance-review.md`, `out/1038-coordinator-symphony-aligned-observability-api-controller-extraction/manual/20260307T045306Z-closeout/13-override-notes.md`, `out/1038-coordinator-symphony-aligned-observability-api-controller-extraction/TASKS-archive-2026.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Selected-Run Presenter Extraction (1037-coordinator-symphony-aligned-selected-run-presenter-extraction) - Update 2026-03-07: completed (selected-run payload shaping, shared selected-run UI fields, and `/ui/data.json` dataset assembly now live in `selectedRunPresenter.ts`; `controlServer.ts` routes `/ui/data.json` through the extracted presenter; compatibility routes, runtime caching, Telegram rendering/fingerprint behavior, and `/api/v1/dispatch` remain on their existing seams. Full validation passed with `996/996` tests, build, lint, docs checks, diff-budget override, pack smoke, manual selected-run presenter evidence, and an explicit elegance pass; docs-review and standalone review are recorded as honest timeout overrides rather than clean terminal gates). Evidence: `docs/PRD-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `tasks/specs/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `tasks/tasks-1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `.agent/task/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md`, `docs/findings/1037-selected-run-presenter-extraction-deliberation.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T041423Z-docs-first/00-summary.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/00-summary.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/11-manual-selected-run-presenter.json`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/12-elegance-review.md`, `out/1037-coordinator-symphony-aligned-selected-run-presenter-extraction/manual/20260307T042627Z-closeout/13-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+ # Task List Snapshot - Coordinator Symphony-Aligned Compatibility Issue Presenter Extraction (1036-coordinator-symphony-aligned-compatibility-issue-index-extraction) - Update 2026-03-07: completed (compatibility-only issue aggregation, representative selection, canonical-before-alias lookup, and compatibility issue payload assembly now live in `compatibilityIssuePresenter.ts`; `controlRuntime.ts` and `observabilitySurface.ts` call the extracted presenter directly; selected-run payload shaping, `/ui/data.json`, Telegram oversight, and `/api/v1/dispatch` remain on the current-run seam. Focused runtime/server regressions passed `93/93`; build, lint, docs checks, docs freshness, diff-budget override, manual presenter evidence, and pack smoke all passed; docs-review, the full-suite wrapper tail, and standalone review are recorded as honest overrides rather than clean terminal gates). Evidence: `docs/PRD-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `tasks/specs/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `tasks/tasks-1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `.agent/task/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md`, `docs/findings/1036-compatibility-issue-index-extraction-deliberation.md`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T034204Z-docs-first/00-summary.md`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/00-summary.md`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/05b-targeted-tests.log`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/11-manual-compatibility-presenter.json`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/12-elegance-review.md`, `out/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction/manual/20260307T035705Z-closeout/13-override-notes.md`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+diff --git a/docs/docs-freshness-registry.json b/docs/docs-freshness-registry.json
+index 996893ce8..ab8a91ef6 100644
+--- a/docs/docs-freshness-registry.json
++++ b/docs/docs-freshness-registry.json
+
+thinking
+**Inspecting untracked files**
+
+I'm noticing that untracked files aren't included in the default `git diff` output. I need to check those untracked files. Using `git diff --no-index` might not help since the new, untracked files aren't shown. It's more efficient to use `git status` to see what's untracked and potentially pipe that output with `sed`. I really want to inspect the relevant file contents properly. Let's make sure I get this sorted out!
+thinking
+**Inspecting untracked files**
+
+I'm noticing that untracked files aren't included in the default `git diff` output. I need to check those untracked files. Using `git diff --no-index` might not help since the new, untracked files aren't shown. It's more efficient to use `git status` to see what's untracked and potentially pipe that output with `sed`. I really want to inspect the relevant file contents properly. Let's make sure I get this sorted out!
+exec
+/bin/zsh -lc "sed -n '1,260p' tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/UiDataController.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' docs/TECH_SPEC-coordinator-symphony-aligned-ui-data-controller-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/uiDataController.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+import http from 'node:http';
+
+import { buildCompatibilityErrorResponse } from './observabilitySurface.js';
+import { readUiDataset, type SelectedRunPresenterContext } from './selectedRunPresenter.js';
+
+const UI_DATA_PATH = '/ui/data.json';
+const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+
+export interface UiDataControllerContext {
+  req: Pick<http.IncomingMessage, 'method' | 'url'>;
+  res: http.ServerResponse;
+  presenterContext: SelectedRunPresenterContext;
+}
+
+export async function handleUiDataRequest(context: UiDataControllerContext): Promise<boolean> {
+  const method = context.req.method ?? 'GET';
+  const pathname = new URL(context.req.url ?? '/', 'http://localhost').pathname;
+  if (pathname !== UI_DATA_PATH) {
+    return false;
+  }
+ succeeded in 53ms:
+import http from 'node:http';
+
+import { describe, expect, it } from 'vitest';
+
+import { handleUiDataRequest } from '../src/cli/control/uiDataController.js';
+import type { ControlState } from '../src/cli/control/controlState.js';
+
+const CONTROL_STATE: ControlState = {
+  run_id: 'run-1',
+  control_seq: 0,
+  latest_action: null,
+  history: [],
+  pending_confirmation: null,
+  queued_questions: null,
+  question_events: [],
+  sessions: null,
+  transport_idempotency: null,
+  provider_traces: null
+};
+
+ succeeded in 53ms:
+# Task Checklist - 1039-coordinator-symphony-aligned-ui-data-controller-extraction
+
+- MCP Task ID: `1039-coordinator-symphony-aligned-ui-data-controller-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+- TECH_SPEC: `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+
+> This lane extracts the standalone `/ui/data.json` route handling into a dedicated controller helper while preserving selected-run dataset construction, `/api/v1/*`, auth/session/webhook handling, and mutating control behavior.
+
+## Foundation
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `.agent/task/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1039-ui-data-controller-extraction-deliberation.md`.
+
+## Shared Registry + Review Handoff
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/findings/1039-ui-data-controller-extraction-deliberation.md`.
+- [ ] docs-review approval/override captured for registered `1039`. Evidence: `.runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/<run-id>/manifest.json`, `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-docs-first/`.
+
+## UI Data Controller Extraction
+- [ ] `/ui/data.json` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
+ succeeded in 53ms:
+# TECH_SPEC - Coordinator Symphony-Aligned UI Data Controller Extraction
+
+## Scope
+
+- Extract the `/ui/data.json` controller decision path from `controlServer.ts`.
+- Keep selected-run payload building in `selectedRunPresenter.ts`.
+- Preserve all `/ui/data.json` route behavior and leave `/api/v1/*`, auth/session, webhooks, and control endpoints untouched.
+
+## Files / Modules
+
+- `orchestrator/src/cli/control/controlServer.ts`
+- `orchestrator/src/cli/control/selectedRunPresenter.ts`
+- `orchestrator/src/cli/control/`
+- `orchestrator/tests/ControlServer.test.ts`
+
+## Design
+
+1. Introduce a dedicated UI data controller module for `/ui/data.json`.
+2. Move the route-local UI method guard and JSON response writing helper into that module.
+3. Keep `readUiDataset(presenterContext)` as the payload source; do not move selected-run dataset construction back into the controller.
+ succeeded in 53ms:
+---
+id: 20260307-1039-coordinator-symphony-aligned-ui-data-controller-extraction
+title: Coordinator Symphony-Aligned UI Data Controller Extraction
+relates_to: docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-03-07
+---
+
+## Summary
+
+- Objective: extract the `/ui/data.json` controller policy into a dedicated helper without changing selected-run dataset behavior.
+- Scope: UI data controller extraction plus regression/manual evidence.
+- Constraints: keep `selectedRunPresenter.ts` as the dataset builder; avoid `/api/v1/*`, auth, webhook, authority, or provider-ingestion changes.
+
+## Pre-Implementation Review Note
+
+- Decision: approved for docs-first planning as the immediate next slice after `1038`.
+- Reasoning: `1038` removed the inline `/api/v1/*` controller tree, leaving the standalone `/ui/data.json` route in `controlServer.ts` as the next smallest Symphony-aligned controller seam to extract without broadening into auth, transport, or control refactors.
+
+thinking
+**Inspecting PRD and action plan**
+
+I'm thinking I need to inspect the PRD and the action plan. It might be worth checking if there's any mismatch in the documentation, especially relating to whether I need to address something like an agent mirror. I wonder if it's necessary to consider this unless there's a guardrail mismatch. So, I should definitely take a look at those untracked documents to ensure everything aligns properly!
+thinking
+**Inspecting PRD and action plan**
+
+I'm thinking I need to inspect the PRD and the action plan. It might be worth checking if there's any mismatch in the documentation, especially relating to whether I need to address something like an agent mirror. I wonder if it's necessary to consider this unless there's a guardrail mismatch. So, I should definitely take a look at those untracked documents to ensure everything aligns properly!
+exec
+/bin/zsh -lc "sed -n '1,240p' docs/findings/1039-ui-data-controller-extraction-deliberation.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,220p' docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' .agent/task/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md" in /Users/kbediako/Code/CO succeeded in 51ms:
+# Findings - 1039 UI Data Controller Extraction Deliberation
+
+## Decision
+
+- Proceed with a bounded `/ui/data.json` controller extraction as the immediate next slice after `1038`.
+
+## Why This Slice
+
+- `1037` already isolated selected-run payload construction in `selectedRunPresenter.ts`.
+- `1038` already isolated the `/api/v1/*` controller tree in `observabilityApiController.ts`.
+- The remaining read-only controller concentration in `controlServer.ts` is now the standalone `/ui/data.json` route, which can be extracted without broadening into auth/session/webhook/control behavior.
+
+## Guardrails
+
+- Keep `selectedRunPresenter.ts` as the UI dataset builder.
+- Keep `/api/v1/*`, Telegram, Linear, and mutating control behavior out of scope.
+- Preserve `/ui/data.json` status, headers, and payload shape.
+
+## Evidence
+
+ succeeded in 51ms:
+# PRD - Coordinator Symphony-Aligned UI Data Controller Extraction
+
+## Problem
+
+`1037` extracted selected-run payload construction and `1038` extracted the `/api/v1/*` observability API controller, but `controlServer.ts` still owns the standalone `/ui/data.json` route inline. That leaves one remaining read-only controller seam mixed into the server entrypoint instead of behind a dedicated UI-route controller boundary.
+
+## Goal
+
+Extract a dedicated UI data controller helper so `/ui/data.json` method guards and response writing sit behind one stable controller boundary while selected-run payload construction, auth/session behavior, webhooks, and mutating control semantics stay unchanged.
+
+## User Value
+
+- Future Symphony-aligned controller refactors can proceed in smaller, safer increments.
+- Operators keep the exact same `/ui/data.json` behavior while the server entrypoint becomes narrower and easier to reason about.
+- CO preserves its stricter authority model by isolating the final read-only route seam from auth/session/webhook/control handling.
+
+## Scope
+
+- Extract the `/ui/data.json` route handling out of `controlServer.ts`.
+- Move UI-route method guards and route-local response writing behind that controller boundary.
+ succeeded in 51ms:
+# ACTION_PLAN - Coordinator Symphony-Aligned UI Data Controller Extraction
+
+## Phase 1 - Docs + Boundary Confirmation
+
+- [ ] Register `1039` across PRD / TECH_SPEC / ACTION_PLAN / task/spec mirrors / freshness registry.
+- [ ] Confirm the UI controller extraction boundary against the post-`1038` server shape before editing runtime code.
+- [ ] Capture docs-review approval or an explicit docs-review override before editing runtime code.
+
+## Phase 2 - UI Data Controller Extraction
+
+- [ ] Introduce a dedicated `/ui/data.json` controller helper.
+- [ ] Move UI-route method guards and route-local response writing into that module.
+- [ ] Keep `selectedRunPresenter.ts`, `/api/v1/*`, auth/session/webhook handling, and mutating control endpoints on their current seams.
+
+## Phase 3 - Verification + Closeout
+
+- [ ] Add focused server/unit regressions that prove `/ui/data.json` behavior parity after extraction.
+- [ ] Capture a manual mock UI-data artifact.
+- [ ] Run the standard validation lane, including `npm run pack:smoke` because packaged CLI paths are touched, and record any honest overrides.
+- [ ] Sync `tasks/index.json`, `docs/TASKS.md`, and task mirrors to the terminal status.
+ succeeded in 51ms:
+# Task Checklist - 1039-coordinator-symphony-aligned-ui-data-controller-extraction
+
+- MCP Task ID: `1039-coordinator-symphony-aligned-ui-data-controller-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+- TECH_SPEC: `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md`
+
+> This lane extracts the standalone `/ui/data.json` route handling into a dedicated controller helper while preserving selected-run dataset construction, `/api/v1/*`, auth/session/webhook handling, and mutating control behavior.
+
+## Foundation
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `.agent/task/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1039-ui-data-controller-extraction-deliberation.md`.
+
+## Shared Registry + Review Handoff
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md`, `docs/findings/1039-ui-data-controller-extraction-deliberation.md`.
+- [ ] docs-review approval/override captured for registered `1039`. Evidence: `.runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/<run-id>/manifest.json`, `out/1039-coordinator-symphony-aligned-ui-data-controller-extraction/manual/<timestamp>-docs-first/`.
+
+## UI Data Controller Extraction
+- [ ] `/ui/data.json` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
+
+thinking
+**Inspecting code for bugs**
+
+I need to take a closer look at the existing code to verify any potential bugs. I’ll focus on the selectedRunPresenter and observabilitySurface types, and I’m considering the controlServer route order as well. It seems important to inspect the surrounding code in the controlServer and related types. This way, I can ensure everything is functioning correctly and address any issues effectively. Let's dive in and see what I find!
+thinking
+**Inspecting code for bugs**
+
+I need to take a closer look at the existing code to verify any potential bugs. I’ll focus on the selectedRunPresenter and observabilitySurface types, and I’m considering the controlServer route order as well. It seems important to inspect the surrounding code in the controlServer and related types. This way, I can ensure everything is functioning correctly and address any issues effectively. Let's dive in and see what I find!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/selectedRunPresenter.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/src/cli/control/observabilitySurface.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '520,660p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "grep -n \"UI_DATA_PATH\\|/ui/data.json\\|writeUiDataMethodNotAllowed\\|writeObservabilityResponse\" -n orchestrator/tests/ControlServer.test.ts orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/uiDataController.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+  if (uiAsset) {
+    await serveUiAsset(uiAsset, res);
+    return;
+  }
+
+  if (url.pathname === '/auth/session' && (req.method === 'GET' || req.method === 'POST')) {
+    if (!isLoopbackAddress(req.socket.remoteAddress)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'loopback_only' }));
+      return;
+    }
+    const allowedHosts = normalizeAllowedHosts(context.config.ui.allowedBindHosts);
+    const hostHeader = parseHostHeader(req.headers.host);
+    if (!hostHeader || !allowedHosts.has(hostHeader)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'host_not_allowed' }));
+      return;
+    }
+    const originHost = parseOriginHost(req.headers.origin);
+    if (originHost) {
+ succeeded in 53ms:
+import { isoTimestamp } from '../utils/time.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { ControlState } from './controlState.js';
+import type {
+  ControlCompatibilityProjectionSnapshot,
+  ControlIssuePayload,
+  ControlStatePayload
+} from './observabilityReadModel.js';
+import { findCompatibilityProjectionIssueRecord } from './compatibilityIssuePresenter.js';
+import type {
+  DispatchPilotEvaluation,
+  DispatchPilotFailure
+} from './trackerDispatchPilot.js';
+
+const READ_ONLY_COMPAT_ACTION = 'refresh';
+const COMPATIBILITY_MUTATING_ACTIONS = new Set(['pause', 'resume', 'cancel', 'fail', 'rerun']);
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+type ObservabilityPayload = Record<string, unknown>;
+
+ succeeded in 53ms:
+import { readFile } from 'node:fs/promises';
+import { relative, resolve } from 'node:path';
+
+import { isoTimestamp } from '../utils/time.js';
+import type { RunPaths } from '../run/runPaths.js';
+import type { CliManifest } from '../types.js';
+import type { ControlState } from './controlState.js';
+import type {
+  ControlSelectedRunPayload,
+  ControlSelectedRunRuntimeSnapshot,
+  SelectedRunContext
+} from './observabilityReadModel.js';
+import {
+  buildProjectionSelectedPayload,
+  buildSelectedRunQuestionSummaryPayload
+} from './observabilityReadModel.js';
+
+export interface UiSelectedRunSharedFields {
+  raw_status: string;
+  display_status: string;
+ succeeded in 51ms:
+orchestrator/tests/ControlServer.test.ts:645:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:799:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:927:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:943:      expect(uiPayload.error?.details?.route).toBe('/ui/data.json');
+orchestrator/tests/ControlServer.test.ts:1107:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:1224:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:1319:        const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:2141:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:2530:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/tests/ControlServer.test.ts:2691:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+orchestrator/src/cli/control/uiDataController.ts:6:const UI_DATA_PATH = '/ui/data.json';
+orchestrator/src/cli/control/uiDataController.ts:18:  if (pathname !== UI_DATA_PATH) {
+orchestrator/src/cli/control/uiDataController.ts:31:          route: UI_DATA_PATH,
+
+thinking
+**Inspecting test behavior**
+
+I need to inspect tests for controlServer specifically around /ui/data.json. I'm wondering if this controller extraction is bypassing certain route semantics. It seems important to search for how the route behaves in the tests, so I can properly evaluate any issues. Maybe there are nuances here that I’m not picking up on yet. I’ll make sure to dig a little deeper into the route behavior to get a clearer understanding!
+thinking
+**Inspecting test behavior**
+
+I need to inspect tests for controlServer specifically around /ui/data.json. I'm wondering if this controller extraction is bypassing certain route semantics. It seems important to search for how the route behaves in the tests, so I can properly evaluate any issues. Maybe there are nuances here that I’m not picking up on yet. I’ll make sure to dig a little deeper into the route behavior to get a clearer understanding!
+exec
+/bin/zsh -lc "sed -n '900,970p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,120p' orchestrator/src/cli/control/observabilityApiController.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '2680,2725p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token
+        }
+      });
+      expect(stateRes.status).toBe(405);
+      const statePayload = (await stateRes.json()) as {
+        error?: { code?: string; details?: { allowed_method?: string } };
+      };
+      expect(statePayload.error?.code).toBe('method_not_allowed');
+      expect(statePayload.error?.details?.allowed_method).toBe('GET');
+
+      const dispatchRes = await fetch(new URL('/api/v1/dispatch', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token
+        }
+      });
+ succeeded in 52ms:
+import http from 'node:http';
+
+import {
+  buildCompatibilityErrorResponse,
+  buildCompatibilityIssueNotFoundResponse,
+  buildCompatibilityMethodNotAllowedResponse,
+  buildCompatibilityNotFoundResponse,
+  buildCompatibilityRefreshRejectedResponse,
+  buildCompatibilityTraceability,
+  readCompatibilityIssue,
+  readCompatibilityRefresh,
+  readCompatibilityState,
+  readDispatchExtension,
+  type DispatchExtensionResult,
+  type ObservabilityPresenterContext,
+  type ObservabilitySurfaceResponse
+} from './observabilitySurface.js';
+
+const COMPATIBILITY_API_PREFIX = '/api/v1';
+const COMPATIBILITY_STATE_PATH = `${COMPATIBILITY_API_PREFIX}/state`;
+ succeeded in 51ms:
+        }
+      });
+      expect(issueRes.status).toBe(200);
+      const issuePayload = (await issueRes.json()) as {
+        tracked?: {
+          linear?: unknown;
+        };
+      };
+      expect(issuePayload.tracked?.linear ?? null).toBeNull();
+      expect(linearFetchCount).toBe(1);
+
+      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(uiRes.status).toBe(200);
+      const uiPayload = (await uiRes.json()) as {
+        selected?: { tracked?: { linear?: unknown } } | null;
+        tasks?: Array<{ tracked?: { linear?: unknown } }>;
+
+thinking
+**Inspecting code patterns**
+
+I need to look into the rest of the `observabilityApiController` and possibly compare it against other patterns I’ve seen. This might help me understand how it’s structured and if there are any improvements I can make. I wonder if there are specific areas that I should focus on. Let's see what I can uncover as I dive deeper into the code!
+thinking
+**Inspecting code patterns**
+
+I need to look into the rest of the `observabilityApiController` and possibly compare it against other patterns I’ve seen. This might help me understand how it’s structured and if there are any improvements I can make. I wonder if there are specific areas that I should focus on. Let's see what I can uncover as I dive deeper into the code!
+exec
+/bin/zsh -lc "sed -n '120,260p' orchestrator/src/cli/control/observabilityApiController.ts" in /Users/kbediako/Code/CO succeeded in 52ms:
+        status: 200,
+        headers: JSON_NO_STORE_HEADERS,
+        body: {
+          ...result.payload,
+          traceability
+        }
+      });
+      return true;
+    }
+    case 'refresh': {
+      if (method !== 'POST') {
+        writeObservabilityResponse(
+          context.res,
+          buildCompatibilityMethodNotAllowedResponse(context.presenterContext, 'POST')
+        );
+        return true;
+      }
+      const result = await readCompatibilityRefresh(
+        {
+          controlStore: context.presenterContext.controlStore,
+[run-review] waiting on codex review (1m 0s elapsed, 1s idle; review progress observed).
+exec
+/bin/zsh -lc "sed -n '260,340p' orchestrator/src/cli/control/observabilityApiController.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+        allowed_method: 'GET'
+      },
+      traceability: buildCompatibilityTraceability(context, {
+        decision: 'rejected',
+        reason: 'method_not_allowed'
+      })
+    })
+  );
+}
+
+
+
+thinking
+**Inspecting code changes**
+
+I need to look at the difference in the history, possibly checking if the prior control server had a helper function. I want to compare old to new and find out if the controller's traceability is missing. It seems the previous method that used `buildCompatibilityErrorResponse` had the same issue. It's worth checking if any new tests were added or if there are any compile errors with type imports in the TypeScript config. Plus, I should review documentation to ensure everything aligns correctly.
+thinking
+**Evaluating test coverage and documentation**
+
+I want to ensure the findings are actionable issues that the author would address. If the spec says to add targeted server/unit tests but no updates were made to the ControlServer test, could that be a bug? It might indicate a guardrail issue. However, the code review requires concrete bugs, not just the absence of tests. User expectations are clear about needing documentation to support the claims. If the extraction preserved behavior without tests, could it still be flagged as a concern? I think I need to confirm it’s a P2 issue and ensure proper documentation overlaps with the code changes.
+thinking
+**Assessing test coverage and specifications**
+
+I might point to specific lines in the spec or the `uiDataController` tests that show only the direct unit tests. It's essential for the body to explain the mismatch since the ControlServer integration path is untested after the refactor. However, the existing ControlServer tests might already cover behaviors related to `/ui/data.json`, which could mean the spec is satisfied. I need to check the git diff for `ControlServer.test`, but it seems there are no changes. The existing tests should still cover the integration path behavior since the patch extracted the route.
+thinking
+**Inspecting code changes**
+
+I need to look at the difference in the history, possibly checking if the prior control server had a helper function. I want to compare old to new and find out if the controller's traceability is missing. It seems the previous method that used `buildCompatibilityErrorResponse` had the same issue. It's worth checking if any new tests were added or if there are any compile errors with type imports in the TypeScript config. Plus, I should review documentation to ensure everything aligns correctly.
+thinking
+**Evaluating test coverage and documentation**
+
+I want to ensure the findings are actionable issues that the author would address. If the spec says to add targeted server/unit tests but no updates were made to the ControlServer test, could that be a bug? It might indicate a guardrail issue. However, the code review requires concrete bugs, not just the absence of tests. User expectations are clear about needing documentation to support the claims. If the extraction preserved behavior without tests, could it still be flagged as a concern? I think I need to confirm it’s a P2 issue and ensure proper documentation overlaps with the code changes.
+thinking
+**Assessing test coverage and specifications**
+
+I might point to specific lines in the spec or the `uiDataController` tests that show only the direct unit tests. It's essential for the body to explain the mismatch since the ControlServer integration path is untested after the refactor. However, the existing ControlServer tests might already cover behaviors related to `/ui/data.json`, which could mean the spec is satisfied. I need to check the git diff for `ControlServer.test`, but it seems there are no changes. The existing tests should still cover the integration path behavior since the patch extracted the route.
+exec
+/bin/zsh -lc "grep -n \"ui data\\|/ui/data.json\\|method_not_allowed\" -n orchestrator/tests/ControlServer.test.ts | head -n 30" in /Users/kbediako/Code/CO succeeded in 53ms:
+509:  it('discovers sibling runtime collections for compatibility routes while leaving ui data on the selected run', async () => {
+645:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+674:  it('resolves same-issue multi-run compatibility lookups while leaving ui data on the selected run', async () => {
+799:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+884:  it('rejects unsupported methods for ui data, Symphony-aligned compatibility routes, and the CO dispatch extension', async () => {
+910:      expect(statePayload.error?.code).toBe('method_not_allowed');
+924:      expect(dispatchPayload.error?.code).toBe('method_not_allowed');
+927:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+941:      expect(uiPayload.error?.code).toBe('method_not_allowed');
+943:      expect(uiPayload.error?.details?.route).toBe('/ui/data.json');
+955:      expect(refreshPayload.error?.code).toBe('method_not_allowed');
+972:      expect(issuePayload.error?.code).toBe('method_not_allowed');
+1107:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+1224:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+1319:        const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+2141:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+2530:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+2691:      const uiRes = await fetch(new URL('/ui/data.json', baseUrl), {
+
+
+
+thinking
+**Identifying potential bugs**
+
+I see there are existing ControlServer tests, so missing diff isn't the issue, but I need to inspect if there's an actual bug. I could compare the existing extraction approach with old function logic to find subtle changes in behavior. 
+
+It seems like the new controller reparses the URL, which should be similar to previous parsing. I wonder if `handleUiDataRequest` returning false on an invalid URL could cause problems, especially with malformed percent-encoding. 
+
+I also need to check if response types and headers have changed, like the cache-control header. Lastly, I’ll verify if route ordering and method handling are still consistent.
+thinking
+**Reviewing code and documentation**
+
+I need to compare the old code path since the method variable has been removed, but auth uses `req.method` directly, which shouldn’t be an issue. I should also check if the new file isn't exported—though it seems fine. There might be a concern with the UI data controller’s direct unit tests not capturing the response type accurately, but I don’t think that’s a bug. 
+
+I wonder if there could be a documentation issue in the `docs/TASKS` header line. I should consider inspecting the manifest checklist for requirements too. The user has asked me to highlight any documentation and code mismatches or violations. Many checkboxes are unchecked, which is by design since the work isn't finished. I’ll need to note any necessary approvals or captures that aren't synced with the terminal status. However, the review guidelines say to focus on bug-like issues, though I’m questioning if missing docs-review could be a guardrail violation before the code edit.
+thinking
+**Considering documentation policies**
+
+I’m realizing the repository policy states we need to halt if a docs-review isn’t captured before editing the runtime code. If the code changes exist without evidence, that would be a process violation. I think the author would fix this if needed, so I can flag it.
+
+I need to confirm whether the evidence manifest has already included docs-review. The user pointed out that the checklist shows some items are unchecked for docs-review approval or override, and they even provided the evidence manifest path.
+thinking
+**Identifying potential bugs**
+
+I see there are existing ControlServer tests, so missing diff isn't the issue, but I need to inspect if there's an actual bug. I could compare the existing extraction approach with old function logic to find subtle changes in behavior. 
+
+It seems like the new controller reparses the URL, which should be similar to previous parsing. I wonder if `handleUiDataRequest` returning false on an invalid URL could cause problems, especially with malformed percent-encoding. 
+
+I also need to check if response types and headers have changed, like the cache-control header. Lastly, I’ll verify if route ordering and method handling are still consistent.
+thinking
+**Reviewing code and documentation**
+
+I need to compare the old code path since the method variable has been removed, but auth uses `req.method` directly, which shouldn’t be an issue. I should also check if the new file isn't exported—though it seems fine. There might be a concern with the UI data controller’s direct unit tests not capturing the response type accurately, but I don’t think that’s a bug. 
+
+I wonder if there could be a documentation issue in the `docs/TASKS` header line. I should consider inspecting the manifest checklist for requirements too. The user has asked me to highlight any documentation and code mismatches or violations. Many checkboxes are unchecked, which is by design since the work isn't finished. I’ll need to note any necessary approvals or captures that aren't synced with the terminal status. However, the review guidelines say to focus on bug-like issues, though I’m questioning if missing docs-review could be a guardrail violation before the code edit.
+thinking
+**Considering documentation policies**
+
+I’m realizing the repository policy states we need to halt if a docs-review isn’t captured before editing the runtime code. If the code changes exist without evidence, that would be a process violation. I think the author would fix this if needed, so I can flag it.
+
+I need to confirm whether the evidence manifest has already included docs-review. The user pointed out that the checklist shows some items are unchecked for docs-review approval or override, and they even provided the evidence manifest path.
+exec
+/bin/zsh -lc "jq '{pipeline, stages: [.commands[]?|{id,status,title}], approvals, run_id, task_id}' .runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/2026-03-07T05-44-06-301Z-3c91d73a/manifest.json" in /Users/kbediako/Code/CO succeeded in 53ms:
+{
+  "pipeline": null,
+  "stages": [
+    {
+      "id": "delegation-guard",
+      "status": "succeeded",
+      "title": "Run delegation guard"
+    },
+    {
+      "id": "spec-guard",
+      "status": "succeeded",
+      "title": "node scripts/spec-guard.mjs --dry-run"
+    },
+    {
+      "id": "docs-check",
+      "status": "succeeded",
+      "title": "npm run docs:check"
+    },
+    {
+      "id": "docs-freshness",
+
+
+
+
+
+[run-review] waiting on codex review (2m 0s elapsed, 1s idle; review progress observed).
+thinking
+**Considering potential code fixes**
+
+I'm thinking about whether the author could address a bug by extracting a generic JSON writer. However, the user mentioned wanting to avoid unnecessary abstraction, and the current structure seems minimal. I'm also wondering if the issue arises from route-local response writing that isn't using the ObservabilitySurfaceResponse type, which might affect traceability. But then again, the response shapes themselves are quite simple. I'm just trying to figure out the best approach!
+thinking
+**Reviewing commit changes**
+
+I’m looking at the previous commit to see if `writeObservabilityResponse` was used by controlServer. The new controller defines the response structure with `status`, `headers`, and `body`, but I'm unsure if it sets the Allow header for 405, similar to the old one, which doesn't seem problematic. Potentially, there’s a docs mismatch since the TECH_SPEC mentions adding focused server/unit regressions but the current changes only include unit tests and docs scaffolding. I'll need to confirm the unsatisfied requirements and document any remaining mismatches or violations.
+thinking
+**Assessing patch readiness**
+
+I’m considering if the task is intentionally a work in progress (WIP), which means it wouldn’t be correct to merge now due to missing guardrails. We need to look for merge-blocking issues, especially since there's no evidence of a docs review. The task checklist still mentions needing evidence from `ControlServer.test.ts`, yet I don't see any new evidence there, although the existing file might be acceptable. I should check if the README/SOP documents have changed since the user asks for confirmation on their alignment with implemented behavior. If they haven't changed, there may be a docs mismatch concerning the requirement for guardrails and running `npm run pack:smoke`. Also, I’m digging into whether there's a bug from removing ObservabilitySurfaceResponse in `controlServer.ts`, and I need to verify the implications for `uiDataController.ts`.
+thinking
+**Inspecting potential doc issues**
+
+I'm looking at a potential typo in the docs, specifically in `tasks/specs/...`, regarding "avoid ... authority." I should check the git diff against HEAD to see if there's a new untracked file that's the only source file. But, I wonder if there are other files that aren't showing up in the diff. I could try using `git diff --name-status --cached`, although untracked files won't be shown. I already know that, but maybe the code change is confined to this new file only.
+thinking
+**Investigating build failures**
+
+I think the build could be failing because the `UiDataController.test.ts` is utilizing the `createResponseRecorder` method where `writeHead` is returning `this` in an object literal method. In strict mode, `this` is inferred as the object type, which seems okay. However, I wonder if the compiler might object due to `noImplicitThis`. It seems like method shorthand might have contextual `this`, but maybe not? I'll have to search for existing tests using similar patterns to get more clarity.
+thinking
+**Considering potential code fixes**
+
+I'm thinking about whether the author could address a bug by extracting a generic JSON writer. However, the user mentioned wanting to avoid unnecessary abstraction, and the current structure seems minimal. I'm also wondering if the issue arises from route-local response writing that isn't using the ObservabilitySurfaceResponse type, which might affect traceability. But then again, the response shapes themselves are quite simple. I'm just trying to figure out the best approach!
+thinking
+**Reviewing commit changes**
+
+I’m looking at the previous commit to see if `writeObservabilityResponse` was used by controlServer. The new controller defines the response structure with `status`, `headers`, and `body`, but I'm unsure if it sets the Allow header for 405, similar to the old one, which doesn't seem problematic. Potentially, there’s a docs mismatch since the TECH_SPEC mentions adding focused server/unit regressions but the current changes only include unit tests and docs scaffolding. I'll need to confirm the unsatisfied requirements and document any remaining mismatches or violations.
+thinking
+**Assessing patch readiness**
+
+I’m considering if the task is intentionally a work in progress (WIP), which means it wouldn’t be correct to merge now due to missing guardrails. We need to look for merge-blocking issues, especially since there's no evidence of a docs review. The task checklist still mentions needing evidence from `ControlServer.test.ts`, yet I don't see any new evidence there, although the existing file might be acceptable. I should check if the README/SOP documents have changed since the user asks for confirmation on their alignment with implemented behavior. If they haven't changed, there may be a docs mismatch concerning the requirement for guardrails and running `npm run pack:smoke`. Also, I’m digging into whether there's a bug from removing ObservabilitySurfaceResponse in `controlServer.ts`, and I need to verify the implications for `uiDataController.ts`.
+thinking
+**Inspecting potential doc issues**
+
+I'm looking at a potential typo in the docs, specifically in `tasks/specs/...`, regarding "avoid ... authority." I should check the git diff against HEAD to see if there's a new untracked file that's the only source file. But, I wonder if there are other files that aren't showing up in the diff. I could try using `git diff --name-status --cached`, although untracked files won't be shown. I already know that, but maybe the code change is confined to this new file only.
+thinking
+**Investigating build failures**
+
+I think the build could be failing because the `UiDataController.test.ts` is utilizing the `createResponseRecorder` method where `writeHead` is returning `this` in an object literal method. In strict mode, `this` is inferred as the object type, which seems okay. However, I wonder if the compiler might object due to `noImplicitThis`. It seems like method shorthand might have contextual `this`, but maybe not? I'll have to search for existing tests using similar patterns to get more clarity.
+exec
+/bin/zsh -lc "grep -R \"function createResponseRecorder\\|writeHead(statusCode: number\" -n orchestrator/tests | head -n 20" in /Users/kbediako/Code/CO succeeded in 53ms:
+orchestrator/tests/UiDataController.test.ts:21:function createResponseRecorder() {
+orchestrator/tests/UiDataController.test.ts:33:    writeHead(statusCode: number, headers: Record<string, string>) {
+orchestrator/tests/ObservabilityApiController.test.ts:24:function createResponseRecorder() {
+orchestrator/tests/ObservabilityApiController.test.ts:36:    writeHead(statusCode: number, headers: Record<string, string>) {
+
+thinking
+**Inspecting test patterns**
+
+I’m going to take a closer look at the `ObservabilityApiController.test` for any patterns that might be similar. It feels like the right move to ensure I understand the structure and behavior, especially if there’s a recurring theme or approach. I wonder what insights I'll gain from this examination, and if it can inform my next steps or decisions about testing. Analyzing this could really help clarify things!
+thinking
+**Inspecting test patterns**
+
+I’m going to take a closer look at the `ObservabilityApiController.test` for any patterns that might be similar. It feels like the right move to ensure I understand the structure and behavior, especially if there’s a recurring theme or approach. I wonder what insights I'll gain from this examination, and if it can inform my next steps or decisions about testing. Analyzing this could really help clarify things!
+exec
+/bin/zsh -lc "sed -n '1,220p' orchestrator/tests/ObservabilityApiController.test.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+import http from 'node:http';
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  handleObservabilityApiRequest,
+  resolveObservabilityApiRoute
+} from '../src/cli/control/observabilityApiController.js';
+import type { ControlState } from '../src/cli/control/controlState.js';
+
+const CONTROL_STATE: ControlState = {
+  run_id: 'run-1',
+  control_seq: 0,
+  latest_action: null,
+  history: [],
+  pending_confirmation: null,
+  queued_questions: null,
+  question_events: [],
+  sessions: null,
+  transport_idempotency: null,
+
+
+
+
+
+
+
+
+
+
+[review-timeout] npm run review exceeded 180 seconds and was terminated.

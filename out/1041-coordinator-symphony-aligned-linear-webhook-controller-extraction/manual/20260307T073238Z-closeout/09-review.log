@@ -1,0 +1,653 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts
+
+(node:42019) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:42019) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 403 > 25
+ - total lines changed 44827 > 800
+Top changed files:
+  - orchestrator/tests/ControlServer.test.ts: 5514
+  - docs/docs-freshness-registry.json: 4581
+  - tasks/index.json: 2326
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - orchestrator/src/cli/control/controlServer.ts: 1316
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1206
+  - orchestrator/src/cli/control/telegramOversightBridge.ts: 901
+  - orchestrator/tests/ControlRuntime.test.ts: 835
+  - orchestrator/src/cli/delegationServer.ts: 816
+  - orchestrator/src/cli/control/linearDispatchSource.ts: 654
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1041 is landing on a stacked branch whose aggregate diff exceeds budget; the current webhook-controller extraction delta is bounded.
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 4 files, 1516 lines.
+[run-review] large uncommitted review scope detected (4 files, 1516 lines; thresholds: 25 files / 1200 lines).
+[run-review] this scope profile is known to produce long CO review traversals; prefer scoped reviews (`--base`/`--commit`) when practical.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/cli/2026-03-07T07-13-53-381Z-1b3f3cde/review/prompt.txt
+Review output log: .runs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/cli/2026-03-07T07-13-53-381Z-1b3f3cde/review/output.log
+Launching Codex review (evidence: .runs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/cli/2026-03-07T07-13-53-381Z-1b3f3cde/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+OpenAI Codex v0.111.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cc748-8289-7682-a16a-fec9a45c705c
+--------
+user
+Review task: 1041-coordinator-symphony-aligned-linear-webhook-controller-extraction
+Evidence manifest: .runs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/cli/2026-03-07T07-13-53-381Z-1b3f3cde/manifest.json
+
+Task context:
+- Task checklist: `tasks/tasks-1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`
+- MCP Task ID: `1041-coordinator-symphony-aligned-linear-webhook-controller-extraction`
+- Primary PRD: `docs/PRD-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`
+- TECH_SPEC: `tasks/specs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`
+- [x] Docs-first artifacts created (PRD/TECH_SPEC/ACTION_PLAN/spec/checklist + `.agent` mirror). Evidence: `docs/PRD-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`, `docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`, `docs/ACTION_PLAN-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`, `tasks/specs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`, `tasks/tasks-1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`, `.agent/task/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`.
+- [x] Deliberation/findings captured for the queued slice. Evidence: `docs/findings/1041-linear-webhook-controller-extraction-deliberation.md`.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
+- [x] Delegated or local read-only review approval captured in the spec/checklist notes. Evidence: `tasks/specs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md`, `docs/findings/1041-linear-webhook-controller-extraction-deliberation.md`.
+- [x] docs-review approval/override captured for registered `1041`. Evidence: `.runs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/cli/2026-03-07T07-13-53-381Z-1b3f3cde/manifest.json`, `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/20260307T070913Z-docs-first/`.
+- [ ] `/integrations/linear/webhook` route handling is extracted into a dedicated controller module. Evidence: `orchestrator/src/cli/control/`, `orchestrator/src/cli/control/controlServer.ts`.
+- [ ] Webhook validation, advisory-state mutation, and route-local response writing move with the new controller without changing route contracts. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] Acceptance, duplicate, ignore, and rejection semantics remain unchanged after extraction. Evidence: `orchestrator/src/cli/control/`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] UI assets, `/auth/session`, auth ordering, event stream setup, `/api/v1/*`, and mutating control endpoints remain in `controlServer.ts`. Evidence: `orchestrator/src/cli/control/controlServer.ts`, `orchestrator/tests/ControlServer.test.ts`.
+- [ ] `node scripts/delegation-guard.mjs`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/01-delegation-guard.log`.
+- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/02-spec-guard.log`.
+- [ ] `npm run build`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/03-build.log`.
+- [ ] `npm run lint`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/04-lint.log`.
+- [ ] `npm run test`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/05-test.log`.
+- [ ] `npm run docs:check`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/06-docs-check.log`.
+- [ ] `npm run docs:freshness`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/07-docs-freshness.log`.
+- [ ] `node scripts/diff-budget.mjs`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/08-diff-budget.log`, `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
+- [ ] `npm run review`. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/09-review.log`, `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/13-override-notes.md`.
+- [ ] `npm run pack:smoke` when required by touched downstream-facing paths. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/10-pack-smoke.log`.
+- [ ] Manual mock Linear webhook artifact captured. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/11-manual-linear-webhook-controller.json`.
+- [ ] Elegance review completed. Evidence: `out/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction/manual/<timestamp>-closeout/12-elegance-review.md`.
+
+Agent notes:
+Goal: validate the bounded Linear webhook controller extraction after final seam cleanup | Summary: controlServer.ts now retains route selection for /integrations/linear/webhook, the extracted controller owns method/signature/timestamp/duplicate/provider handling, and direct controller tests now cover timestamp rejection branches | Risks: stacked branch diff budget requires explicit override and review may still drift into low-signal reinspection
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- README/SOP docs match the implemented behavior
+- Commands/scripts are non-interactive (no TTY prompts)
+- Evidence + checklist mirroring requirements are satisfied
+
+Call out any remaining documentation/code mismatches or guardrail violations.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`) during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Git scope summary:
+```
+## main...origin/main [ahead 50]
+ M docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md
+ M orchestrator/src/cli/control/controlServer.ts
+?? orchestrator/src/cli/control/linearWebhookController.ts
+?? orchestrator/tests/LinearWebhookController.test.ts
+```
+
+Scope advisory: large uncommitted diff detected (4 files, 1516 lines; thresholds: 25 files / 1200 lines).
+Prioritize highest-risk findings first and report actionable issues early; avoid exhaustive low-signal traversal before surfacing initial findings.
+If full coverage is incomplete, call out residual risk areas explicitly.
+
+Diff budget override: 1041 is landing on a stacked branch whose aggregate diff exceeds budget; the current webhook-controller extraction delta is bounded.
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp startup: ready: delegation, openaiDeveloperDocs
+Plan update
+Plan review workflow for bounded diff inspection and optional delegated cross-check.
+  → Inspect changed files and task docs for intended behavior and guardrails
+  • Run one delegated bounded review stream for cross-check evidence
+  • Assess diff for discrete bugs or guardrail/doc mismatches and produce JSON findings
+
+thinking
+**Planning for delegation**
+
+I’m looking to use a delegation tool, but first, I should inspect the repo's status. It makes sense to do some discovery, so I’ll start by running a git diff summary. That way, I can identify any relevant files before proceeding with the delegation. This will help ensure that I’m well-informed and ready to delegate effectively. Let's figure it out together!
+thinking
+**Planning for delegation**
+
+I’m looking to use a delegation tool, but first, I should inspect the repo's status. It makes sense to do some discovery, so I’ll start by running a git diff summary. That way, I can identify any relevant files before proceeding with the delegation. This will help ensure that I’m well-informed and ready to delegate effectively. Let's figure it out together!
+exec
+/bin/zsh -lc 'git diff --unified=3 -- docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/linearWebhookController.ts orchestrator/tests/LinearWebhookController.test.ts' in /Users/kbediako/Code/COexec
+/bin/zsh -lc "git status --short && echo '---' && git diff --stat -- docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md orchestrator/src/cli/control/controlServer.ts orchestrator/src/cli/control/linearWebhookController.ts orchestrator/tests/LinearWebhookController.test.ts" in /Users/kbediako/Code/CO succeeded in 51ms:
+diff --git a/docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md b/docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md
+index e5721a1a5..c40941f5e 100644
+--- a/docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md
++++ b/docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md
+@@ -36,6 +36,6 @@
+ ## Validation
+ 
+ - Targeted `ControlServer` regressions covering accepted, duplicate, ignored, and rejected webhook paths.
+-- Add one direct unit test file for the new Linear webhook controller covering route capture, signature/timestamp rejection, duplicate handling, and accepted delivery behavior.
++- Add one direct unit test file for the new Linear webhook controller covering method rejection, signature/timestamp rejection, duplicate handling, and accepted delivery behavior.
+ - Manual mock artifact confirming the extracted controller preserves route-level response behavior.
+ - Standard validation lane before closeout, including `npm run pack:smoke` because the packaged CLI control surface changes in this slice.
+diff --git a/orchestrator/src/cli/control/controlServer.ts b/orchestrator/src/cli/control/controlServer.ts
+index 316352ef3..c13fc12f0 100644
+--- a/orchestrator/src/cli/control/controlServer.ts
++++ b/orchestrator/src/cli/control/controlServer.ts
+@@ -1,5 +1,5 @@
+ import http from 'node:http';
+-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
++import { randomBytes, timingSafeEqual } from 'node:crypto';
+ succeeded in 51ms:
+ M docs/TECH_SPEC-coordinator-symphony-aligned-linear-webhook-controller-extraction.md
+ M orchestrator/src/cli/control/controlServer.ts
+?? orchestrator/src/cli/control/linearWebhookController.ts
+?? orchestrator/tests/LinearWebhookController.test.ts
+---
+ ...aligned-linear-webhook-controller-extraction.md |   2 +-
+ orchestrator/src/cli/control/controlServer.ts      | 544 +--------------------
+ 2 files changed, 20 insertions(+), 526 deletions(-)
+
+thinking
+**Inspecting files and controlServer**
+
+I'm looking into the new files since they've truncated details. I think it's necessary to check the remaining parts of the controlServer after the imports. My plan is to utilize tools like sed or cat to help with this inspection. I want to ensure I get the complete picture and understand what's happening to avoid missing anything important. Let's see what I can find!
+thinking
+**Inspecting files and controlServer**
+
+I'm looking into the new files since they've truncated details. I think it's necessary to check the remaining parts of the controlServer after the imports. My plan is to utilize tools like sed or cat to help with this inspection. I want to ensure I get the complete picture and understand what's happening to avoid missing anything important. Let's see what I can find!
+exec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/src/cli/control/linearWebhookController.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '1,260p' orchestrator/tests/LinearWebhookController.test.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+import http from 'node:http';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+import { isoTimestamp } from '../utils/time.js';
+import type { ControlState } from './controlState.js';
+import { evaluateTrackerDispatchPilot } from './trackerDispatchPilot.js';
+import {
+  resolveLiveLinearTrackedIssueById,
+  type LiveLinearTrackedIssue
+} from './linearDispatchSource.js';
+
+const LINEAR_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
+const LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT = 100;
+
+export type LinearAdvisoryDeliveryOutcome = 'accepted' | 'duplicate' | 'ignored' | 'rejected';
+
+interface LinearAdvisoryDeliveryRecord {
+  delivery_id: string;
+  event: string | null;
+  action: string | null;
+ succeeded in 53ms:
+import http from 'node:http';
+import { createHmac } from 'node:crypto';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import type { ControlState } from '../src/cli/control/controlState.js';
+import {
+  handleLinearWebhookRequest,
+  normalizeLinearAdvisoryState
+} from '../src/cli/control/linearWebhookController.js';
+
+function createResponseRecorder() {
+  const state: {
+    statusCode: number | null;
+    headers: Record<string, string> | null;
+    body: unknown;
+  } = {
+    statusCode: null,
+    headers: null,
+    body: null
+exec
+/bin/zsh -lc "sed -n '261,520p' orchestrator/tests/LinearWebhookController.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc "sed -n '261,520p' orchestrator/src/cli/control/linearWebhookController.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+    webhookTimestamp,
+    outcome: 'rejected',
+    reason: resolution.reason
+  });
+  writeLinearWebhookResponse(res, resolution.status, 'rejected', resolution.reason);
+  return;
+}
+
+export function normalizeLinearAdvisoryState(input: LinearAdvisoryState | null): LinearAdvisoryState {
+  const state = input ?? {
+    schema_version: 1,
+    updated_at: new Date(0).toISOString(),
+    latest_delivery_id: null,
+    latest_result: null,
+    latest_reason: null,
+    latest_event: null,
+    latest_accepted_at: null,
+    tracked_issue: null,
+    seen_deliveries: []
+  };
+ succeeded in 53ms:
+      outcome: 'accepted',
+      reason: 'linear_delivery_accepted'
+    });
+    const persistLinearAdvisory = vi.fn(async () => undefined);
+    const emitAuditEvent = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const webhookSecret = 'linear-webhook-secret';
+    const body = JSON.stringify({
+      action: 'update',
+      type: 'Issue',
+      webhookTimestamp: Date.now(),
+      data: { id: 'lin-issue-1' }
+    });
+
+    await handleLinearWebhookRequest({
+      req: createRequest({
+        headers: {
+          'linear-delivery': 'delivery-1',
+          'linear-event': 'Issue',
+          'linear-signature': signLinearWebhook(body, webhookSecret)
+
+thinking
+I’m thinking about needing to work on the last chunk of the controller file. It seems like I should go beyond just the readHeaderValue function. There’s probably more to explore or finish up there. I wonder what specific parts need my attention. It’s likely I’ll have to dig into the details and see what’s missing or what can be improved. I’ll keep this in mind as I proceed with my task!
+thinking
+I’m thinking about needing to work on the last chunk of the controller file. It seems like I should go beyond just the readHeaderValue function. There’s probably more to explore or finish up there. I wonder what specific parts need my attention. It’s likely I’ll have to dig into the details and see what’s missing or what can be improved. I’ll keep this in mind as I proceed with my task!
+exec
+/bin/zsh -lc "sed -n '521,620p' orchestrator/src/cli/control/linearWebhookController.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+      if (typeof entry !== 'string') {
+        continue;
+      }
+      const parts = entry.split(',');
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed) {
+          values.push(trimmed);
+        }
+      }
+    }
+    return readUniqueHeaderValue(values);
+  }
+  if (typeof value === 'string') {
+    const values = value
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    return readUniqueHeaderValue(values);
+  }
+
+thinking
+**Inspecting ControlServer tests**
+
+I need to take a closer look at the existing ControlServer tests to see if any changes are needed. However, my git status doesn't show anything significant. I should compare the removed functions and examine linear state usage within ControlServer. It might also help to explore any export changes. Plus, I want to search for how "normalizeLinearAdvisoryState" is being used to ensure it aligns with the necessary requirements.
+thinking
+**Inspecting ControlServer tests**
+
+I need to take a closer look at the existing ControlServer tests to see if any changes are needed. However, my git status doesn't show anything significant. I should compare the removed functions and examine linear state usage within ControlServer. It might also help to explore any export changes. Plus, I want to search for how "normalizeLinearAdvisoryState" is being used to ensure it aligns with the necessary requirements.
+exec
+/bin/zsh -lc "sed -n '1,240p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/COexec
+/bin/zsh -lc 'rg -n "normalizeLinearAdvisoryState|LinearAdvisoryState|linearAdvisoryState|handleLinearWebhookRequest|linear_advisory_webhook_processed" orchestrator/src/cli/control/controlServer.ts orchestrator/tests/ControlServer.test.ts orchestrator/src/cli/control/linearWebhookController.ts' in /Users/kbediako/Code/CO succeeded in 53ms:
+import { describe, expect, it, vi } from 'vitest';
+import http from 'node:http';
+import { createHmac } from 'node:crypto';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+import * as fsUtils from '../src/cli/utils/fs.js';
+import {
+  ControlServer,
+  formatHostForUrl,
+  isLoopbackAddress,
+  __test__ as controlServerTest
+} from '../src/cli/control/controlServer.js';
+import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
+import { resolveRunPaths } from '../src/cli/run/runPaths.js';
+
+const { readDelegationHeaders, callChildControlEndpoint } = controlServerTest;
+
+async function createRunRoot(taskId: string) {
+ succeeded in 51ms:
+orchestrator/src/cli/control/linearWebhookController.ts:37:export interface LinearAdvisoryState {
+orchestrator/src/cli/control/linearWebhookController.ts:61:  linearAdvisoryState: LinearAdvisoryState;
+orchestrator/src/cli/control/linearWebhookController.ts:71:export async function handleLinearWebhookRequest(input: LinearWebhookControllerInput): Promise<void> {
+orchestrator/src/cli/control/linearWebhookController.ts:142:  if (hasSeenLinearDelivery(input.linearAdvisoryState, deliveryId)) {
+orchestrator/src/cli/control/linearWebhookController.ts:143:    markLinearAdvisoryDuplicate(input.linearAdvisoryState, {
+orchestrator/src/cli/control/linearWebhookController.ts:269:export function normalizeLinearAdvisoryState(input: LinearAdvisoryState | null): LinearAdvisoryState {
+orchestrator/src/cli/control/linearWebhookController.ts:308:    'linearAdvisoryState' | 'persistLinearAdvisory' | 'emitAuditEvent'
+orchestrator/src/cli/control/linearWebhookController.ts:321:  recordLinearAdvisoryOutcome(input.linearAdvisoryState, outcome);
+orchestrator/src/cli/control/linearWebhookController.ts:420:function hasSeenLinearDelivery(state: LinearAdvisoryState, deliveryId: string): boolean {
+orchestrator/src/cli/control/linearWebhookController.ts:425:  state: LinearAdvisoryState,
+orchestrator/src/cli/control/linearWebhookController.ts:448:  state: LinearAdvisoryState,
+orchestrator/src/cli/control/controlServer.ts:42:  handleLinearWebhookRequest,
+orchestrator/src/cli/control/controlServer.ts:43:  normalizeLinearAdvisoryState,
+orchestrator/src/cli/control/controlServer.ts:44:  type LinearAdvisoryState,
+orchestrator/src/cli/control/controlServer.ts:156:  private readonly linearAdvisoryState: LinearAdvisoryState;
+orchestrator/src/cli/control/controlServer.ts:174:    linearAdvisoryState: LinearAdvisoryState;
+orchestrator/src/cli/control/controlServer.ts:187:    this.linearAdvisoryState = options.linearAdvisoryState;
+orchestrator/src/cli/control/controlServer.ts:199:    const linearAdvisoryStatePath = join(options.paths.runDir, LINEAR_ADVISORY_STATE_FILE);
+orchestrator/src/cli/control/controlServer.ts:200:    const linearAdvisorySeed = await readJsonFile<LinearAdvisoryState>(linearAdvisoryStatePath);
+orchestrator/src/cli/control/controlServer.ts:228:    const linearAdvisoryState = normalizeLinearAdvisoryState(linearAdvisorySeed);
+
+thinking
+**Inspecting relevant tests**
+
+I see that I need to look into the relevant tests within ControlServer regarding the webhook. I'm thinking that this step could really help clarify any issues or ensure everything is functioning as expected. It might involve searching through the documentation or some testing protocols to find the right information. I'm curious about what specific areas I should focus on, so I'll dive in and explore the details of the tests.
+thinking
+**Inspecting relevant tests**
+
+I see that I need to look into the relevant tests within ControlServer regarding the webhook. I'm thinking that this step could really help clarify any issues or ensure everything is functioning as expected. It might involve searching through the documentation or some testing protocols to find the right information. I'm curious about what specific areas I should focus on, so I'll dive in and explore the details of the tests.
+exec
+/bin/zsh -lc 'rg -n "linear webhook|linear_delivery|dispatch_source|linear_advisory|linear_event_unsupported|linear_action_unsupported|linear_webhook" orchestrator/tests/ControlServer.test.ts' in /Users/kbediako/Code/CO succeeded in 53ms:
+1785:            provider: 'linear_advisory',
+1810:        expectedFailureCode: 'dispatch_source_unavailable',
+1827:        expectedFailureCode: 'dispatch_source_malformed',
+2356:        reason: 'linear_delivery_accepted'
+2425:        reason: 'linear_delivery_duplicate'
+2675:        reason: 'dispatch_source_team_mismatch'
+
+thinking
+**Inspecting webhook tests**
+
+I need to take a closer look at the webhook tests. There might be some lines that aren’t functioning as expected. It’s important to ensure that everything is working properly. I wonder if there are specific error messages I should watch for or any irregularities in the responses.  You know, I just want to get this right so that it all runs smoothly. Let’s see what I uncover during the inspection!
+thinking
+**Inspecting webhook tests**
+
+I need to take a closer look at the webhook tests. There might be some lines that aren’t functioning as expected. It’s important to ensure that everything is working properly. I wonder if there are specific error messages I should watch for or any irregularities in the responses.  You know, I just want to get this right so that it all runs smoothly. Let’s see what I uncover during the inspection!
+exec
+/bin/zsh -lc "sed -n '2280,2705p' orchestrator/tests/ControlServer.test.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+                url: 'https://linear.app/asabeko/issue/PREPROD-101',
+                updatedAt: '2026-03-06T05:00:00.000Z',
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-live',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                history: {
+                  nodes: [
+                    {
+                      id: 'history-1',
+                      createdAt: '2026-03-06T04:55:00.000Z',
+[run-review] waiting on codex review (1m 0s elapsed, 4s idle; review progress observed).
+
+thinking
+**Checking function signature**
+
+I’m looking into the function signature to ensure everything is set up correctly. It seems like we're passing the environment override, which is likely an improvement for our tests. I want to confirm this and see how it impacts the overall functionality. Let’s ensure that everything aligns with what’s expected. I think I need to take a deeper look to be sure I didn’t miss anything important!
+thinking
+**Checking function signature**
+
+I’m looking into the function signature to ensure everything is set up correctly. It seems like we're passing the environment override, which is likely an improvement for our tests. I want to confirm this and see how it impacts the overall functionality. Let’s ensure that everything aligns with what’s expected. I think I need to take a deeper look to be sure I didn’t miss anything important!
+exec
+/bin/zsh -lc "rg -n \"function evaluateTrackerDispatchPilot|export function evaluateTrackerDispatchPilot|interface .*DispatchPilot\" -n orchestrator/src/cli/control/trackerDispatchPilot.ts && sed -n '1,260p' orchestrator/src/cli/control/trackerDispatchPilot.ts" in /Users/kbediako/Code/CO succeeded in 51ms:
+19:export interface DispatchPilotSummary {
+30:export interface DispatchPilotSourceSetup {
+40:export interface DispatchPilotRecommendation {
+51:export interface DispatchPilotFailure {
+57:export interface DispatchPilotEvaluation {
+63:interface DispatchPilotSourceParseReady {
+69:interface DispatchPilotSourceParseLiveLinear {
+75:interface DispatchPilotSourceParseUnavailable {
+79:interface DispatchPilotSourceParseMalformed {
+90:export function evaluateTrackerDispatchPilot(input: {
+240:export async function evaluateTrackerDispatchPilotAsync(input: {
+import {
+  hasLinearApiCredentials,
+  hasLinearSourceBinding,
+  resolveLinearSourceSetup,
+  resolveLiveLinearDispatchRecommendation,
+  type LiveLinearTrackedActivity,
+  type LiveLinearTrackedIssue
+} from './linearDispatchSource.js';
+
+
+
+thinking
+**Investigating potential bugs**
+
+I need to check if there's a bug due to the `controlServer` not importing the evaluation function. Running some targeted tests might be a better approach since the user prefers avoiding full validation suites. As a reviewer, it could be helpful to run specific tests or compile. Maybe I can spawn a bounded review stream and use a delegation tool for that. I’m wondering if we also need a pipeline, like a “docs-review” or something simpler.
+thinking
+**Exploring delegation tool usage**
+
+I need to understand how to use the delegate tool, and I wonder if there are pipeline names in the repo I could check. Maybe I should look for that, but bounded review might just involve spawning a parallel reviewer since the tool is independent. Should I inspect the docs? I’m unsure if that’s necessary. I think I should look into the expected syntax for spawning with the command, so I might search for `delegate_spawn` usage in the repo.
+thinking
+**Investigating potential bugs**
+
+I need to check if there's a bug due to the `controlServer` not importing the evaluation function. Running some targeted tests might be a better approach since the user prefers avoiding full validation suites. As a reviewer, it could be helpful to run specific tests or compile. Maybe I can spawn a bounded review stream and use a delegation tool for that. I’m wondering if we also need a pipeline, like a “docs-review” or something simpler.
+thinking
+**Exploring delegation tool usage**
+
+I need to understand how to use the delegate tool, and I wonder if there are pipeline names in the repo I could check. Maybe I should look for that, but bounded review might just involve spawning a parallel reviewer since the tool is independent. Should I inspect the docs? I’m unsure if that’s necessary. I think I should look into the expected syntax for spawning with the command, so I might search for `delegate_spawn` usage in the repo.
+exec
+/bin/zsh -lc 'rg -n "delegate_spawn|delegate spawn|pipeline:" -g"*.md" -g"*.ts" . | head -n 50' in /Users/kbediako/Code/CO succeeded in 53ms:
+./orchestrator/src/control-plane/request-builder.ts:30:  pipeline: PipelineDefinition;
+./orchestrator/src/control-plane/request-builder.ts:114:    pipeline: {
+./orchestrator/src/cli/services/controlPlaneService.ts:21:  pipeline: PipelineDefinition;
+./orchestrator/src/cli/services/controlPlaneService.ts:44:      pipeline: options.pipeline,
+./orchestrator/src/cli/services/pipelineExperience.ts:20:  pipeline: PipelineDefinition;
+./orchestrator/src/cli/services/pipelineExperience.ts:63:          tool: `pipeline:${pipeline.id}`,
+./orchestrator/src/cli/services/pipelineExperience.ts:92:  pipeline: Pick<PipelineDefinition, 'id' | 'title' | 'tags'>,
+./orchestrator/src/cli/services/pipelineResolver.ts:53:    pipeline: PipelineDefinition;
+./orchestrator/src/cli/services/runPreparation.ts:19:  pipeline: PipelineDefinition;
+./orchestrator/src/cli/services/runPreparation.ts:81:        pipeline: options.pipeline,
+./orchestrator/src/cli/services/runPreparation.ts:102:    pipeline: resolvedPipeline.pipeline,
+./orchestrator/tests/PipelineExperience.test.ts:35:    const pipeline: PipelineDefinition = {
+./orchestrator/tests/PipelineExperience.test.ts:68:    expect(record.toolStats[0]?.tool).toContain('pipeline:diagnostics');
+./orchestrator/tests/PipelineExperience.test.ts:72:    const pipeline: PipelineDefinition = {
+./orchestrator/src/cli/events/runEvents.ts:204:  pipeline: PipelineDefinition
+./tests/cli-orchestrator.spec.ts:52:          pipeline: 'simple'
+./tests/cli-orchestrator.spec.ts:65:          pipeline: 'failable',
+./tests/cli-orchestrator.spec.ts:184:      pipeline: 'simple'
+./tests/cli-orchestrator.spec.ts:191:    expect(text).toContain('pipeline: simple');
+./orchestrator/src/cli/run/manifest.ts:27:  pipeline: PipelineDefinition;
+exec
+/bin/zsh -lc 'rg -n "delegate_spawn|delegate_spawn|delegation MCP|delegate.*pipeline|implementation-gate" docs orchestrator .agent -g"*.md" | head -n 80' in /Users/kbediako/Code/CO succeeded in 53ms:
+Total output lines: 80
+
+.agent/SOPs/review-loop.md:8:   - Default: `implementation-gate` for general reviews.
+.agent/SOPs/agent-autonomy-defaults.md:13:- Default to `docs-review` before implementation and `implementation-gate` after code changes (set `CODEX_REVIEW_DEVTOOLS=1` when DevTools are required).
+.agent/SOPs/instruction-stamps.md:27:- After updating stamps, run `docs-review` and `implementation-gate` (when code/scripts changed).
+docs/TECH_SPEC-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md:94:- implementation-gate: `.runs/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane/cli/<implementation-gate-run-id>/manifest.json`
+.agent/AGENTS.md:26:- Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
+docs/ACTION_PLAN-delegation-autonomy-platform.md:76:   - Run implementation-gate with required guardrails.
+docs/PRD-slimdown.md:13:- Guardrail pipelines (docs-review, implementation-gate, tfgrpo-learning, design) still repeat delegation/spec-guard blocks instead of reusing stage sets.
+docs/ACTION_PLAN-implementation-docs-archive-allowlist.md:15:3. Validate via docs-review and implementation-gate.
+.agent/task/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md:22:- [x] GO-to-close conditions are satisfied (targeted tests + manual checks + terminal evidence pointers). - Evidence: `.runs/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria/cli/2026-03-05T04-41-01-711Z-1543a2df/manifest.json`, `out/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria/manual/20260305T042953Z-terminal-closeout/00-terminal-closeout-summary.md`, `out/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria/manual/20260305T042953Z-terminal-closeout/18-implementation-gate-rerun.log`.
+.agent/task/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria.md:30:- [x] Authoritative implementation-gate rerun is terminal succeeded. - Evidence: `.runs/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria/cli/2026-03-05T04-41-01-711Z-1543a2df/manifest.json`, `out/0999-workspace-symlink-hook-safety-hardening-and-windows-fail-closed-criteria/manual/20260305T042953Z-terminal-closeout/18-implementation-gate-rerun.log`.
+docs/TECH_SPEC-subagent-delegation-enforcement.md:34:- Add `node scripts/delegation-guard.mjs` to the core pipelines (`docs-review`, `implementation-gate`, diagnostics) ahead of spec-guard so failures are captured early.
+docs/TECH_SPEC-docs-freshness-systemization.md:12:- Pipeline integration so docs freshness runs after work completes (docs-review + implementation-gate).
+docs/TECH_SPEC-docs-freshness-systemization.md:59:  - `implementation-gate` (post-implementation validation).
+docs/TECH_SPEC-docs-freshness-systemization.md:70:- Pipeline: verify docs-review and implementation-gate include the new stage.
+docs/ACTION_PLAN-codex-cloud-execution-wiring.md:24:- Run full guardrail chain and capture implementation-gate evidence.
+docs/PRD-spec-guard-codepath-and-review-docs-alignment.md:6:- Scope status: implementation-complete on 2026-03-05; authoritative implementation-gate rerun `2026-03-05T08-27-09-532Z-329a23e2` succeeded.
+docs/PRD-spec-guard-codepath-and-review-docs-alignment.md:36:- Authoritative implementation-gate manifest: `.runs/1005-spec-guard-codepath-and-review-docs-alignment/cli/2026-03-05T08-27-09-532Z-329a23e2/manifest.json`.
+docs/TECH_SPEC-refactor-plan-implementation.md:59:  - Use implementation-gate manifests for evidence.
+
+thinking
+**Running targeted tests**
+
+I’m considering running targeted tests for the new file, along with relevant control server tests. It seems like this approach might help in ensuring everything is functioning as expected. I wonder what specific areas I should focus on during these tests to get the most accurate results. It’s all about fine-tuning and making sure the implementation is solid. I'm curious to see how this will turn out!
+thinking
+**Running targeted tests**
+
+I’m considering running targeted tests for the new file, along with relevant control server tests. It seems like this approach might help in ensuring everything is functioning as expected. I wonder what specific areas I should focus on during these tests to get the most accurate results. It’s all about fine-tuning and making sure the implementation is solid. I'm curious to see how this will turn out!
+exec
+/bin/zsh -lc "cat package.json | jq -r '.scripts.test' && echo '---' && npx vitest run orchestrator/tests/LinearWebhookController.test.ts orchestrator/tests/ControlServer.test.ts -t 'Linear webhook|LinearWebhookController'" in /Users/kbediako/Code/CO succeeded in 720ms:
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/LinearWebhookController.test.ts  (6 tests) 6ms
+ ✓ orchestrator/tests/ControlServer.test.ts  (81 tests | 78 skipped) 41ms
+
+ Test Files  2 passed (2)
+      Tests  9 passed | 78 skipped (87)
+   Start at  18:53:55
+   Duration  327ms (transform 191ms, setup 0ms, collect 235ms, tests 47ms, environment 0ms, prepare 73ms)
+
+exec
+/bin/zsh -lc "rg -n \"LinearAdvisoryDeliveryOutcome|LinearWebhookAuditEventInput|normalizeLinearAdvisoryState\\(|handleLinearWebhookRequest\\(|LINEAR_ADVISORY_STATE_FILE|linearWebhookController\" orchestrator/src orchestrator/tests" in /Users/kbediako/Code/CO succeeded in 51ms:
+orchestrator/src/cli/control/controlServer.ts:45:  type LinearWebhookAuditEventInput
+orchestrator/src/cli/control/controlServer.ts:46:} from './linearWebhookController.js';
+orchestrator/src/cli/control/controlServer.ts:95:const LINEAR_ADVISORY_STATE_FILE = 'linear-advisory-state.json';
+orchestrator/src/cli/control/controlServer.ts:199:    const linearAdvisoryStatePath = join(options.paths.runDir, LINEAR_ADVISORY_STATE_FILE);
+orchestrator/src/cli/control/controlServer.ts:228:    const linearAdvisoryState = normalizeLinearAdvisoryState(linearAdvisorySeed);
+orchestrator/src/cli/control/controlServer.ts:536:    await handleLinearWebhookRequest({
+orchestrator/src/cli/control/controlServer.ts:1361:  input: LinearWebhookAuditEventInput
+orchestrator/src/cli/control/linearWebhookController.ts:15:export type LinearAdvisoryDeliveryOutcome = 'accepted' | 'duplicate' | 'ignored' | 'rejected';
+orchestrator/src/cli/control/linearWebhookController.ts:24:  outcome: LinearAdvisoryDeliveryOutcome;
+orchestrator/src/cli/control/linearWebhookController.ts:41:  latest_result: LinearAdvisoryDeliveryOutcome | null;
+orchestrator/src/cli/control/linearWebhookController.ts:49:export interface LinearWebhookAuditEventInput {
+orchestrator/src/cli/control/linearWebhookController.ts:54:  outcome: LinearAdvisoryDeliveryOutcome;
+orchestrator/src/cli/control/linearWebhookController.ts:64:  emitAuditEvent: (input: LinearWebhookAuditEventInput) => Promise<void>;
+orchestrator/src/cli/control/linearWebhookController.ts:71:export async function handleLinearWebhookRequest(input: LinearWebhookControllerInput): Promise<void> {
+orchestrator/src/cli/control/linearWebhookController.ts:269:export function normalizeLinearAdvisoryState(input: LinearAdvisoryState | null): LinearAdvisoryState {
+orchestrator/src/cli/control/linearWebhookController.ts:316:    outcome: LinearAdvisoryDeliveryOutcome;
+orchestrator/src/cli/control/linearWebhookController.ts:336:  outcome: LinearAdvisoryDeliveryOutcome,
+orchestrator/src/cli/control/linearWebhookController.ts:455:    outcome: LinearAdvisoryDeliveryOutcome;
+orchestrator/tests/LinearWebhookController.test.ts:10:} from '../src/cli/control/linearWebhookController.js';
+orchestrator/tests/LinearWebhookController.test.ts:77:    await handleLinearWebhookRequest({
+exec
+/bin/zsh -lc "rg -n \"function readHeaderValue|readUniqueHeaderValue\" orchestrator/src/cli/control/controlServer.ts && sed -n '1670,1750p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+2224:function readHeaderValue(value: string | string[] | undefined): string | null {
+2239:    return readUniqueHeaderValue(values);
+2250:    return readUniqueHeaderValue(values);
+2255:function readUniqueHeaderValue(values: string[]): string | null {
+  const coordinator = readRecordValue(toggles, 'coordinator');
+  const nested = coordinator ? readRecordValue(coordinator, 'transport_mutating_controls') : undefined;
+  const policy = nested ?? direct ?? {};
+  const allowedTransportValues = readStringArrayValue(policy, 'allowed_transports', 'allowedTransports');
+  return {
+    enabled: readBooleanValue(policy, 'enabled') ?? false,
+    idempotencyWindowMs: clampPolicyWindow(
+      readNumberValue(policy, 'idempotency_window_ms', 'idempotencyWindowMs'),
+      DEFAULT_TRANSPORT_IDEMPOTENCY_WINDOW_MS
+    ),
+    nonceMaxTtlMs: clampPolicyWindow(
+      readNumberValue(policy, 'nonce_max_ttl_ms', 'nonceMaxTtlMs'),
+      DEFAULT_TRANSPORT_NONCE_MAX_TTL_MS
+    ),
+    allowedTransports: resolveAllowedTransportPolicy(allowedTransportValues)
+  };
+exec
+/bin/zsh -lc "sed -n '2220,2265p' orchestrator/src/cli/control/controlServer.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+  }
+  return { token, childRunId };
+}
+
+function readHeaderValue(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    const values: string[] = [];
+    for (const entry of value) {
+      if (typeof entry !== 'string') {
+        continue;
+      }
+      const parts = entry.split(',');
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed) {
+          values.push(trimmed);
+        }
+      }
+    }
+    return readUniqueHeaderValue(values);
+[run-review] waiting on codex review (2m 0s elapsed, 142ms idle; review progress observed).
+exec
+/bin/zsh -lc "rg -n \"from './controlServer|from \\./controlServer|controlServer\" orchestrator/src/cli/control/linearDispatchSource.ts orchestrator/src/cli/control/trackerDispatchPilot.ts orchestrator/src/cli/control/*.ts" in /Users/kbediako/Code/CO exited 1 in 53ms:
+
+
+
+
+thinking
+**Analyzing potential bugs and tests**
+
+It seems there might be some issues with route capture being missed in direct tests, but the spec has changed regarding method rejection. The user’s request seems minimal and aligns with documentation, so it might not be a bug. There could be a concern about type moves affecting the persistence state or missing schema versions. Additionally, I noticed potential bugs related to required headers and timestamp calculations, which raise concerns about how tests are structured. I'll need to check the documentation as the references might have changed.
+thinking
+**Investigating route handling and potential bugs**
+
+The user is asking if the README/SOP documentation aligns with the implemented behavior, and I’m confirming that it does. There could be an issue with extracting route handling into the controller while the control server still relies on `normalizeLinearAdvisoryState` and `LinearAdvisoryState` from a new module. I found that `resolveLinearWebhookSourceSetup` is now inside the controller and accepts environment variables, but there are potential discrepancies with how failure reasons are handled for live linear sources. I’ll need to examine this further, especially regarding the tests that passed previously.
+thinking
+**Inspecting source kind in parsing**
+
+I'm wondering if the source kind from `parseDispatchPilotSource` changes to 'ready' instead of 'live_linear' when the `defaultIssueIdentifier` is null. That seems intriguing, and I think I need to take a closer look at the parse function to confirm this behavior. It could be essential in understanding how the logic flows and whether any implications arise from that. I'll dig into it and see what I find.
+thinking
+**Analyzing potential bugs and tests**
+
+It seems there might be some issues with route capture being missed in direct tests, but the spec has changed regarding method rejection. The user’s request seems minimal and aligns with documentation, so it might not be a bug. There could be a concern about type moves affecting the persistence state or missing schema versions. Additionally, I noticed potential bugs related to required headers and timestamp calculations, which raise concerns about how tests are structured. I'll need to check the documentation as the references might have changed.
+thinking
+**Investigating route handling and potential bugs**
+
+The user is asking if the README/SOP documentation aligns with the implemented behavior, and I’m confirming that it does. There could be an issue with extracting route handling into the controller while the control server still relies on `normalizeLinearAdvisoryState` and `LinearAdvisoryState` from a new module. I found that `resolveLinearWebhookSourceSetup` is now inside the controller and accepts environment variables, but there are potential discrepancies with how failure reasons are handled for live linear sources. I’ll need to examine this further, especially regarding the tests that passed previously.
+thinking
+**Inspecting source kind in parsing**
+
+I'm wondering if the source kind from `parseDispatchPilotSource` changes to 'ready' instead of 'live_linear' when the `defaultIssueIdentifier` is null. That seems intriguing, and I think I need to take a closer look at the parse function to confirm this behavior. It could be essential in understanding how the logic flows and whether any implications arise from that. I'll dig into it and see what I find.
+exec
+/bin/zsh -lc "rg -n \"function parseDispatchPilotSource|defaultIssueIdentifier\" -n orchestrator/src/cli/control/trackerDispatchPilot.ts && sed -n '260,430p' orchestrator/src/cli/control/trackerDispatchPilot.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+92:  defaultIssueIdentifier?: string | null;
+98:  const source = parseDispatchPilotSource(resolved.policy, input.defaultIssueIdentifier ?? null);
+242:  defaultIssueIdentifier?: string | null;
+249:  const source = parseDispatchPilotSource(resolved.policy, input.defaultIssueIdentifier ?? null);
+292:    defaultIssueIdentifier: input.defaultIssueIdentifier ?? null,
+312:      issue_identifier: input.defaultIssueIdentifier ?? null,
+463:function parseDispatchPilotSource(
+465:  defaultIssueIdentifier: string | null
+513:  const issueIdentifier = readStringValue(source, 'issue_identifier', 'issueIdentifier') ?? defaultIssueIdentifier;
+    return buildFailureEvaluation({
+      configured: resolved.configured,
+      sourceStatus: 'unavailable',
+      reason: 'dispatch_source_unavailable',
+      status: 503,
+      code: 'dispatch_source_unavailable',
+      sourceSetup: null
+    });
+  }
+
+  if (source.kind === 'malformed') {
+exec
+/bin/zsh -lc "sed -n '463,560p' orchestrator/src/cli/control/trackerDispatchPilot.ts" in /Users/kbediako/Code/CO succeeded in 53ms:
+function parseDispatchPilotSource(
+  policy: Record<string, unknown>,
+  defaultIssueIdentifier: string | null
+): DispatchPilotSourceParseResult {
+  if (!Object.prototype.hasOwnProperty.call(policy, 'source')) {
+    return { kind: 'unavailable' };
+  }
+  const rawSource = policy.source;
+  if (!rawSource || typeof rawSource !== 'object' || Array.isArray(rawSource)) {
+    return { kind: 'malformed', reason: 'dispatch_source_not_object' };
+  }
+  const source = rawSource as Record<string, unknown>;
+  const provider = readStringValue(source, 'provider', 'source_provider', 'sourceProvider');
+  const normalizedProvider = normalizeDispatchSourceProvider(provider);
+  if (!normalizedProvider) {
+    return {
+      kind: 'malformed',
+      reason: provider ? 'dispatch_source_provider_unsupported' : 'dispatch_source_provider_missing'
+    };
+  }
+
+
+
+
+__REVIEW_TIMEOUT__:180

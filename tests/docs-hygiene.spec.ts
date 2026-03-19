@@ -81,6 +81,71 @@ describe('docs hygiene tooling', () => {
     expect(errors.find((error) => error.reference.includes('archives/'))).toBeUndefined();
   });
 
+  it('fails closed when tasks/index.json contains non-canonical top-level keys', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-index-shape-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify({ items: [], tasks: [] }, null, 2),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'docs', 'test.md'), '# Docs\n', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'tasks/index.json',
+        rule: 'tasks-index-non-canonical',
+        reference: 'non-canonical top-level keys: tasks (allowed: items, specs)'
+      })
+    );
+  });
+
+  it('does not count a trailing newline as an extra docs/TASKS line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-tasks-size-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'tasks', 'index.json'), JSON.stringify({ items: [] }, null, 2), 'utf8');
+    await writeFile(
+      join(repoRoot, 'docs', 'tasks-archive-policy.json'),
+      JSON.stringify({ max_lines: 2 }, null, 2),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'docs', 'TASKS.md'), '# Snapshot\n# Detail\n', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.find((error) => error.rule === 'tasks-file-too-large')).toBeUndefined();
+  });
+
   it('syncs mirrors for an active task idempotently', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-sync-'));
     createdDirs.push(repoRoot);
@@ -219,5 +284,68 @@ describe('docs hygiene tooling', () => {
     expect(updatedTasks).toContain('<!-- docs-sync:end 0906-docs-hygiene-automation -->');
     expect(updatedTasks).toContain('### Foundation');
     expect(updatedTasks).not.toContain('Old content');
+  });
+
+  it('resolves date-prefixed task ids through normalized task keys during docs sync', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-date-prefixed-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await mkdir(join(repoRoot, '.agent', 'task'), { recursive: true });
+
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260314-1167-orchestrator-auto-scout-evidence-recorder-extraction',
+              path: 'tasks/tasks-1167-orchestrator-auto-scout-evidence-recorder-extraction.md'
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    await writeFile(
+      join(repoRoot, 'tasks', 'tasks-1167-orchestrator-auto-scout-evidence-recorder-extraction.md'),
+      [
+        '# Task 1167 — Orchestrator Auto-Scout Evidence Recorder Extraction',
+        '',
+        '## Checklist',
+        '### Foundation',
+        '- [x] Docs-first packet exists.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    await writeFile(
+      join(repoRoot, 'docs', 'TASKS.md'),
+      [
+        '# Task List Snapshot — Orchestrator Auto-Scout Evidence Recorder Extraction (1167)',
+        '',
+        '<!-- docs-sync:begin 1167-orchestrator-auto-scout-evidence-recorder-extraction -->',
+        'Old content',
+        '<!-- docs-sync:end 1167-orchestrator-auto-scout-evidence-recorder-extraction -->',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    await runDocsSync(repoRoot, '1167');
+    const updatedTasks = await readFile(join(repoRoot, 'docs', 'TASKS.md'), 'utf8');
+    expect(updatedTasks).toContain('Mirror status with `tasks/tasks-1167-orchestrator-auto-scout-evidence-recorder-extraction.md`');
+
+    await runDocsSync(repoRoot, '1167-orchestrator-auto-scout-evidence-recorder-extraction');
+    const updatedAgent = await readFile(
+      join(repoRoot, '.agent', 'task', '1167-orchestrator-auto-scout-evidence-recorder-extraction.md'),
+      'utf8'
+    );
+    expect(updatedAgent).toContain('# Task Checklist — Orchestrator Auto-Scout Evidence Recorder Extraction (1167)');
   });
 });

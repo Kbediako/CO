@@ -1,0 +1,47 @@
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+stderr | orchestrator/tests/ObservabilityUpdateNotifier.test.ts > ObservabilityUpdateNotifier > keeps notifying remaining subscribers when one listener fails
+[Codex-Orchestrator] Failed to handle observability update: listener_failed
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > renders selected-run status issue and queued questions through the integrated polling bridge
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stderr | orchestrator/tests/ControlServer.test.ts > ControlServer > responds even when event stream append fails
+[Codex-Orchestrator] Failed to append control event confirmation_required: append failed
+
+ ✓ orchestrator/tests/ObservabilityUpdateNotifier.test.ts  (2 tests) 113ms
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > routes pause and resume through transport-mutating control policy
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+<empty line>
+stderr | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > continues polling after one update fails and advances the Telegram offset
+[Codex-Orchestrator] [telegram-oversight] failed to handle update 200: simulated_send_failure
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends deduped projection-driven push notifications when enabled
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > persists a pending projection during cooldown and flushes it on the next signal
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends projection-driven push notifications when queued questions are added and cleared
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+stderr | orchestrator/tests/ControlServer.test.ts > ControlServer > updates pause reason when questions expire with pause fallback
+[Codex-Orchestrator] Failed to resolve child question: fetch failed
+
+stdout | orchestrator/tests/TelegramOversightBridge.test.ts > TelegramOversightBridge > sends projection-driven push notifications when an accepted live Linear advisory update changes the projection
+[Codex-Orchestrator] [telegram-oversight] enabled for 1 chat(s) as @co_test_advisory_bot
+
+ ✓ orchestrator/tests/ControlServer.test.ts  (76 tests) 843ms
+ ✓ orchestrator/tests/TelegramOversightBridge.test.ts  (7 tests) 868ms
+
+ Test Files  3 passed (3)
+      Tests  85 passed (85)
+   Start at  01:13:39
+   Duration  1.11s (transform 148ms, setup 0ms, collect 311ms, tests 1.82s, environment 0ms, prepare 84ms)
+

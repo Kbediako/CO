@@ -1,0 +1,16 @@
+
+> @kbediako/codex-orchestrator@0.1.38 test:orchestrator
+> vitest run --config vitest.config.core.ts orchestrator/tests/OrchestratorStartPreparationShell.test.ts orchestrator/tests/OrchestratorCleanupOrder.test.ts orchestrator/tests/OrchestratorControlPlaneLifecycleShell.test.ts
+
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/OrchestratorStartPreparationShell.test.ts  (3 tests) 4ms
+ ✓ orchestrator/tests/OrchestratorControlPlaneLifecycleShell.test.ts  (3 tests) 3ms
+ ✓ orchestrator/tests/OrchestratorCleanupOrder.test.ts  (1 test) 5ms
+
+ Test Files  3 passed (3)
+      Tests  7 passed (7)
+   Start at  02:55:47
+   Duration  370ms (transform 371ms, setup 0ms, collect 612ms, tests 12ms, environment 0ms, prepare 90ms)
+

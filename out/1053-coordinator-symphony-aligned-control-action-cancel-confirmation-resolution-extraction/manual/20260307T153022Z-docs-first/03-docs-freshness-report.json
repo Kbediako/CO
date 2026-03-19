@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "generated_at": "2026-03-07T15:31:23.170Z",
+  "task_id": "1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction",
+  "registry_path": "docs/docs-freshness-registry.json",
+  "totals": {
+    "docs_scanned": 1042,
+    "registry_entries": 1045,
+    "missing_in_registry": 7,
+    "missing_on_disk": 0,
+    "invalid_entries": 0,
+    "stale_entries": 0
+  },
+  "missing_in_registry": [
+    ".agent/task/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+    "docs/ACTION_PLAN-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+    "docs/PRD-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+    "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+    "docs/findings/1053-control-action-cancel-confirmation-resolution-deliberation.md",
+    "tasks/specs/1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md",
+    "tasks/tasks-1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction.md"
+  ],
+  "missing_on_disk": [],
+  "invalid_entries": [],
+  "stale_entries": []
+}

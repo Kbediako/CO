@@ -1,0 +1,10 @@
+{
+  "task_id": "1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction",
+  "run_id": "2026-03-09T01-16-15-040Z-67469a98",
+  "pipeline": "diagnostics",
+  "manifest_path": ".runs/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/cli/2026-03-09T01-16-15-040Z-67469a98/manifest.json",
+  "status": "in_progress",
+  "status_reason": "The embedded npm run test step hit the recurring quiet tail after the late full-suite lines in 05-test.log.",
+  "used_for_review_context": true,
+  "review_log": "out/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction/manual/20260309T010648Z-closeout/09-review.log"
+}

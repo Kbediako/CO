@@ -1,7 +1,6 @@
 # Archived Document
 
-last_review: 2026-02-13
-
+last_review: 2026-03-19
 <!-- docs-archive:stub -->
 > Archived on 2025-12-31. Full content: https://github.com/Kbediako/CO/blob/doc-archives/tasks/specs/0906-docs-hygiene-automation.md
 

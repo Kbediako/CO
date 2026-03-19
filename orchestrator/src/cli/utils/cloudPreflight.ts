@@ -1,4 +1,7 @@
+import process from 'node:process';
 import { spawn } from 'node:child_process';
+
+import { resolveCodexCliBin } from './codexCli.js';
 
 export interface CloudPreflightIssue {
   code:
@@ -24,6 +27,14 @@ interface CommandResult {
   exitCode: number;
   stdout: string;
   stderr: string;
+}
+
+export interface CloudPreflightRequest {
+  repoRoot: string;
+  codexBin: string;
+  environmentId: string | null;
+  branch: string | null;
+  env?: NodeJS.ProcessEnv;
 }
 
 function runCommand(
@@ -90,13 +101,32 @@ function normalizeBranch(raw: string | null | undefined): string | null {
   return trimmed.replace(/^refs\/heads\//u, '');
 }
 
-export async function runCloudPreflight(params: {
+function normalizeCloudPreflightRequestValue(raw: string | null | undefined): string | null {
+  const trimmed = String(raw ?? '').trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+export function buildCloudPreflightRequest(params: {
   repoRoot: string;
-  codexBin: string;
   environmentId: string | null;
-  branch: string | null | undefined;
   env?: NodeJS.ProcessEnv;
-}): Promise<CloudPreflightResult> {
+  branch?: string | null;
+}): CloudPreflightRequest {
+  const env = params.env ?? process.env;
+  const branch =
+    normalizeCloudPreflightRequestValue(params.branch)
+    ?? normalizeCloudPreflightRequestValue(env.CODEX_CLOUD_BRANCH);
+
+  return {
+    repoRoot: params.repoRoot,
+    codexBin: resolveCodexCliBin(env),
+    environmentId: params.environmentId,
+    branch,
+    env
+  };
+}
+
+export async function runCloudPreflight(params: CloudPreflightRequest): Promise<CloudPreflightResult> {
   const issues: CloudPreflightIssue[] = [];
   const branch = normalizeBranch(params.branch);
 

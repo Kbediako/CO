@@ -1,11 +1,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import process from 'node:process';
-import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { resolveCodexCliBin } from './utils/codexCli.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { buildCommandPreview } from './utils/commandPreview.js';
+import { readDelegationFallbackConfig } from './utils/delegationConfigParser.js';
 
 export interface DelegationSetupOptions {
   apply?: boolean;
@@ -246,6 +246,15 @@ function inspectDelegationReadinessFallback(
   if (!config) {
     return { configured: false, removeExisting: false, envVars: {} };
   }
+  const isDelegationServer = config.args.includes('delegate-server') || config.args.includes('delegation-server');
+  if (!isDelegationServer) {
+    return {
+      configured: false,
+      removeExisting: true,
+      envVars: config.envVars,
+      reason: 'Existing delegation MCP entry does not point to codex-orchestrator delegate-server; reconfiguring.'
+    };
+  }
 
   const pinnedRepo = readPinnedRepo(config.args);
   if (!pinnedRepo) {
@@ -273,135 +282,4 @@ function inspectDelegationReadinessFallback(
     envVars: config.envVars,
     reason: `Delegation MCP is already configured (pinned to ${pinnedRepo}).`
   };
-}
-
-function readDelegationFallbackConfig(configPath: string): { args: string[]; envVars: Record<string, string> } | null {
-  if (!existsSync(configPath)) {
-    return null;
-  }
-  try {
-    const raw = readFileSync(configPath, 'utf8');
-    if (!hasMcpServerEntry(raw, 'delegation')) {
-      return null;
-    }
-    return {
-      args: readDelegationArgsFromConfig(raw),
-      envVars: readDelegationEnvVarsFromConfig(raw)
-    };
-  } catch {
-    return null;
-  }
-}
-
-function readDelegationArgsFromConfig(raw: string): string[] {
-  const sectionMatch = raw.match(/\[mcp_servers(?:\.delegation|\."delegation"|.'delegation')\]([\s\S]*?)(?=\n\[|$)/u);
-  if (!sectionMatch) {
-    return [];
-  }
-  const section = sectionMatch[1] ?? '';
-  const argsMatch = section.match(/^\s*args\s*=\s*\[([\s\S]*?)\]/mu);
-  if (!argsMatch) {
-    return [];
-  }
-  const argsRaw = argsMatch[1] ?? '';
-  const args: string[] = [];
-  const tokenPattern = /"((?:\\"|[^"])*)"|'((?:\\'|[^'])*)'/gu;
-  let token = tokenPattern.exec(argsRaw);
-  while (token) {
-    const quoted = token[1] ?? token[2] ?? '';
-    const decoded = quoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
-    args.push(decoded);
-    token = tokenPattern.exec(argsRaw);
-  }
-  return args;
-}
-
-function readDelegationEnvVarsFromConfig(raw: string): Record<string, string> {
-  const envVars: Record<string, string> = {};
-  const sectionMatch = raw.match(
-    /\[mcp_servers(?:\.delegation|\."delegation"|.'delegation')\.env\]([\s\S]*?)(?=\n\[|$)/u
-  );
-  if (!sectionMatch) {
-    return envVars;
-  }
-  const section = sectionMatch[1] ?? '';
-  const linePattern = /^\s*([A-Za-z0-9_.-]+)\s*=\s*("(?:\\"|[^"])*"|'(?:\\'|[^'])*')\s*$/gmu;
-  let match = linePattern.exec(section);
-  while (match) {
-    const key = match[1];
-    const rawValue = match[2] ?? '';
-    if (key) {
-      const unquoted = rawValue.slice(1, -1);
-      const decoded = unquoted.replace(/\\"/gu, '"').replace(/\\'/gu, '\'');
-      envVars[key] = decoded;
-    }
-    match = linePattern.exec(section);
-  }
-  return envVars;
-}
-
-function hasMcpServerEntry(raw: string, serverName: string): boolean {
-  const lines = raw.split('\n');
-  let currentTable: string | null = null;
-
-  for (const line of lines) {
-    const trimmed = stripTomlComment(line).trim();
-    if (!trimmed) {
-      continue;
-    }
-    const tableMatch = trimmed.match(/^\[(.+)\]$/u);
-    if (tableMatch) {
-      currentTable = tableMatch[1]?.trim() ?? null;
-      if (
-        currentTable === `mcp_servers.${serverName}` ||
-        currentTable === `mcp_servers."${serverName}"` ||
-        currentTable === `mcp_servers.'${serverName}'`
-      ) {
-        return true;
-      }
-      continue;
-    }
-
-    if (trimmed.startsWith('mcp_servers.')) {
-      if (trimmed.startsWith(`mcp_servers."${serverName}".`)) {
-        return true;
-      }
-      if (trimmed.startsWith(`mcp_servers.'${serverName}'.`)) {
-        return true;
-      }
-      if (trimmed.startsWith(`mcp_servers.${serverName}.`)) {
-        return true;
-      }
-      if (trimmed.startsWith(`mcp_servers."${serverName}"=`)) {
-        return true;
-      }
-      if (trimmed.startsWith(`mcp_servers.'${serverName}'=`)) {
-        return true;
-      }
-      if (trimmed.startsWith(`mcp_servers.${serverName}=`)) {
-        return true;
-      }
-    }
-
-    if (currentTable === 'mcp_servers') {
-      const entryPattern = new RegExp(`^"?${escapeRegExp(serverName)}"?\\s*=`, 'u');
-      if (entryPattern.test(trimmed)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-function stripTomlComment(line: string): string {
-  const index = line.indexOf('#');
-  if (index === -1) {
-    return line;
-  }
-  return line.slice(0, index);
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

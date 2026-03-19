@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0967-pr-watch-required-checks-review-artifacts.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-02-16
+last_review: 2026-03-19
 ---
 
 ## Summary

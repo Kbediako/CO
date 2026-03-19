@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { access, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
@@ -20,6 +21,9 @@ const {
   parseSpawnOutput,
   handleDelegateSpawn,
   handleToolCall,
+  buildToolList,
+  createDelegationServerRpcHandler,
+  resolveChildDelegateMode,
   MAX_MCP_MESSAGE_BYTES,
   MAX_MCP_HEADER_BYTES,
   MAX_QUESTION_POLL_WAIT_MS,
@@ -58,7 +62,124 @@ async function setupRun(options: { baseUrl?: string; tokenPath?: string } = {}) 
     }),
     'utf8'
   );
-  return { root, runDir, manifestPath, tokenPath };
+  return {
+    root: await realpath(root),
+    runDir: await realpath(runDir),
+    manifestPath: await realpath(manifestPath),
+    tokenPath: await realpath(tokenPath)
+  };
+}
+
+const DYNAMIC_TOOL_BRIDGE_TOKEN = 'bridge-secret';
+const DYNAMIC_TOOL_BRIDGE_SOURCE_ID = 'appserver_dynamic_tool';
+const DYNAMIC_TOOL_BRIDGE_PRINCIPAL = 'coordinator.appserver';
+const DYNAMIC_TOOL_BRIDGE_ATTESTATION_KEY = 'dynamic_tool_bridge_attestation';
+
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function buildDynamicToolBridgeContext(root: string) {
+  return {
+    repoRoot: process.cwd(),
+    mode: 'full' as const,
+    allowNested: false,
+    githubEnabled: false,
+    allowedGithubOps: new Set<string>(),
+    allowedRoots: [root],
+    allowedHosts: ['127.0.0.1'],
+    toolProfile: [],
+    expiryFallback: 'pause' as const
+  };
+}
+
+function buildDynamicToolBridgeAttestation(
+  overrides: Partial<{ token: string; source_id: string; principal: string }> = {}
+): Record<string, unknown> {
+  return {
+    token: overrides.token ?? DYNAMIC_TOOL_BRIDGE_TOKEN,
+    source_id: overrides.source_id ?? DYNAMIC_TOOL_BRIDGE_SOURCE_ID,
+    principal: overrides.principal ?? DYNAMIC_TOOL_BRIDGE_PRINCIPAL
+  };
+}
+
+function buildDynamicToolBridgeCodexPrivate(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    [DYNAMIC_TOOL_BRIDGE_ATTESTATION_KEY]: buildDynamicToolBridgeAttestation(),
+    ...overrides
+  };
+}
+
+function buildDynamicToolBridgeControlJson(
+  overrides: {
+    enabled?: boolean;
+    kill_switch?: boolean;
+    control_seq?: number;
+    nest_under_coordinator?: boolean;
+    token?: string;
+    source_id?: string;
+    principal?: string;
+    expires_at?: string;
+    revoked?: boolean;
+    attestation?: Record<string, unknown> | null;
+  } = {}
+): Record<string, unknown> {
+  const attestation =
+    overrides.attestation === undefined
+      ? {
+          token_sha256: sha256Hex(overrides.token ?? DYNAMIC_TOOL_BRIDGE_TOKEN),
+          source_id: overrides.source_id ?? DYNAMIC_TOOL_BRIDGE_SOURCE_ID,
+          principal: overrides.principal ?? DYNAMIC_TOOL_BRIDGE_PRINCIPAL,
+          ...(overrides.expires_at ? { expires_at: overrides.expires_at } : {}),
+          ...(overrides.revoked !== undefined ? { revoked: overrides.revoked } : {})
+        }
+      : overrides.attestation;
+
+  const bridgePolicy = {
+    enabled: overrides.enabled ?? true,
+    ...(overrides.kill_switch ? { kill_switch: true } : {}),
+    ...(attestation ? { attestation } : {})
+  };
+
+  return {
+    run_id: 'run-1',
+    ...(overrides.control_seq !== undefined ? { control_seq: overrides.control_seq } : {}),
+    feature_toggles: {
+      ...(overrides.nest_under_coordinator
+        ? {
+            coordinator: {
+              dynamic_tool_bridge: bridgePolicy
+            }
+          }
+        : {
+            dynamic_tool_bridge: bridgePolicy
+          })
+    }
+  };
+}
+
+function buildCoordinatorDynamicToolRequest(options: {
+  toolName: 'coordinator.status' | 'coordinator.pause' | 'coordinator.resume' | 'coordinator.cancel';
+  manifestPath: string;
+  arguments?: Record<string, unknown>;
+  codexPrivate?: Record<string, unknown>;
+  includeDefaultSource?: boolean;
+}) {
+  return {
+    jsonrpc: '2.0' as const,
+    method: 'tools/call' as const,
+    params: {
+      name: options.toolName,
+      arguments: {
+        manifest_path: options.manifestPath,
+        ...(options.includeDefaultSource === false ? {} : { source_id: DYNAMIC_TOOL_BRIDGE_SOURCE_ID }),
+        ...(options.arguments ?? {})
+      }
+    },
+    ...(options.codexPrivate ? { codex_private: options.codexPrivate } : {})
+  };
 }
 
 function collectMcpResponses(
@@ -232,6 +353,41 @@ describe('delegation server manifest validation', () => {
     }
   });
 
+  it('accepts manifest paths under custom runs roots', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'delegation-server-'));
+    try {
+      const manifestPath = join(root, 'custom_runs', 'task-0940', 'cli', 'run-1', 'manifest.json');
+      await mkdir(dirname(manifestPath), { recursive: true });
+      await writeFile(manifestPath, JSON.stringify({ run_id: 'run-1' }), 'utf8');
+
+      const resolved = resolveRunManifestPath(manifestPath, [root], 'manifest_path');
+      const canonicalManifestPath = await realpath(manifestPath);
+      expect(resolved).toBe(canonicalManifestPath);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects manifest symlinks that resolve outside allowed run roots', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'delegation-server-'));
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'delegation-server-outside-'));
+    try {
+      const localRunDir = join(root, '.runs', 'task-0940', 'cli', 'run-1');
+      const outsideRunDir = join(outsideRoot, '.runs', 'task-0940', 'cli', 'run-1');
+      await mkdir(localRunDir, { recursive: true });
+      await mkdir(outsideRunDir, { recursive: true });
+      const outsideManifestPath = join(outsideRunDir, 'manifest.json');
+      await writeFile(outsideManifestPath, JSON.stringify({ run_id: 'run-1' }), 'utf8');
+      const symlinkPath = join(localRunDir, 'manifest.json');
+      await symlink(outsideManifestPath, symlinkPath);
+
+      expect(() => resolveRunManifestPath(symlinkPath, [root], 'manifest_path')).toThrow('not permitted');
+    } finally {
+      await rm(outsideRoot, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects control endpoints with disallowed hosts', async () => {
     const { root, manifestPath } = await setupRun({ baseUrl: 'http://evil.example.com' });
     try {
@@ -359,6 +515,1767 @@ describe('delegation server status behavior', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('includes control snapshot and traceability in status payloads', async () => {
+    const { root, runDir, manifestPath } = await setupRun();
+    try {
+      await writeFile(
+        manifestPath,
+        JSON.stringify({
+          run_id: 'run-1',
+          task_id: 'task-0940',
+          status: 'in_progress',
+          status_detail: 'running'
+        }),
+        'utf8'
+      );
+      await writeFile(
+        join(runDir, 'control.json'),
+        JSON.stringify({
+          run_id: 'run-1',
+          control_seq: 7,
+          latest_action: {
+            request_id: 'req-7',
+            intent_id: 'intent-7',
+            requested_by: 'delegate',
+            requested_at: '2026-01-01T00:00:00Z',
+            action: 'pause',
+            reason: 'manual'
+          }
+        }),
+        'utf8'
+      );
+
+      const response = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.status',
+            arguments: { manifest_path: manifestPath, intent_id: 'intent-status', request_id: 'req-status' }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      const payload = JSON.parse(response.content[0].text) as Record<string, unknown>;
+      expect(payload.control).toMatchObject({
+        run_id: 'run-1',
+        control_seq: 7
+      });
+      expect(payload.traceability).toEqual({
+        intent_id: 'intent-status',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        manifest_path: manifestPath,
+        request_id: 'req-status'
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('delegation server mode contracts', () => {
+  it('routes initialize, tools/list, and tools/call through the rpc handler shell', async () => {
+    const tools = buildToolList({
+      mode: 'full',
+      githubEnabled: false,
+      allowedGithubOps: new Set<string>()
+    });
+    const toolCallHandler = vi.fn().mockResolvedValue({ ok: true });
+    const handler = createDelegationServerRpcHandler({
+      protocolVersion: '2024-11-05',
+      tools,
+      handleToolCall: toolCallHandler
+    });
+
+    await expect(
+      handler({
+        jsonrpc: '2.0',
+        method: 'initialize'
+      })
+    ).resolves.toEqual({
+      protocolVersion: '2024-11-05',
+      serverInfo: { name: 'codex-delegation', version: '0.1.0' },
+      capabilities: { tools: {} }
+    });
+
+    await expect(
+      handler({
+        jsonrpc: '2.0',
+        method: 'tools/list'
+      })
+    ).resolves.toEqual({ tools });
+
+    const request = {
+      jsonrpc: '2.0' as const,
+      method: 'tools/call' as const,
+      params: {
+        name: 'delegate.status',
+        arguments: { manifest_path: '/tmp/run/manifest.json' }
+      }
+    };
+    await expect(handler(request)).resolves.toEqual({ ok: true });
+    expect(toolCallHandler).toHaveBeenCalledWith(request);
+  });
+
+  it('rejects unsupported rpc methods in the extracted handler shell', async () => {
+    const handler = createDelegationServerRpcHandler({
+      protocolVersion: '2024-11-05',
+      tools: [],
+      handleToolCall: vi.fn()
+    });
+
+    await expect(
+      handler({
+        jsonrpc: '2.0',
+        method: 'ping'
+      })
+    ).rejects.toThrow('Unsupported method: ping');
+  });
+
+  it('exposes coordinator dynamic-tool bridge tools only in full mode', () => {
+    const tools = buildToolList({
+      mode: 'full',
+      githubEnabled: false,
+      allowedGithubOps: new Set<string>()
+    });
+    const names = tools.map((tool) => tool.name);
+
+    expect(names).toContain('coordinator.status');
+    expect(names).toContain('coordinator.pause');
+    expect(names).toContain('coordinator.resume');
+    expect(names).toContain('coordinator.cancel');
+  });
+
+  it('exposes only delegate.status in status_only mode', () => {
+    const tools = buildToolList({
+      mode: 'status_only',
+      githubEnabled: true,
+      allowedGithubOps: new Set(['merge', 'comment'])
+    });
+    expect(tools.map((tool) => tool.name)).toEqual(['delegate.status']);
+  });
+
+  it('keeps question_only tool surface unchanged', () => {
+    const tools = buildToolList({
+      mode: 'question_only',
+      githubEnabled: true,
+      allowedGithubOps: new Set(['merge'])
+    });
+    const names = tools.map((tool) => tool.name);
+
+    expect(names).toContain('delegate.status');
+    expect(names).toContain('delegate.question.enqueue');
+    expect(names).toContain('delegate.question.poll');
+    expect(names).toContain('github.merge');
+    expect(names).not.toContain('delegate.spawn');
+    expect(names).not.toContain('delegate.pause');
+    expect(names).not.toContain('delegate.cancel');
+    expect(names).not.toContain('coordinator.status');
+    expect(names).not.toContain('coordinator.pause');
+    expect(names).not.toContain('coordinator.resume');
+    expect(names).not.toContain('coordinator.cancel');
+  });
+
+  it('rejects blocked tools in status_only mode with a clear error', async () => {
+    await expect(
+      handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.question.poll',
+            arguments: {}
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'status_only',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [process.cwd()],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )
+    ).rejects.toThrow('only delegate.status is allowed');
+
+    await expect(
+      handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'coordinator.status',
+            arguments: {}
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'status_only',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [process.cwd()],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )
+    ).rejects.toThrow('only delegate.status is allowed');
+  });
+
+  it('preserves question_only blocked-tool behavior', async () => {
+    await expect(
+      handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.pause',
+            arguments: {}
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'question_only',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [process.cwd()],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )
+    ).rejects.toThrow('delegate_mode_forbidden');
+  });
+
+  it('includes status_only in nested spawn mode enum and preserves full-mode restriction', () => {
+    const tools = buildToolList({
+      mode: 'full',
+      githubEnabled: false,
+      allowedGithubOps: new Set<string>()
+    });
+    const spawnTool = tools.find((tool) => tool.name === 'delegate.spawn');
+    const schema = spawnTool?.inputSchema as
+      | { properties?: { delegate_mode?: { enum?: string[] } } }
+      | undefined;
+    expect(schema?.properties?.delegate_mode?.enum).toEqual(['full', 'question_only', 'status_only']);
+
+    expect(resolveChildDelegateMode('status_only', false)).toBe('status_only');
+    expect(resolveChildDelegateMode('full', false)).toBe('question_only');
+    expect(resolveChildDelegateMode('full', true)).toBe('full');
+  });
+});
+
+describe('delegation server coordinator dynamic-tool bridge', () => {
+  it('fails closed when dynamic tool bridge policy is disabled', async () => {
+    const { root, manifestPath } = await setupRun();
+    try {
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            codexPrivate: buildDynamicToolBridgeCodexPrivate()
+          }),
+          buildDynamicToolBridgeContext(root)
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_disabled');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when dynamic tool bridge kill switch is enabled', async () => {
+    const { root, runDir, manifestPath } = await setupRun();
+    await writeFile(
+      join(runDir, 'control.json'),
+      JSON.stringify(buildDynamicToolBridgeControlJson({ kill_switch: true })),
+      'utf8'
+    );
+    try {
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            codexPrivate: buildDynamicToolBridgeCodexPrivate()
+          }),
+          buildDynamicToolBridgeContext(root)
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_kill_switched');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects missing and malformed source contexts', async () => {
+    const { root, runDir, manifestPath } = await setupRun();
+    await writeFile(
+      join(runDir, 'control.json'),
+      JSON.stringify(buildDynamicToolBridgeControlJson()),
+      'utf8'
+    );
+    const context = buildDynamicToolBridgeContext(root);
+    try {
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            codexPrivate: buildDynamicToolBridgeCodexPrivate(),
+            includeDefaultSource: false
+          }),
+          context
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_source_missing');
+
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            arguments: {
+              source: {
+                source_id: ''
+              }
+            },
+            codexPrivate: buildDynamicToolBridgeCodexPrivate(),
+            includeDefaultSource: false
+          }),
+          context
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_source_invalid');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects missing or malformed attestation config and hidden attestation payloads', async () => {
+    const { root, runDir, manifestPath } = await setupRun();
+    const context = buildDynamicToolBridgeContext(root);
+    try {
+      await writeFile(
+        join(runDir, 'control.json'),
+        JSON.stringify(buildDynamicToolBridgeControlJson({ attestation: null })),
+        'utf8'
+      );
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            codexPrivate: buildDynamicToolBridgeCodexPrivate()
+          }),
+          context
+        )
+      ).rejects.toThrow(/dynamic_tool_bridge_(attestation_(missing|invalid)|disabled)/);
+
+      await writeFile(
+        join(runDir, 'control.json'),
+        JSON.stringify(
+          buildDynamicToolBridgeControlJson({
+            attestation: {
+              token_sha256: sha256Hex(DYNAMIC_TOOL_BRIDGE_TOKEN),
+              source_id: DYNAMIC_TOOL_BRIDGE_SOURCE_ID
+            }
+          })
+        ),
+        'utf8'
+      );
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            codexPrivate: buildDynamicToolBridgeCodexPrivate()
+          }),
+          context
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_attestation_malformed');
+
+      await writeFile(join(runDir, 'control.json'), JSON.stringify(buildDynamicToolBridgeControlJson()), 'utf8');
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath
+          }),
+          context
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_attestation_missing');
+
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            codexPrivate: {
+              dynamic_tool_bridge_token: DYNAMIC_TOOL_BRIDGE_TOKEN
+            }
+          }),
+          context
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_attestation_missing');
+
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            codexPrivate: {
+              [DYNAMIC_TOOL_BRIDGE_ATTESTATION_KEY]: DYNAMIC_TOOL_BRIDGE_TOKEN
+            }
+          }),
+          context
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_attestation_malformed');
+
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            codexPrivate: {
+              [DYNAMIC_TOOL_BRIDGE_ATTESTATION_KEY]: {
+                token: DYNAMIC_TOOL_BRIDGE_TOKEN,
+                source_id: DYNAMIC_TOOL_BRIDGE_SOURCE_ID
+              }
+            }
+          }),
+          context
+        )
+      ).rejects.toThrow('dynamic_tool_bridge_attestation_malformed');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed on expired, revoked, source-mismatched, principal-mismatched, and invalid attestations', async () => {
+    const { root, runDir, manifestPath } = await setupRun();
+    const context = buildDynamicToolBridgeContext(root);
+    const failureCases = [
+      {
+        control: buildDynamicToolBridgeControlJson({
+          expires_at: new Date(Date.now() - 1_000).toISOString()
+        }),
+        codexPrivate: buildDynamicToolBridgeCodexPrivate(),
+        error: 'dynamic_tool_bridge_attestation_expired'
+      },
+      {
+        control: buildDynamicToolBridgeControlJson({
+          revoked: true
+        }),
+        codexPrivate: buildDynamicToolBridgeCodexPrivate(),
+        error: 'dynamic_tool_bridge_attestation_revoked'
+      },
+      {
+        control: buildDynamicToolBridgeControlJson(),
+        codexPrivate: buildDynamicToolBridgeCodexPrivate({
+          [DYNAMIC_TOOL_BRIDGE_ATTESTATION_KEY]: buildDynamicToolBridgeAttestation({
+            source_id: 'other_dynamic_tool'
+          })
+        }),
+        error: 'dynamic_tool_bridge_attestation_source_mismatch'
+      },
+      {
+        control: buildDynamicToolBridgeControlJson(),
+        codexPrivate: buildDynamicToolBridgeCodexPrivate({
+          [DYNAMIC_TOOL_BRIDGE_ATTESTATION_KEY]: buildDynamicToolBridgeAttestation({
+            principal: 'coordinator.other'
+          })
+        }),
+        error: 'dynamic_tool_bridge_attestation_principal_mismatch'
+      },
+      {
+        control: buildDynamicToolBridgeControlJson({
+          token: 'other-bridge-secret'
+        }),
+        codexPrivate: buildDynamicToolBridgeCodexPrivate(),
+        error: 'dynamic_tool_bridge_attestation_invalid'
+      }
+    ] as const;
+
+    try {
+      for (const failureCase of failureCases) {
+        await writeFile(join(runDir, 'control.json'), JSON.stringify(failureCase.control), 'utf8');
+        await expect(
+          handleToolCall(
+            buildCoordinatorDynamicToolRequest({
+              toolName: 'coordinator.status',
+              manifestPath,
+              codexPrivate: failureCase.codexPrivate
+            }),
+            context
+          )
+        ).rejects.toThrow(failureCase.error);
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts nested attestation metadata and normalizes mixed-case source ids', async () => {
+    const mixedCaseSourceId = 'AppServer_Dynamic_Tool';
+
+    const { root, runDir, manifestPath } = await setupRun();
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(runDir, 'control.json'),
+      JSON.stringify(
+        buildDynamicToolBridgeControlJson({
+          control_seq: 3,
+          nest_under_coordinator: true,
+          source_id: mixedCaseSourceId
+        })
+      ),
+      'utf8'
+    );
+    const context = buildDynamicToolBridgeContext(root);
+
+    try {
+      const statusResponse = (await handleToolCall(
+        buildCoordinatorDynamicToolRequest({
+          toolName: 'coordinator.status',
+          manifestPath,
+          arguments: {
+            request_id: 'req-status',
+            source_id: mixedCaseSourceId
+          },
+          codexPrivate: buildDynamicToolBridgeCodexPrivate({
+            [DYNAMIC_TOOL_BRIDGE_ATTESTATION_KEY]: buildDynamicToolBridgeAttestation({
+              source_id: mixedCaseSourceId
+            })
+          })
+        }),
+        context
+      )) as { content: Array<{ text: string }> };
+
+      const statusPayload = JSON.parse(statusResponse.content[0].text) as Record<string, unknown>;
+      expect((statusPayload.traceability as Record<string, unknown>).request_id).toBe('req-status');
+      expect((statusPayload.traceability as Record<string, unknown>).bridge_source_id).toBe(
+        DYNAMIC_TOOL_BRIDGE_SOURCE_ID
+      );
+      expect((statusPayload.traceability as Record<string, unknown>).bridge_token_validated).toBe(true);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects model-supplied token and attestation fields in params', async () => {
+    const { root, runDir, manifestPath } = await setupRun();
+    await writeFile(join(runDir, 'control.json'), JSON.stringify(buildDynamicToolBridgeControlJson()), 'utf8');
+    const context = buildDynamicToolBridgeContext(root);
+    try {
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            arguments: {
+              dynamic_tool_bridge_token: 'model-value'
+            },
+            codexPrivate: buildDynamicToolBridgeCodexPrivate()
+          }),
+          context
+        )
+      ).rejects.toThrow(/dynamic_tool_bridge_(token_missing|attestation_(missing|invalid))/);
+
+      await expect(
+        handleToolCall(
+          buildCoordinatorDynamicToolRequest({
+            toolName: 'coordinator.status',
+            manifestPath,
+            arguments: {
+              dynamic_tool_bridge_attestation: buildDynamicToolBridgeAttestation({
+                token: 'model-value'
+              })
+            },
+            codexPrivate: buildDynamicToolBridgeCodexPrivate()
+          }),
+          context
+        )
+      ).rejects.toThrow(/dynamic_tool_bridge_(token_missing|attestation_(missing|invalid))/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('passes coordinator tools through existing control handlers and marks bridge_token_validated only after attestation validation', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        const parsed = JSON.parse(body || '{}') as Record<string, unknown>;
+        requests.push(parsed);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            latest_action: {
+              request_id: typeof parsed.request_id === 'string' ? parsed.request_id : null,
+              intent_id: typeof parsed.intent_id === 'string' ? parsed.intent_id : null
+            }
+          })
+        );
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, runDir, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(runDir, 'control.json'),
+      JSON.stringify(buildDynamicToolBridgeControlJson({ control_seq: 3 })),
+      'utf8'
+    );
+
+    const context = buildDynamicToolBridgeContext(root);
+
+    try {
+      const pauseResponse = (await handleToolCall(
+        buildCoordinatorDynamicToolRequest({
+          toolName: 'coordinator.pause',
+          manifestPath,
+          arguments: {
+            intent_id: 'intent-pause',
+            request_id: 'req-pause'
+          },
+          codexPrivate: buildDynamicToolBridgeCodexPrivate()
+        }),
+        context
+      )) as { content: Array<{ text: string }> };
+
+      const resumeFirstResponse = (await handleToolCall(
+        buildCoordinatorDynamicToolRequest({
+          toolName: 'coordinator.resume',
+          manifestPath,
+          arguments: {
+            intent_id: 'intent-resume'
+          },
+          codexPrivate: buildDynamicToolBridgeCodexPrivate()
+        }),
+        context
+      )) as { content: Array<{ text: string }> };
+
+      const resumeReplayResponse = (await handleToolCall(
+        buildCoordinatorDynamicToolRequest({
+          toolName: 'coordinator.resume',
+          manifestPath,
+          arguments: {
+            intent_id: 'intent-resume'
+          },
+          codexPrivate: buildDynamicToolBridgeCodexPrivate()
+        }),
+        context
+      )) as { content: Array<{ text: string }> };
+
+      const cancelResponse = (await handleToolCall(
+        buildCoordinatorDynamicToolRequest({
+          toolName: 'coordinator.cancel',
+          manifestPath,
+          arguments: {
+            intent_id: 'intent-cancel'
+          },
+          codexPrivate: buildDynamicToolBridgeCodexPrivate({
+            confirm_nonce: 'nonce-confirm'
+          })
+        }),
+        context
+      )) as { content: Array<{ text: string }> };
+
+      const statusResponse = (await handleToolCall(
+        buildCoordinatorDynamicToolRequest({
+          toolName: 'coordinator.status',
+          manifestPath,
+          arguments: {
+            request_id: 'req-status'
+          },
+          codexPrivate: buildDynamicToolBridgeCodexPrivate()
+        }),
+        context
+      )) as { content: Array<{ text: string }> };
+
+      expect(requests[0]).toMatchObject({ action: 'pause', request_id: 'req-pause' });
+      expect(requests[1]).toMatchObject({ action: 'resume', intent_id: 'intent-resume' });
+      expect(requests[2]).toMatchObject({ action: 'resume', intent_id: 'intent-resume' });
+      expect(requests[1]?.request_id).toBe(requests[2]?.request_id);
+      expect(requests[3]).toMatchObject({
+        action: 'cancel',
+        intent_id: 'intent-cancel',
+        confirm_nonce: 'nonce-confirm'
+      });
+
+      const pausePayload = JSON.parse(pauseResponse.content[0].text) as Record<string, unknown>;
+      const resumePayload = JSON.parse(resumeFirstResponse.content[0].text) as Record<string, unknown>;
+      const resumeReplayPayload = JSON.parse(resumeReplayResponse.content[0].text) as Record<string, unknown>;
+      const cancelPayload = JSON.parse(cancelResponse.content[0].text) as Record<string, unknown>;
+      const statusPayload = JSON.parse(statusResponse.content[0].text) as Record<string, unknown>;
+
+      expect((pausePayload.traceability as Record<string, unknown>).bridge_action).toBe('pause');
+      expect((pausePayload.traceability as Record<string, unknown>).bridge_source_id).toBe(DYNAMIC_TOOL_BRIDGE_SOURCE_ID);
+      expect((pausePayload.traceability as Record<string, unknown>).bridge_token_validated).toBe(true);
+      expect((resumePayload.traceability as Record<string, unknown>).bridge_action).toBe('resume');
+      expect((resumePayload.traceability as Record<string, unknown>).bridge_token_validated).toBe(true);
+      expect((resumeReplayPayload.traceability as Record<string, unknown>).request_id).toBe(requests[2]?.request_id);
+      expect((resumeReplayPayload.traceability as Record<string, unknown>).bridge_token_validated).toBe(true);
+      expect((cancelPayload.traceability as Record<string, unknown>).bridge_action).toBe('cancel');
+      expect((cancelPayload.traceability as Record<string, unknown>).bridge_token_validated).toBe(true);
+      expect((statusPayload.traceability as Record<string, unknown>).bridge_action).toBe('status');
+      expect((statusPayload.traceability as Record<string, unknown>).request_id).toBe('req-status');
+      expect((statusPayload.traceability as Record<string, unknown>).bridge_token_validated).toBe(true);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('delegation server control bridge traceability', () => {
+  it('passes pause/resume trace ids and returns traceability mappings', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        requests.push(JSON.parse(body || '{}') as Record<string, unknown>);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    try {
+      const pauseResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.pause',
+            arguments: {
+              manifest_path: manifestPath,
+              paused: true,
+              intent_id: 'intent-pause',
+              request_id: 'req-pause'
+            }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      const resumeResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.pause',
+            arguments: {
+              manifest_path: manifestPath,
+              paused: false,
+              intent_id: 'intent-resume'
+            }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      const resumeReplayResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.pause',
+            arguments: {
+              manifest_path: manifestPath,
+              paused: false,
+              intent_id: 'intent-resume'
+            }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      expect(requests[0]).toMatchObject({
+        action: 'pause',
+        intent_id: 'intent-pause',
+        request_id: 'req-pause'
+      });
+      expect(requests[1]).toMatchObject({
+        action: 'resume',
+        intent_id: 'intent-resume'
+      });
+      expect(typeof requests[1]?.request_id).toBe('string');
+      expect(requests[1]?.request_id).toBe(requests[2]?.request_id);
+
+      const pausePayload = JSON.parse(pauseResponse.content[0].text) as Record<string, unknown>;
+      const resumePayload = JSON.parse(resumeResponse.content[0].text) as Record<string, unknown>;
+      const resumeReplayPayload = JSON.parse(resumeReplayResponse.content[0].text) as Record<string, unknown>;
+
+      expect(pausePayload.traceability).toEqual({
+        intent_id: 'intent-pause',
+        task_id: 'task-0940',
+        run_id: 'run-1',
+        manifest_path: manifestPath,
+        request_id: 'req-pause'
+      });
+      expect((resumePayload.traceability as Record<string, unknown>).intent_id).toBe('intent-resume');
+      expect((resumePayload.traceability as Record<string, unknown>).request_id).toBe(requests[1]?.request_id);
+      expect((resumeReplayPayload.traceability as Record<string, unknown>).request_id).toBe(requests[2]?.request_id);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses control latest_action request id for replay traceability when caller request ids differ', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        requests.push(JSON.parse(body || '{}') as Record<string, unknown>);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            idempotent_replay: requests.length > 1,
+            latest_action: {
+              request_id: 'req-control-1',
+              intent_id: 'intent-resume'
+            }
+          })
+        );
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    try {
+      const firstResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.pause',
+            arguments: {
+              manifest_path: manifestPath,
+              paused: false,
+              intent_id: 'intent-resume',
+              request_id: 'req-local-1'
+            }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      const replayResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.pause',
+            arguments: {
+              manifest_path: manifestPath,
+              paused: false,
+              intent_id: 'intent-resume',
+              request_id: 'req-local-2'
+            }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      expect(requests[0]?.request_id).toBe('req-local-1');
+      expect(requests[1]?.request_id).toBe('req-local-2');
+
+      const firstPayload = JSON.parse(firstResponse.content[0].text) as Record<string, unknown>;
+      const replayPayload = JSON.parse(replayResponse.content[0].text) as Record<string, unknown>;
+
+      expect((firstPayload.traceability as Record<string, unknown>).request_id).toBe('req-control-1');
+      expect((replayPayload.traceability as Record<string, unknown>).request_id).toBe('req-control-1');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses cancel response request id for traceability when provided', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        requests.push(JSON.parse(body || '{}') as Record<string, unknown>);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, requestId: 'req-control' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    try {
+      const cancelResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.cancel',
+            arguments: {
+              manifest_path: manifestPath,
+              intent_id: 'intent-cancel',
+              request_id: 'req-local'
+            }
+          },
+          codex_private: { confirm_nonce: 'nonce' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      expect(requests[0]).toMatchObject({
+        action: 'cancel',
+        intent_id: 'intent-cancel',
+        request_id: 'req-local'
+      });
+
+      const cancelPayload = JSON.parse(cancelResponse.content[0].text) as Record<string, unknown>;
+      expect(cancelPayload.requestId).toBe('req-control');
+      expect((cancelPayload.traceability as Record<string, unknown>).request_id).toBe('req-control');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to latest_action.request_id for cancel traceability when top-level request id is missing', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        requests.push(JSON.parse(body || '{}') as Record<string, unknown>);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            latest_action: {
+              request_id: 'req-control-latest'
+            }
+          })
+        );
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    try {
+      const cancelResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.cancel',
+            arguments: {
+              manifest_path: manifestPath,
+              intent_id: 'intent-cancel',
+              request_id: 'req-local'
+            }
+          },
+          codex_private: { confirm_nonce: 'nonce' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      expect(requests[0]).toMatchObject({
+        action: 'cancel',
+        intent_id: 'intent-cancel',
+        request_id: 'req-local'
+      });
+
+      const cancelPayload = JSON.parse(cancelResponse.content[0].text) as Record<string, unknown>;
+      expect((cancelPayload.traceability as Record<string, unknown>).request_id).toBe('req-control-latest');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers canonical cancel traceability from control responses over caller and latest_action fallbacks', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        requests.push(JSON.parse(body || '{}') as Record<string, unknown>);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            idempotent_replay: true,
+            latest_action: {
+              request_id: 'req-stale',
+              intent_id: 'intent-stale'
+            },
+            traceability: {
+              action: 'cancel',
+              decision: 'replayed',
+              request_id: 'req-canonical',
+              intent_id: null,
+              transport: 'discord',
+              actor_id: 'actor-canonical',
+              actor_source: 'discord.oauth',
+              transport_principal: 'discord:channel:canonical'
+            }
+          })
+        );
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    try {
+      const cancelResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.cancel',
+            arguments: {
+              manifest_path: manifestPath,
+              intent_id: 'intent-local',
+              request_id: 'req-local',
+              transport: 'discord',
+              actor_id: 'actor-local',
+              actor_source: 'discord.bot',
+              transport_principal: 'discord:channel:local'
+            }
+          },
+          codex_private: { confirm_nonce: 'nonce' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      expect(requests[0]).toMatchObject({
+        action: 'cancel',
+        intent_id: 'intent-local',
+        request_id: 'req-local'
+      });
+
+      const cancelPayload = JSON.parse(cancelResponse.content[0].text) as Record<string, unknown>;
+      expect(cancelPayload.traceability).toMatchObject({
+        request_id: 'req-canonical',
+        intent_id: null,
+        actor_id: 'actor-canonical',
+        actor_source: 'discord.oauth',
+        transport_principal: 'discord:channel:canonical'
+      });
+      expect((cancelPayload.traceability as Record<string, unknown>).request_id).not.toBe('req-local');
+      expect((cancelPayload.traceability as Record<string, unknown>).request_id).not.toBe('req-stale');
+      expect((cancelPayload.traceability as Record<string, unknown>).intent_id).toBeNull();
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('forwards transport metadata for pause and preserves canonical traceability', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        requests.push(JSON.parse(body || '{}') as Record<string, unknown>);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            traceability: {
+              actor_id: 'actor-123',
+              actor_source: 'discord.oauth',
+              transport: 'discord',
+              transport_principal: 'discord:channel:1',
+              action: 'pause',
+              decision: 'applied',
+              request_id: 'req-control-transport'
+            }
+          })
+        );
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    try {
+      const pauseResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.pause',
+            arguments: {
+              manifest_path: manifestPath,
+              paused: true,
+              intent_id: 'intent-transport',
+              request_id: 'req-transport',
+              transport: 'discord',
+              actor_id: 'actor-123',
+              actor_source: 'discord.oauth',
+              transport_principal: 'discord:channel:1',
+              transport_nonce: 'nonce-transport-pause',
+              transport_nonce_expires_at: new Date(Date.now() + 60_000).toISOString()
+            }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      expect(requests[0]).toMatchObject({
+        transport: 'discord',
+        actor_id: 'actor-123',
+        actor_source: 'discord.oauth',
+        transport_principal: 'discord:channel:1',
+        transport_nonce: 'nonce-transport-pause'
+      });
+
+      const pausePayload = JSON.parse(pauseResponse.content[0].text) as Record<string, unknown>;
+      expect(pausePayload.traceability).toEqual({
+        actor_id: 'actor-123',
+        actor_source: 'discord.oauth',
+        transport: 'discord',
+        transport_principal: 'discord:channel:1',
+        action: 'pause',
+        decision: 'applied',
+        request_id: 'req-control-transport'
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('forwards transport metadata in cancel confirmation creation', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/confirmations/create' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        requests.push(JSON.parse(body || '{}') as Record<string, unknown>);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            request_id: 'req-confirm-transport',
+            traceability: {
+              actor_id: 'actor-321',
+              actor_source: 'telegram.bot',
+              transport: 'telegram',
+              transport_principal: 'telegram:chat:7',
+              action: 'cancel',
+              decision: 'rejected',
+              request_id: 'req-confirm-transport'
+            }
+          })
+        );
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    try {
+      const cancelResponse = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.cancel',
+            arguments: {
+              manifest_path: manifestPath,
+              intent_id: 'intent-transport-cancel',
+              request_id: 'req-transport-cancel',
+              transport: 'telegram',
+              actor_id: 'actor-321',
+              actor_source: 'telegram.bot',
+              transport_principal: 'telegram:chat:7',
+              transport_nonce: 'nonce-transport-cancel',
+              transport_nonce_expires_at: new Date(Date.now() + 60_000).toISOString()
+            }
+          }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      const firstRequest = requests[0] ?? {};
+      expect((firstRequest.params as Record<string, unknown>) ?? {}).toMatchObject({
+        intent_id: 'intent-transport-cancel',
+        request_id: 'req-transport-cancel',
+        transport: 'telegram',
+        actor_id: 'actor-321',
+        actor_source: 'telegram.bot',
+        transport_principal: 'telegram:chat:7'
+      });
+
+      const cancelPayload = JSON.parse(cancelResponse.content[0].text) as Record<string, unknown>;
+      expect(cancelPayload.traceability).toEqual({
+        actor_id: 'actor-321',
+        actor_source: 'telegram.bot',
+        transport: 'telegram',
+        transport_principal: 'telegram:chat:7',
+        action: 'cancel',
+        decision: 'rejected',
+        request_id: 'req-confirm-transport'
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves transport context in cancel confirmation params when confirm nonce is replayed', async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        requests.push(JSON.parse(body || '{}') as Record<string, unknown>);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, request_id: 'req-confirm-replay' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    try {
+      await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.cancel',
+            arguments: {
+              manifest_path: manifestPath,
+              intent_id: 'intent-replay',
+              request_id: 'req-replay',
+              transport: 'discord',
+              actor_id: 'actor-777',
+              actor_source: 'discord.oauth',
+              transport_principal: 'discord:channel:777',
+              transport_nonce: 'nonce-replay',
+              transport_nonce_expires_at: new Date(Date.now() + 60_000).toISOString()
+            }
+          },
+          codex_private: { confirm_nonce: 'nonce' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      );
+
+      expect((requests[0]?.params as Record<string, unknown>) ?? {}).toMatchObject({
+        manifest_path: manifestPath,
+        intent_id: 'intent-replay',
+        request_id: 'req-replay',
+        transport: 'discord',
+        actor_id: 'actor-777',
+        actor_source: 'discord.oauth',
+        transport_principal: 'discord:channel:777'
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed on malformed or unsupported transport values without calling control endpoint', async () => {
+    let controlActionCalls = 0;
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        controlActionCalls += 1;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    const toolContext = {
+      repoRoot: process.cwd(),
+      mode: 'full' as const,
+      allowNested: false,
+      githubEnabled: false,
+      allowedGithubOps: new Set<string>(),
+      allowedRoots: [root],
+      allowedHosts: ['127.0.0.1'],
+      toolProfile: [],
+      expiryFallback: 'pause' as const
+    };
+
+    try {
+      const invalidCases: Array<{ transport: unknown; error: string }> = [
+        { transport: 'slack', error: 'transport_unsupported' },
+        { transport: '   ', error: 'transport_invalid' },
+        { transport: 42, error: 'transport_invalid' }
+      ];
+      for (const invalidCase of invalidCases) {
+        await expect(
+          handleToolCall(
+            {
+              jsonrpc: '2.0',
+              method: 'tools/call',
+              params: {
+                name: 'delegate.pause',
+                arguments: {
+                  manifest_path: manifestPath,
+                  paused: true,
+                  transport: invalidCase.transport
+                }
+              }
+            },
+            toolContext
+          )
+        ).rejects.toThrow(invalidCase.error);
+      }
+      expect(controlActionCalls).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed on pause transport metadata without transport and does not forward control actions', async () => {
+    let controlActionCalls = 0;
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        controlActionCalls += 1;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    const toolContext = {
+      repoRoot: process.cwd(),
+      mode: 'full' as const,
+      allowNested: false,
+      githubEnabled: false,
+      allowedGithubOps: new Set<string>(),
+      allowedRoots: [root],
+      allowedHosts: ['127.0.0.1'],
+      toolProfile: [],
+      expiryFallback: 'pause' as const
+    };
+
+    try {
+      await expect(
+        handleToolCall(
+          {
+            jsonrpc: '2.0',
+            method: 'tools/call',
+            params: {
+              name: 'delegate.pause',
+              arguments: {
+                manifest_path: manifestPath,
+                paused: true,
+                actor_id: 'actor-transport-only',
+                transport_nonce: 'nonce-transport-only'
+              }
+            }
+          },
+          toolContext
+        )
+      ).rejects.toThrow('transport_required');
+      expect(controlActionCalls).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed on cancel transport metadata without transport and does not forward control or confirmation calls', async () => {
+    let controlActionCalls = 0;
+    let confirmationCreateCalls = 0;
+    const server = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        controlActionCalls += 1;
+      }
+      if (req.url === '/confirmations/create' && req.method === 'POST') {
+        confirmationCreateCalls += 1;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-0940',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+
+    const toolContext = {
+      repoRoot: process.cwd(),
+      mode: 'full' as const,
+      allowNested: false,
+      githubEnabled: false,
+      allowedGithubOps: new Set<string>(),
+      allowedRoots: [root],
+      allowedHosts: ['127.0.0.1'],
+      toolProfile: [],
+      expiryFallback: 'pause' as const
+    };
+
+    try {
+      await expect(
+        handleToolCall(
+          {
+            jsonrpc: '2.0',
+            method: 'tools/call',
+            params: {
+              name: 'delegate.cancel',
+              arguments: {
+                manifest_path: manifestPath,
+                actor_id: 'actor-transport-only',
+                transport_principal: 'discord:channel:123',
+                transport_nonce: 'nonce-transport-only'
+              }
+            }
+          },
+          toolContext
+        )
+      ).rejects.toThrow('transport_required');
+      expect(controlActionCalls).toBe(0);
+      expect(confirmationCreateCalls).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('delegation server question helpers', () => {
@@ -425,6 +2342,33 @@ describe('delegation server question helpers', () => {
     } finally {
       if (previousManifestPath) {
         process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifestPath;
+      }
+      if (previousTokenPath) {
+        process.env.CODEX_DELEGATION_TOKEN_PATH = previousTokenPath;
+      } else {
+        delete process.env.CODEX_DELEGATION_TOKEN_PATH;
+      }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks explicit delegation token paths outside the run directory when manifest context is present', async () => {
+    const { root, manifestPath } = await setupRun();
+    const outsideTokenPath = join(root, 'outside-token.json');
+    await writeFile(outsideTokenPath, JSON.stringify({ token: 'outside-token' }), 'utf8');
+    const previousManifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+    const previousTokenPath = process.env.CODEX_DELEGATION_TOKEN_PATH;
+    process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = manifestPath;
+    process.env.CODEX_DELEGATION_TOKEN_PATH = outsideTokenPath;
+
+    try {
+      const token = await resolveDelegationToken({ jsonrpc: '2.0', method: 'tools/call', params: {} }, [root]);
+      expect(token).toBeNull();
+    } finally {
+      if (previousManifestPath) {
+        process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifestPath;
+      } else {
+        delete process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
       }
       if (previousTokenPath) {
         process.env.CODEX_DELEGATION_TOKEN_PATH = previousTokenPath;
@@ -596,6 +2540,111 @@ describe('delegation server question helpers', () => {
       sockets.forEach((socket) => socket.destroy());
       await new Promise<void>((resolve) => stalledServer.close(() => resolve()));
       await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns expired question details and applies fallback action on expired polls', async () => {
+    const expiresAt = '2026-03-16T00:00:00.000Z';
+    let receivedAction: Record<string, unknown> | null = null;
+    const parentServer = http.createServer((req, res) => {
+      if (req.url === '/questions/q-1') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'expired', expires_at: expiresAt }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    const childServer = http.createServer(async (req, res) => {
+      if (req.url === '/control/action' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk.toString();
+        }
+        receivedAction = JSON.parse(body || '{}') as Record<string, unknown>;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => parentServer.listen(0, '127.0.0.1', resolve));
+    await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
+    const parentAddress = parentServer.address();
+    const childAddress = childServer.address();
+    const parentPort = typeof parentAddress === 'string' || !parentAddress ? 0 : parentAddress.port;
+    const childPort = typeof childAddress === 'string' || !childAddress ? 0 : childAddress.port;
+    const parentBaseUrl = `http://127.0.0.1:${parentPort}`;
+    const childBaseUrl = `http://127.0.0.1:${childPort}`;
+
+    const parentRun = await setupRun({ baseUrl: parentBaseUrl });
+    const childRun = await setupRun({ baseUrl: childBaseUrl });
+    await writeFile(
+      join(childRun.runDir, 'control.json'),
+      JSON.stringify({
+        run_id: 'run-1',
+        control_seq: 1,
+        latest_action: {
+          request_id: null,
+          requested_by: 'delegate',
+          requested_at: new Date().toISOString(),
+          action: 'pause',
+          reason: 'awaiting_question_answer'
+        }
+      }),
+      'utf8'
+    );
+    const previousManifestPath = process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+    process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = childRun.manifestPath;
+
+    try {
+      const result = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.question.poll',
+            arguments: {
+              parent_manifest_path: parentRun.manifestPath,
+              question_id: 'q-1',
+              wait_ms: 0
+            }
+          },
+          codex_private: { delegation_token: 'secret-token' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [parentRun.root, childRun.root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'resume'
+        }
+      )) as { content: Array<{ text: string }>; isError?: boolean };
+      const payload = JSON.parse(result.content[0].text) as Record<string, unknown>;
+
+      expect(result.isError).toBe(false);
+      expect(payload).toMatchObject({
+        status: 'expired',
+        expired_at: expiresAt,
+        fallback_action: 'resume'
+      });
+      expect((receivedAction as { action?: string } | null)?.action).toBe('resume');
+      expect((receivedAction as { reason?: string } | null)?.reason).toBe('question_expired');
+    } finally {
+      if (previousManifestPath) {
+        process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH = previousManifestPath;
+      } else {
+        delete process.env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
+      }
+      await new Promise<void>((resolve) => parentServer.close(() => resolve()));
+      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await rm(parentRun.root, { recursive: true, force: true });
+      await rm(childRun.root, { recursive: true, force: true });
     }
   });
 
@@ -891,10 +2940,12 @@ describe('delegation server spawn validation', () => {
       expect(spawnMock).toHaveBeenCalled();
       const spawnArgs = spawnMock.mock.calls[0]?.[2] as { cwd?: string } | undefined;
       expect(spawnArgs?.cwd).toBe(repoRoot);
+      const resolvedManifestPath = await realpath(manifestPath);
+      const resolvedRunDir = dirname(resolvedManifestPath);
       expect(result).toMatchObject({
         run_id: 'run-1',
-        manifest_path: manifestPath,
-        events_path: join(runDir, 'events.jsonl')
+        manifest_path: resolvedManifestPath,
+        events_path: join(resolvedRunDir, 'events.jsonl')
       });
       const tokenRaw = await readFile(join(runDir, 'delegation_token.json'), 'utf8');
       expect(tokenRaw).toContain('token');
@@ -1159,10 +3210,15 @@ describe('delegation server spawn start_only', () => {
 
       const result = await spawnPromise;
       const resolvedManifestPath = await realpath(manifestPath);
+      const resolvedRunDir = dirname(resolvedManifestPath);
       expect(result).toMatchObject({
         run_id: runId,
-        manifest_path: resolvedManifestPath
+        manifest_path: resolvedManifestPath,
+        events_path: join(resolvedRunDir, 'events.jsonl'),
+        log_path: 'logs/child.log'
       });
+      const tokenRaw = await readFile(join(runDir, 'delegation_token.json'), 'utf8');
+      expect(tokenRaw).toContain('token');
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
@@ -1223,6 +3279,104 @@ describe('delegation server confirmation fallback', () => {
       expect(payload.request_id).toBe('req-1');
       expect(actionCalls).toBe(1);
       expect(createCalls).toBe(1);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not allow cancel nonce replay across intent/request scope', async () => {
+    const actionRequests: Array<Record<string, unknown>> = [];
+    const createRequests: Array<Record<string, unknown>> = [];
+    const server = http.createServer(async (req, res) => {
+      let body = '';
+      for await (const chunk of req) {
+        body += chunk.toString();
+      }
+      const payload = JSON.parse(body || '{}') as Record<string, unknown>;
+      if (req.url === '/control/action') {
+        actionRequests.push(payload);
+        res.writeHead(409, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'confirmation_scope_mismatch' }));
+        return;
+      }
+      if (req.url === '/confirmations/create') {
+        createRequests.push(payload);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ request_id: 'req-reconfirm' }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    const port = typeof address === 'string' || !address ? 0 : address.port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const { root, manifestPath } = await setupRun({ baseUrl });
+
+    try {
+      const response = (await handleToolCall(
+        {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: {
+            name: 'delegate.cancel',
+            arguments: {
+              manifest_path: manifestPath,
+              intent_id: 'intent-replay-target',
+              request_id: 'req-replay-target',
+              transport: 'discord',
+              actor_id: 'actor-999',
+              actor_source: 'discord.oauth',
+              transport_principal: 'discord:channel:999'
+            }
+          },
+          codex_private: { confirm_nonce: 'nonce-from-other-scope' }
+        },
+        {
+          repoRoot: process.cwd(),
+          mode: 'full',
+          allowNested: false,
+          githubEnabled: false,
+          allowedGithubOps: new Set<string>(),
+          allowedRoots: [root],
+          allowedHosts: ['127.0.0.1'],
+          toolProfile: [],
+          expiryFallback: 'pause'
+        }
+      )) as { content: Array<{ text: string }> };
+
+      expect(actionRequests).toHaveLength(1);
+      expect(actionRequests[0]).toMatchObject({
+        action: 'cancel',
+        intent_id: 'intent-replay-target',
+        request_id: 'req-replay-target'
+      });
+      expect((actionRequests[0]?.params as Record<string, unknown>) ?? {}).toMatchObject({
+        manifest_path: manifestPath,
+        intent_id: 'intent-replay-target',
+        request_id: 'req-replay-target',
+        transport: 'discord',
+        actor_id: 'actor-999',
+        actor_source: 'discord.oauth',
+        transport_principal: 'discord:channel:999'
+      });
+
+      expect(createRequests).toHaveLength(1);
+      expect((createRequests[0]?.params as Record<string, unknown>) ?? {}).toMatchObject({
+        manifest_path: manifestPath,
+        intent_id: 'intent-replay-target',
+        request_id: 'req-replay-target',
+        transport: 'discord',
+        actor_id: 'actor-999',
+        actor_source: 'discord.oauth',
+        transport_principal: 'discord:channel:999'
+      });
+
+      const payload = JSON.parse(response.content[0].text) as Record<string, unknown>;
+      expect(payload.request_id).toBe('req-reconfirm');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await rm(root, { recursive: true, force: true });

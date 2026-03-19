@@ -1,0 +1,25 @@
+
+> @kbediako/codex-orchestrator@0.1.38 test
+> npm run test:orchestrator orchestrator/tests/DelegationRegisterController.test.ts orchestrator/tests/ControlServer.test.ts
+
+
+> @kbediako/codex-orchestrator@0.1.38 test:orchestrator
+> vitest run --config vitest.config.core.ts orchestrator/tests/DelegationRegisterController.test.ts orchestrator/tests/ControlServer.test.ts
+
+
+ RUN  v1.6.1 /Users/kbediako/Code/CO
+
+ ✓ orchestrator/tests/DelegationRegisterController.test.ts  (5 tests) 2ms
+stderr | orchestrator/tests/ControlServer.test.ts > ControlServer > responds even when event stream append fails
+[Codex-Orchestrator] Failed to append control event confirmation_required: append failed
+
+stderr | orchestrator/tests/ControlServer.test.ts > ControlServer > updates pause reason when questions expire with pause fallback
+[Codex-Orchestrator] Failed to resolve child question: fetch failed
+
+ ✓ orchestrator/tests/ControlServer.test.ts  (84 tests) 334ms
+
+ Test Files  2 passed (2)
+      Tests  89 passed (89)
+   Start at  20:53:25
+   Duration  613ms (transform 153ms, setup 0ms, collect 188ms, tests 336ms, environment 0ms, prepare 48ms)
+

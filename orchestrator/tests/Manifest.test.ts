@@ -107,6 +107,70 @@ describe('loadManifest', () => {
     );
   });
 
+  it('resolves manifests by run id across task directories under custom runs roots', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-custom-runs-'));
+    const customRunsRoot = join(repoRoot, 'custom-runs');
+    const targetTask = 'task-target';
+    const requesterTask = 'task-requester';
+    const runId = '2026-02-14T00-00-00-000Z-load-custom-runs';
+
+    const targetEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: customRunsRoot,
+      outRoot: join(repoRoot, 'out'),
+      taskId: targetTask
+    };
+    const requesterEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: customRunsRoot,
+      outRoot: join(repoRoot, 'out'),
+      taskId: requesterTask
+    };
+
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    await bootstrapManifest(runId, {
+      env: targetEnv,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    const loaded = await loadManifest(requesterEnv, runId);
+    expect(loaded.manifest.task_id).toBe(targetTask);
+    expect(loaded.paths.manifestPath).toContain(
+      join('custom-runs', targetTask, 'cli', runId, 'manifest.json')
+    );
+  });
+
+  it('resolves legacy-layout manifests by run id across task directories', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-legacy-'));
+    const targetTask = 'task-target';
+    const requesterTask = 'task-requester';
+    const runId = '2026-02-14T00-00-00-000Z-load-legacy';
+    const legacyManifestPath = join(repoRoot, '.runs', targetTask, runId, 'manifest.json');
+
+    const requesterEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: requesterTask
+    };
+
+    await mkdir(join(repoRoot, '.runs', targetTask, runId), { recursive: true });
+    await writeFile(
+      legacyManifestPath,
+      JSON.stringify({ task_id: targetTask, run_id: runId, status: 'succeeded' }),
+      'utf8'
+    );
+
+    const loaded = await loadManifest(requesterEnv, runId);
+    expect(loaded.manifest.task_id).toBe(targetTask);
+    expect(loaded.paths.manifestPath).toContain(
+      join('.runs', targetTask, runId, 'manifest.json')
+    );
+  });
+
   it('ignores non-manifest local-mcp stubs and falls back to task cli manifests', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-stub-'));
     const targetTask = 'task-target';
@@ -183,6 +247,108 @@ describe('loadManifest', () => {
     expect(loaded.paths.manifestPath).toContain(
       join('.runs', targetTask, 'cli', runId, 'manifest.json')
     );
+  });
+
+  it('ignores local-mcp symlink targets that escape runs root', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-escape-symlink-'));
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'manifest-load-outside-'));
+    const targetTask = 'task-target';
+    const requesterTask = 'task-requester';
+    const runId = '2026-02-14T00-00-00-000Z-load-escape-symlink';
+
+    const targetEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: targetTask
+    };
+    const requesterEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: requesterTask
+    };
+
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    await bootstrapManifest(runId, {
+      env: targetEnv,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    const outsideRunDir = join(outsideRoot, '.runs', 'outside-task', 'cli', runId);
+    await mkdir(outsideRunDir, { recursive: true });
+    await writeFile(
+      join(outsideRunDir, 'manifest.json'),
+      JSON.stringify({ task_id: 'outside-task', run_id: runId, status: 'succeeded' }),
+      'utf8'
+    );
+
+    const localCompatPath = join(repoRoot, '.runs', 'local-mcp', runId, 'manifest.json');
+    await rm(localCompatPath, { force: true });
+    await symlink(join(outsideRunDir, 'manifest.json'), localCompatPath);
+
+    try {
+      const loaded = await loadManifest(requesterEnv, runId);
+      expect(loaded.manifest.task_id).toBe(targetTask);
+      expect(loaded.paths.manifestPath).toContain(
+        join('.runs', targetTask, 'cli', runId, 'manifest.json')
+      );
+    } finally {
+      await rm(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores local-mcp redirect manifest targets that escape runs root', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-escape-redirect-'));
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'manifest-load-outside-'));
+    const targetTask = 'task-target';
+    const requesterTask = 'task-requester';
+    const runId = '2026-02-14T00-00-00-000Z-load-escape-redirect';
+
+    const targetEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: targetTask
+    };
+    const requesterEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: requesterTask
+    };
+
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    await bootstrapManifest(runId, {
+      env: targetEnv,
+      pipeline,
+      parentRunId: null,
+      taskSlug: null,
+      approvalPolicy: null
+    });
+
+    const outsideRunDir = join(outsideRoot, '.runs', 'outside-task', 'cli', runId);
+    await mkdir(outsideRunDir, { recursive: true });
+    const outsideManifest = join(outsideRunDir, 'manifest.json');
+    await writeFile(outsideManifest, JSON.stringify({ task_id: 'outside-task', run_id: runId }), 'utf8');
+
+    const localCompatPath = join(repoRoot, '.runs', 'local-mcp', runId, 'manifest.json');
+    await rm(localCompatPath, { force: true });
+    await mkdir(join(repoRoot, '.runs', 'local-mcp', runId), { recursive: true });
+    await writeFile(localCompatPath, JSON.stringify({ manifest: outsideManifest }), 'utf8');
+
+    try {
+      const loaded = await loadManifest(requesterEnv, runId);
+      expect(loaded.manifest.task_id).toBe(targetTask);
+      expect(loaded.paths.manifestPath).toContain(
+        join('.runs', targetTask, 'cli', runId, 'manifest.json')
+      );
+    } finally {
+      await rm(outsideRoot, { recursive: true, force: true });
+    }
   });
 });
 

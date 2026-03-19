@@ -1,0 +1,9 @@
+# 1039 Docs-First Summary
+
+- Task: `1039-coordinator-symphony-aligned-ui-data-controller-extraction`
+- Scope approved: extract only the standalone `/ui/data.json` route handling into a dedicated controller while keeping `selectedRunPresenter.ts` as the UI dataset builder and leaving `/api/v1/*`, auth/session, webhook, and mutating control routes in `controlServer.ts`.
+- Delegation evidence: top-level delegation guard passed in `01-delegation-guard.log`; bounded controller-boundary review completed via subagent stream and the delegated diagnostics manifest `.runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction-boundary-review/cli/2026-03-07T05-42-58-581Z-ce0a48d6/manifest.json`.
+- Deterministic docs gates passed before implementation in `02-spec-guard.log`, `03-docs-check.log`, and `04-docs-freshness.log`.
+- Docs-review wrapper evidence: `.runs/1039-coordinator-symphony-aligned-ui-data-controller-extraction/cli/2026-03-07T05-44-06-301Z-3c91d73a/manifest.json`.
+- Docs-review outcome: the wrapper reached `npm run review`, then drifted into repetitive inspection without a terminal verdict. The only concrete finding was a docs-process mismatch: the `1039` ACTION_PLAN did not explicitly require docs-review approval or override before runtime edits, and the validation text did not explicitly call out `npm run pack:smoke` for the packaged CLI-path change. Those docs were corrected, then the deterministic docs gates were rerun successfully in `06-spec-guard-rerun.log`, `07-docs-check-rerun.log`, and `08-docs-freshness-rerun.log`.
+- Decision: proceed with the bounded runtime extraction using the corrected docs plus the delegated boundary review as the docs-first approval basis, while recording the non-terminal review-wrapper behavior as an explicit override rather than a false pass.

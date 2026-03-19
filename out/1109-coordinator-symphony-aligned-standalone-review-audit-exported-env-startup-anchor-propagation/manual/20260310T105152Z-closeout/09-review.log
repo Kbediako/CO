@@ -1,0 +1,432 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation-guard/cli/2026-03-10T10-32-14-103Z-c5a8e56a/manifest.json
+
+(node:77941) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:77941) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 987 > 25
+ - total lines changed 95691 > 800
+Top changed files:
+  - docs/docs-freshness-registry.json: 9439
+  - orchestrator/tests/ControlServer.test.ts: 7570
+  - tasks/index.json: 6134
+  - scripts/lib/review-execution-state.ts: 3003
+  - orchestrator/tests/DelegationServer.test.ts: 2115
+  - tests/review-execution-state.spec.ts: 1890
+  - scripts/run-review.ts: 1794
+  - orchestrator/src/cli/control/controlServer.ts: 1657
+  - tests/run-review.spec.ts: 1582
+  - orchestrator/tests/TelegramOversightBridge.test.ts: 1480
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: stacked branch carries prior Symphony alignment slices; 1109 delta is intentionally bounded to review audit exported-env startup anchor propagation
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 14 files, 1868 lines.
+[run-review] large uncommitted review scope detected (14 files, 1868 lines; thresholds: 25 files / 1200 lines).
+[run-review] this scope profile is known to produce long CO review traversals; prefer scoped reviews (`--base`/`--commit`) when practical.
+[run-review] runtime requested=appserver selected=appserver provider=AppServerRuntimeProvider.
+[run-review] delegation MCP enabled for this review (default; set --disable-delegation-mcp or CODEX_REVIEW_DISABLE_DELEGATION_MCP=1 to disable).
+Review prompt saved to: .runs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation-guard/cli/2026-03-10T10-32-14-103Z-c5a8e56a/review/prompt.txt
+Review output log: .runs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation-guard/cli/2026-03-10T10-32-14-103Z-c5a8e56a/review/output.log
+Launching Codex review (evidence: .runs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation-guard/cli/2026-03-10T10-32-14-103Z-c5a8e56a/manifest.json)
+[run-review] patience-first monitor checkpoints every 1m 0s (set CODEX_REVIEW_MONITOR_INTERVAL_SECONDS=0 to disable).
+[run-review] low-signal drift guard enabled after 3m 0s of repetitive bounded activity (set CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=0 to disable).
+[run-review] meta-surface expansion guard enabled after 3m 0s of sustained off-task meta activity (set CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=0 to disable).
+[run-review] startup-anchor boundary enabled for diff mode; repeated memory/skills/review-docs/manifest/review-artifact reads before the first startup anchor will terminate the review.
+OpenAI Codex v0.114.0 (research preview)
+--------
+workdir: /Users/kbediako/Code/CO
+model: gpt-5.4
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: detailed
+session id: 019cda7e-8470-7211-a2e8-411506af95c3
+--------
+user
+Review task: 1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation-guard
+Review surface: diff
+
+Agent notes:
+Goal: verify exported-env startup-anchor propagation and shell-dialect audit semantics. | Summary: added operator-aware carry-forward across executed &&/||, shell-dialect handling for bashlike bare export persistence, blocked-env fallback suppression, and bashlike export -n unexport handling. | Risks: shell-model overfitting across zsh/bash audit payloads, wrapper review drift.
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths (14):
+```
+docs/TASKS.md
+docs/docs-freshness-registry.json
+docs/standalone-review-guide.md
+scripts/lib/review-execution-state.ts
+tasks/index.json
+tests/review-execution-state.spec.ts
+tests/run-review.spec.ts
+.agent/task/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+docs/PRD-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+docs/findings/1109-standalone-review-audit-exported-env-startup-anchor-propagation-deliberation.md
+tasks/specs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+tasks/tasks-1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+```
+
+Scope advisory: large uncommitted diff detected (14 files, 1868 lines; thresholds: 25 files / 1200 lines).
+Prioritize highest-risk findings first and report actionable issues early; avoid exhaustive low-signal traversal before surfacing initial findings.
+If full coverage is incomplete, call out residual risk areas explicitly.
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: playwright starting
+mcp: delegation ready
+mcp: openaiDeveloperDocs ready
+mcp: delegation starting
+mcp: openaiDeveloperDocs starting
+mcp: playwright starting
+mcp: delegation ready
+mcp: playwright ready
+mcp startup: ready: delegation, openaiDeveloperDocs, playwright
+mcp: openaiDeveloperDocs ready
+mcp: playwright ready
+mcp startup: ready: delegation, openaiDeveloperDocs, playwright
+
+
+thinking
+**Reviewing JSON findings**
+
+I need to produce a JSON review of the findings. The user emphasizes starting with the touched paths and scoped diff commands, instead of diving into memory or documentation right away. Since this is a non-trivial review, I’ll check the repo status and the diffs first, and might consult memory later if needed. Essentially, my first step is to identify any bugs in the changes and analyze the relevant files for potential fixes.
+thinking
+**Updating the work plan**
+
+I’m considering whether I need to update the plan for this task because it involves a review. It seems sensible to keep things organized by using a clear plan. I should remember to use commentary for any tool calls I make along the way. So, let’s start by inspecting the git status and checking the diff stats to ensure I’m fully aware of the current state before moving forward.
+thinking
+**Reviewing JSON findings**
+
+I need to produce a JSON review of the findings. The user emphasizes starting with the touched paths and scoped diff commands, instead of diving into memory or documentation right away. Since this is a non-trivial review, I’ll check the repo status and the diffs first, and might consult memory later if needed. Essentially, my first step is to identify any bugs in the changes and analyze the relevant files for potential fixes.
+thinking
+**Updating the work plan**
+
+I’m considering whether I need to update the plan for this task because it involves a review. It seems sensible to keep things organized by using a clear plan. I should remember to use commentary for any tool calls I make along the way. So, let’s start by inspecting the git status and checking the diff stats to ensure I’m fully aware of the current state before moving forward.
+Plan update
+  → Inspect touched diff and identify code files with behavioral changes
+  • Review nearby implementation and tests for regressions or gaps
+  • Summarize actionable findings and overall correctness
+exec
+/bin/zsh -lc "git status --short && echo '---' && git diff --stat -- docs/TASKS.md docs/docs-freshness-registry.json docs/standalone-review-guide.md scripts/lib/review-execution-state.ts tasks/index.json tests/review-execution-state.spec.ts tests/run-review.spec.ts .agent/task/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md docs/PRD-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md docs/findings/1109-standalone-review-audit-exported-env-startup-anchor-propagation-deliberation.md tasks/specs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md tasks/tasks-1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md" in /Users/kbediako/Code/CO succeeded in 0ms:
+ M docs/TASKS.md
+ M docs/docs-freshness-registry.json
+ M docs/standalone-review-guide.md
+ M scripts/lib/review-execution-state.ts
+ M tasks/index.json
+ M tests/review-execution-state.spec.ts
+ M tests/run-review.spec.ts
+?? .agent/task/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+?? docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+?? docs/PRD-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+?? docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+?? docs/findings/1109-standalone-review-audit-exported-env-startup-anchor-propagation-deliberation.md
+?? tasks/specs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+?? tasks/tasks-1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md
+---
+ docs/TASKS.md                         |   1 +
+ docs/docs-freshness-registry.json     |  49 +++
+ docs/standalone-review-guide.md       |   1 +
+ scripts/lib/review-execution-state.ts | 679 ++++++++++++++++++++++++++++++----
+ tasks/index.json                      |  16 +
+
+thinking
+I need to inspect the main code differences. It seems like looking into the specific changes between the files will help clarify what's happening. I'll dive into the code file and analyze the differences to ensure everything is working as expected. This process can sometimes be tedious, but I want to get a clear picture of any modifications made. It's crucial for maintaining quality and functionality, so let's get started on that!
+thinking
+I need to inspect the main code differences. It seems like looking into the specific changes between the files will help clarify what's happening. I'll dive into the code file and analyze the differences to ensure everything is working as expected. This process can sometimes be tedious, but I want to get a clear picture of any modifications made. It's crucial for maintaining quality and functionality, so let's get started on that!
+exec
+/bin/zsh -lc 'git diff -- scripts/lib/review-execution-state.ts tests/review-execution-state.spec.ts tests/run-review.spec.ts' in /Users/kbediako/Code/CO succeeded in 0ms:
+diff --git a/scripts/lib/review-execution-state.ts b/scripts/lib/review-execution-state.ts
+index 63dc3ee7f..e01f405bd 100644
+--- a/scripts/lib/review-execution-state.ts
++++ b/scripts/lib/review-execution-state.ts
+@@ -69,6 +69,7 @@ export type ReviewCommandIntentViolationKind =
+ 
+ export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
+ export type ReviewStartupAnchorMode = 'diff' | 'audit';
++type ReviewShellDialect = 'bashlike' | 'zsh' | 'other';
+ 
+ export interface ReviewOutputSummary {
+   lineCount: number;
+@@ -911,19 +912,26 @@ function normalizeReviewCommandLine(line: string): string {
+   return trimmed;
+ }
+ 
+-function splitShellControlSegments(command: string): string[] {
++type ShellControlSeparator = ';' | '\n' | '&&' | '||' | '|' | '&' | null;
++
++type ShellControlSegment = {
+
+thinking
+**Inspecting for context**
+
+I need to examine the surrounding implementation for better context, which includes looking at existing functions and their usages. It might be helpful to run some targeted searches to identify any actual bugs. I'll focus on inspecting the relevant function definitions in the areas that have changed since there might be hidden issues. Using `sed` around important lines could aid in my process, so I'll be mindful of that as I dig deeper.
+thinking
+**Inspecting for context**
+
+I need to examine the surrounding implementation for better context, which includes looking at existing functions and their usages. It might be helpful to run some targeted searches to identify any actual bugs. I'll focus on inspecting the relevant function definitions in the areas that have changed since there might be hidden issues. Using `sed` around important lines could aid in my process, so I'll be mindful of that as I dig deeper.
+exec
+/bin/zsh -lc "sed -n '900,1180p' scripts/lib/review-execution-state.ts && echo '---CUT---' && sed -n '1380,1760p' scripts/lib/review-execution-state.ts && echo '---CUT---' && sed -n '1760,2060p' scripts/lib/review-execution-state.ts && echo '---CUT---' && sed -n '2060,2520p' scripts/lib/review-execution-state.ts && echo '---CUT---' && sed -n '2520,2890p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const succeededIndex = trimmed.indexOf(' succeeded in ');
+  if (succeededIndex >= 0) {
+    return trimmed.slice(0, succeededIndex).trimEnd();
+  }
+  const exitedIndex = trimmed.indexOf(' exited ');
+  if (exitedIndex >= 0) {
+    return trimmed.slice(0, exitedIndex).trimEnd();
+  }
+  return trimmed;
+}
+
+type ShellControlSeparator = ';' | '\n' | '&&' | '||' | '|' | '&' | null;
+
+type ShellControlSegment = {
+  segment: string;
+  separatorAfter: ShellControlSeparator;
+
+thinking
+**Investigating code changes**
+
+I think I might need to look into the classifyMetaSurfaceOperand more closely, but only if it's relevant. I also need to identify any potential regressions from the recent code changes, likely in the shell modeling.
+
+I should check out the extractShellCommandPayload and unwrapEnvCommandTokens to try understanding the nested shell environment handling better. I'll search through the relevant functions to gather more information.
+thinking
+**Investigating code changes**
+
+I think I might need to look into the classifyMetaSurfaceOperand more closely, but only if it's relevant. I also need to identify any potential regressions from the recent code changes, likely in the shell modeling.
+
+I should check out the extractShellCommandPayload and unwrapEnvCommandTokens to try understanding the nested shell environment handling better. I'll search through the relevant functions to gather more information.
+exec
+/bin/zsh -lc "grep -n \"function unwrapEnvCommandTokens\\|function extractShellCommandPayload\\|function resolveShellPayloadIndex\\|function isAllowedAuditMetaSurfaceSample\\|function normalizeAuditMetaSurfaceEnvVar\" -n scripts/lib/review-execution-state.ts && echo '---' && sed -n '1160,1380p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+1181:function unwrapEnvCommandTokens(tokens: string[]): string[] {
+1283:function extractShellCommandPayload(tokens: string[]): string | null {
+2537:function isAllowedAuditMetaSurfaceSample(
+2556:function normalizeAuditMetaSurfaceEnvVar(candidate: string): string | null {
+2562:function normalizeAuditMetaSurfaceEnvVarPathMap(
+---
+          continue;
+        }
+        if (candidate.startsWith('-')) {
+          index += packageOptionConsumesValue(candidate) ? 2 : 1;
+          continue;
+        }
+        return candidateNormalized;
+      }
+      return null;
+    }
+
+    if (token.startsWith('-')) {
+      index += packageOptionConsumesValue(token) ? 2 : 1;
+      continue;
+[run-review] waiting on codex review (1m 0s elapsed, 5s idle; review progress observed).
+
+thinking
+**Inspecting shell semantics**
+
+I think I need to look into existing tests related to shell semantics. Maybe I could run targeted commands or use a JavaScript REPL, but that probably isn't necessary right now. I need to reason through the bugs first, so inspecting the file history might be a good idea. I could also compare it with the base, but they seem different enough. I should seriously consider inspecting all uses of classifyMetaSurfaceDirectDetailed, resolveAuditMetaSurfaceEnvOperandPath, and others. I'll search for those!
+thinking
+**Inspecting shell semantics**
+
+I think I need to look into existing tests related to shell semantics. Maybe I could run targeted commands or use a JavaScript REPL, but that probably isn't necessary right now. I need to reason through the bugs first, so inspecting the file history might be a good idea. I could also compare it with the base, but they seem different enough. I should seriously consider inspecting all uses of classifyMetaSurfaceDirectDetailed, resolveAuditMetaSurfaceEnvOperandPath, and others. I'll search for those!
+exec
+/bin/zsh -lc "rg -n \"classifyMetaSurfaceDirectDetailed\\(|resolveAuditMetaSurfaceEnvOperandPath\\(|buildCommandEnvAssignments\\(|buildNestedShellEnvState\\(|commandUsesCleanEnvironment\\(|collectInlineEnvUnsetVars\\(\" scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+1589:  for (const envVar of collectInlineEnvUnsetVars(rawTokens)) {
+1608:function buildCommandEnvAssignments(
+1612:  const envAssignments = commandUsesCleanEnvironment(rawTokens)
+1621:function buildNestedShellEnvState(
+1626:  const usesCleanEnvironment = commandUsesCleanEnvironment(rawTokens);
+1819:  const envAssignments = buildCommandEnvAssignments(shellEnvState, rawTokens);
+1840:      let nestedShellEnvState = buildNestedShellEnvState(shellEnvState, rawTokens);
+1882:  const metaSurfaceSamples = classifyMetaSurfaceDirectDetailed(
+1967:  const resolvedEnvPath = resolveAuditMetaSurfaceEnvOperandPath(
+2030:function commandUsesCleanEnvironment(tokens: string[]): boolean {
+2072:function collectInlineEnvUnsetVars(tokens: string[]): Set<string> {
+2138:function resolveAuditMetaSurfaceEnvOperandPath(
+2283:  const envAssignments = buildCommandEnvAssignments(shellEnvState, rawTokens);
+2304:      let nestedShellEnvState = buildNestedShellEnvState(shellEnvState, rawTokens);
+2338:  const metaSurfaceSamples = classifyMetaSurfaceDirectDetailed(
+2474:  return classifyMetaSurfaceDirectDetailed(command, args, touchedPaths, repoRoot).map((sample) => sample.kind);
+2477:function classifyMetaSurfaceDirectDetailed(
+2489:    const resolvedEnvPath = resolveAuditMetaSurfaceEnvOperandPath(
+
+
+
+
+[run-review] waiting on codex review (2m 0s elapsed, 11s idle; review progress observed).
+
+
+thinking
+**Analyzing test possibilities**
+
+I need to inspect potential missing tests and consider running targeted unit tests. The user mentioned avoiding full validation suites, so I'm unsure if I can execute any tests directly. It seems reviewing by reasoning might be okay, but I wonder if I should even use memory since the user suggested starting with different commands first. I should analyze the code to identify specific areas for bugs, especially in the logic for handling background commands in the shell.
+thinking
+**Clarifying job behavior**
+
+I've realized that in many shells, a background job like `cmd1` runs in a subshell, meaning exports or unsets in the background shouldn't affect the parent shell. The state carried forward after the separator following `&` returns false because it doesn't carry state from segments before it. The segment after `&` is considered to run in the parent shell, which seems fine. However, I worry about the function `inferStaticShellTruthiness`, as it seems overly simplistic and could create false negatives or positives with certain commands.
+thinking
+**Evaluating potential issues**
+
+I’m considering whether this approach is too conservative and might fail or be acceptable. I worry it could disrupt valid audit anchors or meta-surface classifications. I need to determine if the author would address this, especially since they've implemented operator-aware carry-forward across executed `&&` or `||`. However, since most commands have a previous truthiness of null, segments following those operators are assumed not to run—even though they could. I wonder if this affects the overall correctness.
+thinking
+**Rethinking shell exports**
+
+I’m considering how `VAR=foo export` works in POSIX shell. It seems like it might print exports, but I’m not sure that the assignment stays persistent after that. I don't think it's something frequently used or essential. It’s also not critical for difference-checking. I should double-check the behavior to be sure I'm on the right track, but it feels like this might just be a quirk rather than a necessary tool.
+thinking
+**Verifying zsh semantics**
+
+I'm thinking I should double-check the actual zsh semantics. It makes sense to verify what I know to ensure I'm on the right track. There's so much nuance with shell commands, and I want to make sure I'm getting it right. It’s better to confirm before proceeding, maybe checking documentation or resources. I don't want to overlook anything important!
+thinking
+**Verifying shell semantics**
+
+I'm figuring out how `nextShellEnvState` works for zsh, especially with leading assignments and export. It seems the old allowed path remains intact, which might match the intended behavior. The assumption is that an export command like `MANIFEST=/tmp export MANIFEST` sets the variable properly. The tests say it doesn't propagate, but I wonder if that's accurate. Shell semantics can be tricky, especially in zsh versus bash. I think we need to run some tests locally to clarify this!
+thinking
+**Analyzing test possibilities**
+
+I need to inspect potential missing tests and consider running targeted unit tests. The user mentioned avoiding full validation suites, so I'm unsure if I can execute any tests directly. It seems reviewing by reasoning might be okay, but I wonder if I should even use memory since the user suggested starting with different commands first. I should analyze the code to identify specific areas for bugs, especially in the logic for handling background commands in the shell.
+thinking
+**Clarifying job behavior**
+
+I've realized that in many shells, a background job like `cmd1` runs in a subshell, meaning exports or unsets in the background shouldn't affect the parent shell. The state carried forward after the separator following `&` returns false because it doesn't carry state from segments before it. The segment after `&` is considered to run in the parent shell, which seems fine. However, I worry about the function `inferStaticShellTruthiness`, as it seems overly simplistic and could create false negatives or positives with certain commands.
+thinking
+**Evaluating potential issues**
+
+I’m considering whether this approach is too conservative and might fail or be acceptable. I worry it could disrupt valid audit anchors or meta-surface classifications. I need to determine if the author would address this, especially since they've implemented operator-aware carry-forward across executed `&&` or `||`. However, since most commands have a previous truthiness of null, segments following those operators are assumed not to run—even though they could. I wonder if this affects the overall correctness.
+thinking
+**Rethinking shell exports**
+
+I’m considering how `VAR=foo export` works in POSIX shell. It seems like it might print exports, but I’m not sure that the assignment stays persistent after that. I don't think it's something frequently used or essential. It’s also not critical for difference-checking. I should double-check the behavior to be sure I'm on the right track, but it feels like this might just be a quirk rather than a necessary tool.
+thinking
+**Verifying zsh semantics**
+
+I'm thinking I should double-check the actual zsh semantics. It makes sense to verify what I know to ensure I'm on the right track. There's so much nuance with shell commands, and I want to make sure I'm getting it right. It’s better to confirm before proceeding, maybe checking documentation or resources. I don't want to overlook anything important!
+thinking
+**Verifying shell semantics**
+
+I'm figuring out how `nextShellEnvState` works for zsh, especially with leading assignments and export. It seems the old allowed path remains intact, which might match the intended behavior. The assumption is that an export command like `MANIFEST=/tmp export MANIFEST` sets the variable properly. The tests say it doesn't propagate, but I wonder if that's accurate. Shell semantics can be tricky, especially in zsh versus bash. I think we need to run some tests locally to clarify this!
+exec
+/bin/zsh -lc "python - <<'PY'
+import subprocess, textwrap
+cases = [
+    ('zsh', \"MANIFEST=/tmp/other.json export MANIFEST; printf '%s\\n' \\\""'$MANIFEST'"\\\"\"),
+    ('bash', \"MANIFEST=/tmp/other.json export MANIFEST; printf '%s\\n' \\\""'$MANIFEST'"\\\"\"),
+    ('zsh', \"unset MANIFEST; export MANIFEST="'$MANIFEST; printf '"'<%s>\\n' \\\""'$MANIFEST'"\\\"\"),
+    ('bash', \"unset MANIFEST; export MANIFEST="'$MANIFEST; printf '"'<%s>\\n' \\\""'$MANIFEST'"\\\"\"),
+]
+for shell, script in cases:
+    path = '/bin/' + shell
+    try:
+        out = subprocess.check_output([path, '-lc', script], text=True)
+        print(shell, script, '=>', out.strip())
+    except Exception as e:
+        print(shell, script, 'ERR', e)
+PY" in /Users/kbediako/Code/CO exited 127 in 0ms:
+zsh:1: command not found: python
+exec
+/bin/zsh -lc "python3 - <<'PY'
+import subprocess
+cases = [
+    ('zsh', \"MANIFEST=/tmp/other.json export MANIFEST; printf '%s\\n' \\\""'$MANIFEST'"\\\"\"),
+    ('bash', \"MANIFEST=/tmp/other.json export MANIFEST; printf '%s\\n' \\\""'$MANIFEST'"\\\"\"),
+    ('zsh', \"unset MANIFEST; export MANIFEST="'$MANIFEST; printf '"'<%s>\\n' \\\""'$MANIFEST'"\\\"\"),
+    ('bash', \"unset MANIFEST; export MANIFEST="'$MANIFEST; printf '"'<%s>\\n' \\\""'$MANIFEST'"\\\"\"),
+]
+for shell, script in cases:
+    path = '/bin/' + shell
+    proc = subprocess.run([path, '-lc', script], text=True, capture_output=True)
+    print('SHELL', shell)
+    print('SCRIPT', script)
+    print('RC', proc.returncode)
+    print('STDOUT', proc.stdout.strip())
+    print('STDERR', proc.stderr.strip())
+    print('---')
+PY" in /Users/kbediako/Code/CO succeeded in 0ms:
+SHELL zsh
+SCRIPT MANIFEST=/tmp/other.json export MANIFEST; printf '%s
+' "$MANIFEST"
+RC 0
+STDOUT /Users/kbediako/Code/CO/.runs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation-guard/cli/2026-03-10T10-32-14-103Z-c5a8e56a/manifest.json
+STDERR 
+---
+SHELL bash
+SCRIPT MANIFEST=/tmp/other.json export MANIFEST; printf '%s
+' "$MANIFEST"
+RC 0
+STDOUT /tmp/other.json
+STDERR 
+---
+SHELL zsh
+SCRIPT unset MANIFEST; export MANIFEST=$MANIFEST; printf '<%s>
+' "$MANIFEST"
+RC 0
+STDOUT <>
+STDERR 
+exec
+/bin/zsh -lc "rg -n \"allowedMetaSurfaceEnvVarPaths|auditStartupAnchorEnvVarPaths|buildOutputSummary\\(|getStartupAnchorBoundaryState\\(\" scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+176:  auditStartupAnchorEnvVarPaths?: Record<string, string>;
+177:  allowedMetaSurfaceEnvVarPaths?: Record<string, string>;
+237:  private readonly auditStartupAnchorEnvVarPaths: ReadonlyMap<string, string>;
+240:  private readonly allowedMetaSurfaceEnvVarPaths: ReadonlyMap<string, string>;
+306:    this.auditStartupAnchorEnvVarPaths = normalizeAuditMetaSurfaceEnvVarPathMap(
+307:      options.auditStartupAnchorEnvVarPaths,
+320:    this.allowedMetaSurfaceEnvVarPaths = normalizeAuditMetaSurfaceEnvVarPathMap(
+321:      options.allowedMetaSurfaceEnvVarPaths,
+364:  buildOutputSummary(): ReviewOutputSummary {
+400:    const summary = this.buildOutputSummary();
+423:    const summary = this.buildOutputSummary();
+443:  getStartupAnchorBoundaryState(nowMs = Date.now()): ReviewStartupAnchorBoundaryState {
+444:    const summary = this.buildOutputSummary();
+462:    const summary = this.buildOutputSummary();
+488:      summary: this.buildOutputSummary()
+505:    const summary = this.buildOutputSummary();
+574:            allowedMetaSurfaceEnvVarPaths: this.allowedMetaSurfaceEnvVarPaths
+643:      auditStartupAnchorEnvVarPaths: this.auditStartupAnchorEnvVarPaths
+660:    const summary = this.buildOutputSummary();
+728:    const summary = this.buildOutputSummary();
+[run-review] waiting on codex review (3m 0s elapsed, 2s idle; review progress observed).
+exec
+/bin/zsh -lc "sed -n '520,680p' scripts/lib/review-execution-state.ts" in /Users/kbediako/Code/CO succeeded in 0ms:
+      output_log_path: path.relative(options.repoRoot, options.outputLogPath),
+      summary: persistedSummary
+    };
+  }
+
+  private processLine(line: string, nowMs: number): void {
+    this.lineCount += 1;
+    const trimmed = line.trim();
+
+    if (trimmed.length > 0) {
+      this.lastLines.push(trimmed);
+      if (this.lastLines.length > this.tailLineLimit) {
+        this.lastLines.shift();
+      }
+    }
+
+    if (REVIEW_DELEGATION_STARTUP_LINE_RE.test(trimmed)) {
+      this.startupEvents += 1;
+    }
+    if (trimmed === 'thinking') {
+

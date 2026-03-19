@@ -1,7 +1,7 @@
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   formatDoctorCloudPreflightSummary,
@@ -9,6 +9,7 @@ import {
   runDoctor,
   runDoctorCloudPreflight
 } from '../src/cli/doctor.js';
+import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
 
 async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
   const binPath = join(dir, 'codex');
@@ -66,13 +67,12 @@ describe('runDoctor', () => {
       await writeFile(
         join(tempHome, 'config.toml'),
         [
-          'model = "gpt-5.3-codex"',
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
           'model_reasoning_effort = "xhigh"',
           '',
           '[agents]',
           'max_threads = 12',
-          'max_depth = 4',
-          'max_spawn_depth = 4',
           '',
           '[mcp_servers.chrome-devtools]',
           'command = "npx"',
@@ -88,10 +88,13 @@ describe('runDoctor', () => {
       expect(result.devtools.config.status).toBe('ok');
       expect(result.codex_defaults.status).toBe('ok');
       expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.review_model.status).toBe('ok');
       expect(result.codex_defaults.checks.model_reasoning_effort.status).toBe('ok');
       expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
       expect(result.codex_defaults.checks.max_depth.status).toBe('ok');
       expect(result.codex_defaults.checks.max_spawn_depth.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_depth.actual).toBeNull();
+      expect(result.codex_defaults.checks.max_spawn_depth.actual).toBeNull();
 
       const summary = formatDoctorSummary(result).join('\n');
       for (const name of names) {
@@ -99,6 +102,69 @@ describe('runDoctor', () => {
       }
       expect(summary).toContain('DevTools: ok');
       expect(summary).toContain('Codex defaults advisory: ok');
+      expect(summary).toContain('review_model: ok');
+      expect(summary).toContain('agents.max_depth: ok (actual: <unset>, expected >= 4 when set; <unset> accepted)');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('reports delegation readiness when config declares the delegation MCP entry', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        ['mcp_servers."delegation" = { command = "codex-orchestrator" } # keep enabled'].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.delegation.status).toBe('ok');
+      expect(result.delegation.config.status).toBe('ok');
+      expect(formatDoctorSummary(result).join('\n')).toContain('Delegation: ok');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('flags review_model when it does not match the baseline', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.3-codex"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
+      expect(result.codex_defaults.checks.review_model.actual).toBe('gpt-5.3-codex');
+      expect(formatDoctorSummary(result).join('\n')).toContain(
+        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.4)'
+      );
     } finally {
       if (originalCodexHome === undefined) {
         delete process.env.CODEX_HOME;
@@ -661,6 +727,83 @@ describe('runDoctor', () => {
       expect(result.details.environment_id).toBe('env_stage_meta');
       expect(result.issues).toHaveLength(0);
     } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('passes the shared cloud-preflight request contract while preserving doctor precedence', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-shared-contract-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_stage_meta' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    const runCloudPreflightSpy = vi
+      .spyOn(cloudPreflight, 'runCloudPreflight')
+      .mockImplementation(async (request) => ({
+        ok: true,
+        issues: [],
+        details: {
+          codexBin: request.codexBin,
+          environmentId: request.environmentId,
+          branch: typeof request.branch === 'string' ? request.branch.replace(/^refs\/heads\//u, '') : null
+        }
+      }));
+
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        branch: ' refs/heads/option-branch ',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_from_env',
+          CODEX_CLOUD_BRANCH: 'refs/heads/env-branch'
+        }
+      });
+
+      expect(runCloudPreflightSpy).toHaveBeenCalledOnce();
+      const [request] = runCloudPreflightSpy.mock.calls[0] ?? [];
+      expect(request).toBeDefined();
+      expect(request?.repoRoot).toBe(tempDir);
+      expect(request?.codexBin).toBe(fakeCodexBin);
+      expect(request?.environmentId).toBe('env_stage_meta');
+      expect(request?.branch).toBe('refs/heads/option-branch');
+      expect(request?.env).toEqual(
+        expect.objectContaining({
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_from_env',
+          CODEX_CLOUD_BRANCH: 'refs/heads/env-branch'
+        })
+      );
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_stage_meta');
+      expect(result.details.branch).toBe('option-branch');
+    } finally {
+      runCloudPreflightSpy.mockRestore();
       await rm(tempDir, { recursive: true, force: true });
     }
   });

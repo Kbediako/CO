@@ -1,0 +1,11 @@
+# 1206 Targeted Validation Evidence
+
+- Focused executor file:
+  - `npx vitest run orchestrator/tests/OrchestratorCloudTargetExecutor.test.ts`
+  - Result: `11/11` tests passed
+- Deterministic blank-parent-env repro:
+  - `CODEX_NON_INTERACTIVE='' CODEX_NO_INTERACTIVE='' CODEX_INTERACTIVE='' npx vitest run orchestrator/tests/OrchestratorCloudTargetExecutor.test.ts -t "falls back to defaults when optional request env values are blank or invalid"`
+  - Result: `1/1` test passed
+- Late-suite confidence run:
+  - `npx vitest run orchestrator/tests/OrchestratorCloudTargetExecutor.test.ts tests/run-review.spec.ts tests/cli-command-surface.spec.ts tests/cli-orchestrator.spec.ts`
+  - Result: `4/4` files passed and `204/204` tests passed

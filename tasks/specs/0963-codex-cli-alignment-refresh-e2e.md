@@ -5,7 +5,7 @@ relates_to: docs/PRD-codex-cli-alignment-refresh-e2e.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-02-14
+last_review: 2026-03-19
 ---
 
 ## Summary
