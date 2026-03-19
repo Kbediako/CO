@@ -5,7 +5,7 @@ relates_to: docs/PRD-experience-prompt-injection-and-delegation-skill-harmonizat
 risk: medium
 owners:
   - Codex
-last_review: 2026-02-14
+last_review: 2026-03-19
 ---
 
 ## Summary

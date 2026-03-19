@@ -5,7 +5,7 @@ relates_to: docs/PRD-manifest-persister-throughput.md
 risk: low
 owners:
   - Codex (top-level agent)
-last_review: 2026-02-13
+last_review: 2026-03-19
 ---
 
 ## Summary

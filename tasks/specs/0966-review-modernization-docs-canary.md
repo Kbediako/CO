@@ -6,7 +6,7 @@ relates_to: docs/PRD-review-modernization-docs-canary.md
 risk: low
 owners:
   - Codex
-last_review: 2026-02-16
+last_review: 2026-03-19
 ---
 
 ## Summary
