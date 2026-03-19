@@ -152,6 +152,48 @@ export function createProviderIssueHandoffService(
       }
 
       if (claim.state === 'starting' || claim.state === 'resuming') {
+        const queuedRun = claimRuns.find((run) => run.status === 'queued');
+        if (queuedRun) {
+          if (isProviderClaimRehydrationTimedOut(claim, now)) {
+            publishRuntime ||= hasProviderClaimTransitioned(claim, {
+              state: 'handoff_failed',
+              reason: 'provider_issue_rehydration_timeout',
+              task_id: queuedRun.taskId,
+              run_id: queuedRun.runId,
+              run_manifest_path: queuedRun.manifestPath
+            });
+            upsertProviderIntakeClaim(options.state, {
+              ...claim,
+              task_id: queuedRun.taskId,
+              state: 'handoff_failed',
+              reason: 'provider_issue_rehydration_timeout',
+              run_id: queuedRun.runId,
+              run_manifest_path: queuedRun.manifestPath,
+              updated_at: now
+            });
+            continue;
+          }
+
+          publishRuntime ||= hasProviderClaimTransitioned(claim, {
+            state: claim.state,
+            reason: 'provider_issue_rehydrated_queued_run',
+            task_id: queuedRun.taskId,
+            run_id: queuedRun.runId,
+            run_manifest_path: queuedRun.manifestPath
+          });
+          upsertProviderIntakeClaim(options.state, {
+            ...claim,
+            task_id: queuedRun.taskId,
+            state: claim.state,
+            reason: 'provider_issue_rehydrated_queued_run',
+            run_id: queuedRun.runId,
+            run_manifest_path: queuedRun.manifestPath,
+            updated_at: claim.updated_at
+          });
+          hasPendingClaims = true;
+          continue;
+        }
+
         if (isProviderClaimRehydrationTimedOut(claim, now)) {
           publishRuntime ||= hasProviderClaimTransitioned(claim, {
             state: 'handoff_failed',

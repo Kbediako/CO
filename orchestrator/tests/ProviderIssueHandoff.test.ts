@@ -188,6 +188,266 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a queued child run tied to an in-flight handoff instead of launching a duplicate start', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-child'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'task-1303-child',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-child',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_rehydrated_queued_run',
+      accepted_at: '2026-03-19T04:20:00.000Z',
+      updated_at: '2026-03-19T04:20:00.000Z',
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-child',
+      run_manifest_path: childPaths.manifestPath
+    });
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => undefined),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        updated_at: '2026-03-19T04:21:00.000Z'
+      }),
+      deliveryId: 'delivery-queued',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_100_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_handoff_inflight'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_handoff_inflight',
+      run_id: 'run-child',
+      run_manifest_path: childPaths.manifestPath,
+      task_id: 'task-1303-child'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefers an in-progress child run over a newer queued child run during duplicate-event discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const queuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-queued'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-active');
+    const queuedPaths = resolveRunPaths(queuedEnv, 'run-queued');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await mkdir(queuedPaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'task-1303-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      queuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-queued',
+        task_id: 'task-1303-queued',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => undefined),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        updated_at: '2026-03-19T04:22:00.000Z'
+      }),
+      deliveryId: 'delivery-mixed-active',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_200_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_run_already_active'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_run_already_active',
+      run_id: 'run-active',
+      run_manifest_path: activePaths.manifestPath,
+      task_id: 'task-1303-active'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumes a newer failed child run instead of treating an older queued run as active', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-queued'
+    };
+    const failedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-failed'
+    };
+    const queuedPaths = resolveRunPaths(queuedEnv, 'run-queued');
+    const failedPaths = resolveRunPaths(failedEnv, 'run-failed');
+    await mkdir(queuedPaths.runDir, { recursive: true });
+    await mkdir(failedPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-queued',
+        task_id: 'task-1303-queued',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      failedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-failed',
+        task_id: 'task-1303-failed',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => undefined),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        updated_at: '2026-03-19T04:22:00.000Z'
+      }),
+      deliveryId: 'delivery-failed-after-queued',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_250_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'resume',
+      reason: 'provider_issue_resume_launched'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).toHaveBeenCalledWith({
+      runId: 'run-failed',
+      actor: 'control-host',
+      reason: 'provider-accepted-issue'
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'resuming',
+      reason: 'provider_issue_resume_launched',
+      run_id: 'run-failed',
+      run_manifest_path: failedPaths.manifestPath,
+      task_id: 'task-1303-failed'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('re-reads claim state after async run discovery before launching a duplicate handoff', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -348,6 +608,336 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'task-1303-child'
     });
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.rehydrate');
+  });
+
+  it('keeps queued child runs pending during explicit restart rehydrate', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-child'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'task-1303-child',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launchedAt = new Date().toISOString();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: launchedAt,
+      updated_at: launchedAt,
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: null,
+      run_manifest_path: null
+    });
+    const persist = vi.fn(async () => undefined);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_rehydrated_queued_run',
+      run_id: 'run-child',
+      run_manifest_path: childPaths.manifestPath,
+      task_id: 'task-1303-child'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks stale queued-only handoffs as handoff_failed during explicit restart rehydrate', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-child'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'task-1303-child',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launchedAt = new Date(Date.now() - 60_000).toISOString();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: launchedAt,
+      updated_at: launchedAt,
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: null,
+      run_manifest_path: null
+    });
+    const persist = vi.fn(async () => undefined);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_rehydration_timeout',
+      run_id: 'run-child',
+      run_manifest_path: childPaths.manifestPath,
+      task_id: 'task-1303-child'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefers an in-progress child run over a newer queued child run during explicit restart rehydrate', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const queuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-queued'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-active');
+    const queuedPaths = resolveRunPaths(queuedEnv, 'run-queued');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await mkdir(queuedPaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'task-1303-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      queuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-queued',
+        task_id: 'task-1303-queued',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launchedAt = new Date(Date.now() - 60_000).toISOString();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: launchedAt,
+      updated_at: launchedAt,
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: null,
+      run_manifest_path: null
+    });
+    const persist = vi.fn(async () => undefined);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active',
+      run_manifest_path: activePaths.manifestPath,
+      task_id: 'task-1303-active'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefers a newer failed child run over an older queued child run during explicit restart rehydrate', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-queued'
+    };
+    const failedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-failed'
+    };
+    const queuedPaths = resolveRunPaths(queuedEnv, 'run-queued');
+    const failedPaths = resolveRunPaths(failedEnv, 'run-failed');
+    await mkdir(queuedPaths.runDir, { recursive: true });
+    await mkdir(failedPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-queued',
+        task_id: 'task-1303-queued',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      failedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-failed',
+        task_id: 'task-1303-failed',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launchedAt = new Date(Date.now() - 60_000).toISOString();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: launchedAt,
+      updated_at: launchedAt,
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: null,
+      run_manifest_path: null
+    });
+    const persist = vi.fn(async () => undefined);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: 'run-failed',
+      run_manifest_path: failedPaths.manifestPath,
+      task_id: 'task-1303-failed'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 
   it('marks stale in-flight claims as handoff_failed during explicit restart rehydrate', async () => {
