@@ -37,4 +37,4 @@
 - [x] `npm run review` non-interactive handoff prompt captured. Evidence: `out/1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix/manual/20260319T114341Z-live-query-contract-fix/09-review.log`.
 - [x] `npm run pack:smoke`. Evidence: `out/1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix/manual/20260319T114341Z-live-query-contract-fix/10-pack-smoke.log`.
 - [x] Explicit elegance review pass recorded. Evidence: `out/1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix/manual/20260319T114341Z-live-query-contract-fix/12-elegance-review.md`.
-- [ ] Unresolved actionable review threads verified as `0`, or waiver recorded with evidence, before merge. Evidence: PR thread audit pending on `#279`.
+- [x] Unresolved actionable review threads verified as `0`, or waiver recorded with evidence, before merge. Evidence: PR `#279` thread audit via `gh api graphql ... reviewThreads ...` on 2026-03-19 after resolving the final CodeRabbit thread.
