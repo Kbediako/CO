@@ -347,7 +347,7 @@ function buildLinearIssueByIdQuery(issueId: string): {
   variables: Record<string, string>;
 } {
   return {
-    query: `query ResolveLiveLinearTrackedIssueById($issueId: ID!) {
+    query: `query ResolveLiveLinearTrackedIssueById($issueId: String!) {
       viewer {
         organization {
           id

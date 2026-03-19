@@ -13,6 +13,7 @@ describe('resolveLiveLinearTrackedIssueById', () => {
   it('resolves a specific Linear issue by id and preserves the normalized tracked shape', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
+      expect(body.query).toContain('$issueId: String!');
       expect(body.query).toContain('issue(id: $issueId)');
       expect(body.variables?.issueId).toBe('lin-issue-1');
       return jsonResponse({
