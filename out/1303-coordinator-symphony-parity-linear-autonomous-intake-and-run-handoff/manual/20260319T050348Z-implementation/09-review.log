@@ -2,38 +2,36 @@
 > @kbediako/codex-orchestrator@0.1.38 review
 > node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/manifest.json
 
-(node:76182) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+(node:87202) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
 --import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:76182) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(node:87202) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 ⚠️ Diff budget exceeded (override applied) (base=origin/main)
  - changed files 49 > 25
- - total lines changed 2205 > 800
+ - total lines changed 2194 > 800
 Top changed files:
-  - orchestrator/src/cli/control/providerIssueHandoff.ts: 502
-  - orchestrator/src/cli/control/providerIntakeState.ts: 310
-  - orchestrator/src/cli/controlHostCliShell.ts: 194
-  - orchestrator/tests/ProviderIssueHandoff.test.ts: 186
+  - orchestrator/src/cli/control/providerIssueHandoff.ts: 501
+  - orchestrator/src/cli/control/providerIntakeState.ts: 309
+  - orchestrator/src/cli/controlHostCliShell.ts: 193
+  - orchestrator/tests/ProviderIssueHandoff.test.ts: 185
   - orchestrator/tests/ControlRuntime.test.ts: 80
-  - docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md: 71
+  - docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md: 70
   - orchestrator/src/cli/control/selectedRunProjection.ts: 69
-  - docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md: 64
+  - docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md: 63
   - orchestrator/tests/ControlServerSeededRuntimeAssembly.test.ts: 57
   - orchestrator/tests/ControlServerSeedLoading.test.ts: 51
 
-Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1303 parity spans the provider-intake ledger, control-host CLI, manifest issue identity, observability propagation, docs updates, and regression coverage; splitting this lane would break the end-to-end intake and handoff contract under validation
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1303 parity plus final 0.115.0 docs alignment spans the provider-intake ledger, control-host CLI, manifest issue identity, observability propagation, docs updates, and regression coverage; splitting the lane would break the end-to-end intake and handoff contract under validation
 [run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
-[run-review] review scope metrics: 49 files, 2194 lines.
-[run-review] large uncommitted review scope detected (49 files, 2194 lines; thresholds: 25 files / 1200 lines).
-[run-review] this scope profile is known to produce long CO review traversals; prefer scoped reviews (`--base`/`--commit`) when practical.
+[run-review] review scope metrics: 3 files, 128 lines.
 Codex review handoff (non-interactive):
 ---
 Review task: 1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff
 Review surface: diff
 
 Agent notes:
-Goal: Land Symphony parity for provider-driven autonomous intake and run handoff while preserving CO execution authority. | Summary: Added a persistent control-host CLI, provider intake ledger and handoff service, deterministic issue identity propagation, restart rehydration, and coherent Telegram and observability surfaces after autonomous start or resume. | Risks: Validate claim idempotency, selected-run projection, and host-child lifecycle boundaries.
+Goal: Land Symphony parity for provider-driven autonomous intake and run handoff while preserving CO execution authority, then fold the remaining 0.115.0 docs alignment into the same branch. | Summary: Added a persistent control-host CLI, provider intake ledger and handoff service, deterministic issue identity propagation, restart rehydration, coherent Telegram and observability surfaces, and the matching version-policy doc alignment. | Risks: Validate claim idempotency, selected-run projection, host-child lifecycle boundaries, and final docs alignment.
 
 Please review the current changes and confirm:
 - The solution is minimal and avoids unnecessary abstraction/scope
@@ -53,62 +51,12 @@ Execution constraints (bounded review mode):
 
 Review scope hint: uncommitted working tree changes (default).
 
-Review scope paths (49):
+Review scope paths (3):
 ```
-AGENTS.md
-bin/codex-orchestrator.ts
-docs/AGENTS.md
-docs/TASKS.md
-docs/docs-freshness-registry.json
-docs/guides/codex-version-policy.md
-orchestrator/src/cli/control/compatibilityIssuePresenter.ts
-orchestrator/src/cli/control/controlPersistenceFiles.ts
-orchestrator/src/cli/control/controlRequestContext.ts
-orchestrator/src/cli/control/controlRequestRouteDispatch.ts
-orchestrator/src/cli/control/controlRuntime.ts
-orchestrator/src/cli/control/controlServerOwnedRuntimeLifecycle.ts
-orchestrator/src/cli/control/controlServerPublicLifecycle.ts
-orchestrator/src/cli/control/controlServerSeedLoading.ts
-orchestrator/src/cli/control/controlServerSeededRuntimeAssembly.ts
-orchestrator/src/cli/control/controlServerStartupInputPreparation.ts
-orchestrator/src/cli/control/controlTelegramReadController.ts
-orchestrator/src/cli/control/linearWebhookController.ts
-orchestrator/src/cli/control/observabilityReadModel.ts
-orchestrator/src/cli/control/observabilitySurface.ts
-orchestrator/src/cli/control/selectedRunProjection.ts
-orchestrator/src/cli/control/telegramOversightBridgeRuntimeLifecycle.ts
-orchestrator/src/cli/run/manifest.ts
-orchestrator/src/cli/services/orchestratorStartPreparationShell.ts
-orchestrator/src/cli/startCliRequestShell.ts
-orchestrator/src/cli/startCliShell.ts
-orchestrator/src/cli/types.ts
-orchestrator/tests/ControlRuntime.test.ts
-orchestrator/tests/ControlServer.test.ts
-orchestrator/tests/ControlServerSeedLoading.test.ts
-orchestrator/tests/ControlServerSeededRuntimeAssembly.test.ts
-orchestrator/tests/ControlServerStartupInputPreparation.test.ts
-orchestrator/tests/LinearWebhookController.test.ts
-orchestrator/tests/OrchestratorStartPreparationShell.test.ts
-orchestrator/tests/TelegramOversightBridgeRuntimeLifecycle.test.ts
-packages/shared/manifest/types.ts
-schemas/manifest.json
-tasks/index.json
-.agent/task/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md
-docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md
-docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md
-docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md
-docs/findings/1303-symphony-parity-linear-autonomous-intake-and-run-handoff-deliberation.md
-orchestrator/src/cli/control/providerIntakeState.ts
-orchestrator/src/cli/control/providerIssueHandoff.ts
-orchestrator/src/cli/controlHostCliShell.ts
-orchestrator/tests/ProviderIssueHandoff.test.ts
-tasks/specs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md
-tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md
+out/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/manual/20260319T050348Z-implementation/06-docs-check.log
+out/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/manual/20260319T050348Z-implementation/08-diff-budget.log
+out/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/manual/20260319T050348Z-implementation/09-review.log
 ```
-
-Scope advisory: large uncommitted diff detected (49 files, 2194 lines; thresholds: 25 files / 1200 lines).
-Prioritize highest-risk findings first and report actionable issues early; avoid exhaustive low-signal traversal before surfacing initial findings.
-If full coverage is incomplete, call out residual risk areas explicitly.
 ---
 Review prompt saved to: .runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/review/prompt.txt
 Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.
