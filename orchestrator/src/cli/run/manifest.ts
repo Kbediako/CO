@@ -29,6 +29,10 @@ export interface ManifestBootstrapOptions {
   taskSlug: string | null;
   approvalPolicy?: string | null;
   planTargetId?: string | null;
+  issueProvider?: string | null;
+  issueId?: string | null;
+  issueIdentifier?: string | null;
+  issueUpdatedAt?: string | null;
 }
 
 export interface GuardrailStatusSnapshot {
@@ -101,6 +105,10 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     artifact_root: relativeToRepo(env, paths.runDir),
     compat_path: relative(env.repoRoot, dirname(paths.compatManifestPath)),
     log_path: relativeToRepo(env, paths.logPath),
+    issue_provider: options.issueProvider ?? null,
+    issue_id: options.issueId ?? null,
+    issue_identifier: options.issueIdentifier ?? null,
+    issue_updated_at: options.issueUpdatedAt ?? null,
     summary: null,
     metrics_recorded: false,
     resume_token: resumeToken,

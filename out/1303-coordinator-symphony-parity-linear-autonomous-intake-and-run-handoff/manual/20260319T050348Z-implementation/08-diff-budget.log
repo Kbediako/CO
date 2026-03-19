@@ -1,0 +1,16 @@
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 49 > 25
+ - total lines changed 2205 > 800
+Top changed files:
+  - orchestrator/src/cli/control/providerIssueHandoff.ts: 502
+  - orchestrator/src/cli/control/providerIntakeState.ts: 310
+  - orchestrator/src/cli/controlHostCliShell.ts: 194
+  - orchestrator/tests/ProviderIssueHandoff.test.ts: 186
+  - orchestrator/tests/ControlRuntime.test.ts: 80
+  - docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md: 71
+  - orchestrator/src/cli/control/selectedRunProjection.ts: 69
+  - docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md: 64
+  - orchestrator/tests/ControlServerSeededRuntimeAssembly.test.ts: 57
+  - orchestrator/tests/ControlServerSeedLoading.test.ts: 51
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1303 parity spans the provider-intake ledger, control-host CLI, manifest issue identity, observability propagation, docs updates, and regression coverage; splitting this lane would break the end-to-end intake and handoff contract under validation

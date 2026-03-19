@@ -29,7 +29,15 @@ import {
   normalizeLinearAdvisoryState,
   type LinearAdvisoryState
 } from './linearWebhookController.js';
-import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
+import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
+import {
+  normalizeProviderIntakeState,
+  type ProviderIntakeState
+} from './providerIntakeState.js';
+import {
+  LINEAR_ADVISORY_STATE_FILE,
+  PROVIDER_INTAKE_STATE_FILE
+} from './controlPersistenceFiles.js';
 import type {
   ControlRequestPersist,
   ControlRequestSharedContext,
@@ -48,6 +56,11 @@ interface ControlServerSeededRuntimeAssemblyOptions {
   questionsSeed: { questions?: QuestionRecord[] } | null;
   delegationSeed: { tokens?: DelegationTokenRecord[] } | null;
   linearAdvisorySeed: LinearAdvisoryState | null;
+  providerIntakeSeed: ProviderIntakeState | null;
+  createProviderIssueHandoff?: ((input: {
+    providerIntakeState: ProviderIntakeState;
+    persistProviderIntake: () => Promise<void>;
+  }) => ProviderIssueHandoffService) | null;
 }
 
 export interface ControlServerSeededRuntimeAssembly {
@@ -123,11 +136,13 @@ export function createControlServerSeededRuntimeAssembly(
   const delegationTokens = new DelegationTokenStore({ seed: options.delegationSeed?.tokens ?? [] });
   const sessionTokens = new SessionTokenStore(options.sessionTtlMs);
   const linearAdvisoryState = normalizeLinearAdvisoryState(options.linearAdvisorySeed);
+  const providerIntakeState = normalizeProviderIntakeState(options.providerIntakeSeed);
   const controlRuntime = createControlRuntime({
     controlStore,
     questionQueue,
     paths: options.paths,
-    linearAdvisoryState
+    linearAdvisoryState,
+    providerIntakeState
   });
 
   const clients = new Set<http.ServerResponse>();
@@ -137,14 +152,21 @@ export function createControlServerSeededRuntimeAssembly(
     runtime: controlRuntime
   });
   const linearAdvisoryStatePath = join(options.paths.runDir, LINEAR_ADVISORY_STATE_FILE);
+  const providerIntakeStatePath = join(options.paths.runDir, PROVIDER_INTAKE_STATE_FILE);
   const persist = {
     control: async () => writeJsonAtomic(options.paths.controlPath, controlStore.snapshot()),
     confirmations: async () => writeJsonAtomic(options.paths.confirmationsPath, confirmationStore.snapshot()),
     questions: async () => writeJsonAtomic(options.paths.questionsPath, { questions: questionQueue.list() }),
     delegationTokens: async () =>
       writeJsonAtomic(options.paths.delegationTokensPath, { tokens: delegationTokens.list() }),
-    linearAdvisory: async () => writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState)
+    linearAdvisory: async () => writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState),
+    providerIntake: async () => writeJsonAtomic(providerIntakeStatePath, providerIntakeState)
   } satisfies ControlRequestPersist;
+  const providerIssueHandoff =
+    options.createProviderIssueHandoff?.({
+      providerIntakeState,
+      persistProviderIntake: persist.providerIntake ?? (async () => undefined)
+    }) ?? null;
   const requestContextShared = {
     token: options.token,
     controlStore,
@@ -158,6 +180,8 @@ export function createControlServerSeededRuntimeAssembly(
     eventTransport,
     paths: options.paths,
     linearAdvisoryState,
+    providerIntakeState,
+    providerIssueHandoff,
     runtime: controlRuntime
   } satisfies ControlRequestSharedContext;
 

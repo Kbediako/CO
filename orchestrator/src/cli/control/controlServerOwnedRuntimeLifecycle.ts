@@ -72,7 +72,13 @@ export async function closeControlServerOwnedRuntime(
     client.end();
   }
 
-  await new Promise<void>((resolve) => {
-    options.server.close(() => resolve());
+  await new Promise<void>((resolve, reject) => {
+    options.server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
   });
 }

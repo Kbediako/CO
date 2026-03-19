@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
 import { createHmac } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
@@ -162,6 +162,15 @@ async function readTextOrNull(path: string): Promise<string | null> {
 }
 
 describe('ControlServer', () => {
+  beforeEach(() => {
+    // Keep this suite hermetic even when the operator shell has live Telegram oversight env configured.
+    vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '0');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('formats IPv6 hosts for base URLs', () => {
     expect(formatHostForUrl('127.0.0.1')).toBe('127.0.0.1');
     expect(formatHostForUrl('::1')).toBe('[::1]');

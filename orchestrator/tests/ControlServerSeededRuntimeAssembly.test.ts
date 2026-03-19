@@ -5,9 +5,13 @@ import { tmpdir } from 'node:os';
 
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
-import { LINEAR_ADVISORY_STATE_FILE } from '../src/cli/control/controlPersistenceFiles.js';
+import {
+  LINEAR_ADVISORY_STATE_FILE,
+  PROVIDER_INTAKE_STATE_FILE
+} from '../src/cli/control/controlPersistenceFiles.js';
 import { createControlServerSeededRuntimeAssembly } from '../src/cli/control/controlServerSeededRuntimeAssembly.js';
 import type { LinearAdvisoryState } from '../src/cli/control/linearWebhookController.js';
+import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
 
 async function createRunRoot(taskId: string) {
   const root = await mkdtemp(join(tmpdir(), 'control-server-seeded-runtime-'));
@@ -39,7 +43,8 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         confirmationsSeed: null,
         questionsSeed: null,
         delegationSeed: null,
-        linearAdvisorySeed: null
+        linearAdvisorySeed: null,
+        providerIntakeSeed: null
       });
       const context = assembly.requestContextShared;
 
@@ -83,7 +88,8 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         confirmationsSeed: null,
         questionsSeed: null,
         delegationSeed: null,
-        linearAdvisorySeed: null
+        linearAdvisorySeed: null,
+        providerIntakeSeed: null
       });
 
       expect(assembly.requestContextShared.controlStore.snapshot().feature_toggles).toEqual({
@@ -109,6 +115,14 @@ describe('createControlServerSeededRuntimeAssembly', () => {
       tracked_issue: null,
       seen_deliveries: []
     };
+    const seededProviderIntake: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-09T00:00:30.000Z',
+      rehydrated_at: null,
+      latest_provider_key: null,
+      latest_reason: null,
+      claims: []
+    };
 
     try {
       const assembly = createControlServerSeededRuntimeAssembly({
@@ -127,7 +141,8 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         confirmationsSeed: null,
         questionsSeed: null,
         delegationSeed: null,
-        linearAdvisorySeed: seededAdvisory
+        linearAdvisorySeed: seededAdvisory,
+        providerIntakeSeed: seededProviderIntake
       });
       const context = assembly.requestContextShared;
 
@@ -168,12 +183,36 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         outcome: 'accepted',
         reason: 'linear_delivery_accepted'
       });
+      context.providerIntakeState = context.providerIntakeState ?? seededProviderIntake;
+      context.providerIntakeState.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:ISSUE-1',
+        issue_id: 'ISSUE-1',
+        issue_identifier: 'PRE-1',
+        issue_title: 'Seeded issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-09T00:01:00.000Z',
+        task_id: 'linear-issue-1',
+        mapping_source: 'provider_id_fallback',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        accepted_at: '2026-03-09T00:01:00.000Z',
+        updated_at: '2026-03-09T00:01:00.000Z',
+        last_delivery_id: 'delivery-1',
+        last_event: 'issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_700_000_000_000,
+        run_id: null,
+        run_manifest_path: null
+      });
 
       await context.persist.control();
       await context.persist.confirmations();
       await context.persist.questions();
       await context.persist.delegationTokens();
       await context.persist.linearAdvisory();
+      await context.persist.providerIntake?.();
 
       const controlSnapshot = JSON.parse(await readFile(paths.controlPath, 'utf8')) as {
         control_seq: number;
@@ -227,6 +266,16 @@ describe('createControlServerSeededRuntimeAssembly', () => {
       expect(advisorySnapshot.latest_result).toBe('accepted');
       expect(advisorySnapshot.latest_reason).toBe('linear_delivery_accepted');
       expect(advisorySnapshot.seen_deliveries).toHaveLength(1);
+
+      const providerIntakeSnapshot = JSON.parse(
+        await readFile(join(paths.runDir, PROVIDER_INTAKE_STATE_FILE), 'utf8')
+      ) as ProviderIntakeState;
+      expect(providerIntakeSnapshot.claims).toHaveLength(1);
+      expect(providerIntakeSnapshot.claims[0]).toMatchObject({
+        provider_key: 'linear:ISSUE-1',
+        state: 'starting',
+        task_id: 'linear-issue-1'
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }

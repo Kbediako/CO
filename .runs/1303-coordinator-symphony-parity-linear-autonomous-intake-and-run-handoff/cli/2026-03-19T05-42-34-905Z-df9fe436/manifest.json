@@ -1,0 +1,345 @@
+{
+  "version": 1,
+  "task_id": "1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff",
+  "task_slug": "1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff",
+  "run_id": "2026-03-19T05-42-34-905Z-df9fe436",
+  "parent_run_id": null,
+  "pipeline_id": "diagnostics",
+  "pipeline_title": "Diagnostics Pipeline",
+  "runner": "codex-cli",
+  "approval_policy": null,
+  "status": "failed",
+  "status_detail": "stage:delegation-guard:failed",
+  "started_at": "2026-03-19T05:42:34.906Z",
+  "completed_at": "2026-03-19T05:42:40.089Z",
+  "updated_at": "2026-03-19T05:42:40.093Z",
+  "heartbeat_at": "2026-03-19T05:42:40.089Z",
+  "heartbeat_interval_seconds": 5,
+  "heartbeat_stale_after_seconds": 30,
+  "artifact_root": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436",
+  "compat_path": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/mcp/2026-03-19T05-42-34-905Z-df9fe436",
+  "log_path": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/runner.ndjson",
+  "summary": "Stage 'Run delegation guard' failed with exit code 1.\nGuardrails: spec-guard partial (1 pending of 1).",
+  "metrics_recorded": true,
+  "resume_token": "a262fa83a0fd8582ceb49f034aeb27d31fc6a87551d64e765093190484fbfff0",
+  "resume_events": [],
+  "approvals": [],
+  "commands": [
+    {
+      "index": 1,
+      "id": "delegation-guard",
+      "title": "Run delegation guard",
+      "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/delegationGuardRunner.js\"",
+      "kind": "command",
+      "status": "failed",
+      "started_at": "2026-03-19T05:42:34.989Z",
+      "completed_at": "2026-03-19T05:42:40.088Z",
+      "exit_code": 1,
+      "summary": "Exited with code 1",
+      "log_path": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/commands/01-delegation-guard.ndjson",
+      "error_file": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/errors/01-delegation-guard.json",
+      "sub_run_id": null
+    },
+    {
+      "index": 2,
+      "id": "build",
+      "title": "npm run build",
+      "command": "npm run build",
+      "kind": "command",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "exit_code": null,
+      "summary": null,
+      "log_path": null,
+      "error_file": null,
+      "sub_run_id": null
+    },
+    {
+      "index": 3,
+      "id": "lint",
+      "title": "npm run lint",
+      "command": "npm run lint",
+      "kind": "command",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "exit_code": null,
+      "summary": null,
+      "log_path": null,
+      "error_file": null,
+      "sub_run_id": null
+    },
+    {
+      "index": 4,
+      "id": "test",
+      "title": "npm run test",
+      "command": "npm run test",
+      "kind": "command",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "exit_code": null,
+      "summary": null,
+      "log_path": null,
+      "error_file": null,
+      "sub_run_id": null
+    },
+    {
+      "index": 5,
+      "id": "spec-guard",
+      "title": "node scripts/spec-guard.mjs --dry-run",
+      "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js\" --dry-run",
+      "kind": "command",
+      "status": "pending",
+      "started_at": null,
+      "completed_at": null,
+      "exit_code": null,
+      "summary": null,
+      "log_path": null,
+      "error_file": null,
+      "sub_run_id": null
+    }
+  ],
+  "collab_tool_calls": [],
+  "child_runs": [],
+  "run_summary_path": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/run-summary.json",
+  "plan_target_id": "diagnostics:delegation-guard",
+  "instructions_hash": "ac5d41bc4ceb8fd9b1e07715d47c18b6b9272f2a60fdfc2077a8f69a1eb5d0ca",
+  "instructions_sources": [
+    "AGENTS.md",
+    "docs/AGENTS.md",
+    ".agent/AGENTS.md"
+  ],
+  "prompt_packs": [
+    {
+      "id": "tfgrpo-diagnostics",
+      "domain": "diagnostics",
+      "stamp": "318c254d1a868bffe9e3dd78bd1b92cad7f20d130bd31c4573d2fceda333f838",
+      "experience_slots": 1,
+      "sources": [
+        ".agent/prompts/mcp-diagnostics.md",
+        ".agent/prompts/mcp-diagnostics.md",
+        ".agent/prompts/mcp-diagnostics.md",
+        ".agent/prompts/mcp-diagnostics.md",
+        ".agent/prompts/mcp-diagnostics.md"
+      ]
+    },
+    {
+      "id": "tfgrpo-implementation",
+      "domain": "implementation",
+      "stamp": "f690d89bb2ba6c5ffbd0e6808a367f1bfa0bf933b07f164c0f1937d676436ad3",
+      "experience_slots": 3,
+      "sources": [
+        ".agent/prompts/hotswap-implementation.md",
+        ".agent/prompts/hotswap-implementation.md",
+        ".agent/prompts/hotswap-implementation.md",
+        ".agent/prompts/hotswap-implementation.md",
+        ".agent/prompts/hotswap-implementation.md"
+      ]
+    },
+    {
+      "id": "crystalizer-v1",
+      "domain": "learning",
+      "stamp": "d111894654b09369a0057cad64e44f44ee6f30ef0a4f43c99769e61115549517",
+      "experience_slots": 0,
+      "sources": [
+        ".agent/prompts/crystalizer.md",
+        ".agent/prompts/crystalizer.md"
+      ]
+    }
+  ],
+  "guardrails_required": true,
+  "runtime_mode_requested": "appserver",
+  "runtime_mode": "appserver",
+  "runtime_provider": "AppServerRuntimeProvider",
+  "runtime_fallback": {
+    "occurred": false,
+    "code": null,
+    "reason": null,
+    "from_mode": null,
+    "to_mode": null,
+    "checked_at": "2026-03-19T05:42:34.988Z"
+  },
+  "cloud_execution": null,
+  "cloud_fallback": null,
+  "learning": {
+    "validation": {
+      "mode": "per-task",
+      "grouping": null,
+      "status": "pending"
+    },
+    "alerts": [],
+    "approvals": []
+  },
+  "tfgrpo": null,
+  "control_plane": {
+    "schema_id": "codex.control-plane.run-request",
+    "schema_version": "2.0.0",
+    "request_id": "2026-03-19T05-42-34-905Z-df9fe436",
+    "validation": {
+      "mode": "shadow",
+      "status": "passed",
+      "timestamp": "2026-03-19T05:42:34.918Z",
+      "errors": []
+    },
+    "drift": {
+      "report_path": "out/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/control-plane/drift.json",
+      "total_samples": 1,
+      "invalid_samples": 0,
+      "invalid_rate": 0,
+      "last_sampled_at": "2026-03-19T05:42:34.918Z",
+      "mode": "shadow"
+    },
+    "enforcement": {
+      "enabled": false,
+      "activated_at": null
+    }
+  },
+  "scheduler": {
+    "mode": "multi-instance",
+    "requested_at": "2026-03-19T05:42:34.919Z",
+    "min_instances": 1,
+    "max_instances": 2,
+    "recovery": {
+      "heartbeat_interval_seconds": 30,
+      "missing_heartbeat_timeout_seconds": 120,
+      "max_retries": 3
+    },
+    "assignments": [
+      {
+        "instance_id": "1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff-diagnostics-primary-01",
+        "capability": "diagnostics-primary",
+        "status": "failed",
+        "assigned_at": "2026-03-19T05:42:34.919Z",
+        "completed_at": "2026-03-19T05:42:40.089Z",
+        "metadata": {
+          "weight": 1,
+          "maxConcurrency": 1
+        },
+        "attempts": [
+          {
+            "number": 1,
+            "assigned_at": "2026-03-19T05:42:34.919Z",
+            "started_at": "2026-03-19T05:42:40.089Z",
+            "completed_at": "2026-03-19T05:42:40.089Z",
+            "status": "failed",
+            "recovery_checkpoints": [
+              {
+                "timestamp": "2026-03-19T05:42:40.089Z",
+                "reason": "missed-heartbeat",
+                "action": "requeue",
+                "detail": "Finalizer detected incomplete execution; queued for recovery."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "instance_id": "1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff-diagnostics-secondary-01",
+        "capability": "diagnostics-secondary",
+        "status": "failed",
+        "assigned_at": "2026-03-19T05:42:34.919Z",
+        "completed_at": "2026-03-19T05:42:40.089Z",
+        "metadata": {
+          "weight": 1,
+          "maxConcurrency": 1
+        },
+        "attempts": [
+          {
+            "number": 1,
+            "assigned_at": "2026-03-19T05:42:34.919Z",
+            "started_at": "2026-03-19T05:42:40.089Z",
+            "completed_at": "2026-03-19T05:42:40.089Z",
+            "status": "failed",
+            "recovery_checkpoints": [
+              {
+                "timestamp": "2026-03-19T05:42:40.089Z",
+                "reason": "missed-heartbeat",
+                "action": "requeue",
+                "detail": "Finalizer detected incomplete execution; queued for recovery."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "guardrail_status": {
+    "present": false,
+    "recommendation": null,
+    "summary": "Guardrails: spec-guard partial (1 pending of 1).",
+    "computed_at": "2026-03-19T05:42:40.089Z",
+    "counts": {
+      "total": 1,
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0,
+      "other": 1
+    }
+  },
+  "collab_tool_calls_max_events": 200,
+  "handles": [
+    {
+      "handle_id": "92c693df-578f-4ebe-ab93-15749a0b1dd6",
+      "correlation_id": "b39b1833-9542-4e5b-bc2f-cc5ccf0ea37b",
+      "stage_id": "delegation-guard",
+      "pipeline_id": "diagnostics",
+      "status": "closed",
+      "frame_count": 4,
+      "latest_sequence": 4,
+      "created_at": "2026-03-19T05:42:39.995Z",
+      "metadata": {
+        "run_id": "2026-03-19T05-42-34-905Z-df9fe436"
+      }
+    }
+  ],
+  "privacy": {
+    "mode": "shadow",
+    "decisions": [
+      {
+        "handle_id": "92c693df-578f-4ebe-ab93-15749a0b1dd6",
+        "sequence": 1,
+        "action": "allow",
+        "rule": null,
+        "reason": null,
+        "timestamp": "2026-03-19T05:42:39.997Z",
+        "stage_id": "delegation-guard"
+      },
+      {
+        "handle_id": "92c693df-578f-4ebe-ab93-15749a0b1dd6",
+        "sequence": 2,
+        "action": "allow",
+        "rule": null,
+        "reason": null,
+        "timestamp": "2026-03-19T05:42:40.085Z",
+        "stage_id": "delegation-guard"
+      },
+      {
+        "handle_id": "92c693df-578f-4ebe-ab93-15749a0b1dd6",
+        "sequence": 3,
+        "action": "allow",
+        "rule": null,
+        "reason": null,
+        "timestamp": "2026-03-19T05:42:40.086Z",
+        "stage_id": "delegation-guard"
+      },
+      {
+        "handle_id": "92c693df-578f-4ebe-ab93-15749a0b1dd6",
+        "sequence": 4,
+        "action": "allow",
+        "rule": null,
+        "reason": null,
+        "timestamp": "2026-03-19T05:42:40.088Z",
+        "stage_id": "delegation-guard"
+      }
+    ],
+    "totals": {
+      "total_frames": 4,
+      "redacted_frames": 0,
+      "blocked_frames": 0,
+      "allowed_frames": 4
+    },
+    "log_path": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/privacy-decisions.ndjson"
+  }
+}

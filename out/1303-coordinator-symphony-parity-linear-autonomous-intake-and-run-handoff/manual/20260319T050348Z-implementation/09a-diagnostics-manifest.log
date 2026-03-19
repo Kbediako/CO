@@ -1,0 +1,34 @@
+[Codex-Orchestrator] prepareRun start for pipeline diagnostics
+[Codex-Orchestrator] prepareRun resolving pipeline diagnostics
+[Codex-Orchestrator] PipelineResolver.resolve start for diagnostics
+[Codex-Orchestrator] [design-config] loaded repo file at /Users/kbediako/Code/CO/design.config.yaml
+[Codex-Orchestrator] [codex-config] Loaded user config from /Users/kbediako/Code/CO/codex.orchestrator.json
+[Codex-Orchestrator] [codex-config] Using repo-local codex.orchestrator.json.
+[Codex-Orchestrator] PipelineResolver.resolve selected pipeline diagnostics
+[Codex-Orchestrator] prepareRun resolved pipeline diagnostics
+[Codex-Orchestrator] prepareRun loaded metadata for task 1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff
+[Codex-Orchestrator] prepareRun running planner for pipeline diagnostics
+[Codex-Orchestrator] prepareRun planner completed for pipeline diagnostics
+[Codex-Orchestrator] prepareRun complete for pipeline diagnostics
+{
+  "run_id": "2026-03-19T05-42-34-905Z-df9fe436",
+  "status": "failed",
+  "artifact_root": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436",
+  "manifest": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/manifest.json",
+  "log_path": ".runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/runner.ndjson",
+  "summary": "Stage 'Run delegation guard' failed with exit code 1.\nGuardrails: spec-guard partial (1 pending of 1).",
+  "runtime_mode_requested": "appserver",
+  "runtime_mode": "appserver",
+  "runtime_provider": "AppServerRuntimeProvider",
+  "runtime_fallback": {
+    "occurred": false,
+    "code": null,
+    "reason": null,
+    "from_mode": null,
+    "to_mode": null,
+    "checked_at": "2026-03-19T05:42:34.988Z"
+  },
+  "cloud_fallback_reason": null,
+  "issue_log": null,
+  "issue_log_error": null
+}

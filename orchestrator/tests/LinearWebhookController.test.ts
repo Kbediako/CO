@@ -363,6 +363,9 @@ describe('LinearWebhookController', () => {
     const persistLinearAdvisory = vi.fn(async () => undefined);
     const emitAuditEvent = vi.fn(async () => undefined);
     const publishRuntime = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(async () => undefined)
+    };
     const webhookSecret = 'linear-webhook-secret';
     const body = JSON.stringify({
       action: 'update',
@@ -433,6 +436,7 @@ describe('LinearWebhookController', () => {
       persistLinearAdvisory,
       emitAuditEvent,
       readFeatureToggles: () => createDispatchPilotFeatureToggles(),
+      providerIssueHandoff,
       publishRuntime,
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token',
@@ -459,6 +463,17 @@ describe('LinearWebhookController', () => {
       outcome: 'accepted',
       reason: 'linear_delivery_accepted'
     });
+    expect(providerIssueHandoff.handleAcceptedTrackedIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deliveryId: 'delivery-accepted',
+        action: 'update',
+        trackedIssue: expect.objectContaining({
+          id: 'lin-issue-1',
+          identifier: 'PREPROD-101',
+          state_type: 'started'
+        })
+      })
+    );
     expect(publishRuntime).toHaveBeenCalledTimes(1);
   });
 });

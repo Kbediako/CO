@@ -8,7 +8,11 @@ import type { ConfirmationStoreSnapshot } from './confirmations.js';
 import type { QuestionRecord } from './questions.js';
 import type { DelegationTokenRecord } from './delegationTokens.js';
 import type { LinearAdvisoryState } from './linearWebhookController.js';
-import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
+import type { ProviderIntakeState } from './providerIntakeState.js';
+import {
+  LINEAR_ADVISORY_STATE_FILE,
+  PROVIDER_INTAKE_STATE_FILE
+} from './controlPersistenceFiles.js';
 
 export interface ControlServerSeeds {
   controlSeed: ControlState | null;
@@ -16,6 +20,7 @@ export interface ControlServerSeeds {
   questionsSeed: { questions?: QuestionRecord[] } | null;
   delegationSeed: { tokens?: DelegationTokenRecord[] } | null;
   linearAdvisorySeed: LinearAdvisoryState | null;
+  providerIntakeSeed: ProviderIntakeState | null;
 }
 
 export async function readControlServerSeeds(paths: RunPaths): Promise<ControlServerSeeds> {
@@ -26,6 +31,9 @@ export async function readControlServerSeeds(paths: RunPaths): Promise<ControlSe
     delegationSeed: await readJsonFile<{ tokens?: DelegationTokenRecord[] }>(paths.delegationTokensPath),
     linearAdvisorySeed: await readJsonFile<LinearAdvisoryState>(
       join(paths.runDir, LINEAR_ADVISORY_STATE_FILE)
+    ),
+    providerIntakeSeed: await readJsonFile<ProviderIntakeState>(
+      join(paths.runDir, PROVIDER_INTAKE_STATE_FILE)
     )
   };
 }

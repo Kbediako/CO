@@ -135,4 +135,29 @@ describe('createTelegramOversightBridgeRuntimeLifecycle', () => {
 
     expect(closeResolved).toBe(true);
   });
+
+  it('bounds close when the polling loop ignores abort', async () => {
+    const flushNotifications = vi.fn(async () => undefined);
+    const lifecycle = createTelegramOversightBridgeRuntimeLifecycle({
+      loadState: vi.fn(async () => createDefaultTelegramOversightState()),
+      setState: vi.fn(),
+      getBotIdentity: vi.fn(async () => ({ id: 1, username: 'bot' })),
+      runPolling: vi.fn(async () => {
+        await createDeferred<void>().promise;
+      }),
+      abortPolling: vi.fn(),
+      closePollGraceMs: 5,
+      flushNotifications,
+      logEnabled: vi.fn()
+    });
+
+    await lifecycle.start();
+
+    const startedAt = Date.now();
+    await lifecycle.close();
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(elapsedMs).toBeLessThan(250);
+    expect(flushNotifications).toHaveBeenCalledOnce();
+  });
 });

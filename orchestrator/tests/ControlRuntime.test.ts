@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { ControlStateStore } from '../src/cli/control/controlState.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
+import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
 import type { QuestionRecord } from '../src/cli/control/questions.js';
 import { resolveRunPaths, type RunPaths } from '../src/cli/run/runPaths.js';
 
@@ -20,6 +21,7 @@ interface CreateFixtureOptions {
   taskId?: string;
   featureToggles?: Record<string, unknown>;
   linearAdvisoryState?: Parameters<typeof createControlRuntime>[0]['linearAdvisoryState'];
+  providerIntakeState?: ProviderIntakeState;
   questions?: QuestionRecord[];
   env?: NodeJS.ProcessEnv;
 }
@@ -61,6 +63,7 @@ async function createFixture(options: CreateFixtureOptions = {}): Promise<TestFi
     questionQueue: { list: () => options.questions ?? [] },
     paths,
     linearAdvisoryState: options.linearAdvisoryState ?? { tracked_issue: null },
+    providerIntakeState: options.providerIntakeState,
     env: options.env
   });
 
@@ -831,5 +834,82 @@ describe('ControlRuntime', () => {
     expect(recoveredDispatch.evaluation.failure ?? null).toBeNull();
     expect(recoveredDispatch.evaluation.summary.reason).toBe('recommendation_available');
     expect(dispatchReadCount).toBe(2);
+  });
+
+  it('surfaces provider intake state and follows the handed-off child run manifest when present', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'control-runtime-provider-intake-'));
+    cleanupRoots.push(root);
+    const env = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'local-mcp'
+    };
+    const paths = resolveRunPaths(env, 'run-1');
+    await mkdir(paths.runDir, { recursive: true });
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      summary: 'control host'
+    });
+    const childManifestPath = join(root, '.runs', 'task-1303-child', 'cli', 'run-child', 'manifest.json');
+    const controlStore = new ControlStateStore({ runId: 'run-1' });
+    const runtime = createControlRuntime({
+      controlStore,
+      questionQueue: { list: () => [] },
+      paths,
+      linearAdvisoryState: { tracked_issue: null },
+      providerIntakeState: {
+        schema_version: 1,
+        updated_at: '2026-03-19T04:10:00.000Z',
+        rehydrated_at: '2026-03-19T04:10:00.000Z',
+        latest_provider_key: 'linear:lin-issue-1',
+        latest_reason: 'provider_issue_rehydrated_active_run',
+        claims: [
+          {
+            provider: 'linear',
+            provider_key: 'linear:lin-issue-1',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-2',
+            issue_title: 'Autonomous intake handoff',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-03-19T04:09:00.000Z',
+            task_id: 'task-1303-child',
+            mapping_source: 'provider_id_fallback',
+            state: 'running',
+            reason: 'provider_issue_rehydrated_active_run',
+            accepted_at: '2026-03-19T04:09:30.000Z',
+            updated_at: '2026-03-19T04:10:00.000Z',
+            last_delivery_id: 'delivery-1',
+            last_event: 'Issue',
+            last_action: 'update',
+            last_webhook_timestamp: 1_742_360_000_000,
+            run_id: 'run-child',
+            run_manifest_path: childManifestPath
+          }
+        ]
+      }
+    });
+
+    await createSiblingRun(root, 'task-1303-child', 'run-child', {
+      manifest: {
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        summary: 'child run is active'
+      }
+    });
+
+    const snapshot = await runtime.snapshot().readSelectedRunSnapshot();
+
+    expect(snapshot.selected?.issueIdentifier).toBe('CO-2');
+    expect(snapshot.selected?.taskId).toBe('task-1303-child');
+    expect(snapshot.selected?.runId).toBe('run-child');
+    expect(snapshot.providerIntake).toMatchObject({
+      issue_identifier: 'CO-2',
+      task_id: 'task-1303-child',
+      state: 'running',
+      run_id: 'run-child'
+    });
   });
 });

@@ -59,6 +59,10 @@ describe('runOrchestratorStartPreparationShell', () => {
         targetStageId: 'stage-1',
         parentRunId: 'parent-1',
         approvalPolicy: 'never',
+        issueProvider: 'linear',
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-2',
+        issueUpdatedAt: '2026-03-19T03:45:00.000Z',
         runtimeMode: 'cli'
       },
       applyRequestedRuntimeMode,
@@ -93,7 +97,11 @@ describe('runOrchestratorStartPreparationShell', () => {
       parentRunId: 'parent-1',
       taskSlug: 'task-1',
       approvalPolicy: 'never',
-      planTargetId: 'preview-target'
+      planTargetId: 'preview-target',
+      issueProvider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T03:45:00.000Z'
     });
     expect(applyRequestedRuntimeMode).toHaveBeenCalledWith(manifest, 'cli');
     expect(appendSummaryImpl).toHaveBeenCalledWith(manifest, 'repo config active');
