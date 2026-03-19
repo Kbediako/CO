@@ -2280,6 +2280,28 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     await expect(readFile(stalePromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('accepts an explicit CODEX_ORCHESTRATOR_RUN_DIR layout when the task cannot be inferred from path', async () => {
+    const sandbox = await makeSandbox();
+    const customRunDir = join(sandbox, 'custom-review-runs', 'orchestrator-run');
+    await mkdir(customRunDir, { recursive: true });
+    await writeFile(join(customRunDir, 'manifest.json'), JSON.stringify({ run: 'custom-layout' }), 'utf8');
+    await writeFile(join(customRunDir, 'runner.ndjson'), '{"event":"custom-layout"}\n', 'utf8');
+    const requestedManifestPath = await makeManifestForTask(sandbox, 'requested-task', 'in-band-fallback');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(null, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_ORCHESTRATOR_RUN_DIR: customRunDir
+    }, ['--task', 'requested-task', '--surface', 'audit']);
+
+    expect(result.exitCode).toBe(0);
+    const selectedPromptPath = join(customRunDir, 'review', 'prompt.txt');
+    const selectedPrompt = await readFile(selectedPromptPath, 'utf8');
+    expect(selectedPrompt).toContain('Evidence manifest: custom-review-runs/orchestrator-run/manifest.json');
+    expect(selectedPrompt).toContain('Review task: requested-task');
+    const fallbackPromptPath = join(dirname(requestedManifestPath), 'review', 'prompt.txt');
+    await expect(readFile(fallbackPromptPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('derives audit task context from the resolved run-dir manifest when task env is absent', async () => {
     const sandbox = await makeSandbox();
     const activeManifestPath = await makeManifestForTask(sandbox, 'sample-task', 'run-dir-active');

@@ -279,7 +279,7 @@ async function resolveManifestPath(options: CliOptions): Promise<string> {
   const runDirTask = runDirManifest ? inferTaskFromManifestPath(runDirManifest) : null;
   if (
     runDirManifest &&
-    (!requestedTask || (typeof runDirTask === 'string' && runDirTask === requestedTask))
+    (!requestedTask || runDirTask === null || (typeof runDirTask === 'string' && runDirTask === requestedTask))
   ) {
     return runDirManifest;
   }
