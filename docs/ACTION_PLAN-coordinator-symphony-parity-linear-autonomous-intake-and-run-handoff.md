@@ -25,7 +25,14 @@
    - auditability and rollback,
    - Telegram and `/dispatch` coherence,
    - multi-run ambiguity handling.
-4. Register the next implementation-ready lane in docs/task mirrors and capture docs-first validation evidence.
+4. Register the next implementation-ready lane in docs/task mirrors, reference the pre-implementation approval note below, and capture docs-first validation evidence.
+
+## Pre-Implementation Review Approval
+
+- Status: approved for implementation before lane execution.
+- Reviewer: top-level Codex orchestrator self-review against the active 1303 task/spec packet and Symphony comparison surface.
+- Date: 2026-03-19.
+- Checklist linkage: mirrored in `tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`, `tasks/specs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`, and `.agent/task/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`.
 
 ## Dependencies
 
@@ -40,8 +47,10 @@
 
 - Checks / tests:
   - `node scripts/spec-guard.mjs --dry-run`
+  - `node scripts/diff-budget.mjs`
   - `npm run docs:check`
   - `npm run docs:freshness`
+  - When the diff must exceed the configured budget, set `DIFF_BUDGET_OVERRIDE_REASON` and record the justification in the task override notes.
 - Rollback plan:
   - planning-only lane; no runtime behavior changes in this turn
 
