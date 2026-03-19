@@ -250,10 +250,15 @@ export function createProviderIssueHandoffService(
         provider: 'linear',
         issueId: input.trackedIssue.id
       });
+      const latestExisting = readProviderIntakeClaim(options.state, providerKey);
+      const latestClaimBase = {
+        ...claimBase,
+        accepted_at: latestExisting?.accepted_at ?? claimBase.accepted_at
+      };
       const activeRun = discoveredRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
         const claim = upsertProviderIntakeClaim(options.state, {
-          ...claimBase,
+          ...latestClaimBase,
           task_id: activeRun.taskId,
           mapping_source: mappingSource,
           state: 'running',
@@ -265,17 +270,17 @@ export function createProviderIssueHandoffService(
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
 
-      if (existing && (existing.state === 'starting' || existing.state === 'resuming')) {
+      if (latestExisting && (latestExisting.state === 'starting' || latestExisting.state === 'resuming')) {
         const claim = upsertProviderIntakeClaim(options.state, {
-          ...claimBase,
-          task_id: existing.task_id,
-          mapping_source: existing.mapping_source,
-          state: existing.state,
+          ...latestClaimBase,
+          task_id: latestExisting.task_id,
+          mapping_source: latestExisting.mapping_source,
+          state: latestExisting.state,
           reason: 'provider_issue_handoff_inflight',
-          run_id: existing.run_id,
-          run_manifest_path: existing.run_manifest_path,
-          accepted_at: existing.accepted_at,
-          updated_at: existing.updated_at
+          run_id: latestExisting.run_id,
+          run_manifest_path: latestExisting.run_manifest_path,
+          accepted_at: latestExisting.accepted_at,
+          updated_at: latestExisting.updated_at
         });
         await options.persist();
         return { kind: 'ignored', reason: 'provider_issue_handoff_inflight', claim };
@@ -284,7 +289,7 @@ export function createProviderIssueHandoffService(
       const latestRun = discoveredRuns[0] ?? null;
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
         const inflightClaim = upsertProviderIntakeClaim(options.state, {
-          ...claimBase,
+          ...latestClaimBase,
           task_id: latestRun.taskId,
           mapping_source: mappingSource,
           state: 'resuming',
@@ -301,7 +306,7 @@ export function createProviderIssueHandoffService(
           });
         } catch (error) {
           const claim = upsertProviderIntakeClaim(options.state, {
-            ...claimBase,
+            ...latestClaimBase,
             task_id: latestRun.taskId,
             mapping_source: mappingSource,
             state: 'handoff_failed',
@@ -318,7 +323,7 @@ export function createProviderIssueHandoffService(
 
       if (latestRun?.status === 'succeeded') {
         const claim = upsertProviderIntakeClaim(options.state, {
-          ...claimBase,
+          ...latestClaimBase,
           task_id: latestRun.taskId,
           mapping_source: mappingSource,
           state: 'completed',
@@ -331,7 +336,7 @@ export function createProviderIssueHandoffService(
       }
 
       const inflightClaim = upsertProviderIntakeClaim(options.state, {
-        ...claimBase,
+        ...latestClaimBase,
         task_id: taskId,
         mapping_source: mappingSource,
         state: 'starting',
@@ -351,7 +356,7 @@ export function createProviderIssueHandoffService(
         });
       } catch (error) {
         const claim = upsertProviderIntakeClaim(options.state, {
-          ...claimBase,
+          ...latestClaimBase,
           task_id: taskId,
           mapping_source: mappingSource,
           state: 'handoff_failed',

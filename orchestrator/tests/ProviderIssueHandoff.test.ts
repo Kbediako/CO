@@ -188,6 +188,87 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('re-reads claim state after async run discovery before launching a duplicate handoff', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => undefined),
+      resume: vi.fn(async () => undefined)
+    };
+    let injectedInflightClaim = false;
+    vi.resetModules();
+    vi.doMock('node:fs/promises', async () => {
+      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      return {
+        ...actual,
+        readdir: vi.fn(async () => {
+          if (!injectedInflightClaim) {
+            injectedInflightClaim = true;
+            state.claims.push({
+              provider: 'linear',
+              provider_key: 'linear:lin-issue-1',
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              issue_title: 'Autonomous intake handoff',
+              issue_state: 'In Progress',
+              issue_state_type: 'started',
+              issue_updated_at: '2026-03-19T04:00:00.000Z',
+              task_id: 'linear-lin-issue-1',
+              mapping_source: 'provider_id_fallback',
+              state: 'starting',
+              reason: 'provider_issue_start_launched',
+              accepted_at: '2026-03-19T04:00:00.000Z',
+              updated_at: '2026-03-19T04:00:00.000Z',
+              last_delivery_id: 'delivery-1',
+              last_event: 'Issue',
+              last_action: 'update',
+              last_webhook_timestamp: 1_742_360_000_000,
+              run_id: null,
+              run_manifest_path: null
+            });
+          }
+          return [];
+        })
+      };
+    });
+
+    try {
+      const { createProviderIssueHandoffService: createProviderIssueHandoffServiceWithMockedDiscovery } =
+        await import('../src/cli/control/providerIssueHandoff.js');
+      const service = createProviderIssueHandoffServiceWithMockedDiscovery({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'diagnostics'
+      });
+
+      const result = await service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue(),
+        deliveryId: 'delivery-2',
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_361_000_000
+      });
+
+      expect(result).toMatchObject({
+        kind: 'ignored',
+        reason: 'provider_issue_handoff_inflight'
+      });
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        provider_key: 'linear:lin-issue-1',
+        state: 'starting',
+        reason: 'provider_issue_handoff_inflight'
+      });
+    } finally {
+      vi.doUnmock('node:fs/promises');
+      vi.resetModules();
+    }
+  });
+
   it('keeps a start claim in-flight when the first rehydrate probe finds no child run', async () => {
     const scheduledCallbacks: Array<() => void> = [];
     vi.spyOn(globalThis, 'setTimeout').mockImplementation(
