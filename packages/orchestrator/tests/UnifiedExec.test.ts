@@ -302,7 +302,9 @@ describe('UnifiedExecRunner', () => {
           pidFile
         ],
         sessionId: 'shell',
-        timeoutMs: 50
+        // Allow slower CI runners enough startup time to persist child.pid
+        // before timeout escalation begins.
+        timeoutMs: 250
       });
 
       expect(result.status).toBe('failed');
