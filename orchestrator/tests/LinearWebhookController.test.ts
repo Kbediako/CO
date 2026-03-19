@@ -363,6 +363,9 @@ describe('LinearWebhookController', () => {
     const persistLinearAdvisory = vi.fn(async () => undefined);
     const emitAuditEvent = vi.fn(async () => undefined);
     const publishRuntime = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(async () => undefined)
+    };
     const webhookSecret = 'linear-webhook-secret';
     const body = JSON.stringify({
       action: 'update',
@@ -433,6 +436,7 @@ describe('LinearWebhookController', () => {
       persistLinearAdvisory,
       emitAuditEvent,
       readFeatureToggles: () => createDispatchPilotFeatureToggles(),
+      providerIssueHandoff,
       publishRuntime,
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token',
@@ -459,6 +463,116 @@ describe('LinearWebhookController', () => {
       outcome: 'accepted',
       reason: 'linear_delivery_accepted'
     });
+    expect(providerIssueHandoff.handleAcceptedTrackedIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deliveryId: 'delivery-accepted',
+        action: 'update',
+        trackedIssue: expect.objectContaining({
+          id: 'lin-issue-1',
+          identifier: 'PREPROD-101',
+          state_type: 'started'
+        })
+      })
+    );
     expect(publishRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not persist an accepted delivery before provider handoff succeeds', async () => {
+    const { res } = createResponseRecorder();
+    const advisoryState = normalizeLinearAdvisoryState(null);
+    const persistLinearAdvisory = vi.fn(async () => undefined);
+    const emitAuditEvent = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(async () => {
+        throw new Error('provider handoff failed');
+      })
+    };
+    const webhookSecret = 'linear-webhook-secret';
+    const body = JSON.stringify({
+      action: 'update',
+      type: 'Issue',
+      webhookTimestamp: Date.now(),
+      data: { id: 'lin-issue-1' }
+    });
+    const realFetch = globalThis.fetch;
+
+    vi.stubGlobal('fetch', async (input, init) => {
+      const rawUrl = input instanceof Request ? input.url : String(input);
+      const url = new URL(rawUrl);
+      if (url.toString() === 'https://api.linear.app/graphql') {
+        return new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                organization: {
+                  id: 'lin-workspace-1'
+                }
+              },
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'PREPROD-101',
+                title: 'Investigate advisory routing',
+                url: 'https://linear.app/asabeko/issue/PREPROD-101',
+                updatedAt: '2026-03-06T05:00:00.000Z',
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-live',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                history: {
+                  nodes: []
+                }
+              }
+            }
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      return realFetch(input, init);
+    });
+
+    await expect(
+      handleLinearWebhookRequest({
+        req: createRequest({
+          headers: {
+            'content-type': 'application/json',
+            'linear-delivery': 'delivery-handoff-failure',
+            'linear-event': 'Issue',
+            'linear-signature': signLinearWebhook(body, webhookSecret)
+          }
+        }),
+        res,
+        linearAdvisoryState: advisoryState,
+        readRawBody: vi.fn(async () => Buffer.from(body)),
+        persistLinearAdvisory,
+        emitAuditEvent,
+        readFeatureToggles: () => createDispatchPilotFeatureToggles(),
+        providerIssueHandoff,
+        publishRuntime,
+        env: {
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CO_LINEAR_WEBHOOK_SECRET: webhookSecret
+        }
+      })
+    ).rejects.toThrow('provider handoff failed');
+
+    expect(advisoryState.latest_result).toBeNull();
+    expect(advisoryState.latest_reason).toBeNull();
+    expect(advisoryState.seen_deliveries).toHaveLength(0);
+    expect(persistLinearAdvisory).not.toHaveBeenCalled();
+    expect(emitAuditEvent).not.toHaveBeenCalled();
+    expect(publishRuntime).not.toHaveBeenCalled();
   });
 });

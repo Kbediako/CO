@@ -129,6 +129,10 @@ export interface StartOptions {
   pipelineId?: string;
   parentRunId?: string | null;
   approvalPolicy?: string;
+  issueProvider?: string | null;
+  issueId?: string | null;
+  issueIdentifier?: string | null;
+  issueUpdatedAt?: string | null;
   format?: 'text' | 'json';
   targetStageId?: string;
   executionMode?: 'mcp' | 'cloud';

@@ -9,6 +9,8 @@ import type { ControlRuntime, ControlRuntimeSnapshot } from './controlRuntime.js
 import type { ControlStateStore } from './controlState.js';
 import type { DelegationTokenStore } from './delegationTokens.js';
 import type { LinearAdvisoryState } from './linearWebhookController.js';
+import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
+import type { ProviderIntakeState } from './providerIntakeState.js';
 import type {
   ObservabilityPresenterContext
 } from './observabilitySurface.js';
@@ -21,6 +23,7 @@ export interface ControlRequestPersist {
   questions(): Promise<void>;
   delegationTokens(): Promise<void>;
   linearAdvisory(): Promise<void>;
+  providerIntake?(): Promise<void>;
 }
 
 export interface ControlSessionTokens {
@@ -41,6 +44,8 @@ export interface ControlRequestSharedContext {
   eventTransport: ControlEventTransport;
   paths: RunPaths;
   linearAdvisoryState: LinearAdvisoryState;
+  providerIntakeState?: ProviderIntakeState;
+  providerIssueHandoff?: ProviderIssueHandoffService | null;
   runtime: ControlRuntime;
 }
 
@@ -79,6 +84,8 @@ export function buildControlRequestContext(
     eventTransport: input.eventTransport,
     paths: input.paths,
     linearAdvisoryState: input.linearAdvisoryState,
+    providerIntakeState: input.providerIntakeState,
+    providerIssueHandoff: input.providerIssueHandoff,
     runtime: input.runtime,
     expiryLifecycle: input.expiryLifecycle
   };

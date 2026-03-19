@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
@@ -14,9 +14,13 @@ import {
 } from './observabilityReadModel.js';
 import type { QuestionRecord } from './questions.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { ProviderIntakeState } from './providerIntakeState.js';
+import { selectProviderIntakeClaim } from './providerIntakeState.js';
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
+  manifestPath: string;
+  runDir: string;
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;
@@ -35,6 +39,7 @@ export interface SelectedRunProjectionContext {
   linearAdvisoryState: {
     tracked_issue: LiveLinearTrackedIssue | null;
   };
+  providerIntakeState?: ProviderIntakeState;
 }
 
 export interface SelectedRunProjectionReader {
@@ -147,14 +152,14 @@ async function buildSelectedRunContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<SelectedRunContext | null> {
-  return buildProjectionContextFromParts(snapshot, resolveCurrentProjectionContextParts(context));
+  return buildProjectionContextFromParts(snapshot, await resolveProjectionContextParts(context, snapshot));
 }
 
 async function buildCompatibilitySourceContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<ControlCompatibilitySourceContext | null> {
-  return buildProjectionContextFromParts(snapshot, resolveCurrentProjectionContextParts(context));
+  return buildProjectionContextFromParts(snapshot, await resolveProjectionContextParts(context, snapshot));
 }
 
 function buildProjectionContextFromParts(
@@ -216,6 +221,18 @@ function buildProjectionContextFromParts(
 async function readSelectedRunManifestSnapshotInternal(
   context: SelectedRunProjectionContext
 ): Promise<SelectedRunManifestSnapshot | null> {
+  const preferredManifestPath = resolveProviderSelectedManifestPath(context);
+  if (preferredManifestPath) {
+    const preferredManifest = await readJsonFile<CliManifest>(preferredManifestPath);
+    if (preferredManifest) {
+      return buildSelectedRunManifestSnapshot(
+        preferredManifest as unknown as Record<string, unknown>,
+        preferredManifestPath,
+        readStringValue(preferredManifest as unknown as Record<string, unknown>, 'run_id') ?? null
+      );
+    }
+  }
+
   const manifest = await readJsonFile<CliManifest>(context.paths.manifestPath);
   if (!manifest) {
     return null;
@@ -310,14 +327,34 @@ function resolveRunIdFromManifestPath(manifestPath: string): string | null {
   return match?.[1] ?? null;
 }
 
-function resolveCurrentProjectionContextParts(
-  context: SelectedRunProjectionContext
-): ProjectionContextParts {
+async function resolveProjectionContextParts(
+  context: SelectedRunProjectionContext,
+  snapshot: SelectedRunManifestSnapshot | null
+): Promise<ProjectionContextParts> {
+  if (!snapshot || snapshot.runDir === context.paths.runDir) {
+    return {
+      control: context.controlStore.snapshot(),
+      questions: context.questionQueue.list(),
+      runDir: context.paths.runDir,
+      trackedIssue: context.linearAdvisoryState.tracked_issue
+    };
+  }
+
+  const control = normalizeControlState(
+    await readJsonFile<ControlState>(join(snapshot.runDir, 'control.json')),
+    snapshot.runId
+  );
+  const questionSnapshot = await readJsonFile<{ questions?: QuestionRecord[] }>(
+    join(snapshot.runDir, 'questions.json')
+  );
+  const advisoryState = await readJsonFile<LinearAdvisoryStateSnapshot>(
+    join(snapshot.runDir, LINEAR_ADVISORY_STATE_FILE)
+  );
   return {
-    control: context.controlStore.snapshot(),
-    questions: context.questionQueue.list(),
-    runDir: context.paths.runDir,
-    trackedIssue: context.linearAdvisoryState.tracked_issue
+    control,
+    questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
+    runDir: snapshot.runDir,
+    trackedIssue: advisoryState?.tracked_issue ?? null
   };
 }
 
@@ -339,6 +376,8 @@ function buildSelectedRunManifestSnapshot(
   }
   return {
     manifestRecord,
+    manifestPath,
+    runDir: dirname(manifestPath),
     issueIdentifier,
     issueId,
     taskId,
@@ -457,4 +496,14 @@ function buildProjectionLookupAliases(input: {
     }
   }
   return Array.from(aliases);
+}
+
+function resolveProviderSelectedManifestPath(
+  context: SelectedRunProjectionContext
+): string | null {
+  const claim = selectProviderIntakeClaim(context.providerIntakeState);
+  if (!claim?.run_manifest_path) {
+    return null;
+  }
+  return claim.run_manifest_path;
 }

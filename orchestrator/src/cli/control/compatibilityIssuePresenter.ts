@@ -95,7 +95,8 @@ export function buildCompatibilityProjectionSnapshot(
     issues,
     selected: selectedPayload,
     dispatchPilot: snapshot.dispatchPilot,
-    tracked: snapshot.tracked
+    tracked: snapshot.tracked,
+    providerIntake: snapshot.providerIntake
   };
 }
 

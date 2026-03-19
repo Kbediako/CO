@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp b4f509e66a9de11e454bdde28522708f88f9621028cee98d5fd1dde86027da88 -->
+<!-- codex:instruction-stamp 2a1b05c4352b5322d52e954a26442e910cef7f75f44a7002090deb4523b5d6ba -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -41,7 +41,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes`.
 
 ## Codex Version Policy (CO Scope)
-- Current CO compatibility/adoption target is stable Codex CLI `0.111.0`.
+- Current CO compatibility/adoption target is stable Codex CLI `0.115.0`.
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
 - In ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.
 - Evaluate newer stable/prerelease Codex builds only in explicit, task-scoped CO lanes where evidence is captured under `.runs/<task-id>/` and `out/<task-id>/manual/`.

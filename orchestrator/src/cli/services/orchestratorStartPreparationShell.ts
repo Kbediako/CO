@@ -64,7 +64,11 @@ export async function runOrchestratorStartPreparationShell(
     parentRunId: params.options.parentRunId ?? null,
     taskSlug: preparation.metadata.slug,
     approvalPolicy: params.options.approvalPolicy ?? null,
-    planTargetId: preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null
+    planTargetId: preparation.planPreview?.targetId ?? preparation.plannerTargetId ?? null,
+    issueProvider: params.options.issueProvider ?? null,
+    issueId: params.options.issueId ?? null,
+    issueIdentifier: params.options.issueIdentifier ?? null,
+    issueUpdatedAt: params.options.issueUpdatedAt ?? null
   });
   params.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
   if (preparation.configNotice) {

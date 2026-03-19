@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e08bb54054b0855ae89412e6247a5a84f624dc5f7f1ed48945b62756fb768cb3 -->
+<!-- codex:instruction-stamp c6685211c9127a5b6f73350ea3776e51dc67f86595fbaf1611bd2dc2582bb903 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -53,7 +53,7 @@
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Current CO compatibility/adoption target is stable Codex CLI (`0.111.0`).
+- Current CO compatibility/adoption target is stable Codex CLI (`0.115.0`).
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
 - On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.
 - CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.

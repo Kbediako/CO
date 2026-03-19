@@ -4,6 +4,8 @@ import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream } from '../events/runEventStream.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { ControlRequestSharedContext } from './controlRequestContext.js';
+import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
+import type { ProviderIntakeState } from './providerIntakeState.js';
 import {
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
@@ -19,6 +21,11 @@ export interface StartControlServerPublicLifecycleOptions {
   config: EffectiveDelegationConfig;
   eventStream?: Pick<RunEventStream, 'append'>;
   runId: string;
+  createProviderIssueHandoff?: ((input: {
+    providerIntakeState: ProviderIntakeState;
+    persistProviderIntake: () => Promise<void>;
+    publishRuntime: (source: string) => void;
+  }) => ProviderIssueHandoffService) | null;
 }
 
 export interface ControlServerPublicLifecycleState {
@@ -39,7 +46,8 @@ export async function startControlServerPublicLifecycle(
     config: options.config,
     eventStream: options.eventStream,
     runId: options.runId,
-    sessionTtlMs: SESSION_TTL_MS
+    sessionTtlMs: SESSION_TTL_MS,
+    createProviderIssueHandoff: options.createProviderIssueHandoff
   });
 
   const readyInstance = await startControlServerReadyInstanceLifecycle({

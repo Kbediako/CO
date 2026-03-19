@@ -47,6 +47,7 @@ import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 import { runMcpEnableCliShell } from '../orchestrator/src/cli/mcpEnableCliShell.js';
 import { runDelegationServerCliShell } from '../orchestrator/src/cli/delegationServerCliShell.js';
+import { runControlHostCliShell } from '../orchestrator/src/cli/controlHostCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -117,6 +118,9 @@ async function main(): Promise<void> {
         break;
       case 'status':
         await handleStatus(orchestrator, args);
+        break;
+      case 'control-host':
+        await handleControlHost(args);
         break;
       case 'exec':
         await handleExec(args);
@@ -723,6 +727,14 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
   await runStatusCliShell({ orchestrator, runId, watch, format, interval });
 }
 
+async function handleControlHost(rawArgs: string[]): Promise<void> {
+  const { flags } = parseArgs(rawArgs);
+  await runControlHostCliShell({
+    flags,
+    printHelp: printControlHostHelp
+  });
+}
+
 async function maybeStartHud(
   gate: ReturnType<typeof evaluateInteractiveGate>,
   emitter: RunEventEmitter
@@ -1321,6 +1333,13 @@ Commands:
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
 
+  control-host [options]
+    Start a persistent Linear intake and Telegram/status host without tying it to a foreground run.
+    --task <id>             Artifact task id for the host state (default: local-mcp).
+    --run <id>              Host run id for persisted state files (default: control-host).
+    --pipeline <id>         Pipeline used for provider-driven starts (default: diagnostics).
+    --format json           Emit machine-readable readiness output.
+
   status --run <id> [--watch] [--interval N] [--format json]
 
   self-check [--format json]
@@ -1391,6 +1410,7 @@ Commands:
     --repo <path>         Repo root for config + manifests (default cwd).
     --mode <full|question_only|status_only>  Limit tool surface for child runs.
     --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
+  control-host            Run the persistent provider intake + oversight host.
   version | --version
 
   help                      Show this message.
@@ -1456,6 +1476,18 @@ Options:
   --watch            Poll until run reaches a terminal state.
   --interval <sec>   Poll interval when --watch is enabled (default 10).
   --format json      Emit machine-readable status output.
+`);
+}
+
+function printControlHostHelp(): void {
+  console.log(`Usage: codex-orchestrator control-host [options]
+
+Options:
+  --task <id>           Artifact task id for the host state (default: local-mcp).
+  --run <id>            Host run id for persisted state files (default: control-host).
+  --pipeline <id>       Pipeline used for provider-driven starts (default: diagnostics).
+  --format json         Emit machine-readable readiness output.
+  --help                Show this message.
 `);
 }
 
@@ -1648,6 +1680,10 @@ Options:
   --task <id>               Override task identifier.
   --parent-run <id>         Link run to parent run id.
   --approval-policy <p>     Record approval policy metadata.
+  --issue-provider <name>   Persist provider identity for autonomous intake handoff.
+  --issue-id <id>           Persist provider issue id on the run manifest.
+  --issue-identifier <id>   Persist human issue identifier on the run manifest.
+  --issue-updated-at <iso>  Persist provider issue updated timestamp on the run manifest.
   --format json             Emit machine-readable output.
   --execution-mode <mcp|cloud>  Force execution mode for this run.
   --cloud                   Shortcut for --execution-mode cloud.

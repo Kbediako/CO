@@ -8,6 +8,7 @@ import {
   resolveLiveLinearTrackedIssueById,
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
+import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 
 const LINEAR_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
 const LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT = 100;
@@ -64,6 +65,7 @@ export interface LinearWebhookControllerInput {
   emitAuditEvent: (input: LinearWebhookAuditEventInput) => Promise<void>;
   readFeatureToggles: () => ControlState['feature_toggles'];
   publishRuntime: () => void;
+  providerIssueHandoff?: ProviderIssueHandoffService | null;
   env?: NodeJS.ProcessEnv;
   now?: () => number;
 }
@@ -228,6 +230,13 @@ export async function handleLinearWebhookRequest(input: LinearWebhookControllerI
   });
 
   if (resolution.kind === 'ready') {
+    await input.providerIssueHandoff?.handleAcceptedTrackedIssue({
+      trackedIssue: resolution.tracked_issue,
+      deliveryId,
+      event: eventName,
+      action,
+      webhookTimestamp
+    });
     await recordAndPersistLinearAdvisoryOutcome(input, {
       deliveryId,
       event: eventName,

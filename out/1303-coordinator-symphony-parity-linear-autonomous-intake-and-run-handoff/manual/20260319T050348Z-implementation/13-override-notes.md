@@ -1,0 +1,6 @@
+# 1303 Override Notes
+
+- `delegation-guard`: override applied because this top-level workspace turn used collab subagents for bounded research/review streams, but no manifest-backed delegated child run was launched from this checkout before the final guard check. Evidence: `01-delegation-guard.log`
+- `diff-budget`: override applied because the parity gap crosses the provider-intake ledger, persistent host CLI, manifest identity propagation, observability wiring, docs packet, and regression coverage, so splitting the lane would break the end-to-end contract under test. Evidence: `08-diff-budget.log`
+- `review`: `npm run review` initially failed without a task-scoped manifest. A diagnostics run was started to materialize `.runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/manifest.json`, then the wrapper was rerun against that explicit manifest and completed in non-interactive handoff mode. Evidence: `09a-diagnostics-manifest.log`, `09-review.log`
+- `AGENTS` instruction stamps: refreshed `AGENTS.md` and `docs/AGENTS.md` after the current tree’s Codex version text had diverged from the stored instruction stamp, which was causing stamp-based repo tests to fail. No additional policy broadening was introduced in that repair.

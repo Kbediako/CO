@@ -3020,6 +3020,13 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3357,6 +3364,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
@@ -8053,6 +8067,13 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/findings/1303-symphony-parity-linear-autonomous-intake-and-run-handoff-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/findings/ethical-life.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -8404,6 +8425,13 @@
     },
     {
       "path": "docs/PRD-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
@@ -11267,6 +11295,13 @@
     },
     {
       "path": "docs/TECH_SPEC-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
@@ -16621,6 +16656,13 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -19464,6 +19506,13 @@
     },
     {
       "path": "tasks/tasks-1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",

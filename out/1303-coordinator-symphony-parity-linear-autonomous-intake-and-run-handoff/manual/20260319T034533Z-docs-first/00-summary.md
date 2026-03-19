@@ -1,0 +1,24 @@
+# 1303 Docs-First Summary
+
+- Status: active docs-first lane registered for the remaining Symphony parity gap.
+- Conclusion: CO is not yet fully Symphony-aligned for autonomous ticket execution. `1302` closed provider setup and advisory surfacing, but the repo still lacks provider-driven autonomous intake and run handoff.
+- Scope correction: the missing parity boundary is broader than a bare "start from Linear" trigger. The packet now explicitly includes provider-side start semantics, persistent intake hosting, deterministic accepted-issue to start/resume mapping, idempotent claim and replay handling, restart rehydration, and Telegram/observability coherence after autonomy.
+- Repo registration completed:
+  - `docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`
+  - `docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`
+  - `docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`
+  - `docs/findings/1303-symphony-parity-linear-autonomous-intake-and-run-handoff-deliberation.md`
+  - `tasks/specs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`
+  - `tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`
+  - `.agent/task/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md`
+  - `tasks/index.json`
+  - `docs/TASKS.md`
+  - `docs/docs-freshness-registry.json`
+- Validation:
+  - `node scripts/spec-guard.mjs --dry-run` passed. Evidence: `02-spec-guard.log`
+  - `npm run docs:check` passed. Evidence: `03-docs-check.log`
+  - `npm run docs:freshness` passed. Evidence: `04-docs-freshness.log`
+- Docs-review state: explicit override for this registration-only planning turn. Evidence: `05-docs-review-override.md`
+- Implementation context:
+  - local Codex CLI verified at `codex-cli 0.115.0`
+  - local Symphony checkout `/Users/kbediako/Code/symphony` synced to `1f86bac53a84eb0e9f10d6546e3f19a5724a5b09`

@@ -52,6 +52,7 @@ export async function handleControlRequestRouteDispatch(
       persistLinearAdvisory: input.context.persist.linearAdvisory,
       emitAuditEvent: (auditInput) => emitLinearWebhookAuditEvent(input.context, auditInput),
       readFeatureToggles: () => input.context.controlStore.snapshot().feature_toggles,
+      providerIssueHandoff: input.context.providerIssueHandoff ?? null,
       publishRuntime: () => input.context.runtime.publish({ source: 'linear.webhook' })
     })
   ) {

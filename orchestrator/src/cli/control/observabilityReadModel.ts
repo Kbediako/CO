@@ -1,4 +1,5 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
 
 export interface SelectedRunQuestionSummary {
@@ -156,12 +157,14 @@ export interface ControlStatePayload {
   selected: ControlSelectedRunPayload | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload;
+  provider_intake?: ProviderIntakeSummaryPayload;
 }
 
 export interface ControlSelectedRunRuntimeSnapshot {
   selected: SelectedRunContext | null;
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
+  providerIntake?: ProviderIntakeSummaryPayload | null;
 }
 
 export interface ControlCompatibilitySourceContext extends SharedSelectedProjectionFields {}
@@ -172,6 +175,7 @@ export interface ControlCompatibilityRuntimeSnapshot {
   retrying: ControlCompatibilitySourceContext[];
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
+  providerIntake?: ProviderIntakeSummaryPayload | null;
 }
 
 export interface CompatibilityProjectionIssueRecord {
@@ -187,6 +191,7 @@ export interface ControlCompatibilityProjectionSnapshot {
   selected: ControlSelectedRunPayload | null;
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
+  providerIntake?: ProviderIntakeSummaryPayload | null;
 }
 
 export interface ControlIssuePayload {
@@ -316,8 +321,9 @@ export function buildSelectedRunRuntimeFingerprintInput(
   const selected = snapshot.selected ?? null;
   const dispatchPilot = snapshot.dispatchPilot ?? null;
   const trackedLinear = selected?.tracked?.linear ?? snapshot.tracked?.linear ?? null;
+  const providerIntake = snapshot.providerIntake ?? null;
   const questionSummary = selected?.questionSummary ?? null;
-  if (!selected && !trackedLinear && !dispatchPilot && !questionSummary) {
+  if (!selected && !trackedLinear && !dispatchPilot && !questionSummary && !providerIntake) {
     return null;
   }
   return {
@@ -360,6 +366,15 @@ export function buildSelectedRunRuntimeFingerprintInput(
           state: trackedLinear.state,
           url: trackedLinear.url,
           team_key: trackedLinear.team_key
+        }
+      : null,
+    provider_intake: providerIntake
+      ? {
+          issue_identifier: providerIntake.issue_identifier,
+          task_id: providerIntake.task_id,
+          state: providerIntake.state,
+          reason: providerIntake.reason,
+          run_id: providerIntake.run_id
         }
       : null
   };

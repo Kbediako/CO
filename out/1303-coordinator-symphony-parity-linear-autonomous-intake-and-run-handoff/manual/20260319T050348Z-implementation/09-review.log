@@ -1,0 +1,62 @@
+
+> @kbediako/codex-orchestrator@0.1.38 review
+> node --loader ts-node/esm scripts/run-review.ts --manifest .runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/manifest.json
+
+(node:87202) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87202) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+⚠️ Diff budget exceeded (override applied) (base=origin/main)
+ - changed files 49 > 25
+ - total lines changed 2194 > 800
+Top changed files:
+  - orchestrator/src/cli/control/providerIssueHandoff.ts: 501
+  - orchestrator/src/cli/control/providerIntakeState.ts: 309
+  - orchestrator/src/cli/controlHostCliShell.ts: 193
+  - orchestrator/tests/ProviderIssueHandoff.test.ts: 185
+  - orchestrator/tests/ControlRuntime.test.ts: 80
+  - docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md: 70
+  - orchestrator/src/cli/control/selectedRunProjection.ts: 69
+  - docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md: 63
+  - orchestrator/tests/ControlServerSeededRuntimeAssembly.test.ts: 57
+  - orchestrator/tests/ControlServerSeedLoading.test.ts: 51
+
+Override accepted via DIFF_BUDGET_OVERRIDE_REASON: 1303 parity plus final 0.115.0 docs alignment spans the provider-intake ledger, control-host CLI, manifest issue identity, observability propagation, docs updates, and regression coverage; splitting the lane would break the end-to-end intake and handoff contract under validation
+[run-review] bounded review guidance enabled by default (set CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1 to opt into unrestricted heavy-command execution).
+[run-review] review scope metrics: 3 files, 128 lines.
+Codex review handoff (non-interactive):
+---
+Review task: 1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff
+Review surface: diff
+
+Agent notes:
+Goal: Land Symphony parity for provider-driven autonomous intake and run handoff while preserving CO execution authority, then fold the remaining 0.115.0 docs alignment into the same branch. | Summary: Added a persistent control-host CLI, provider intake ledger and handoff service, deterministic issue identity propagation, restart rehydration, coherent Telegram and observability surfaces, and the matching version-policy doc alignment. | Risks: Validate claim idempotency, selected-run projection, host-child lifecycle boundaries, and final docs alignment.
+
+Please review the current changes and confirm:
+- The solution is minimal and avoids unnecessary abstraction/scope
+- Behavior remains correct for changed files and nearby dependencies
+- Call out concrete regressions, risky edge cases, or missing tests in the changed area
+- Start with touched paths, scoped diff commands, or nearby changed code before consulting memory, skills, review docs, manifests, or review artifacts
+- Concrete same-diff progress can be shown by citing touched paths with explicit locations such as `path:line`, `path:line:col`, `path#Lline`, or `path#LlineCcol`.
+- If you already have that diff-local citation evidence, do not search the wider repo for other examples of the rendering.
+
+Keep this pass diff-focused. Do not audit checklist/docs/evidence surfaces unless they are directly required to assess code correctness.
+
+Execution constraints (bounded review mode):
+- Keep this review focused on changed files and nearby dependencies.
+- Avoid full validation suites (for example `npm run test`, `npm run lint`, `npm run build`, `npm run docs:check`, `npm run docs:freshness`) during this pass.
+- Do not launch direct validation runners (for example `npx vitest`, `npm exec jest`) or nested review/pipeline/delegation flows during this pass.
+- If broader validation would improve confidence, list follow-up commands instead of executing them.
+
+Review scope hint: uncommitted working tree changes (default).
+
+Review scope paths (3):
+```
+out/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/manual/20260319T050348Z-implementation/06-docs-check.log
+out/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/manual/20260319T050348Z-implementation/08-diff-budget.log
+out/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/manual/20260319T050348Z-implementation/09-review.log
+```
+---
+Review prompt saved to: .runs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff/cli/2026-03-19T05-42-34-905Z-df9fe436/review/prompt.txt
+Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.

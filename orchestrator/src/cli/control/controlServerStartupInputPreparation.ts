@@ -4,6 +4,8 @@ import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream } from '../events/runEventStream.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { ControlRequestSharedContext } from './controlRequestContext.js';
+import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
+import type { ProviderIntakeState } from './providerIntakeState.js';
 import { readControlServerSeeds } from './controlServerSeedLoading.js';
 import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
 
@@ -13,6 +15,11 @@ interface PrepareControlServerStartupInputsOptions {
   eventStream?: Pick<RunEventStream, 'append'>;
   runId: string;
   sessionTtlMs: number;
+  createProviderIssueHandoff?: ((input: {
+    providerIntakeState: ProviderIntakeState;
+    persistProviderIntake: () => Promise<void>;
+    publishRuntime: (source: string) => void;
+  }) => ProviderIssueHandoffService) | null;
 }
 
 export interface PreparedControlServerStartupInputs {
@@ -30,7 +37,8 @@ export async function prepareControlServerStartupInputs(
     confirmationsSeed,
     questionsSeed,
     delegationSeed,
-    linearAdvisorySeed
+    linearAdvisorySeed,
+    providerIntakeSeed
   } = await readControlServerSeeds(options.paths);
 
   const { requestContextShared } = createControlServerSeededRuntimeAssembly({
@@ -44,7 +52,9 @@ export async function prepareControlServerStartupInputs(
     confirmationsSeed,
     questionsSeed,
     delegationSeed,
-    linearAdvisorySeed
+    linearAdvisorySeed,
+    providerIntakeSeed,
+    createProviderIssueHandoff: options.createProviderIssueHandoff
   });
 
   return {

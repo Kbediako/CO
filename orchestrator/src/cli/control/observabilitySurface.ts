@@ -305,6 +305,7 @@ export async function readCompatibilityState(
     codex_totals: null,
     rate_limits: null,
     selected: projection.selected,
+    ...(projection.providerIntake ? { provider_intake: projection.providerIntake } : {}),
     ...(projection.dispatchPilot ? { dispatch_pilot: projection.dispatchPilot } : {}),
     ...(projection.tracked ? { tracked: projection.tracked } : {})
   };

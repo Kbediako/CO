@@ -10,6 +10,7 @@ import {
   buildSelectedRunQuestionSummaryPayload,
   buildSelectedRunRuntimeFingerprintInput
 } from './observabilityReadModel.js';
+import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 
 export interface TelegramProjectionDeltaPresentation {
   projectionHash: string | null;
@@ -134,10 +135,12 @@ function buildStatusMessage(snapshot: ControlSelectedRunRuntimeSnapshot): string
   const selected = snapshot.selected ?? null;
   const dispatch = snapshot.dispatchPilot ?? null;
   const trackedLinear = selected?.tracked?.linear ?? snapshot.tracked?.linear ?? null;
+  const providerIntake = snapshot.providerIntake ?? null;
   if (!selected) {
     return [
       'CO status',
       'No active running projection.',
+      formatProviderIntakeSummary(providerIntake),
       trackedLinear?.identifier
         ? `Linear: ${trackedLinear.identifier}${trackedLinear.title ? ` - ${truncateLine(trackedLinear.title, 120)}` : ''}`
         : null,
@@ -162,6 +165,7 @@ function buildStatusMessage(snapshot: ControlSelectedRunRuntimeSnapshot): string
     `Issue: ${issueIdentifier}`,
     formatStateLine(displayStatus, rawStatus),
     statusReason ? `Reason: ${statusReason}` : null,
+    formatProviderIntakeSummary(providerIntake),
     sessionId ? `Session: ${sessionId}` : null,
     latestEvent?.event ? `Last event: ${latestEvent.event}` : null,
     summary ? `Summary: ${truncateLine(summary, 180)}` : null,
@@ -200,6 +204,17 @@ function formatDispatchSummary(
   const sourceStatus = dispatchPilot.source_status ?? 'unknown';
   const reason = dispatchPilot.reason ? ` (${dispatchPilot.reason})` : '';
   return `Dispatch: ${status}/${sourceStatus}${reason}`;
+}
+
+function formatProviderIntakeSummary(
+  providerIntake: ProviderIntakeSummaryPayload | null | undefined
+): string | null {
+  if (!providerIntake) {
+    return null;
+  }
+  const runId = providerIntake.run_id ? ` -> ${providerIntake.run_id}` : '';
+  const reason = providerIntake.reason ? ` (${providerIntake.reason})` : '';
+  return `Intake: ${providerIntake.state} ${providerIntake.issue_identifier} -> ${providerIntake.task_id}${runId}${reason}`;
 }
 
 function formatStateLine(

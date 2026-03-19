@@ -24,6 +24,10 @@ export interface CodexOrchestratorCLIManifest {
   artifact_root: string;
   compat_path: string;
   log_path: string;
+  issue_provider?: string | null;
+  issue_id?: string | null;
+  issue_identifier?: string | null;
+  issue_updated_at?: string | null;
   summary: string | null;
   metrics_recorded: boolean;
   resume_token: string;

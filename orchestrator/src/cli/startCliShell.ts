@@ -24,6 +24,10 @@ export interface RunStartCliShellParams {
   taskIdOverride?: string;
   parentRunId?: string;
   approvalPolicy?: string;
+  issueProvider?: string;
+  issueId?: string;
+  issueIdentifier?: string;
+  issueUpdatedAt?: string;
   targetStageId?: string;
   runWithUi: (action: (runEvents: RunEventEmitter) => Promise<void>) => Promise<void>;
   emitRunOutput: (
@@ -92,6 +96,10 @@ export async function runStartCliShell(
         taskId: taskIdOverride,
         parentRunId: params.parentRunId,
         approvalPolicy: params.approvalPolicy,
+        issueProvider: params.issueProvider,
+        issueId: params.issueId,
+        issueIdentifier: params.issueIdentifier,
+        issueUpdatedAt: params.issueUpdatedAt,
         targetStageId: params.targetStageId,
         executionMode: params.executionMode,
         runtimeMode: params.runtimeMode,

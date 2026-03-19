@@ -2,6 +2,10 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
+  buildProviderIntakeSummary,
+  type ProviderIntakeState
+} from './providerIntakeState.js';
+import {
   buildTrackedLinearPayload,
   type ControlCompatibilityProjectionSnapshot,
   type ControlCompatibilityRuntimeSnapshot,
@@ -33,6 +37,7 @@ interface ControlRuntimeContext {
   linearAdvisoryState: {
     tracked_issue: LiveLinearTrackedIssue | null;
   };
+  providerIntakeState?: ProviderIntakeState;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -127,10 +132,12 @@ function createControlRuntimeSnapshot(
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+      const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       return {
         selected,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
-        tracked
+        tracked,
+        providerIntake
       };
     })();
     return selectedRunSnapshotPromise;
@@ -144,20 +151,26 @@ function createControlRuntimeSnapshot(
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
+      const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const running = [
         ...(selected?.rawStatus === 'in_progress' ? [selected] : []),
         ...discoveredCollections.running
-      ];
+      ].filter((entry, index, collection) =>
+        collection.findIndex((candidate) => candidate.runId === entry.runId) === index
+      );
       const retrying = [
         ...(selected?.rawStatus === 'failed' && !selected.completedAt ? [selected] : []),
         ...discoveredCollections.retrying
-      ];
+      ].filter((entry, index, collection) =>
+        collection.findIndex((candidate) => candidate.runId === entry.runId) === index
+      );
       return {
         selected,
         running,
         retrying,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
-        tracked
+        tracked,
+        providerIntake
       };
     })();
     return compatibilityRuntimeSnapshotPromise;
