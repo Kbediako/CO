@@ -414,7 +414,10 @@ export function createProviderIssueHandoffService(
     },
 
     async rehydrate(): Promise<void> {
-      await rehydrateNow();
+      const result = await rehydrateNow();
+      if (result.hasPendingClaims) {
+        scheduleBestEffortRehydrate(rehydrateNow);
+      }
     }
   };
 }

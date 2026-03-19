@@ -611,6 +611,20 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it('keeps queued child runs pending during explicit restart rehydrate', async () => {
+    const scheduledCallbacks: Array<() => void> = [];
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(
+      ((callback: TimerHandler) => {
+        if (typeof callback === 'function') {
+          scheduledCallbacks.push(callback as () => void);
+        }
+        return {
+          unref() {
+            return this;
+          }
+        } as unknown as ReturnType<typeof setTimeout>;
+      }) as typeof setTimeout
+    );
+
     const { root, paths } = await createHostPaths();
     const childEnv = {
       repoRoot: root,
@@ -679,6 +693,7 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: childPaths.manifestPath,
       task_id: 'task-1303-child'
     });
+    expect(scheduledCallbacks).toHaveLength(1);
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
