@@ -378,7 +378,10 @@ function matchesProviderClaim(claim, contract) {
   const reason = readNonEmptyString(claim, 'reason');
   const launchSource = readNonEmptyString(claim, 'launch_source');
   const launchToken = readNonEmptyString(claim, 'launch_token');
+  const runId = readNonEmptyString(claim, 'run_id');
   const runManifestPath = readNonEmptyString(claim, 'run_manifest_path');
+  const canonicalManifestPath =
+    runId.length > 0 ? join(contract.runsDir, contract.taskId, 'cli', runId, 'manifest.json') : '';
   return (
     provider === contract.provider &&
     issueId === contract.issueId &&
@@ -389,7 +392,9 @@ function matchesProviderClaim(claim, contract) {
     reason.startsWith('provider_issue_') &&
     launchSource === PROVIDER_LAUNCH_SOURCE_CONTROL_HOST &&
     launchToken === contract.launchToken &&
-    (!runManifestPath || runManifestPath === contract.manifestPath)
+    (!runManifestPath ||
+      runManifestPath === contract.manifestPath ||
+      (canonicalManifestPath.length > 0 && canonicalManifestPath === contract.manifestPath))
   );
 }
 
@@ -518,6 +523,7 @@ async function findProviderContractProof(runsDir, taskId, env) {
   }
   contract.manifestPath = manifestPath;
   contract.launchToken = launchContext.launchToken;
+  contract.runsDir = runsDir;
 
   const { statePath, explicit, state, error: stateError } = await loadControlHostProviderIntakeState(
     runsDir,

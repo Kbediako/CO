@@ -2758,7 +2758,7 @@ describe('delegation-guard script', () => {
     expect(stdout).not.toContain(`Provider-child task id '${taskId}'`);
   });
 
-  it('rejects provider-started fallback runs when the claim manifest path points at a different run', async () => {
+  it('accepts provider-started fallback runs when the claim manifest path is stale but the claim run id matches', async () => {
     tempDir = await initRepo();
     const taskId = 'linear-lin-issue-1';
     const runId = '2026-03-20T00-00-00-000Z-run-1';
@@ -2807,6 +2807,78 @@ describe('delegation-guard script', () => {
           last_action: 'update',
           last_webhook_timestamp: 1_742_430_000_000,
           run_id: runId,
+          run_manifest_path: join(tempDir, '.runs', taskId, 'cli', 'different-run', 'manifest.json'),
+          launch_source: 'control-host',
+          launch_token: 'launch-token-1'
+        }
+      ]
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: tempDir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_ROOT: tempDir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN: 'launch-token-1'
+      })
+    });
+
+    expect(stdout).toContain(`'${taskId}' accepted via provider-intake contract`);
+    expect(stdout).toContain('Delegation guard: OK (provider-started run contract matched).');
+  });
+
+  it('rejects provider-started fallback runs when the claim points at a different canonical run id', async () => {
+    tempDir = await initRepo();
+    const taskId = 'linear-lin-issue-1';
+    const runId = '2026-03-20T00-00-00-000Z-run-1';
+    const manifestDir = join(tempDir, '.runs', taskId, 'cli', runId);
+    const manifestPath = join(manifestDir, 'manifest.json');
+    await mkdir(manifestDir, { recursive: true });
+    await writeJson(manifestPath, {
+      task_id: taskId,
+      run_id: runId,
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2'
+    });
+
+    const controlHostDir = join(tempDir, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostDir, { recursive: true });
+    await writeJson(join(controlHostDir, 'linear-advisory-state.json'), {
+      schema_version: 1,
+      updated_at: '2026-03-20T00:00:01.000Z',
+      tracked_issue: null
+    });
+    await writeJson(join(controlHostDir, 'provider-intake-state.json'), {
+      schema_version: 1,
+      updated_at: '2026-03-20T00:00:01.000Z',
+      rehydrated_at: '2026-03-20T00:00:01.000Z',
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T00:00:00.000Z',
+          task_id: taskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-20T00:00:00.000Z',
+          updated_at: '2026-03-20T00:00:01.000Z',
+          last_delivery_id: 'delivery-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_430_000_000,
+          run_id: 'different-run',
           run_manifest_path: join(tempDir, '.runs', taskId, 'cli', 'different-run', 'manifest.json'),
           launch_source: 'control-host',
           launch_token: 'launch-token-1'

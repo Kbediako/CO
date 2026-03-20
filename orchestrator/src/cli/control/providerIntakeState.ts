@@ -201,6 +201,9 @@ function hasProviderRunIdentityChanged(
   const existingRunId = existing.run_id ?? null;
   const nextRunId = next.run_id ?? null;
   if (existingRunId || nextRunId) {
+    if (!existingRunId && nextRunId) {
+      return false;
+    }
     return existingRunId !== nextRunId;
   }
 
