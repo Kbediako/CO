@@ -121,14 +121,15 @@ export async function runControlHostCliShell(
         startPipelineId,
         publishRuntime,
         resolveTrackedIssue: async ({ issueId }) => {
-          const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), env);
+          const runtimeEnv = process.env;
+          const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), runtimeEnv);
           if ('error' in sourceSetup) {
             return { kind: 'skip', reason: sourceSetup.error } as const;
           }
           const resolution = await resolveLiveLinearTrackedIssueById({
             issueId,
             sourceSetup: sourceSetup.sourceSetup,
-            env
+            env: runtimeEnv
           });
           if (resolution.kind === 'ready') {
             return { kind: 'ready', trackedIssue: resolution.tracked_issue } as const;

@@ -66,7 +66,7 @@
     "issue_id": { "type": ["string", "null"] },
     "issue_identifier": { "type": ["string", "null"] },
     "issue_updated_at": { "type": ["string", "null"] },
-    "workspace_path": { "type": ["string", "null"] },
+    "workspace_path": { "type": ["string", "null"], "minLength": 1 },
     "provider_control_host_task_id": { "type": ["string", "null"] },
     "provider_control_host_run_id": { "type": ["string", "null"] },
     "summary": { "type": ["string", "null"] },

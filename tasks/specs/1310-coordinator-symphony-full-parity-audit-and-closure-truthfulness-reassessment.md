@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md
 review_notes:
   - 2026-03-20: Opened after a fresh upstream parity audit showed that prior provider-intake follow-up lanes did not prove truthful full Symphony parity. The current tree still has larger architectural divergences around per-issue workspaces, repeated worker-turn continuation, and mid-run reconciliation, plus bounded patchable bugs in provider-intake success handling and selected-run summary freshness.
+  - 2026-03-20: Closed after PR `#281` merged with required checks terminal green, unresolved actionable review threads verified as `0`, and the bounded review-wrapper quota waiver recorded in the task checklist plus `out/1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment/manual/20260320T072319Z-closeout/14-review-waiver.md`.
 ---
 
 # Technical Specification
