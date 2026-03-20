@@ -160,7 +160,7 @@ describe('ObservabilityApiController', () => {
     });
   });
 
-  it('does not fabricate turn or retry counters in compatibility projections', () => {
+  it('does not fabricate session, turn, or retry counters in compatibility projections', () => {
     const runningSource = buildCompatibilitySource('task-1311-running', {
       displayStatus: 'awaiting_input',
       statusReason: 'queued_questions',
@@ -195,6 +195,7 @@ describe('ObservabilityApiController', () => {
         issue_identifier: 'task-1311-running',
         display_state: 'awaiting_input',
         status_reason: 'queued_questions',
+        session_id: null,
         turn_count: null,
         tokens: {
           input_tokens: null,
@@ -207,6 +208,7 @@ describe('ObservabilityApiController', () => {
       expect.objectContaining({
         issue_identifier: 'task-1311-retrying',
         state: 'failed',
+        session_id: null,
         attempt: null
       })
     ]);

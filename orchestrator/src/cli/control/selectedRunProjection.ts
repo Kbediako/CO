@@ -221,6 +221,11 @@ function buildProjectionContextFromParts(
     latestAction,
     latestEvent,
     workspacePath,
+    pipelineTitle: readStringValue(manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null,
+    stages: readManifestStageSummaries(manifestRecord),
+    approvalsTotal: readManifestApprovalsTotal(manifestRecord),
+    manifestPath: snapshot.manifestPath,
+    runDir: snapshot.runDir,
     questionSummary,
     tracked
   };
@@ -360,6 +365,41 @@ function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boo
     }
     return readStringValue(command as Record<string, unknown>, 'status') === 'failed';
   });
+}
+
+function readManifestStageSummaries(manifestRecord: Record<string, unknown>): Array<{
+  id: string;
+  title: string;
+  status: string | null;
+}> {
+  const commands = manifestRecord.commands;
+  if (!Array.isArray(commands)) {
+    return [];
+  }
+  return commands.flatMap((command) => {
+    if (!isRecord(command)) {
+      return [];
+    }
+    const id = readStringValue(command, 'id');
+    if (!id) {
+      return [];
+    }
+    return [
+      {
+        id,
+        title: readStringValue(command, 'title') ?? id,
+        status: readStringValue(command, 'status') ?? null
+      }
+    ];
+  });
+}
+
+function readManifestApprovalsTotal(manifestRecord: Record<string, unknown>): number {
+  return Array.isArray(manifestRecord.approvals) ? manifestRecord.approvals.length : 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function resolveRunsRootFromRunDir(runDir: string): string | null {

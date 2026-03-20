@@ -74,6 +74,9 @@ function buildSelectedRun(overrides: Partial<SelectedRunContext> = {}): Selected
       reason: 'control_pause'
     },
     workspacePath: '/repo/.workspaces/task-1311',
+    pipelineTitle: 'UI Data Controller',
+    stages: [],
+    approvalsTotal: 0,
     questionSummary: {
       queuedCount: 0,
       latestQuestion: null

@@ -42,6 +42,12 @@ export interface ControlTrackedPayload {
   linear: ControlTrackedLinearPayload;
 }
 
+export interface SelectedRunStageSummary {
+  id: string;
+  title: string;
+  status: string | null;
+}
+
 export interface ControlDispatchPilotPayload {
   status?: string | null;
   source_status?: string | null;
@@ -65,6 +71,11 @@ interface SharedSelectedProjectionFields {
   latestAction: string | null;
   latestEvent: SelectedRunLatestEvent | null;
   workspacePath: string;
+  pipelineTitle: string | null;
+  stages: SelectedRunStageSummary[];
+  approvalsTotal: number;
+  manifestPath?: string | null;
+  runDir?: string | null;
   questionSummary: SelectedRunQuestionSummary;
   tracked: ControlTrackedPayload | null;
 }

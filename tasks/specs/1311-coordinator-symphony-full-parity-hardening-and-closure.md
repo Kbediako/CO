@@ -33,12 +33,12 @@ review_notes:
 
 ## Current Truth
 
-- Core blockers are workspace confinement and authoritative lifecycle reconcile.
-- Current CO provider intake remains narrower than the upstream scheduler contract.
+- The current branch already lands deterministic workspace recreation plus prune, legacy resume deterministic workspace fallback, resume workspace-root confinement validation, startup immediate refresh, queued/null release fail-closed behavior, released-claim stability on rehydrate, active-issue eligibility for `Todo` plus Linear `state_type=started` issues with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names, terminal-only cleanup for provider-managed `.workspaces/<taskId>` on release/startup replay, selected child-manifest UI metadata truthfulness, and compatibility `session_id=null` handling.
+- Provider control-host continuation/retry handoff for active issues is materially covered, but full parity is still not closed.
 - Tracker writes are aligned at the core-contract level and do not block `1311`.
-- `1311` must not claim closure until workspace plus lifecycle proof is live.
-- The current branch lands workspace confinement, refresh-driven continuation, release/reconcile behavior, and truthful observability/read-model hardening, but it does not yet close the whole task.
+- `1311` must not claim closure while real blockers remain, even though the full local suite is terminal green.
 - Live `turn_count`, `codex_totals`, `rate_limits`, and related retry counters are not derivable from current authoritative CO sources, so `1311` cannot truthfully close full parity until that capture exists or is explicitly deferred.
+- Active-issue continuation after a normal success still starts a fresh child run rather than continuing the same live session.
 
 ## Validation Plan
 
@@ -47,5 +47,6 @@ review_notes:
 - `npm run docs:check`
 - `npm run docs:freshness`
 - focused lifecycle/workspace tests
-- full repo gate chain
+- `npm run build`
+- full repo gate chain, with the explicit current truth that the focused 1311 regression pack is `11/11` files and `262/262` tests, and `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green at `282/282` files and `1998/1998` tests
 - live provider proof against the existing control host

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import http from 'node:http';
 import { createHmac } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import type { Socket } from 'node:net';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -15,6 +16,45 @@ import {
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import { RunEventStream } from '../src/cli/events/runEventStream.js';
+
+const originalCreateServer = http.createServer;
+const originalControlServerStart = ControlServer.start.bind(ControlServer);
+const trackedHttpServers = new Set<http.Server>();
+const trackedHttpServerSockets = new Map<http.Server, Set<Socket>>();
+const trackedControlServers = new Set<ControlServer>();
+
+function trackHttpServer(server: http.Server): http.Server {
+  if (trackedHttpServers.has(server)) {
+    return server;
+  }
+  const sockets = new Set<Socket>();
+  trackedHttpServers.add(server);
+  trackedHttpServerSockets.set(server, sockets);
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+  return server;
+}
+
+async function closeTrackedHttpServer(server: http.Server): Promise<void> {
+  server.closeIdleConnections?.();
+  server.closeAllConnections?.();
+  const sockets = trackedHttpServerSockets.get(server);
+  sockets?.forEach((socket) => socket.destroy());
+  trackedHttpServerSockets.delete(server);
+  trackedHttpServers.delete(server);
+  if (!server.listening) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    try {
+      server.close(() => resolve());
+    } catch {
+      resolve();
+    }
+  });
+}
 
 async function createRunRoot(taskId: string) {
   const root = await mkdtemp(join(tmpdir(), 'control-server-'));
@@ -165,9 +205,31 @@ describe('ControlServer', () => {
   beforeEach(() => {
     // Keep this suite hermetic even when the operator shell has live Telegram oversight env configured.
     vi.stubEnv('CO_TELEGRAM_POLLING_ENABLED', '0');
+    trackedHttpServers.clear();
+    trackedHttpServerSockets.clear();
+    trackedControlServers.clear();
+    (http as typeof http & { createServer: typeof http.createServer }).createServer = ((...args) =>
+      trackHttpServer(originalCreateServer(...args))) as typeof http.createServer;
+    (ControlServer as typeof ControlServer & { start: typeof ControlServer.start }).start = (async (...args) => {
+      const server = await originalControlServerStart(...args);
+      trackedControlServers.add(server);
+      return server;
+    }) as typeof ControlServer.start;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    for (const server of Array.from(trackedControlServers).reverse()) {
+      await server.close().catch(() => undefined);
+    }
+    trackedControlServers.clear();
+    for (const server of Array.from(trackedHttpServers).reverse()) {
+      await closeTrackedHttpServer(server);
+    }
+    trackedHttpServers.clear();
+    trackedHttpServerSockets.clear();
+    (ControlServer as typeof ControlServer & { start: typeof ControlServer.start }).start =
+      originalControlServerStart as typeof ControlServer.start;
+    (http as typeof http & { createServer: typeof http.createServer }).createServer = originalCreateServer;
     vi.unstubAllEnvs();
   });
 
@@ -1046,7 +1108,9 @@ describe('ControlServer', () => {
       const statePayload = (await stateRes.json()) as {
         generated_at?: string;
         counts?: { running?: number; retrying?: number };
-        running?: Array<{ issue_identifier?: string; session_id?: string; state?: string }>;
+        running?: Array<{ issue_identifier?: string; session_id?: string | null; state?: string }>;
+        codex_totals?: null;
+        rate_limits?: null;
         selected?: {
           issue_identifier?: string;
           raw_status?: string;
@@ -1058,9 +1122,11 @@ describe('ControlServer', () => {
       expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
       expect(statePayload.running?.[0]).toMatchObject({
         issue_identifier: 'task-0940',
-        session_id: 'run-1',
+        session_id: null,
         state: 'in_progress'
       });
+      expect(statePayload.codex_totals).toBeNull();
+      expect(statePayload.rate_limits).toBeNull();
       expect(statePayload.selected).toMatchObject({
         issue_identifier: 'task-0940',
         raw_status: 'in_progress',
@@ -1097,12 +1163,12 @@ describe('ControlServer', () => {
       expect(runAliasRes.status).toBe(200);
       const runAliasPayload = (await runAliasRes.json()) as {
         issue_identifier?: string;
-        running?: { session_id?: string } | null;
+        running?: { session_id?: string | null } | null;
       };
       expect(runAliasPayload).toMatchObject({
         issue_identifier: 'task-0940',
         running: {
-          session_id: 'run-1'
+          session_id: null
         }
       });
 
@@ -1215,7 +1281,7 @@ describe('ControlServer', () => {
         display_status?: string;
         status_reason?: string | null;
         question_summary?: { queued_count?: number };
-        running?: { session_id?: string; display_state?: string } | null;
+        running?: { session_id?: string | null; display_state?: string } | null;
       };
       expect(siblingIssuePayload).toMatchObject({
         issue_identifier: 'task-1034-running',
@@ -1225,7 +1291,7 @@ describe('ControlServer', () => {
           queued_count: 1
         },
         running: {
-          session_id: 'run-2',
+          session_id: null,
           display_state: 'paused'
         }
       });
@@ -1249,12 +1315,12 @@ describe('ControlServer', () => {
       expect(retryIssueRes.status).toBe(200);
       const retryIssuePayload = (await retryIssueRes.json()) as {
         issue_identifier?: string;
-        retry?: { session_id?: string; state?: string } | null;
+        retry?: { session_id?: string | null; state?: string } | null;
       };
       expect(retryIssuePayload).toMatchObject({
         issue_identifier: 'task-1034-retrying',
         retry: {
-          session_id: 'run-3',
+          session_id: null,
           state: 'failed'
         }
       });
@@ -1358,8 +1424,8 @@ describe('ControlServer', () => {
       expect(stateRes.status).toBe(200);
       const statePayload = (await stateRes.json()) as {
         counts?: { running?: number; retrying?: number };
-        running?: Array<{ issue_identifier?: string; session_id?: string; display_state?: string }>;
-        retrying?: Array<{ issue_identifier?: string; session_id?: string; state?: string }>;
+        running?: Array<{ issue_identifier?: string; session_id?: string | null; display_state?: string }>;
+        retrying?: Array<{ issue_identifier?: string; session_id?: string | null; state?: string }>;
         selected?: { issue_identifier?: string; run_id?: string } | null;
       };
       expect(statePayload.counts).toEqual({ running: 1, retrying: 1 });
@@ -1370,14 +1436,14 @@ describe('ControlServer', () => {
       expect(statePayload.running).toEqual([
         expect.objectContaining({
           issue_identifier: 'ISSUE-1035',
-          session_id: 'run-3',
+          session_id: null,
           display_state: 'paused'
         })
       ]);
       expect(statePayload.retrying).toEqual([
         expect.objectContaining({
           issue_identifier: 'ISSUE-1035',
-          session_id: 'run-2',
+          session_id: null,
           state: 'failed'
         })
       ]);
@@ -1392,8 +1458,8 @@ describe('ControlServer', () => {
         const issuePayload = (await issueRes.json()) as {
           issue_identifier?: string;
           display_status?: string;
-          running?: { session_id?: string; display_state?: string } | null;
-          retry?: { session_id?: string; state?: string } | null;
+          running?: { session_id?: string | null; display_state?: string } | null;
+          retry?: { session_id?: string | null; state?: string } | null;
           question_summary?: { queued_count?: number };
         };
         expect(issuePayload).toMatchObject({
@@ -1403,11 +1469,11 @@ describe('ControlServer', () => {
             queued_count: 1
           },
           running: {
-            session_id: 'run-3',
+            session_id: null,
             display_state: 'paused'
           },
           retry: {
-            session_id: 'run-2',
+            session_id: null,
             state: 'failed'
           }
         });
@@ -1482,13 +1548,13 @@ describe('ControlServer', () => {
       expect(issueRes.status).toBe(200);
       const issuePayload = (await issueRes.json()) as {
         issue_identifier?: string;
-        running?: { session_id?: string } | null;
-        retry?: { session_id?: string } | null;
+        running?: { session_id?: string | null } | null;
+        retry?: { session_id?: string | null } | null;
       };
       expect(issuePayload).toMatchObject({
         issue_identifier: 'run-2',
         running: {
-          session_id: 'run-1'
+          session_id: null
         }
       });
       expect(issuePayload.retry).toBeNull();

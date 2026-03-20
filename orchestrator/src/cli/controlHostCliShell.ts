@@ -27,7 +27,7 @@ import { normalizeEnvironmentPaths, normalizeTaskId } from './run/environment.js
 import { loadManifest } from './run/manifest.js';
 import {
   ensureProviderWorkspace,
-  resolveManifestWorkspacePath
+  resolveProviderResumeWorkspacePath
 } from './run/workspacePath.js';
 import {
   closeControlServerPublicLifecycle,
@@ -35,7 +35,10 @@ import {
 } from './control/controlServerPublicLifecycle.js';
 import { resolveLiveLinearTrackedIssueById } from './control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from './control/linearWebhookController.js';
-import { createProviderIssueHandoffService } from './control/providerIssueHandoff.js';
+import {
+  createProviderIssueHandoffService,
+  type ProviderIssueHandoffService
+} from './control/providerIssueHandoff.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -197,7 +200,10 @@ export async function runControlHostCliShell(
 
   try {
     await lifecycle.requestContextShared.providerIssueHandoff?.rehydrate();
-    lifecycle.requestContextShared.runtime.publish({ source: 'provider-intake.rehydrate' });
+    void beginProviderIssueHandoffStartupRefresh(
+      lifecycle.requestContextShared.providerIssueHandoff,
+      () => lifecycle.requestContextShared.runtime.publish({ source: 'provider-intake.rehydrate' })
+    );
 
     const payload = {
       status: 'ready',
@@ -372,8 +378,15 @@ async function resolveProviderResumeLaunchSpec(
   runId: string
 ): Promise<ProviderLaunchSpec> {
   const { manifest } = await loadManifest(env, runId);
-  const workspacePath =
-    resolveManifestWorkspacePath(manifest as unknown as Record<string, unknown>) ?? env.repoRoot;
+  const resumeTaskId =
+    typeof manifest.task_id === 'string' && manifest.task_id.trim().length > 0
+      ? manifest.task_id.trim()
+      : runId;
+  const workspacePath = await resolveProviderResumeWorkspacePath(
+    env.repoRoot,
+    resumeTaskId,
+    manifest as unknown as Record<string, unknown>
+  );
   return buildProviderLaunchSpec(env, workspacePath);
 }
 
@@ -401,10 +414,36 @@ function shouldReleaseTrackedIssueClaim(reason: string): boolean {
 }
 
 export const __test__ = {
+  beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
+  refreshProviderIssueHandoffOnStartup,
   resolveProviderResumeLaunchSpec,
   snapshotRunManifests
 };
+
+function beginProviderIssueHandoffStartupRefresh(
+  providerIssueHandoff: ProviderIssueHandoffService | null | undefined,
+  onSettled?: () => void
+): Promise<void> {
+  return refreshProviderIssueHandoffOnStartup(providerIssueHandoff).then(() => {
+    onSettled?.();
+  });
+}
+
+async function refreshProviderIssueHandoffOnStartup(
+  providerIssueHandoff: ProviderIssueHandoffService | null | undefined
+): Promise<void> {
+  if (!providerIssueHandoff) {
+    return;
+  }
+  try {
+    await providerIssueHandoff.refresh();
+  } catch (error) {
+    logger.warn(
+      `Provider issue startup refresh failed: ${(error as Error)?.message ?? String(error)}`
+    );
+  }
+}
 
 function manifestMatchesCorrelation(
   manifest: Record<string, unknown>,

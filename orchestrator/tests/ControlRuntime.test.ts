@@ -29,6 +29,7 @@ interface CreateFixtureOptions {
 const cleanupRoots: string[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -478,14 +479,14 @@ describe('ControlRuntime', () => {
     expect(compatibilityProjection.running).toEqual([
       expect.objectContaining({
         issue_identifier: 'ISSUE-1035',
-        session_id: 'run-3',
+        session_id: null,
         display_state: 'paused'
       })
     ]);
     expect(compatibilityProjection.retrying).toEqual([
       expect.objectContaining({
         issue_identifier: 'ISSUE-1035',
-        session_id: 'run-2',
+        session_id: null,
         state: 'failed'
       })
     ]);
@@ -502,12 +503,12 @@ describe('ControlRuntime', () => {
       },
       running: {
         issue_identifier: 'ISSUE-1035',
-        session_id: 'run-3',
+        session_id: null,
         display_state: 'paused'
       },
       retry: {
         issue_identifier: 'ISSUE-1035',
-        session_id: 'run-2',
+        session_id: null,
         state: 'failed'
       }
     });
@@ -556,12 +557,12 @@ describe('ControlRuntime', () => {
     expect(compatibilityProjection.running).toEqual([
       expect.objectContaining({
         issue_identifier: 'ISSUE-1036',
-        session_id: 'run-3'
+        session_id: null
       })
     ]);
     expect(sameIssueRecord?.payload.running).toMatchObject({
       issue_identifier: 'ISSUE-1036',
-      session_id: 'run-3'
+      session_id: null
     });
   });
 

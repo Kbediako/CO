@@ -3,34 +3,31 @@
 ## Added by Bootstrap 2026-03-20
 
 ## Summary
-- Problem Statement: `1310` proved that CO was not yet at full Symphony parity. The remaining blockers are not small bug fixes; they are architectural and lifecycle gaps against the current `/Users/kbediako/Code/symphony/SPEC.md` contract and the current Elixir reference at commit `a164593aacb3db4d6808adc5a87173d906726406`. CO still lacks deterministic per-issue workspaces, authoritative claim/running/retry/completed bookkeeping, true internal continuation while an issue stays active, and a provider-owned reconcile/stop loop when issue state changes.
-- Desired Outcome: open and execute a new delivery lane that closes the remaining real parity gaps as far as current authoritative CO data allows, using docs-first planning and delegated implementation streams, while leaving any residual blocker explicit instead of overstating full parity closure.
+- Problem Statement: `1311` is an in-progress hardening lane, not a truthful parity closeout. The current branch has now landed the bounded provider/workspace/eligibility/test-teardown tranche, but full Symphony parity is still not closed against `/Users/kbediako/Code/symphony/SPEC.md` and the current Elixir reference.
+- Desired Outcome: Keep the packet aligned to verified branch truth: provider control-host continuation/retry handoff for active issues is materially covered, issue eligibility and provider-managed terminal workspace cleanup are hardened, the full local suite is terminal green, and the remaining real blockers stay explicit.
 
 ## User Request Translation (Context Anchor)
-- User intent / needs (in your own words): Open a new docs-first delivery lane for actual full Symphony parity, orchestrate it end to end with subagents doing as much of the implementation and review work as possible, and use the current SPEC plus current Elixir reference as the truth source instead of reusing the narrower 1310 audit lane.
+- User intent / needs (in your own words): use a docs-first lane to harden the real remaining Symphony parity gaps against the current SPEC and Elixir reference, while keeping the packet truthful if full parity still is not actually closed.
 - Success criteria / acceptance:
-  - a new `1311` docs-first packet exists and explicitly supersedes `1310` as the closure lane
-  - the lane lands deterministic workspace confinement, authoritative lifecycle bookkeeping, repeated continuation while active, running-issue reconcile/stop behavior, and truthful observability/read-model hardening
-  - any still-open closure blockers, including issue eligibility breadth or missing authoritative turn/token/rate-limit capture, are recorded explicitly and kept out of merged parity claims
-  - tracker-write ownership stays correctly classified as aligned at the core-contract level rather than being misframed as the blocker
-  - docs-review runs before implementation and implementation streams are broken into bounded ownership slices
-  - the lane carries through implementation, validation, live provider proof, PR feedback, merge, and clean-main closeout unless a concrete external blocker prevents completion
+  - landed fixes are recorded explicitly: deterministic workspace recreation plus prune; legacy resume deterministic workspace fallback; resume workspace-root confinement validation; startup immediate refresh; queued/null release fail-closed behavior; released-claim stability on rehydrate; selected child-manifest UI metadata truthfulness; compatibility `session_id` null handling
+  - landed fixes now also include active-issue eligibility for `Todo` plus Linear `state_type=started` issues, a Todo blocker rule that uses Linear blocker `state.type` when present (falling back to blocker state names), and terminal-only cleanup for provider-managed `.workspaces/<taskId>` on release/startup replay
+  - provider control-host continuation/retry handoff for active issues is described as materially covered, but full parity remains open
+  - remaining blockers stay explicit: live observability is not yet an authoritative runtime snapshot for turn/retry/token/rate-limit counters, and active-issue continuation after a normal success still starts a fresh child run instead of continuing the same session
+  - validation is described truthfully: `npm run build` passed; the focused 1311 regression pack passed `11/11` files and `262/262` tests; full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green at `282/282` files and `1998/1998` tests
 - Constraints / non-goals:
-  - when SPEC and current Elixir reference differ, parity claims are governed by the SPEC
-  - do not reopen `1303` or mutate `1310` into a new architecture lane; keep the audit packet truthful and intact
-  - do not rely on the shared repo root as an implicit fallback workspace once the parity lane starts landing workspace confinement
-  - do not widen tracker authority into orchestrator-owned ticket writes that the SPEC keeps in worker/tooling space
+  - do not claim full hardened parity closed on this branch
+  - do not treat focused validation passes as equivalent to a terminal-green full suite
+  - do not reframe tracker-write ownership as a parity blocker
 
 ## Goals
-- Close the real remaining gaps between CO and the current Symphony orchestrator contract without overstating closure when authoritative data is still missing.
-- Keep the delivery sequence explicit: docs/spec first, workspace substrate, provider lifecycle reconcile plus continuation, then observability/UI parity.
-- Preserve CO as execution authority while matching Symphony's scheduler/runner and tracker-reader responsibilities.
-- Produce artifact-backed proof that the new behavior works against the existing provider/control-host setup.
+- Keep the `1311` packet truthful about what is already landed.
+- Keep the remaining blockers explicit enough to prevent optimistic parity or closeout language.
+- Preserve the careful continuation wording: materially covered for active issues at the scheduler boundary, but not same-session parity closure.
 
 ## Non-Goals
-- Re-litigating whether `1310` was truthful; that lane is already the accepted rebaseline.
-- Expanding the lane into general multi-tenant control-plane work or unrelated cloud/runtime migrations.
-- Treating repo-owned tracker writes as a mandatory parity requirement when the SPEC still leaves them to workflow/runtime tooling.
+- Re-litigating `1310`; it remains the truthful audit/rebaseline lane.
+- Claiming full Symphony parity while authoritative live counters and same-session continuation still diverge from upstream.
+- Treating green local tests as proof that the remaining architectural parity gaps are gone.
 
 ## Stakeholders
 - Product: CO operator
@@ -39,47 +36,45 @@
 
 ## Metrics & Guardrails
 - Primary Success Metrics:
-  - child runs execute inside deterministic per-issue workspaces instead of the shared repo root
-  - provider lifecycle state is authoritative enough to reconcile running, retrying, completed, and released states without stale `running` claims after child completion
-  - normal child completion can continue work while the issue remains active without waiting for a fresh provider event
-  - running work is stopped or released correctly when the provider issue leaves the active set
-  - selected-run, compatibility, and UI surfaces expose real issue/workspace/lifecycle state and never fabricate turn/token/rate-limit values when authoritative capture does not exist
+  - the docs state the landed fix set exactly and do not regress to a "full parity closed" claim
+  - the remaining blockers stay explicit: non-authoritative live observability counters and missing same-session continuation
+  - validation sections report the current terminal-green full suite counts without inflating them into parity closure
 - Guardrails / Error Budgets:
-  - fail closed if workspace provisioning fails; do not silently fall back to shared repo-root execution
-  - keep parity claims SPEC-governed whenever the Elixir tree shows richer or drifted behavior
-  - keep each implementation slice reviewable and evidence-backed rather than landing one opaque rewrite
-
-## User Experience
-- Personas: CO operator trying to run Symphony-style long-lived issue execution safely and truthfully
-- User Journeys:
-  - start the control host and see issue work mapped to deterministic workspaces and authoritative lifecycle state
-  - watch the selected-run or compatibility surfaces and understand which issue is running, where it is running, and whether it is retrying, continuing, or being reconciled
-  - move a provider issue out of the active state and see CO stop or release the work without stale ledger state
+  - parity claims stay governed by `/Users/kbediako/Code/symphony/SPEC.md` when the Elixir tree is richer or drifted
+  - continuation/retry wording stays narrow and does not imply the same-session continuation gap is solved
+  - no review or closeout statement may assume the remaining architectural blockers are gone just because the local suite is green
 
 ## Technical Considerations
-- Architectural Notes:
-  - the new lane is a follow-on to `1310`, not a correction of it; `1310` remains the truthful audit and bounded-fix packet
-  - the current upstream contract is rooted in `/Users/kbediako/Code/symphony/SPEC.md`, with corroborating behavior in the Elixir orchestrator, agent runner, workspace, status dashboard, presenter, and observability API modules
-  - the expected workspace substrate for `1311` is deterministic per-issue repository workspaces with persisted workspace identity, rather than continuing to infer workspace from run directory or repo root
-  - lifecycle parity requires a single durable control-host authority over claim/running/retry/completed state, plus explicit reconcile and stop behavior when tracker state changes
+- Current branch truth:
+  - deterministic workspace recreation plus prune is landed
+  - legacy resume deterministic workspace fallback is landed
+  - resume workspace-root confinement validation is landed
+  - startup immediate refresh is landed
+  - queued/null release fail-closed behavior is landed
+  - released-claim stability on rehydrate is landed
+  - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, with a Todo blocker rule that prefers Linear blocker `state.type` over display-name matching
+  - terminal-only cleanup for provider-managed `.workspaces/<taskId>` is landed on release/startup replay
+  - selected child-manifest UI metadata truthfulness is landed
+  - compatibility `session_id` null handling is landed
+- Remaining blockers:
+  - live observability is still not an authoritative runtime snapshot for turn/retry/token/rate-limit counters
+  - active-issue continuation after a normal success still starts a fresh child run instead of continuing the same session
 - Dependencies / Integrations:
   - `/Users/kbediako/Code/symphony/SPEC.md`
   - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`
   - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/agent_runner.ex`
   - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/workspace.ex`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/status_dashboard.ex`
-  - `orchestrator/src/cli/controlHostCliShell.ts`
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`
   - `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`
-  - `orchestrator/src/cli/services/commandRunner.ts`
   - `orchestrator/src/cli/control/selectedRunProjection.ts`
   - `orchestrator/src/cli/control/observabilityReadModel.ts`
 
-## Open Questions
-- Should the richer Elixir dashboard/host monitor behavior be closed completely in `1311`, or should the lane claim SPEC-level parity first and treat additional Elixir-only operator affordances as a separate stretch target?
-- Do provider-active-state continuation semantics require a new explicit control-host reconcile tick, or can they reuse the existing runtime refresh surface once lifecycle authority is widened?
+## Validation Status
+- `npm run build` passed.
+- The focused 1311 regression pack passed `11/11` files and `262/262` tests.
+- `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` passed `282/282` files and `1998/1998` tests.
 
 ## Approvals
-- Product: Self-approved from the operator directive to get to full hardened parity using a docs-first approach.
-- Engineering: Pre-implementation self-review completed on 2026-03-20 against the current Symphony SPEC, current Elixir reference, and current CO control-host/lifecycle surfaces.
+- Product: Self-approved to keep the `1311` packet truthful to the current branch.
+- Engineering: Current state re-reviewed on 2026-03-20 against the verified branch facts for this doc patch.
 - Design: N/A

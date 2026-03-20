@@ -6,7 +6,11 @@ import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { ensureProviderWorkspace, resolveProviderWorkspacePath } from '../src/cli/run/workspacePath.js';
+import {
+  cleanupProviderWorkspace,
+  ensureProviderWorkspace,
+  resolveProviderWorkspacePath
+} from '../src/cli/run/workspacePath.js';
 
 const execFileAsync = promisify(execFile);
 const cleanupRoots: string[] = [];
@@ -43,5 +47,37 @@ describe('workspacePath', () => {
     expect(reusedWorkspacePath).toBe(workspacePath);
     await expect(access(join(workspacePath, 'package.json'))).resolves.toBeUndefined();
     await expect(runGit(workspacePath, ['rev-parse', '--is-inside-work-tree'])).resolves.toBe('true');
+  });
+
+  it('prunes stale git worktree registrations before recreating a deleted workspace', async () => {
+    const repoRoot = await createRepoRoot();
+
+    const workspacePath = await ensureProviderWorkspace(repoRoot, 'task-123');
+    await rm(workspacePath, { recursive: true, force: true });
+
+    const recreatedWorkspacePath = await ensureProviderWorkspace(repoRoot, 'task-123');
+
+    expect(recreatedWorkspacePath).toBe(workspacePath);
+    await expect(access(join(recreatedWorkspacePath, 'package.json'))).resolves.toBeUndefined();
+    await expect(runGit(recreatedWorkspacePath, ['rev-parse', '--is-inside-work-tree'])).resolves.toBe(
+      'true'
+    );
+  });
+
+  it('removes provider-managed worktrees and prunes their git registration', async () => {
+    const repoRoot = await createRepoRoot();
+
+    const workspacePath = await ensureProviderWorkspace(repoRoot, 'task-123');
+
+    await expect(cleanupProviderWorkspace(repoRoot, workspacePath)).resolves.toBe(true);
+    await expect(access(workspacePath)).rejects.toThrow();
+    await expect(runGit(repoRoot, ['worktree', 'list'])).resolves.not.toContain(workspacePath);
+  });
+
+  it('refuses to remove workspaces outside the provider-managed root', async () => {
+    const repoRoot = await createRepoRoot();
+
+    await expect(cleanupProviderWorkspace(repoRoot, repoRoot)).resolves.toBe(false);
+    await expect(access(join(repoRoot, 'package.json'))).resolves.toBeUndefined();
   });
 });
