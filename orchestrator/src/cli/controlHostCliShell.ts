@@ -31,6 +31,8 @@ import {
 } from './run/workspacePath.js';
 import {
   closeControlServerPublicLifecycle,
+  runProviderIssueHandoffRefresh,
+  runProviderIssueHandoffRehydrate,
   startControlServerPublicLifecycle
 } from './control/controlServerPublicLifecycle.js';
 import { resolveLiveLinearTrackedIssueById } from './control/linearDispatchSource.js';
@@ -200,7 +202,9 @@ export async function runControlHostCliShell(
   });
 
   try {
-    await lifecycle.requestContextShared.providerIssueHandoff?.rehydrate();
+    if (lifecycle.requestContextShared.providerIssueHandoff) {
+      await runProviderIssueHandoffRehydrate(lifecycle.requestContextShared.providerIssueHandoff);
+    }
     void beginProviderIssueHandoffStartupRefresh(
       lifecycle.requestContextShared.providerIssueHandoff,
       () => lifecycle.requestContextShared.runtime.publish({ source: 'provider-intake.rehydrate' }),
@@ -441,7 +445,7 @@ async function refreshProviderIssueHandoffOnStartup(
     return;
   }
   try {
-    await providerIssueHandoff.refresh();
+    await runProviderIssueHandoffRefresh(providerIssueHandoff);
   } catch (error) {
     logger.warn(
       `Provider issue startup refresh failed: ${(error as Error)?.message ?? String(error)}`

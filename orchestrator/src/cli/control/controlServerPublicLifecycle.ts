@@ -17,6 +17,7 @@ import { prepareControlServerStartupInputs } from './controlServerStartupInputPr
 const EXPIRY_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_INTERVAL_MS = 15_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
+const providerIssueHandoffOperations = new WeakMap<ProviderIssueHandoffService, Promise<void>>();
 
 export interface StartControlServerPublicLifecycleOptions {
   paths: RunPaths;
@@ -93,24 +94,29 @@ export async function closeControlServerPublicLifecycle(
   });
 }
 
+export function runProviderIssueHandoffRefresh(
+  providerIssueHandoff: ProviderIssueHandoffService
+): Promise<void> {
+  return runProviderIssueHandoffOperation(providerIssueHandoff, () => providerIssueHandoff.refresh());
+}
+
+export function runProviderIssueHandoffRehydrate(
+  providerIssueHandoff: ProviderIssueHandoffService
+): Promise<void> {
+  return runProviderIssueHandoffOperation(providerIssueHandoff, () => providerIssueHandoff.rehydrate());
+}
+
 function createProviderRefreshCoordinator(
   providerIssueHandoff: ProviderIssueHandoffService
 ): {
   timer: NodeJS.Timeout;
   trigger: () => Promise<void>;
 } {
-  let refreshInFlight = false;
   const trigger = async (): Promise<void> => {
-    if (refreshInFlight) {
-      return;
-    }
-    refreshInFlight = true;
     try {
-      await providerIssueHandoff.refresh();
+      await runProviderIssueHandoffRefresh(providerIssueHandoff);
     } catch {
       // Best-effort provider refreshes should not crash the public lifecycle.
-    } finally {
-      refreshInFlight = false;
     }
   };
   const timer = setInterval(() => {
@@ -118,4 +124,21 @@ function createProviderRefreshCoordinator(
   }, PROVIDER_REFRESH_INTERVAL_MS);
   timer.unref?.();
   return { timer, trigger };
+}
+
+function runProviderIssueHandoffOperation(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  operation: () => Promise<void>
+): Promise<void> {
+  const existingOperation = providerIssueHandoffOperations.get(providerIssueHandoff);
+  if (existingOperation) {
+    return existingOperation;
+  }
+  const operationPromise = operation().finally(() => {
+    if (providerIssueHandoffOperations.get(providerIssueHandoff) === operationPromise) {
+      providerIssueHandoffOperations.delete(providerIssueHandoff);
+    }
+  });
+  providerIssueHandoffOperations.set(providerIssueHandoff, operationPromise);
+  return operationPromise;
 }

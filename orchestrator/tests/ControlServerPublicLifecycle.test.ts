@@ -12,6 +12,7 @@ import {
 } from '../src/cli/control/controlServerReadyInstanceLifecycle.js';
 import {
   closeControlServerPublicLifecycle,
+  runProviderIssueHandoffRehydrate,
   startControlServerPublicLifecycle,
   type ControlServerPublicLifecycleState
 } from '../src/cli/control/controlServerPublicLifecycle.js';
@@ -246,6 +247,61 @@ describe('startControlServerPublicLifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(15_000);
     expect(refresh).toHaveBeenCalledTimes(2);
+
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('keeps the provider refresh timer from overlapping an in-flight rehydrate', async () => {
+    vi.useFakeTimers();
+
+    let resolveRehydrate: (() => void) | null = null;
+    const rehydratePromise = new Promise<void>((resolve) => {
+      resolveRehydrate = resolve;
+    });
+    const refresh = vi.fn(async () => undefined);
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {
+        await rehydratePromise;
+      }),
+      refresh
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    const rehydrate = runProviderIssueHandoffRehydrate(providerIssueHandoff);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(refresh).not.toHaveBeenCalled();
+
+    resolveRehydrate?.();
+    await rehydrate;
+    await started.triggerProviderRefresh?.();
+    expect(refresh).toHaveBeenCalledTimes(1);
 
     await closeControlServerPublicLifecycle(started);
   });
