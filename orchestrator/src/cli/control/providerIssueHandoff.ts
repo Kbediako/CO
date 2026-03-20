@@ -394,8 +394,10 @@ export function createProviderIssueHandoffService(
       // run's started_at so restart-time duplicate deliveries remain older than the
       // completed child run, while issue updates that happened after the old run started
       // can still relaunch.
+      const latestCompletedClaimIssueUpdatedAt =
+        latestExisting?.state === 'completed' ? latestExisting.issue_updated_at ?? null : null;
       const latestCompletedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
-        latestExisting?.issue_updated_at ?? null,
+        latestCompletedClaimIssueUpdatedAt,
         latestRun?.issueUpdatedAt ?? latestRun?.startedAt ?? null
       );
       if (
