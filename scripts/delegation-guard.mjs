@@ -432,25 +432,34 @@ function matchesProviderParentClaim(claim, taskId) {
   };
 }
 
-function resolveProviderParentManifestPath(runsDir, contract) {
-  return contract.runManifestPath || join(runsDir, contract.parentTaskId, 'cli', contract.parentRunId, 'manifest.json');
+function resolveProviderParentManifestPaths(runsDir, contract) {
+  const canonicalPath = join(runsDir, contract.parentTaskId, 'cli', contract.parentRunId, 'manifest.json');
+  if (!contract.runManifestPath || contract.runManifestPath === canonicalPath) {
+    return [canonicalPath];
+  }
+  return [contract.runManifestPath, canonicalPath];
 }
 
 async function hasActiveProviderParentManifest(runsDir, contract) {
-  let manifest;
-  try {
-    manifest = await loadJson(resolveProviderParentManifestPath(runsDir, contract));
-  } catch {
-    return false;
+  for (const manifestPath of resolveProviderParentManifestPaths(runsDir, contract)) {
+    let manifest;
+    try {
+      manifest = await loadJson(manifestPath);
+    } catch {
+      continue;
+    }
+    if (
+      readNonEmptyString(manifest, 'task_id') === contract.parentTaskId &&
+      readNonEmptyString(manifest, 'run_id') === contract.parentRunId &&
+      readNonEmptyString(manifest, 'issue_provider') === contract.provider &&
+      readNonEmptyString(manifest, 'issue_id') === contract.issueId &&
+      readNonEmptyString(manifest, 'issue_identifier') === contract.issueIdentifier &&
+      readNonEmptyString(manifest, 'status') === 'in_progress'
+    ) {
+      return true;
+    }
   }
-  return (
-    readNonEmptyString(manifest, 'task_id') === contract.parentTaskId &&
-    readNonEmptyString(manifest, 'run_id') === contract.parentRunId &&
-    readNonEmptyString(manifest, 'issue_provider') === contract.provider &&
-    readNonEmptyString(manifest, 'issue_id') === contract.issueId &&
-    readNonEmptyString(manifest, 'issue_identifier') === contract.issueIdentifier &&
-    readNonEmptyString(manifest, 'status') === 'in_progress'
-  );
+  return false;
 }
 
 async function resolveProviderParentClaim(runsDir, claim, taskId) {
@@ -775,15 +784,17 @@ async function main() {
         );
       }
     } else if (parentKey !== taskId) {
-      if (providerParentProof?.matched) {
-        console.log(
-          `Delegation guard: '${taskId}' treated as subagent run for sanctioned provider task '${parentKey}' (${providerParentProof.statePath}).`
-        );
-      } else {
-        console.log(`Delegation guard: '${taskId}' treated as subagent run for '${parentKey}'.`);
+      if (failures.length === 0) {
+        if (providerParentProof?.matched) {
+          console.log(
+            `Delegation guard: '${taskId}' treated as subagent run for sanctioned provider task '${parentKey}' (${providerParentProof.statePath}).`
+          );
+        } else {
+          console.log(`Delegation guard: '${taskId}' treated as subagent run for '${parentKey}'.`);
+        }
+        console.log('Delegation guard: OK (subagent runs are exempt).');
+        return;
       }
-      console.log('Delegation guard: OK (subagent runs are exempt).');
-      return;
     } else {
       const { found, error } = await findSubagentManifests(runsDir, taskId);
       if (error) {

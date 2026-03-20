@@ -1,7 +1,7 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { spawn } from 'node:child_process';
-import { access, mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
 
@@ -217,20 +217,12 @@ async function snapshotRunManifests(taskRunsRoot: string): Promise<Set<string>> 
   }
 
   const snapshot = new Set<string>();
-  await Promise.all(
-    entries.map(async (entry) => {
-      if (!entry.isDirectory()) {
-        return;
-      }
-      const manifestPath = join(taskRunsRoot, entry.name, 'manifest.json');
-      try {
-        await access(manifestPath);
-        snapshot.add(entry.name);
-      } catch {
-        // Ignore incomplete runs while taking the baseline snapshot.
-      }
-    })
-  );
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    snapshot.add(entry.name);
+  }
   return snapshot;
 }
 

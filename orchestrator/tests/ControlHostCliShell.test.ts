@@ -51,4 +51,33 @@ describe('controlHostCliShell manifest discovery', () => {
       manifestPath
     });
   });
+
+  it('ignores a preexisting run directory that gains a manifest after the baseline snapshot', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+
+    await mkdir(join(tempRoot, 'run-existing'), { recursive: true });
+    const baselineRuns = await snapshotRunManifests(tempRoot);
+
+    const newManifestPath = await writeManifest(tempRoot, 'run-new', {
+      run_id: 'run-new',
+      task_id: 'task-1'
+    });
+    const existingManifestPath = await writeManifest(tempRoot, 'run-existing', {
+      run_id: 'run-existing',
+      task_id: 'task-1'
+    });
+    const laterTimestamp = new Date('2026-03-20T00:00:02.000Z');
+    await utimes(existingManifestPath, laterTimestamp, laterTimestamp);
+
+    await expect(
+      findSpawnManifest({
+        taskRunsRoot: tempRoot,
+        taskId: 'task-1',
+        baselineRuns
+      })
+    ).resolves.toEqual({
+      runId: 'run-new',
+      manifestPath: newManifestPath
+    });
+  });
 });

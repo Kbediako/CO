@@ -269,7 +269,7 @@ describe('delegation-guard script', () => {
       ]
     });
 
-    const { stdout } = await execFileAsync('node', [scriptPath], {
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
       env: cleanGuardOverrideEnv({
         MCP_RUNNER_TASK_ID: taskId,
@@ -335,7 +335,7 @@ describe('delegation-guard script', () => {
       ]
     });
 
-    const { stdout } = await execFileAsync('node', [scriptPath], {
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
       env: cleanGuardOverrideEnv({
         MCP_RUNNER_TASK_ID: taskId,
@@ -1224,6 +1224,86 @@ describe('delegation-guard script', () => {
     expect(stdout).not.toContain('did not match any control-host provider-intake claim');
   });
 
+  it('accepts provider-child runs when the provider parent claim path is stale but the canonical parent manifest matches', async () => {
+    tempDir = await initRepo();
+    const parentTaskId = 'linear-lin-issue-1';
+    const taskId = `${parentTaskId}-guard`;
+    const runId = '2026-03-20T00-00-00-000Z-run-1';
+    const manifestDir = join(tempDir, '.runs', taskId, 'cli', runId);
+    const manifestPath = join(manifestDir, 'manifest.json');
+    const parentRunDir = join(tempDir, '.runs', parentTaskId, 'cli', 'run-parent');
+    const parentManifestPath = join(parentRunDir, 'manifest.json');
+    await mkdir(manifestDir, { recursive: true });
+    await writeJson(manifestPath, {
+      task_id: taskId,
+      run_id: runId,
+      status: 'in_progress',
+      parent_run_id: 'run-parent',
+      issue_provider: null,
+      issue_id: null,
+      issue_identifier: null
+    });
+    await mkdir(parentRunDir, { recursive: true });
+    await writeJson(parentManifestPath, {
+      task_id: parentTaskId,
+      run_id: 'run-parent',
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2'
+    });
+
+    const controlHostDir = join(tempDir, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostDir, { recursive: true });
+    await writeJson(join(controlHostDir, 'provider-intake-state.json'), {
+      schema_version: 1,
+      updated_at: '2026-03-20T00:00:01.000Z',
+      rehydrated_at: '2026-03-20T00:00:01.000Z',
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T00:00:00.000Z',
+          task_id: parentTaskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-20T00:00:00.000Z',
+          updated_at: '2026-03-20T00:00:01.000Z',
+          last_delivery_id: 'delivery-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_430_000_000,
+          run_id: 'run-parent',
+          run_manifest_path: join(tempDir, '.runs', parentTaskId, 'cli', 'relocated-run-parent', 'manifest.json'),
+          launch_source: 'control-host',
+          launch_token: 'launch-token-1'
+        }
+      ]
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: tempDir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_ROOT: tempDir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+      })
+    });
+
+    expect(stdout).toContain(
+      `Delegation guard: '${taskId}' treated as subagent run for sanctioned provider task '${parentTaskId}'`
+    );
+    expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
+  });
+
   it('rejects delegated child runs when only a non-control-host intake ledger sanctions the parent', async () => {
     tempDir = await initRepo();
     const parentTaskId = 'linear-lin-issue-1';
@@ -1771,6 +1851,86 @@ describe('delegation-guard script', () => {
       `Delegation guard: '${taskId}' treated as subagent run for sanctioned provider task '${parentTaskId}'`
     );
     expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
+  });
+
+  it('preserves prior failures before accepting a sanctioned provider parent subagent run', async () => {
+    tempDir = await initRepo();
+    await rm(join(tempDir, 'tasks', 'index.json'));
+    const parentTaskId = 'linear-lin-issue-1';
+    const taskId = `${parentTaskId}-guard`;
+    const runId = '2026-03-20T00-00-00-000Z-run-1';
+    const manifestDir = join(tempDir, '.runs', taskId, 'cli', runId);
+    const manifestPath = join(manifestDir, 'manifest.json');
+    const parentRunDir = join(tempDir, '.runs', parentTaskId, 'cli', 'run-parent');
+    const parentManifestPath = join(parentRunDir, 'manifest.json');
+    await mkdir(manifestDir, { recursive: true });
+    await writeJson(manifestPath, {
+      task_id: taskId,
+      run_id: runId,
+      status: 'in_progress',
+      parent_run_id: 'run-parent',
+      issue_provider: null,
+      issue_id: null,
+      issue_identifier: null
+    });
+    await mkdir(parentRunDir, { recursive: true });
+    await writeJson(parentManifestPath, {
+      task_id: parentTaskId,
+      run_id: 'run-parent',
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2'
+    });
+
+    const controlHostDir = join(tempDir, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostDir, { recursive: true });
+    await writeJson(join(controlHostDir, 'provider-intake-state.json'), {
+      schema_version: 1,
+      updated_at: '2026-03-20T00:00:01.000Z',
+      rehydrated_at: '2026-03-20T00:00:01.000Z',
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T00:00:00.000Z',
+          task_id: parentTaskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-20T00:00:00.000Z',
+          updated_at: '2026-03-20T00:00:01.000Z',
+          last_delivery_id: 'delivery-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_430_000_000,
+          run_id: 'run-parent',
+          run_manifest_path: parentManifestPath,
+          launch_source: 'control-host',
+          launch_token: 'launch-token-1'
+        }
+      ]
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: tempDir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_ROOT: tempDir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+      })
+    });
+
+    expect(stdout).toContain('Delegation guard: issues detected');
+    expect(stdout).toContain('Unable to read tasks/index.json');
+    expect(stdout).not.toContain('Delegation guard: OK (subagent runs are exempt).');
   });
 
   it('rejects delegated child runs when the manifest locator is stale even if another control-host lane matches', async () => {
