@@ -48,6 +48,8 @@ interface ProviderIssueRunRecord {
   runId: string;
   manifestPath: string;
   status: string | null;
+  issueUpdatedAt: string | null;
+  startedAt: string | null;
   updatedAt: string | null;
 }
 
@@ -388,7 +390,24 @@ export function createProviderIssueHandoffService(
         return { kind: 'resume', reason: 'provider_issue_resume_launched', claim: inflightClaim };
       }
 
-      if (latestRun?.status === 'succeeded') {
+      // Older manifests may predate explicit issue_updated_at recording. Fall back to the
+      // run's started_at so restart-time duplicate deliveries remain older than the
+      // completed child run, while issue updates that happened after the old run started
+      // can still relaunch.
+      const latestCompletedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
+        latestExisting?.issue_updated_at ?? null,
+        latestRun?.issueUpdatedAt ?? latestRun?.startedAt ?? null
+      );
+      if (
+        latestRun?.status === 'succeeded' &&
+        (
+          input.trackedIssue.updated_at === null ||
+          isTrackedIssueNonIncreasing({
+            existingIssueUpdatedAt: latestCompletedIssueUpdatedAt,
+            nextIssueUpdatedAt: input.trackedIssue.updated_at
+          })
+        )
+      ) {
         const claim = upsertProviderIntakeClaim(options.state, {
           ...latestClaimBase,
           task_id: latestRun.taskId,
@@ -478,15 +497,53 @@ function isTrackedIssueStale(input: {
   existingIssueUpdatedAt: string | null;
   nextIssueUpdatedAt: string | null;
 }): boolean {
+  return compareTrackedIssueUpdatedAt(input) === 'older';
+}
+
+function isTrackedIssueNonIncreasing(input: {
+  existingIssueUpdatedAt: string | null;
+  nextIssueUpdatedAt: string | null;
+}): boolean {
+  const comparison = compareTrackedIssueUpdatedAt(input);
+  return comparison === 'older' || comparison === 'equal';
+}
+
+function selectMostRecentTrackedIssueUpdatedAt(
+  primaryIssueUpdatedAt: string | null,
+  secondaryIssueUpdatedAt: string | null
+): string | null {
+  const comparison = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: primaryIssueUpdatedAt,
+    nextIssueUpdatedAt: secondaryIssueUpdatedAt
+  });
+  if (comparison === 'older' || comparison === 'equal') {
+    return primaryIssueUpdatedAt;
+  }
+  if (comparison === 'newer') {
+    return secondaryIssueUpdatedAt;
+  }
+  return primaryIssueUpdatedAt ?? secondaryIssueUpdatedAt ?? null;
+}
+
+function compareTrackedIssueUpdatedAt(input: {
+  existingIssueUpdatedAt: string | null;
+  nextIssueUpdatedAt: string | null;
+}): 'older' | 'equal' | 'newer' | 'unknown' {
   if (!input.existingIssueUpdatedAt || !input.nextIssueUpdatedAt) {
-    return false;
+    return 'unknown';
   }
   const existingTime = Date.parse(input.existingIssueUpdatedAt);
   const nextTime = Date.parse(input.nextIssueUpdatedAt);
   if (!Number.isFinite(existingTime) || !Number.isFinite(nextTime)) {
-    return false;
+    return 'unknown';
   }
-  return nextTime < existingTime;
+  if (nextTime < existingTime) {
+    return 'older';
+  }
+  if (nextTime === existingTime) {
+    return 'equal';
+  }
+  return 'newer';
 }
 
 function createProviderLaunchToken(): string {
@@ -531,6 +588,8 @@ async function discoverProviderIssueRuns(
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
         status: readStringValue(manifest, 'status'),
+        issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
+        startedAt: readStringValue(manifest, 'started_at'),
         updatedAt: readStringValue(manifest, 'updated_at', 'started_at')
       });
     }
