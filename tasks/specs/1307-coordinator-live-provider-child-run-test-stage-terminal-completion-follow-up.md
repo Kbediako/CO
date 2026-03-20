@@ -45,7 +45,7 @@ dependencies:
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`
-  - `npm run review`
+  - `TASK=1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up NOTES="Goal: ... | Summary: ... | Risks: ..." npm run review -- --manifest <review-manifest-path>`
   - `npm run pack:smoke`
 - Explicit elegance review pass
 - Live provider rerun against the existing control host

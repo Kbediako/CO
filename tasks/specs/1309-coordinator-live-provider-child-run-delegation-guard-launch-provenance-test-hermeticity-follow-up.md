@@ -47,7 +47,7 @@ dependencies:
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`
-  - `npm run review`
+  - `TASK=1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up NOTES="Goal: ... | Summary: ... | Risks: ..." npm run review -- --manifest <review-manifest-path>`
   - `npm run pack:smoke`
 - Explicit elegance review pass
 - Live provider replay against the existing control host

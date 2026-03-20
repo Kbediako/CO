@@ -47,7 +47,7 @@ dependencies:
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`
-  - `npm run review`
+  - `TASK=1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment NOTES="Goal: ... | Summary: ... | Risks: ..." npm run review -- --manifest <review-manifest-path>`
   - `npm run pack:smoke`
   - explicit elegance review pass
   - forged provider-flag regression proving unmatched top-level runs still fail
