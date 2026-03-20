@@ -77,7 +77,7 @@ export type ProviderTrackedIssueRefreshResolution =
   | { kind: 'skip'; reason: string };
 
 export interface CreateProviderIssueHandoffServiceOptions {
-  paths: Pick<RunPaths, 'runDir'>;
+  paths: Pick<RunPaths, 'runDir'> & { repoRoot: string };
   state: ProviderIntakeState;
   persist: () => Promise<void>;
   launcher: ProviderIssueLauncher;
@@ -117,7 +117,7 @@ export function createProviderIssueHandoffService(
 ): ProviderIssueHandoffService {
   const startPipelineId = options.startPipelineId ?? 'diagnostics';
   const allowedRunRoots = [resolve(options.paths.runDir, '..', '..', '..')];
-  const repoRoot = resolve(options.paths.runDir, '..', '..', '..', '..');
+  const repoRoot = resolve(options.paths.repoRoot);
 
   const launchResumeForRun = async (input: {
     claim: ProviderIntakeClaimRecord;

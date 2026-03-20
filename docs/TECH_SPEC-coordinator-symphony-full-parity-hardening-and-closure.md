@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-full-parity-hardening-and-closure.md
 risk: high
 owners:
   - Codex
-last_review: 2026-03-20
+last_review: 2026-03-21
 ---
 
 ## Added by Bootstrap (refresh as needed)
@@ -26,9 +26,12 @@ last_review: 2026-03-20
   - startup immediate refresh
   - queued/null release fail-closed behavior
   - released-claim stability on rehydrate
+  - explicit authenticated/manual refresh requests now queue one follow-up pass instead of being dropped behind in-flight provider handoff work
   - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names
   - terminal-only cleanup for provider-managed `.workspaces/<taskId>` is present on release/startup replay
+  - provider workspace cleanup now resolves against the real repo root when `CODEX_ORCHESTRATOR_RUNS_DIR` lives outside the repository
   - selected child-manifest UI metadata truthfulness
+  - selected-run workspace fallback stays truthful for child CLI manifests under repo-local and external overridden runs roots
   - compatibility `session_id` null handling
 - Continuation posture:
   - provider control-host continuation/retry handoff for active issues is materially covered, but full parity is still not closed
@@ -42,7 +45,9 @@ last_review: 2026-03-20
   - legacy resume paths must recover the deterministic workspace rather than silently drifting to the shared repo root
   - resume/startup flows must validate workspace-root confinement before launching child work
   - startup refresh must run immediately enough to reconcile provider state without waiting for a later poll
+  - explicit refresh requests during in-flight startup/rehydrate work must queue one follow-up refresh without reopening overlap between provider handoff operations
   - queued/null release handling must fail closed, and released claims must remain stable across rehydrate
+  - provider workspace cleanup must resolve against the real repository root rather than assuming `.runs` lives under the repo root
   - selected-run/UI compatibility payloads must expose truthful child-manifest metadata and preserve `session_id=null` where no session exists
 - Remaining requirements:
   - add authoritative runtime capture for live turn/retry/token/rate-limit counters or explicitly defer those counters out of parity scope
@@ -60,6 +65,7 @@ last_review: 2026-03-20
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`
   - `orchestrator/src/cli/control/providerIntakeState.ts`
   - `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`
+  - `orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts`
 - Read-model/UI surfaces touched by the landed tranche:
   - `orchestrator/src/cli/control/selectedRunProjection.ts`
   - `orchestrator/src/cli/control/selectedRunPresenter.ts`
@@ -69,9 +75,12 @@ last_review: 2026-03-20
 
 ## Validation Plan
 - Current verified checks:
+  - `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs` passed (`5` subagent manifests found)
+  - `node scripts/spec-guard.mjs --dry-run` passed
   - `npm run build` passed
-  - the focused 1311 regression pack passed `11/11` files and `262/262` tests
-  - `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` passed `282/282` files and `1998/1998` tests
+  - `npm run lint` passed
+  - the March 21 review-fix regression pack passed `5/5` files and `70/70` tests
+  - local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` again reached all file-level green output through `tests/cli-orchestrator.spec.ts` and then hung without a terminal summary, so CI Core Lane remains the authoritative full-suite terminal result for this head
 - Closure gate:
   - do not claim parity closeout until the remaining blockers are resolved, even though the local suite is now terminal green
 
@@ -81,4 +90,4 @@ last_review: 2026-03-20
 
 ## Approvals
 - Reviewer: Codex (top-level orchestrator)
-- Date: 2026-03-20
+- Date: 2026-03-21

@@ -12,6 +12,7 @@ import {
 } from '../src/cli/control/controlServerReadyInstanceLifecycle.js';
 import {
   closeControlServerPublicLifecycle,
+  runProviderIssueHandoffRefresh,
   runProviderIssueHandoffRehydrate,
   startControlServerPublicLifecycle,
   type ControlServerPublicLifecycleState
@@ -249,6 +250,65 @@ describe('startControlServerPublicLifecycle', () => {
     expect(refresh).toHaveBeenCalledTimes(2);
 
     await closeControlServerPublicLifecycle(started);
+  });
+
+  it('queues one follow-up refresh when a manual refresh request arrives during an in-flight refresh', async () => {
+    let resolveRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const refresh = vi
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(async () => {
+        await firstRefresh;
+      })
+      .mockImplementation(async () => undefined);
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh
+    };
+
+    const inFlightRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    const queuedRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      queueIfBusy: true
+    });
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(queuedRefresh).not.toBe(inFlightRefresh);
+
+    resolveRefresh?.();
+    await queuedRefresh;
+
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('queues a follow-up refresh when a manual refresh request arrives during rehydrate', async () => {
+    let resolveRehydrate: (() => void) | null = null;
+    const rehydratePromise = new Promise<void>((resolve) => {
+      resolveRehydrate = resolve;
+    });
+    const refresh = vi.fn(async () => undefined);
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {
+        await rehydratePromise;
+      }),
+      refresh
+    };
+
+    const inFlightRehydrate = runProviderIssueHandoffRehydrate(providerIssueHandoff);
+    const queuedRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      queueIfBusy: true
+    });
+
+    expect(refresh).not.toHaveBeenCalled();
+
+    resolveRehydrate?.();
+    await inFlightRehydrate;
+    await queuedRefresh;
+
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the provider refresh timer from overlapping an in-flight rehydrate', async () => {

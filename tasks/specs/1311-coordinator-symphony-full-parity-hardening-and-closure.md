@@ -4,7 +4,7 @@ title: Coordinator Symphony Full-Parity Hardening and Closure
 status: in_progress
 owner: Codex
 created: 2026-03-20
-last_review: 2026-03-20
+last_review: 2026-03-21
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-full-parity-hardening-and-closure.md
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md
 review_notes:
   - 2026-03-20: Opened as the delivery follow-up to `1310`. The parity authority is `/Users/kbediako/Code/symphony/SPEC.md` at commit `a164593aacb3db4d6808adc5a87173d906726406`, with current Elixir reference behavior used to scope richer operational parity surfaces.
+  - 2026-03-21: March 21 review-fix tranche landed for queued manual refreshes during in-flight provider handoff work, truthful selected-run workspace fallback under overridden runs roots, and real repo-root provider workspace cleanup when `CODEX_ORCHESTRATOR_RUNS_DIR` is external. Local full `npm run test` again reached file-level green completion and then hung without a terminal summary, so CI remains the full-suite authority for this head.
 ---
 
 # Technical Specification
@@ -34,6 +35,7 @@ review_notes:
 ## Current Truth
 
 - The current branch already lands deterministic workspace recreation plus prune, legacy resume deterministic workspace fallback, resume workspace-root confinement validation, startup immediate refresh, queued/null release fail-closed behavior, released-claim stability on rehydrate, active-issue eligibility for `Todo` plus Linear `state_type=started` issues with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names, terminal-only cleanup for provider-managed `.workspaces/<taskId>` on release/startup replay, selected child-manifest UI metadata truthfulness, and compatibility `session_id=null` handling.
+- The current branch now also lands queued follow-up refresh for explicit authenticated/manual refresh requests that arrive during in-flight provider handoff work, truthful selected-run workspace fallback for child CLI manifests under repo-local and external overridden runs roots, and real repo-root provider workspace cleanup when `CODEX_ORCHESTRATOR_RUNS_DIR` is outside the repository.
 - Provider control-host continuation/retry handoff for active issues is materially covered, but full parity is still not closed.
 - Tracker writes are aligned at the core-contract level and do not block `1311`.
 - `1311` must not claim closure while real blockers remain, even though the full local suite is terminal green.
@@ -43,10 +45,12 @@ review_notes:
 ## Validation Plan
 
 - docs-review before implementation
+- `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs`
 - `node scripts/spec-guard.mjs --dry-run`
+- `npm run build`
+- `npm run lint`
+- focused March 21 lifecycle/workspace/review-fix pack (`5/5` files and `70/70` tests)
+- full repo gate chain, with the explicit current truth that local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` again reached all file-level green output through `tests/cli-orchestrator.spec.ts` and then hung without a terminal summary, so CI Core Lane remains the full-suite authority for this head
 - `npm run docs:check`
 - `npm run docs:freshness`
-- focused lifecycle/workspace tests
-- `npm run build`
-- full repo gate chain, with the explicit current truth that the focused 1311 regression pack is `11/11` files and `262/262` tests, and `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green at `282/282` files and `1998/1998` tests
 - live provider proof against the existing control host

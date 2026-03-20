@@ -178,7 +178,9 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     expect(adapter.resolveChildQuestion).toHaveBeenCalledWith({ question_id: 'q-1' }, 'answered');
 
     await assembled.refreshProviderIssues?.();
-    expect(runProviderIssueHandoffRefresh).toHaveBeenCalledWith(context.providerIssueHandoff);
+    expect(runProviderIssueHandoffRefresh).toHaveBeenCalledWith(context.providerIssueHandoff, {
+      queueIfBusy: true
+    });
   });
 
   it('returns a null task id when the manifest path does not live under a cli task root', () => {

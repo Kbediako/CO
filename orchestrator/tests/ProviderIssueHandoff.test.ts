@@ -30,7 +30,7 @@ async function createHostPaths() {
     outRoot: join(root, 'out'),
     taskId: 'local-mcp'
   };
-  const paths = resolveRunPaths(env, 'control-host');
+  const paths = Object.assign(resolveRunPaths(env, 'control-host'), { repoRoot: root });
   await mkdir(paths.runDir, { recursive: true });
   return { root, paths };
 }
@@ -2753,6 +2753,98 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_released:not_active',
       issue_state: 'Done',
       issue_state_type: 'completed'
+    });
+  });
+
+  it('cleans only the repo-root provider workspace when the runs root lives outside the repo', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'provider-issue-handoff-repo-'));
+    const runsRoot = await mkdtemp(join(tmpdir(), 'provider-issue-handoff-runs-'));
+    cleanupRoots.push(root, runsRoot);
+    const env = {
+      repoRoot: root,
+      runsRoot,
+      outRoot: join(root, 'out'),
+      taskId: 'local-mcp'
+    };
+    const paths = Object.assign(resolveRunPaths(env, 'control-host'), { repoRoot: root });
+    await mkdir(paths.runDir, { recursive: true });
+
+    const childEnv = {
+      repoRoot: root,
+      runsRoot,
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        workspace_path: join(root, '.workspaces', 'task-1303-completed'),
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-completed');
+    await mkdir(workspacePath, { recursive: true });
+    await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+    const decoyWorkspacePath = join(runsRoot, '.workspaces', 'task-1303-completed');
+    await mkdir(decoyWorkspacePath, { recursive: true });
+    await writeFile(join(decoyWorkspacePath, '.git'), 'gitdir: /tmp/decoy-provider-worktree\n', 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    await expect(access(workspacePath)).rejects.toThrow();
+    await expect(access(decoyWorkspacePath)).resolves.toBeUndefined();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath
     });
   });
 

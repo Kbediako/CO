@@ -117,7 +117,7 @@ export async function runControlHostCliShell(
       readFeatureToggles
     }) =>
       createProviderIssueHandoffService({
-        paths,
+        paths: { ...paths, repoRoot: env.repoRoot },
         state: providerIntakeState,
         persist: persistProviderIntake,
         startPipelineId,

@@ -17,7 +17,15 @@ import { prepareControlServerStartupInputs } from './controlServerStartupInputPr
 const EXPIRY_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_INTERVAL_MS = 15_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
-const providerIssueHandoffOperations = new WeakMap<ProviderIssueHandoffService, Promise<void>>();
+interface ProviderIssueHandoffOperationState {
+  active: Promise<void> | null;
+  queuedRefresh: Promise<void> | null;
+}
+
+const providerIssueHandoffOperations = new WeakMap<
+  ProviderIssueHandoffService,
+  ProviderIssueHandoffOperationState
+>();
 
 export interface StartControlServerPublicLifecycleOptions {
   paths: RunPaths;
@@ -95,9 +103,14 @@ export async function closeControlServerPublicLifecycle(
 }
 
 export function runProviderIssueHandoffRefresh(
-  providerIssueHandoff: ProviderIssueHandoffService
+  providerIssueHandoff: ProviderIssueHandoffService,
+  options?: { queueIfBusy?: boolean }
 ): Promise<void> {
-  return runProviderIssueHandoffOperation(providerIssueHandoff, () => providerIssueHandoff.refresh());
+  return runProviderIssueHandoffOperation(
+    providerIssueHandoff,
+    () => providerIssueHandoff.refresh(),
+    options
+  );
 }
 
 export function runProviderIssueHandoffRehydrate(
@@ -128,17 +141,84 @@ function createProviderRefreshCoordinator(
 
 function runProviderIssueHandoffOperation(
   providerIssueHandoff: ProviderIssueHandoffService,
+  operation: () => Promise<void>,
+  options?: { queueIfBusy?: boolean }
+): Promise<void> {
+  const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
+  if (state.active) {
+    if (!options?.queueIfBusy) {
+      return state.active;
+    }
+    return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation);
+  }
+  return startProviderIssueHandoffOperation(providerIssueHandoff, state, operation);
+}
+
+function startProviderIssueHandoffOperation(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  state: ProviderIssueHandoffOperationState,
   operation: () => Promise<void>
 ): Promise<void> {
-  const existingOperation = providerIssueHandoffOperations.get(providerIssueHandoff);
-  if (existingOperation) {
-    return existingOperation;
-  }
   const operationPromise = operation().finally(() => {
-    if (providerIssueHandoffOperations.get(providerIssueHandoff) === operationPromise) {
-      providerIssueHandoffOperations.delete(providerIssueHandoff);
+    if (state.active === operationPromise) {
+      state.active = null;
+      clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
     }
   });
-  providerIssueHandoffOperations.set(providerIssueHandoff, operationPromise);
+  state.active = operationPromise;
   return operationPromise;
+}
+
+function queueProviderIssueHandoffRefresh(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  state: ProviderIssueHandoffOperationState,
+  operation: () => Promise<void>
+): Promise<void> {
+  if (state.queuedRefresh) {
+    return state.queuedRefresh;
+  }
+  const queuedRefresh = state.active!
+    .then(
+      () => undefined,
+      () => undefined
+    )
+    .then(() => {
+      if (state.queuedRefresh !== queuedRefresh) {
+        return;
+      }
+      state.queuedRefresh = null;
+      return runProviderIssueHandoffOperation(providerIssueHandoff, operation);
+    })
+    .finally(() => {
+      if (state.queuedRefresh === queuedRefresh) {
+        state.queuedRefresh = null;
+      }
+      clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
+    });
+  state.queuedRefresh = queuedRefresh;
+  return queuedRefresh;
+}
+
+function getProviderIssueHandoffOperationState(
+  providerIssueHandoff: ProviderIssueHandoffService
+): ProviderIssueHandoffOperationState {
+  const existingState = providerIssueHandoffOperations.get(providerIssueHandoff);
+  if (existingState) {
+    return existingState;
+  }
+  const nextState: ProviderIssueHandoffOperationState = {
+    active: null,
+    queuedRefresh: null
+  };
+  providerIssueHandoffOperations.set(providerIssueHandoff, nextState);
+  return nextState;
+}
+
+function clearProviderIssueHandoffOperationState(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  state: ProviderIssueHandoffOperationState
+): void {
+  if (!state.active && !state.queuedRefresh) {
+    providerIssueHandoffOperations.delete(providerIssueHandoff);
+  }
 }
