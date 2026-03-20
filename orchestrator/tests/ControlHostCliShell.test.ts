@@ -20,7 +20,7 @@ afterEach(async () => {
 async function writeManifest(
   taskRunsRoot: string,
   runId: string,
-  manifest: { run_id: string; task_id: string }
+  manifest: Record<string, unknown>
 ): Promise<string> {
   const runDir = join(taskRunsRoot, runId);
   await mkdir(runDir, { recursive: true });
@@ -78,6 +78,102 @@ describe('controlHostCliShell manifest discovery', () => {
     ).resolves.toEqual({
       runId: 'run-new',
       manifestPath: newManifestPath
+    });
+  });
+
+  it('matches the launched manifest by issue metadata before accepting newer concurrent manifests', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+
+    const baselineRuns = await snapshotRunManifests(tempRoot);
+
+    const expectedManifestPath = await writeManifest(tempRoot, 'run-expected', {
+      run_id: 'run-expected',
+      task_id: 'task-1',
+      issue_provider: 'linear',
+      issue_id: 'issue-1',
+      issue_identifier: 'CO-1',
+      issue_updated_at: '2026-03-20T00:00:00.000Z',
+      provider_control_host_task_id: 'provider-host-task',
+      provider_control_host_run_id: 'provider-host-run'
+    });
+    const newerOtherManifestPath = await writeManifest(tempRoot, 'run-other', {
+      run_id: 'run-other',
+      task_id: 'task-1',
+      issue_provider: 'linear',
+      issue_id: 'issue-2',
+      issue_identifier: 'CO-2',
+      issue_updated_at: '2026-03-20T00:00:01.000Z',
+      provider_control_host_task_id: 'provider-host-task',
+      provider_control_host_run_id: 'provider-host-run'
+    });
+    const laterTimestamp = new Date('2026-03-20T00:00:02.000Z');
+    await utimes(newerOtherManifestPath, laterTimestamp, laterTimestamp);
+
+    await expect(
+      findSpawnManifest({
+        taskRunsRoot: tempRoot,
+        taskId: 'task-1',
+        baselineRuns,
+        correlation: {
+          issueProvider: 'linear',
+          issueId: 'issue-1',
+          issueIdentifier: 'CO-1',
+          issueUpdatedAt: '2026-03-20T00:00:00.000Z',
+          providerControlHostTaskId: 'provider-host-task',
+          providerControlHostRunId: 'provider-host-run'
+        }
+      })
+    ).resolves.toEqual({
+      runId: 'run-expected',
+      manifestPath: expectedManifestPath
+    });
+  });
+
+  it('matches the launched manifest by control-host locator before accepting same-issue collisions', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+
+    const baselineRuns = await snapshotRunManifests(tempRoot);
+
+    const expectedManifestPath = await writeManifest(tempRoot, 'run-expected', {
+      run_id: 'run-expected',
+      task_id: 'task-1',
+      issue_provider: 'linear',
+      issue_id: 'issue-1',
+      issue_identifier: 'CO-1',
+      issue_updated_at: '2026-03-20T00:00:00.000Z',
+      provider_control_host_task_id: 'provider-host-task',
+      provider_control_host_run_id: 'provider-host-run'
+    });
+    const newerOtherManifestPath = await writeManifest(tempRoot, 'run-other', {
+      run_id: 'run-other',
+      task_id: 'task-1',
+      issue_provider: 'linear',
+      issue_id: 'issue-1',
+      issue_identifier: 'CO-1',
+      issue_updated_at: '2026-03-20T00:00:00.000Z',
+      provider_control_host_task_id: 'provider-host-task',
+      provider_control_host_run_id: 'other-provider-host-run'
+    });
+    const laterTimestamp = new Date('2026-03-20T00:00:02.000Z');
+    await utimes(newerOtherManifestPath, laterTimestamp, laterTimestamp);
+
+    await expect(
+      findSpawnManifest({
+        taskRunsRoot: tempRoot,
+        taskId: 'task-1',
+        baselineRuns,
+        correlation: {
+          issueProvider: 'linear',
+          issueId: 'issue-1',
+          issueIdentifier: 'CO-1',
+          issueUpdatedAt: '2026-03-20T00:00:00.000Z',
+          providerControlHostTaskId: 'provider-host-task',
+          providerControlHostRunId: 'provider-host-run'
+        }
+      })
+    ).resolves.toEqual({
+      runId: 'run-expected',
+      manifestPath: expectedManifestPath
     });
   });
 });

@@ -41,6 +41,15 @@ interface SpawnedRunManifestInfo {
   manifestPath: string;
 }
 
+interface SpawnManifestCorrelation {
+  issueProvider?: string | null;
+  issueId?: string | null;
+  issueIdentifier?: string | null;
+  issueUpdatedAt?: string | null;
+  providerControlHostTaskId?: string | null;
+  providerControlHostRunId?: string | null;
+}
+
 export interface RunControlHostCliShellParams {
   flags: ArgMap;
   printHelp: () => void;
@@ -115,6 +124,14 @@ export async function runControlHostCliShell(
                 [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
                 [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
                 [PROVIDER_LAUNCH_TOKEN_ENV]: input.launchToken
+              },
+              {
+                issueProvider: input.provider,
+                issueId: input.issueId,
+                issueIdentifier: input.issueIdentifier,
+                issueUpdatedAt: input.issueUpdatedAt,
+                providerControlHostTaskId: taskId,
+                providerControlHostRunId: runId
               }
             );
           },
@@ -172,7 +189,8 @@ async function spawnBackgroundCliAndWaitForManifest(
   args: string[],
   taskRunsRoot: string,
   taskId: string,
-  envOverrides: Record<string, string> = {}
+  envOverrides: Record<string, string> = {},
+  correlation: SpawnManifestCorrelation | null = null
 ): Promise<SpawnedRunManifestInfo | null> {
   const baselineRuns = await snapshotRunManifests(taskRunsRoot);
   await spawnBackgroundCli(repoRoot, cliEntrypoint, args, envOverrides);
@@ -180,6 +198,7 @@ async function spawnBackgroundCliAndWaitForManifest(
     taskRunsRoot,
     taskId,
     baselineRuns,
+    correlation,
     timeoutMs: SPAWN_MANIFEST_WAIT_TIMEOUT_MS,
     intervalMs: SPAWN_MANIFEST_WAIT_INTERVAL_MS
   });
@@ -230,6 +249,7 @@ async function pollForSpawnManifest(params: {
   taskRunsRoot: string;
   taskId: string;
   baselineRuns: Set<string>;
+  correlation: SpawnManifestCorrelation | null;
   timeoutMs: number;
   intervalMs: number;
 }): Promise<SpawnedRunManifestInfo | null> {
@@ -248,6 +268,7 @@ async function findSpawnManifest(params: {
   taskRunsRoot: string;
   taskId: string;
   baselineRuns: Set<string>;
+  correlation?: SpawnManifestCorrelation | null;
 }): Promise<SpawnedRunManifestInfo | null> {
   let entries: Array<import('node:fs').Dirent>;
   try {
@@ -275,8 +296,11 @@ async function findSpawnManifest(params: {
   for (const candidate of candidates) {
     try {
       const raw = await readFile(candidate.manifestPath, 'utf8');
-      const parsed = JSON.parse(raw) as { run_id?: string; task_id?: string };
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
       if (typeof parsed.task_id === 'string' && parsed.task_id !== params.taskId) {
+        continue;
+      }
+      if (!manifestMatchesCorrelation(parsed, params.correlation ?? null)) {
         continue;
       }
       const runId =
@@ -299,6 +323,48 @@ export const __test__ = {
   findSpawnManifest,
   snapshotRunManifests
 };
+
+function manifestMatchesCorrelation(
+  manifest: Record<string, unknown>,
+  correlation: SpawnManifestCorrelation | null
+): boolean {
+  if (!correlation) {
+    return true;
+  }
+
+  return (
+    manifestFieldMatches(manifest, 'issue_provider', correlation.issueProvider) &&
+    manifestFieldMatches(manifest, 'issue_id', correlation.issueId) &&
+    manifestFieldMatches(manifest, 'issue_identifier', correlation.issueIdentifier) &&
+    manifestFieldMatches(manifest, 'issue_updated_at', correlation.issueUpdatedAt) &&
+    manifestFieldMatches(
+      manifest,
+      'provider_control_host_task_id',
+      correlation.providerControlHostTaskId
+    ) &&
+    manifestFieldMatches(manifest, 'provider_control_host_run_id', correlation.providerControlHostRunId)
+  );
+}
+
+function manifestFieldMatches(
+  manifest: Record<string, unknown>,
+  field: string,
+  expected: string | null | undefined
+): boolean {
+  if (!expected) {
+    return true;
+  }
+  return readManifestString(manifest, field) === expected;
+}
+
+function readManifestString(manifest: Record<string, unknown>, field: string): string | null {
+  const value = manifest[field];
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {
   const layers: DelegationConfigLayer[] = [];
