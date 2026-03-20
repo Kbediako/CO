@@ -987,7 +987,7 @@ async function resolveProviderCleanupWorkspacePath(
 ): Promise<string> {
   const manifestRecord = await readManifestRecord(manifestPath);
   const explicitWorkspacePath = manifestRecord
-    ? resolveExplicitProviderWorkspacePathWithinRoot(repoRoot, manifestRecord)
+    ? resolveExplicitProviderWorkspacePathWithinRoot(repoRoot, taskId, manifestRecord)
     : null;
   return explicitWorkspacePath ?? resolveProviderWorkspacePath(repoRoot, taskId);
 }

@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   cleanupProviderWorkspace,
   ensureProviderWorkspace,
+  resolveProviderResumeWorkspacePath,
   resolveProviderWorkspacePath
 } from '../src/cli/run/workspacePath.js';
 
@@ -88,5 +89,18 @@ describe('workspacePath', () => {
       'Invalid provider workspace task id: ../escape'
     );
     await expect(access(join(repoRoot, 'package.json'))).resolves.toBeUndefined();
+  });
+
+  it('ignores explicit manifest workspaces that belong to a different task', async () => {
+    const repoRoot = await createRepoRoot();
+    const taskAWorkspace = await ensureProviderWorkspace(repoRoot, 'task-a');
+    const taskBWorkspace = await ensureProviderWorkspace(repoRoot, 'task-b');
+
+    const resolvedWorkspace = await resolveProviderResumeWorkspacePath(repoRoot, 'task-a', {
+      workspace_path: taskBWorkspace
+    });
+
+    expect(resolvedWorkspace).toBe(taskAWorkspace);
+    expect(resolvedWorkspace).not.toBe(taskBWorkspace);
   });
 });

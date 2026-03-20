@@ -430,10 +430,14 @@ function beginProviderIssueHandoffStartupRefresh(
   onSettled?: () => void,
   refreshProviderIssueHandoff?: (() => Promise<void>) | null
 ): Promise<void> {
-  return (refreshProviderIssueHandoff
-    ? refreshProviderIssueHandoff()
-    : refreshProviderIssueHandoffOnStartup(providerIssueHandoff)
-  ).then(() => {
+  const refreshPromise = refreshProviderIssueHandoff
+    ? refreshProviderIssueHandoff().catch((error) => {
+        logger.warn(
+          `Provider issue startup refresh failed: ${(error as Error)?.message ?? String(error)}`
+        );
+      })
+    : refreshProviderIssueHandoffOnStartup(providerIssueHandoff);
+  return refreshPromise.finally(() => {
     onSettled?.();
   });
 }

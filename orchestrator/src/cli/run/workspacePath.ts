@@ -24,13 +24,17 @@ export function resolveProviderWorkspacePath(repoRoot: string, taskId: string): 
 
 export function resolveExplicitProviderWorkspacePathWithinRoot(
   repoRoot: string,
+  taskId: string,
   manifestRecord: Record<string, unknown>
 ): string | null {
   const explicitWorkspacePath = resolveManifestWorkspacePath(manifestRecord);
   if (!explicitWorkspacePath || !isProviderWorkspacePathWithinRoot(repoRoot, explicitWorkspacePath)) {
     return null;
   }
-  return resolve(explicitWorkspacePath);
+  const resolvedWorkspacePath = resolve(explicitWorkspacePath);
+  return resolvedWorkspacePath === resolveProviderWorkspacePath(repoRoot, taskId)
+    ? resolvedWorkspacePath
+    : null;
 }
 
 export async function ensureProviderWorkspace(repoRoot: string, taskId: string): Promise<string> {
@@ -51,7 +55,11 @@ export async function resolveProviderResumeWorkspacePath(
   taskId: string,
   manifestRecord: Record<string, unknown>
 ): Promise<string> {
-  const explicitWorkspacePath = resolveExplicitProviderWorkspacePathWithinRoot(repoRoot, manifestRecord);
+  const explicitWorkspacePath = resolveExplicitProviderWorkspacePathWithinRoot(
+    repoRoot,
+    taskId,
+    manifestRecord
+  );
   if (
     explicitWorkspacePath &&
     (await isUsableProviderWorkspace(explicitWorkspacePath))
