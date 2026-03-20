@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 
 import { __test__ as controlHostCliShellTest } from '../src/cli/controlHostCliShell.js';
+import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
-const { findSpawnManifest, snapshotRunManifests } = controlHostCliShellTest;
+const { findSpawnManifest, resolveProviderResumeLaunchSpec, snapshotRunManifests } =
+  controlHostCliShellTest;
 
 let tempRoot: string | null = null;
 
@@ -174,6 +177,44 @@ describe('controlHostCliShell manifest discovery', () => {
     ).resolves.toEqual({
       runId: 'run-expected',
       manifestPath: expectedManifestPath
+    });
+  });
+
+  it('resumes provider runs inside the manifest workspace while preserving main repo artifact roots', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const childPaths = resolveRunPaths(
+      {
+        ...env,
+        taskId: 'linear-lin-issue-1'
+      },
+      'run-child'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        workspace_path: join(tempRoot, '.workspaces', 'linear-lin-issue-1')
+      }),
+      'utf8'
+    );
+
+    const spec = await resolveProviderResumeLaunchSpec(env, 'run-child');
+
+    expect(spec).toEqual({
+      cwd: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
+      envOverrides: {
+        CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
+        CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
+        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+      }
     });
   });
 });

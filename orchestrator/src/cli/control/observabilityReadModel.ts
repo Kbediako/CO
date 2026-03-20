@@ -118,7 +118,7 @@ export interface ControlRunningPayload {
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
-  turn_count: number;
+  turn_count: number | null;
   last_event: string | null;
   last_message: string | null;
   started_at: string | null;
@@ -205,8 +205,8 @@ export interface ControlIssuePayload {
     path: string;
   };
   attempts: {
-    restart_count: number;
-    current_retry_attempt: number;
+    restart_count: number | null;
+    current_retry_attempt: number | null;
   };
   running: ControlRunningPayload | null;
   retry: ControlRetryPayload | null;

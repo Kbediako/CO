@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import { callChildControlEndpoint } from './questionChildResolutionAdapter.js';
 import {
   buildProviderFallbackTaskId,
   buildProviderIssueKey,
@@ -62,7 +63,13 @@ export interface ProviderIssueHandoffService {
     webhookTimestamp: number | null;
   }): Promise<ProviderIssueHandoffResult>;
   rehydrate(): Promise<void>;
+  refresh(): Promise<void>;
 }
+
+export type ProviderTrackedIssueRefreshResolution =
+  | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
+  | { kind: 'release'; reason: string }
+  | { kind: 'skip'; reason: string };
 
 export interface CreateProviderIssueHandoffServiceOptions {
   paths: Pick<RunPaths, 'runDir'>;
@@ -71,6 +78,12 @@ export interface CreateProviderIssueHandoffServiceOptions {
   launcher: ProviderIssueLauncher;
   startPipelineId?: string;
   publishRuntime?: ((source: string) => void) | null;
+  resolveTrackedIssue?: ((
+    input: {
+      provider: 'linear';
+      issueId: string;
+    }
+  ) => Promise<ProviderTrackedIssueRefreshResolution>) | null;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
@@ -84,6 +97,180 @@ export function createProviderIssueHandoffService(
   options: CreateProviderIssueHandoffServiceOptions
 ): ProviderIssueHandoffService {
   const startPipelineId = options.startPipelineId ?? 'diagnostics';
+  const allowedRunRoots = [resolve(options.paths.runDir, '..', '..', '..')];
+
+  const launchResumeForRun = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: LiveLinearTrackedIssue;
+    run: ProviderIssueRunRecord;
+    reason: string;
+  }): Promise<void> => {
+    const launchToken = createProviderLaunchToken();
+    upsertProviderIntakeClaim(options.state, {
+      ...input.claim,
+      issue_identifier: input.trackedIssue.identifier,
+      issue_title: input.trackedIssue.title,
+      issue_state: input.trackedIssue.state,
+      issue_state_type: input.trackedIssue.state_type,
+      issue_updated_at: input.trackedIssue.updated_at,
+      task_id: input.run.taskId,
+      state: 'resuming',
+      reason: input.reason,
+      run_id: input.run.runId,
+      run_manifest_path: input.run.manifestPath,
+      launch_source: PROVIDER_LAUNCH_SOURCE,
+      launch_token: launchToken
+    });
+    await options.persist();
+    try {
+      await options.launcher.resume({
+        runId: input.run.runId,
+        actor: 'control-host',
+        reason: 'provider-refresh',
+        launchToken
+      });
+    } catch (error) {
+      upsertProviderIntakeClaim(options.state, {
+        ...input.claim,
+        issue_identifier: input.trackedIssue.identifier,
+        issue_title: input.trackedIssue.title,
+        issue_state: input.trackedIssue.state,
+        issue_state_type: input.trackedIssue.state_type,
+        issue_updated_at: input.trackedIssue.updated_at,
+        task_id: input.run.taskId,
+        state: 'handoff_failed',
+        reason: `provider_issue_refresh_resume_failed:${(error as Error)?.message ?? String(error)}`,
+        run_id: input.run.runId,
+        run_manifest_path: input.run.manifestPath,
+        launch_source: PROVIDER_LAUNCH_SOURCE,
+        launch_token: launchToken
+      });
+      await options.persist();
+      throw error;
+    }
+    scheduleBestEffortRehydrate(rehydrateNow);
+  };
+
+  const launchStartForTrackedIssue = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: LiveLinearTrackedIssue;
+    reason: string;
+  }): Promise<void> => {
+    const taskId = buildProviderFallbackTaskId(input.trackedIssue);
+    const launchToken = createProviderLaunchToken();
+    upsertProviderIntakeClaim(options.state, {
+      ...input.claim,
+      issue_identifier: input.trackedIssue.identifier,
+      issue_title: input.trackedIssue.title,
+      issue_state: input.trackedIssue.state,
+      issue_state_type: input.trackedIssue.state_type,
+      issue_updated_at: input.trackedIssue.updated_at,
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: input.reason,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: PROVIDER_LAUNCH_SOURCE,
+      launch_token: launchToken
+    });
+    await options.persist();
+    let startedRun: { runId: string; manifestPath: string } | null = null;
+    try {
+      startedRun = await options.launcher.start({
+        taskId,
+        pipelineId: startPipelineId,
+        provider: 'linear',
+        issueId: input.trackedIssue.id,
+        issueIdentifier: input.trackedIssue.identifier,
+        issueUpdatedAt: input.trackedIssue.updated_at,
+        launchToken
+      });
+    } catch (error) {
+      upsertProviderIntakeClaim(options.state, {
+        ...input.claim,
+        issue_identifier: input.trackedIssue.identifier,
+        issue_title: input.trackedIssue.title,
+        issue_state: input.trackedIssue.state,
+        issue_state_type: input.trackedIssue.state_type,
+        issue_updated_at: input.trackedIssue.updated_at,
+        task_id: taskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'handoff_failed',
+        reason: `provider_issue_refresh_start_failed:${(error as Error)?.message ?? String(error)}`,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: PROVIDER_LAUNCH_SOURCE,
+        launch_token: launchToken
+      });
+      await options.persist();
+      throw error;
+    }
+    if (startedRun) {
+      upsertProviderIntakeClaim(options.state, {
+        ...input.claim,
+        issue_identifier: input.trackedIssue.identifier,
+        issue_title: input.trackedIssue.title,
+        issue_state: input.trackedIssue.state,
+        issue_state_type: input.trackedIssue.state_type,
+        issue_updated_at: input.trackedIssue.updated_at,
+        task_id: taskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'starting',
+        reason: input.reason,
+        run_id: startedRun.runId,
+        run_manifest_path: startedRun.manifestPath,
+        launch_source: PROVIDER_LAUNCH_SOURCE,
+        launch_token: launchToken
+      });
+      await options.persist();
+      options.publishRuntime?.('provider-intake.refresh');
+    }
+    scheduleBestEffortRehydrate(rehydrateNow);
+  };
+
+  const releaseClaim = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    nextReason: string;
+    activeRun: ProviderIssueRunRecord | null;
+  }): Promise<void> => {
+    if (input.activeRun?.manifestPath) {
+      await callChildControlEndpoint({
+        manifestPath: input.activeRun.manifestPath,
+        payload: {
+          action: 'cancel',
+          requested_by: 'control-host',
+          reason: input.nextReason
+        },
+        allowedRunRoots
+      });
+    }
+    const now = isoTimestamp();
+    const nextTaskId = input.activeRun?.taskId ?? input.claim.task_id;
+    const nextRunId = input.activeRun?.runId ?? input.claim.run_id;
+    const nextManifestPath = input.activeRun?.manifestPath ?? input.claim.run_manifest_path;
+    const transitioned = hasProviderClaimTransitioned(input.claim, {
+      state: 'released',
+      reason: input.nextReason,
+      task_id: nextTaskId,
+      run_id: nextRunId,
+      run_manifest_path: nextManifestPath
+    });
+    upsertProviderIntakeClaim(options.state, {
+      ...input.claim,
+      task_id: nextTaskId,
+      state: 'released',
+      reason: input.nextReason,
+      run_id: nextRunId,
+      run_manifest_path: nextManifestPath,
+      updated_at: now
+    });
+    await options.persist();
+    if (transitioned) {
+      options.publishRuntime?.('provider-intake.refresh');
+    }
+  };
+
   const rehydrateNow = async (): Promise<{ hasPendingClaims: boolean }> => {
     const now = isoTimestamp();
     const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
@@ -490,6 +677,85 @@ export function createProviderIssueHandoffService(
       const result = await rehydrateNow();
       if (result.hasPendingClaims) {
         scheduleBestEffortRehydrate(rehydrateNow);
+      }
+    },
+
+    async refresh(): Promise<void> {
+      const result = await rehydrateNow();
+      if (result.hasPendingClaims) {
+        scheduleBestEffortRehydrate(rehydrateNow);
+      }
+      if (!options.resolveTrackedIssue) {
+        return;
+      }
+
+      const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
+      const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
+      for (const claim of [...options.state.claims]) {
+        try {
+          const claimRuns =
+            runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
+          const activeRun = claimRuns.find((run) => run.status === 'in_progress') ?? null;
+          const latestRun = claimRuns[0] ?? null;
+          const resolution = await options.resolveTrackedIssue({
+            provider: claim.provider,
+            issueId: claim.issue_id
+          });
+
+          if (resolution.kind === 'skip') {
+            continue;
+          }
+          if (resolution.kind === 'release') {
+            await releaseClaim({
+              claim,
+              nextReason: `provider_issue_released:${resolution.reason}`,
+              activeRun
+            });
+            continue;
+          }
+
+          if (resolution.trackedIssue.state_type !== 'started') {
+            await releaseClaim({
+              claim,
+              nextReason: 'provider_issue_released:not_active',
+              activeRun
+            });
+            continue;
+          }
+
+          if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
+            continue;
+          }
+
+          if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+            await launchResumeForRun({
+              claim,
+              trackedIssue: resolution.trackedIssue,
+              run: latestRun,
+              reason: 'provider_issue_refresh_resume_launched'
+            });
+            continue;
+          }
+
+          if (latestRun?.status === 'succeeded') {
+            await launchStartForTrackedIssue({
+              claim,
+              trackedIssue: resolution.trackedIssue,
+              reason: 'provider_issue_continuation_launched'
+            });
+            continue;
+          }
+
+          if (!latestRun) {
+            await launchStartForTrackedIssue({
+              claim,
+              trackedIssue: resolution.trackedIssue,
+              reason: 'provider_issue_refresh_start_launched'
+            });
+          }
+        } catch {
+          continue;
+        }
       }
     }
   };

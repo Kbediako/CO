@@ -3076,6 +3076,13 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3419,17 +3426,31 @@
       "cadence_days": 30
     },
     {
-      "path": "docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "path": "docs/ACTION_PLAN-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-19",
-      "cadence_days": 30
+      "last_review": "2026-03-06",
+      "cadence_days": 90
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -3452,34 +3473,6 @@
       "status": "active",
       "last_review": "2026-03-20",
       "cadence_days": 30
-    },
-    {
-      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/ACTION_PLAN-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/ACTION_PLAN-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-06",
-      "cadence_days": 90
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
@@ -5488,6 +5481,27 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-full-parity-hardening-and-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
       "cadence_days": 30
     },
     {
@@ -8221,6 +8235,13 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/findings/1311-symphony-full-parity-hardening-and-closure-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/findings/ethical-life.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -8578,17 +8599,31 @@
       "cadence_days": 30
     },
     {
-      "path": "docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "path": "docs/PRD-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-19",
-      "cadence_days": 30
+      "last_review": "2026-03-06",
+      "cadence_days": 90
     },
     {
       "path": "docs/PRD-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -8611,34 +8646,6 @@
       "status": "active",
       "last_review": "2026-03-20",
       "cadence_days": 30
-    },
-    {
-      "path": "docs/PRD-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/PRD-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/PRD-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/PRD-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-06",
-      "cadence_days": 90
     },
     {
       "path": "docs/PRD-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
@@ -10650,6 +10657,27 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-full-parity-hardening-and-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/PRD-coordinator-telegram-setup-canary-and-runbook-implementation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -11497,17 +11525,31 @@
       "cadence_days": 30
     },
     {
-      "path": "docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "path": "docs/TECH_SPEC-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
+      "last_review": "2026-03-06",
+      "cadence_days": 90
     },
     {
       "path": "docs/TECH_SPEC-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -11530,34 +11572,6 @@
       "status": "active",
       "last_review": "2026-03-20",
       "cadence_days": 30
-    },
-    {
-      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/TECH_SPEC-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-20",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/TECH_SPEC-coordinator-live-linear-advisory-ingress-and-telegram-delta-notifications.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-06",
-      "cadence_days": 90
     },
     {
       "path": "docs/TECH_SPEC-coordinator-readonly-observability-surface-hardening-and-symphony-inclusion-plan.md",
@@ -13566,6 +13580,27 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-07",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-full-parity-hardening-and-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -16957,6 +16992,13 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -19856,6 +19898,13 @@
     },
     {
       "path": "tasks/tasks-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-20",

@@ -1,6 +1,6 @@
 import http from 'node:http';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EffectiveDelegationConfig } from '../src/config/delegationConfig.js';
 import type { RunPaths } from '../src/run/runPaths.js';
@@ -32,6 +32,11 @@ vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
 describe('startControlServerPublicLifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('prepares startup inputs before activating the ready instance and returns the public lifecycle state', async () => {
@@ -86,6 +91,49 @@ describe('startControlServerPublicLifecycle', () => {
       controlToken: 'token-123',
       intervalMs: 15_000
     });
+  });
+
+  it('schedules a provider refresh timer when provider handoff is present and clears it on shutdown', async () => {
+    vi.useFakeTimers();
+
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff: {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: vi.fn(async () => undefined)
+      }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(requestContextShared.providerIssueHandoff?.refresh).toHaveBeenCalledTimes(1);
+
+    await closeControlServerPublicLifecycle(started);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(requestContextShared.providerIssueHandoff?.refresh).toHaveBeenCalledTimes(1);
   });
 });
 

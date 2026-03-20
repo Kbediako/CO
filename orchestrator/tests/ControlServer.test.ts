@@ -1023,7 +1023,9 @@ describe('ControlServer', () => {
 
   it('projects read-only compatibility state and issue payloads', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
-    await seedManifest(paths);
+    await seedManifest(paths, {
+      workspace_path: join(root, '.workspaces', 'task-0940')
+    });
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
 
     const server = await ControlServer.start({
@@ -1084,7 +1086,7 @@ describe('ControlServer', () => {
       expect(issuePayload.status).toBe('in_progress');
       expect(issuePayload.raw_status).toBe('in_progress');
       expect(issuePayload.display_status).toBe('in_progress');
-      expect(issuePayload.workspace?.path).toBe(env.repoRoot);
+      expect(issuePayload.workspace?.path).toBe(join(root, '.workspaces', 'task-0940'));
       expect(issuePayload.running?.state).toBe('in_progress');
 
       const runAliasRes = await fetch(new URL('/api/v1/run-1', baseUrl), {
@@ -1960,11 +1962,17 @@ describe('ControlServer', () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths, { summary: 'task is running' });
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const refreshProviderIssues = vi.fn(async () => undefined);
 
     const server = await ControlServer.start({
       paths,
       config,
-      runId: 'run-1'
+      runId: 'run-1',
+      createProviderIssueHandoff: () => ({
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: refreshProviderIssues
+      })
     });
 
     try {
@@ -2022,6 +2030,7 @@ describe('ControlServer', () => {
         reason: 'refresh_projection_acknowledged',
         requested_action: 'refresh'
       });
+      expect(refreshProviderIssues).toHaveBeenCalledTimes(1);
 
       const refreshedStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
         headers: { Authorization: `Bearer ${token}` }

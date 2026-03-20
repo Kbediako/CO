@@ -14,6 +14,7 @@ export type ProviderIntakeClaimState =
   | 'running'
   | 'resuming'
   | 'resumable'
+  | 'released'
   | 'completed'
   | 'stale'
   | 'duplicate'
@@ -311,6 +312,7 @@ function normalizeClaimState(value: string): ProviderIntakeClaimState {
     case 'running':
     case 'resuming':
     case 'resumable':
+    case 'released':
     case 'completed':
     case 'stale':
     case 'duplicate':
@@ -344,16 +346,18 @@ function rankClaimState(state: ProviderIntakeClaimState): number {
       return 6;
     case 'accepted':
       return 5;
-    case 'handoff_failed':
+    case 'released':
       return 4;
-    case 'completed':
+    case 'handoff_failed':
       return 3;
-    case 'duplicate':
+    case 'completed':
       return 2;
-    case 'stale':
+    case 'duplicate':
       return 1;
+    case 'stale':
+      return 0;
     case 'ignored':
     default:
-      return 0;
+      return -1;
   }
 }

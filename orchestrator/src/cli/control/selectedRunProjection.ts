@@ -5,6 +5,7 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlAction, ControlState } from './controlState.js';
 import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
+import { resolveManifestWorkspacePath } from '../run/workspacePath.js';
 import {
   buildTrackedLinearPayload,
   type ControlCompatibilitySourceContext,
@@ -181,7 +182,7 @@ function buildProjectionContextFromParts(
     rawStatus,
     summary: manifestSummary
   });
-  const workspacePath = resolveRepoRootFromRunDir(parts.runDir) ?? parts.runDir;
+  const workspacePath = resolveManifestWorkspacePath(manifestRecord, parts.runDir) ?? parts.runDir;
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
@@ -359,11 +360,6 @@ function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boo
     }
     return readStringValue(command as Record<string, unknown>, 'status') === 'failed';
   });
-}
-
-function resolveRepoRootFromRunDir(runDir: string): string | null {
-  const candidate = resolve(runDir, '..', '..', '..', '..');
-  return candidate || null;
 }
 
 function resolveRunsRootFromRunDir(runDir: string): string | null {

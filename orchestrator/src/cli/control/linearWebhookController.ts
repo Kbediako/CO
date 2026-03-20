@@ -353,7 +353,7 @@ function writeLinearWebhookResponse(
   res.end(JSON.stringify({ status: outcome, reason, timestamp: isoTimestamp() }));
 }
 
-function resolveLinearWebhookSourceSetup(
+export function resolveLinearWebhookSourceSetup(
   featureToggles: ControlState['feature_toggles'],
   env: NodeJS.ProcessEnv
 ):

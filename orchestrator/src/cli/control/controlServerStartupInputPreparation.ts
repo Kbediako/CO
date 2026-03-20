@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream } from '../events/runEventStream.js';
 import type { RunPaths } from '../run/runPaths.js';
+import type { ControlState } from './controlState.js';
 import type { ControlRequestSharedContext } from './controlRequestContext.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import type { ProviderIntakeState } from './providerIntakeState.js';
@@ -19,6 +20,7 @@ interface PrepareControlServerStartupInputsOptions {
     providerIntakeState: ProviderIntakeState;
     persistProviderIntake: () => Promise<void>;
     publishRuntime: (source: string) => void;
+    readFeatureToggles: () => ControlState['feature_toggles'];
   }) => ProviderIssueHandoffService) | null;
 }
 

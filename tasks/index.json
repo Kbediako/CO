@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260320-1311-coordinator-symphony-full-parity-hardening-and-closure",
+      "title": "Coordinator Symphony Full-Parity Hardening and Closure",
+      "relates_to": "tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-20",
+      "paths": {
+        "spec": "tasks/specs/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
+        "task": "tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md",
+        "agent_task": ".agent/task/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-full-parity-hardening-and-closure.md"
+      }
+    },
+    {
       "id": "20260320-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment",
       "title": "Coordinator Symphony Full Parity Audit and Closure Truthfulness Reassessment",
       "relates_to": "tasks/tasks-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",

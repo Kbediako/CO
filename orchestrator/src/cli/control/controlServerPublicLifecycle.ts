@@ -3,6 +3,7 @@ import http from 'node:http';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream } from '../events/runEventStream.js';
 import type { RunPaths } from '../run/runPaths.js';
+import type { ControlState } from './controlState.js';
 import type { ControlRequestSharedContext } from './controlRequestContext.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import type { ProviderIntakeState } from './providerIntakeState.js';
@@ -14,6 +15,7 @@ import {
 import { prepareControlServerStartupInputs } from './controlServerStartupInputPreparation.js';
 
 const EXPIRY_INTERVAL_MS = 15_000;
+const PROVIDER_REFRESH_INTERVAL_MS = 15_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 
 export interface StartControlServerPublicLifecycleOptions {
@@ -25,6 +27,7 @@ export interface StartControlServerPublicLifecycleOptions {
     providerIntakeState: ProviderIntakeState;
     persistProviderIntake: () => Promise<void>;
     publishRuntime: (source: string) => void;
+    readFeatureToggles: () => ControlState['feature_toggles'];
   }) => ProviderIssueHandoffService) | null;
 }
 
@@ -32,6 +35,7 @@ export interface ControlServerPublicLifecycleState {
   server: http.Server;
   requestContextShared: ControlRequestSharedContext;
   lifecycleState: ControlServerOwnedLifecycleState;
+  providerRefreshTimer?: NodeJS.Timeout | null;
 }
 
 export interface StartedControlServerPublicLifecycle extends ControlServerPublicLifecycleState {
@@ -61,6 +65,13 @@ export async function startControlServerPublicLifecycle(
     server: readyInstance.server,
     requestContextShared: startupInputs.requestContextShared,
     lifecycleState: readyInstance.lifecycleState,
+    ...(startupInputs.requestContextShared.providerIssueHandoff
+      ? {
+          providerRefreshTimer: startProviderRefreshTimer(
+            startupInputs.requestContextShared.providerIssueHandoff
+          )
+        }
+      : {}),
     baseUrl: readyInstance.baseUrl
   };
 }
@@ -68,9 +79,22 @@ export async function startControlServerPublicLifecycle(
 export async function closeControlServerPublicLifecycle(
   state: ControlServerPublicLifecycleState
 ): Promise<void> {
+  if (state.providerRefreshTimer) {
+    clearInterval(state.providerRefreshTimer);
+  }
   return closeControlServerOwnedRuntime({
     server: state.server,
     requestContextShared: state.requestContextShared,
     lifecycleState: state.lifecycleState
   });
+}
+
+function startProviderRefreshTimer(
+  providerIssueHandoff: ProviderIssueHandoffService
+): NodeJS.Timeout {
+  const timer = setInterval(() => {
+    void providerIssueHandoff.refresh().catch(() => undefined);
+  }, PROVIDER_REFRESH_INTERVAL_MS);
+  timer.unref?.();
+  return timer;
 }

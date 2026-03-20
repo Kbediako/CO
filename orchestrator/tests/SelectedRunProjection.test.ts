@@ -208,4 +208,36 @@ describe('SelectedRunProjection', () => {
       message: 'Using repo-local codex.orchestrator.json.'
     });
   });
+
+  it('prefers explicit manifest workspace paths over run-directory inference', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: join(root, '.workspaces', 'linear-lin-issue-1'),
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBe(join(root, '.workspaces', 'linear-lin-issue-1'));
+  });
 });

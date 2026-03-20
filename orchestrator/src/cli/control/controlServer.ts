@@ -14,12 +14,14 @@ export class ControlServer {
   private readonly requestContextShared: StartedControlServerPublicLifecycle['requestContextShared'];
   private baseUrl: string | null = null;
   private readonly lifecycleState: StartedControlServerPublicLifecycle['lifecycleState'];
+  private readonly providerRefreshTimer: StartedControlServerPublicLifecycle['providerRefreshTimer'];
 
   private constructor(options: StartedControlServerPublicLifecycle) {
     this.server = options.server;
     this.requestContextShared = options.requestContextShared;
     this.baseUrl = options.baseUrl;
     this.lifecycleState = options.lifecycleState;
+    this.providerRefreshTimer = options.providerRefreshTimer;
   }
 
   static async start(options: ControlServerOptions): Promise<ControlServer> {
@@ -38,7 +40,8 @@ export class ControlServer {
     return closeControlServerPublicLifecycle({
       server: this.server,
       requestContextShared: this.requestContextShared,
-      lifecycleState: this.lifecycleState
+      lifecycleState: this.lifecycleState,
+      providerRefreshTimer: this.providerRefreshTimer
     });
   }
 }

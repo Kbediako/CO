@@ -59,7 +59,8 @@ export function buildUiDataset(input: {
 
   const selected = input.snapshot.selected;
   const selectedSharedFields = selected ? buildUiSelectedRunSharedFields(selected) : null;
-  const bucketInfo = classifyBucket(input.manifest.status, input.control);
+  const effectiveStatus = selected?.rawStatus ?? input.manifest.status;
+  const bucketInfo = classifyBucket(effectiveStatus, input.control);
   const approvalsTotal = Array.isArray(input.manifest.approvals) ? input.manifest.approvals.length : 0;
   const repoRoot = resolveRepoRootFromRunDir(input.paths.runDir);
   const links = {
@@ -80,9 +81,9 @@ export function buildUiDataset(input: {
   const runEntry = {
     run_id: input.manifest.run_id,
     task_id: input.manifest.task_id,
-    status: input.manifest.status,
-    raw_status: selected?.rawStatus ?? input.manifest.status,
-    display_status: selected?.displayStatus ?? input.manifest.status,
+    status: effectiveStatus,
+    raw_status: effectiveStatus,
+    display_status: selected?.displayStatus ?? effectiveStatus,
     status_reason: selected?.statusReason ?? null,
     started_at: input.manifest.started_at,
     updated_at: input.manifest.updated_at,
@@ -108,9 +109,9 @@ export function buildUiDataset(input: {
     title: input.manifest.pipeline_title || input.manifest.task_id,
     bucket: bucketInfo.bucket,
     bucket_reason: bucketInfo.reason,
-    status: input.manifest.status,
-    raw_status: selected?.rawStatus ?? input.manifest.status,
-    display_status: selected?.displayStatus ?? input.manifest.status,
+    status: effectiveStatus,
+    raw_status: effectiveStatus,
+    display_status: selected?.displayStatus ?? effectiveStatus,
     status_reason: selected?.statusReason ?? null,
     last_update: input.manifest.updated_at,
     latest_run_id: input.manifest.run_id,
@@ -142,10 +143,7 @@ export async function readUiDataset(context: SelectedRunPresenterContext): Promi
   });
 }
 
-function classifyBucket(
-  status: CliManifest['status'],
-  control: ControlState
-): { bucket: string; reason: string } {
+function classifyBucket(status: string, control: ControlState): { bucket: string; reason: string } {
   if (status === 'queued') {
     return { bucket: 'pending', reason: 'queued' };
   }

@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -31,6 +32,33 @@ async function createHostPaths() {
   const paths = resolveRunPaths(env, 'control-host');
   await mkdir(paths.runDir, { recursive: true });
   return { root, paths };
+}
+
+async function createControlEndpointServer(): Promise<{
+  baseUrl: string;
+  actions: Array<Record<string, unknown>>;
+  close(): Promise<void>;
+}> {
+  const actions: Array<Record<string, unknown>> = [];
+  const server = http.createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on('end', () => {
+      actions.push(JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Failed to bind control endpoint test server.');
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    actions,
+    close: () => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+  };
 }
 
 function createProviderIntakeState(): ProviderIntakeState {
@@ -1810,5 +1838,205 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: childPaths.manifestPath
     });
     expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases inactive issues on refresh and cancels the active child run', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'task-1303-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const endpoint = await createControlEndpointServer();
+    await writeFile(
+      join(childPaths.runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: endpoint.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-running',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-child',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      })
+    });
+
+    try {
+      await service.refresh();
+    } finally {
+      await endpoint.close();
+    }
+
+    expect(endpoint.actions).toEqual([
+      expect.objectContaining({
+        action: 'cancel',
+        reason: 'provider_issue_released:not_active'
+      })
+    ]);
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'run-child',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('starts a continuation run on refresh when the latest child run succeeded but the issue remains active', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-continuation',
+        manifestPath: '/tmp/provider-run/continuation-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:20:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:20:00.000Z',
+      launchToken: expect.any(String)
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_continuation_launched',
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-continuation',
+      run_manifest_path: '/tmp/provider-run/continuation-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
   });
 });

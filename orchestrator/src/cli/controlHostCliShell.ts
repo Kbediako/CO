@@ -22,11 +22,19 @@ import {
 } from './config/delegationConfig.js';
 import { logger } from '../logger.js';
 import { resolveRunPaths } from './run/runPaths.js';
+import type { EnvironmentPaths } from './run/environment.js';
 import { normalizeEnvironmentPaths, normalizeTaskId } from './run/environment.js';
+import { loadManifest } from './run/manifest.js';
+import {
+  ensureProviderWorkspace,
+  resolveManifestWorkspacePath
+} from './run/workspacePath.js';
 import {
   closeControlServerPublicLifecycle,
   startControlServerPublicLifecycle
 } from './control/controlServerPublicLifecycle.js';
+import { resolveLiveLinearTrackedIssueById } from './control/linearDispatchSource.js';
+import { resolveLinearWebhookSourceSetup } from './control/linearWebhookController.js';
 import { createProviderIssueHandoffService } from './control/providerIssueHandoff.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -48,6 +56,11 @@ interface SpawnManifestCorrelation {
   issueUpdatedAt?: string | null;
   providerControlHostTaskId?: string | null;
   providerControlHostRunId?: string | null;
+}
+
+interface ProviderLaunchSpec {
+  cwd: string;
+  envOverrides: Record<string, string>;
 }
 
 export interface RunControlHostCliShellParams {
@@ -92,17 +105,41 @@ export async function runControlHostCliShell(
     paths,
     config,
     runId,
-    createProviderIssueHandoff: ({ providerIntakeState, persistProviderIntake, publishRuntime }) =>
+    createProviderIssueHandoff: ({
+      providerIntakeState,
+      persistProviderIntake,
+      publishRuntime,
+      readFeatureToggles
+    }) =>
       createProviderIssueHandoffService({
         paths,
         state: providerIntakeState,
         persist: persistProviderIntake,
         startPipelineId,
         publishRuntime,
+        resolveTrackedIssue: async ({ issueId }) => {
+          const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), env);
+          if ('error' in sourceSetup) {
+            return { kind: 'skip', reason: sourceSetup.error } as const;
+          }
+          const resolution = await resolveLiveLinearTrackedIssueById({
+            issueId,
+            sourceSetup: sourceSetup.sourceSetup,
+            env
+          });
+          if (resolution.kind === 'ready') {
+            return { kind: 'ready', trackedIssue: resolution.tracked_issue } as const;
+          }
+          if (shouldReleaseTrackedIssueClaim(resolution.reason)) {
+            return { kind: 'release', reason: resolution.reason } as const;
+          }
+          return { kind: 'skip', reason: resolution.reason } as const;
+        },
         launcher: {
           start: async (input) => {
+            const launchSpec = await resolveProviderStartLaunchSpec(env, input.taskId);
             return await spawnBackgroundCliAndWaitForManifest(
-              env.repoRoot,
+              launchSpec.cwd,
               cliEntrypoint,
               [
                 'start',
@@ -120,6 +157,7 @@ export async function runControlHostCliShell(
               join(env.runsRoot, input.taskId, 'cli'),
               input.taskId,
               {
+                ...launchSpec.envOverrides,
                 [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
                 [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
                 [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
@@ -136,7 +174,8 @@ export async function runControlHostCliShell(
             );
           },
           resume: async (input) => {
-            await spawnBackgroundCli(env.repoRoot, cliEntrypoint, [
+            const launchSpec = await resolveProviderResumeLaunchSpec(env, input.runId);
+            await spawnBackgroundCli(launchSpec.cwd, cliEntrypoint, [
               'resume',
               '--run',
               input.runId,
@@ -145,6 +184,7 @@ export async function runControlHostCliShell(
               '--reason',
               input.reason
             ], {
+              ...launchSpec.envOverrides,
               [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
               [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
               [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
@@ -184,7 +224,7 @@ export async function runControlHostCliShell(
 }
 
 async function spawnBackgroundCliAndWaitForManifest(
-  repoRoot: string,
+  cwd: string,
   cliEntrypoint: string,
   args: string[],
   taskRunsRoot: string,
@@ -193,7 +233,7 @@ async function spawnBackgroundCliAndWaitForManifest(
   correlation: SpawnManifestCorrelation | null = null
 ): Promise<SpawnedRunManifestInfo | null> {
   const baselineRuns = await snapshotRunManifests(taskRunsRoot);
-  await spawnBackgroundCli(repoRoot, cliEntrypoint, args, envOverrides);
+  await spawnBackgroundCli(cwd, cliEntrypoint, args, envOverrides);
   return await pollForSpawnManifest({
     taskRunsRoot,
     taskId,
@@ -205,14 +245,14 @@ async function spawnBackgroundCliAndWaitForManifest(
 }
 
 async function spawnBackgroundCli(
-  repoRoot: string,
+  cwd: string,
   cliEntrypoint: string,
   args: string[],
   envOverrides: Record<string, string> = {}
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(process.execPath, [...process.execArgv, cliEntrypoint, ...args], {
-      cwd: repoRoot,
+      cwd,
       env: { ...process.env, ...envOverrides },
       detached: true,
       stdio: 'ignore'
@@ -319,8 +359,50 @@ async function findSpawnManifest(params: {
   return null;
 }
 
+async function resolveProviderStartLaunchSpec(
+  env: EnvironmentPaths,
+  taskId: string
+): Promise<ProviderLaunchSpec> {
+  const workspacePath = await ensureProviderWorkspace(env.repoRoot, taskId);
+  return buildProviderLaunchSpec(env, workspacePath);
+}
+
+async function resolveProviderResumeLaunchSpec(
+  env: EnvironmentPaths,
+  runId: string
+): Promise<ProviderLaunchSpec> {
+  const { manifest } = await loadManifest(env, runId);
+  const workspacePath =
+    resolveManifestWorkspacePath(manifest as unknown as Record<string, unknown>) ?? env.repoRoot;
+  return buildProviderLaunchSpec(env, workspacePath);
+}
+
+function buildProviderLaunchSpec(
+  env: EnvironmentPaths,
+  workspacePath: string
+): ProviderLaunchSpec {
+  return {
+    cwd: workspacePath,
+    envOverrides: {
+      CODEX_ORCHESTRATOR_ROOT: workspacePath,
+      CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
+      CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+    }
+  };
+}
+
+function shouldReleaseTrackedIssueClaim(reason: string): boolean {
+  return (
+    reason === 'dispatch_source_issue_not_found' ||
+    reason === 'dispatch_source_workspace_mismatch' ||
+    reason === 'dispatch_source_team_mismatch' ||
+    reason === 'dispatch_source_project_mismatch'
+  );
+}
+
 export const __test__ = {
   findSpawnManifest,
+  resolveProviderResumeLaunchSpec,
   snapshotRunManifests
 };
 

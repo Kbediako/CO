@@ -44,6 +44,7 @@ export function createControlAuthenticatedRouteContext(
     delegationTokens: input.context.delegationTokens,
     persist: input.context.persist,
     runtime: input.context.runtime,
+    refreshProviderIssues: () => input.context.providerIssueHandoff?.refresh() ?? Promise.resolve(),
     readRequestBody: () => readJsonBody(input.req),
     readDispatchEvaluation: () => input.runtimeSnapshot.readDispatchEvaluation(),
     onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(input.context, record),
