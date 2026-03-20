@@ -259,17 +259,6 @@ export function createProviderIssueHandoffService(
     > | null;
     cleanupWorkspace?: boolean;
   }): Promise<void> => {
-    if (shouldAttemptReleaseCancel(input.releaseRun) && input.releaseRun?.manifestPath) {
-      await callChildControlEndpoint({
-        manifestPath: input.releaseRun.manifestPath,
-        payload: {
-          action: 'cancel',
-          requested_by: 'control-host',
-          reason: input.nextReason
-        },
-        allowedRunRoots
-      });
-    }
     const now = isoTimestamp();
     const nextTaskId = input.releaseRun?.taskId ?? input.claim.task_id;
     const nextRunId = input.releaseRun?.runId ?? input.claim.run_id;
@@ -301,6 +290,22 @@ export function createProviderIssueHandoffService(
     }
     if (transitioned) {
       options.publishRuntime?.('provider-intake.refresh');
+    }
+    if (shouldAttemptReleaseCancel(input.releaseRun) && input.releaseRun?.manifestPath) {
+      try {
+        await callChildControlEndpoint({
+          manifestPath: input.releaseRun.manifestPath,
+          payload: {
+            action: 'cancel',
+            requested_by: 'control-host',
+            reason: input.nextReason
+          },
+          allowedRunRoots
+        });
+      } catch {
+        // Keep the claim released and let the next rehydrate/refresh retry cancellation
+        // while the child run drains.
+      }
     }
   };
 

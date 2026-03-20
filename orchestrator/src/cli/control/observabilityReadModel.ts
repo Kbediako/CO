@@ -70,7 +70,7 @@ interface SharedSelectedProjectionFields {
   lastError: string | null;
   latestAction: string | null;
   latestEvent: SelectedRunLatestEvent | null;
-  workspacePath: string;
+  workspacePath: string | null;
   pipelineTitle: string | null;
   stages: SelectedRunStageSummary[];
   approvalsTotal: number;
@@ -116,7 +116,7 @@ export interface ControlSelectedRunPayload {
   latest_action: string | null;
   latest_event: ControlLatestEventPayload | null;
   workspace: {
-    path: string;
+    path: string | null;
   };
   question_summary: ControlQuestionSummaryPayload;
   tracked?: ControlTrackedPayload;
@@ -213,7 +213,7 @@ export interface ControlIssuePayload {
   display_status: string;
   status_reason: string | null;
   workspace: {
-    path: string;
+    path: string | null;
   };
   attempts: {
     restart_count: number | null;

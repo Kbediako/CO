@@ -192,6 +192,63 @@ describe('startControlServerPublicLifecycle', () => {
 
     await closeControlServerPublicLifecycle(started);
   });
+
+  it('shares the in-flight refresh lock between startup-triggered and interval-triggered provider refreshes', async () => {
+    vi.useFakeTimers();
+
+    let resolveRefresh: (() => void) | null = null;
+    const refreshPromise = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const refresh = vi.fn(async () => {
+      await refreshPromise;
+    });
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff: {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh
+      }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    const startupRefresh = started.triggerProviderRefresh?.();
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    resolveRefresh?.();
+    await startupRefresh;
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(refresh).toHaveBeenCalledTimes(2);
+
+    await closeControlServerPublicLifecycle(started);
+  });
 });
 
 describe('closeControlServerPublicLifecycle', () => {

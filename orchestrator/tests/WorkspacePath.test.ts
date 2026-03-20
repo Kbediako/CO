@@ -80,4 +80,13 @@ describe('workspacePath', () => {
     await expect(cleanupProviderWorkspace(repoRoot, repoRoot)).resolves.toBe(false);
     await expect(access(join(repoRoot, 'package.json'))).resolves.toBeUndefined();
   });
+
+  it('rejects task ids that escape the provider workspace root before destructive setup', async () => {
+    const repoRoot = await createRepoRoot();
+
+    await expect(ensureProviderWorkspace(repoRoot, '../escape')).rejects.toThrow(
+      'Invalid provider workspace task id: ../escape'
+    );
+    await expect(access(join(repoRoot, 'package.json'))).resolves.toBeUndefined();
+  });
 });

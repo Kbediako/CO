@@ -182,7 +182,11 @@ function buildProjectionContextFromParts(
     rawStatus,
     summary: manifestSummary
   });
-  const workspacePath = resolveManifestWorkspacePath(manifestRecord, parts.runDir) ?? parts.runDir;
+  const workspacePath = resolveSelectedRunWorkspacePath({
+    manifestRecord,
+    manifestPath: snapshot.manifestPath,
+    runDir: parts.runDir
+  });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
@@ -229,6 +233,25 @@ function buildProjectionContextFromParts(
     questionSummary,
     tracked
   };
+}
+
+function resolveSelectedRunWorkspacePath(input: {
+  manifestRecord: Record<string, unknown>;
+  manifestPath: string;
+  runDir: string;
+}): string | null {
+  const explicitWorkspacePath = resolveManifestWorkspacePath(input.manifestRecord);
+  if (explicitWorkspacePath) {
+    return explicitWorkspacePath;
+  }
+  if (!isCliRunManifestPath(input.manifestPath)) {
+    return null;
+  }
+  return resolveManifestWorkspacePath(input.manifestRecord, input.runDir);
+}
+
+function isCliRunManifestPath(manifestPath: string): boolean {
+  return /(?:^|[\\/])\.runs[\\/][^\\/]+[\\/]cli[\\/][^\\/]+[\\/]manifest\.json$/u.test(manifestPath);
 }
 
 async function readSelectedRunManifestSnapshotInternal(

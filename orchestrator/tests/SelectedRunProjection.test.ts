@@ -241,6 +241,32 @@ describe('SelectedRunProjection', () => {
     expect(selected?.workspacePath).toBe(join(root, '.workspaces', 'linear-lin-issue-1'));
   });
 
+  it('returns a null workspace path instead of the manifest artefact directory for non-run manifests', async () => {
+    const { root, paths } = await createHostPaths();
+    const externalRunRoot = join(root, 'external-provider-run');
+    await mkdir(externalRunRoot, { recursive: true });
+    const externalManifestPath = join(externalRunRoot, 'manifest.json');
+    await writeFile(
+      externalManifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, externalManifestPath).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBeNull();
+  });
+
   it('threads child manifest stage, approval, and title metadata into the selected context', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

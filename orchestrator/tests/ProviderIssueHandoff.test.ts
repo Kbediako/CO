@@ -2418,7 +2418,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('keeps the claim in-flight when releasing an inactive queued child run fails closed', async () => {
+  it('persists the release even when cancelling an inactive queued child run fails closed', async () => {
     const { root, paths } = await createHostPaths();
     const now = new Date().toISOString();
     const childEnv = {
@@ -2493,11 +2493,11 @@ describe('createProviderIssueHandoffService', () => {
     await service.refresh();
 
     expect(state.claims[0]).toMatchObject({
-      state: 'starting',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
       run_id: 'run-queued',
       run_manifest_path: childPaths.manifestPath
     });
-    expect(state.claims[0]?.reason).not.toContain('provider_issue_released');
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
@@ -2904,6 +2904,83 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'run-active',
       run_manifest_path: childPaths.manifestPath
     });
+  });
+
+  it('keeps the release transition persisted when child cancellation fails during refresh', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-active');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'task-1303-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: async () => ({
+        kind: 'release',
+        reason: 'not_active'
+      })
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      task_id: 'task-1303-active',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(persist).toHaveBeenCalled();
   });
 
   it('resumes a failed run on refresh when the issue remains active without requiring a newer issue timestamp', async () => {

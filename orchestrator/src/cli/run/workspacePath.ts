@@ -15,7 +15,11 @@ export function normalizeWorkspacePath(value: unknown): string | null {
 }
 
 export function resolveProviderWorkspacePath(repoRoot: string, taskId: string): string {
-  return join(repoRoot, PROVIDER_WORKSPACE_ROOT_DIRNAME, taskId);
+  const workspacePath = resolve(repoRoot, PROVIDER_WORKSPACE_ROOT_DIRNAME, taskId);
+  if (!isProviderWorkspacePathWithinRoot(repoRoot, workspacePath)) {
+    throw new Error(`Invalid provider workspace task id: ${taskId}`);
+  }
+  return workspacePath;
 }
 
 export function resolveExplicitProviderWorkspacePathWithinRoot(

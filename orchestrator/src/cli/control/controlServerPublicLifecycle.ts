@@ -36,6 +36,7 @@ export interface ControlServerPublicLifecycleState {
   requestContextShared: ControlRequestSharedContext;
   lifecycleState: ControlServerOwnedLifecycleState;
   providerRefreshTimer?: NodeJS.Timeout | null;
+  triggerProviderRefresh?: (() => Promise<void>) | null;
 }
 
 export interface StartedControlServerPublicLifecycle extends ControlServerPublicLifecycleState {
@@ -61,15 +62,18 @@ export async function startControlServerPublicLifecycle(
     intervalMs: EXPIRY_INTERVAL_MS
   });
 
+  const providerRefreshCoordinator = startupInputs.requestContextShared.providerIssueHandoff
+    ? createProviderRefreshCoordinator(startupInputs.requestContextShared.providerIssueHandoff)
+    : null;
+
   return {
     server: readyInstance.server,
     requestContextShared: startupInputs.requestContextShared,
     lifecycleState: readyInstance.lifecycleState,
-    ...(startupInputs.requestContextShared.providerIssueHandoff
+    ...(providerRefreshCoordinator
       ? {
-          providerRefreshTimer: startProviderRefreshTimer(
-            startupInputs.requestContextShared.providerIssueHandoff
-          )
+          providerRefreshTimer: providerRefreshCoordinator.timer,
+          triggerProviderRefresh: providerRefreshCoordinator.trigger
         }
       : {}),
     baseUrl: readyInstance.baseUrl
@@ -89,21 +93,29 @@ export async function closeControlServerPublicLifecycle(
   });
 }
 
-function startProviderRefreshTimer(
+function createProviderRefreshCoordinator(
   providerIssueHandoff: ProviderIssueHandoffService
-): NodeJS.Timeout {
+): {
+  timer: NodeJS.Timeout;
+  trigger: () => Promise<void>;
+} {
   let refreshInFlight = false;
-  const timer = setInterval(() => {
+  const trigger = async (): Promise<void> => {
     if (refreshInFlight) {
       return;
     }
     refreshInFlight = true;
-    void providerIssueHandoff.refresh()
-      .catch(() => undefined)
-      .finally(() => {
-        refreshInFlight = false;
-      });
+    try {
+      await providerIssueHandoff.refresh();
+    } catch {
+      // Best-effort provider refreshes should not crash the public lifecycle.
+    } finally {
+      refreshInFlight = false;
+    }
+  };
+  const timer = setInterval(() => {
+    void trigger();
   }, PROVIDER_REFRESH_INTERVAL_MS);
   timer.unref?.();
-  return timer;
+  return { timer, trigger };
 }

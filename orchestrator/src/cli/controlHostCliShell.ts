@@ -203,7 +203,8 @@ export async function runControlHostCliShell(
     await lifecycle.requestContextShared.providerIssueHandoff?.rehydrate();
     void beginProviderIssueHandoffStartupRefresh(
       lifecycle.requestContextShared.providerIssueHandoff,
-      () => lifecycle.requestContextShared.runtime.publish({ source: 'provider-intake.rehydrate' })
+      () => lifecycle.requestContextShared.runtime.publish({ source: 'provider-intake.rehydrate' }),
+      lifecycle.triggerProviderRefresh ?? undefined
     );
 
     const payload = {
@@ -379,10 +380,7 @@ async function resolveProviderResumeLaunchSpec(
   runId: string
 ): Promise<ProviderLaunchSpec> {
   const { manifest } = await loadManifest(env, runId);
-  const resumeTaskId =
-    typeof manifest.task_id === 'string' && manifest.task_id.trim().length > 0
-      ? manifest.task_id.trim()
-      : runId;
+  const resumeTaskId = resolveProviderResumeTaskId(manifest as unknown as Record<string, unknown>, runId);
   const workspacePath = await resolveProviderResumeWorkspacePath(
     env.repoRoot,
     resumeTaskId,
@@ -419,14 +417,19 @@ export const __test__ = {
   findSpawnManifest,
   refreshProviderIssueHandoffOnStartup,
   resolveProviderResumeLaunchSpec,
+  resolveProviderResumeTaskId,
   snapshotRunManifests
 };
 
 function beginProviderIssueHandoffStartupRefresh(
   providerIssueHandoff: ProviderIssueHandoffService | null | undefined,
-  onSettled?: () => void
+  onSettled?: () => void,
+  refreshProviderIssueHandoff?: (() => Promise<void>) | null
 ): Promise<void> {
-  return refreshProviderIssueHandoffOnStartup(providerIssueHandoff).then(() => {
+  return (refreshProviderIssueHandoff
+    ? refreshProviderIssueHandoff()
+    : refreshProviderIssueHandoffOnStartup(providerIssueHandoff)
+  ).then(() => {
     onSettled?.();
   });
 }
@@ -486,6 +489,23 @@ function readManifestString(manifest: Record<string, unknown>, field: string): s
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function resolveProviderResumeTaskId(
+  manifest: Record<string, unknown>,
+  runId: string
+): string {
+  const manifestTaskId = readManifestString(manifest, 'task_id');
+  if (!manifestTaskId) {
+    return normalizeTaskId(runId);
+  }
+  try {
+    return normalizeTaskId(manifestTaskId);
+  } catch (error) {
+    throw new Error(
+      `Invalid provider resume manifest task_id for run ${runId}: ${(error as Error)?.message ?? String(error)}`
+    );
+  }
 }
 
 function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {

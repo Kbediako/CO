@@ -318,6 +318,37 @@ describe('controlHostCliShell manifest discovery', () => {
       }
     });
   });
+
+  it('rejects invalid manifest task ids before recreating a provider resume workspace', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    await initializeRepo(tempRoot);
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const childPaths = resolveRunPaths(
+      {
+        ...env,
+        taskId: 'linear-lin-issue-1'
+      },
+      'run-child'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: '../escape'
+      }),
+      'utf8'
+    );
+
+    await expect(resolveProviderResumeLaunchSpec(env, 'run-child')).rejects.toThrow(
+      'Invalid provider resume manifest task_id for run run-child'
+    );
+  });
 });
 
 describe('controlHostCliShell startup refresh', () => {
