@@ -175,7 +175,12 @@ function buildProjectionContextFromParts(
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
   const updatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
   const completedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? null;
-  const summary = readStringValue(manifestRecord, 'summary') ?? null;
+  const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
+  const summary = resolveSelectedRunDisplaySummary({
+    manifestRecord,
+    rawStatus,
+    summary: manifestSummary
+  });
   const workspacePath = resolveRepoRootFromRunDir(parts.runDir) ?? parts.runDir;
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
@@ -192,9 +197,11 @@ function buildProjectionContextFromParts(
     fallbackEvent: rawStatus
   });
   const lastError =
-    rawStatus === 'failed' || latestAction === 'fail'
+    rawStatus === 'failed'
       ? summary ?? control.latest_action?.reason ?? 'run_failed'
-      : null;
+      : latestAction === 'fail'
+        ? control.latest_action?.reason ?? manifestSummary ?? 'run_failed'
+        : null;
 
   return {
     issueIdentifier,
@@ -303,6 +310,55 @@ function buildSelectedRunLatestEvent(input: {
     requestedBy: input.controlAction?.requested_by ?? null,
     reason: input.controlAction?.reason ?? null
   };
+}
+
+function resolveSelectedRunDisplaySummary(input: {
+  manifestRecord: Record<string, unknown>;
+  rawStatus: string;
+  summary: string | null;
+}): string | null {
+  if (
+    input.rawStatus === 'succeeded' &&
+    input.summary &&
+    hasStaleSucceededFailureSummary(input.summary) &&
+    !manifestHasFailedCommands(input.manifestRecord)
+  ) {
+    const filteredSummary = filterStaleSucceededFailureSummary(input.summary);
+    return filteredSummary ?? 'Completed successfully';
+  }
+  return input.summary;
+}
+
+function hasStaleSucceededFailureSummary(summary: string): boolean {
+  return summary.split('\n').some((line) => isStaleSucceededFailureSummaryLine(line));
+}
+
+function filterStaleSucceededFailureSummary(summary: string): string | null {
+  const retainedLines = summary
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !isStaleSucceededFailureSummaryLine(line));
+  if (retainedLines.length === 0) {
+    return null;
+  }
+  return retainedLines.join('\n');
+}
+
+function isStaleSucceededFailureSummaryLine(line: string): boolean {
+  return /^Stage '.*' failed with exit code \d+\.$/u.test(line.trim());
+}
+
+function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boolean {
+  const commands = manifestRecord.commands;
+  if (!Array.isArray(commands)) {
+    return false;
+  }
+  return commands.some((command) => {
+    if (!command || typeof command !== 'object') {
+      return false;
+    }
+    return readStringValue(command as Record<string, unknown>, 'status') === 'failed';
+  });
 }
 
 function resolveRepoRootFromRunDir(runDir: string): string | null {

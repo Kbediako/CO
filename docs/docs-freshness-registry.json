@@ -3069,6 +3069,13 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3455,6 +3462,13 @@
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-20",
@@ -8200,6 +8214,13 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/findings/1310-symphony-full-parity-audit-and-closure-truthfulness-reassessment-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/findings/ethical-life.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -8600,6 +8621,13 @@
     },
     {
       "path": "docs/PRD-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-20",
@@ -11512,6 +11540,13 @@
     },
     {
       "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-20",
@@ -16915,6 +16950,13 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/specs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -19807,6 +19849,13 @@
     },
     {
       "path": "tasks/tasks-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-20",

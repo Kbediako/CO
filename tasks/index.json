@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260320-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment",
+      "title": "Coordinator Symphony Full Parity Audit and Closure Truthfulness Reassessment",
+      "relates_to": "tasks/tasks-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-20",
+      "paths": {
+        "spec": "tasks/specs/1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+        "task": "tasks/tasks-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+        "agent_task": ".agent/task/1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md"
+      }
+    },
+    {
       "id": "20260320-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up",
       "title": "Coordinator Live Provider Child-Run Delegation-Guard Launch-Provenance Test Hermeticity Follow-Up",
       "relates_to": "tasks/tasks-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
