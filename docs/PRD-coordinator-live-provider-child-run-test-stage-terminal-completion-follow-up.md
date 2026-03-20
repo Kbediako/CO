@@ -1,6 +1,6 @@
 # PRD - Coordinator Live Provider Child-Run Test-Stage Terminal Completion Follow-Up
 
-## Added by Bootstrap 2025-10-16
+## Added by Bootstrap 2026-03-20
 
 ## Summary
 - Problem Statement: `1306` fixed the concrete `04-test` assertion regressions, and focused suites plus `delegation-guard`, `spec-guard`, `build`, and `lint` now pass on the current tree. Fresh follow-up validation refined the blocker: [`tests/cli-orchestrator.spec.ts`](../tests/cli-orchestrator.spec.ts) exits cleanly on its own, but the long quiet tail in `npm run test` remains concentrated in [`tests/cli-command-surface.spec.ts`](../tests/cli-command-surface.spec.ts), which keeps spawning real `codex-orchestrator.ts` child commands under ambient runtime selection. Under full-suite load, the same run also surfaced one timing-sensitive audit-log assertion in [`orchestrator/tests/CloudSyncWorker.test.ts`](../orchestrator/tests/CloudSyncWorker.test.ts), so this lane first removes ambient runtime drag from command-surface subprocess coverage and then re-evaluates any residual blocker.
@@ -70,5 +70,5 @@
 
 ## Approvals
 - Product: Self-approved from operator directive and fresh isolated-test evidence
-- Engineering: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`
+- Engineering: Codex docs-review approved on 2026-03-19. Evidence: `.runs/1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up/cli/2026-03-19T23-03-46-459Z-587c5d05/manifest.json`
 - Design: N/A

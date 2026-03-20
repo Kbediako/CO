@@ -489,7 +489,7 @@ describe('delegation-guard script', () => {
     expect(stdout).toContain('Delegation guard: OK (provider-started run contract matched).');
   });
 
-  it('accepts provider-started fallback runs when the manifest locator is stale but a fallback control-host lane matches', async () => {
+  it('rejects provider-started fallback runs when the manifest locator is stale even if another control-host lane matches', async () => {
     tempDir = await initRepo();
     const taskId = 'linear-lin-issue-1';
     const runId = '2026-03-20T00-00-00-000Z-run-1';
@@ -564,7 +564,7 @@ describe('delegation-guard script', () => {
       ]
     });
 
-    const { stdout } = await execFileAsync('node', [scriptPath], {
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
       env: cleanGuardOverrideEnv({
         MCP_RUNNER_TASK_ID: taskId,
@@ -575,11 +575,17 @@ describe('delegation-guard script', () => {
       })
     });
 
-    expect(stdout).toContain(`'${taskId}' accepted via provider-intake contract`);
-    expect(stdout).toContain('Delegation guard: OK (provider-started run contract matched).');
+    expect(stdout).toContain(
+      `Provider-started task id '${taskId}' did not match any control-host provider-intake claim in ${join(
+        staleControlHostDir,
+        'provider-intake-state.json'
+      )}`
+    );
+    expect(stdout).toContain(`Task id '${taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain('accepted via provider-intake contract');
   });
 
-  it('accepts provider-started fallback runs when the fallback lane has only provider-intake state and another fallback lane is malformed', async () => {
+  it('rejects provider-started fallback runs when an explicit locator is stale even if another fallback lane matches', async () => {
     tempDir = await initRepo();
     const taskId = 'linear-lin-issue-1';
     const runId = '2026-03-20T00-00-00-000Z-run-1';
@@ -658,7 +664,7 @@ describe('delegation-guard script', () => {
     await mkdir(malformedControlHostDir, { recursive: true });
     await writeFile(join(malformedControlHostDir, 'provider-intake-state.json'), '{not-json');
 
-    const { stdout } = await execFileAsync('node', [scriptPath], {
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
       env: cleanGuardOverrideEnv({
         MCP_RUNNER_TASK_ID: taskId,
@@ -669,8 +675,14 @@ describe('delegation-guard script', () => {
       })
     });
 
-    expect(stdout).toContain(`'${taskId}' accepted via provider-intake contract`);
-    expect(stdout).toContain('Delegation guard: OK (provider-started run contract matched).');
+    expect(stdout).toContain(
+      `Provider-started task id '${taskId}' did not match any control-host provider-intake claim in ${join(
+        staleControlHostDir,
+        'provider-intake-state.json'
+      )}`
+    );
+    expect(stdout).toContain(`Task id '${taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain('accepted via provider-intake contract');
     expect(stdout).not.toContain('could not be read');
   });
 
@@ -1761,7 +1773,7 @@ describe('delegation-guard script', () => {
     expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
   });
 
-  it('accepts delegated child runs when the manifest locator is stale but a fallback control-host lane matches the active parent run', async () => {
+  it('rejects delegated child runs when the manifest locator is stale even if another control-host lane matches', async () => {
     tempDir = await initRepo();
     const parentTaskId = 'linear-lin-issue-1';
     const taskId = `${parentTaskId}-guard`;
@@ -1886,7 +1898,7 @@ describe('delegation-guard script', () => {
       ]
     });
 
-    const { stdout } = await execFileAsync('node', [scriptPath], {
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
       env: cleanGuardOverrideEnv({
         MCP_RUNNER_TASK_ID: taskId,
@@ -1896,12 +1908,15 @@ describe('delegation-guard script', () => {
     });
 
     expect(stdout).toContain(
+      `Provider-child task id '${taskId}' parent_run_id 'run-parent-new' does not match sanctioned provider parent run 'run-parent-old'`
+    );
+    expect(stdout).toContain(`Task id '${taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain(
       `Delegation guard: '${taskId}' treated as subagent run for sanctioned provider task '${parentTaskId}'`
     );
-    expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
   });
 
-  it('accepts delegated child runs when the fallback lane has only provider-intake state and another fallback lane is malformed', async () => {
+  it('rejects delegated child runs when an explicit locator is stale even if another fallback lane matches', async () => {
     tempDir = await initRepo();
     const parentTaskId = 'linear-lin-issue-1';
     const taskId = `${parentTaskId}-guard`;
@@ -2030,7 +2045,7 @@ describe('delegation-guard script', () => {
     await mkdir(malformedControlHostDir, { recursive: true });
     await writeFile(join(malformedControlHostDir, 'provider-intake-state.json'), '{not-json');
 
-    const { stdout } = await execFileAsync('node', [scriptPath], {
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: tempDir,
       env: cleanGuardOverrideEnv({
         MCP_RUNNER_TASK_ID: taskId,
@@ -2039,10 +2054,10 @@ describe('delegation-guard script', () => {
       })
     });
 
-    expect(stdout).toContain(
+    expect(stdout).toContain(`Task id '${taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain(
       `Delegation guard: '${taskId}' treated as subagent run for sanctioned provider task '${parentTaskId}'`
     );
-    expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
     expect(stdout).not.toContain('could not be read');
   });
 
@@ -2249,10 +2264,39 @@ describe('delegation-guard script', () => {
       })
     });
 
-    expect(stdout).toContain(
+    expect(stdout).toContain(`Task id '${taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain(
       `Provider-child task id '${taskId}' is missing parent_run_id in active manifest '${manifestPath}'`
     );
+  });
+
+  it('rejects ordinary unregistered top-level runs without emitting provider-child diagnostics', async () => {
+    tempDir = await initRepo();
+    const taskId = 'ad-hoc-top-level-run';
+    const runId = '2026-03-20T00-00-00-000Z-run-1';
+    const manifestDir = join(tempDir, '.runs', taskId, 'cli', runId);
+    const manifestPath = join(manifestDir, 'manifest.json');
+    await mkdir(manifestDir, { recursive: true });
+    await writeJson(manifestPath, {
+      task_id: taskId,
+      run_id: runId,
+      status: 'in_progress',
+      issue_provider: null,
+      issue_id: null,
+      issue_identifier: null
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: tempDir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_ROOT: tempDir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+      })
+    });
+
     expect(stdout).toContain(`Task id '${taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain(`Provider-child task id '${taskId}'`);
   });
 
   it('rejects delegated child runs once the provider parent claim is already completed', async () => {

@@ -1,6 +1,6 @@
 # PRD - Coordinator Live Provider Child-Run Task Identity and Delegation Guard Contract Alignment
 
-## Added by Bootstrap 2025-10-16
+## Added by Bootstrap 2026-03-20
 
 ## Summary
 - Problem Statement: Live provider-driven intake now accepts real Linear deliveries, writes provider-intake claims for `CO-1` and `CO-2`, and launches child runs, but those child runs use dynamic fallback task ids like `linear-<issueId>`. Strict `delegation-guard` rejects those runs before any downstream work starts because the task ids are not registered in `tasks/index.json` and are not prefixed as children of a registered task.
@@ -73,5 +73,5 @@
 
 ## Approvals
 - Product: Self-approved from operator directive and live evidence
-- Engineering: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`
+- Engineering: Codex docs-review approved on 2026-03-19. Evidence: `.runs/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment/cli/2026-03-19T14-17-56-695Z-cbfe549d/manifest.json`
 - Design: N/A

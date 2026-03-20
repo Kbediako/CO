@@ -161,26 +161,43 @@ function readExplicitControlHostRunLocator(env, manifest = null) {
 }
 
 function resolveControlHostProviderIntakeStatePath(runsDir, env, manifest = null) {
-  const locator = resolveControlHostRunLocator(env, manifest);
+  const explicitLocator = readExplicitControlHostRunLocator(env, manifest);
+  const locator = explicitLocator ?? resolveControlHostRunLocator(env, manifest);
   return {
     ...locator,
+    explicit: explicitLocator !== null,
     statePath: join(runsDir, locator.taskId, 'cli', locator.runId, PROVIDER_INTAKE_STATE_FILE)
   };
 }
 
 async function loadControlHostProviderIntakeState(runsDir, env, manifest = null) {
-  const { statePath, taskId, runId } = resolveControlHostProviderIntakeStatePath(runsDir, env, manifest);
+  const { statePath, taskId, runId, explicit } = resolveControlHostProviderIntakeStatePath(
+    runsDir,
+    env,
+    manifest
+  );
   try {
     const state = await loadJson(statePath);
-    return { statePath, taskId, runId, state, error: null };
+    return { statePath, taskId, runId, explicit, state, error: null };
   } catch (error) {
     if (error && typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
-      return { statePath, taskId, runId, state: null, error: null };
+      if (!explicit) {
+        return { statePath, taskId, runId, explicit, state: null, error: null };
+      }
+      return {
+        statePath,
+        taskId,
+        runId,
+        explicit,
+        state: null,
+        error: `Control-host provider-intake state '${statePath}' is missing for explicit locator '${taskId}/${runId}'`
+      };
     }
     return {
       statePath,
       taskId,
       runId,
+      explicit,
       state: null,
       error: `Control-host provider-intake state '${statePath}' could not be read (${describeError(error)})`
     };
@@ -493,7 +510,7 @@ async function findProviderContractProof(runsDir, taskId, env) {
   contract.manifestPath = manifestPath;
   contract.launchToken = launchContext.launchToken;
 
-  const { statePath, state, error: stateError } = await loadControlHostProviderIntakeState(
+  const { statePath, explicit, state, error: stateError } = await loadControlHostProviderIntakeState(
     runsDir,
     env,
     manifest
@@ -504,6 +521,9 @@ async function findProviderContractProof(runsDir, taskId, env) {
   const claims = Array.isArray(state?.claims) ? state.claims : [];
   if (claims.some((claim) => matchesProviderClaim(claim, contract))) {
     return { matched: true, contract, statePath, error: null };
+  }
+  if (explicit) {
+    return { matched: false, contract, statePath, error: null };
   }
 
   const { states: fallbackStates, error: fallbackError } = await discoverFallbackControlHostProviderIntakeStates(
@@ -559,16 +579,8 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
     };
   }
   const childParentRunId = manifest ? readNonEmptyString(manifest, 'parent_run_id') : '';
-  if (!childParentRunId) {
-    return {
-      matched: false,
-      parentTaskId: null,
-      statePath: null,
-      error: `Provider-child task id '${taskId}' is missing parent_run_id in active manifest '${manifestPath}'`
-    };
-  }
 
-  const { statePath, state, error: stateError } = await loadControlHostProviderIntakeState(
+  const { statePath, explicit, state, error: stateError } = await loadControlHostProviderIntakeState(
     runsDir,
     env,
     manifest
@@ -584,9 +596,11 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
   const candidateContracts = await collectProviderParentContracts(runsDir, state, taskId, statePath);
 
   let matchedStatePath = statePath;
-  const hasMatchingParentRun = candidateContracts.some((contract) => contract.parentRunId === childParentRunId);
   let fallbackError = null;
-  if (!hasMatchingParentRun) {
+  const hasMatchingParentRun = childParentRunId
+    ? candidateContracts.some((contract) => contract.parentRunId === childParentRunId)
+    : false;
+  if ((!childParentRunId || !hasMatchingParentRun) && !explicit) {
     const { states: fallbackStates, error: discoveredFallbackError } =
       await discoverFallbackControlHostProviderIntakeStates(runsDir, statePath);
     if (discoveredFallbackError) {
@@ -607,6 +621,23 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
         }
       }
     }
+  }
+
+  if (!childParentRunId) {
+    if (candidateContracts.length === 0) {
+      return {
+        matched: false,
+        parentTaskId: null,
+        statePath: matchedStatePath,
+        error: fallbackError
+      };
+    }
+    return {
+      matched: false,
+      parentTaskId: null,
+      statePath: matchedStatePath,
+      error: `Provider-child task id '${taskId}' is missing parent_run_id in active manifest '${manifestPath}'`
+    };
   }
 
   if (candidateContracts.length === 0) {

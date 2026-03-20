@@ -132,11 +132,11 @@ export function upsertProviderIntakeClaim(
   const existing = existingIndex >= 0 ? state.claims[existingIndex] : null;
   const nextRunId = input.run_id ?? null;
   const nextRunManifestPath = input.run_manifest_path ?? null;
-  const runIdentityChanged =
-    existing !== null &&
-    (existing.task_id !== input.task_id ||
-      existing.run_id !== nextRunId ||
-      existing.run_manifest_path !== nextRunManifestPath);
+  const runIdentityChanged = hasProviderRunIdentityChanged(existing, {
+    task_id: input.task_id,
+    run_id: nextRunId,
+    run_manifest_path: nextRunManifestPath
+  });
   const next: ProviderIntakeClaimRecord = {
     provider: 'linear',
     provider_key: input.provider_key,
@@ -184,6 +184,27 @@ export function upsertProviderIntakeClaim(
   state.claims = state.claims.slice(-PROVIDER_INTAKE_CLAIM_LIMIT);
 
   return next;
+}
+
+function hasProviderRunIdentityChanged(
+  existing: ProviderIntakeClaimRecord | null,
+  next: Pick<ProviderIntakeClaimRecord, 'task_id' | 'run_id' | 'run_manifest_path'>
+): boolean {
+  if (!existing) {
+    return false;
+  }
+
+  if (existing.task_id !== next.task_id) {
+    return true;
+  }
+
+  const existingRunId = existing.run_id ?? null;
+  const nextRunId = next.run_id ?? null;
+  if (existingRunId || nextRunId) {
+    return existingRunId !== nextRunId;
+  }
+
+  return (existing.run_manifest_path ?? null) !== (next.run_manifest_path ?? null);
 }
 
 export function markProviderIntakeRehydrated(

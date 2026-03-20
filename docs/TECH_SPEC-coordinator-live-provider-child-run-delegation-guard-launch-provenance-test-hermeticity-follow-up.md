@@ -67,8 +67,8 @@
   - distinguish local targeted hermeticity regressions from live provider-state transitions
 
 ## Open Questions
-- What keeps direct `npm run test` and the live reused `04-test` stage from returning after the final visible Vitest success line.
-- Whether the next corrective lane belongs in CLI test/process handling rather than delegation-guard coverage.
+- What keeps direct `npm run test` and the live reused `04-test` stage from returning after the final visible Vitest success line?
+- Whether the next corrective lane belongs in CLI test/process handling rather than delegation-guard coverage?
 
 ## Approvals
 - Reviewer: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`

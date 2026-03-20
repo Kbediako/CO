@@ -1,6 +1,6 @@
 # PRD - Coordinator Live Provider Child-Run CLI Command-Surface Subprocess Completion Follow-Up
 
-## Added by Bootstrap 2026-03-19
+## Added by Bootstrap 2026-03-20
 
 ## Summary
 - Problem Statement: `1307` already pinned the shared CLI command-surface test helper to deterministic `cli` runtime env values unless an individual test overrides them. Fresh remeasurement on the current tree shows the previously suspicious focus surface is long but terminal, not stuck: [`tests/cli-command-surface.spec.ts`](../tests/cli-command-surface.spec.ts) passes `100/100` tests in about `297.91s`. That invalidates the earlier assumption that help-path subprocesses such as `resume --help` were the concrete blocker. The remaining truthful work is to rerun the full local validation floor and the live provider-started child run with patience-first monitoring, then capture the next exact blocker if one still exists.
@@ -68,5 +68,5 @@
 
 ## Approvals
 - Product: Self-approved from operator directive and fresh focused command-surface remeasurement
-- Engineering: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`
+- Engineering: Codex docs-review rerun approved on 2026-03-19. Evidence: `.runs/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up-docs-rerun/cli/2026-03-19T23-44-17-826Z-d4c5ecb0/manifest.json`
 - Design: N/A

@@ -1,6 +1,6 @@
 # PRD - Coordinator Live Provider Child-Run Delegation-Guard Launch-Provenance Test Hermeticity Follow-Up
 
-## Added by Bootstrap 2025-10-16
+## Added by Bootstrap 2026-03-20
 
 ## Summary
 - Problem Statement: `1308` ended at a live resumed `04-test` failure in `tests/delegation-guard.spec.ts`, so `1309` started by treating ambient provider launch provenance as the likely root cause. Current-tree validation then showed the narrow hermetic helper was already present in `tests/delegation-guard.spec.ts`: targeted delegation-guard coverage passes both from a normal shell and from an injected provider-started parent env. A fresh signed live `CO-2` replay on March 20, 2026 also carried the reused child run past the earlier `stage:test:failed` boundary and through the final visible Vitest success line. The remaining blocker is now downstream of that former failure mode: both the direct local `npm run test` invocation and the live reused child run stop returning after the final visible test success line, so `05-spec-guard` never starts on the live path.
@@ -64,8 +64,8 @@
   - live control-host and provider child-run evidence under `.runs/local-mcp/cli/control-host/` and `.runs/linear-*/`
 
 ## Open Questions
-- What keeps the direct `npm run test` command and the live reused `04-test` stage from returning after the final visible Vitest success line.
-- Whether the next corrective lane belongs in CLI test/process handling rather than delegation-guard coverage.
+- What keeps the direct `npm run test` command and the live reused `04-test` stage from returning after the final visible Vitest success line?
+- Whether the next corrective lane belongs in CLI test/process handling rather than delegation-guard coverage?
 
 ## Approvals
 - Product: Self-approved from operator directive and fresh live rerun evidence

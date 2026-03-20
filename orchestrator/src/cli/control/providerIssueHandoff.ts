@@ -102,6 +102,8 @@ export function createProviderIssueHandoffService(
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
+          launch_source: undefined,
+          launch_token: undefined,
           task_id: activeRun.taskId,
           state: 'running',
           reason: 'provider_issue_rehydrated_active_run',
@@ -125,6 +127,8 @@ export function createProviderIssueHandoffService(
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
+          launch_source: undefined,
+          launch_token: undefined,
           task_id: resumableRun.taskId,
           state: 'resumable',
           reason: 'provider_issue_rehydrated_resumable_run',
@@ -146,6 +150,8 @@ export function createProviderIssueHandoffService(
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
+          launch_source: undefined,
+          launch_token: undefined,
           task_id: completedRun.taskId,
           state: 'completed',
           reason: 'provider_issue_rehydrated_completed_run',
@@ -169,6 +175,8 @@ export function createProviderIssueHandoffService(
             });
             upsertProviderIntakeClaim(options.state, {
               ...claim,
+              launch_source: undefined,
+              launch_token: undefined,
               task_id: queuedRun.taskId,
               state: 'handoff_failed',
               reason: 'provider_issue_rehydration_timeout',
@@ -188,6 +196,8 @@ export function createProviderIssueHandoffService(
           });
           upsertProviderIntakeClaim(options.state, {
             ...claim,
+            launch_source: undefined,
+            launch_token: undefined,
             task_id: queuedRun.taskId,
             state: claim.state,
             reason: 'provider_issue_rehydrated_queued_run',
@@ -209,6 +219,8 @@ export function createProviderIssueHandoffService(
           });
           upsertProviderIntakeClaim(options.state, {
             ...claim,
+            launch_source: undefined,
+            launch_token: undefined,
             state: 'handoff_failed',
             reason: 'provider_issue_rehydration_timeout',
             updated_at: now
@@ -223,6 +235,8 @@ export function createProviderIssueHandoffService(
       if (claim.state === 'accepted') {
         upsertProviderIntakeClaim(options.state, {
           ...claim,
+          launch_source: undefined,
+          launch_token: undefined,
           state: 'accepted',
           reason: 'provider_issue_rehydration_pending_revalidation',
           updated_at: now

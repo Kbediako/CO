@@ -59,5 +59,5 @@ dependencies:
   - Mitigation: stop after capturing that new blocker rather than broadening this lane.
 
 ## Approvals
-- Reviewer: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`
-- Date: 2026-03-20
+- Reviewer: Codex docs-review rerun approved on 2026-03-19. Evidence: `.runs/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up-docs-rerun/cli/2026-03-19T23-44-17-826Z-d4c5ecb0/manifest.json`
+- Date: 2026-03-19

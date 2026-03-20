@@ -79,9 +79,9 @@
   - monitor `provider-intake-state.json`, `linear-advisory-state.json`, child-run manifests, and the guard command log
 
 ## Open Questions
-- Whether any helper extraction is worth doing now, or if inline manifest-plus-provider-intake validation inside `scripts/delegation-guard.mjs` is the smallest correct change.
-- Whether the current fallback task-id shape should be formalized in a shared helper after this lane, once live validation confirms the narrow contract.
+- Whether any helper extraction is worth doing now, or if inline manifest-plus-provider-intake validation inside `scripts/delegation-guard.mjs` is the smallest correct change?
+- Whether the current fallback task-id shape should be formalized in a shared helper after this lane, once live validation confirms the narrow contract?
 
 ## Approvals
-- Reviewer: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`
-- Date: 2026-03-20
+- Reviewer: Codex docs-review approved on 2026-03-19. Evidence: `.runs/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment/cli/2026-03-19T14-17-56-695Z-cbfe549d/manifest.json`
+- Date: 2026-03-19
