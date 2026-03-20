@@ -92,8 +92,17 @@ export async function closeControlServerPublicLifecycle(
 function startProviderRefreshTimer(
   providerIssueHandoff: ProviderIssueHandoffService
 ): NodeJS.Timeout {
+  let refreshInFlight = false;
   const timer = setInterval(() => {
-    void providerIssueHandoff.refresh().catch(() => undefined);
+    if (refreshInFlight) {
+      return;
+    }
+    refreshInFlight = true;
+    void providerIssueHandoff.refresh()
+      .catch(() => undefined)
+      .finally(() => {
+        refreshInFlight = false;
+      });
   }, PROVIDER_REFRESH_INTERVAL_MS);
   timer.unref?.();
   return timer;
