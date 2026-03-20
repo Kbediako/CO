@@ -71,6 +71,67 @@ describe('appendCommandError', () => {
   });
 });
 
+describe('bootstrapManifest', () => {
+  it('persists control-host locator provenance from the ambient provider launch env', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-provider-control-host-'));
+    const env: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+    const previousProviderEnv = {
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID
+    } as const;
+
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE = 'control-host';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID = 'provider-host-task';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID = 'provider-host-run';
+
+    try {
+      const { manifest } = await bootstrapManifest('run-provider-contract', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null,
+        issueProvider: 'linear',
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-2',
+        issueUpdatedAt: '2026-03-20T00:00:00.000Z'
+      });
+
+      expect(manifest.provider_control_host_task_id).toBe('provider-host-task');
+      expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
+    } finally {
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID;
+      }
+      if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID =
+          previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('loadManifest', () => {
   it('resolves manifests by run id across task directories', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-load-'));

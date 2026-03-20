@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { access, lstat, mkdir, readdir, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import process from 'node:process';
 
 import type {
   CliManifest,
@@ -21,6 +22,12 @@ import { resolveRunPaths, relativeToRepo } from './runPaths.js';
 import { ExperienceStore } from '../../persistence/ExperienceStore.js';
 import { formatExperienceInjections } from '../exec/experience.js';
 import { sanitizeRunId } from '../../persistence/sanitizeRunId.js';
+import {
+  PROVIDER_CONTROL_HOST_RUN_ID_ENV,
+  PROVIDER_CONTROL_HOST_TASK_ID_ENV,
+  PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+  PROVIDER_LAUNCH_SOURCE_ENV
+} from '../../../../scripts/lib/provider-run-contract.js';
 
 export interface ManifestBootstrapOptions {
   env: EnvironmentPaths;
@@ -33,6 +40,11 @@ export interface ManifestBootstrapOptions {
   issueId?: string | null;
   issueIdentifier?: string | null;
   issueUpdatedAt?: string | null;
+}
+
+interface ProviderControlHostLocator {
+  taskId: string | null;
+  runId: string | null;
 }
 
 export interface GuardrailStatusSnapshot {
@@ -70,6 +82,26 @@ function runtimeProviderForMode(mode: 'cli' | 'appserver'): 'CliRuntimeProvider'
   return mode === 'appserver' ? 'AppServerRuntimeProvider' : 'CliRuntimeProvider';
 }
 
+function resolveProviderControlHostLocatorFromEnv(
+  env: NodeJS.ProcessEnv = process.env
+): ProviderControlHostLocator {
+  const launchSource = normalizeOptionalString(env[PROVIDER_LAUNCH_SOURCE_ENV]);
+  const taskId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_TASK_ID_ENV]);
+  const runId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_RUN_ID_ENV]);
+  if (launchSource !== PROVIDER_LAUNCH_SOURCE_CONTROL_HOST || !taskId || !runId) {
+    return { taskId: null, runId: null };
+  }
+  return { taskId, runId };
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export async function bootstrapManifest(runId: string, options: ManifestBootstrapOptions): Promise<{
   manifest: CliManifest;
   paths: RunPaths;
@@ -83,6 +115,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
   const now = isoTimestamp();
   const resumeToken = randomBytes(32).toString('hex');
   const commands = buildCommandEntries(pipeline);
+  const providerControlHostLocator = resolveProviderControlHostLocatorFromEnv();
 
   const manifest: CliManifest = {
     version: 1,
@@ -109,6 +142,8 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     issue_id: options.issueId ?? null,
     issue_identifier: options.issueIdentifier ?? null,
     issue_updated_at: options.issueUpdatedAt ?? null,
+    provider_control_host_task_id: providerControlHostLocator.taskId,
+    provider_control_host_run_id: providerControlHostLocator.runId,
     summary: null,
     metrics_recorded: false,
     resume_token: resumeToken,
@@ -199,6 +234,26 @@ export async function loadManifest(env: EnvironmentPaths, runId: string): Promis
   };
   const paths = resolveRunPathsForManifestPath(resolvedEnv, runId, manifestPath);
   return { manifest, paths };
+}
+
+export function backfillProviderControlHostLocatorFromEnv(
+  manifest: CliManifest,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const locator = resolveProviderControlHostLocatorFromEnv(env);
+  if (!locator.taskId || !locator.runId) {
+    return false;
+  }
+
+  const manifestTaskId = normalizeOptionalString(manifest.provider_control_host_task_id);
+  const manifestRunId = normalizeOptionalString(manifest.provider_control_host_run_id);
+  if (manifestTaskId === locator.taskId && manifestRunId === locator.runId) {
+    return false;
+  }
+
+  manifest.provider_control_host_task_id = locator.taskId;
+  manifest.provider_control_host_run_id = locator.runId;
+  return true;
 }
 
 export function updateCommandStatus(

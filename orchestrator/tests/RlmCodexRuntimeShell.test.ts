@@ -29,6 +29,9 @@ function makeCollabLine(
 
 describe('rlmCodexRuntimeShell', () => {
   it('caches runtime context and shapes exec env', async () => {
+    vi.stubEnv('CODEX_NON_INTERACTIVE', '');
+    vi.stubEnv('CODEX_NO_INTERACTIVE', '');
+    vi.stubEnv('CODEX_INTERACTIVE', '');
     const createRuntimeContextImpl = vi.fn(async () => ({ runtime: { provider: 'CliRuntimeProvider' } }) as never);
     const resolveRuntimeCommandImpl = vi.fn((args: string[]) => ({ command: 'codex', args }));
     const formatRuntimeSelectionSummaryImpl = vi.fn(() => 'provider=CliRuntimeProvider');
@@ -55,38 +58,44 @@ describe('rlmCodexRuntimeShell', () => {
       log
     });
 
-    await shell.runCompletion('first prompt', {
-      nonInteractive: true,
-      subagentsEnabled: true,
-      mirrorOutput: false
-    });
-    await shell.runCompletion('second prompt', {
-      nonInteractive: false,
-      subagentsEnabled: false,
-      mirrorOutput: false
-    });
+    try {
+      await shell.runCompletion('first prompt', {
+        nonInteractive: true,
+        subagentsEnabled: true,
+        mirrorOutput: false
+      });
+      await shell.runCompletion('second prompt', {
+        nonInteractive: false,
+        subagentsEnabled: false,
+        mirrorOutput: false
+      });
 
-    expect(createRuntimeContextImpl).toHaveBeenCalledTimes(1);
-    expect(formatRuntimeSelectionSummaryImpl).toHaveBeenCalledTimes(1);
-    expect(log.info).toHaveBeenCalledTimes(1);
-    expect(resolveRuntimeCommandImpl).toHaveBeenNthCalledWith(
-      1,
-      ['exec', 'first prompt'],
-      expect.anything()
-    );
+      expect(createRuntimeContextImpl).toHaveBeenCalledTimes(1);
+      expect(formatRuntimeSelectionSummaryImpl).toHaveBeenCalledTimes(1);
+      expect(log.info).toHaveBeenCalledTimes(1);
+      expect(resolveRuntimeCommandImpl).toHaveBeenNthCalledWith(
+        1,
+        ['exec', 'first prompt'],
+        expect.anything()
+      );
 
-    const firstRequest = execRunner.mock.calls[0]?.[0];
-    expect(firstRequest?.command).toBe('codex');
-    expect(firstRequest?.args).toEqual(['exec', 'first prompt']);
-    expect(firstRequest?.cwd).toBe('/repo');
-    expect(firstRequest?.env.CODEX_NON_INTERACTIVE).toBe('1');
-    expect(firstRequest?.env.CODEX_NO_INTERACTIVE).toBe('1');
-    expect(firstRequest?.env.CODEX_INTERACTIVE).toBe('0');
-    expect(firstRequest?.env.CODEX_SUBAGENTS).toBe('1');
+      const firstRequest = execRunner.mock.calls[0]?.[0];
+      expect(firstRequest?.command).toBe('codex');
+      expect(firstRequest?.args).toEqual(['exec', 'first prompt']);
+      expect(firstRequest?.cwd).toBe('/repo');
+      expect(firstRequest?.env.CODEX_NON_INTERACTIVE).toBe('1');
+      expect(firstRequest?.env.CODEX_NO_INTERACTIVE).toBe('1');
+      expect(firstRequest?.env.CODEX_INTERACTIVE).toBe('0');
+      expect(firstRequest?.env.CODEX_SUBAGENTS).toBe('1');
 
-    const secondRequest = execRunner.mock.calls[1]?.[0];
-    expect(secondRequest?.env.CODEX_SUBAGENTS).toBe('0');
-    expect(secondRequest?.env.CODEX_NON_INTERACTIVE).toBeUndefined();
+      const secondRequest = execRunner.mock.calls[1]?.[0];
+      expect(secondRequest?.env.CODEX_SUBAGENTS).toBe('0');
+      expect(secondRequest?.env.CODEX_NON_INTERACTIVE).toBe('');
+      expect(secondRequest?.env.CODEX_NO_INTERACTIVE).toBe('');
+      expect(secondRequest?.env.CODEX_INTERACTIVE).toBe('');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('returns the last agent message and warns for role-policy failures in warn mode', async () => {

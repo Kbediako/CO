@@ -5,6 +5,7 @@ import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 const PROVIDER_INTAKE_CLAIM_LIMIT = 128;
 
 export type ProviderTaskMappingSource = 'provider_id_fallback';
+export type ProviderLaunchSource = 'control-host';
 
 export type ProviderIntakeClaimState =
   | 'ignored'
@@ -39,6 +40,8 @@ export interface ProviderIntakeClaimRecord {
   last_webhook_timestamp: number | null;
   run_id: string | null;
   run_manifest_path: string | null;
+  launch_source: ProviderLaunchSource | null;
+  launch_token: string | null;
 }
 
 export interface ProviderIntakeState {
@@ -116,10 +119,12 @@ export function upsertProviderIntakeClaim(
   state: ProviderIntakeState,
   input: Omit<
     ProviderIntakeClaimRecord,
-    'accepted_at' | 'updated_at'
+    'accepted_at' | 'updated_at' | 'launch_source' | 'launch_token'
   > & {
     accepted_at?: string | null;
     updated_at?: string | null;
+    launch_source?: ProviderLaunchSource | null;
+    launch_token?: string | null;
   }
 ): ProviderIntakeClaimRecord {
   const now = input.updated_at ?? isoTimestamp();
@@ -145,7 +150,11 @@ export function upsertProviderIntakeClaim(
     last_action: input.last_action ?? null,
     last_webhook_timestamp: input.last_webhook_timestamp ?? null,
     run_id: input.run_id ?? null,
-    run_manifest_path: input.run_manifest_path ?? null
+    run_manifest_path: input.run_manifest_path ?? null,
+    launch_source:
+      input.launch_source === undefined ? existing?.launch_source ?? null : input.launch_source,
+    launch_token:
+      input.launch_token === undefined ? existing?.launch_token ?? null : input.launch_token
   };
 
   if (existingIndex >= 0) {
@@ -249,7 +258,9 @@ function normalizeProviderIntakeClaim(
         : null,
     run_id: typeof input.run_id === 'string' ? input.run_id : null,
     run_manifest_path:
-      typeof input.run_manifest_path === 'string' ? input.run_manifest_path : null
+      typeof input.run_manifest_path === 'string' ? input.run_manifest_path : null,
+    launch_source: input.launch_source === 'control-host' ? 'control-host' : null,
+    launch_token: typeof input.launch_token === 'string' ? input.launch_token : null
   };
 }
 

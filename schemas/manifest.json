@@ -66,6 +66,8 @@
     "issue_id": { "type": ["string", "null"] },
     "issue_identifier": { "type": ["string", "null"] },
     "issue_updated_at": { "type": ["string", "null"] },
+    "provider_control_host_task_id": { "type": ["string", "null"] },
+    "provider_control_host_run_id": { "type": ["string", "null"] },
     "summary": { "type": ["string", "null"] },
     "metrics_recorded": { "type": "boolean" },
     "resume_token": { "type": "string", "minLength": 1 },

@@ -1,10 +1,10 @@
 ---
 id: 20260319-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff
 title: Coordinator Symphony-Parity Provider-Driven Autonomous Intake and Run Handoff
-status: active
+status: completed
 owner: Codex
 created: 2026-03-19
-last_review: 2026-03-19
+last_review: 2026-03-20
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-03-19: Implementation landed a dedicated `codex-orchestrator control-host` intake surface, manifest-carried provider issue identity, and a separate `provider-intake-state.json` claim ledger. Live Linear intake remains bounded to `state_type=started`; task ids use a stable provider-id fallback when the live issue projection lacks an explicit CO task-id carrier.
   - 2026-03-19: Post-merge follow-up on PR `#278` stabilized `packages/orchestrator/tests/UnifiedExec.test.ts` for slower CI runners after the queued-handoff fix exposed startup-sensitive timeout coverage. This did not change the provider-intake runtime contract; it only preserved CI validation for the already-landed 1303 follow-up lane.
   - 2026-03-19: First live autonomous intake rerun reached the exact Linear issue-by-id lookup and exposed a narrow upstream contract bug: `buildLinearIssueByIdQuery(...)` declared `$issueId: ID!` while Linear expects `issue(id: String!)`. The runtime contract stayed otherwise intact; the fix and live rerun are tracked separately in `1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix`.
+  - 2026-03-20: Live rerun after `1304` proved the next blocker is the strict `delegation-guard` contract: accepted provider-started child runs still use the documented provider-id fallback task ids, and those runs fail before downstream work because the fallback ids are not registered top-level tasks. The narrow contract-alignment follow-up is tracked in `1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment`.
 ---
 
 # Technical Specification
@@ -41,6 +42,7 @@ The remaining gap after `1302` is provider-driven autonomous work intake, not pr
 - Deterministic handoff: the host writes provider claim state to `provider-intake-state.json`, scans manifests by `{issue_provider, issue_id}`, and deterministically chooses `resume` for the latest failed/cancelled matching run, `ignore` for an active or completed run, and `start` otherwise.
 - Task-id mapping: manifests carry `issue_provider`, `issue_id`, `issue_identifier`, and `issue_updated_at`; new starts currently use `linear-<opaque-provider-id>` when the live Linear issue data does not expose an explicit CO task-id field.
 - Restart rehydration: the host reloads `provider-intake-state.json`, relinks matching child manifests by persisted provider issue identity, and marks unresolved claims as pending revalidation instead of silently relaunching arbitrary work.
+- Follow-up `1305` now tracks the strict-guard alignment required for that documented provider-fallback path.
 
 ## Validation Plan
 

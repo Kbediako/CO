@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
@@ -9,6 +10,7 @@ import {
   buildProviderIssueKey,
   markProviderIntakeRehydrated,
   readProviderIntakeClaim,
+  type ProviderLaunchSource,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState,
   type ProviderTaskMappingSource,
@@ -23,11 +25,13 @@ export interface ProviderIssueLauncher {
     issueId: string;
     issueIdentifier: string;
     issueUpdatedAt: string | null;
-  }): Promise<void>;
+    launchToken: string;
+  }): Promise<{ runId: string; manifestPath: string } | null>;
   resume(input: {
     runId: string;
     actor: string;
     reason: string;
+    launchToken: string;
   }): Promise<void>;
 }
 
@@ -72,6 +76,7 @@ const BEST_EFFORT_REHYDRATE_DELAY_MS = 1_000;
 const BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS = 5;
 const BEST_EFFORT_REHYDRATE_TIMEOUT_MS =
   BEST_EFFORT_REHYDRATE_DELAY_MS * BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS;
+const PROVIDER_LAUNCH_SOURCE: ProviderLaunchSource = 'control-host';
 
 export function createProviderIssueHandoffService(
   options: CreateProviderIssueHandoffServiceOptions
@@ -330,6 +335,7 @@ export function createProviderIssueHandoffService(
 
       const latestRun = discoveredRuns[0] ?? null;
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+        const launchToken = createProviderLaunchToken();
         const inflightClaim = upsertProviderIntakeClaim(options.state, {
           ...latestClaimBase,
           task_id: latestRun.taskId,
@@ -337,14 +343,17 @@ export function createProviderIssueHandoffService(
           state: 'resuming',
           reason: 'provider_issue_resume_launched',
           run_id: latestRun.runId,
-          run_manifest_path: latestRun.manifestPath
+          run_manifest_path: latestRun.manifestPath,
+          launch_source: PROVIDER_LAUNCH_SOURCE,
+          launch_token: launchToken
         });
         await options.persist();
         try {
           await options.launcher.resume({
             runId: latestRun.runId,
             actor: 'control-host',
-            reason: 'provider-accepted-issue'
+            reason: 'provider-accepted-issue',
+            launchToken
           });
         } catch (error) {
           const claim = upsertProviderIntakeClaim(options.state, {
@@ -355,6 +364,8 @@ export function createProviderIssueHandoffService(
             reason: `provider_issue_resume_failed:${(error as Error)?.message ?? String(error)}`,
             run_id: latestRun.runId,
             run_manifest_path: latestRun.manifestPath,
+            launch_source: PROVIDER_LAUNCH_SOURCE,
+            launch_token: launchToken
           });
           await options.persist();
           throw new Error(`Failed to resume provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
@@ -377,6 +388,7 @@ export function createProviderIssueHandoffService(
         return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
       }
 
+      const launchToken = createProviderLaunchToken();
       const inflightClaim = upsertProviderIntakeClaim(options.state, {
         ...latestClaimBase,
         task_id: taskId,
@@ -384,17 +396,21 @@ export function createProviderIssueHandoffService(
         state: 'starting',
         reason: 'provider_issue_start_launched',
         run_id: null,
-        run_manifest_path: null
+        run_manifest_path: null,
+        launch_source: PROVIDER_LAUNCH_SOURCE,
+        launch_token: launchToken
       });
       await options.persist();
+      let startedRun: { runId: string; manifestPath: string } | null = null;
       try {
-        await options.launcher.start({
+        startedRun = await options.launcher.start({
           taskId,
           pipelineId: startPipelineId,
           provider: 'linear',
           issueId: input.trackedIssue.id,
           issueIdentifier: input.trackedIssue.identifier,
-          issueUpdatedAt: input.trackedIssue.updated_at
+          issueUpdatedAt: input.trackedIssue.updated_at,
+          launchToken
         });
       } catch (error) {
         const claim = upsertProviderIntakeClaim(options.state, {
@@ -405,12 +421,31 @@ export function createProviderIssueHandoffService(
           reason: `provider_issue_start_failed:${(error as Error)?.message ?? String(error)}`,
           run_id: null,
           run_manifest_path: null,
+          launch_source: PROVIDER_LAUNCH_SOURCE,
+          launch_token: launchToken
         });
         await options.persist();
         throw new Error(`Failed to start provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
       }
+      const claim = startedRun
+        ? upsertProviderIntakeClaim(options.state, {
+            ...latestClaimBase,
+            task_id: taskId,
+            mapping_source: mappingSource,
+            state: 'starting',
+            reason: 'provider_issue_start_launched',
+            run_id: startedRun.runId,
+            run_manifest_path: startedRun.manifestPath,
+            launch_source: PROVIDER_LAUNCH_SOURCE,
+            launch_token: launchToken
+          })
+        : inflightClaim;
+      if (startedRun) {
+        await options.persist();
+        options.publishRuntime?.('provider-intake.start');
+      }
       scheduleBestEffortRehydrate(rehydrateNow);
-      return { kind: 'start', reason: 'provider_issue_start_launched', claim: inflightClaim };
+      return { kind: 'start', reason: 'provider_issue_start_launched', claim };
     },
 
     async rehydrate(): Promise<void> {
@@ -435,6 +470,10 @@ function isTrackedIssueStale(input: {
     return false;
   }
   return nextTime < existingTime;
+}
+
+function createProviderLaunchToken(): string {
+  return randomBytes(16).toString('hex');
 }
 
 async function discoverProviderIssueRuns(

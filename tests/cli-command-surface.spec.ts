@@ -12,6 +12,16 @@ const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
+const RUNTIME_TEST_ENV_KEYS = [
+  'CODEX_ORCHESTRATOR_RUNTIME_MODE',
+  'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
+  'CODEX_RUNTIME_MODE'
+] as const;
+const DEFAULT_RUNTIME_TEST_ENV = {
+  CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
+  CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
+  CODEX_RUNTIME_MODE: 'cli'
+} satisfies NodeJS.ProcessEnv;
 
 let tempDir: string | null = null;
 
@@ -28,8 +38,30 @@ async function runCli(
   env?: NodeJS.ProcessEnv,
   timeoutMs: number = CLI_EXEC_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string }> {
+  const mergedEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...(env ?? {})
+  };
+  const explicitRuntimeOverrides = Object.fromEntries(
+    RUNTIME_TEST_ENV_KEYS.flatMap((key) => {
+      if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
+        return [];
+      }
+      if (env[key] === process.env[key] && Object.prototype.hasOwnProperty.call(process.env, key)) {
+        return [];
+      }
+      return [[key, env[key]]];
+    })
+  ) as NodeJS.ProcessEnv;
+  for (const key of RUNTIME_TEST_ENV_KEYS) {
+    delete mergedEnv[key];
+  }
   return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
-    env: env ?? process.env,
+    env: {
+      ...mergedEnv,
+      ...DEFAULT_RUNTIME_TEST_ENV,
+      ...explicitRuntimeOverrides
+    },
     timeout: timeoutMs
   });
 }
