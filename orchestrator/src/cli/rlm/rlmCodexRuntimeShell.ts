@@ -161,6 +161,10 @@ function envFlagEnabled(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
+function readNonEmptyEnvValue(value: string | undefined): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
 export function createRlmCodexRuntimeShell(
   options: RlmCodexRuntimeShellOptions
 ): RlmCodexRuntimeShell {
@@ -217,9 +221,9 @@ export function createRlmCodexRuntimeShell(
     };
 
     if (execOptions.nonInteractive) {
-      childEnv.CODEX_NON_INTERACTIVE = childEnv.CODEX_NON_INTERACTIVE ?? '1';
-      childEnv.CODEX_NO_INTERACTIVE = childEnv.CODEX_NO_INTERACTIVE ?? '1';
-      childEnv.CODEX_INTERACTIVE = childEnv.CODEX_INTERACTIVE ?? '0';
+      childEnv.CODEX_NON_INTERACTIVE = readNonEmptyEnvValue(childEnv.CODEX_NON_INTERACTIVE) ?? '1';
+      childEnv.CODEX_NO_INTERACTIVE = readNonEmptyEnvValue(childEnv.CODEX_NO_INTERACTIVE) ?? '1';
+      childEnv.CODEX_INTERACTIVE = readNonEmptyEnvValue(childEnv.CODEX_INTERACTIVE) ?? '0';
     }
     childEnv.CODEX_SUBAGENTS = execOptions.subagentsEnabled ? '1' : '0';
 

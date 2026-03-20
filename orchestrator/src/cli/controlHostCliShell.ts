@@ -1,9 +1,17 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import process from 'node:process';
 
+import {
+  PROVIDER_CONTROL_HOST_RUN_ID_ENV,
+  PROVIDER_CONTROL_HOST_TASK_ID_ENV,
+  PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+  PROVIDER_LAUNCH_SOURCE_ENV,
+  PROVIDER_LAUNCH_TOKEN_ENV
+} from '../../../scripts/lib/provider-run-contract.js';
 import { resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
 import {
   computeEffectiveDelegationConfig,
@@ -25,6 +33,22 @@ type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
+const SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 5_000;
+const SPAWN_MANIFEST_WAIT_INTERVAL_MS = 100;
+
+interface SpawnedRunManifestInfo {
+  runId: string;
+  manifestPath: string;
+}
+
+interface SpawnManifestCorrelation {
+  issueProvider?: string | null;
+  issueId?: string | null;
+  issueIdentifier?: string | null;
+  issueUpdatedAt?: string | null;
+  providerControlHostTaskId?: string | null;
+  providerControlHostRunId?: string | null;
+}
 
 export interface RunControlHostCliShellParams {
   flags: ArgMap;
@@ -77,19 +101,39 @@ export async function runControlHostCliShell(
         publishRuntime,
         launcher: {
           start: async (input) => {
-            await spawnBackgroundCli(env.repoRoot, cliEntrypoint, [
-              'start',
-              input.pipelineId,
-              '--task',
+            return await spawnBackgroundCliAndWaitForManifest(
+              env.repoRoot,
+              cliEntrypoint,
+              [
+                'start',
+                input.pipelineId,
+                '--task',
+                input.taskId,
+                '--issue-provider',
+                input.provider,
+                '--issue-id',
+                input.issueId,
+                '--issue-identifier',
+                input.issueIdentifier,
+                ...(input.issueUpdatedAt ? ['--issue-updated-at', input.issueUpdatedAt] : [])
+              ],
+              join(env.runsRoot, input.taskId, 'cli'),
               input.taskId,
-              '--issue-provider',
-              input.provider,
-              '--issue-id',
-              input.issueId,
-              '--issue-identifier',
-              input.issueIdentifier,
-              ...(input.issueUpdatedAt ? ['--issue-updated-at', input.issueUpdatedAt] : [])
-            ]);
+              {
+                [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
+                [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
+                [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+                [PROVIDER_LAUNCH_TOKEN_ENV]: input.launchToken
+              },
+              {
+                issueProvider: input.provider,
+                issueId: input.issueId,
+                issueIdentifier: input.issueIdentifier,
+                issueUpdatedAt: input.issueUpdatedAt,
+                providerControlHostTaskId: taskId,
+                providerControlHostRunId: runId
+              }
+            );
           },
           resume: async (input) => {
             await spawnBackgroundCli(env.repoRoot, cliEntrypoint, [
@@ -100,7 +144,12 @@ export async function runControlHostCliShell(
               input.actor,
               '--reason',
               input.reason
-            ]);
+            ], {
+              [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
+              [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
+              [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+              [PROVIDER_LAUNCH_TOKEN_ENV]: input.launchToken
+            });
           }
         }
       })
@@ -134,11 +183,37 @@ export async function runControlHostCliShell(
   }
 }
 
-async function spawnBackgroundCli(repoRoot: string, cliEntrypoint: string, args: string[]): Promise<void> {
+async function spawnBackgroundCliAndWaitForManifest(
+  repoRoot: string,
+  cliEntrypoint: string,
+  args: string[],
+  taskRunsRoot: string,
+  taskId: string,
+  envOverrides: Record<string, string> = {},
+  correlation: SpawnManifestCorrelation | null = null
+): Promise<SpawnedRunManifestInfo | null> {
+  const baselineRuns = await snapshotRunManifests(taskRunsRoot);
+  await spawnBackgroundCli(repoRoot, cliEntrypoint, args, envOverrides);
+  return await pollForSpawnManifest({
+    taskRunsRoot,
+    taskId,
+    baselineRuns,
+    correlation,
+    timeoutMs: SPAWN_MANIFEST_WAIT_TIMEOUT_MS,
+    intervalMs: SPAWN_MANIFEST_WAIT_INTERVAL_MS
+  });
+}
+
+async function spawnBackgroundCli(
+  repoRoot: string,
+  cliEntrypoint: string,
+  args: string[],
+  envOverrides: Record<string, string> = {}
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(process.execPath, [...process.execArgv, cliEntrypoint, ...args], {
       cwd: repoRoot,
-      env: process.env,
+      env: { ...process.env, ...envOverrides },
       detached: true,
       stdio: 'ignore'
     });
@@ -150,6 +225,145 @@ async function spawnBackgroundCli(repoRoot: string, cliEntrypoint: string, args:
       resolve();
     });
   });
+}
+
+async function snapshotRunManifests(taskRunsRoot: string): Promise<Set<string>> {
+  let entries: Array<import('node:fs').Dirent>;
+  try {
+    entries = await readdir(taskRunsRoot, { withFileTypes: true });
+  } catch {
+    return new Set<string>();
+  }
+
+  const snapshot = new Set<string>();
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    snapshot.add(entry.name);
+  }
+  return snapshot;
+}
+
+async function pollForSpawnManifest(params: {
+  taskRunsRoot: string;
+  taskId: string;
+  baselineRuns: Set<string>;
+  correlation: SpawnManifestCorrelation | null;
+  timeoutMs: number;
+  intervalMs: number;
+}): Promise<SpawnedRunManifestInfo | null> {
+  const deadline = Date.now() + params.timeoutMs;
+  while (Date.now() <= deadline) {
+    const manifest = await findSpawnManifest(params);
+    if (manifest) {
+      return manifest;
+    }
+    await delay(params.intervalMs);
+  }
+  return null;
+}
+
+async function findSpawnManifest(params: {
+  taskRunsRoot: string;
+  taskId: string;
+  baselineRuns: Set<string>;
+  correlation?: SpawnManifestCorrelation | null;
+}): Promise<SpawnedRunManifestInfo | null> {
+  let entries: Array<import('node:fs').Dirent>;
+  try {
+    entries = await readdir(params.taskRunsRoot, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const candidates: Array<{ runId: string; manifestPath: string; mtimeMs: number }> = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || params.baselineRuns.has(entry.name)) {
+      continue;
+    }
+    const manifestPath = join(params.taskRunsRoot, entry.name, 'manifest.json');
+    let stats;
+    try {
+      stats = await stat(manifestPath);
+    } catch {
+      continue;
+    }
+    candidates.push({ runId: entry.name, manifestPath, mtimeMs: stats.mtimeMs });
+  }
+
+  candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  for (const candidate of candidates) {
+    try {
+      const raw = await readFile(candidate.manifestPath, 'utf8');
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (typeof parsed.task_id === 'string' && parsed.task_id !== params.taskId) {
+        continue;
+      }
+      if (!manifestMatchesCorrelation(parsed, params.correlation ?? null)) {
+        continue;
+      }
+      const runId =
+        typeof parsed.run_id === 'string' && parsed.run_id.trim().length > 0
+          ? parsed.run_id.trim()
+          : candidate.runId;
+      if (!runId) {
+        continue;
+      }
+      return { runId, manifestPath: candidate.manifestPath };
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+export const __test__ = {
+  findSpawnManifest,
+  snapshotRunManifests
+};
+
+function manifestMatchesCorrelation(
+  manifest: Record<string, unknown>,
+  correlation: SpawnManifestCorrelation | null
+): boolean {
+  if (!correlation) {
+    return true;
+  }
+
+  return (
+    manifestFieldMatches(manifest, 'issue_provider', correlation.issueProvider) &&
+    manifestFieldMatches(manifest, 'issue_id', correlation.issueId) &&
+    manifestFieldMatches(manifest, 'issue_identifier', correlation.issueIdentifier) &&
+    manifestFieldMatches(manifest, 'issue_updated_at', correlation.issueUpdatedAt) &&
+    manifestFieldMatches(
+      manifest,
+      'provider_control_host_task_id',
+      correlation.providerControlHostTaskId
+    ) &&
+    manifestFieldMatches(manifest, 'provider_control_host_run_id', correlation.providerControlHostRunId)
+  );
+}
+
+function manifestFieldMatches(
+  manifest: Record<string, unknown>,
+  field: string,
+  expected: string | null | undefined
+): boolean {
+  if (!expected) {
+    return true;
+  }
+  return readManifestString(manifest, field) === expected;
+}
+
+function readManifestString(manifest: Record<string, unknown>, field: string): string | null {
+  const value = manifest[field];
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {
@@ -195,4 +409,8 @@ async function waitForSignal(): Promise<void> {
     process.on('SIGINT', handle);
     process.on('SIGTERM', handle);
   });
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }

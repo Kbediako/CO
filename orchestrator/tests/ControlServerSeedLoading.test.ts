@@ -174,7 +174,9 @@ describe('readControlServerSeeds', () => {
           last_action: 'update',
           last_webhook_timestamp: 1_700_000_000_000,
           run_id: null,
-          run_manifest_path: null
+          run_manifest_path: null,
+          launch_source: null,
+          launch_token: null
         }
       ]
     };

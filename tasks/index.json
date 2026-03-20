@@ -1,6 +1,86 @@
 {
   "items": [
     {
+      "id": "20260320-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up",
+      "title": "Coordinator Live Provider Child-Run Delegation-Guard Launch-Provenance Test Hermeticity Follow-Up",
+      "relates_to": "tasks/tasks-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-20",
+      "paths": {
+        "spec": "tasks/specs/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+        "task": "tasks/tasks-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+        "agent_task": ".agent/task/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md"
+      }
+    },
+    {
+      "id": "20260320-1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up",
+      "title": "Coordinator Live Provider Child-Run CLI Command-Surface Subprocess Completion Follow-Up",
+      "relates_to": "tasks/tasks-1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-20",
+      "paths": {
+        "spec": "tasks/specs/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+        "task": "tasks/tasks-1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+        "agent_task": ".agent/task/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md"
+      }
+    },
+    {
+      "id": "20260320-1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up",
+      "title": "Coordinator Live Provider Child-Run Test-Stage Terminal Completion Follow-Up",
+      "relates_to": "tasks/tasks-1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-20",
+      "paths": {
+        "spec": "tasks/specs/1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+        "task": "tasks/tasks-1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+        "agent_task": ".agent/task/1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md"
+      }
+    },
+    {
+      "id": "20260320-1306-coordinator-live-provider-child-run-test-stage-regression-follow-up",
+      "title": "Coordinator Live Provider Child-Run Test-Stage Regression Follow-Up",
+      "relates_to": "tasks/tasks-1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-20",
+      "paths": {
+        "spec": "tasks/specs/1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+        "task": "tasks/tasks-1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+        "agent_task": ".agent/task/1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-test-stage-regression-follow-up.md"
+      }
+    },
+    {
+      "id": "20260320-1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment",
+      "title": "Coordinator Live Provider Child-Run Task Identity and Delegation Guard Contract Alignment",
+      "relates_to": "tasks/tasks-1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-20",
+      "paths": {
+        "spec": "tasks/specs/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+        "task": "tasks/tasks-1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+        "agent_task": ".agent/task/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md"
+      }
+    },
+    {
       "id": "20260319-1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix",
       "title": "Coordinator Live Linear Tracked-Issue By-Id Query String Contract Fix",
       "relates_to": "tasks/tasks-1304-coordinator-live-linear-tracked-issue-by-id-query-string-contract-fix.md",
@@ -24,7 +104,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-19",
+      "last_review": "2026-03-20",
       "paths": {
         "spec": "tasks/specs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
         "task": "tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",

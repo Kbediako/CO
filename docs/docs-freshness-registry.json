@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-03-19",
+  "generated_at": "2026-03-20",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -3034,6 +3034,41 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -3388,6 +3423,41 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -8095,6 +8165,41 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/findings/1305-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1306-live-provider-child-run-test-stage-regression-follow-up-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1307-live-provider-child-run-test-stage-terminal-completion-follow-up-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1308-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/findings/1309-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up-deliberation.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/findings/ethical-life.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -8463,6 +8568,41 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -11332,7 +11472,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-19",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -11340,6 +11480,41 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -16694,7 +16869,7 @@
       "path": "tasks/specs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-19",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -16702,6 +16877,41 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {
@@ -19565,6 +19775,41 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-20",
       "cadence_days": 30
     },
     {

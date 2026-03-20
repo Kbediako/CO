@@ -79,6 +79,7 @@ describe('createProviderIssueHandoffService', () => {
           state: 'starting',
           task_id: 'linear-lin-issue-1'
         });
+        return null;
       }),
       resume: vi.fn(async () => undefined)
     };
@@ -106,16 +107,158 @@ describe('createProviderIssueHandoffService', () => {
       provider: 'linear',
       issueId: 'lin-issue-1',
       issueIdentifier: 'CO-2',
-      issueUpdatedAt: '2026-03-19T04:00:00.000Z'
+      issueUpdatedAt: '2026-03-19T04:00:00.000Z',
+      launchToken: expect.any(String)
     });
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       provider_key: 'linear:lin-issue-1',
       state: 'starting',
       task_id: 'linear-lin-issue-1',
-      issue_identifier: 'CO-2'
+      issue_identifier: 'CO-2',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
     });
     expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('captures the started run identity immediately while keeping the handoff inflight until rehydrate confirms activity', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-child',
+        manifestPath: '/tmp/provider-run/manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      publishRuntime
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue(),
+      deliveryId: 'delivery-1b',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_100_000
+    });
+
+    expect(result.kind).toBe('start');
+    expect(state.claims[0]).toMatchObject({
+      provider_key: 'linear:lin-issue-1',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-child',
+      run_manifest_path: '/tmp/provider-run/manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(result.claim).toMatchObject({
+      state: 'starting',
+      run_id: 'run-child',
+      run_manifest_path: '/tmp/provider-run/manifest.json'
+    });
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(publishRuntime).toHaveBeenCalledWith('provider-intake.start');
+  });
+
+  it('still queues best-effort rehydrate when post-start runtime publication throws', async () => {
+    vi.useFakeTimers();
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn(() => {
+      throw new Error('publish failed');
+    });
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-child',
+        manifestPath: '/tmp/provider-run/manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      publishRuntime
+    });
+
+    await expect(
+      service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue(),
+        deliveryId: 'delivery-1c',
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_360_200_000
+      })
+    ).rejects.toThrow('publish failed');
+
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(setTimeoutSpy).toHaveBeenCalled();
+  });
+
+  it('keeps a manifest-observed start claim inflight so repeat deliveries do not launch a duplicate run', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-child',
+        manifestPath: '/tmp/provider-run/manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    const first = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue(),
+      deliveryId: 'delivery-1b',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_100_000
+    });
+    const second = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        updated_at: '2026-03-19T04:00:01.000Z'
+      }),
+      deliveryId: 'delivery-1c',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_101_000
+    });
+
+    expect(first.kind).toBe('start');
+    expect(second).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_handoff_inflight'
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_handoff_inflight',
+      run_id: 'run-child',
+      run_manifest_path: '/tmp/provider-run/manifest.json'
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
   });
 
   it('persists a resuming claim before resuming the latest failed run for the same provider issue', async () => {
@@ -145,7 +288,7 @@ describe('createProviderIssueHandoffService', () => {
     const state = createProviderIntakeState();
     const persist = vi.fn(async () => undefined);
     const launcher = {
-      start: vi.fn(async () => undefined),
+      start: vi.fn(async () => null),
       resume: vi.fn(async () => {
         expect(state.claims[0]).toMatchObject({
           state: 'resuming',
@@ -176,14 +319,17 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).toHaveBeenCalledWith({
       runId: 'run-child',
       actor: 'control-host',
-      reason: 'provider-accepted-issue'
+      reason: 'provider-accepted-issue',
+      launchToken: expect.any(String)
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       state: 'resuming',
       run_id: 'run-child',
       run_manifest_path: childPaths.manifestPath,
-      task_id: 'task-1303-child'
+      task_id: 'task-1303-child',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -237,7 +383,7 @@ describe('createProviderIssueHandoffService', () => {
     });
     const persist = vi.fn(async () => undefined);
     const launcher = {
-      start: vi.fn(async () => undefined),
+      start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
     };
 
@@ -322,7 +468,7 @@ describe('createProviderIssueHandoffService', () => {
     const state = createProviderIntakeState();
     const persist = vi.fn(async () => undefined);
     const launcher = {
-      start: vi.fn(async () => undefined),
+      start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
     };
 
@@ -407,7 +553,7 @@ describe('createProviderIssueHandoffService', () => {
     const state = createProviderIntakeState();
     const persist = vi.fn(async () => undefined);
     const launcher = {
-      start: vi.fn(async () => undefined),
+      start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
     };
 
@@ -436,14 +582,17 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).toHaveBeenCalledWith({
       runId: 'run-failed',
       actor: 'control-host',
-      reason: 'provider-accepted-issue'
+      reason: 'provider-accepted-issue',
+      launchToken: expect.any(String)
     });
     expect(state.claims[0]).toMatchObject({
       state: 'resuming',
       reason: 'provider_issue_resume_launched',
       run_id: 'run-failed',
       run_manifest_path: failedPaths.manifestPath,
-      task_id: 'task-1303-failed'
+      task_id: 'task-1303-failed',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -453,7 +602,7 @@ describe('createProviderIssueHandoffService', () => {
     const state = createProviderIntakeState();
     const persist = vi.fn(async () => undefined);
     const launcher = {
-      start: vi.fn(async () => undefined),
+      start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
     };
     let injectedInflightClaim = false;
@@ -556,7 +705,7 @@ describe('createProviderIssueHandoffService', () => {
     const persist = vi.fn(async () => undefined);
     const publishRuntime = vi.fn();
     const launcher = {
-      start: vi.fn(async () => undefined),
+      start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
     };
 
@@ -679,7 +828,7 @@ describe('createProviderIssueHandoffService', () => {
       state,
       persist,
       launcher: {
-        start: vi.fn(async () => undefined),
+        start: vi.fn(async () => null),
         resume: vi.fn(async () => undefined)
       }
     });
@@ -752,7 +901,7 @@ describe('createProviderIssueHandoffService', () => {
       state,
       persist,
       launcher: {
-        start: vi.fn(async () => undefined),
+        start: vi.fn(async () => null),
         resume: vi.fn(async () => undefined)
       }
     });
@@ -845,7 +994,7 @@ describe('createProviderIssueHandoffService', () => {
       state,
       persist,
       launcher: {
-        start: vi.fn(async () => undefined),
+        start: vi.fn(async () => null),
         resume: vi.fn(async () => undefined)
       }
     });
@@ -938,7 +1087,7 @@ describe('createProviderIssueHandoffService', () => {
       state,
       persist,
       launcher: {
-        start: vi.fn(async () => undefined),
+        start: vi.fn(async () => null),
         resume: vi.fn(async () => undefined)
       }
     });
@@ -951,6 +1100,177 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'run-failed',
       run_manifest_path: failedPaths.manifestPath,
       task_id: 'task-1303-failed'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves launch provenance when rehydrate only backfills the manifest path for the same run id', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-active');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'task-1303-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'task-1303-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-03-19T04:00:00.000Z',
+      updated_at: '2026-03-19T04:20:00.000Z',
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: 'run-active',
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-1'
+    });
+    const persist = vi.fn(async () => undefined);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      task_id: 'task-1303-active',
+      run_id: 'run-active',
+      run_manifest_path: activePaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-1'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears launch provenance when rehydrate binds the claim to a different child run identity', async () => {
+    const { root, paths } = await createHostPaths();
+    const oldEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-old'
+    };
+    const newEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-new'
+    };
+    const oldPaths = resolveRunPaths(oldEnv, 'run-old');
+    const newPaths = resolveRunPaths(newEnv, 'run-new');
+    await mkdir(oldPaths.runDir, { recursive: true });
+    await mkdir(newPaths.runDir, { recursive: true });
+    await writeFile(
+      oldPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-old',
+        task_id: 'task-1303-old',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      newPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-new',
+        task_id: 'task-1303-new',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'task-1303-old',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-03-19T04:00:00.000Z',
+      updated_at: '2026-03-19T04:20:00.000Z',
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: 'run-old',
+      run_manifest_path: oldPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-old'
+    });
+    const persist = vi.fn(async () => undefined);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      task_id: 'task-1303-new',
+      run_id: 'run-new',
+      run_manifest_path: newPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -988,7 +1308,7 @@ describe('createProviderIssueHandoffService', () => {
       state,
       persist,
       launcher: {
-        start: vi.fn(async () => undefined),
+        start: vi.fn(async () => null),
         resume: vi.fn(async () => undefined)
       }
     });
@@ -1019,7 +1339,7 @@ describe('createProviderIssueHandoffService', () => {
       state: createProviderIntakeState(),
       persist: vi.fn(async () => undefined),
       launcher: {
-        start: vi.fn(async () => undefined),
+        start: vi.fn(async () => null),
         resume: vi.fn(async () => undefined)
       }
     });

@@ -4,9 +4,28 @@ import type { PipelineResolver } from '../src/cli/services/pipelineResolver.js';
 import type { ManifestPersister } from '../src/cli/run/manifestPersister.js';
 import { runOrchestratorResumePreparationShell } from '../src/cli/services/orchestratorResumePreparationShell.js';
 
+const initialEnvSnapshot = {
+  CODEX_ORCHESTRATOR_RUNTIME_MODE: process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE,
+  CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
+  CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE,
+  CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID:
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID,
+  CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID:
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID
+} as const;
+
+function restoreInitialEnv(snapshot: Record<string, string | undefined>): void {
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (value === undefined) {
+      delete process.env[key];
+      continue;
+    }
+    process.env[key] = value;
+  }
+}
+
 afterEach(() => {
-  delete process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE;
-  delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+  restoreInitialEnv(initialEnvSnapshot);
   vi.restoreAllMocks();
 });
 
@@ -140,6 +159,86 @@ describe('runOrchestratorResumePreparationShell', () => {
       paths,
       persister
     });
+  });
+
+  it('refreshes control-host locator provenance from env before scheduling persistence', async () => {
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE = 'control-host';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID = 'provider-host-task';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID = 'provider-host-run';
+
+    const manifest = {
+      task_id: 'linear-lin-issue-1',
+      pipeline_id: 'pipeline-1',
+      plan_target_id: null,
+      runtime_mode_requested: 'appserver',
+      runtime_mode: 'appserver',
+      heartbeat_interval_seconds: 2,
+      summary: null,
+      issue_provider: 'linear',
+      provider_control_host_task_id: 'old-provider-host-task',
+      provider_control_host_run_id: 'old-provider-host-run',
+      run_id: 'run-provider'
+    } as never;
+    const paths = {
+      runDir: '/tmp/repo/.runs/linear-lin-issue-1/run-provider',
+      manifestPath: '/tmp/repo/.runs/linear-lin-issue-1/run-provider/manifest.json',
+      logPath: '/tmp/repo/.runs/linear-lin-issue-1/run-provider/runner.ndjson'
+    } as never;
+    const resolver = {
+      loadDesignConfig: vi.fn(async () => ({ label: 'design-config' })),
+      resolveDesignEnvOverrides: vi.fn(() => ({}))
+    } as unknown as PipelineResolver;
+    const pipeline = { id: 'pipeline-1', title: 'Pipeline 1', stages: [] } as never;
+    const preparation = {
+      env: {
+        repoRoot: '/tmp/repo',
+        taskId: 'linear-lin-issue-1',
+        runsRoot: '/tmp/repo/.runs',
+        outRoot: '/tmp/repo/out'
+      },
+      pipeline,
+      pipelineSource: null,
+      runtimeModeDefault: null,
+      configNotice: null,
+      envOverrides: {},
+      planner: { label: 'planner' },
+      plannerTargetId: null,
+      taskContext: { id: 'linear-lin-issue-1', title: 'Task 1', metadata: {} },
+      metadata: { id: 'linear-lin-issue-1', slug: 'linear-lin-issue-1', title: 'Task 1' },
+      resolver,
+      planPreview: { items: [] }
+    } as never;
+    const schedule = vi.fn(async () => undefined);
+
+    await runOrchestratorResumePreparationShell({
+      baseEnv: {
+        repoRoot: '/tmp/repo',
+        taskId: 'task-base',
+        runsRoot: '/tmp/repo/.runs',
+        outRoot: '/tmp/repo/out'
+      } as never,
+      options: { runId: 'run-provider' },
+      validateResumeToken: vi.fn(async () => undefined),
+      applyRequestedRuntimeMode: vi.fn(),
+      loadManifestImpl: vi.fn(async () => ({ manifest, paths })),
+      overrideTaskEnvironmentImpl: vi.fn((env) => ({ ...env, taskId: manifest.task_id })),
+      createResolver: () => resolver,
+      isRepoConfigRequiredImpl: vi.fn(() => false),
+      loadUserConfigImpl: vi.fn(async () => ({ source: 'repo', runtimeMode: 'appserver' })),
+      loadPackageConfigImpl: vi.fn(async () => null),
+      resolvePipelineForResumeImpl: vi.fn(() => pipeline),
+      recordResumeEventImpl: vi.fn(),
+      resetForResumeImpl: vi.fn(),
+      updateHeartbeatImpl: vi.fn(),
+      prepareRunImpl: vi.fn(async () => preparation),
+      resolveRuntimeModeImpl: vi.fn(() => ({ mode: 'appserver', source: 'default' as const })),
+      appendSummaryImpl: vi.fn(),
+      createPersister: vi.fn(() => ({ schedule } as unknown as ManifestPersister))
+    });
+
+    expect(manifest.provider_control_host_task_id).toBe('provider-host-task');
+    expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
+    expect(schedule).toHaveBeenCalledWith({ manifest: true, heartbeat: true, force: true });
   });
 
   it('aborts before resume mutation when token validation fails', async () => {

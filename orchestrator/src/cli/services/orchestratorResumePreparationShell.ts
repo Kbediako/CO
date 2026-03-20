@@ -3,6 +3,7 @@ import process from 'node:process';
 import {
   loadManifest,
   appendSummary,
+  backfillProviderControlHostLocatorFromEnv,
   updateHeartbeat,
   resetForResume,
   recordResumeEvent
@@ -102,6 +103,7 @@ export async function runOrchestratorResumePreparationShell(
   const envOverrides = resolver.resolveDesignEnvOverrides(designConfig, pipeline.id);
 
   await params.validateResumeToken(paths, manifest, params.options.resumeToken ?? null);
+  backfillProviderControlHostLocatorFromEnv(manifest);
   recordResumeEventImpl(manifest, {
     actor: params.options.actor ?? 'cli',
     reason: params.options.reason ?? 'manual-resume',
