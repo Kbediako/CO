@@ -41,10 +41,14 @@
 - Running-issue reconcile/stop behavior when the issue leaves `started`.
 
 ## Live Proof Notes
-- After restarting the current-branch control host on March 20, 2026, the issue endpoint `GET /api/v1/linear-856c1318-524f-4db3-8d4a-b357ec51c304` reported the older succeeded child run with `status=succeeded` and `summary=Guardrails: spec-guard succeeded (1 passed).`, proving the stale-summary cleanup is live.
-- A replay with unchanged `issue_updated_at` remained pinned to the earlier completed child run with `provider_issue_run_already_completed`, so equal/non-increasing updates no longer trigger duplicate reruns.
-- A fresh newer `issue_updated_at` from a real `CO-2` state transition launched new child run `2026-03-20T07-29-36-397Z-acb7e8c2`, and that child run reached `status=succeeded` through `delegation-guard`, `build`, `lint`, `test`, and `spec-guard`.
-- Even after that rerun completed, `provider-intake-state.json` still showed `CO-2` as `state=running` with `reason=provider_issue_run_already_active`, which is why this lane remains a truthful rebaseline plus bounded fixes rather than a full parity closure.
+- Older succeeded child manifest pointer: `.runs/linear-856c1318-524f-4db3-8d4a-b357ec51c304/cli/2026-03-19T11-53-42-683Z-10f53643/manifest.json`.
+  After restarting the current-branch control host on March 20, 2026, the issue endpoint `GET /api/v1/linear-856c1318-524f-4db3-8d4a-b357ec51c304` reported that older succeeded child run with `status=succeeded` and `summary=Guardrails: spec-guard succeeded (1 passed).`, proving the stale-summary cleanup is live.
+- Unchanged-replay proof pointer: `.runs/local-mcp/cli/control-host/provider-intake-state.json`.
+  After the unchanged replay, the provider-intake ledger remained pinned to the earlier completed child run with `reason=provider_issue_run_already_completed`, so equal/non-increasing updates no longer trigger duplicate reruns.
+- Fresh-relaunch child manifest pointer: `.runs/linear-856c1318-524f-4db3-8d4a-b357ec51c304/cli/2026-03-20T07-29-36-397Z-acb7e8c2/manifest.json`.
+  A fresh newer `issue_updated_at` from a real `CO-2` state transition launched child run `2026-03-20T07-29-36-397Z-acb7e8c2`, and that child manifest reached `status=succeeded` through `delegation-guard`, `build`, `lint`, `test`, and `spec-guard`.
+- Post-rerun ledger pointer: `.runs/local-mcp/cli/control-host/provider-intake-state.json`.
+  Even after that rerun completed, the provider-intake ledger still showed `CO-2` as `state=running` with `reason=provider_issue_run_already_active`, which is why this lane remains a truthful rebaseline plus bounded fixes rather than a full parity closure.
 
 ## Recommendation
 - Merge a truthful rebaseline plus the bounded fixes now.
