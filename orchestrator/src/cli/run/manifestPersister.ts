@@ -29,6 +29,7 @@ export class ManifestPersister {
   private dirtyHeartbeat = false;
   private timer: NodeJS.Timeout | null = null;
   private timerResolver: (() => void) | null = null;
+  private scheduledWait: { promise: Promise<void>; start: () => void; resolve: () => void } | null = null;
   private lastPersistAt = 0;
   private pendingPersist: Promise<void> = Promise.resolve();
 
@@ -50,31 +51,22 @@ export class ManifestPersister {
       return this.pendingPersist;
     }
     if (force) {
-      this.clearTimer();
-      if (this.timerResolver) {
-        const resolver = this.timerResolver;
-        this.timerResolver = null;
-        resolver();
+      if (this.scheduledWait) {
+        this.scheduledWait.resolve();
         return this.pendingPersist;
       }
       this.pendingPersist = this.pendingPersist.then(() => this.flushPersist());
       return this.pendingPersist;
     }
-    if (this.timer) {
+    if (this.scheduledWait) {
       return this.pendingPersist;
     }
-    const waitMs = Math.max(0, this.lastPersistAt + this.persistIntervalMs - this.now());
+    const scheduledWait = this.createScheduledWait();
     this.pendingPersist = this.pendingPersist
-      .then(
-        () =>
-          new Promise<void>((resolve) => {
-            this.timerResolver = resolve;
-            this.timer = setTimeout(() => {
-              this.clearTimer();
-              resolve();
-            }, waitMs);
-          })
-      )
+      .then(() => {
+        scheduledWait.start();
+        return scheduledWait.promise;
+      })
       .then(() => this.flushPersist());
     return this.pendingPersist;
   }
@@ -88,6 +80,46 @@ export class ManifestPersister {
       clearTimeout(this.timer);
       this.timer = null;
     }
+  }
+
+  private createScheduledWait(): { promise: Promise<void>; start: () => void; resolve: () => void } {
+    let started = false;
+    let settled = false;
+    let resolvePromise!: () => void;
+
+    const resolveWait = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      this.clearTimer();
+      if (this.timerResolver === resolveWait) {
+        this.timerResolver = null;
+      }
+      if (this.scheduledWait?.resolve === resolveWait) {
+        this.scheduledWait = null;
+      }
+      resolvePromise();
+    };
+
+    const scheduledWait = {
+      promise: new Promise<void>((resolve) => {
+        resolvePromise = resolve;
+      }),
+      start: () => {
+        if (settled || started) {
+          return;
+        }
+        started = true;
+        const waitMs = Math.max(0, this.lastPersistAt + this.persistIntervalMs - this.now());
+        this.timerResolver = resolveWait;
+        this.timer = setTimeout(resolveWait, waitMs);
+      },
+      resolve: resolveWait
+    };
+
+    this.scheduledWait = scheduledWait;
+    return scheduledWait;
   }
 
   private async flushPersist(): Promise<void> {

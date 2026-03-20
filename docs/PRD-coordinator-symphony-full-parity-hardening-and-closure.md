@@ -3,8 +3,8 @@
 ## Added by Bootstrap 2026-03-20
 
 ## Summary
-- Problem Statement: `1311` is an in-progress hardening lane, not a truthful parity closeout. The current branch has now landed the bounded provider/workspace/eligibility/test-teardown tranche plus the March 21 review-follow-up tranche, but full Symphony parity is still not closed against `/Users/kbediako/Code/symphony/SPEC.md` and the current Elixir reference.
-- Desired Outcome: Keep the packet aligned to verified branch truth: provider control-host continuation/retry handoff for active issues is materially covered, issue eligibility and provider-managed terminal workspace cleanup are hardened, explicit refreshes no longer drop behind startup `rehydrate()`, selected-run workspace fallback stays truthful under overridden runs roots, and the remaining real blockers stay explicit.
+- Problem Statement: `1311` is an in-progress hardening lane, not a truthful parity closeout. The current branch has now landed the bounded provider/workspace/eligibility/test-teardown tranche, the March 21 review-follow-up tranche, and a same-tick manifest-persister force-preempt fix, but full Symphony parity is still not closed against `/Users/kbediako/Code/symphony/SPEC.md` and the current Elixir reference.
+- Desired Outcome: Keep the packet aligned to verified branch truth: provider control-host continuation/retry handoff for active issues is materially covered, issue eligibility and provider-managed terminal workspace cleanup are hardened, explicit refreshes no longer drop behind startup `rehydrate()`, selected-run workspace fallback stays truthful under overridden runs roots, forced manifest writes no longer wait behind a same-tick scheduled persist, and the remaining real blockers stay explicit.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): use a docs-first lane to harden the real remaining Symphony parity gaps against the current SPEC and Elixir reference, while keeping the packet truthful if full parity still is not actually closed.
@@ -14,7 +14,7 @@
   - landed fixes now also include queued follow-up refresh for authenticated/manual refresh requests that arrive during in-flight provider handoff work, selected-run workspace fallback for child CLI manifests under repo-local and external overridden runs roots, and real repo-root provider workspace cleanup when `CODEX_ORCHESTRATOR_RUNS_DIR` is outside the repository
   - provider control-host continuation/retry handoff for active issues is described as materially covered, but full parity remains open
   - remaining blockers stay explicit: live observability is not yet an authoritative runtime snapshot for turn/retry/token/rate-limit counters, and active-issue continuation after a normal success still starts a fresh child run instead of continuing the same session
-  - validation is described truthfully: delegation guard, spec guard, `npm run build`, and `npm run lint` passed; the March 21 review-fix pack passed `5/5` files and `70/70` tests; local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` again reached all file-level green output and then hung without a terminal summary, so CI Core Lane remains the authoritative full-suite terminal result
+  - validation is described truthfully: delegation guard, spec guard, `npm run build`, and `npm run lint` passed; the March 21 review-fix pack passed `5/5` files and `70/70` tests; the persister fast-path regression pack passed `2/2` files and `16/16` tests; a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`; and local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `282/282` files and `2014/2014` tests in `204.37s`
 - Constraints / non-goals:
   - do not claim full hardened parity closed on this branch
   - do not treat focused validation passes as equivalent to a terminal-green full suite
@@ -58,6 +58,7 @@
   - explicit refreshes now queue one follow-up pass instead of being dropped behind an in-flight `refresh()` or `rehydrate()`
   - selected-run workspace fallback remains truthful under repo-local and external overridden runs roots
   - provider workspace cleanup now uses the real repo root even when `CODEX_ORCHESTRATOR_RUNS_DIR` is outside the repository
+  - forced manifest writes now preempt same-tick scheduled persister waits instead of inheriting the full heartbeat window
   - selected child-manifest UI metadata truthfulness is landed
   - compatibility `session_id` null handling is landed
 - Remaining blockers:
@@ -79,7 +80,9 @@
 - `npm run build` passed.
 - `npm run lint` passed.
 - The March 21 review-fix regression pack passed `5/5` files and `70/70` tests.
-- Local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` again reached all file-level green output through `tests/cli-orchestrator.spec.ts` and then stopped emitting output without a terminal summary; CI Core Lane remains the authoritative full-suite terminal result for this head.
+- The persister fast-path regression pack passed `2/2` files and `16/16` tests.
+- A trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms` after the persister fix.
+- Local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `282/282` files and `2014/2014` tests in `204.37s`.
 
 ## Approvals
 - Product: Self-approved to keep the `1311` packet truthful to the current branch.

@@ -30,6 +30,7 @@ last_review: 2026-03-21
   - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names
   - terminal-only cleanup for provider-managed `.workspaces/<taskId>` is present on release/startup replay
   - provider workspace cleanup now resolves against the real repo root when `CODEX_ORCHESTRATOR_RUNS_DIR` lives outside the repository
+  - forced manifest writes now preempt same-tick scheduled persister waits instead of inheriting the full heartbeat interval
   - selected child-manifest UI metadata truthfulness
   - selected-run workspace fallback stays truthful for child CLI manifests under repo-local and external overridden runs roots
   - compatibility `session_id` null handling
@@ -48,6 +49,7 @@ last_review: 2026-03-21
   - explicit refresh requests during in-flight startup/rehydrate work must queue one follow-up refresh without reopening overlap between provider handoff operations
   - queued/null release handling must fail closed, and released claims must remain stable across rehydrate
   - provider workspace cleanup must resolve against the real repository root rather than assuming `.runs` lives under the repo root
+  - forced manifest writes must be able to preempt a same-tick scheduled persist without waiting for the heartbeat interval
   - selected-run/UI compatibility payloads must expose truthful child-manifest metadata and preserve `session_id=null` where no session exists
 - Remaining requirements:
   - add authoritative runtime capture for live turn/retry/token/rate-limit counters or explicitly defer those counters out of parity scope
@@ -80,9 +82,11 @@ last_review: 2026-03-21
   - `npm run build` passed
   - `npm run lint` passed
   - the March 21 review-fix regression pack passed `5/5` files and `70/70` tests
-  - local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` again reached all file-level green output through `tests/cli-orchestrator.spec.ts` and then hung without a terminal summary, so CI Core Lane remains the authoritative full-suite terminal result for this head
+  - the persister fast-path regression pack passed `2/2` files and `16/16` tests
+  - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
+  - local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `282/282` files and `2014/2014` tests in `204.37s`; the earlier quiet tail reflected long late suites (`tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts`), not a persister deadlock
 - Closure gate:
-  - do not claim parity closeout until the remaining blockers are resolved, even though the local suite is now terminal green
+  - do not claim parity closeout until the remaining blockers are resolved, even though the local suite is now terminal green again
 
 ## Open Questions
 - Whether `1311` should add authoritative live counter capture directly, or explicitly defer those fields into a narrower follow-on without pretending parity is closed.
