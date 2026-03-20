@@ -9,6 +9,7 @@
 - The current tree still has bounded parity bugs worth fixing now, so the truthful result is not docs-only.
 
 ## Parity Matrix
+
 | Surface | Classification | Notes |
 | --- | --- | --- |
 | Provider-driven intake host lifecycle | aligned | `codex-orchestrator control-host` provides a persistent local intake host and restart-safe ledgers. |
@@ -31,6 +32,7 @@
 
 ## Implementable-Now Work
 - Remove the provider-intake hard gate that treats a previously succeeded child run as a permanent ignore for the next fresh accepted active-issue event.
+- Keep failed relaunch claims out of the completed-run freshness baseline so same-timestamp retries still relaunch after transient launch failures.
 - Fix selected-run/status summary freshness so a succeeded child manifest no longer surfaces stale failure text.
 
 ## Larger Architectural Divergences
