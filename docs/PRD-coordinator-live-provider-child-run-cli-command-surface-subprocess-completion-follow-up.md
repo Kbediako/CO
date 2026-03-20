@@ -1,6 +1,6 @@
 # PRD - Coordinator Live Provider Child-Run CLI Command-Surface Subprocess Completion Follow-Up
 
-## Added by Bootstrap 2025-10-16
+## Added by Bootstrap 2026-03-19
 
 ## Summary
 - Problem Statement: `1307` already pinned the shared CLI command-surface test helper to deterministic `cli` runtime env values unless an individual test overrides them. Fresh remeasurement on the current tree shows the previously suspicious focus surface is long but terminal, not stuck: [`tests/cli-command-surface.spec.ts`](../tests/cli-command-surface.spec.ts) passes `100/100` tests in about `297.91s`. That invalidates the earlier assumption that help-path subprocesses such as `resume --help` were the concrete blocker. The remaining truthful work is to rerun the full local validation floor and the live provider-started child run with patience-first monitoring, then capture the next exact blocker if one still exists.
@@ -63,10 +63,10 @@
   - live provider state under `.runs/local-mcp/cli/control-host/` and the reused provider child-run manifests under `.runs/linear-*/`
 
 ## Open Questions
-- Whether full `npm run test` is also long-but-terminal on the current tree, or whether it still exposes a separate concrete blocker after the focused command-surface proof.
-- Which downstream stage becomes the next live provider child-run blocker once the local validation floor is rerun with patience-first monitoring.
+- Whether full `npm run test` is also long-but-terminal on the current tree, or whether it still exposes a separate concrete blocker after the focused command-surface proof?
+- Which downstream stage becomes the next live provider child-run blocker once the local validation floor is rerun with patience-first monitoring?
 
 ## Approvals
 - Product: Self-approved from operator directive and fresh focused command-surface remeasurement
-- Engineering: Pending docs-review for `1308`
+- Engineering: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`
 - Design: N/A

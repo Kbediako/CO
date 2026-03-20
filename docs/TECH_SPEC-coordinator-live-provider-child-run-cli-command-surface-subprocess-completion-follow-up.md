@@ -67,8 +67,8 @@
 
 ## Open Questions
 - Whether full `npm run test` is also long-but-terminal on the current tree, or whether it still exposes another specific blocker after the focused command-surface pass.
-- Which downstream stage becomes the next live blocker once the local validation floor is rerun with patience-first monitoring.
+- Which downstream stage becomes the next live blocker once the local validation floor is rerun with patience-first monitoring?
 
 ## Approvals
-- Reviewer: pending docs-review for `1308`
+- Reviewer: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`
 - Date: 2026-03-20

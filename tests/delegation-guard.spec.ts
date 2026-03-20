@@ -832,6 +832,75 @@ describe('delegation-guard script', () => {
     expect(stdout).toContain('Delegation guard: OK (provider-started run contract matched).');
   });
 
+  it('does not bypass earlier task-index failures when a provider-started contract matches', async () => {
+    tempDir = await initRepo();
+    const taskId = 'linear-lin-issue-1';
+    const runId = '2026-03-20T00-00-00-000Z-run-1';
+    const manifestDir = join(tempDir, '.runs', taskId, 'cli', runId);
+    const controlHostRunId = 'control-host-run-1';
+    const providerIntakeStatePath = join(
+      tempDir,
+      '.runs',
+      'local-mcp',
+      'cli',
+      controlHostRunId,
+      'provider-intake-state.json'
+    );
+
+    await mkdir(manifestDir, { recursive: true });
+    await writeJson(join(manifestDir, 'manifest.json'), {
+      run_id: runId,
+      task_id: taskId
+    });
+    await mkdir(join(tempDir, '.runs', 'local-mcp', 'cli', controlHostRunId), { recursive: true });
+    await writeJson(providerIntakeStatePath, {
+      schema_version: 1,
+      updated_at: '2026-03-20T00:00:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_start_launched',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T00:00:00.000Z',
+          task_id: taskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'starting',
+          reason: 'provider_issue_start_launched',
+          accepted_at: '2026-03-20T00:00:00.000Z',
+          updated_at: '2026-03-20T00:00:00.000Z',
+          last_delivery_id: 'delivery-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_428_800_000,
+          run_id: runId,
+          run_manifest_path: join(manifestDir, 'manifest.json'),
+          launch_source: 'control-host',
+          launch_token: 'launch-token-1'
+        }
+      ]
+    });
+    await writeFile(join(tempDir, 'tasks', 'index.json'), '{not-json');
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run', '--task', taskId], {
+      cwd: tempDir,
+      env: cleanGuardOverrideEnv({
+        CODEX_ORCHESTRATOR_ROOT: tempDir,
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN: 'launch-token-1'
+      })
+    });
+
+    expect(stdout).toContain('Unable to read tasks/index.json');
+    expect(stdout).not.toContain('Delegation guard: OK (provider-started run contract matched).');
+  });
+
   it('rejects provider-started fallback runs when only a non-control-host intake ledger matches', async () => {
     tempDir = await initRepo();
     const taskId = 'linear-lin-issue-1';

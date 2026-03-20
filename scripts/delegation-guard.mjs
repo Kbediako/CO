@@ -721,19 +721,22 @@ async function main() {
     if (!parentKey) {
       const providerProof = await findProviderContractProof(runsDir, taskId, process.env);
       if (providerProof.matched) {
-        console.log(
-          `Delegation guard: '${taskId}' accepted via provider-intake contract (${providerProof.statePath}).`
-        );
-        console.log('Delegation guard: OK (provider-started run contract matched).');
-        return;
-      }
-      if (providerProof.error) {
-        failures.push(providerProof.error);
-      }
-      if (providerProof.contract) {
-        failures.push(
-          `Provider-started task id '${taskId}' did not match any control-host provider-intake claim in ${providerProof.statePath}`
-        );
+        if (failures.length === 0) {
+          console.log(
+            `Delegation guard: '${taskId}' accepted via provider-intake contract (${providerProof.statePath}).`
+          );
+          console.log('Delegation guard: OK (provider-started run contract matched).');
+          return;
+        }
+      } else {
+        if (providerProof.error) {
+          failures.push(providerProof.error);
+        }
+        if (providerProof.contract) {
+          failures.push(
+            `Provider-started task id '${taskId}' did not match any control-host provider-intake claim in ${providerProof.statePath}`
+          );
+        }
       }
       if (taskIndexReadable) {
         failures.push(

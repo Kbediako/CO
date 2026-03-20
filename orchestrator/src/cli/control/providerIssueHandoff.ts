@@ -440,12 +440,15 @@ export function createProviderIssueHandoffService(
             launch_token: launchToken
           })
         : inflightClaim;
-      if (startedRun) {
-        await options.persist();
-        options.publishRuntime?.('provider-intake.start');
+      try {
+        if (startedRun) {
+          await options.persist();
+          options.publishRuntime?.('provider-intake.start');
+        }
+        return { kind: 'start', reason: 'provider_issue_start_launched', claim };
+      } finally {
+        scheduleBestEffortRehydrate(rehydrateNow);
       }
-      scheduleBestEffortRehydrate(rehydrateNow);
-      return { kind: 'start', reason: 'provider_issue_start_launched', claim };
     },
 
     async rehydrate(): Promise<void> {

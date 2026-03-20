@@ -130,6 +130,13 @@ export function upsertProviderIntakeClaim(
   const now = input.updated_at ?? isoTimestamp();
   const existingIndex = state.claims.findIndex((claim) => claim.provider_key === input.provider_key);
   const existing = existingIndex >= 0 ? state.claims[existingIndex] : null;
+  const nextRunId = input.run_id ?? null;
+  const nextRunManifestPath = input.run_manifest_path ?? null;
+  const runIdentityChanged =
+    existing !== null &&
+    (existing.task_id !== input.task_id ||
+      existing.run_id !== nextRunId ||
+      existing.run_manifest_path !== nextRunManifestPath);
   const next: ProviderIntakeClaimRecord = {
     provider: 'linear',
     provider_key: input.provider_key,
@@ -149,12 +156,20 @@ export function upsertProviderIntakeClaim(
     last_event: input.last_event ?? null,
     last_action: input.last_action ?? null,
     last_webhook_timestamp: input.last_webhook_timestamp ?? null,
-    run_id: input.run_id ?? null,
-    run_manifest_path: input.run_manifest_path ?? null,
+    run_id: nextRunId,
+    run_manifest_path: nextRunManifestPath,
     launch_source:
-      input.launch_source === undefined ? existing?.launch_source ?? null : input.launch_source,
+      input.launch_source === undefined
+        ? runIdentityChanged
+          ? null
+          : existing?.launch_source ?? null
+        : input.launch_source,
     launch_token:
-      input.launch_token === undefined ? existing?.launch_token ?? null : input.launch_token
+      input.launch_token === undefined
+        ? runIdentityChanged
+          ? null
+          : existing?.launch_token ?? null
+        : input.launch_token
   };
 
   if (existingIndex >= 0) {

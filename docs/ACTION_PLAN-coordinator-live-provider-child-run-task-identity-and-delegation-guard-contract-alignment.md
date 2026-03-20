@@ -45,5 +45,5 @@
   - Mitigation: stop at the first new blocker and record exact manifest/log evidence instead of broadening scope.
 
 ## Approvals
-- Reviewer: Pending docs-review for `1305`
+- Reviewer: Waiver granted by the top-level orchestrator on 2026-03-20; the stacked docs-review wrapper remained non-terminal at the final review step. Evidence: `out/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up/manual/20260320T011421Z-live-provider-test-hermeticity-closeout/14-review-waiver.md`
 - Date: 2026-03-20

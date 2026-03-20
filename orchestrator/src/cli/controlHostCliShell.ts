@@ -175,13 +175,11 @@ async function spawnBackgroundCliAndWaitForManifest(
   envOverrides: Record<string, string> = {}
 ): Promise<SpawnedRunManifestInfo | null> {
   const baselineRuns = await snapshotRunManifests(taskRunsRoot);
-  const spawnStart = Date.now();
   await spawnBackgroundCli(repoRoot, cliEntrypoint, args, envOverrides);
   return await pollForSpawnManifest({
     taskRunsRoot,
     taskId,
     baselineRuns,
-    spawnStart,
     timeoutMs: SPAWN_MANIFEST_WAIT_TIMEOUT_MS,
     intervalMs: SPAWN_MANIFEST_WAIT_INTERVAL_MS
   });
@@ -240,7 +238,6 @@ async function pollForSpawnManifest(params: {
   taskRunsRoot: string;
   taskId: string;
   baselineRuns: Set<string>;
-  spawnStart: number;
   timeoutMs: number;
   intervalMs: number;
 }): Promise<SpawnedRunManifestInfo | null> {
@@ -259,7 +256,6 @@ async function findSpawnManifest(params: {
   taskRunsRoot: string;
   taskId: string;
   baselineRuns: Set<string>;
-  spawnStart: number;
 }): Promise<SpawnedRunManifestInfo | null> {
   let entries: Array<import('node:fs').Dirent>;
   try {
@@ -278,9 +274,6 @@ async function findSpawnManifest(params: {
     try {
       stats = await stat(manifestPath);
     } catch {
-      continue;
-    }
-    if (stats.mtimeMs < params.spawnStart) {
       continue;
     }
     candidates.push({ runId: entry.name, manifestPath, mtimeMs: stats.mtimeMs });
@@ -309,6 +302,11 @@ async function findSpawnManifest(params: {
 
   return null;
 }
+
+export const __test__ = {
+  findSpawnManifest,
+  snapshotRunManifests
+};
 
 function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {
   const layers: DelegationConfigLayer[] = [];

@@ -171,6 +171,46 @@ describe('createProviderIssueHandoffService', () => {
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.start');
   });
 
+  it('still queues best-effort rehydrate when post-start runtime publication throws', async () => {
+    vi.useFakeTimers();
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn(() => {
+      throw new Error('publish failed');
+    });
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-child',
+        manifestPath: '/tmp/provider-run/manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      publishRuntime
+    });
+
+    await expect(
+      service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue(),
+        deliveryId: 'delivery-1c',
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_360_200_000
+      })
+    ).rejects.toThrow('publish failed');
+
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(setTimeoutSpy).toHaveBeenCalled();
+  });
+
   it('keeps a manifest-observed start claim inflight so repeat deliveries do not launch a duplicate run', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
