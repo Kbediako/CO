@@ -7401,7 +7401,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-02-17",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/0969-playwright-context-subagent-guardrails.md",
         "task": "tasks/tasks-0969-playwright-context-subagent-guardrails.md",
@@ -7449,7 +7449,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-02-18",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/0972-multi-agent-canonical-compat-alignment.md",
         "task": "tasks/tasks-0972-multi-agent-canonical-compat-alignment.md",
@@ -7465,7 +7465,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-02-18",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/0974-cloud-adoption-preflight-reliability.md",
         "task": "tasks/tasks-0974-cloud-adoption-preflight-reliability.md",

@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0971-advanced-capability-autopilot.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-02-18
+last_review: 2026-03-21
 ---
 
 ## Summary
