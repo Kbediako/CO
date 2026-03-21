@@ -127,6 +127,22 @@ export function createProviderIssueHandoffService(
       retryConsumed: boolean;
     }
   >();
+  let refreshLifecycleChain: Promise<void> = Promise.resolve();
+
+  const runWithRefreshLifecycleLock = async <T>(operation: () => Promise<T>): Promise<T> => {
+    const nextOperation = refreshLifecycleChain.then(operation, operation);
+    refreshLifecycleChain = nextOperation.then(
+      () => undefined,
+      () => undefined
+    );
+    return nextOperation;
+  };
+
+  const scheduleBestEffortRehydrateWithRefreshLock = (): void => {
+    // Best-effort rehydrate timers must queue behind the current refresh loop so
+    // claim rehydration cannot overlap with tracked-issue resolution.
+    scheduleBestEffortRehydrate(() => runWithRefreshLifecycleLock(rehydrateNow));
+  };
 
   const launchResumeForRun = async (input: {
     claim: ProviderIntakeClaimRecord;
@@ -177,7 +193,7 @@ export function createProviderIssueHandoffService(
       await options.persist();
       throw error;
     }
-    scheduleBestEffortRehydrate(rehydrateNow);
+    scheduleBestEffortRehydrateWithRefreshLock();
   };
 
   const launchStartForTrackedIssue = async (input: {
@@ -257,7 +273,7 @@ export function createProviderIssueHandoffService(
         options.publishRuntime?.('provider-intake.refresh');
       }
     } finally {
-      scheduleBestEffortRehydrate(rehydrateNow);
+      scheduleBestEffortRehydrateWithRefreshLock();
     }
   };
 
@@ -826,7 +842,7 @@ export function createProviderIssueHandoffService(
           await options.persist();
           throw new Error(`Failed to resume provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
         }
-        scheduleBestEffortRehydrate(rehydrateNow);
+        scheduleBestEffortRehydrateWithRefreshLock();
         return { kind: 'resume', reason: 'provider_issue_resume_launched', claim: inflightClaim };
       }
 
@@ -922,124 +938,128 @@ export function createProviderIssueHandoffService(
         }
         return { kind: 'start', reason: 'provider_issue_start_launched', claim };
       } finally {
-        scheduleBestEffortRehydrate(rehydrateNow);
+        scheduleBestEffortRehydrateWithRefreshLock();
       }
     },
 
     async rehydrate(): Promise<void> {
-      const result = await rehydrateNow();
-      if (result.hasPendingClaims) {
-        scheduleBestEffortRehydrate(rehydrateNow);
-      }
+      await runWithRefreshLifecycleLock(async () => {
+        const result = await rehydrateNow();
+        if (result.hasPendingClaims) {
+          scheduleBestEffortRehydrateWithRefreshLock();
+        }
+      });
     },
 
     async refresh(): Promise<void> {
-      const result = await rehydrateNow();
-      if (result.hasPendingClaims) {
-        scheduleBestEffortRehydrate(rehydrateNow);
-      }
-      if (!options.resolveTrackedIssue) {
-        return;
-      }
+      await runWithRefreshLifecycleLock(async () => {
+        const result = await rehydrateNow();
+        if (result.hasPendingClaims) {
+          scheduleBestEffortRehydrateWithRefreshLock();
+        }
+        if (!options.resolveTrackedIssue) {
+          return;
+        }
 
-      const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
-      const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
-      for (const claim of [...options.state.claims]) {
-        try {
-          const claimRuns =
-            runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
-          const activeRun = claimRuns.find((run) => run.status === 'in_progress') ?? null;
-          const releaseRun = resolveProviderReleaseRun(claim, claimRuns);
-          const latestRun = claimRuns[0] ?? null;
-          const resolution = await options.resolveTrackedIssue({
-            provider: claim.provider,
-            issueId: claim.issue_id
-          });
+        const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
+        const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
+        for (const claim of [...options.state.claims]) {
+          try {
+            const claimRuns =
+              runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
+            const activeRun = claimRuns.find((run) => run.status === 'in_progress') ?? null;
+            const releaseRun = resolveProviderReleaseRun(claim, claimRuns);
+            const latestRun = claimRuns[0] ?? null;
+            const resolution = await options.resolveTrackedIssue({
+              provider: claim.provider,
+              issueId: claim.issue_id
+            });
 
-          if (resolution.kind === 'skip') {
-            if (claim.state === 'released') {
+            if (resolution.kind === 'skip') {
+              if (claim.state === 'released') {
+                void retryReleaseCancel({
+                  releaseRun,
+                  reason: claim.reason ?? 'provider_issue_released'
+                });
+              }
+              continue;
+            }
+            if (resolution.kind === 'release') {
+              await releaseClaim({
+                claim,
+                nextReason: `provider_issue_released:${resolution.reason}`,
+                releaseRun,
+                trackedIssue: null,
+                cleanupWorkspace: false
+              });
+              continue;
+            }
+
+            const eligibility = assessProviderTrackedIssueEligibility(resolution.trackedIssue);
+            if (!eligibility.eligible) {
+              await releaseClaim({
+                claim,
+                nextReason: eligibility.releaseReason,
+                releaseRun,
+                trackedIssue: resolution.trackedIssue,
+                cleanupWorkspace: eligibility.cleanupWorkspace
+              });
+              continue;
+            }
+
+            if (
+              claim.state === 'released' &&
+              shouldAttemptReleaseCancel(releaseRun) &&
+              releaseRun?.status !== null
+            ) {
               void retryReleaseCancel({
                 releaseRun,
                 reason: claim.reason ?? 'provider_issue_released'
               });
-            }
-            continue;
-          }
-          if (resolution.kind === 'release') {
-            await releaseClaim({
-              claim,
-              nextReason: `provider_issue_released:${resolution.reason}`,
-              releaseRun,
-              trackedIssue: null,
-              cleanupWorkspace: false
-            });
-            continue;
-          }
-
-          const eligibility = assessProviderTrackedIssueEligibility(resolution.trackedIssue);
-          if (!eligibility.eligible) {
-            await releaseClaim({
-              claim,
-              nextReason: eligibility.releaseReason,
-              releaseRun,
-              trackedIssue: resolution.trackedIssue,
-              cleanupWorkspace: eligibility.cleanupWorkspace
-            });
-            continue;
-          }
-
-          if (
-            claim.state === 'released' &&
-            shouldAttemptReleaseCancel(releaseRun) &&
-            releaseRun?.status !== null
-          ) {
-            void retryReleaseCancel({
-              releaseRun,
-              reason: claim.reason ?? 'provider_issue_released'
-            });
-            continue;
-          }
-
-          if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
-            continue;
-          }
-
-          // Refresh is the scheduler-owned continuation/retry path, not webhook dedupe.
-          // Once a child run reaches a terminal state, an unchanged active issue remains
-          // eligible for another session until provider state leaves the active set.
-          if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
-            if (hasPendingReleaseCancel(releaseRun?.manifestPath ?? latestRun.manifestPath)) {
               continue;
             }
-            await launchResumeForRun({
-              claim,
-              trackedIssue: resolution.trackedIssue,
-              run: latestRun,
-              reason: 'provider_issue_refresh_resume_launched'
-            });
+
+            if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
+              continue;
+            }
+
+            // Refresh is the scheduler-owned continuation/retry path, not webhook dedupe.
+            // Once a child run reaches a terminal state, an unchanged active issue remains
+            // eligible for another session until provider state leaves the active set.
+            if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+              if (hasPendingReleaseCancel(releaseRun?.manifestPath ?? latestRun.manifestPath)) {
+                continue;
+              }
+              await launchResumeForRun({
+                claim,
+                trackedIssue: resolution.trackedIssue,
+                run: latestRun,
+                reason: 'provider_issue_refresh_resume_launched'
+              });
+              continue;
+            }
+
+            if (latestRun?.status === 'succeeded') {
+              await launchStartForTrackedIssue({
+                claim,
+                trackedIssue: resolution.trackedIssue,
+                reason: 'provider_issue_continuation_launched'
+              });
+              continue;
+            }
+
+            if (!latestRun) {
+              await launchStartForTrackedIssue({
+                claim,
+                trackedIssue: resolution.trackedIssue,
+                reason: 'provider_issue_refresh_start_launched'
+              });
+            }
+          } catch {
             continue;
           }
-
-          if (latestRun?.status === 'succeeded') {
-            await launchStartForTrackedIssue({
-              claim,
-              trackedIssue: resolution.trackedIssue,
-              reason: 'provider_issue_continuation_launched'
-            });
-            continue;
-          }
-
-          if (!latestRun) {
-            await launchStartForTrackedIssue({
-              claim,
-              trackedIssue: resolution.trackedIssue,
-              reason: 'provider_issue_refresh_start_launched'
-            });
-          }
-        } catch {
-          continue;
         }
-      }
+      });
     }
   };
 }

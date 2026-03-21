@@ -14,6 +14,8 @@ import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 const cleanupRoots: string[] = [];
 
 afterEach(async () => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -68,6 +70,87 @@ function createTrackedIssue(
 }
 
 describe('runProviderIssueHandoffRefresh', () => {
+  it('serializes best-effort rehydrate behind an in-flight refresh loop', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-21T07:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-21T07:00:00.000Z',
+      task_id: 'task-1303-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-03-21T07:00:00.000Z',
+      updated_at: '2026-03-21T07:00:00.000Z',
+      last_delivery_id: 'delivery-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_534_400_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token'
+    });
+
+    let refreshLoopBlocked = false;
+    let releaseRefreshLoop: (() => void) | null = null;
+    const persistPhases: string[] = [];
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => {
+        persistPhases.push(refreshLoopBlocked ? 'during_refresh_loop' : 'outside_refresh_loop');
+      }),
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: async () => {
+        refreshLoopBlocked = true;
+        return await new Promise<{ kind: 'skip'; reason: string }>((resolve) => {
+          releaseRefreshLoop = () => {
+            refreshLoopBlocked = false;
+            resolve({
+              kind: 'skip',
+              reason: 'linear_refresh_unavailable'
+            });
+          };
+        });
+      }
+    });
+
+    const refreshPromise = service.refresh();
+    await vi.waitFor(() => {
+      expect(refreshLoopBlocked).toBe(true);
+      expect(persistPhases).toEqual(['outside_refresh_loop']);
+    });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(persistPhases).toEqual(['outside_refresh_loop']);
+
+    if (!releaseRefreshLoop) {
+      throw new Error('Expected refresh loop gate to be captured.');
+    }
+    releaseRefreshLoop();
+    await refreshPromise;
+    await vi.waitFor(() => {
+      expect(persistPhases).toEqual([
+        'outside_refresh_loop',
+        'outside_refresh_loop'
+      ]);
+    });
+  });
+
   it('dedupes released child cancellation across queued refreshes without blocking refresh completion', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
