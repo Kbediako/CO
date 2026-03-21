@@ -1095,8 +1095,8 @@ function didRunMatchClaimAttempt(
   claim: Pick<ProviderIntakeClaimRecord, 'state' | 'updated_at' | 'launch_started_at' | 'issue_updated_at'>,
   run: Pick<ProviderIssueRunRecord, 'startedAt' | 'updatedAt' | 'issueUpdatedAt'>
 ): boolean {
-  if (didRunFinishAfterClaimLaunch(claim, run)) {
-    return true;
+  if (resolveProviderClaimLaunchAt(claim)) {
+    return didRunFinishAfterClaimLaunch(claim, run);
   }
   if (claim.state !== 'handoff_failed' && claim.state !== 'released') {
     return false;
