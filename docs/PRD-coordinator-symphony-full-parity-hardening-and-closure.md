@@ -91,5 +91,5 @@
 
 ## Approvals
 - Product: Self-approved to keep the `1311` packet truthful to the current branch.
-- Engineering: Internal docs/state review refreshed on 2026-03-21 against the verified March 21 branch facts; standalone review and the PR loop are still open until the fresh review rerun completes.
+- Engineering: Internal docs/state review refreshed on 2026-03-21 against the verified March 21 branch facts; a fresh uncommitted review rerun completed cleanly on 2026-03-21, so the earlier quota-waiver contingency is superseded. The PR loop remains open only until GitHub reruns settle and unresolved actionable threads reach zero.
 - Design: N/A

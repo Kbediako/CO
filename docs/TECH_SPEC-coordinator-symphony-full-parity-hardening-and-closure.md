@@ -99,5 +99,5 @@ last_review: 2026-03-21
 - Whether same-session continuation should be implemented inside the provider/control-host architecture, or moved into a dedicated follow-on session-owner lane.
 
 ## Approvals
-- Reviewer: Codex (top-level orchestrator; internal docs/state review only, not a claim that PR #282 is already externally approved)
+- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the successful 2026-03-21 uncommitted review rerun; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
 - Date: 2026-03-21

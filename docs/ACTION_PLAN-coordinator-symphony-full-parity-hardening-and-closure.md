@@ -69,5 +69,5 @@
   - Mitigation: keep the continuation wording narrow and tie closure to upstream-faithful same-session ownership.
 
 ## Approvals
-- Reviewer: Codex (top-level orchestrator; internal docs/state review only, PR review still in progress)
+- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the successful 2026-03-21 uncommitted review rerun; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
 - Date: 2026-03-21
