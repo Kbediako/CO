@@ -3018,6 +3018,189 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('reattaches a released claim to its persisted run_id when a resumed child loses only the manifest path', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const targetPaths = resolveRunPaths(childEnv, 'run-completed-target');
+    await mkdir(targetPaths.runDir, { recursive: true });
+    await writeFile(
+      targetPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed-target',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        started_at: '2026-03-19T04:10:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const newerPaths = resolveRunPaths(childEnv, 'run-completed-newer');
+    await mkdir(newerPaths.runDir, { recursive: true });
+    await writeFile(
+      newerPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed-newer',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:40:00.000Z',
+        updated_at: '2026-03-19T04:50:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-completed-target',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed-target',
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'detached-release-resume-token',
+      launch_started_at: '2026-03-19T04:20:30.000Z'
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      task_id: 'task-1303-completed',
+      run_id: 'run-completed-target',
+      run_manifest_path: targetPaths.manifestPath
+    });
+  });
+
+  it('reattaches a handoff_failed claim to its persisted run_id when a resumed child loses only the manifest path', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const targetPaths = resolveRunPaths(childEnv, 'run-handoff-target');
+    await mkdir(targetPaths.runDir, { recursive: true });
+    await writeFile(
+      targetPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-handoff-target',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        started_at: '2026-03-19T04:10:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const newerPaths = resolveRunPaths(childEnv, 'run-handoff-newer');
+    await mkdir(newerPaths.runDir, { recursive: true });
+    await writeFile(
+      newerPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-handoff-newer',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:40:00.000Z',
+        started_at: '2026-03-19T04:40:00.000Z',
+        updated_at: '2026-03-19T04:50:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_resume_failed:control host restarted',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:30.000Z',
+      last_delivery_id: 'delivery-handoff-target',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-handoff-target',
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'handoff-resume-token',
+      launch_started_at: '2026-03-19T04:20:30.000Z'
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      }
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      task_id: 'task-1303-completed',
+      run_id: 'run-handoff-target',
+      run_manifest_path: targetPaths.manifestPath
+    });
+  });
+
   it('cleans terminal released provider workspaces during refresh startup replay', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

@@ -471,7 +471,13 @@ export function createProviderIssueHandoffService(
         continue;
       }
 
-      const completedRun = claimRuns.find((run) => run.status === 'succeeded');
+      const matchedCompletedRun = resolveProviderClaimRunIdentity(claim, claimRuns);
+      const completedRun =
+        matchedCompletedRun?.status === 'succeeded'
+          ? matchedCompletedRun
+          : claim.run_id || claim.run_manifest_path
+            ? null
+            : claimRuns.find((run) => run.status === 'succeeded');
       if (
         completedRun &&
         (
@@ -1092,9 +1098,18 @@ function didRunFinishAfterClaimLaunch(
 }
 
 function didRunMatchClaimAttempt(
-  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'updated_at' | 'launch_started_at' | 'issue_updated_at'>,
-  run: Pick<ProviderIssueRunRecord, 'startedAt' | 'updatedAt' | 'issueUpdatedAt'>
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'updated_at' | 'launch_started_at' | 'issue_updated_at' | 'run_id' | 'run_manifest_path'
+  >,
+  run: Pick<ProviderIssueRunRecord, 'runId' | 'manifestPath' | 'startedAt' | 'updatedAt' | 'issueUpdatedAt'>
 ): boolean {
+  if (
+    (claim.run_manifest_path && claim.run_manifest_path === run.manifestPath) ||
+    (claim.run_id && claim.run_id === run.runId)
+  ) {
+    return true;
+  }
   if (resolveProviderClaimLaunchAt(claim)) {
     return didRunFinishAfterClaimLaunch(claim, run);
   }
@@ -1372,9 +1387,21 @@ function resolveProviderReleaseRun(
   if (queuedRun) {
     return queuedRun;
   }
+  const matchedIdentityRun = resolveProviderClaimRunIdentity(claim, claimRuns);
+  if (matchedIdentityRun) {
+    return matchedIdentityRun;
+  }
+  if (
+    (claim.run_id || claim.run_manifest_path) &&
+    (
+      claim.state === 'handoff_failed' ||
+      claim.state === 'released'
+    )
+  ) {
+    return null;
+  }
   if (
     !claim.run_manifest_path &&
-    !claim.run_id &&
     (
       claim.state === 'handoff_failed' ||
       claim.state === 'released'
@@ -1407,6 +1434,22 @@ function resolveProviderReleaseRun(
     };
   }
   return claimRuns[0] ?? null;
+}
+
+function resolveProviderClaimRunIdentity(
+  claim: Pick<ProviderIntakeClaimRecord, 'run_id' | 'run_manifest_path'>,
+  claimRuns: ProviderIssueRunRecord[]
+): ProviderIssueRunRecord | null {
+  if (claim.run_manifest_path) {
+    const manifestMatch = claimRuns.find((run) => run.manifestPath === claim.run_manifest_path) ?? null;
+    if (manifestMatch) {
+      return manifestMatch;
+    }
+  }
+  if (claim.run_id) {
+    return claimRuns.find((run) => run.runId === claim.run_id) ?? null;
+  }
+  return null;
 }
 
 function shouldAttemptReleaseCancel(run: ProviderIssueRunRecord | null): boolean {
