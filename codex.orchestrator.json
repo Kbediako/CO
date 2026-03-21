@@ -255,6 +255,24 @@
       ]
     },
     {
+      "id": "provider-linear-worker",
+      "title": "Provider Linear Worker",
+      "description": "Runs the provider-owned same-session Linear worker loop inside one child run.",
+      "tags": [
+        "provider-worker",
+        "linear"
+      ],
+      "stages": [
+        {
+          "kind": "command",
+          "id": "provider-linear-worker",
+          "title": "Run provider linear worker",
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js\"",
+          "summaryHint": "Provider linear worker completed"
+        }
+      ]
+    },
+    {
       "id": "frontend-testing",
       "title": "Frontend Testing",
       "description": "Runs the frontend testing runner (DevTools off by default).",

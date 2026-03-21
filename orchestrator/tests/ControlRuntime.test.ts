@@ -8,6 +8,10 @@ import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
 import type { QuestionRecord } from '../src/cli/control/questions.js';
+import {
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  type ProviderLinearWorkerProof
+} from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths, type RunPaths } from '../src/cli/run/runPaths.js';
 
 interface TestFixture {
@@ -148,6 +152,53 @@ async function createSiblingRun(
     await seedQuestions(paths, options.questions);
   }
   return paths;
+}
+
+async function seedProviderLinearWorkerProof(
+  paths: Pick<RunPaths, 'runDir'>,
+  overrides: Partial<ProviderLinearWorkerProof> = {}
+): Promise<void> {
+  await writeFile(
+    join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+    JSON.stringify({
+      issue_id: 'issue-1',
+      issue_identifier: 'ISSUE-1',
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      turn_count: 1,
+      last_event: 'task_complete',
+      last_message: 'done',
+      last_event_at: '2026-03-07T00:10:00.000Z',
+      tokens: {
+        input_tokens: 1,
+        output_tokens: 1,
+        total_tokens: 2
+      },
+      rate_limits: null,
+      owner_phase: 'turn_completed',
+      owner_status: 'in_progress',
+      workspace_path: '/tmp/workspace',
+      end_reason: null,
+      updated_at: '2026-03-07T00:10:00.000Z',
+      ...overrides
+    }),
+    'utf8'
+  );
+}
+
+function createProviderIntakeState(
+  claims: ProviderIntakeState['claims'] = []
+): ProviderIntakeState {
+  return {
+    schema_version: 1,
+    updated_at: '2026-03-07T00:00:00.000Z',
+    rehydrated_at: '2026-03-07T00:00:00.000Z',
+    latest_provider_key: claims.at(-1)?.provider_key ?? null,
+    latest_reason: claims.at(-1)?.reason ?? null,
+    claims
+  };
 }
 
 function buildLiveLinearDispatchPilot(): Record<string, unknown> {
@@ -319,8 +370,10 @@ describe('ControlRuntime', () => {
   });
 
   it('discovers sibling running and retrying compatibility entries while keeping selected-run local', async () => {
+    const providerIntakeState = createProviderIntakeState();
     const fixture = await createFixture({
-      taskId: 'task-1034-current'
+      taskId: 'task-1034-current',
+      providerIntakeState
     });
 
     await createSiblingRun(fixture.root, 'task-1034-running', 'run-2', {
@@ -355,13 +408,42 @@ describe('ControlRuntime', () => {
       ]
     });
 
-    await createSiblingRun(fixture.root, 'task-1034-retrying', 'run-3', {
+    const retryPaths = await createSiblingRun(fixture.root, 'task-1034-retrying', 'run-3', {
       manifest: {
         status: 'failed',
         completed_at: null,
         summary: 'retryable failure pending rerun',
+        workspace_path: join(fixture.root, '.workspaces', 'task-1034-retrying'),
         updated_at: '2026-03-07T00:17:00.000Z'
       }
+    });
+    providerIntakeState.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:task-1034-retrying',
+      issue_id: 'task-1034-retrying',
+      issue_identifier: 'task-1034-retrying',
+      issue_title: 'Retry issue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-07T00:17:00.000Z',
+      task_id: 'task-1034-retrying',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-03-07T00:17:05.000Z',
+      updated_at: '2026-03-07T00:17:10.000Z',
+      last_delivery_id: 'delivery-retrying',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_020_000,
+      run_id: 'run-3',
+      run_manifest_path: retryPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'retry-launch',
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-03-07T00:17:30.000Z',
+      retry_error: 'retryable failure pending rerun'
     });
 
     const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
@@ -398,13 +480,94 @@ describe('ControlRuntime', () => {
     });
     expect(siblingRetry?.payload.retry).toMatchObject({
       issue_identifier: 'task-1034-retrying',
-      state: 'failed'
+      state: 'resumable',
+      workspace_path: join(fixture.root, '.workspaces', 'task-1034-retrying'),
+      attempt: 2,
+      due_at: '2026-03-07T00:17:30.000Z',
+      error: 'retryable failure pending rerun',
+      last_event: 'resumable',
+      last_message: 'provider_issue_rehydrated_resumable_run',
+      last_event_at: '2026-03-07T00:17:10.000Z'
+    });
+    expect(siblingRetry?.payload.summary).toBe('provider_issue_rehydrated_resumable_run');
+    expect(siblingRetry?.payload.attempts).toEqual({
+      restart_count: 1,
+      current_retry_attempt: 2
     });
   });
 
-  it('collapses same-issue multi-run compatibility state while preserving run aliases', async () => {
+  it('falls back to manifest-only retry compatibility rows when provider intake state is absent', async () => {
     const fixture = await createFixture({
-      taskId: 'task-1035-current'
+      taskId: 'task-1034-current'
+    });
+
+    await createSiblingRun(fixture.root, 'task-1034-retrying', 'run-3', {
+      manifest: {
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'issue-1034-retrying',
+        issue_identifier: 'ISSUE-1034-RETRYING',
+        summary: 'retryable failure pending rerun',
+        workspace_path: join(fixture.root, '.workspaces', 'task-1034-retrying'),
+        updated_at: '2026-03-07T00:17:00.000Z'
+      }
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const fallbackRetry = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1034-RETRYING'
+    );
+
+    expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+      'task-1034-current'
+    ]);
+    expect(compatibilityProjection.retrying.map((entry) => entry.issue_identifier)).toEqual([
+      'ISSUE-1034-RETRYING'
+    ]);
+    expect(fallbackRetry?.payload.retry).toMatchObject({
+      issue_identifier: 'ISSUE-1034-RETRYING',
+      state: 'failed',
+      workspace_path: join(fixture.root, '.workspaces', 'task-1034-retrying'),
+      error: 'retryable failure pending rerun',
+      last_event: 'failed',
+      last_message: 'retryable failure pending rerun'
+    });
+  });
+
+  it('preserves authoritative retry attempts on a running issue after a prior restart', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-1035',
+        issue_id: 'issue-1035',
+        issue_identifier: 'ISSUE-1035',
+        issue_title: 'Retrying running issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-07T00:18:00.000Z',
+        task_id: 'task-1035-current',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-03-07T00:17:30.000Z',
+        updated_at: '2026-03-07T00:18:10.000Z',
+        last_delivery_id: 'delivery-1035',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_030_000,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-1035',
+        retry_queued: false,
+        retry_attempt: 2,
+        retry_due_at: null,
+        retry_error: null
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'task-1035-current',
+      providerIntakeState
     });
 
     await seedManifest(fixture.paths, {
@@ -428,6 +591,7 @@ describe('ControlRuntime', () => {
     await createSiblingRun(fixture.root, 'task-1035-current', 'run-3', {
       manifest: {
         task_id: 'task-1035-current',
+        issue_id: 'issue-1035',
         issue_identifier: 'ISSUE-1035',
         status: 'in_progress',
         summary: 'newer run is awaiting operator input',
@@ -483,21 +647,19 @@ describe('ControlRuntime', () => {
         display_state: 'paused'
       })
     ]);
-    expect(compatibilityProjection.retrying).toEqual([
-      expect.objectContaining({
-        issue_identifier: 'ISSUE-1035',
-        session_id: null,
-        state: 'failed'
-      })
-    ]);
+    expect(compatibilityProjection.retrying).toEqual([]);
     expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['ISSUE-1035']);
     expect(sameIssueRecord?.aliases).toEqual(
-      expect.arrayContaining(['ISSUE-1035', 'task-1035-current', 'run-1', 'run-2', 'run-3'])
+      expect.arrayContaining(['ISSUE-1035', 'task-1035-current', 'run-1', 'run-3'])
     );
     expect(sameIssueRecord?.payload).toMatchObject({
       issue_identifier: 'ISSUE-1035',
       display_status: 'paused',
       status_reason: 'queued_questions',
+      attempts: {
+        restart_count: 1,
+        current_retry_attempt: 2
+      },
       question_summary: {
         queued_count: 1
       },
@@ -506,11 +668,7 @@ describe('ControlRuntime', () => {
         session_id: null,
         display_state: 'paused'
       },
-      retry: {
-        issue_identifier: 'ISSUE-1035',
-        session_id: null,
-        state: 'failed'
-      }
+      retry: null
     });
   });
 
@@ -564,6 +722,326 @@ describe('ControlRuntime', () => {
       issue_identifier: 'ISSUE-1036',
       session_id: null
     });
+  });
+
+  it('uses the same preferred same-issue running source for telemetry as the issue projection', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-1037-current'
+      });
+
+      await seedManifest(fixture.paths, {
+        task_id: 'task-1037-current',
+        issue_id: 'issue-1037',
+        issue_identifier: 'ISSUE-1037',
+        started_at: '2026-03-07T00:10:00.000Z',
+        updated_at: '2026-03-07T00:20:00.000Z',
+        summary: 'older selected run still owns the selected slot'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-1037',
+        issue_identifier: 'ISSUE-1037',
+        latest_session_id: 'thread-selected-turn-2',
+        turn_count: 2,
+        last_message: 'selected proof is stale',
+        last_event_at: '2026-03-07T00:20:00.000Z',
+        tokens: {
+          input_tokens: 11,
+          output_tokens: 7,
+          total_tokens: 18
+        },
+        rate_limits: {
+          limit_id: 'coding',
+          primary: {
+            remaining: 3
+          }
+        },
+        updated_at: '2026-03-07T00:20:00.000Z'
+      });
+
+      const newerSibling = await createSiblingRun(fixture.root, 'task-1037-current', 'run-2', {
+        manifest: {
+          task_id: 'task-1037-current',
+          issue_id: 'issue-1037',
+          issue_identifier: 'ISSUE-1037',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:00.000Z',
+          summary: 'newer sibling run has fresher telemetry'
+        }
+      });
+      await seedProviderLinearWorkerProof(newerSibling, {
+        issue_id: 'issue-1037',
+        issue_identifier: 'ISSUE-1037',
+        latest_session_id: 'thread-sibling-turn-1',
+        turn_count: 1,
+        last_message: 'sibling proof is current',
+        last_event_at: '2026-03-07T00:29:00.000Z',
+        tokens: {
+          input_tokens: 5,
+          output_tokens: 3,
+          total_tokens: 8
+        },
+        rate_limits: {
+          limit_id: 'coding',
+          primary: {
+            remaining: 17
+          }
+        },
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const sameIssueRecord = compatibilityProjection.issues.find(
+        (issue) => issue.issueIdentifier === 'ISSUE-1037'
+      );
+
+      expect(compatibilityProjection.running).toEqual([
+        expect.objectContaining({
+          issue_identifier: 'ISSUE-1037',
+          session_id: 'thread-sibling-turn-1',
+          turn_count: 1,
+          tokens: {
+            input_tokens: 5,
+            output_tokens: 3,
+            total_tokens: 8
+          }
+        })
+      ]);
+      expect(sameIssueRecord?.payload.running).toMatchObject({
+        issue_identifier: 'ISSUE-1037',
+        session_id: 'thread-sibling-turn-1',
+        turn_count: 1
+      });
+      expect(compatibilityProjection.codexTotals).toEqual({
+        input_tokens: 5,
+        output_tokens: 3,
+        total_tokens: 8,
+        seconds_running: 300
+      });
+      expect(compatibilityProjection.rateLimits).toEqual({
+        limit_id: 'coding',
+        primary: {
+          remaining: 17
+        }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('aggregates only surfaced running and retrying telemetry into runtime rows and codex totals', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-telemetry-current'
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-telemetry-current',
+        issue_identifier: 'ISSUE-TELEMETRY',
+        started_at: '2026-03-07T00:10:00.000Z',
+        updated_at: '2026-03-07T00:20:00.000Z'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-TELEMETRY',
+        latest_session_id: 'thread-current-turn-2',
+        turn_count: 2,
+        last_message: 'current run active',
+        last_event_at: '2026-03-07T00:20:00.000Z',
+        tokens: {
+          input_tokens: 21,
+          output_tokens: 13,
+          total_tokens: 34
+        },
+        updated_at: '2026-03-07T00:20:00.000Z'
+      });
+
+      const completedSibling = await createSiblingRun(fixture.root, 'task-telemetry-completed', 'run-2', {
+        manifest: {
+          task_id: 'task-telemetry-completed',
+          issue_identifier: 'ISSUE-TELEMETRY-COMPLETED',
+          status: 'succeeded',
+          started_at: '2026-03-07T00:05:00.000Z',
+          updated_at: '2026-03-07T00:15:00.000Z',
+          completed_at: '2026-03-07T00:15:00.000Z'
+        }
+      });
+      await seedProviderLinearWorkerProof(completedSibling, {
+        issue_id: 'issue-completed',
+        issue_identifier: 'ISSUE-TELEMETRY-COMPLETED',
+        latest_session_id: 'thread-completed-turn-1',
+        turn_count: 1,
+        tokens: {
+          input_tokens: 12,
+          output_tokens: 8,
+          total_tokens: 20
+        },
+        updated_at: '2026-03-07T00:15:00.000Z'
+      });
+
+      const runningSibling = await createSiblingRun(fixture.root, 'task-telemetry-running', 'run-3', {
+        manifest: {
+          task_id: 'task-telemetry-running',
+          issue_identifier: 'ISSUE-TELEMETRY-RUNNING',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:00.000Z'
+        }
+      });
+      await seedProviderLinearWorkerProof(runningSibling, {
+        issue_id: 'issue-running',
+        issue_identifier: 'ISSUE-TELEMETRY-RUNNING',
+        latest_session_id: 'thread-running-turn-1',
+        turn_count: 1,
+        tokens: {
+          input_tokens: 5,
+          output_tokens: 3,
+          total_tokens: 8
+        },
+        rate_limits: {
+          limit_id: 'coding',
+          primary: {
+            remaining: 17
+          }
+        },
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            issue_identifier: 'ISSUE-TELEMETRY',
+            session_id: 'thread-current-turn-2',
+            turn_count: 2,
+            tokens: {
+              input_tokens: 21,
+              output_tokens: 13,
+              total_tokens: 34
+            }
+          }),
+          expect.objectContaining({
+            issue_identifier: 'ISSUE-TELEMETRY-RUNNING',
+            session_id: 'thread-running-turn-1',
+            turn_count: 1
+          })
+        ])
+      );
+      expect(compatibilityProjection.codexTotals).toEqual({
+        input_tokens: 26,
+        output_tokens: 16,
+        total_tokens: 42,
+        seconds_running: 1500
+      });
+      expect(compatibilityProjection.rateLimits).toEqual({
+        limit_id: 'coding',
+        primary: {
+          remaining: 17
+        }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses the same preferred same-issue running source for runtime rows and telemetry totals', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-telemetry-selected'
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-telemetry-selected',
+        issue_identifier: 'ISSUE-TELEMETRY-SAME',
+        started_at: '2026-03-07T00:00:00.000Z',
+        updated_at: '2026-03-07T00:10:00.000Z'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-same',
+        issue_identifier: 'ISSUE-TELEMETRY-SAME',
+        latest_session_id: 'session-old',
+        turn_count: 1,
+        tokens: {
+          input_tokens: 1,
+          output_tokens: 2,
+          total_tokens: 3
+        },
+        rate_limits: {
+          source: 'old'
+        },
+        updated_at: '2026-03-07T00:10:00.000Z'
+      });
+
+      const restartedSibling = await createSiblingRun(fixture.root, 'task-telemetry-restarted', 'run-2', {
+        manifest: {
+          task_id: 'task-telemetry-restarted',
+          issue_identifier: 'ISSUE-TELEMETRY-SAME',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:20:00.000Z',
+          updated_at: '2026-03-07T00:25:00.000Z'
+        }
+      });
+      await seedProviderLinearWorkerProof(restartedSibling, {
+        issue_id: 'issue-same',
+        issue_identifier: 'ISSUE-TELEMETRY-SAME',
+        latest_session_id: 'session-new',
+        turn_count: 2,
+        tokens: {
+          input_tokens: 100,
+          output_tokens: 200,
+          total_tokens: 300
+        },
+        rate_limits: {
+          source: 'new'
+        },
+        updated_at: '2026-03-07T00:25:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const sameIssue = compatibilityProjection.issues.find(
+        (issue) => issue.issueIdentifier === 'ISSUE-TELEMETRY-SAME'
+      );
+
+      expect(compatibilityProjection.running).toEqual([
+        expect.objectContaining({
+          issue_identifier: 'ISSUE-TELEMETRY-SAME',
+          session_id: 'session-new',
+          turn_count: 2,
+          tokens: {
+            input_tokens: 100,
+            output_tokens: 200,
+            total_tokens: 300
+          }
+        })
+      ]);
+      expect(sameIssue?.payload.running).toMatchObject({
+        issue_identifier: 'ISSUE-TELEMETRY-SAME',
+        session_id: 'session-new',
+        turn_count: 2,
+        tokens: {
+          input_tokens: 100,
+          output_tokens: 200,
+          total_tokens: 300
+        }
+      });
+      expect(compatibilityProjection.codexTotals).toEqual({
+        input_tokens: 100,
+        output_tokens: 200,
+        total_tokens: 300,
+        seconds_running: 600
+      });
+      expect(compatibilityProjection.rateLimits).toEqual({
+        source: 'new'
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('invalidates the cached snapshot on publish', async () => {

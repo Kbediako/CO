@@ -92,6 +92,8 @@ export function buildCompatibilityProjectionSnapshot(
   return {
     running,
     retrying,
+    codexTotals: snapshot.codexTotals,
+    rateLimits: snapshot.rateLimits,
     issues,
     selected: selectedPayload,
     dispatchPilot: snapshot.dispatchPilot,
@@ -232,27 +234,25 @@ export function findCompatibilityIssueLike<TIssue extends { issueIdentifier: str
 export function buildCompatibilityRunningEntry(
   selected: ControlCompatibilitySourceContext
 ): ControlRunningPayload {
+  const proof = selected.providerLinearWorkerProof ?? null;
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
-    state: selected.rawStatus,
+    state: resolveCompatibilityRunningState(selected),
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
-    session_id: null,
-    turn_count: null,
-    last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
-    last_message: selected.latestEvent?.message ?? selected.summary,
+    session_id: proof?.latest_session_id ?? null,
+    turn_count: proof?.turn_count ?? null,
+    last_event: selected.latestEvent?.event ?? proof?.last_event ?? selected.latestAction ?? selected.rawStatus,
+    last_message: selected.latestEvent?.message ?? proof?.last_message ?? selected.summary,
     started_at: selected.startedAt,
-    last_event_at: selected.latestEvent?.at ?? selected.updatedAt,
-    tokens: {
-      input_tokens: null,
-      output_tokens: null,
-      total_tokens: null
-    }
+    last_event_at: selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt,
+    tokens: proof?.tokens ?? buildEmptyTokenUsage()
   };
 }
 
 export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourceContext): ControlRetryPayload {
+  const retryState = selected.providerRetryState ?? null;
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -260,7 +260,10 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
     session_id: null,
-    attempt: resolveCompatibilityRetryAttempt(),
+    workspace_path: selected.workspacePath,
+    attempt: retryState?.attempt ?? null,
+    due_at: retryState?.due_at ?? null,
+    error: retryState?.error ?? selected.lastError,
     last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
     last_message: selected.latestEvent?.message ?? selected.summary,
     started_at: selected.startedAt,
@@ -281,14 +284,14 @@ export function buildCompatibilityIssuePayload(input: {
   return {
     issue_identifier: input.source.issueIdentifier,
     issue_id: input.source.issueId,
-    status: input.source.rawStatus,
+    status: resolveCompatibilityIssueStatus(input.running, input.retry, input.source),
     raw_status: input.source.rawStatus,
     display_status: input.source.displayStatus,
     status_reason: input.source.statusReason,
     workspace: {
       path: input.source.workspacePath
     },
-    attempts: buildCompatibilityIssueAttempts(input.retry),
+    attempts: buildCompatibilityIssueAttempts(input.source, input.retry),
     running: input.running,
     retry: input.retry,
     logs: {
@@ -305,22 +308,46 @@ export function buildCompatibilityIssuePayload(input: {
 }
 
 function buildCompatibilityIssueAttempts(
+  source: ControlCompatibilitySourceContext,
   retry: ControlRetryPayload | null
 ): ControlIssuePayload['attempts'] {
-  if (retry?.attempt === null || retry?.attempt === undefined) {
+  const attempt = retry?.attempt ?? source.providerRetryState?.attempt ?? null;
+  if (attempt === null || attempt === undefined) {
     return {
       restart_count: null,
       current_retry_attempt: null
     };
   }
   return {
-    restart_count: Math.max(retry.attempt - 1, 0),
-    current_retry_attempt: retry.attempt
+    restart_count: Math.max(attempt - 1, 0),
+    current_retry_attempt: attempt
   };
 }
 
-function resolveCompatibilityRetryAttempt(): number | null {
-  return null;
+function buildEmptyTokenUsage(): ControlRunningPayload['tokens'] {
+  return {
+    input_tokens: null,
+    output_tokens: null,
+    total_tokens: null
+  };
+}
+
+function resolveCompatibilityRunningState(selected: ControlCompatibilitySourceContext): string {
+  return selected.compatibilityState ?? selected.rawStatus;
+}
+
+function resolveCompatibilityIssueStatus(
+  running: ControlRunningPayload | null,
+  retry: ControlRetryPayload | null,
+  source: ControlCompatibilitySourceContext
+): string {
+  if (running) {
+    return 'running';
+  }
+  if (retry) {
+    return 'retrying';
+  }
+  return source.rawStatus;
 }
 
 function buildCompatibilityIssueAliases<TSource extends CompatibilityIssueSourceRecord>(selected: TSource): string[] {

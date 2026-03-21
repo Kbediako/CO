@@ -56,6 +56,23 @@ const waitForCondition = async (predicate: () => boolean, timeoutMs: number = 20
   throw new Error('timed out waiting for async condition');
 };
 
+const waitForAuditLogEntry = async (
+  outDir: string,
+  summary: RunSummary,
+  expected: string,
+  timeoutMs: number = 2000
+): Promise<string> => {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const audit = await readAuditLog(outDir, summary);
+    if (audit.includes(expected)) {
+      return audit;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`timed out waiting for audit log entry: ${expected}`);
+};
+
 describe('CloudSyncWorker', () => {
   it('uploads manifest and writes audit log on success', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cloud-sync-worker-'));
@@ -225,10 +242,10 @@ describe('CloudSyncWorker', () => {
     worker.start();
     bus.emit({ type: 'run:completed', payload: summary });
 
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await waitForCondition(() => upload.mock.calls.length >= 3);
 
     expect(upload).toHaveBeenCalledTimes(3);
-    const audit = await readAuditLog(outDir, summary);
+    const audit = await waitForAuditLogEntry(outDir, summary, 'Cloud sync completed');
     expect(audit).toContain('Cloud sync attempt failed');
     expect(audit).toContain('Cloud sync completed');
   });

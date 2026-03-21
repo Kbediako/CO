@@ -9,11 +9,15 @@ import {
   resolveExplicitProviderWorkspacePathWithinRoot,
   resolveProviderWorkspacePath
 } from '../run/workspacePath.js';
-import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import {
+  sortLiveLinearTrackedIssuesForDispatch,
+  type LiveLinearTrackedIssue
+} from './linearDispatchSource.js';
 import { callChildControlEndpoint } from './questionChildResolutionAdapter.js';
 import {
   buildProviderFallbackTaskId,
   buildProviderIssueKey,
+  hasQueuedProviderIntakeRetry,
   markProviderIntakeRehydrated,
   readProviderIntakeClaim,
   type ProviderLaunchSource,
@@ -22,6 +26,7 @@ import {
   type ProviderTaskMappingSource,
   upsertProviderIntakeClaim
 } from './providerIntakeState.js';
+import { createProviderIssueRetryQueue } from './providerIssueRetryQueue.js';
 
 export interface ProviderIssueLauncher {
   start(input: {
@@ -31,6 +36,9 @@ export interface ProviderIssueLauncher {
     issueId: string;
     issueIdentifier: string;
     issueUpdatedAt: string | null;
+    workspaceId?: string | null;
+    teamId?: string | null;
+    projectId?: string | null;
     launchToken: string;
   }): Promise<{ runId: string; manifestPath: string } | null>;
   resume(input: {
@@ -47,6 +55,15 @@ export interface ProviderIssueHandoffResult {
   claim: ProviderIntakeClaimRecord;
 }
 
+export type ProviderTrackedIssuePollResolution =
+  | { kind: 'ready'; trackedIssues: LiveLinearTrackedIssue[] }
+  | { kind: 'skip'; reason: string };
+
+export interface ProviderIssueHandoffPollInput {
+  trackedIssues: LiveLinearTrackedIssue[];
+  refetchTrackedIssues?: (() => Promise<ProviderTrackedIssuePollResolution>) | null;
+}
+
 interface ProviderIssueRunRecord {
   provider: 'linear';
   issueId: string;
@@ -54,6 +71,7 @@ interface ProviderIssueRunRecord {
   runId: string;
   manifestPath: string;
   status: string | null;
+  summary: string | null;
   issueUpdatedAt: string | null;
   startedAt: string | null;
   updatedAt: string | null;
@@ -62,13 +80,14 @@ interface ProviderIssueRunRecord {
 export interface ProviderIssueHandoffService {
   handleAcceptedTrackedIssue(input: {
     trackedIssue: LiveLinearTrackedIssue;
-    deliveryId: string;
+    deliveryId: string | null;
     event: string | null;
     action: string | null;
     webhookTimestamp: number | null;
   }): Promise<ProviderIssueHandoffResult>;
   rehydrate(): Promise<void>;
   refresh(): Promise<void>;
+  poll?(input: ProviderIssueHandoffPollInput): Promise<void>;
 }
 
 export type ProviderTrackedIssueRefreshResolution =
@@ -83,12 +102,14 @@ export interface CreateProviderIssueHandoffServiceOptions {
   launcher: ProviderIssueLauncher;
   startPipelineId?: string;
   publishRuntime?: ((source: string) => void) | null;
+  readFeatureToggles?: (() => Record<string, unknown> | null | undefined) | null;
   resolveTrackedIssue?: ((
     input: {
       provider: 'linear';
       issueId: string;
     }
   ) => Promise<ProviderTrackedIssueRefreshResolution>) | null;
+  resolveTrackedIssues?: (() => Promise<ProviderTrackedIssuePollResolution>) | null;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
@@ -101,6 +122,20 @@ const BEST_EFFORT_REHYDRATE_TIMEOUT_MS =
   BEST_EFFORT_REHYDRATE_DELAY_MS * BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS;
 const PROVIDER_LAUNCH_SOURCE: ProviderLaunchSource = 'control-host';
 const PROVIDER_RELEASED_PENDING_REOPEN_PREFIX = 'provider_issue_released_pending_reopen:';
+const PROVIDER_POST_WORKER_EXIT_REFRESH_PENDING_REASON =
+  'provider_issue_post_worker_exit_refresh_pending';
+const PROVIDER_POST_WORKER_EXIT_START_LAUNCHED_REASON =
+  'provider_issue_post_worker_exit_start_launched';
+const PROVIDER_POST_WORKER_EXIT_START_FAILED_REASON =
+  'provider_issue_post_worker_exit_start_failed';
+const PROVIDER_RETRY_RESUME_LAUNCHED_REASON = 'provider_issue_retry_resume_launched';
+const PROVIDER_RETRY_RESUME_FAILED_REASON = 'provider_issue_retry_resume_failed';
+const PROVIDER_RETRY_START_LAUNCHED_REASON = 'provider_issue_retry_start_launched';
+const PROVIDER_RETRY_START_FAILED_REASON = 'provider_issue_retry_start_failed';
+const PROVIDER_CONTINUATION_RETRY_DELAY_MS = 1_000;
+const PROVIDER_FAILURE_RETRY_BASE_MS = 10_000;
+const PROVIDER_FAILURE_RETRY_MAX_BACKOFF_MS = 300_000;
+const DEFAULT_PROVIDER_MAX_CONCURRENT_AGENTS = 10;
 
 type ProviderTrackedIssueEligibility =
   | { eligible: true }
@@ -119,6 +154,7 @@ export function createProviderIssueHandoffService(
   const startPipelineId = options.startPipelineId ?? 'diagnostics';
   const allowedRunRoots = [resolve(options.paths.runDir, '..', '..', '..')];
   const repoRoot = resolve(options.paths.repoRoot);
+  const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
     {
@@ -128,6 +164,13 @@ export function createProviderIssueHandoffService(
     }
   >();
   let refreshLifecycleChain: Promise<void> = Promise.resolve();
+  let bestEffortRehydrateTimer: NodeJS.Timeout | null = null;
+  let bestEffortRehydrateFailureCount = 0;
+  let pollTrackedIssueRefetch: (() => Promise<ProviderTrackedIssuePollResolution>) | null = null;
+  const queuedRetryTrackedIssueRefetches = new Map<
+    string,
+    () => Promise<ProviderTrackedIssuePollResolution>
+  >();
 
   const runWithRefreshLifecycleLock = async <T>(operation: () => Promise<T>): Promise<T> => {
     const nextOperation = refreshLifecycleChain.then(operation, operation);
@@ -138,17 +181,67 @@ export function createProviderIssueHandoffService(
     return nextOperation;
   };
 
-  const scheduleBestEffortRehydrateWithRefreshLock = (): void => {
-    // Best-effort rehydrate timers must queue behind the current refresh loop so
-    // claim rehydration cannot overlap with tracked-issue resolution.
-    scheduleBestEffortRehydrate(() => runWithRefreshLifecycleLock(rehydrateNow));
+  const persistState = async (): Promise<void> => {
+    await options.persist();
+    rebuildRetryQueue();
   };
+
+  const scheduleBestEffortRehydrateWithRefreshLock = (): void => {
+    if (bestEffortRehydrateTimer) {
+      return;
+    }
+    bestEffortRehydrateTimer = setTimeout(() => {
+      bestEffortRehydrateTimer = null;
+      void runWithRefreshLifecycleLock(rehydrateNow)
+        .then((result) => {
+          bestEffortRehydrateFailureCount = 0;
+          if (result.hasPendingClaims) {
+            scheduleBestEffortRehydrateWithRefreshLock();
+          }
+        })
+        .catch(() => {
+          bestEffortRehydrateFailureCount += 1;
+          if (bestEffortRehydrateFailureCount < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
+            scheduleBestEffortRehydrateWithRefreshLock();
+          }
+        });
+    }, BEST_EFFORT_REHYDRATE_DELAY_MS);
+    bestEffortRehydrateTimer.unref?.();
+  };
+
+  function rebuildRetryQueue(): void {
+    const queuedProviderKeys = new Set<string>();
+    retryQueue.sync(
+      options.state.claims.flatMap((claim) => {
+        if (claim.retry_queued !== true || !isValidProviderRetryTimestamp(claim.retry_due_at)) {
+          return [];
+        }
+        queuedProviderKeys.add(claim.provider_key);
+        const dueAt = claim.retry_due_at;
+        return [
+          {
+            key: claim.provider_key,
+            dueAt,
+            fire: () => dispatchQueuedProviderRetry(claim.provider_key, dueAt)
+          }
+        ];
+      })
+    );
+    for (const providerKey of queuedRetryTrackedIssueRefetches.keys()) {
+      if (!queuedProviderKeys.has(providerKey)) {
+        queuedRetryTrackedIssueRefetches.delete(providerKey);
+      }
+    }
+  }
 
   const launchResumeForRun = async (input: {
     claim: ProviderIntakeClaimRecord;
     trackedIssue: LiveLinearTrackedIssue;
     run: ProviderIssueRunRecord;
     reason: string;
+    failureReason?: string;
+    launcherReason?: string;
+    seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<void> => {
     const launchToken = createProviderLaunchToken();
     upsertProviderIntakeClaim(options.state, {
@@ -164,17 +257,24 @@ export function createProviderIssueHandoffService(
       run_id: input.run.runId,
       run_manifest_path: input.run.manifestPath,
       launch_source: PROVIDER_LAUNCH_SOURCE,
-      launch_token: launchToken
+      launch_token: launchToken,
+      ...buildProviderRetryLaunchFields({
+        claim: input.claim,
+        previousRun: input.run,
+        preserveCurrentAttempt: input.claim.retry_queued === true,
+        seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
+      })
     });
-    await options.persist();
+    await persistState();
     try {
       await options.launcher.resume({
         runId: input.run.runId,
         actor: 'control-host',
-        reason: 'provider-refresh',
+        reason: input.launcherReason ?? 'provider-refresh',
         launchToken
       });
     } catch (error) {
+      const failureReason = input.failureReason ?? 'provider_issue_refresh_resume_failed';
       upsertProviderIntakeClaim(options.state, {
         ...input.claim,
         issue_identifier: input.trackedIssue.identifier,
@@ -184,13 +284,20 @@ export function createProviderIssueHandoffService(
         issue_updated_at: input.trackedIssue.updated_at,
         task_id: input.run.taskId,
         state: 'handoff_failed',
-        reason: `provider_issue_refresh_resume_failed:${(error as Error)?.message ?? String(error)}`,
+        reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
         run_id: input.run.runId,
         run_manifest_path: input.run.manifestPath,
         launch_source: PROVIDER_LAUNCH_SOURCE,
-        launch_token: launchToken
+        launch_token: launchToken,
+        ...buildQueuedProviderRetryFields({
+          claim: input.claim,
+          previousRun: input.run,
+          error: (error as Error)?.message ?? String(error),
+          preserveCurrentAttempt: true,
+          delayType: 'failure'
+        })
       });
-      await options.persist();
+      await persistState();
       throw error;
     }
     scheduleBestEffortRehydrateWithRefreshLock();
@@ -200,7 +307,11 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord;
     trackedIssue: LiveLinearTrackedIssue;
     reason: string;
-  }): Promise<void> => {
+    failureReason?: string;
+    previousRun?: ProviderIssueRunRecord | null;
+    preserveRetryAttempt?: boolean;
+    seedRetryAttemptFromPreviousRun?: boolean;
+  }): Promise<ProviderIssueHandoffResult> => {
     const taskId = buildProviderFallbackTaskId(input.trackedIssue);
     const launchToken = createProviderLaunchToken();
     upsertProviderIntakeClaim(options.state, {
@@ -217,9 +328,15 @@ export function createProviderIssueHandoffService(
       run_id: null,
       run_manifest_path: null,
       launch_source: PROVIDER_LAUNCH_SOURCE,
-      launch_token: launchToken
+      launch_token: launchToken,
+      ...buildProviderRetryLaunchFields({
+        claim: input.claim,
+        previousRun: input.previousRun ?? null,
+        preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+        seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
+      })
     });
-    await options.persist();
+    await persistState();
     let startedRun: { runId: string; manifestPath: string } | null = null;
     try {
       startedRun = await options.launcher.start({
@@ -229,9 +346,13 @@ export function createProviderIssueHandoffService(
         issueId: input.trackedIssue.id,
         issueIdentifier: input.trackedIssue.identifier,
         issueUpdatedAt: input.trackedIssue.updated_at,
+        workspaceId: input.trackedIssue.workspace_id,
+        teamId: input.trackedIssue.team_id,
+        projectId: input.trackedIssue.project_id,
         launchToken
       });
     } catch (error) {
+      const failureReason = input.failureReason ?? 'provider_issue_refresh_start_failed';
       upsertProviderIntakeClaim(options.state, {
         ...input.claim,
         issue_identifier: input.trackedIssue.identifier,
@@ -242,18 +363,24 @@ export function createProviderIssueHandoffService(
         task_id: taskId,
         mapping_source: 'provider_id_fallback',
         state: 'handoff_failed',
-        reason: `provider_issue_refresh_start_failed:${(error as Error)?.message ?? String(error)}`,
+        reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
         run_id: null,
         run_manifest_path: null,
         launch_source: PROVIDER_LAUNCH_SOURCE,
-        launch_token: launchToken
+        launch_token: launchToken,
+        ...buildQueuedProviderRetryFields({
+          claim: input.claim,
+          previousRun: input.previousRun ?? null,
+          error: (error as Error)?.message ?? String(error),
+          preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+          delayType: 'failure'
+        })
       });
-      await options.persist();
+      await persistState();
       throw error;
     }
-    try {
-      if (startedRun) {
-        upsertProviderIntakeClaim(options.state, {
+    const claim = startedRun
+      ? upsertProviderIntakeClaim(options.state, {
           ...input.claim,
           issue_identifier: input.trackedIssue.identifier,
           issue_title: input.trackedIssue.title,
@@ -267,11 +394,21 @@ export function createProviderIssueHandoffService(
           run_id: startedRun.runId,
           run_manifest_path: startedRun.manifestPath,
           launch_source: PROVIDER_LAUNCH_SOURCE,
-          launch_token: launchToken
-        });
-        await options.persist();
+          launch_token: launchToken,
+          ...buildProviderRetryLaunchFields({
+            claim: input.claim,
+            previousRun: input.previousRun ?? null,
+            preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+            seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
+          })
+        })
+      : input.claim;
+    try {
+      if (startedRun) {
+        await persistState();
         options.publishRuntime?.('provider-intake.refresh');
       }
+      return { kind: 'start', reason: input.reason, claim };
     } finally {
       scheduleBestEffortRehydrateWithRefreshLock();
     }
@@ -296,7 +433,8 @@ export function createProviderIssueHandoffService(
       reason: input.nextReason,
       task_id: nextTaskId,
       run_id: nextRunId,
-      run_manifest_path: nextManifestPath
+      run_manifest_path: nextManifestPath,
+      ...clearProviderRetryFields()
     });
     upsertProviderIntakeClaim(options.state, {
       ...input.claim,
@@ -310,9 +448,10 @@ export function createProviderIssueHandoffService(
       reason: input.nextReason,
       run_id: nextRunId,
       run_manifest_path: nextManifestPath,
+      ...clearProviderRetryFields(),
       updated_at: now
     });
-    await options.persist();
+    await persistState();
     if (input.cleanupWorkspace && canCleanupReleasedProviderWorkspace(input.releaseRun)) {
       await cleanupReleasedProviderWorkspace(repoRoot, nextTaskId, nextManifestPath);
     }
@@ -459,6 +598,7 @@ export function createProviderIssueHandoffService(
           run_manifest_path: activeRun.manifestPath,
           updated_at: now
         });
+        hasPendingClaims = true;
         continue;
       }
 
@@ -466,12 +606,21 @@ export function createProviderIssueHandoffService(
         (run) => run.status !== null && RESUME_ELIGIBLE_STATUSES.has(run.status)
       );
       if (resumableRun) {
+        const queuedRetryFields = buildQueuedProviderRetryFields({
+          claim,
+          previousRun: resumableRun,
+          error: resolveProviderRetryErrorFromRun(resumableRun),
+          preserveCurrentAttempt: claim.retry_queued === true,
+          preserveExistingDueAt: claim.retry_queued === true,
+          delayType: 'failure'
+        });
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           state: 'resumable',
           reason: 'provider_issue_rehydrated_resumable_run',
           task_id: resumableRun.taskId,
           run_id: resumableRun.runId,
-          run_manifest_path: resumableRun.manifestPath
+          run_manifest_path: resumableRun.manifestPath,
+          ...queuedRetryFields
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
@@ -482,6 +631,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_rehydrated_resumable_run',
           run_id: resumableRun.runId,
           run_manifest_path: resumableRun.manifestPath,
+          ...queuedRetryFields,
           updated_at: now
         });
         continue;
@@ -501,12 +651,23 @@ export function createProviderIssueHandoffService(
           didRunMatchClaimAttempt(claim, completedRun)
         )
       ) {
+        const queuedRetryFields = shouldQueuePostWorkerRetryClaim(claim)
+          ? buildQueuedProviderRetryFields({
+              claim,
+              previousRun: completedRun,
+              error: null,
+              preserveCurrentAttempt: claim.retry_queued === true,
+              preserveExistingDueAt: claim.retry_queued === true,
+              delayType: 'continuation'
+            })
+          : clearProviderRetryFields();
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           state: 'completed',
           reason: 'provider_issue_rehydrated_completed_run',
           task_id: completedRun.taskId,
           run_id: completedRun.runId,
-          run_manifest_path: completedRun.manifestPath
+          run_manifest_path: completedRun.manifestPath,
+          ...queuedRetryFields
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
@@ -517,6 +678,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_rehydrated_completed_run',
           run_id: completedRun.runId,
           run_manifest_path: completedRun.manifestPath,
+          ...queuedRetryFields,
           updated_at: now
         });
         continue;
@@ -526,12 +688,20 @@ export function createProviderIssueHandoffService(
         const queuedRun = claimRuns.find((run) => run.status === 'queued');
         if (queuedRun) {
           if (isProviderClaimRehydrationTimedOut(claim, now)) {
+            const queuedRetryFields = buildQueuedProviderRetryFields({
+              claim,
+              previousRun: null,
+              error: 'provider_issue_rehydration_timeout',
+              preserveCurrentAttempt: true,
+              delayType: 'failure'
+            });
             publishRuntime ||= hasProviderClaimTransitioned(claim, {
               state: 'handoff_failed',
               reason: 'provider_issue_rehydration_timeout',
               task_id: queuedRun.taskId,
               run_id: queuedRun.runId,
-              run_manifest_path: queuedRun.manifestPath
+              run_manifest_path: queuedRun.manifestPath,
+              ...queuedRetryFields
             });
             upsertProviderIntakeClaim(options.state, {
               ...claim,
@@ -542,6 +712,7 @@ export function createProviderIssueHandoffService(
               reason: 'provider_issue_rehydration_timeout',
               run_id: queuedRun.runId,
               run_manifest_path: queuedRun.manifestPath,
+              ...queuedRetryFields,
               updated_at: now
             });
             continue;
@@ -570,12 +741,20 @@ export function createProviderIssueHandoffService(
         }
 
         if (isProviderClaimRehydrationTimedOut(claim, now)) {
+          const queuedRetryFields = buildQueuedProviderRetryFields({
+            claim,
+            previousRun: null,
+            error: 'provider_issue_rehydration_timeout',
+            preserveCurrentAttempt: true,
+            delayType: 'failure'
+          });
           publishRuntime ||= hasProviderClaimTransitioned(claim, {
             state: 'handoff_failed',
             reason: 'provider_issue_rehydration_timeout',
             task_id: claim.task_id,
             run_id: claim.run_id,
-            run_manifest_path: claim.run_manifest_path
+            run_manifest_path: claim.run_manifest_path,
+            ...queuedRetryFields
           });
           upsertProviderIntakeClaim(options.state, {
             ...claim,
@@ -583,6 +762,7 @@ export function createProviderIssueHandoffService(
             launch_token: undefined,
             state: 'handoff_failed',
             reason: 'provider_issue_rehydration_timeout',
+            ...queuedRetryFields,
             updated_at: now
           });
           continue;
@@ -593,6 +773,40 @@ export function createProviderIssueHandoffService(
       }
 
       if (claim.state === 'accepted') {
+        if (hasQueuedProviderIntakeRetry(claim)) {
+          if (!isValidProviderRetryTimestamp(claim.retry_due_at)) {
+            const queuedRetryFields = buildQueuedProviderRetryFields({
+              claim,
+              previousRun: null,
+              error: claim.retry_error ?? null,
+              preserveCurrentAttempt: true,
+              preserveExistingDueAt: true,
+              delayType: resolveProviderRetryDelayType({
+                claim,
+                previousRun: null
+              })
+            });
+            const nextReason = claim.reason ?? 'provider_issue_rehydration_pending_revalidation';
+            publishRuntime ||= hasProviderClaimTransitioned(claim, {
+              state: 'accepted',
+              reason: nextReason,
+              task_id: claim.task_id,
+              run_id: claim.run_id,
+              run_manifest_path: claim.run_manifest_path,
+              ...queuedRetryFields
+            });
+            upsertProviderIntakeClaim(options.state, {
+              ...claim,
+              launch_source: undefined,
+              launch_token: undefined,
+              state: 'accepted',
+              reason: nextReason,
+              ...queuedRetryFields,
+              updated_at: now
+            });
+          }
+          continue;
+        }
         upsertProviderIntakeClaim(options.state, {
           ...claim,
           launch_source: undefined,
@@ -605,15 +819,300 @@ export function createProviderIssueHandoffService(
     }
 
     markProviderIntakeRehydrated(options.state, now);
-    await options.persist();
+    await persistState();
     if (publishRuntime) {
       options.publishRuntime?.('provider-intake.rehydrate');
     }
     return { hasPendingClaims };
   };
 
-  return {
-    async handleAcceptedTrackedIssue(input): Promise<ProviderIssueHandoffResult> {
+  const ensureQueuedProviderRetryDeadline = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: LiveLinearTrackedIssue;
+    previousRun: ProviderIssueRunRecord | null;
+  }): Promise<ProviderIntakeClaimRecord> => {
+    if (
+      !hasQueuedProviderIntakeRetry(input.claim) ||
+      isValidProviderRetryTimestamp(input.claim.retry_due_at)
+    ) {
+      if (input.claim.retry_queued === true && pollTrackedIssueRefetch) {
+        queuedRetryTrackedIssueRefetches.set(input.claim.provider_key, pollTrackedIssueRefetch);
+      }
+      return input.claim;
+    }
+
+    const queuedRetryFields = buildQueuedProviderRetryFields({
+      claim: input.claim,
+      previousRun: input.previousRun,
+      error: input.claim.retry_error ?? resolveProviderRetryErrorFromRun(input.previousRun),
+      preserveCurrentAttempt: true,
+      preserveExistingDueAt: true,
+      delayType: resolveProviderRetryDelayType({
+        claim: input.claim,
+        previousRun: input.previousRun
+      })
+    });
+    const nextClaim = upsertProviderIntakeClaim(options.state, {
+      ...input.claim,
+      issue_identifier: input.trackedIssue.identifier,
+      issue_title: input.trackedIssue.title,
+      issue_state: input.trackedIssue.state,
+      issue_state_type: input.trackedIssue.state_type,
+      issue_updated_at: input.trackedIssue.updated_at,
+      task_id: input.previousRun?.taskId ?? input.claim.task_id,
+      run_id: input.previousRun?.runId ?? input.claim.run_id,
+      run_manifest_path: input.previousRun?.manifestPath ?? input.claim.run_manifest_path,
+      ...queuedRetryFields
+    });
+    if (pollTrackedIssueRefetch) {
+      queuedRetryTrackedIssueRefetches.set(nextClaim.provider_key, pollTrackedIssueRefetch);
+    }
+    await persistState();
+    options.publishRuntime?.('provider-intake.refresh');
+    return nextClaim;
+  };
+
+  const resolveRefreshTrackedIssueResolution = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssuesByKey?: Map<string, LiveLinearTrackedIssue> | null;
+    consumedTrackedIssueKeys?: Set<string>;
+  }):
+    Promise<
+      | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
+      | {
+          kind: 'release';
+          reason: string;
+          trackedIssue: Pick<
+            LiveLinearTrackedIssue,
+            'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
+          > | null;
+          cleanupWorkspace: boolean;
+        }
+      | { kind: 'skip'; reason: string }
+    > => {
+    if (input.trackedIssuesByKey) {
+      const providerKey = buildProviderIssueKey(input.claim.provider, input.claim.issue_id);
+      if (input.trackedIssuesByKey.has(providerKey)) {
+        input.consumedTrackedIssueKeys?.add(providerKey);
+      }
+      return resolveTrackedIssuePollResolution(input.claim, input.trackedIssuesByKey);
+    }
+
+    if (!options.resolveTrackedIssue) {
+      return { kind: 'skip', reason: 'provider_issue_refresh_resolution_unavailable' };
+    }
+
+    const resolution = await options.resolveTrackedIssue({
+      provider: input.claim.provider,
+      issueId: input.claim.issue_id
+    });
+    if (resolution.kind === 'ready') {
+      const eligibility = assessProviderTrackedIssueEligibility(resolution.trackedIssue);
+      if (eligibility.eligible) {
+        return resolution;
+      }
+      return {
+        kind: 'release',
+        reason: stripProviderIssueReleasedPrefix(eligibility.releaseReason),
+        trackedIssue: resolution.trackedIssue,
+        cleanupWorkspace: eligibility.cleanupWorkspace
+      };
+    }
+    if (resolution.kind === 'release') {
+      return {
+        kind: 'release',
+        reason: resolution.reason,
+        trackedIssue: null,
+        cleanupWorkspace: false
+      };
+    }
+    return resolution;
+  };
+
+  const resolveRetryDispatchResolutionFromPoll = async (
+    claim: ProviderIntakeClaimRecord
+  ):
+    Promise<
+      | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
+      | {
+          kind: 'release';
+          reason: string;
+          trackedIssue: Pick<
+            LiveLinearTrackedIssue,
+            'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
+          > | null;
+          cleanupWorkspace: boolean;
+        }
+      | { kind: 'skip'; reason: string }
+      | null
+    > => {
+    const trackedIssueRefetch =
+      queuedRetryTrackedIssueRefetches.get(claim.provider_key) ??
+      pollTrackedIssueRefetch ??
+      options.resolveTrackedIssues ??
+      null;
+    if (!trackedIssueRefetch) {
+      return null;
+    }
+
+    const resolution = await trackedIssueRefetch();
+    if (resolution.kind === 'skip') {
+      return resolution;
+    }
+    return resolveTrackedIssuePollResolution(claim, buildTrackedIssuePollMap(resolution.trackedIssues));
+  };
+
+  const resolveRefreshPollInput = async (): Promise<ProviderIssueHandoffPollInput | undefined> => {
+    if (!options.resolveTrackedIssues) {
+      return undefined;
+    }
+    const resolution = await options.resolveTrackedIssues();
+    if (resolution.kind === 'skip') {
+      return undefined;
+    }
+    return {
+      trackedIssues: resolution.trackedIssues,
+      refetchTrackedIssues: options.resolveTrackedIssues
+    };
+  };
+
+  const resolveRetryDispatchResolution = async (
+    claim: ProviderIntakeClaimRecord
+  ):
+    Promise<
+      | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
+      | {
+          kind: 'release';
+          reason: string;
+          trackedIssue: Pick<
+            LiveLinearTrackedIssue,
+            'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
+          > | null;
+          cleanupWorkspace: boolean;
+        }
+      | { kind: 'skip'; reason: string }
+    > => {
+    const pollResolution = await resolveRetryDispatchResolutionFromPoll(claim);
+    if (pollResolution) {
+      return pollResolution;
+    }
+
+    if (!options.resolveTrackedIssue) {
+      const trackedIssue = buildTrackedIssueSnapshotFromClaim(claim);
+      const eligibility = assessProviderTrackedIssueEligibility(trackedIssue);
+      if (eligibility.eligible) {
+        return { kind: 'ready', trackedIssue };
+      }
+      return {
+        kind: 'release',
+        reason: stripProviderIssueReleasedPrefix(eligibility.releaseReason),
+        trackedIssue,
+        cleanupWorkspace: eligibility.cleanupWorkspace
+      };
+    }
+
+    return await resolveRefreshTrackedIssueResolution({ claim });
+  };
+
+  async function dispatchQueuedProviderRetry(providerKey: string, expectedDueAt: string): Promise<void> {
+    await runWithRefreshLifecycleLock(async () => {
+      const claim = readProviderIntakeClaim(options.state, providerKey);
+      if (
+        !claim ||
+        claim.retry_queued !== true ||
+        claim.retry_due_at !== expectedDueAt
+      ) {
+        return;
+      }
+
+      const claimRuns = await discoverProviderIssueRuns(options.paths.runDir, {
+        provider: claim.provider,
+        issueId: claim.issue_id
+      });
+      const activeRun = claimRuns.find((run) => run.status === 'in_progress') ?? null;
+      if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
+        scheduleBestEffortRehydrateWithRefreshLock();
+        return;
+      }
+
+      const latestRun = claimRuns[0] ?? null;
+      const releaseRun = resolveProviderReleaseRun(claim, claimRuns);
+      const resolution = await resolveRetryDispatchResolution(claim);
+
+      if (resolution.kind === 'skip') {
+        upsertProviderIntakeClaim(options.state, {
+          ...claim,
+          ...buildQueuedProviderRetryFields({
+            claim,
+            previousRun: latestRun,
+            error: `retry poll failed: ${resolution.reason}`,
+            preserveCurrentAttempt: true,
+            delayType: 'failure'
+          })
+        });
+        await persistState();
+        options.publishRuntime?.('provider-intake.refresh');
+        return;
+      }
+
+      if (resolution.kind === 'release') {
+        await releaseClaim({
+          claim,
+          nextReason: `provider_issue_released:${resolution.reason}`,
+          releaseRun,
+          trackedIssue: resolution.trackedIssue,
+          cleanupWorkspace: resolution.cleanupWorkspace
+        });
+        return;
+      }
+
+      if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+        if (hasPendingReleaseCancel(releaseRun?.manifestPath ?? latestRun.manifestPath)) {
+          scheduleBestEffortRehydrateWithRefreshLock();
+          return;
+        }
+        await launchResumeForRun({
+          claim,
+          trackedIssue: resolution.trackedIssue,
+          run: latestRun,
+          reason: PROVIDER_RETRY_RESUME_LAUNCHED_REASON,
+          failureReason: PROVIDER_RETRY_RESUME_FAILED_REASON,
+          launcherReason: 'provider-retry'
+        });
+        return;
+      }
+
+      if (latestRun && latestRun.status !== 'succeeded' && latestRun.status !== null) {
+        scheduleBestEffortRehydrateWithRefreshLock();
+        return;
+      }
+
+      const startReason =
+        latestRun?.status === 'succeeded'
+          ? PROVIDER_POST_WORKER_EXIT_START_LAUNCHED_REASON
+          : PROVIDER_RETRY_START_LAUNCHED_REASON;
+      const startFailureReason =
+        latestRun?.status === 'succeeded'
+          ? PROVIDER_POST_WORKER_EXIT_START_FAILED_REASON
+          : PROVIDER_RETRY_START_FAILED_REASON;
+      await launchStartForTrackedIssue({
+        claim,
+        trackedIssue: resolution.trackedIssue,
+        reason: startReason,
+        failureReason: startFailureReason,
+        previousRun: latestRun,
+        preserveRetryAttempt: true
+      });
+    });
+  }
+
+  const processTrackedIssueCandidate = async (input: {
+    trackedIssue: LiveLinearTrackedIssue;
+    deliveryId: string | null;
+    event: string | null;
+    action: string | null;
+    webhookTimestamp: number | null;
+  }): Promise<ProviderIssueHandoffResult> => {
       const providerKey = buildProviderIssueKey('linear', input.trackedIssue.id);
       const taskId = buildProviderFallbackTaskId(input.trackedIssue);
       const mappingSource: ProviderTaskMappingSource = 'provider_id_fallback';
@@ -711,7 +1210,7 @@ export function createProviderIssueHandoffService(
             run_id: releasedRun?.runId ?? existing.run_id,
             run_manifest_path: releasedRun?.manifestPath ?? existing.run_manifest_path,
           });
-          await options.persist();
+          await persistState();
           return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_released', claim };
         }
       }
@@ -731,7 +1230,7 @@ export function createProviderIssueHandoffService(
           run_id: existing?.run_id ?? null,
           run_manifest_path: existing?.run_manifest_path ?? null,
         });
-        await options.persist();
+        await persistState();
         return { kind: 'ignored', reason: 'provider_issue_stale', claim };
       }
 
@@ -746,7 +1245,7 @@ export function createProviderIssueHandoffService(
           run_id: existing?.run_id ?? null,
           run_manifest_path: existing?.run_manifest_path ?? null,
         });
-        await options.persist();
+        await persistState();
         return { kind: 'ignored', reason: eligibility.claimReason, claim };
       }
 
@@ -761,6 +1260,10 @@ export function createProviderIssueHandoffService(
         ...claimBase,
         accepted_at: latestExisting?.accepted_at ?? claimBase.accepted_at
       };
+      const latestRetryStateBase: Pick<
+        ProviderIntakeClaimRecord,
+        'retry_queued' | 'retry_attempt' | 'retry_due_at'
+      > = latestExisting ?? clearProviderRetryFields();
       const activeRun = discoveredRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
         const claim = upsertProviderIntakeClaim(options.state, {
@@ -772,7 +1275,7 @@ export function createProviderIssueHandoffService(
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
         });
-        await options.persist();
+        await persistState();
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
 
@@ -788,7 +1291,7 @@ export function createProviderIssueHandoffService(
           accepted_at: latestExisting.accepted_at,
           updated_at: latestExisting.updated_at
         });
-        await options.persist();
+        await persistState();
         return { kind: 'ignored', reason: 'provider_issue_handoff_inflight', claim };
       }
 
@@ -804,79 +1307,92 @@ export function createProviderIssueHandoffService(
             run_id: latestRun.runId,
             run_manifest_path: latestRun.manifestPath,
           });
-          await options.persist();
+          await persistState();
           return { kind: 'ignored', reason: 'provider_issue_release_cancel_inflight', claim };
         }
-        const launchToken = createProviderLaunchToken();
-        const inflightClaim = upsertProviderIntakeClaim(options.state, {
+        const claim = upsertProviderIntakeClaim(options.state, {
           ...latestClaimBase,
           task_id: latestRun.taskId,
-          mapping_source: mappingSource,
-          state: 'resuming',
-          reason: 'provider_issue_resume_launched',
+          mapping_source: latestExisting?.mapping_source ?? mappingSource,
+          state: 'resumable',
+          reason: 'provider_issue_rehydrated_resumable_run',
           run_id: latestRun.runId,
           run_manifest_path: latestRun.manifestPath,
-          launch_source: PROVIDER_LAUNCH_SOURCE,
-          launch_token: launchToken
+          ...buildQueuedProviderRetryFields({
+            claim: latestRetryStateBase,
+            previousRun: latestRun,
+            preserveCurrentAttempt: latestExisting?.retry_queued === true,
+            preserveExistingDueAt: latestExisting?.retry_queued === true,
+            error: resolveProviderRetryErrorFromRun(latestRun),
+            delayType: 'failure'
+          })
         });
-        await options.persist();
-        try {
-          await options.launcher.resume({
-            runId: latestRun.runId,
-            actor: 'control-host',
-            reason: 'provider-accepted-issue',
-            launchToken
-          });
-        } catch (error) {
-          const claim = upsertProviderIntakeClaim(options.state, {
-            ...latestClaimBase,
-            task_id: latestRun.taskId,
-            mapping_source: mappingSource,
-            state: 'handoff_failed',
-            reason: `provider_issue_resume_failed:${(error as Error)?.message ?? String(error)}`,
-            run_id: latestRun.runId,
-            run_manifest_path: latestRun.manifestPath,
-            launch_source: PROVIDER_LAUNCH_SOURCE,
-            launch_token: launchToken
-          });
-          await options.persist();
-          throw new Error(`Failed to resume provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
-        }
-        scheduleBestEffortRehydrateWithRefreshLock();
-        return { kind: 'resume', reason: 'provider_issue_resume_launched', claim: inflightClaim };
+        await persistState();
+        return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_rehydrated_resumable_run', claim };
       }
 
       // Older manifests may predate explicit issue_updated_at recording. Fall back to the
       // run's started_at so restart-time duplicate deliveries remain older than the
-      // completed child run, while issue updates that happened after the old run started
-      // can still relaunch.
+      // completed child run. Direct webhook intake is not the scheduler-owned relaunch
+      // path after a successful worker exit, so newer issue updates stay pending until
+      // refresh can relaunch unless we are retrying an explicit failed relaunch attempt.
       const latestCompletedClaimIssueUpdatedAt =
         latestExisting?.state === 'completed' ? latestExisting.issue_updated_at ?? null : null;
       const latestCompletedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
         latestCompletedClaimIssueUpdatedAt,
         latestRun?.issueUpdatedAt ?? latestRun?.startedAt ?? null
       );
-      if (
+      const retryingFailedRelaunch =
         latestRun?.status === 'succeeded' &&
-        (
-          input.trackedIssue.updated_at === null ||
-          isTrackedIssueNonIncreasing({
-            existingIssueUpdatedAt: latestCompletedIssueUpdatedAt,
-            nextIssueUpdatedAt: input.trackedIssue.updated_at
-          })
-        )
-      ) {
-        const claim = upsertProviderIntakeClaim(options.state, {
-          ...latestClaimBase,
-          task_id: latestRun.taskId,
-          mapping_source: mappingSource,
-          state: 'completed',
-          reason: 'provider_issue_run_already_completed',
-          run_id: latestRun.runId,
-          run_manifest_path: latestRun.manifestPath,
+        latestExisting?.state === 'handoff_failed' &&
+        latestExisting.launch_source === PROVIDER_LAUNCH_SOURCE &&
+        hasFailedProviderStartReason(latestExisting.reason) &&
+        !isTrackedIssueStale({
+          existingIssueUpdatedAt: latestExisting.issue_updated_at ?? latestCompletedIssueUpdatedAt,
+          nextIssueUpdatedAt: input.trackedIssue.updated_at
         });
-        await options.persist();
-        return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
+      if (latestRun?.status === 'succeeded' && latestExisting?.state !== 'released') {
+        if (!retryingFailedRelaunch) {
+          if (
+            input.trackedIssue.updated_at === null ||
+            isTrackedIssueNonIncreasing({
+              existingIssueUpdatedAt: latestCompletedIssueUpdatedAt,
+              nextIssueUpdatedAt: input.trackedIssue.updated_at
+            })
+          ) {
+            const claim = upsertProviderIntakeClaim(options.state, {
+              ...latestClaimBase,
+              task_id: latestRun.taskId,
+              mapping_source: mappingSource,
+              state: 'completed',
+              reason: 'provider_issue_run_already_completed',
+              run_id: latestRun.runId,
+              run_manifest_path: latestRun.manifestPath,
+            });
+            await persistState();
+            return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
+          }
+
+          const claim = upsertProviderIntakeClaim(options.state, {
+            ...latestClaimBase,
+            task_id: latestRun.taskId,
+            mapping_source: latestExisting?.mapping_source ?? mappingSource,
+            state: 'accepted',
+            reason: PROVIDER_POST_WORKER_EXIT_REFRESH_PENDING_REASON,
+            run_id: latestRun.runId,
+            run_manifest_path: latestRun.manifestPath,
+            ...buildQueuedProviderRetryFields({
+              claim: latestExisting ?? clearProviderRetryFields(),
+              previousRun: latestRun,
+              error: null,
+              preserveCurrentAttempt: latestExisting?.retry_queued === true,
+              preserveExistingDueAt: latestExisting?.retry_queued === true,
+              delayType: 'continuation'
+            })
+          });
+          await persistState();
+          return { kind: 'ignored', reason: PROVIDER_POST_WORKER_EXIT_REFRESH_PENDING_REASON, claim };
+        }
       }
 
       const launchToken = createProviderLaunchToken();
@@ -889,9 +1405,15 @@ export function createProviderIssueHandoffService(
         run_id: null,
         run_manifest_path: null,
         launch_source: PROVIDER_LAUNCH_SOURCE,
-        launch_token: launchToken
+        launch_token: launchToken,
+        ...buildProviderRetryLaunchFields({
+          claim: latestRetryStateBase,
+          previousRun: latestRun,
+          preserveCurrentAttempt: latestExisting?.retry_queued === true,
+          seedFromPreviousRun: retryingFailedRelaunch
+        })
       });
-      await options.persist();
+      await persistState();
       let startedRun: { runId: string; manifestPath: string } | null = null;
       try {
         startedRun = await options.launcher.start({
@@ -901,6 +1423,9 @@ export function createProviderIssueHandoffService(
           issueId: input.trackedIssue.id,
           issueIdentifier: input.trackedIssue.identifier,
           issueUpdatedAt: input.trackedIssue.updated_at,
+          workspaceId: input.trackedIssue.workspace_id,
+          teamId: input.trackedIssue.team_id,
+          projectId: input.trackedIssue.project_id,
           launchToken
         });
       } catch (error) {
@@ -913,9 +1438,16 @@ export function createProviderIssueHandoffService(
           run_id: null,
           run_manifest_path: null,
           launch_source: PROVIDER_LAUNCH_SOURCE,
-          launch_token: launchToken
+          launch_token: launchToken,
+          ...buildQueuedProviderRetryFields({
+            claim: latestRetryStateBase,
+            previousRun: latestRun,
+            error: (error as Error)?.message ?? String(error),
+            preserveCurrentAttempt: latestExisting?.retry_queued === true,
+            delayType: 'failure'
+          })
         });
-        await options.persist();
+        await persistState();
         throw new Error(`Failed to start provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
       }
       const claim = startedRun
@@ -928,18 +1460,270 @@ export function createProviderIssueHandoffService(
             run_id: startedRun.runId,
             run_manifest_path: startedRun.manifestPath,
             launch_source: PROVIDER_LAUNCH_SOURCE,
-            launch_token: launchToken
+            launch_token: launchToken,
+            ...buildProviderRetryLaunchFields({
+              claim: latestRetryStateBase,
+              previousRun: latestRun,
+              preserveCurrentAttempt: latestExisting?.retry_queued === true,
+              seedFromPreviousRun: retryingFailedRelaunch
+            })
           })
         : inflightClaim;
       try {
         if (startedRun) {
-          await options.persist();
+          await persistState();
           options.publishRuntime?.('provider-intake.start');
         }
         return { kind: 'start', reason: 'provider_issue_start_launched', claim };
       } finally {
         scheduleBestEffortRehydrateWithRefreshLock();
       }
+    };
+
+  const runRefreshCycle = async (pollInput?: ProviderIssueHandoffPollInput): Promise<void> => {
+    const previousPollTrackedIssueRefetch = pollTrackedIssueRefetch;
+    if (pollInput?.refetchTrackedIssues) {
+      pollTrackedIssueRefetch = pollInput.refetchTrackedIssues;
+    }
+
+    try {
+      await runWithRefreshLifecycleLock(async () => {
+        const result = await rehydrateNow();
+        if (result.hasPendingClaims) {
+          scheduleBestEffortRehydrateWithRefreshLock();
+        }
+
+        const trackedIssuesByKey = pollInput ? buildTrackedIssuePollMap(pollInput.trackedIssues) : null;
+        const consumedTrackedIssueKeys = new Set<string>();
+        if (!options.resolveTrackedIssue && !trackedIssuesByKey) {
+          return;
+        }
+
+        const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
+        const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
+        const existingProviderKeys = new Set(options.state.claims.map((claim) => claim.provider_key));
+        const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
+        const occupiedPollDispatchKeys = new Set<string>();
+        const noteOccupiedPollDispatchSlot = (
+          providerKey: string,
+          trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
+        ): void => {
+          if (occupiedPollDispatchKeys.has(providerKey)) {
+            return;
+          }
+          occupiedPollDispatchKeys.add(providerKey);
+          pollDispatchBudget.noteOccupied(trackedIssue);
+        };
+
+        for (const run of discoveredRuns) {
+          if (run.status !== 'in_progress') {
+            continue;
+          }
+          const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+          if (existingProviderKeys.has(providerKey)) {
+            continue;
+          }
+          noteOccupiedPollDispatchSlot(
+            providerKey,
+            trackedIssuesByKey?.get(providerKey) ?? { state: null }
+          );
+        }
+
+      for (const claim of [...options.state.claims]) {
+        try {
+          const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
+          const claimRuns =
+            runsByProviderIssue.get(claimProviderKey) ?? [];
+          const activeRun = claimRuns.find((run) => run.status === 'in_progress') ?? null;
+          const releaseRun = resolveProviderReleaseRun(claim, claimRuns);
+          const latestRun = claimRuns[0] ?? null;
+          const resolution = await resolveRefreshTrackedIssueResolution({
+            claim,
+            trackedIssuesByKey,
+            consumedTrackedIssueKeys
+          });
+
+          if (resolution.kind === 'skip') {
+            if (claim.state === 'released') {
+              void retryReleaseCancel({
+                releaseRun,
+                reason: claim.reason ?? 'provider_issue_released'
+              });
+            }
+            continue;
+          }
+          if (resolution.kind === 'release') {
+            await releaseClaim({
+              claim,
+              nextReason: `provider_issue_released:${resolution.reason}`,
+              releaseRun,
+              trackedIssue: resolution.trackedIssue,
+              cleanupWorkspace: resolution.cleanupWorkspace
+            });
+            continue;
+          }
+
+          if (
+            claim.state === 'released' &&
+            shouldAttemptReleaseCancel(releaseRun) &&
+            releaseRun?.status !== null
+          ) {
+            void retryReleaseCancel({
+              releaseRun,
+              reason: claim.reason ?? 'provider_issue_released'
+            });
+            continue;
+          }
+
+          if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
+            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            continue;
+          }
+
+          const currentClaim =
+            claim.retry_queued === true
+              ? await ensureQueuedProviderRetryDeadline({
+                  claim,
+                  trackedIssue: resolution.trackedIssue,
+                  previousRun: latestRun
+                })
+              : claim;
+          if (currentClaim.retry_queued === true) {
+            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            continue;
+          }
+
+          if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+            const queuedRetryFields = buildQueuedProviderRetryFields({
+              claim: currentClaim,
+              previousRun: latestRun,
+              error: resolveProviderRetryErrorFromRun(latestRun),
+              delayType: 'failure'
+            });
+            const transitioned = hasProviderClaimTransitioned(currentClaim, {
+              state: 'resumable',
+              reason: 'provider_issue_rehydrated_resumable_run',
+              task_id: latestRun.taskId,
+              run_id: latestRun.runId,
+              run_manifest_path: latestRun.manifestPath,
+              ...queuedRetryFields
+            });
+            upsertProviderIntakeClaim(options.state, {
+              ...currentClaim,
+              issue_identifier: resolution.trackedIssue.identifier,
+              issue_title: resolution.trackedIssue.title,
+              issue_state: resolution.trackedIssue.state,
+              issue_state_type: resolution.trackedIssue.state_type,
+              issue_updated_at: resolution.trackedIssue.updated_at,
+              task_id: latestRun.taskId,
+              state: 'resumable',
+              reason: 'provider_issue_rehydrated_resumable_run',
+              run_id: latestRun.runId,
+              run_manifest_path: latestRun.manifestPath,
+              ...queuedRetryFields
+            });
+            if (transitioned) {
+              await persistState();
+              options.publishRuntime?.('provider-intake.refresh');
+            }
+            if (queuedRetryFields.retry_queued === true) {
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            }
+            continue;
+          }
+
+          if (latestRun?.status === 'succeeded') {
+            const queuedRetryFields = buildQueuedProviderRetryFields({
+              claim: currentClaim,
+              previousRun: latestRun,
+              error: null,
+              delayType: 'continuation'
+            });
+            const transitioned = hasProviderClaimTransitioned(currentClaim, {
+              state: 'completed',
+              reason: 'provider_issue_rehydrated_completed_run',
+              task_id: latestRun.taskId,
+              run_id: latestRun.runId,
+              run_manifest_path: latestRun.manifestPath,
+              ...queuedRetryFields
+            });
+            upsertProviderIntakeClaim(options.state, {
+              ...currentClaim,
+              issue_identifier: resolution.trackedIssue.identifier,
+              issue_title: resolution.trackedIssue.title,
+              issue_state: resolution.trackedIssue.state,
+              issue_state_type: resolution.trackedIssue.state_type,
+              issue_updated_at: resolution.trackedIssue.updated_at,
+              task_id: latestRun.taskId,
+              state: 'completed',
+              reason: 'provider_issue_rehydrated_completed_run',
+              run_id: latestRun.runId,
+              run_manifest_path: latestRun.manifestPath,
+              ...queuedRetryFields
+            });
+            if (transitioned) {
+              await persistState();
+              options.publishRuntime?.('provider-intake.refresh');
+            }
+            if (queuedRetryFields.retry_queued === true) {
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            }
+            continue;
+          }
+
+          if (!latestRun) {
+            await launchStartForTrackedIssue({
+              claim: currentClaim,
+              trackedIssue: resolution.trackedIssue,
+              reason: 'provider_issue_refresh_start_launched'
+            });
+            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+          }
+        } catch {
+          continue;
+        }
+      }
+
+        if (!pollInput) {
+          return;
+        }
+
+        for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(pollInput.trackedIssues)) {
+          const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
+          if (existingProviderKeys.has(providerKey) || consumedTrackedIssueKeys.has(providerKey)) {
+            continue;
+          }
+          if (!pollDispatchBudget.canDispatch(trackedIssue)) {
+            if (!pollDispatchBudget.hasGlobalSlots()) {
+              break;
+            }
+            continue;
+          }
+          consumedTrackedIssueKeys.add(providerKey);
+          try {
+            const handoffResult = await processTrackedIssueCandidate({
+              trackedIssue,
+              deliveryId: null,
+              event: 'poll_tick',
+              action: 'reconcile',
+              webhookTimestamp: null
+            });
+            if (handoffResult.kind !== 'ignored' || handoffResult.claim.retry_queued === true) {
+              noteOccupiedPollDispatchSlot(providerKey, trackedIssue);
+            }
+          } catch {
+            continue;
+          }
+        }
+      });
+    } finally {
+      pollTrackedIssueRefetch = previousPollTrackedIssueRefetch;
+    }
+  };
+
+  return {
+    async handleAcceptedTrackedIssue(input): Promise<ProviderIssueHandoffResult> {
+      return await processTrackedIssueCandidate(input);
     },
 
     async rehydrate(): Promise<void> {
@@ -952,114 +1736,11 @@ export function createProviderIssueHandoffService(
     },
 
     async refresh(): Promise<void> {
-      await runWithRefreshLifecycleLock(async () => {
-        const result = await rehydrateNow();
-        if (result.hasPendingClaims) {
-          scheduleBestEffortRehydrateWithRefreshLock();
-        }
-        if (!options.resolveTrackedIssue) {
-          return;
-        }
+      await runRefreshCycle(await resolveRefreshPollInput());
+    },
 
-        const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
-        const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
-        for (const claim of [...options.state.claims]) {
-          try {
-            const claimRuns =
-              runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
-            const activeRun = claimRuns.find((run) => run.status === 'in_progress') ?? null;
-            const releaseRun = resolveProviderReleaseRun(claim, claimRuns);
-            const latestRun = claimRuns[0] ?? null;
-            const resolution = await options.resolveTrackedIssue({
-              provider: claim.provider,
-              issueId: claim.issue_id
-            });
-
-            if (resolution.kind === 'skip') {
-              if (claim.state === 'released') {
-                void retryReleaseCancel({
-                  releaseRun,
-                  reason: claim.reason ?? 'provider_issue_released'
-                });
-              }
-              continue;
-            }
-            if (resolution.kind === 'release') {
-              await releaseClaim({
-                claim,
-                nextReason: `provider_issue_released:${resolution.reason}`,
-                releaseRun,
-                trackedIssue: null,
-                cleanupWorkspace: false
-              });
-              continue;
-            }
-
-            const eligibility = assessProviderTrackedIssueEligibility(resolution.trackedIssue);
-            if (!eligibility.eligible) {
-              await releaseClaim({
-                claim,
-                nextReason: eligibility.releaseReason,
-                releaseRun,
-                trackedIssue: resolution.trackedIssue,
-                cleanupWorkspace: eligibility.cleanupWorkspace
-              });
-              continue;
-            }
-
-            if (
-              claim.state === 'released' &&
-              shouldAttemptReleaseCancel(releaseRun) &&
-              releaseRun?.status !== null
-            ) {
-              void retryReleaseCancel({
-                releaseRun,
-                reason: claim.reason ?? 'provider_issue_released'
-              });
-              continue;
-            }
-
-            if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
-              continue;
-            }
-
-            // Refresh is the scheduler-owned continuation/retry path, not webhook dedupe.
-            // Once a child run reaches a terminal state, an unchanged active issue remains
-            // eligible for another session until provider state leaves the active set.
-            if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
-              if (hasPendingReleaseCancel(releaseRun?.manifestPath ?? latestRun.manifestPath)) {
-                continue;
-              }
-              await launchResumeForRun({
-                claim,
-                trackedIssue: resolution.trackedIssue,
-                run: latestRun,
-                reason: 'provider_issue_refresh_resume_launched'
-              });
-              continue;
-            }
-
-            if (latestRun?.status === 'succeeded') {
-              await launchStartForTrackedIssue({
-                claim,
-                trackedIssue: resolution.trackedIssue,
-                reason: 'provider_issue_continuation_launched'
-              });
-              continue;
-            }
-
-            if (!latestRun) {
-              await launchStartForTrackedIssue({
-                claim,
-                trackedIssue: resolution.trackedIssue,
-                reason: 'provider_issue_refresh_start_launched'
-              });
-            }
-          } catch {
-            continue;
-          }
-        }
-      });
+    async poll(input: ProviderIssueHandoffPollInput): Promise<void> {
+      await runRefreshCycle(input);
     }
   };
 }
@@ -1069,6 +1750,17 @@ function isTrackedIssueStale(input: {
   nextIssueUpdatedAt: string | null;
 }): boolean {
   return compareTrackedIssueUpdatedAt(input) === 'older';
+}
+
+function hasFailedProviderStartReason(reason: string | null | undefined): boolean {
+  return Boolean(
+    reason &&
+      (
+        reason.startsWith('provider_issue_start_failed:') ||
+        reason.startsWith('provider_issue_refresh_start_failed:') ||
+        reason.startsWith(`${PROVIDER_POST_WORKER_EXIT_START_FAILED_REASON}:`)
+      )
+  );
 }
 
 function isTrackedIssueNonIncreasing(input: {
@@ -1269,6 +1961,136 @@ function normalizeTrackedIssueState(value: string | null | undefined): string | 
   return normalized.length > 0 ? normalized : null;
 }
 
+function createProviderPollDispatchBudget(featureToggles: Record<string, unknown> | null | undefined): {
+  canDispatch(trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): boolean;
+  noteOccupied(trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): void;
+  hasGlobalSlots(): boolean;
+} {
+  const limits = resolveProviderPollDispatchLimits(featureToggles);
+  let occupiedGlobalSlots = 0;
+  const occupiedStateSlots = new Map<string, number>();
+
+  const hasGlobalSlots = (): boolean => occupiedGlobalSlots < limits.maxConcurrentAgents;
+
+  const canDispatch = (trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): boolean => {
+    if (!hasGlobalSlots()) {
+      return false;
+    }
+    const normalizedState = normalizeTrackedIssueState(trackedIssue.state);
+    if (!normalizedState) {
+      return true;
+    }
+    const usedSlots = occupiedStateSlots.get(normalizedState) ?? 0;
+    const stateLimit = limits.maxConcurrentAgentsByState.get(normalizedState) ?? limits.maxConcurrentAgents;
+    return usedSlots < stateLimit;
+  };
+
+  const noteOccupied = (trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>): void => {
+    occupiedGlobalSlots += 1;
+    const normalizedState = normalizeTrackedIssueState(trackedIssue.state);
+    if (!normalizedState) {
+      return;
+    }
+    occupiedStateSlots.set(normalizedState, (occupiedStateSlots.get(normalizedState) ?? 0) + 1);
+  };
+
+  return {
+    canDispatch,
+    noteOccupied,
+    hasGlobalSlots
+  };
+}
+
+function resolveProviderPollDispatchLimits(
+  featureToggles: Record<string, unknown> | null | undefined
+): {
+  maxConcurrentAgents: number;
+  maxConcurrentAgentsByState: Map<string, number>;
+} {
+  const agentConfig = readProviderPollAgentConfig(featureToggles);
+  return {
+    maxConcurrentAgents:
+      readPositiveIntegerValue(agentConfig, 'max_concurrent_agents', 'maxConcurrentAgents') ??
+      DEFAULT_PROVIDER_MAX_CONCURRENT_AGENTS,
+    maxConcurrentAgentsByState: readPositiveIntegerMap(
+      agentConfig,
+      'max_concurrent_agents_by_state',
+      'maxConcurrentAgentsByState'
+    )
+  };
+}
+
+function readProviderPollAgentConfig(
+  featureToggles: Record<string, unknown> | null | undefined
+): Record<string, unknown> | null {
+  const direct = readRecordValue(featureToggles, 'agent');
+  const nested = readRecordValue(readRecordValue(featureToggles, 'coordinator'), 'agent');
+  if (!direct && !nested) {
+    return null;
+  }
+  return {
+    ...(nested ?? {}),
+    ...(direct ?? {})
+  };
+}
+
+function readPositiveIntegerMap(
+  record: Record<string, unknown> | null | undefined,
+  ...keys: string[]
+): Map<string, number> {
+  const value = readRecordValue(record, ...keys);
+  if (!value) {
+    return new Map<string, number>();
+  }
+
+  const entries = new Map<string, number>();
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    const normalizedKey = normalizeTrackedIssueState(rawKey);
+    const parsedValue = readPositiveIntegerValue({ value: rawValue }, 'value');
+    if (!normalizedKey || parsedValue === null) {
+      continue;
+    }
+    entries.set(normalizedKey, parsedValue);
+  }
+  return entries;
+}
+
+function readPositiveIntegerValue(
+  record: Record<string, unknown> | null | undefined,
+  ...keys: string[]
+): number | null {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        continue;
+      }
+      const parsed = Number.parseInt(trimmed, 10);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+function readRecordValue(
+  record: Record<string, unknown> | null | undefined,
+  ...keys: string[]
+): Record<string, unknown> | null {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+  }
+  return null;
+}
+
 async function cleanupReleasedProviderWorkspace(
   repoRoot: string,
   taskId: string,
@@ -1344,6 +2166,7 @@ async function discoverProviderIssueRuns(
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
         status: readStringValue(manifest, 'status'),
+        summary: readStringValue(manifest, 'summary'),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
         startedAt: readStringValue(manifest, 'started_at'),
         updatedAt: readStringValue(manifest, 'updated_at', 'started_at')
@@ -1382,16 +2205,150 @@ function groupProviderIssueRuns(records: ProviderIssueRunRecord[]): Map<string, 
   return grouped;
 }
 
+function buildProviderRetryLaunchFields(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'>;
+  previousRun: ProviderIssueRunRecord | null;
+  preserveCurrentAttempt?: boolean;
+  seedFromPreviousRun?: boolean;
+}): Pick<
+  ProviderIntakeClaimRecord,
+  'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+> {
+  // A launched run only carries retry metadata when it is consuming an existing
+  // queued retry. Historical successful runs alone must not fabricate retry attempts.
+  const retryAttempt = input.preserveCurrentAttempt
+    ? resolveCurrentProviderRetryAttempt(input.claim, input.previousRun)
+    : input.seedFromPreviousRun === true
+      ? resolveNextProviderRetryAttempt(input.claim, input.previousRun)
+      : null;
+  if (retryAttempt === null) {
+    return clearProviderRetryFields();
+  }
+  return {
+    retry_queued: false,
+    retry_attempt: retryAttempt,
+    retry_due_at: null,
+    retry_error: null
+  };
+}
+
+function buildQueuedProviderRetryFields(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt' | 'retry_due_at'>;
+  previousRun: ProviderIssueRunRecord | null;
+  error: string | null;
+  preserveCurrentAttempt?: boolean;
+  preserveExistingDueAt?: boolean;
+  delayType: ProviderRetryDelayType;
+}): Pick<
+  ProviderIntakeClaimRecord,
+  'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+> {
+  const retryAttempt = input.preserveCurrentAttempt
+    ? resolveCurrentProviderRetryAttempt(input.claim, input.previousRun)
+    : resolveNextProviderRetryAttempt(input.claim, input.previousRun);
+  if (retryAttempt === null) {
+    return clearProviderRetryFields();
+  }
+  return {
+    retry_queued: true,
+    retry_attempt: retryAttempt,
+    retry_due_at:
+      input.preserveExistingDueAt && isValidProviderRetryTimestamp(input.claim.retry_due_at)
+        ? input.claim.retry_due_at
+        : buildProviderRetryDueAt(input.delayType, retryAttempt),
+    retry_error: input.error
+  };
+}
+
+function clearProviderRetryFields(): Pick<
+  ProviderIntakeClaimRecord,
+  'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+> {
+  return {
+    retry_queued: null,
+    retry_attempt: null,
+    retry_due_at: null,
+    retry_error: null
+  };
+}
+
+function resolveCurrentProviderRetryAttempt(
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_attempt'>,
+  previousRun: ProviderIssueRunRecord | null
+): number | null {
+  if (typeof claim.retry_attempt === 'number' && claim.retry_attempt > 0) {
+    return claim.retry_attempt;
+  }
+  return previousRun ? 1 : null;
+}
+
+function resolveNextProviderRetryAttempt(
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_attempt'>,
+  previousRun: ProviderIssueRunRecord | null
+): number | null {
+  if (typeof claim.retry_attempt === 'number' && claim.retry_attempt > 0) {
+    return claim.retry_attempt + 1;
+  }
+  return previousRun ? 1 : null;
+}
+
+function resolveProviderRetryErrorFromRun(run: ProviderIssueRunRecord | null): string | null {
+  if (run?.status !== 'failed') {
+    return null;
+  }
+  return run.summary ?? null;
+}
+
+type ProviderRetryDelayType = 'continuation' | 'failure';
+
+function buildProviderRetryDueAt(delayType: ProviderRetryDelayType, attempt: number): string {
+  return new Date(Date.now() + computeProviderRetryDelayMs(delayType, attempt)).toISOString();
+}
+
+function computeProviderRetryDelayMs(delayType: ProviderRetryDelayType, attempt: number): number {
+  if (delayType === 'continuation') {
+    return PROVIDER_CONTINUATION_RETRY_DELAY_MS;
+  }
+  const retryOrdinal = Math.max(attempt, 1);
+  const maxDelayPower = Math.min(retryOrdinal - 1, 10);
+  return Math.min(
+    PROVIDER_FAILURE_RETRY_BASE_MS * (1 << maxDelayPower),
+    PROVIDER_FAILURE_RETRY_MAX_BACKOFF_MS
+  );
+}
+
+function isValidProviderRetryTimestamp(value: string | null | undefined): value is string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return false;
+  }
+  return Number.isFinite(Date.parse(value));
+}
+
 function hasProviderClaimTransitioned(
   claim: ProviderIntakeClaimRecord,
-  next: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'task_id' | 'run_id' | 'run_manifest_path'>
+  next: Pick<
+    ProviderIntakeClaimRecord,
+    | 'state'
+    | 'reason'
+    | 'task_id'
+    | 'run_id'
+    | 'run_manifest_path'
+    | 'retry_queued'
+    | 'retry_attempt'
+    | 'retry_due_at'
+    | 'retry_error'
+  >
 ): boolean {
   return (
     claim.state !== next.state ||
     claim.reason !== next.reason ||
     claim.task_id !== next.task_id ||
     claim.run_id !== next.run_id ||
-    claim.run_manifest_path !== next.run_manifest_path
+    claim.run_manifest_path !== next.run_manifest_path ||
+    (claim.retry_queued ?? null) !== (next.retry_queued ?? null) ||
+    (claim.retry_attempt ?? null) !== (next.retry_attempt ?? null) ||
+    (claim.retry_due_at ?? null) !== (next.retry_due_at ?? null) ||
+    (claim.retry_error ?? null) !== (next.retry_error ?? null)
   );
 }
 
@@ -1405,6 +2362,20 @@ function isProviderClaimRehydrationTimedOut(
     return false;
   }
   return observedAt - launchedAt >= BEST_EFFORT_REHYDRATE_TIMEOUT_MS;
+}
+
+function resolveProviderRetryDelayType(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason'>;
+  previousRun: ProviderIssueRunRecord | null;
+}): ProviderRetryDelayType {
+  if (
+    input.claim.reason === PROVIDER_POST_WORKER_EXIT_REFRESH_PENDING_REASON ||
+    input.previousRun?.status === 'succeeded' ||
+    input.claim.state === 'accepted'
+  ) {
+    return 'continuation';
+  }
+  return 'failure';
 }
 
 function resolveProviderReleaseRun(
@@ -1468,6 +2439,7 @@ function resolveProviderReleaseRun(
       runId: claim.run_id ?? claim.task_id,
       manifestPath: claim.run_manifest_path,
       status: null,
+      summary: null,
       issueUpdatedAt: claim.issue_updated_at,
       startedAt: null,
       updatedAt: claim.updated_at
@@ -1490,6 +2462,109 @@ function resolveProviderClaimRunIdentity(
     return claimRuns.find((run) => run.runId === claim.run_id) ?? null;
   }
   return null;
+}
+
+function shouldQueuePostWorkerRetryClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'retry_queued' | 'issue_state' | 'issue_state_type'
+  >
+): boolean {
+  if (claim.retry_queued === true) {
+    return true;
+  }
+  const normalizedState = normalizeTrackedIssueState(claim.issue_state);
+  const normalizedStateType = normalizeTrackedIssueState(claim.issue_state_type);
+  return (
+    normalizedStateType === 'started' ||
+    (normalizedState !== null && ACTIVE_PROVIDER_ISSUE_STATES.has(normalizedState))
+  );
+}
+
+function buildTrackedIssuePollMap(
+  trackedIssues: LiveLinearTrackedIssue[]
+): Map<string, LiveLinearTrackedIssue> {
+  const trackedIssuesByKey = new Map<string, LiveLinearTrackedIssue>();
+  for (const trackedIssue of trackedIssues) {
+    const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
+    if (trackedIssuesByKey.has(providerKey)) {
+      continue;
+    }
+    trackedIssuesByKey.set(providerKey, trackedIssue);
+  }
+  return trackedIssuesByKey;
+}
+
+function resolveTrackedIssuePollResolution(
+  claim: Pick<ProviderIntakeClaimRecord, 'provider' | 'issue_id'>,
+  trackedIssuesByKey: Map<string, LiveLinearTrackedIssue>
+):
+  | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
+  | {
+      kind: 'release';
+      reason: string;
+      trackedIssue: Pick<
+        LiveLinearTrackedIssue,
+        'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
+      > | null;
+      cleanupWorkspace: boolean;
+    } {
+  const trackedIssue = trackedIssuesByKey.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? null;
+  if (!trackedIssue) {
+    return {
+      kind: 'release',
+      reason: 'not_found',
+      trackedIssue: null,
+      cleanupWorkspace: false
+    };
+  }
+
+  const eligibility = assessProviderTrackedIssueEligibility(trackedIssue);
+  if (eligibility.eligible) {
+    return {
+      kind: 'ready',
+      trackedIssue
+    };
+  }
+
+  return {
+    kind: 'release',
+    reason: stripProviderIssueReleasedPrefix(eligibility.releaseReason),
+    trackedIssue,
+    cleanupWorkspace: eligibility.cleanupWorkspace
+  };
+}
+
+function buildTrackedIssueSnapshotFromClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'issue_title' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >
+): LiveLinearTrackedIssue {
+  return {
+    provider: 'linear',
+    id: claim.issue_id,
+    identifier: claim.issue_identifier,
+    title: claim.issue_title,
+    url: null,
+    state: claim.issue_state,
+    state_type: claim.issue_state_type,
+    workspace_id: null,
+    team_id: null,
+    team_key: null,
+    team_name: null,
+    project_id: null,
+    project_name: null,
+    updated_at: claim.issue_updated_at,
+    blocked_by: [],
+    recent_activity: []
+  };
+}
+
+function stripProviderIssueReleasedPrefix(reason: string): string {
+  return reason.startsWith('provider_issue_released:')
+    ? reason.slice('provider_issue_released:'.length)
+    : reason;
 }
 
 function shouldAttemptReleaseCancel(run: ProviderIssueRunRecord | null): boolean {
@@ -1525,24 +2600,4 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
     }
   }
   return null;
-}
-
-function scheduleBestEffortRehydrate(
-  perform: () => Promise<{ hasPendingClaims: boolean }>,
-  attempt = 1
-): void {
-  const timer = setTimeout(() => {
-    void perform()
-      .then((result) => {
-        if (result.hasPendingClaims && attempt < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
-          scheduleBestEffortRehydrate(perform, attempt + 1);
-        }
-      })
-      .catch(() => {
-        if (attempt < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
-          scheduleBestEffortRehydrate(perform, attempt + 1);
-        }
-      });
-  }, BEST_EFFORT_REHYDRATE_DELAY_MS);
-  timer.unref?.();
 }

@@ -118,13 +118,25 @@ describe('ObservabilityApiController', () => {
         readCompatibilityProjection: async () => ({
           running: [],
           retrying: [],
+          codexTotals: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0,
+            seconds_running: 0
+          },
+          rateLimits: null,
           selected: null,
           dispatchPilot: null,
           tracked: null
         })
       },
       readRequestBody: async () => ({}),
-      requestRefresh: async () => {},
+      requestRefresh: async () => ({
+        queued: true,
+        coalesced: false,
+        requested_at: '2026-03-21T15:02:00.000Z',
+        operations: ['reconcile']
+      }),
       readDispatchEvaluation: async () => ({
         issueIdentifier: null,
         evaluation: {
@@ -160,8 +172,74 @@ describe('ObservabilityApiController', () => {
     });
   });
 
-  it('does not fabricate session, turn, or retry counters in compatibility projections', () => {
+  it('synthesizes the refresh acknowledgement when the adapter returns no payload', async () => {
+    const { res, state } = createResponseRecorder();
+    const handled = await handleObservabilityApiRequest({
+      req: {
+        method: 'POST',
+        url: '/api/v1/refresh'
+      } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res,
+      presenterContext: {
+        controlStore: {
+          snapshot: () => CONTROL_STATE
+        },
+        paths: {
+          manifestPath: '/repo/.runs/task-1038/cli/run-1/manifest.json',
+          runDir: '/repo/.runs/task-1038/cli/run-1',
+          logPath: '/repo/.runs/task-1038/cli/run-1/log.txt'
+        },
+        readCompatibilityProjection: async () => ({
+          running: [],
+          retrying: [],
+          codexTotals: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0,
+            seconds_running: 0
+          },
+          rateLimits: null,
+          selected: null,
+          dispatchPilot: null,
+          tracked: null
+        })
+      },
+      readRequestBody: async () => ({ action: 'refresh' }),
+      requestRefresh: async () => undefined as never,
+      readDispatchEvaluation: async () => ({
+        issueIdentifier: null,
+        evaluation: {
+          summary: {
+            status: 'disabled',
+            reason: 'pilot_disabled_default_off',
+            source_status: 'disabled',
+            advisory_only: true,
+            source_setup: null
+          },
+          recommendation: null,
+          failure: null
+        }
+      })
+    });
+
+    expect(handled).toBe(true);
+    expect(state.statusCode).toBe(202);
+    expect(state.body).toMatchObject({
+      queued: true,
+      coalesced: false,
+      operations: ['poll', 'reconcile'],
+      traceability: {
+        decision: 'acknowledged',
+        reason: 'refresh_requested',
+        requested_action: 'refresh'
+      }
+    });
+    expect((state.body as { requested_at?: string }).requested_at).toBeTruthy();
+  });
+
+  it('keeps running counters null without proof and surfaces authoritative retry metadata when present', () => {
     const runningSource = buildCompatibilitySource('task-1311-running', {
+      compatibilityState: 'In Progress',
       displayStatus: 'awaiting_input',
       statusReason: 'queued_questions',
       questionSummary: {
@@ -178,13 +256,26 @@ describe('ObservabilityApiController', () => {
       rawStatus: 'failed',
       displayStatus: 'failed',
       updatedAt: '2026-03-20T00:02:00.000Z',
-      summary: 'retry pending'
+      summary: 'retry pending',
+      providerRetryState: {
+        active: true,
+        attempt: 2,
+        due_at: '2026-03-20T00:03:00.000Z',
+        error: 'retry queued'
+      }
     });
 
     const projection = buildCompatibilityProjectionSnapshot({
       selected: runningSource,
       running: [runningSource],
       retrying: [retryingSource],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 60
+      },
+      rateLimits: null,
       dispatchPilot: null,
       tracked: null,
       providerIntake: null
@@ -193,6 +284,7 @@ describe('ObservabilityApiController', () => {
     expect(projection.running).toEqual([
       expect.objectContaining({
         issue_identifier: 'task-1311-running',
+        state: 'In Progress',
         display_state: 'awaiting_input',
         status_reason: 'queued_questions',
         session_id: null,
@@ -209,13 +301,97 @@ describe('ObservabilityApiController', () => {
         issue_identifier: 'task-1311-retrying',
         state: 'failed',
         session_id: null,
-        attempt: null
+        workspace_path: '/tmp/task-1311-retrying',
+        attempt: 2,
+        due_at: '2026-03-20T00:03:00.000Z',
+        error: 'retry queued'
       })
     ]);
-    const retryIssue = projection.issues.find((issue) => issue.issueIdentifier === 'task-1311-retrying');
-    expect(retryIssue?.payload.attempts).toEqual({
-      restart_count: null,
-      current_retry_attempt: null
+    expect(projection.codexTotals).toEqual({
+      input_tokens: 0,
+      output_tokens: 0,
+      total_tokens: 0,
+      seconds_running: 60
     });
+    const retryIssue = projection.issues.find((issue) => issue.issueIdentifier === 'task-1311-retrying');
+    expect(projection.issues.find((issue) => issue.issueIdentifier === 'task-1311-running')?.payload.status).toBe(
+      'running'
+    );
+    expect(retryIssue?.payload.status).toBe('retrying');
+    expect(retryIssue?.payload.attempts).toEqual({
+      restart_count: 1,
+      current_retry_attempt: 2
+    });
+  });
+
+  it('keeps running event telemetry aligned with the authoritative selected event when worker proof is stale', () => {
+    const runningSource = buildCompatibilitySource('task-1311-running', {
+      compatibilityState: 'In Progress',
+      displayStatus: 'awaiting_input',
+      statusReason: 'queued_questions',
+      updatedAt: '2026-03-20T00:02:00.000Z',
+      latestEvent: {
+        at: '2026-03-20T00:02:00.000Z',
+        event: 'pause',
+        message: 'Awaiting operator input',
+        requestedBy: 'telegram',
+        reason: 'queued_questions'
+      },
+      providerLinearWorkerProof: {
+        issue_id: 'task-1311-running-id',
+        issue_identifier: 'task-1311-running',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'task_complete',
+        last_message: 'done',
+        last_event_at: '2026-03-20T00:01:00.000Z',
+        tokens: {
+          input_tokens: 12,
+          output_tokens: 8,
+          total_tokens: 20
+        },
+        rate_limits: null,
+        owner_phase: 'turn_completed',
+        owner_status: 'in_progress',
+        workspace_path: '/tmp/task-1311-running',
+        end_reason: null,
+        updated_at: '2026-03-20T00:01:00.000Z'
+      }
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: runningSource,
+      running: [runningSource],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20,
+        seconds_running: 120
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null
+    });
+
+    expect(projection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'task-1311-running',
+        session_id: 'thread-1-turn-1',
+        turn_count: 1,
+        last_event: 'pause',
+        last_message: 'Awaiting operator input',
+        last_event_at: '2026-03-20T00:02:00.000Z',
+        tokens: {
+          input_tokens: 12,
+          output_tokens: 8,
+          total_tokens: 20
+        }
+      })
+    ]);
   });
 });

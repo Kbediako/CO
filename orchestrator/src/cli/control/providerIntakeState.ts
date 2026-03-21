@@ -44,6 +44,10 @@ export interface ProviderIntakeClaimRecord {
   launch_source: ProviderLaunchSource | null;
   launch_token: string | null;
   launch_started_at?: string | null;
+  retry_queued?: boolean | null;
+  retry_attempt?: number | null;
+  retry_due_at?: string | null;
+  retry_error?: string | null;
 }
 
 export interface ProviderIntakeState {
@@ -167,6 +171,24 @@ export function upsertProviderIntakeClaim(
               : null
           )
       : input.launch_started_at;
+  const retryStateDefaults =
+    existing?.retry_attempt !== null && existing?.retry_attempt !== undefined
+      ? input.state === 'resumable' || input.state === 'handoff_failed'
+        ? {
+            retryQueued: existing?.retry_queued ?? null,
+            retryDueAt: existing?.retry_due_at ?? null,
+            retryError: existing?.retry_error ?? null
+          }
+        : {
+            retryQueued: false,
+            retryDueAt: null,
+            retryError: null
+          }
+      : {
+          retryQueued: existing?.retry_queued ?? null,
+          retryDueAt: existing?.retry_due_at ?? null,
+          retryError: existing?.retry_error ?? null
+        };
   const next: ProviderIntakeClaimRecord = {
     provider: 'linear',
     provider_key: input.provider_key,
@@ -200,7 +222,23 @@ export function upsertProviderIntakeClaim(
           ? null
           : existing?.launch_token ?? null
         : input.launch_token,
-    launch_started_at: nextLaunchStartedAt
+    launch_started_at: nextLaunchStartedAt,
+    retry_queued:
+      input.retry_queued === undefined
+        ? retryStateDefaults.retryQueued
+        : normalizeRetryQueued(input.retry_queued),
+    retry_attempt:
+      input.retry_attempt === undefined
+        ? existing?.retry_attempt ?? null
+        : normalizeRetryAttempt(input.retry_attempt),
+    retry_due_at:
+      input.retry_due_at === undefined
+        ? retryStateDefaults.retryDueAt
+        : normalizeRetryTimestamp(input.retry_due_at),
+    retry_error:
+      input.retry_error === undefined
+        ? retryStateDefaults.retryError
+        : normalizeRetryError(input.retry_error)
   };
 
   if (existingIndex >= 0) {
@@ -282,6 +320,12 @@ export function buildProviderIntakeSummary(
   };
 }
 
+export function hasQueuedProviderIntakeRetry(
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'> | null | undefined
+): boolean {
+  return claim?.retry_queued === true && (claim.retry_attempt ?? null) !== null;
+}
+
 function normalizeProviderIntakeClaim(
   input: ProviderIntakeClaimRecord | null | undefined
 ): ProviderIntakeClaimRecord | null {
@@ -341,8 +385,28 @@ function normalizeProviderIntakeClaim(
       typeof input.run_manifest_path === 'string' ? input.run_manifest_path : null,
     launch_source: launchSource,
     launch_token: typeof input.launch_token === 'string' ? input.launch_token : null,
-    launch_started_at: launchStartedAt
+    launch_started_at: launchStartedAt,
+    retry_queued: normalizeRetryQueued(input.retry_queued),
+    retry_attempt: normalizeRetryAttempt(input.retry_attempt),
+    retry_due_at: normalizeRetryTimestamp(input.retry_due_at),
+    retry_error: normalizeRetryError(input.retry_error)
   };
+}
+
+function normalizeRetryQueued(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function normalizeRetryAttempt(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function normalizeRetryTimestamp(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function normalizeRetryError(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
 function normalizeClaimState(value: string): ProviderIntakeClaimState {

@@ -1,6 +1,7 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
+import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
 
 export interface SelectedRunQuestionSummary {
   queuedCount: number;
@@ -78,6 +79,9 @@ interface SharedSelectedProjectionFields {
   runDir?: string | null;
   questionSummary: SelectedRunQuestionSummary;
   tracked: ControlTrackedPayload | null;
+  compatibilityState?: string | null;
+  providerLinearWorkerProof?: ProviderLinearWorkerProof | null;
+  providerRetryState?: ControlProviderRetryState | null;
 }
 
 export interface SelectedRunContext extends SharedSelectedProjectionFields {}
@@ -120,6 +124,24 @@ export interface ControlSelectedRunPayload {
   };
   question_summary: ControlQuestionSummaryPayload;
   tracked?: ControlTrackedPayload;
+  provider_linear_worker_proof?: ProviderLinearWorkerProof;
+}
+
+export interface ControlTokenUsagePayload {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+}
+
+export interface ControlCodexTotalsPayload extends ControlTokenUsagePayload {
+  seconds_running: number;
+}
+
+export interface ControlProviderRetryState {
+  active: boolean;
+  attempt: number | null;
+  due_at: string | null;
+  error: string | null;
 }
 
 export interface ControlRunningPayload {
@@ -134,11 +156,7 @@ export interface ControlRunningPayload {
   last_message: string | null;
   started_at: string | null;
   last_event_at: string | null;
-  tokens: {
-    input_tokens: number | null;
-    output_tokens: number | null;
-    total_tokens: number | null;
-  };
+  tokens: ControlTokenUsagePayload;
 }
 
 export interface ControlRetryPayload {
@@ -148,7 +166,10 @@ export interface ControlRetryPayload {
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
+  workspace_path: string | null;
   attempt: number | null;
+  due_at: string | null;
+  error: string | null;
   last_event: string | null;
   last_message: string | null;
   started_at: string | null;
@@ -163,8 +184,8 @@ export interface ControlStatePayload {
   };
   running: ControlRunningPayload[];
   retrying: ControlRetryPayload[];
-  codex_totals: null;
-  rate_limits: null;
+  codex_totals: ControlCodexTotalsPayload;
+  rate_limits: Record<string, unknown> | null;
   selected: ControlSelectedRunPayload | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload;
@@ -184,6 +205,8 @@ export interface ControlCompatibilityRuntimeSnapshot {
   selected: ControlCompatibilitySourceContext | null;
   running: ControlCompatibilitySourceContext[];
   retrying: ControlCompatibilitySourceContext[];
+  codexTotals: ControlCodexTotalsPayload;
+  rateLimits: Record<string, unknown> | null;
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
@@ -198,6 +221,8 @@ export interface CompatibilityProjectionIssueRecord {
 export interface ControlCompatibilityProjectionSnapshot {
   running: ControlRunningPayload[];
   retrying: ControlRetryPayload[];
+  codexTotals: ControlCodexTotalsPayload;
+  rateLimits: Record<string, unknown> | null;
   issues: CompatibilityProjectionIssueRecord[];
   selected: ControlSelectedRunPayload | null;
   dispatchPilot: ControlDispatchPilotPayload | null;
@@ -322,7 +347,12 @@ export function buildProjectionSelectedPayload(
       path: selected.workspacePath
     },
     question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
-    ...(selected.tracked ? { tracked: selected.tracked } : {})
+    ...(selected.tracked ? { tracked: selected.tracked } : {}),
+    ...(selected.providerLinearWorkerProof
+      ? {
+          provider_linear_worker_proof: selected.providerLinearWorkerProof
+        }
+      : {})
   };
 }
 
@@ -353,6 +383,8 @@ export function buildSelectedRunRuntimeFingerprintInput(
                 at: selected.latestEvent.at
               }
             : null,
+          provider_linear_worker_proof: selected.providerLinearWorkerProof ?? null,
+          provider_retry_state: selected.providerRetryState ?? null,
           question_summary: questionSummary
             ? {
                 queued_count: questionSummary.queuedCount,

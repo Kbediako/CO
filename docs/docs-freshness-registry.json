@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-03-20",
+  "generated_at": "2026-03-22",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -3079,7 +3079,42 @@
       "path": ".agent/task/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-20",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
       "cadence_days": 30
     },
     {
@@ -5494,7 +5529,7 @@
       "path": "docs/ACTION_PLAN-coordinator-symphony-full-parity-hardening-and-closure.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-20",
+      "last_review": "2026-03-22",
       "cadence_days": 30
     },
     {
@@ -5502,6 +5537,41 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-same-session-continuation-after-normal-success.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-post-worker-retry-queue-ownership.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
       "cadence_days": 30
     },
     {
@@ -10667,7 +10737,7 @@
       "path": "docs/PRD-coordinator-symphony-full-parity-hardening-and-closure.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-20",
+      "last_review": "2026-03-22",
       "cadence_days": 30
     },
     {
@@ -10675,6 +10745,41 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-19",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-same-session-continuation-after-normal-success.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-post-worker-retry-queue-ownership.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
       "cadence_days": 30
     },
     {
@@ -11276,7 +11381,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-05",
+      "last_review": "2026-03-22",
       "cadence_days": 90
     },
     {
@@ -13593,7 +13698,7 @@
       "path": "docs/TECH_SPEC-coordinator-symphony-full-parity-hardening-and-closure.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-20",
+      "last_review": "2026-03-22",
       "cadence_days": 30
     },
     {
@@ -13601,6 +13706,41 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-20",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-same-session-continuation-after-normal-success.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-21",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-post-worker-retry-queue-ownership.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
       "cadence_days": 30
     },
     {
@@ -16995,7 +17135,42 @@
       "path": "tasks/specs/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-20",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
       "cadence_days": 30
     },
     {
@@ -19907,7 +20082,42 @@
       "path": "tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-20",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
       "cadence_days": 30
     },
     {

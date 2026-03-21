@@ -8,11 +8,15 @@ import type { ProviderIssueHandoffService } from '../src/cli/control/providerIss
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 
 import { __test__ as controlHostCliShellTest } from '../src/cli/controlHostCliShell.js';
+import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
 const {
+  DEFAULT_PROVIDER_START_PIPELINE_ID,
+  buildProviderLinearSourceEnvOverrides,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
+  rehydrateProviderIssueHandoffOnStartup,
   refreshProviderIssueHandoffOnStartup,
   resolveProviderResumeLaunchSpec,
   snapshotRunManifests
@@ -56,6 +60,40 @@ async function initializeRepo(repoRoot: string): Promise<void> {
 }
 
 describe('controlHostCliShell manifest discovery', () => {
+  it('defaults provider starts to the provider worker pipeline', () => {
+    expect(DEFAULT_PROVIDER_START_PIPELINE_ID).toBe('provider-linear-worker');
+  });
+
+  it('maps tracked issue scope bindings into provider worker env overrides', () => {
+    expect(
+      buildProviderLinearSourceEnvOverrides({
+        provider: 'linear',
+        workspaceId: 'workspace-1',
+        teamId: 'team-1',
+        projectId: 'project-1'
+      })
+    ).toEqual({
+      CO_LINEAR_WORKSPACE_ID: 'workspace-1',
+      CO_LINEAR_TEAM_ID: 'team-1',
+      CO_LINEAR_PROJECT_ID: 'project-1'
+    });
+  });
+
+  it('clears null tracked issue scope bindings in provider worker env overrides', () => {
+    expect(
+      buildProviderLinearSourceEnvOverrides({
+        provider: 'linear',
+        workspaceId: 'workspace-1',
+        teamId: null,
+        projectId: null
+      })
+    ).toEqual({
+      CO_LINEAR_WORKSPACE_ID: 'workspace-1',
+      CO_LINEAR_TEAM_ID: '',
+      CO_LINEAR_PROJECT_ID: ''
+    });
+  });
+
   it('keeps the newly spawned manifest even when its mtime falls before the local spawn timestamp', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
 
@@ -237,7 +275,64 @@ describe('controlHostCliShell manifest discovery', () => {
       envOverrides: {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
-        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        CO_LINEAR_WORKSPACE_ID: '',
+        CO_LINEAR_TEAM_ID: '',
+        CO_LINEAR_PROJECT_ID: ''
+      }
+    });
+  });
+
+  it('restores persisted Linear scope bindings for provider resumes and clears null fields', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    await initializeRepo(tempRoot);
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const childPaths = resolveRunPaths(
+      {
+        ...env,
+        taskId: 'linear-lin-issue-1'
+      },
+      'run-child'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        workspace_path: join(tempRoot, '.workspaces', 'linear-lin-issue-1')
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        source_setup: {
+          provider: 'linear',
+          workspace_id: 'workspace-1',
+          team_id: null,
+          project_id: 'project-1'
+        }
+      }),
+      'utf8'
+    );
+
+    const spec = await resolveProviderResumeLaunchSpec(env, 'run-child');
+
+    expect(spec).toEqual({
+      cwd: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
+      envOverrides: {
+        CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
+        CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
+        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        CO_LINEAR_WORKSPACE_ID: 'workspace-1',
+        CO_LINEAR_TEAM_ID: '',
+        CO_LINEAR_PROJECT_ID: 'project-1'
       }
     });
   });
@@ -275,7 +370,10 @@ describe('controlHostCliShell manifest discovery', () => {
       envOverrides: {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
-        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        CO_LINEAR_WORKSPACE_ID: '',
+        CO_LINEAR_TEAM_ID: '',
+        CO_LINEAR_PROJECT_ID: ''
       }
     });
   });
@@ -306,7 +404,10 @@ describe('controlHostCliShell manifest discovery', () => {
       envOverrides: {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
-        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        CO_LINEAR_WORKSPACE_ID: '',
+        CO_LINEAR_TEAM_ID: '',
+        CO_LINEAR_PROJECT_ID: ''
       }
     });
   });
@@ -345,7 +446,10 @@ describe('controlHostCliShell manifest discovery', () => {
       envOverrides: {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
-        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        CO_LINEAR_WORKSPACE_ID: '',
+        CO_LINEAR_TEAM_ID: '',
+        CO_LINEAR_PROJECT_ID: ''
       }
     });
   });
@@ -382,7 +486,32 @@ describe('controlHostCliShell manifest discovery', () => {
   });
 });
 
-describe('controlHostCliShell startup refresh', () => {
+describe('controlHostCliShell startup provider handoff bootstrap', () => {
+  it('runs an immediate provider rehydrate during control-host startup', async () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    } satisfies ProviderIssueHandoffService;
+
+    await rehydrateProviderIssueHandoffOnStartup(providerIssueHandoff);
+
+    expect(providerIssueHandoff.rehydrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps startup non-blocking when the immediate provider rehydrate fails', async () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {
+        throw new Error('rehydrate unavailable');
+      }),
+      refresh: vi.fn(async () => undefined)
+    } satisfies ProviderIssueHandoffService;
+
+    await expect(rehydrateProviderIssueHandoffOnStartup(providerIssueHandoff)).resolves.toBeUndefined();
+    expect(providerIssueHandoff.rehydrate).toHaveBeenCalledTimes(1);
+  });
+
   it('starts the immediate provider refresh without waiting for it to finish before startup can continue', async () => {
     let resolveRefresh: (() => void) | null = null;
     const publish = vi.fn();
@@ -453,5 +582,29 @@ describe('controlHostCliShell startup refresh', () => {
 
     expect(refreshProviderIssueHandoff).toHaveBeenCalledTimes(1);
     expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels the lifecycle-owned startup trigger before the injected startup refresh takes over', async () => {
+    vi.useFakeTimers();
+    try {
+      const publish = vi.fn();
+      const refreshProviderIssueHandoff = vi.fn(async () => undefined);
+      const startupTrigger = setTimeout(() => {
+        throw new Error('startup trigger should have been cancelled');
+      }, 0);
+
+      await beginProviderIssueHandoffStartupRefresh(
+        undefined,
+        publish,
+        refreshProviderIssueHandoff,
+        startupTrigger
+      );
+      await vi.runAllTimersAsync();
+
+      expect(refreshProviderIssueHandoff).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

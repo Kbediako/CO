@@ -42,8 +42,15 @@ export interface DispatchExtensionContext {
   }>;
 }
 
+export interface CompatibilityRefreshAcknowledgement {
+  queued: boolean;
+  coalesced: boolean;
+  requested_at: string;
+  operations: string[];
+}
+
 export interface ObservabilityRefreshContext extends ObservabilityTraceabilityContext {
-  requestRefresh(): Promise<void>;
+  requestRefresh(): Promise<CompatibilityRefreshAcknowledgement>;
 }
 
 export type CompatibilityRefreshRejectionReason =
@@ -247,23 +254,31 @@ export async function readCompatibilityRefresh(
     };
   }
 
-  await context.requestRefresh();
+  const refreshAcknowledgement = normalizeRefreshAcknowledgement(await context.requestRefresh());
 
   const requestBody = isRecordLike(body) ? body : {};
   const requestedAction = readStringValue(requestBody, 'action');
   return {
     kind: 'accepted',
     payload: {
-      status: 'accepted',
-      mode: 'read_only',
-      action: READ_ONLY_COMPAT_ACTION,
-      requested_at: isoTimestamp(),
+      ...refreshAcknowledgement,
       traceability: buildCompatibilityTraceability(context, {
         decision: 'acknowledged',
-        reason: 'refresh_projection_acknowledged',
+        reason: 'refresh_requested',
         requestAction: requestedAction ? requestedAction.toLowerCase() : READ_ONLY_COMPAT_ACTION
       })
     }
+  };
+}
+
+function normalizeRefreshAcknowledgement(
+  value: CompatibilityRefreshAcknowledgement | null | undefined
+): CompatibilityRefreshAcknowledgement {
+  return {
+    queued: value?.queued ?? true,
+    coalesced: value?.coalesced ?? false,
+    requested_at: value?.requested_at ?? isoTimestamp(),
+    operations: value?.operations ?? ['poll', 'reconcile']
   };
 }
 
@@ -302,8 +317,8 @@ export async function readCompatibilityState(
     counts: { running: projection.running.length, retrying: projection.retrying.length },
     running: projection.running,
     retrying: projection.retrying,
-    codex_totals: null,
-    rate_limits: null,
+    codex_totals: projection.codexTotals,
+    rate_limits: projection.rateLimits,
     selected: projection.selected,
     ...(projection.providerIntake ? { provider_intake: projection.providerIntake } : {}),
     ...(projection.dispatchPilot ? { dispatch_pilot: projection.dispatchPilot } : {}),

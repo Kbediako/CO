@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { createControlTelegramReadController } from '../src/cli/control/controlTelegramReadController.js';
 import type { ControlSelectedRunRuntimeSnapshot } from '../src/cli/control/observabilityReadModel.js';
+import type { ProviderLinearWorkerProof } from '../src/cli/providerLinearWorkerRunner.js';
 
 function buildSnapshot(input: {
   prompt: string;
   urgency: 'low' | 'medium' | 'high';
+  proof?: Partial<ProviderLinearWorkerProof>;
 }): ControlSelectedRunRuntimeSnapshot {
   return {
     selected: {
@@ -51,7 +53,33 @@ function buildSnapshot(input: {
           updated_at: '2026-03-12T00:01:00.000Z',
           recent_activity: []
         }
-      }
+      },
+      providerLinearWorkerProof: input.proof
+        ? {
+            issue_id: 'task-1124',
+            issue_identifier: 'task-1124',
+            thread_id: 'thread-1',
+            latest_turn_id: 'turn-1',
+            latest_session_id: 'thread-1-turn-1',
+            latest_session_id_source: 'derived_from_thread_and_turn',
+            turn_count: 1,
+            last_event: 'task_complete',
+            last_message: 'done',
+            last_event_at: '2026-03-12T00:01:00.000Z',
+            tokens: {
+              input_tokens: 12,
+              output_tokens: 8,
+              total_tokens: 20
+            },
+            rate_limits: null,
+            owner_phase: 'turn_completed',
+            owner_status: 'in_progress',
+            workspace_path: '/tmp/co',
+            end_reason: null,
+            updated_at: '2026-03-12T00:01:00.000Z',
+            ...input.proof
+          }
+        : null
     },
     dispatchPilot: {
       advisory_only: true,
@@ -193,6 +221,42 @@ describe('ControlTelegramReadController', () => {
     expect(thirdProjection.projectionHash).toBeTruthy();
     expect(firstProjection.projectionHash).not.toBe(secondProjection.projectionHash);
     expect(firstProjection.projectionHash).not.toBe(thirdProjection.projectionHash);
+  });
+
+  it('treats provider worker proof changes as distinct projection hashes', async () => {
+    const first = createControlTelegramReadController({
+      readAdapter: {
+        readSelectedRun: async () =>
+          buildSnapshot({
+            prompt: 'Approve the retry?',
+            urgency: 'high',
+            proof: { latest_turn_id: 'turn-1', turn_count: 1 }
+          }),
+        readDispatch: async () => ({}),
+        readQuestions: async () => ({ questions: [] })
+      },
+      mutationsEnabled: true
+    });
+    const second = createControlTelegramReadController({
+      readAdapter: {
+        readSelectedRun: async () =>
+          buildSnapshot({
+            prompt: 'Approve the retry?',
+            urgency: 'high',
+            proof: { latest_turn_id: 'turn-2', latest_session_id: 'thread-1-turn-2', turn_count: 2 }
+          }),
+        readDispatch: async () => ({}),
+        readQuestions: async () => ({ questions: [] })
+      },
+      mutationsEnabled: true
+    });
+
+    const firstProjection = await first.renderProjectionDeltaMessage();
+    const secondProjection = await second.renderProjectionDeltaMessage();
+
+    expect(firstProjection.projectionHash).toBeTruthy();
+    expect(secondProjection.projectionHash).toBeTruthy();
+    expect(firstProjection.projectionHash).not.toBe(secondProjection.projectionHash);
   });
 
   it('renders issue and dispatch read commands through the extracted controller', async () => {

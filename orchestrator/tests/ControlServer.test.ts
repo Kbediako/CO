@@ -189,6 +189,24 @@ async function createSiblingRun(
   return paths;
 }
 
+async function seedProviderIntakeState(
+  paths: ReturnType<typeof resolveRunPaths>,
+  claims: Array<Record<string, unknown>>
+): Promise<void> {
+  await writeFile(
+    join(paths.runDir, 'provider-intake-state.json'),
+    JSON.stringify({
+      schema_version: 1,
+      updated_at: '2026-03-07T00:00:00.000Z',
+      rehydrated_at: '2026-03-07T00:00:00.000Z',
+      latest_provider_key: claims.at(-1)?.provider_key ?? null,
+      latest_reason: claims.at(-1)?.reason ?? null,
+      claims
+    }),
+    'utf8'
+  );
+}
+
 function signLinearWebhook(body: string, secret: string): string {
   return createHmac('sha256', secret).update(body).digest('hex');
 }
@@ -1109,8 +1127,13 @@ describe('ControlServer', () => {
         generated_at?: string;
         counts?: { running?: number; retrying?: number };
         running?: Array<{ issue_identifier?: string; session_id?: string | null; state?: string }>;
-        codex_totals?: null;
-        rate_limits?: null;
+        codex_totals?: {
+          input_tokens?: number;
+          output_tokens?: number;
+          total_tokens?: number;
+          seconds_running?: number;
+        };
+        rate_limits?: Record<string, unknown> | null;
         selected?: {
           issue_identifier?: string;
           raw_status?: string;
@@ -1125,7 +1148,12 @@ describe('ControlServer', () => {
         session_id: null,
         state: 'in_progress'
       });
-      expect(statePayload.codex_totals).toBeNull();
+      expect(statePayload.codex_totals).toMatchObject({
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0
+      });
+      expect(statePayload.codex_totals?.seconds_running ?? 0).toBeGreaterThanOrEqual(0);
       expect(statePayload.rate_limits).toBeNull();
       expect(statePayload.selected).toMatchObject({
         issue_identifier: 'task-0940',
@@ -1149,7 +1177,7 @@ describe('ControlServer', () => {
         running?: { state?: string };
       };
       expect(issuePayload.issue_identifier).toBe('task-0940');
-      expect(issuePayload.status).toBe('in_progress');
+      expect(issuePayload.status).toBe('running');
       expect(issuePayload.raw_status).toBe('in_progress');
       expect(issuePayload.display_status).toBe('in_progress');
       expect(issuePayload.workspace?.path).toBe(join(root, '.workspaces', 'task-0940'));
@@ -1225,14 +1253,45 @@ describe('ControlServer', () => {
         }
       ]
     });
-    await createSiblingRun(root, 'task-1034-retrying', 'run-3', {
+    const retryPaths = await createSiblingRun(root, 'task-1034-retrying', 'run-3', {
       manifest: {
         status: 'failed',
         completed_at: null,
         summary: 'retryable failure pending rerun',
+        workspace_path: join(root, '.workspaces', 'task-1034-retrying'),
         updated_at: '2026-03-07T00:19:00.000Z'
       }
     });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:task-1034-retrying',
+        issue_id: 'task-1034-retrying',
+        issue_identifier: 'task-1034-retrying',
+        issue_title: 'Retry issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-07T00:19:00.000Z',
+        task_id: 'task-1034-retrying',
+        mapping_source: 'provider_id_fallback',
+        state: 'resumable',
+        reason: 'provider_issue_rehydrated_resumable_run',
+        accepted_at: '2026-03-07T00:19:05.000Z',
+        updated_at: '2026-03-07T00:19:10.000Z',
+        last_delivery_id: 'delivery-retrying',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_040_000,
+        run_id: 'run-3',
+        run_manifest_path: retryPaths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'retry-launch',
+        retry_queued: true,
+        retry_attempt: 2,
+        retry_due_at: null,
+        retry_error: 'retryable failure pending rerun'
+      }
+    ]);
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
 
     const server = await ControlServer.start({
@@ -1253,7 +1312,7 @@ describe('ControlServer', () => {
       const statePayload = (await stateRes.json()) as {
         counts?: { running?: number; retrying?: number };
         running?: Array<{ issue_identifier?: string; display_state?: string }>;
-        retrying?: Array<{ issue_identifier?: string; state?: string }>;
+        retrying?: Array<{ issue_identifier?: string; state?: string; workspace_path?: string | null }>;
         selected?: { issue_identifier?: string } | null;
       };
       expect(statePayload.counts).toEqual({ running: 2, retrying: 1 });
@@ -1269,6 +1328,7 @@ describe('ControlServer', () => {
       expect(statePayload.retrying?.map((entry) => entry.issue_identifier)).toEqual([
         'task-1034-retrying'
       ]);
+      expect(statePayload.retrying?.[0]?.workspace_path).toBe(join(root, '.workspaces', 'task-1034-retrying'));
 
       const siblingIssueRes = await fetch(new URL('/api/v1/task-1034-running', baseUrl), {
         headers: {
@@ -1315,13 +1375,33 @@ describe('ControlServer', () => {
       expect(retryIssueRes.status).toBe(200);
       const retryIssuePayload = (await retryIssueRes.json()) as {
         issue_identifier?: string;
-        retry?: { session_id?: string | null; state?: string } | null;
+        status?: string;
+        workspace?: { path?: string | null };
+        retry?: {
+          session_id?: string | null;
+          state?: string;
+          workspace_path?: string | null;
+          attempt?: number | null;
+          error?: string | null;
+        } | null;
+        attempts?: { restart_count?: number | null; current_retry_attempt?: number | null };
       };
       expect(retryIssuePayload).toMatchObject({
         issue_identifier: 'task-1034-retrying',
+        status: 'retrying',
+        workspace: {
+          path: join(root, '.workspaces', 'task-1034-retrying')
+        },
         retry: {
           session_id: null,
-          state: 'failed'
+          state: 'resumable',
+          workspace_path: join(root, '.workspaces', 'task-1034-retrying'),
+          attempt: 2,
+          error: 'retryable failure pending rerun'
+        },
+        attempts: {
+          restart_count: 1,
+          current_retry_attempt: 2
         }
       });
 
@@ -1375,6 +1455,7 @@ describe('ControlServer', () => {
     await createSiblingRun(root, 'task-1035-current', 'run-3', {
       manifest: {
         task_id: 'task-1035-current',
+        issue_id: 'issue-1035',
         issue_identifier: 'ISSUE-1035',
         status: 'in_progress',
         summary: 'newer run is awaiting operator input',
@@ -1405,6 +1486,36 @@ describe('ControlServer', () => {
         }
       ]
     });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-1035',
+        issue_id: 'issue-1035',
+        issue_identifier: 'ISSUE-1035',
+        issue_title: 'Retrying running issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-07T00:18:00.000Z',
+        task_id: 'task-1035-current',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-03-07T00:17:30.000Z',
+        updated_at: '2026-03-07T00:18:10.000Z',
+        last_delivery_id: 'delivery-1035',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_050_000,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-1035',
+        retry_queued: false,
+        retry_attempt: 2,
+        retry_due_at: null,
+        retry_error: null
+      }
+    ]);
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
 
     const server = await ControlServer.start({
@@ -1424,11 +1535,16 @@ describe('ControlServer', () => {
       expect(stateRes.status).toBe(200);
       const statePayload = (await stateRes.json()) as {
         counts?: { running?: number; retrying?: number };
-        running?: Array<{ issue_identifier?: string; session_id?: string | null; display_state?: string }>;
+        running?: Array<{
+          issue_identifier?: string;
+          session_id?: string | null;
+          state?: string;
+          display_state?: string;
+        }>;
         retrying?: Array<{ issue_identifier?: string; session_id?: string | null; state?: string }>;
         selected?: { issue_identifier?: string; run_id?: string } | null;
       };
-      expect(statePayload.counts).toEqual({ running: 1, retrying: 1 });
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
       expect(statePayload.selected).toMatchObject({
         issue_identifier: 'ISSUE-1035',
         run_id: 'run-1'
@@ -1437,18 +1553,13 @@ describe('ControlServer', () => {
         expect.objectContaining({
           issue_identifier: 'ISSUE-1035',
           session_id: null,
+          state: 'In Progress',
           display_state: 'paused'
         })
       ]);
-      expect(statePayload.retrying).toEqual([
-        expect.objectContaining({
-          issue_identifier: 'ISSUE-1035',
-          session_id: null,
-          state: 'failed'
-        })
-      ]);
+      expect(statePayload.retrying).toEqual([]);
 
-      for (const identifier of ['ISSUE-1035', 'task-1035-current', 'run-2', 'run-3']) {
+      for (const identifier of ['ISSUE-1035', 'task-1035-current', 'run-3']) {
         const issueRes = await fetch(new URL(`/api/v1/${identifier}`, baseUrl), {
           headers: {
             Authorization: `Bearer ${token}`
@@ -1457,25 +1568,29 @@ describe('ControlServer', () => {
         expect(issueRes.status).toBe(200);
         const issuePayload = (await issueRes.json()) as {
           issue_identifier?: string;
+          status?: string;
           display_status?: string;
           running?: { session_id?: string | null; display_state?: string } | null;
           retry?: { session_id?: string | null; state?: string } | null;
           question_summary?: { queued_count?: number };
+          attempts?: { restart_count?: number | null; current_retry_attempt?: number | null };
         };
         expect(issuePayload).toMatchObject({
           issue_identifier: 'ISSUE-1035',
+          status: 'running',
           display_status: 'paused',
           question_summary: {
             queued_count: 1
+          },
+          attempts: {
+            restart_count: 1,
+            current_retry_attempt: 2
           },
           running: {
             session_id: null,
             display_state: 'paused'
           },
-          retry: {
-            session_id: null,
-            state: 'failed'
-          }
+          retry: null
         });
       }
 
@@ -2028,7 +2143,12 @@ describe('ControlServer', () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths, { summary: 'task is running' });
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
-    const refreshProviderIssues = vi.fn(async () => undefined);
+    const refreshProviderIssues = vi.fn(async () => ({
+      queued: true,
+      coalesced: false,
+      requested_at: '2026-03-06T03:01:00.000Z',
+      operations: ['poll', 'reconcile']
+    }));
 
     const server = await ControlServer.start({
       paths,
@@ -2068,6 +2188,7 @@ describe('ControlServer', () => {
         selected?: { summary?: string | null } | null;
       };
       expect(staleStatePayload.selected?.summary).toBe('task is running');
+      const refreshCallsBefore = refreshProviderIssues.mock.calls.length;
 
       const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
         method: 'POST',
@@ -2081,22 +2202,106 @@ describe('ControlServer', () => {
 
       expect(refreshRes.status).toBe(202);
       const refreshPayload = (await refreshRes.json()) as {
-        status?: string;
-        mode?: string;
-        action?: string;
+        queued?: boolean;
+        coalesced?: boolean;
         requested_at?: string;
+        operations?: string[];
         traceability?: { decision?: string; reason?: string; requested_action?: string | null };
       };
-      expect(refreshPayload.status).toBe('accepted');
-      expect(refreshPayload.mode).toBe('read_only');
-      expect(refreshPayload.action).toBe('refresh');
+      expect(refreshPayload.queued).toBe(true);
+      expect(refreshPayload.coalesced).toBe(false);
       expect(refreshPayload.requested_at).toBeTruthy();
+      expect(refreshPayload.operations).toEqual(['poll', 'reconcile']);
       expect(refreshPayload.traceability).toMatchObject({
         decision: 'acknowledged',
-        reason: 'refresh_projection_acknowledged',
+        reason: 'refresh_requested',
         requested_action: 'refresh'
       });
-      expect(refreshProviderIssues).toHaveBeenCalledTimes(1);
+      expect(refreshProviderIssues).toHaveBeenCalledTimes(refreshCallsBefore + 1);
+
+      const refreshedStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(refreshedStateRes.status).toBe(200);
+      const refreshedStatePayload = (await refreshedStateRes.json()) as {
+        selected?: { summary?: string | null } | null;
+      };
+      expect(refreshedStatePayload.selected?.summary).toBe('task needs review');
+
+      const afterRaw = await readFile(paths.controlPath, 'utf8');
+      const after = JSON.parse(afterRaw) as {
+        control_seq?: number;
+        latest_action?: { action?: string | null } | null;
+      };
+      expect(after.control_seq).toBe(before.control_seq);
+      expect(after.latest_action ?? null).toEqual(before.latest_action ?? null);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('acknowledges read-only refresh requests without provider handoff by reconciling runtime only', async () => {
+    const { root, env, paths } = await createRunRoot('task-0940');
+    await seedManifest(paths, { summary: 'task is running' });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const beforeRaw = await readFile(paths.controlPath, 'utf8');
+      const before = JSON.parse(beforeRaw) as {
+        control_seq?: number;
+        latest_action?: { action?: string | null } | null;
+      };
+
+      const initialStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(initialStateRes.status).toBe(200);
+      const initialStatePayload = (await initialStateRes.json()) as {
+        selected?: { summary?: string | null } | null;
+      };
+      expect(initialStatePayload.selected?.summary).toBe('task is running');
+
+      await seedManifest(paths, { summary: 'task needs review' });
+
+      const staleStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(staleStateRes.status).toBe(200);
+      const staleStatePayload = (await staleStateRes.json()) as {
+        selected?: { summary?: string | null } | null;
+      };
+      expect(staleStatePayload.selected?.summary).toBe('task is running');
+
+      const refreshRes = await fetch(new URL('/api/v1/refresh', baseUrl), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-csrf-token': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'refresh' })
+      });
+
+      expect(refreshRes.status).toBe(202);
+      const refreshPayload = (await refreshRes.json()) as {
+        queued?: boolean;
+        coalesced?: boolean;
+        requested_at?: string;
+        operations?: string[];
+      };
+      expect(refreshPayload.queued).toBe(true);
+      expect(refreshPayload.coalesced).toBe(false);
+      expect(refreshPayload.requested_at).toBeTruthy();
+      expect(refreshPayload.operations).toEqual(['reconcile']);
 
       const refreshedStateRes = await fetch(new URL('/api/v1/state', baseUrl), {
         headers: { Authorization: `Bearer ${token}` }
