@@ -353,12 +353,9 @@ function isCliRunManifestPathWithinRunsRoot(manifestPath: string, runsRoot: stri
 async function readSelectedRunManifestSnapshotInternal(
   context: SelectedRunProjectionContext
 ): Promise<SelectedRunManifestSnapshot | null> {
-  const preferredManifestPath = resolveProviderSelectedManifestPath(context);
-  if (preferredManifestPath) {
-    const preferredSnapshot = await readManifestSnapshotForPath(preferredManifestPath);
-    if (preferredSnapshot) {
-      return preferredSnapshot;
-    }
+  const preferredSnapshot = await resolveProviderSelectedManifestSnapshot(context);
+  if (preferredSnapshot) {
+    return preferredSnapshot;
   }
 
   const manifest = await readJsonFile<CliManifest>(context.paths.manifestPath);
@@ -994,17 +991,39 @@ function buildProjectionLookupAliases(input: {
   return Array.from(aliases);
 }
 
-function resolveProviderSelectedManifestPath(
+async function resolveProviderSelectedManifestSnapshot(
   context: SelectedRunProjectionContext
-): string | null {
-  const currentTaskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
-  const currentRunId = resolveRunIdFromManifestPath(context.paths.manifestPath);
-  if (currentTaskId !== 'local-mcp' && currentRunId !== 'control-host') {
-    return null;
-  }
+): Promise<SelectedRunManifestSnapshot | null> {
   const claim = selectProviderIntakeClaim(context.providerIntakeState);
   if (!claim?.run_manifest_path) {
     return null;
   }
-  return claim.run_manifest_path;
+
+  const preferredSnapshot = await readManifestSnapshotForPath(claim.run_manifest_path);
+  if (!preferredSnapshot) {
+    return null;
+  }
+
+  const currentTaskId = resolveTaskIdFromManifestPath(context.paths.manifestPath);
+  const currentRunId = resolveRunIdFromManifestPath(context.paths.manifestPath);
+  if (currentTaskId === 'local-mcp' && currentRunId === 'control-host') {
+    return preferredSnapshot;
+  }
+
+  const providerControlHostTaskId = readStringValue(
+    preferredSnapshot.manifestRecord,
+    'provider_control_host_task_id'
+  );
+  const providerControlHostRunId = readStringValue(
+    preferredSnapshot.manifestRecord,
+    'provider_control_host_run_id'
+  );
+  if (
+    providerControlHostTaskId !== currentTaskId ||
+    providerControlHostRunId !== currentRunId
+  ) {
+    return null;
+  }
+
+  return preferredSnapshot;
 }

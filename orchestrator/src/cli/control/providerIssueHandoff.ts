@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
+import { logger } from '../../logger.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import {
@@ -58,6 +59,8 @@ export interface ProviderIssueHandoffResult {
 export type ProviderTrackedIssuePollResolution =
   | { kind: 'ready'; trackedIssues: LiveLinearTrackedIssue[] }
   | { kind: 'skip'; reason: string };
+
+type ProviderTrackedIssueRefetch = () => Promise<ProviderTrackedIssuePollResolution>;
 
 export interface ProviderIssueHandoffPollInput {
   trackedIssues: LiveLinearTrackedIssue[];
@@ -166,11 +169,7 @@ export function createProviderIssueHandoffService(
   let refreshLifecycleChain: Promise<void> = Promise.resolve();
   let bestEffortRehydrateTimer: NodeJS.Timeout | null = null;
   let bestEffortRehydrateFailureCount = 0;
-  let pollTrackedIssueRefetch: (() => Promise<ProviderTrackedIssuePollResolution>) | null = null;
-  const queuedRetryTrackedIssueRefetches = new Map<
-    string,
-    () => Promise<ProviderTrackedIssuePollResolution>
-  >();
+  const queuedRetryTrackedIssueRefetches = new Map<string, ProviderTrackedIssueRefetch>();
 
   const runWithRefreshLifecycleLock = async <T>(operation: () => Promise<T>): Promise<T> => {
     const nextOperation = refreshLifecycleChain.then(operation, operation);
@@ -184,6 +183,58 @@ export function createProviderIssueHandoffService(
   const persistState = async (): Promise<void> => {
     await options.persist();
     rebuildRetryQueue();
+  };
+
+  type ProviderStateSnapshot = {
+    schema_version: number;
+    updated_at: string;
+    rehydrated_at: string | null;
+    latest_provider_key: string | null;
+    latest_reason: string | null;
+    claims: ProviderIntakeClaimRecord[];
+  };
+
+  const captureProviderStateSnapshot = (): ProviderStateSnapshot => ({
+    schema_version: options.state.schema_version,
+    updated_at: options.state.updated_at,
+    rehydrated_at: options.state.rehydrated_at,
+    latest_provider_key: options.state.latest_provider_key,
+    latest_reason: options.state.latest_reason,
+    claims: options.state.claims.map((claim) => ({ ...claim }))
+  });
+
+  const restoreProviderStateSnapshot = (snapshot: ProviderStateSnapshot): void => {
+    options.state.schema_version = snapshot.schema_version;
+    options.state.updated_at = snapshot.updated_at;
+    options.state.rehydrated_at = snapshot.rehydrated_at;
+    options.state.latest_provider_key = snapshot.latest_provider_key;
+    options.state.latest_reason = snapshot.latest_reason;
+    options.state.claims = snapshot.claims.map((claim) => ({ ...claim }));
+    rebuildRetryQueue();
+  };
+
+  const persistStateOrRollback = async (snapshot: ProviderStateSnapshot): Promise<void> => {
+    try {
+      await persistState();
+    } catch (error) {
+      restoreProviderStateSnapshot(snapshot);
+      throw error;
+    }
+  };
+
+  const upsertProviderClaimAndPersist = async (
+    input: Parameters<typeof upsertProviderIntakeClaim>[1],
+    persistOptions: { rollbackOnPersistFailure?: boolean } = {}
+  ): Promise<ProviderIntakeClaimRecord> => {
+    const snapshot =
+      persistOptions.rollbackOnPersistFailure === false ? null : captureProviderStateSnapshot();
+    const claim = upsertProviderIntakeClaim(options.state, input);
+    if (snapshot) {
+      await persistStateOrRollback(snapshot);
+    } else {
+      await persistState();
+    }
+    return claim;
   };
 
   const scheduleBestEffortRehydrateWithRefreshLock = (): void => {
@@ -244,7 +295,7 @@ export function createProviderIssueHandoffService(
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<void> => {
     const launchToken = createProviderLaunchToken();
-    upsertProviderIntakeClaim(options.state, {
+    await upsertProviderClaimAndPersist({
       ...input.claim,
       issue_identifier: input.trackedIssue.identifier,
       issue_title: input.trackedIssue.title,
@@ -265,7 +316,6 @@ export function createProviderIssueHandoffService(
         seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
       })
     });
-    await persistState();
     try {
       await options.launcher.resume({
         runId: input.run.runId,
@@ -275,7 +325,7 @@ export function createProviderIssueHandoffService(
       });
     } catch (error) {
       const failureReason = input.failureReason ?? 'provider_issue_refresh_resume_failed';
-      upsertProviderIntakeClaim(options.state, {
+      await upsertProviderClaimAndPersist({
         ...input.claim,
         issue_identifier: input.trackedIssue.identifier,
         issue_title: input.trackedIssue.title,
@@ -296,8 +346,7 @@ export function createProviderIssueHandoffService(
           preserveCurrentAttempt: true,
           delayType: 'failure'
         })
-      });
-      await persistState();
+      }, { rollbackOnPersistFailure: false });
       throw error;
     }
     scheduleBestEffortRehydrateWithRefreshLock();
@@ -314,7 +363,7 @@ export function createProviderIssueHandoffService(
   }): Promise<ProviderIssueHandoffResult> => {
     const taskId = buildProviderFallbackTaskId(input.trackedIssue);
     const launchToken = createProviderLaunchToken();
-    upsertProviderIntakeClaim(options.state, {
+    await upsertProviderClaimAndPersist({
       ...input.claim,
       issue_identifier: input.trackedIssue.identifier,
       issue_title: input.trackedIssue.title,
@@ -336,7 +385,6 @@ export function createProviderIssueHandoffService(
         seedFromPreviousRun: input.seedRetryAttemptFromPreviousRun === true
       })
     });
-    await persistState();
     let startedRun: { runId: string; manifestPath: string } | null = null;
     try {
       startedRun = await options.launcher.start({
@@ -353,7 +401,7 @@ export function createProviderIssueHandoffService(
       });
     } catch (error) {
       const failureReason = input.failureReason ?? 'provider_issue_refresh_start_failed';
-      upsertProviderIntakeClaim(options.state, {
+      await upsertProviderClaimAndPersist({
         ...input.claim,
         issue_identifier: input.trackedIssue.identifier,
         issue_title: input.trackedIssue.title,
@@ -375,8 +423,7 @@ export function createProviderIssueHandoffService(
           preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
           delayType: 'failure'
         })
-      });
-      await persistState();
+      }, { rollbackOnPersistFailure: false });
       throw error;
     }
     const claim = startedRun
@@ -436,7 +483,7 @@ export function createProviderIssueHandoffService(
       run_manifest_path: nextManifestPath,
       ...clearProviderRetryFields()
     });
-    upsertProviderIntakeClaim(options.state, {
+    await upsertProviderClaimAndPersist({
       ...input.claim,
       issue_identifier: input.trackedIssue?.identifier ?? input.claim.issue_identifier,
       issue_title: input.trackedIssue?.title ?? input.claim.issue_title,
@@ -451,7 +498,6 @@ export function createProviderIssueHandoffService(
       ...clearProviderRetryFields(),
       updated_at: now
     });
-    await persistState();
     if (input.cleanupWorkspace && canCleanupReleasedProviderWorkspace(input.releaseRun)) {
       await cleanupReleasedProviderWorkspace(repoRoot, nextTaskId, nextManifestPath);
     }
@@ -830,13 +876,14 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord;
     trackedIssue: LiveLinearTrackedIssue;
     previousRun: ProviderIssueRunRecord | null;
+    trackedIssueRefetch: ProviderTrackedIssueRefetch | null;
   }): Promise<ProviderIntakeClaimRecord> => {
     if (
       !hasQueuedProviderIntakeRetry(input.claim) ||
       isValidProviderRetryTimestamp(input.claim.retry_due_at)
     ) {
-      if (input.claim.retry_queued === true && pollTrackedIssueRefetch) {
-        queuedRetryTrackedIssueRefetches.set(input.claim.provider_key, pollTrackedIssueRefetch);
+      if (input.claim.retry_queued === true && input.trackedIssueRefetch) {
+        queuedRetryTrackedIssueRefetches.set(input.claim.provider_key, input.trackedIssueRefetch);
       }
       return input.claim;
     }
@@ -852,6 +899,7 @@ export function createProviderIssueHandoffService(
         previousRun: input.previousRun
       })
     });
+    const queuedRetrySnapshot = captureProviderStateSnapshot();
     const nextClaim = upsertProviderIntakeClaim(options.state, {
       ...input.claim,
       issue_identifier: input.trackedIssue.identifier,
@@ -864,10 +912,10 @@ export function createProviderIssueHandoffService(
       run_manifest_path: input.previousRun?.manifestPath ?? input.claim.run_manifest_path,
       ...queuedRetryFields
     });
-    if (pollTrackedIssueRefetch) {
-      queuedRetryTrackedIssueRefetches.set(nextClaim.provider_key, pollTrackedIssueRefetch);
+    if (input.trackedIssueRefetch) {
+      queuedRetryTrackedIssueRefetches.set(nextClaim.provider_key, input.trackedIssueRefetch);
     }
-    await persistState();
+    await persistStateOrRollback(queuedRetrySnapshot);
     options.publishRuntime?.('provider-intake.refresh');
     return nextClaim;
   };
@@ -948,7 +996,6 @@ export function createProviderIssueHandoffService(
     > => {
     const trackedIssueRefetch =
       queuedRetryTrackedIssueRefetches.get(claim.provider_key) ??
-      pollTrackedIssueRefetch ??
       options.resolveTrackedIssues ??
       null;
     if (!trackedIssueRefetch) {
@@ -1168,7 +1215,7 @@ export function createProviderIssueHandoffService(
           releaseCancelPending ||
           replayBlockedByReleasedMetadata
         ) {
-          const claim = upsertProviderIntakeClaim(options.state, {
+          const claim = await upsertProviderClaimAndPersist({
             ...claimBase,
             issue_identifier:
               newerWebhookBlockedByDrain
@@ -1210,7 +1257,6 @@ export function createProviderIssueHandoffService(
             run_id: releasedRun?.runId ?? existing.run_id,
             run_manifest_path: releasedRun?.manifestPath ?? existing.run_manifest_path,
           });
-          await persistState();
           return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_released', claim };
         }
       }
@@ -1221,7 +1267,7 @@ export function createProviderIssueHandoffService(
           nextIssueUpdatedAt: input.trackedIssue.updated_at
         })
       ) {
-        const claim = upsertProviderIntakeClaim(options.state, {
+        const claim = await upsertProviderClaimAndPersist({
           ...claimBase,
           task_id: taskId,
           mapping_source: mappingSource,
@@ -1230,13 +1276,12 @@ export function createProviderIssueHandoffService(
           run_id: existing?.run_id ?? null,
           run_manifest_path: existing?.run_manifest_path ?? null,
         });
-        await persistState();
         return { kind: 'ignored', reason: 'provider_issue_stale', claim };
       }
 
       const eligibility = assessProviderTrackedIssueEligibility(input.trackedIssue);
       if (!eligibility.eligible) {
-        const claim = upsertProviderIntakeClaim(options.state, {
+        const claim = await upsertProviderClaimAndPersist({
           ...claimBase,
           task_id: taskId,
           mapping_source: mappingSource,
@@ -1245,7 +1290,6 @@ export function createProviderIssueHandoffService(
           run_id: existing?.run_id ?? null,
           run_manifest_path: existing?.run_manifest_path ?? null,
         });
-        await persistState();
         return { kind: 'ignored', reason: eligibility.claimReason, claim };
       }
 
@@ -1266,7 +1310,7 @@ export function createProviderIssueHandoffService(
       > = latestExisting ?? clearProviderRetryFields();
       const activeRun = discoveredRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
-        const claim = upsertProviderIntakeClaim(options.state, {
+        const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
           task_id: activeRun.taskId,
           mapping_source: mappingSource,
@@ -1275,12 +1319,11 @@ export function createProviderIssueHandoffService(
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
         });
-        await persistState();
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
 
       if (latestExisting && (latestExisting.state === 'starting' || latestExisting.state === 'resuming')) {
-        const claim = upsertProviderIntakeClaim(options.state, {
+        const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
           task_id: latestExisting.task_id,
           mapping_source: latestExisting.mapping_source,
@@ -1291,14 +1334,13 @@ export function createProviderIssueHandoffService(
           accepted_at: latestExisting.accepted_at,
           updated_at: latestExisting.updated_at
         });
-        await persistState();
         return { kind: 'ignored', reason: 'provider_issue_handoff_inflight', claim };
       }
 
       const latestRun = discoveredRuns[0] ?? null;
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
         if (hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)) {
-          const claim = upsertProviderIntakeClaim(options.state, {
+          const claim = await upsertProviderClaimAndPersist({
             ...latestClaimBase,
             task_id: latestRun.taskId,
             mapping_source: latestExisting?.mapping_source ?? mappingSource,
@@ -1307,10 +1349,9 @@ export function createProviderIssueHandoffService(
             run_id: latestRun.runId,
             run_manifest_path: latestRun.manifestPath,
           });
-          await persistState();
           return { kind: 'ignored', reason: 'provider_issue_release_cancel_inflight', claim };
         }
-        const claim = upsertProviderIntakeClaim(options.state, {
+        const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
           task_id: latestRun.taskId,
           mapping_source: latestExisting?.mapping_source ?? mappingSource,
@@ -1327,7 +1368,6 @@ export function createProviderIssueHandoffService(
             delayType: 'failure'
           })
         });
-        await persistState();
         return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_rehydrated_resumable_run', claim };
       }
 
@@ -1360,7 +1400,7 @@ export function createProviderIssueHandoffService(
               nextIssueUpdatedAt: input.trackedIssue.updated_at
             })
           ) {
-            const claim = upsertProviderIntakeClaim(options.state, {
+            const claim = await upsertProviderClaimAndPersist({
               ...latestClaimBase,
               task_id: latestRun.taskId,
               mapping_source: mappingSource,
@@ -1369,11 +1409,10 @@ export function createProviderIssueHandoffService(
               run_id: latestRun.runId,
               run_manifest_path: latestRun.manifestPath,
             });
-            await persistState();
             return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
           }
 
-          const claim = upsertProviderIntakeClaim(options.state, {
+          const claim = await upsertProviderClaimAndPersist({
             ...latestClaimBase,
             task_id: latestRun.taskId,
             mapping_source: latestExisting?.mapping_source ?? mappingSource,
@@ -1390,12 +1429,12 @@ export function createProviderIssueHandoffService(
               delayType: 'continuation'
             })
           });
-          await persistState();
           return { kind: 'ignored', reason: PROVIDER_POST_WORKER_EXIT_REFRESH_PENDING_REASON, claim };
         }
       }
 
       const launchToken = createProviderLaunchToken();
+      const inflightClaimSnapshot = captureProviderStateSnapshot();
       const inflightClaim = upsertProviderIntakeClaim(options.state, {
         ...latestClaimBase,
         task_id: taskId,
@@ -1413,7 +1452,7 @@ export function createProviderIssueHandoffService(
           seedFromPreviousRun: retryingFailedRelaunch
         })
       });
-      await persistState();
+      await persistStateOrRollback(inflightClaimSnapshot);
       let startedRun: { runId: string; manifestPath: string } | null = null;
       try {
         startedRun = await options.launcher.start({
@@ -1429,7 +1468,7 @@ export function createProviderIssueHandoffService(
           launchToken
         });
       } catch (error) {
-        const claim = upsertProviderIntakeClaim(options.state, {
+        const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
           task_id: taskId,
           mapping_source: mappingSource,
@@ -1446,8 +1485,7 @@ export function createProviderIssueHandoffService(
             preserveCurrentAttempt: latestExisting?.retry_queued === true,
             delayType: 'failure'
           })
-        });
-        await persistState();
+        }, { rollbackOnPersistFailure: false });
         throw new Error(`Failed to start provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
       }
       const claim = startedRun
@@ -1481,57 +1519,52 @@ export function createProviderIssueHandoffService(
     };
 
   const runRefreshCycle = async (pollInput?: ProviderIssueHandoffPollInput): Promise<void> => {
-    const previousPollTrackedIssueRefetch = pollTrackedIssueRefetch;
-    if (pollInput?.refetchTrackedIssues) {
-      pollTrackedIssueRefetch = pollInput.refetchTrackedIssues;
-    }
+    const trackedIssueRefetch = pollInput?.refetchTrackedIssues ?? null;
+    await runWithRefreshLifecycleLock(async () => {
+      const result = await rehydrateNow();
+      if (result.hasPendingClaims) {
+        scheduleBestEffortRehydrateWithRefreshLock();
+      }
 
-    try {
-      await runWithRefreshLifecycleLock(async () => {
-        const result = await rehydrateNow();
-        if (result.hasPendingClaims) {
-          scheduleBestEffortRehydrateWithRefreshLock();
-        }
+      const trackedIssuesByKey = pollInput ? buildTrackedIssuePollMap(pollInput.trackedIssues) : null;
+      const consumedTrackedIssueKeys = new Set<string>();
+      if (!options.resolveTrackedIssue && !trackedIssuesByKey) {
+        return;
+      }
 
-        const trackedIssuesByKey = pollInput ? buildTrackedIssuePollMap(pollInput.trackedIssues) : null;
-        const consumedTrackedIssueKeys = new Set<string>();
-        if (!options.resolveTrackedIssue && !trackedIssuesByKey) {
+      const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
+      const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
+      const existingProviderKeys = new Set(options.state.claims.map((claim) => claim.provider_key));
+      const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
+      const occupiedPollDispatchKeys = new Set<string>();
+      const noteOccupiedPollDispatchSlot = (
+        providerKey: string,
+        trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
+      ): void => {
+        if (occupiedPollDispatchKeys.has(providerKey)) {
           return;
         }
+        occupiedPollDispatchKeys.add(providerKey);
+        pollDispatchBudget.noteOccupied(trackedIssue);
+      };
 
-        const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
-        const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
-        const existingProviderKeys = new Set(options.state.claims.map((claim) => claim.provider_key));
-        const pollDispatchBudget = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
-        const occupiedPollDispatchKeys = new Set<string>();
-        const noteOccupiedPollDispatchSlot = (
-          providerKey: string,
-          trackedIssue: Pick<LiveLinearTrackedIssue, 'state'>
-        ): void => {
-          if (occupiedPollDispatchKeys.has(providerKey)) {
-            return;
-          }
-          occupiedPollDispatchKeys.add(providerKey);
-          pollDispatchBudget.noteOccupied(trackedIssue);
-        };
-
-        for (const run of discoveredRuns) {
-          if (run.status !== 'in_progress') {
-            continue;
-          }
-          const providerKey = buildProviderIssueKey(run.provider, run.issueId);
-          if (existingProviderKeys.has(providerKey)) {
-            continue;
-          }
-          noteOccupiedPollDispatchSlot(
-            providerKey,
-            trackedIssuesByKey?.get(providerKey) ?? { state: null }
-          );
+      for (const run of discoveredRuns) {
+        if (run.status !== 'in_progress') {
+          continue;
         }
+        const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+        if (existingProviderKeys.has(providerKey)) {
+          continue;
+        }
+        noteOccupiedPollDispatchSlot(
+          providerKey,
+          trackedIssuesByKey?.get(providerKey) ?? { state: null }
+        );
+      }
 
       for (const claim of [...options.state.claims]) {
+        const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
         try {
-          const claimProviderKey = buildProviderIssueKey(claim.provider, claim.issue_id);
           const claimRuns =
             runsByProviderIssue.get(claimProviderKey) ?? [];
           const activeRun = claimRuns.find((run) => run.status === 'in_progress') ?? null;
@@ -1585,7 +1618,8 @@ export function createProviderIssueHandoffService(
               ? await ensureQueuedProviderRetryDeadline({
                   claim,
                   trackedIssue: resolution.trackedIssue,
-                  previousRun: latestRun
+                  previousRun: latestRun,
+                  trackedIssueRefetch
                 })
               : claim;
           if (currentClaim.retry_queued === true) {
@@ -1608,6 +1642,7 @@ export function createProviderIssueHandoffService(
               run_manifest_path: latestRun.manifestPath,
               ...queuedRetryFields
             });
+            const refreshResumableSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
               ...currentClaim,
               issue_identifier: resolution.trackedIssue.identifier,
@@ -1623,7 +1658,7 @@ export function createProviderIssueHandoffService(
               ...queuedRetryFields
             });
             if (transitioned) {
-              await persistState();
+              await persistStateOrRollback(refreshResumableSnapshot);
               options.publishRuntime?.('provider-intake.refresh');
             }
             if (queuedRetryFields.retry_queued === true) {
@@ -1647,6 +1682,7 @@ export function createProviderIssueHandoffService(
               run_manifest_path: latestRun.manifestPath,
               ...queuedRetryFields
             });
+            const refreshCompletedSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
               ...currentClaim,
               issue_identifier: resolution.trackedIssue.identifier,
@@ -1662,7 +1698,7 @@ export function createProviderIssueHandoffService(
               ...queuedRetryFields
             });
             if (transitioned) {
-              await persistState();
+              await persistStateOrRollback(refreshCompletedSnapshot);
               options.publishRuntime?.('provider-intake.refresh');
             }
             if (queuedRetryFields.retry_queued === true) {
@@ -1679,46 +1715,53 @@ export function createProviderIssueHandoffService(
             });
             noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
           }
-        } catch {
+        } catch (error) {
+          logger.warn(
+            `Provider issue refresh reconcile failed for ${claimProviderKey}: ${
+              (error as Error)?.message ?? String(error)
+            }`
+          );
           continue;
         }
       }
 
-        if (!pollInput) {
-          return;
-        }
+      if (!pollInput) {
+        return;
+      }
 
-        for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(pollInput.trackedIssues)) {
-          const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
-          if (existingProviderKeys.has(providerKey) || consumedTrackedIssueKeys.has(providerKey)) {
-            continue;
-          }
-          if (!pollDispatchBudget.canDispatch(trackedIssue)) {
-            if (!pollDispatchBudget.hasGlobalSlots()) {
-              break;
-            }
-            continue;
-          }
-          consumedTrackedIssueKeys.add(providerKey);
-          try {
-            const handoffResult = await processTrackedIssueCandidate({
-              trackedIssue,
-              deliveryId: null,
-              event: 'poll_tick',
-              action: 'reconcile',
-              webhookTimestamp: null
-            });
-            if (handoffResult.kind !== 'ignored' || handoffResult.claim.retry_queued === true) {
-              noteOccupiedPollDispatchSlot(providerKey, trackedIssue);
-            }
-          } catch {
-            continue;
-          }
+      for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(pollInput.trackedIssues)) {
+        const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
+        if (existingProviderKeys.has(providerKey) || consumedTrackedIssueKeys.has(providerKey)) {
+          continue;
         }
-      });
-    } finally {
-      pollTrackedIssueRefetch = previousPollTrackedIssueRefetch;
-    }
+        if (!pollDispatchBudget.canDispatch(trackedIssue)) {
+          if (!pollDispatchBudget.hasGlobalSlots()) {
+            break;
+          }
+          continue;
+        }
+        consumedTrackedIssueKeys.add(providerKey);
+        try {
+          const handoffResult = await processTrackedIssueCandidate({
+            trackedIssue,
+            deliveryId: null,
+            event: 'poll_tick',
+            action: 'reconcile',
+            webhookTimestamp: null
+          });
+          if (handoffResult.kind !== 'ignored' || handoffResult.claim.retry_queued === true) {
+            noteOccupiedPollDispatchSlot(providerKey, trackedIssue);
+          }
+        } catch (error) {
+          logger.warn(
+            `Provider issue poll dispatch failed for ${providerKey}: ${
+              (error as Error)?.message ?? String(error)
+            }`
+          );
+          continue;
+        }
+      }
+    });
   };
 
   return {

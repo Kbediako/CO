@@ -1,5 +1,5 @@
 ---
-id: 20260322-1316-coordinator-symphony-poll-owned-discovery-and-recovery
+id: 20260321-1316-coordinator-symphony-poll-owned-discovery-and-recovery
 title: Coordinator Symphony Poll-Owned Discovery Recovery and Observability API Normalization
 status: in_progress
 owner: Codex

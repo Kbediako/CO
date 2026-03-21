@@ -50,7 +50,7 @@ Functional requirements:
   - the runtime retry record must preserve truthful retry metadata plus `workspace_path` where CO has it, without inventing `worker_host` fields the current provider flow does not track
   - `/api/v1/state.retrying` and `/api/v1/<issue>` must continue to expose truthful retry metadata during the ownership change
   - restart/bootstrap must remain safe: pending retry truth must survive control-host restart or be rebuilt deterministically from persisted state
-- Non-functional requirements:
+Non-functional requirements:
   - keep `1315` bounded away from unrelated reconciliation, workspace, and UI work
   - avoid duplicating retry ownership across the refresh loop and the new queue owner
   - preserve current provider-intake claim auditability and manifest-backed evidence

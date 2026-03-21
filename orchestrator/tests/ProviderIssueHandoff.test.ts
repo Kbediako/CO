@@ -221,6 +221,54 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(2);
   });
 
+  it('retries a fresh poll candidate after a pre-launch persist failure instead of stranding it in-memory', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    let persistCallCount = 0;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      if (persistCallCount === 2) {
+        throw new Error('pre-launch persist failed');
+      }
+    });
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await expect(
+      service.poll?.({
+        trackedIssues: [createTrackedIssue()]
+      })
+    ).resolves.toBeUndefined();
+
+    expect(state.claims).toEqual([]);
+    expect(launcher.start).not.toHaveBeenCalled();
+
+    await expect(
+      service.poll?.({
+        trackedIssues: [createTrackedIssue()]
+      })
+    ).resolves.toBeUndefined();
+
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(state.claims[0]).toMatchObject({
+      provider_key: 'linear:lin-issue-1',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      last_event: 'poll_tick',
+      last_action: 'reconcile'
+    });
+  });
+
   it('dispatches fresh poll candidates in Symphony order', async () => {
     const { paths } = await createHostPaths();
     const launcher = {
@@ -3382,6 +3430,77 @@ describe('createProviderIssueHandoffService', () => {
       retry_error: 'transient launch failure'
     });
     expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
+  });
+
+  it('keeps an in-memory handoff_failed retry state when persisting the failure record fails so a same-timestamp retry can relaunch immediately', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    let persistCallCount = 0;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      if (persistCallCount === 2) {
+        throw new Error('post-failure persist failed');
+      }
+    });
+    const launcher = {
+      start: vi
+        .fn(async () => null)
+        .mockRejectedValueOnce(new Error('transient launch failure'))
+        .mockResolvedValueOnce(null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const trackedIssue = createTrackedIssue({
+      updated_at: '2026-03-19T04:21:00.000Z'
+    });
+
+    await expect(
+      service.handleAcceptedTrackedIssue({
+        trackedIssue,
+        deliveryId: 'delivery-start-failure-persist',
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_360_100_000
+      })
+    ).rejects.toThrow('post-failure persist failed');
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:transient launch failure',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      retry_queued: null,
+      retry_error: null
+    });
+
+    await expect(
+      service.handleAcceptedTrackedIssue({
+        trackedIssue,
+        deliveryId: 'delivery-start-failure-retry',
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_360_100_100
+      })
+    ).resolves.toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+
+    expect(launcher.start).toHaveBeenCalledTimes(2);
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      retry_queued: null,
+      retry_error: null
+    });
   });
 
   it('prefers the fresher discovered completed run timestamp over a stale existing claim', async () => {
@@ -6667,5 +6786,87 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: '2026-03-19T04:30:20.000Z',
       retry_error: null
     });
+  });
+
+  it('retries queued-retry deadline repair after refresh persist failure instead of keeping only in-memory retry_due_at', async () => {
+    const { paths } = await createHostPaths();
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: 'not-a-timestamp',
+      retry_error: null
+    });
+
+    let persistCallCount = 0;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      if (persistCallCount === 2) {
+        throw new Error('completed refresh persist failed');
+      }
+    });
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:20:00.000Z'
+        })
+      })
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: 'not-a-timestamp'
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      task_id: 'task-1303-completed',
+      retry_queued: true,
+      retry_attempt: 1
+    });
+    expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
   });
 });

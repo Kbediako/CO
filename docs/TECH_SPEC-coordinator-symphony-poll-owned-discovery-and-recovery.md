@@ -1,5 +1,5 @@
 ---
-id: 20260322-1316-coordinator-symphony-poll-owned-discovery-and-recovery
+id: 20260321-1316-coordinator-symphony-poll-owned-discovery-and-recovery
 title: Coordinator Symphony Poll-Owned Discovery Recovery and Observability API Normalization
 relates_to: docs/PRD-coordinator-symphony-poll-owned-discovery-and-recovery.md
 risk: high
@@ -38,11 +38,11 @@ last_review: 2026-03-21
 ## Technical Requirements
 Functional requirements:
   - fresh poll candidate retrieval must page through the full active Linear candidate set before dispatch evaluation
-  - fresh poll candidates must sort by `priority` ascending (`1..4`, null/unknown last), then oldest `created_at`, then `identifier`
+  - fresh poll candidates must sort by `priority` ascending (`1-4`, null/unknown last), then oldest `created_at`, then `identifier`
   - fresh launches must stop when the global dispatch slot budget is exhausted
   - fresh launches must respect the current per-state slot overrides sourced from control/runtime feature-toggle inputs
   - the slice must preserve the already-landed poll reconcile/retry-refetch and `/api/v1` normalization behavior
-- Non-functional requirements:
+Non-functional requirements:
   - keep `1316` bounded away from unrelated UI richness, tracker write-back, and SSH-host work
   - preserve auditable claim transitions and manifest-backed runtime evidence
   - keep publication status explicit until the current closeout pack reaches terminal clean state

@@ -441,6 +441,48 @@ describe('SelectedRunProjection', () => {
       JSON.stringify({
         run_id: 'run-child',
         task_id: 'linear-lin-issue-1',
+        provider_control_host_task_id: 'provider-host-task',
+        provider_control_host_run_id: 'control-host',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-2',
+      runId: 'run-child',
+      workspacePath: root
+    });
+  });
+
+  it('projects the preferred provider child for custom control-host task and run ids', async () => {
+    const { root, paths } = await createHostPaths(undefined, {
+      taskId: 'provider-host-task',
+      runId: 'provider-host-run'
+    });
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        provider_control_host_task_id: 'provider-host-task',
+        provider_control_host_run_id: 'provider-host-run',
         status: 'in_progress',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',

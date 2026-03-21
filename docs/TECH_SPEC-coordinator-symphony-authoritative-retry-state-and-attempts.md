@@ -42,7 +42,7 @@ Functional requirements:
   - `/api/v1/<issue>.retry` must expose the same authoritative retry state, including an external retry deadline field projected from the stored deadline
   - `/api/v1/<issue>.attempts.restart_count` and `current_retry_attempt` must derive from the authoritative retry record when it exists
   - the retry state source must be backend-authoritative, not presenter-only derivation
-- Non-functional requirements:
+Non-functional requirements:
   - do not guess retry metadata that CO still does not track
   - keep scheduler ownership/cadence parity explicit and separate
   - keep the diff bounded away from optional human-readable surface richness unless backend/API work strictly requires a companion test update
