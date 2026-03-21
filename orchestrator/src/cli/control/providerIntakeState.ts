@@ -43,6 +43,7 @@ export interface ProviderIntakeClaimRecord {
   run_manifest_path: string | null;
   launch_source: ProviderLaunchSource | null;
   launch_token: string | null;
+  launch_started_at?: string | null;
 }
 
 export interface ProviderIntakeState {
@@ -120,12 +121,13 @@ export function upsertProviderIntakeClaim(
   state: ProviderIntakeState,
   input: Omit<
     ProviderIntakeClaimRecord,
-    'accepted_at' | 'updated_at' | 'launch_source' | 'launch_token'
+    'accepted_at' | 'updated_at' | 'launch_source' | 'launch_token' | 'launch_started_at'
   > & {
     accepted_at?: string | null;
     updated_at?: string | null;
     launch_source?: ProviderLaunchSource | null;
     launch_token?: string | null;
+    launch_started_at?: string | null;
   }
 ): ProviderIntakeClaimRecord {
   const now = input.updated_at ?? isoTimestamp();
@@ -138,6 +140,33 @@ export function upsertProviderIntakeClaim(
     run_id: nextRunId,
     run_manifest_path: nextRunManifestPath
   });
+  const existingLaunchStartedAt =
+    existing?.launch_started_at ??
+    (
+      existing?.launch_source === 'control-host' &&
+      (
+        existing.state === 'starting' ||
+        existing.state === 'resuming'
+      )
+        ? existing.updated_at
+        : null
+    );
+  const nextLaunchStartedAt =
+    input.launch_started_at === undefined
+      ? runIdentityChanged
+        ? null
+        : existingLaunchStartedAt ??
+          (
+            input.launch_source === 'control-host' &&
+            (
+              input.state === 'starting' ||
+              input.state === 'resuming' ||
+              input.state === 'handoff_failed'
+            )
+              ? now
+              : null
+          )
+      : input.launch_started_at;
   const next: ProviderIntakeClaimRecord = {
     provider: 'linear',
     provider_key: input.provider_key,
@@ -170,7 +199,8 @@ export function upsertProviderIntakeClaim(
         ? runIdentityChanged
           ? null
           : existing?.launch_token ?? null
-        : input.launch_token
+        : input.launch_token,
+    launch_started_at: nextLaunchStartedAt
   };
 
   if (existingIndex >= 0) {
@@ -267,6 +297,19 @@ function normalizeProviderIntakeClaim(
   ) {
     return null;
   }
+  const state = normalizeClaimState(input.state);
+  const updatedAt =
+    typeof input.updated_at === 'string' && input.updated_at.trim().length > 0
+      ? input.updated_at
+      : new Date(0).toISOString();
+  const launchSource = input.launch_source === 'control-host' ? 'control-host' : null;
+  const launchStartedAt =
+    typeof input.launch_started_at === 'string' && input.launch_started_at.trim().length > 0
+      ? input.launch_started_at
+      : launchSource === 'control-host' &&
+          (state === 'starting' || state === 'resuming')
+        ? updatedAt
+        : null;
   return {
     provider: 'linear',
     provider_key: input.provider_key,
@@ -278,16 +321,13 @@ function normalizeProviderIntakeClaim(
     issue_updated_at: typeof input.issue_updated_at === 'string' ? input.issue_updated_at : null,
     task_id: input.task_id,
     mapping_source: 'provider_id_fallback',
-    state: normalizeClaimState(input.state),
+    state,
     reason: typeof input.reason === 'string' ? input.reason : null,
     accepted_at:
       typeof input.accepted_at === 'string' && input.accepted_at.trim().length > 0
         ? input.accepted_at
         : new Date(0).toISOString(),
-    updated_at:
-      typeof input.updated_at === 'string' && input.updated_at.trim().length > 0
-        ? input.updated_at
-        : new Date(0).toISOString(),
+    updated_at: updatedAt,
     last_delivery_id: typeof input.last_delivery_id === 'string' ? input.last_delivery_id : null,
     last_event: typeof input.last_event === 'string' ? input.last_event : null,
     last_action: typeof input.last_action === 'string' ? input.last_action : null,
@@ -299,8 +339,9 @@ function normalizeProviderIntakeClaim(
     run_id: typeof input.run_id === 'string' ? input.run_id : null,
     run_manifest_path:
       typeof input.run_manifest_path === 'string' ? input.run_manifest_path : null,
-    launch_source: input.launch_source === 'control-host' ? 'control-host' : null,
-    launch_token: typeof input.launch_token === 'string' ? input.launch_token : null
+    launch_source: launchSource,
+    launch_token: typeof input.launch_token === 'string' ? input.launch_token : null,
+    launch_started_at: launchStartedAt
   };
 }
 

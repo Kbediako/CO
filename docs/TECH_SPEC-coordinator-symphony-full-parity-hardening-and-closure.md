@@ -34,6 +34,7 @@ last_review: 2026-03-21
   - terminal-only cleanup for provider-managed `.workspaces/<taskId>` is present on release/startup replay
   - provider workspace cleanup now resolves against the real repo root when `CODEX_ORCHESTRATOR_RUNS_DIR` lives outside the repository
   - forced manifest writes now preempt same-tick scheduled persister waits instead of inheriting the full heartbeat interval
+  - detached released/handoff_failed reattachment now prefers child `started_at` when present so older runs that merely finish late do not rebind to a newer launch anchor
   - selected child-manifest UI metadata truthfulness
   - selected-run workspace fallback stays truthful for child CLI manifests under repo-local and external overridden runs roots
   - compatibility `session_id` null handling
@@ -86,11 +87,12 @@ last_review: 2026-03-21
   - `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`
   - `npm run build` passed
   - `npm run lint` passed
-  - the current post-review focused hardening pack passed `3/3` files and `59/59` tests across `ProviderIssueHandoff`, `ProviderIssueHandoffRefreshSerialization`, and `ControlHostCliShell`
+  - the current detached-run hardening regression pack passed `5/5` files and `72/72` tests across `ProviderIssueHandoff`, `ProviderIssueHandoffRefreshSerialization`, `ProviderIntakeState`, `ControlServerSeedLoading`, and `ControlServerStartupInputPreparation`
   - the persister fast-path regression pack passed `2/2` files and `16/16` tests
   - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed
   - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-  - local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2022/2022` tests in `199.04s`; the earlier quiet tail still reflects long late suites (`tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts`), not a persister deadlock
+  - the latest uncommitted `npm run review` terminated on the startup-anchor boundary after pre-anchor `codex-skills` and `codex-memories` reads without a concrete finding
+  - the latest local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` reruns reached the post-`tests/cli-frontend-test.spec.ts` quiet tail without a terminal summary on this head
 - Closure gate:
   - do not claim parity closeout until the remaining blockers are resolved, even though the local suite is now terminal green again
 
@@ -99,5 +101,5 @@ last_review: 2026-03-21
 - Whether same-session continuation should be implemented inside the provider/control-host architecture, or moved into a dedicated follow-on session-owner lane.
 
 ## Approvals
-- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the successful 2026-03-21 uncommitted review rerun; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
+- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the current startup-anchor review-tooling boundary rather than by a clean local rerun; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
 - Date: 2026-03-21

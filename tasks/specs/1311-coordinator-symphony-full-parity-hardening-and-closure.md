@@ -14,6 +14,7 @@ related_tasks:
 review_notes:
   - 2026-03-20: Opened as the delivery follow-up to `1310`. The parity authority is `/Users/kbediako/Code/symphony/SPEC.md` at commit `a164593aacb3db4d6808adc5a87173d906726406`, with current Elixir reference behavior used to scope richer operational parity surfaces.
   - 2026-03-21: March 21 review-fix tranche landed for queued manual refreshes during in-flight provider handoff work, truthful selected-run workspace fallback under overridden runs roots, real repo-root provider workspace cleanup when `CODEX_ORCHESTRATOR_RUNS_DIR` is external, and released-claim cancel retry when provider refresh resolves to `skip` without reopening overlapping refresh/cancel cycles. The same day also landed the manifest-persister force-preempt fix, moved the refresh-serialization regression into a dedicated focused test file to eliminate full-suite flake, hardened released-claim cancel retry collapse so queued skipped refreshes share one pending follow-up retry signal per manifest, capped skip-path retries at that single follow-up, added resume deferral while a released-run cancel remains in flight, accepted `state=null` when the provider still reports `state_type=started`, recovered legacy resume task identity from the resolved run path when manifest `task_id` is missing, kept sync-throwing injected startup refresh callbacks on the catch/finally path, and restored local full `npm run test` to terminal green at `283/283` files and `2022/2022` tests in `199.04s`; the current post-review focused hardening pack now passes `3/3` files and `59/59` tests, and a trivial `CodexOrchestrator.start()` repro still drops from about `5.1s` to about `112ms`.
+  - 2026-03-21: The final local follow-up on this head fixed one real detached-run regression in `providerIssueHandoff`: manifest-less released/handoff-failed reattachment now prefers child `started_at` when present instead of trusting a later terminal `updated_at`, so an older run that merely finished after a newer launch anchor no longer gets rebound to the new claim. Focused regressions passed `5/5` files and `72/72` tests across `ProviderIssueHandoff`, `ProviderIssueHandoffRefreshSerialization`, `ProviderIntakeState`, `ControlServerSeedLoading`, and `ControlServerStartupInputPreparation`; `npm run pack:smoke` passed again; the latest uncommitted `npm run review` terminated on the startup-anchor boundary after pre-anchor `codex-skills`/`codex-memories` reads without surfacing a concrete finding; and the latest local full-suite reruns reached the post-`tests/cli-frontend-test.spec.ts` quiet tail without a terminal summary, so current-head full-suite counts must not be restated as terminal.
 ---
 
 # Technical Specification
@@ -40,7 +41,7 @@ review_notes:
 - The current branch now also lands released-claim cancel retry during skipped provider refresh so already-released queued or in-progress child runs still receive cancel follow-ups when provider issue resolution is temporarily unavailable, while queued skipped refreshes dedupe the in-flight cancel and can issue one follow-up retry after a failed attempt without blocking refresh completion.
 - Provider control-host continuation/retry handoff for active issues is materially covered, but full parity is still not closed.
 - Tracker writes are aligned at the core-contract level and do not block `1311`.
-- `1311` must not claim closure while real blockers remain, even though the full local suite is terminal green.
+- `1311` must not claim closure while real blockers remain, and the latest local full-suite rerun on this head is not terminal-clean evidence.
 - Live `turn_count`, `codex_totals`, `rate_limits`, and related retry counters are not derivable from current authoritative CO sources, so `1311` cannot truthfully close full parity until that capture exists or is explicitly deferred.
 - Active-issue continuation after a normal success still starts a fresh child run rather than continuing the same live session.
 
@@ -51,9 +52,9 @@ review_notes:
 - `node scripts/spec-guard.mjs --dry-run`
 - `npm run build`
 - `npm run lint`
-- current post-review focused hardening pack (`3/3` files and `59/59` tests)
+- current detached-run hardening regression pack (`5/5` files and `72/72` tests)
 - persister fast-path regression pack (`2/2` files and `16/16` tests)
-- full repo gate chain, with the explicit current truth that local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2022/2022` tests in `199.04s`
+- full repo gate chain, with the explicit current truth that the latest local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` reruns reached the post-`tests/cli-frontend-test.spec.ts` quiet tail without a terminal summary on this head
 - `npm run docs:check`
 - `npm run docs:freshness`
 - `node scripts/diff-budget.mjs` with the explicit March 21 override

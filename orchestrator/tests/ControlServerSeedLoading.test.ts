@@ -176,7 +176,8 @@ describe('readControlServerSeeds', () => {
           run_id: null,
           run_manifest_path: null,
           launch_source: null,
-          launch_token: null
+          launch_token: null,
+          launch_started_at: null
         }
       ]
     };

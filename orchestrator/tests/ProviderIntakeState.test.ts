@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  normalizeProviderIntakeState,
   type ProviderIntakeState,
   upsertProviderIntakeClaim
 } from '../src/cli/control/providerIntakeState.js';
@@ -20,7 +21,7 @@ describe('upsertProviderIntakeClaim', () => {
   it('preserves launch provenance when the run identity is unchanged and no new launch fields are supplied', () => {
     const state = createProviderIntakeState();
 
-    upsertProviderIntakeClaim(state, {
+    const initialClaim = upsertProviderIntakeClaim(state, {
       provider: 'linear',
       provider_key: 'linear:lin-issue-1',
       issue_id: 'lin-issue-1',
@@ -39,6 +40,8 @@ describe('upsertProviderIntakeClaim', () => {
       launch_token: 'launch-token-1'
     });
 
+    expect(initialClaim.launch_started_at).toBeTruthy();
+
     const claim = upsertProviderIntakeClaim(state, {
       provider: 'linear',
       provider_key: 'linear:lin-issue-1',
@@ -58,12 +61,13 @@ describe('upsertProviderIntakeClaim', () => {
 
     expect(claim.launch_source).toBe('control-host');
     expect(claim.launch_token).toBe('launch-token-1');
+    expect(claim.launch_started_at).toBe(initialClaim.launch_started_at);
   });
 
   it('preserves launch provenance when the task and run id stay fixed but the manifest path is populated later', () => {
     const state = createProviderIntakeState();
 
-    upsertProviderIntakeClaim(state, {
+    const initialClaim = upsertProviderIntakeClaim(state, {
       provider: 'linear',
       provider_key: 'linear:lin-issue-1',
       issue_id: 'lin-issue-1',
@@ -81,6 +85,8 @@ describe('upsertProviderIntakeClaim', () => {
       launch_source: 'control-host',
       launch_token: 'launch-token-1'
     });
+
+    expect(initialClaim.launch_started_at).toBeTruthy();
 
     const claim = upsertProviderIntakeClaim(state, {
       provider: 'linear',
@@ -101,12 +107,13 @@ describe('upsertProviderIntakeClaim', () => {
 
     expect(claim.launch_source).toBe('control-host');
     expect(claim.launch_token).toBe('launch-token-1');
+    expect(claim.launch_started_at).toBe(initialClaim.launch_started_at);
   });
 
   it('preserves launch provenance when the run id is first discovered during rehydrate', () => {
     const state = createProviderIntakeState();
 
-    upsertProviderIntakeClaim(state, {
+    const initialClaim = upsertProviderIntakeClaim(state, {
       provider: 'linear',
       provider_key: 'linear:lin-issue-1',
       issue_id: 'lin-issue-1',
@@ -125,6 +132,8 @@ describe('upsertProviderIntakeClaim', () => {
       launch_token: 'launch-token-1'
     });
 
+    expect(initialClaim.launch_started_at).toBeTruthy();
+
     const claim = upsertProviderIntakeClaim(state, {
       provider: 'linear',
       provider_key: 'linear:lin-issue-1',
@@ -144,6 +153,7 @@ describe('upsertProviderIntakeClaim', () => {
 
     expect(claim.launch_source).toBe('control-host');
     expect(claim.launch_token).toBe('launch-token-1');
+    expect(claim.launch_started_at).toBe(initialClaim.launch_started_at);
   });
 
   it('clears inherited launch provenance when the run identity changes and no new launch fields are supplied', () => {
@@ -187,5 +197,141 @@ describe('upsertProviderIntakeClaim', () => {
 
     expect(claim.launch_source).toBeNull();
     expect(claim.launch_token).toBeNull();
+    expect(claim.launch_started_at).toBeNull();
+  });
+
+  it('preserves the launch timestamp anchor across a detached release rewrite', () => {
+    const state = createProviderIntakeState();
+
+    const inflightClaim = upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-1',
+      updated_at: '2026-03-19T04:00:10.000Z'
+    });
+
+    const claim = upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:01:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null,
+      updated_at: '2026-03-19T04:02:00.000Z'
+    });
+
+    expect(inflightClaim.launch_started_at).toBe('2026-03-19T04:00:10.000Z');
+    expect(claim.updated_at).toBe('2026-03-19T04:02:00.000Z');
+    expect(claim.launch_started_at).toBe('2026-03-19T04:00:10.000Z');
+  });
+
+  it('does not invent a launch timestamp anchor for a legacy control-host handoff_failed claim', () => {
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_rehydration_timeout',
+      accepted_at: '2026-03-19T04:00:05.000Z',
+      updated_at: '2026-03-19T04:00:10.000Z',
+      last_delivery_id: 'delivery-handoff-failed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'legacy-launch-token'
+    });
+
+    const claim = upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:01:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null,
+      updated_at: '2026-03-19T04:02:00.000Z'
+    });
+
+    expect(claim.updated_at).toBe('2026-03-19T04:02:00.000Z');
+    expect(claim.launch_started_at).toBeNull();
+  });
+});
+
+describe('normalizeProviderIntakeState', () => {
+  it('leaves launch_started_at unset for legacy control-host handoff_failed claims', () => {
+    const normalized = normalizeProviderIntakeState({
+      schema_version: 1,
+      updated_at: '2026-03-19T04:50:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_start_failed:transient launch failure',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:40:00.000Z',
+          task_id: 'linear-lin-issue-1',
+          mapping_source: 'provider_id_fallback',
+          state: 'handoff_failed',
+          reason: 'provider_issue_start_failed:transient launch failure',
+          accepted_at: '2026-03-19T04:40:05.000Z',
+          updated_at: '2026-03-19T04:40:10.000Z',
+          last_delivery_id: 'delivery-failed-start',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_050_000,
+          run_id: null,
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-token-failed'
+        }
+      ]
+    });
+
+    expect(normalized.claims[0]?.launch_started_at).toBeNull();
   });
 });

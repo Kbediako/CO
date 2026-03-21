@@ -100,6 +100,7 @@ const BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS = 5;
 const BEST_EFFORT_REHYDRATE_TIMEOUT_MS =
   BEST_EFFORT_REHYDRATE_DELAY_MS * BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS;
 const PROVIDER_LAUNCH_SOURCE: ProviderLaunchSource = 'control-host';
+const PROVIDER_RELEASED_PENDING_REOPEN_PREFIX = 'provider_issue_released_pending_reopen:';
 
 type ProviderTrackedIssueEligibility =
   | { eligible: true }
@@ -234,27 +235,30 @@ export function createProviderIssueHandoffService(
       await options.persist();
       throw error;
     }
-    if (startedRun) {
-      upsertProviderIntakeClaim(options.state, {
-        ...input.claim,
-        issue_identifier: input.trackedIssue.identifier,
-        issue_title: input.trackedIssue.title,
-        issue_state: input.trackedIssue.state,
-        issue_state_type: input.trackedIssue.state_type,
-        issue_updated_at: input.trackedIssue.updated_at,
-        task_id: taskId,
-        mapping_source: 'provider_id_fallback',
-        state: 'starting',
-        reason: input.reason,
-        run_id: startedRun.runId,
-        run_manifest_path: startedRun.manifestPath,
-        launch_source: PROVIDER_LAUNCH_SOURCE,
-        launch_token: launchToken
-      });
-      await options.persist();
-      options.publishRuntime?.('provider-intake.refresh');
+    try {
+      if (startedRun) {
+        upsertProviderIntakeClaim(options.state, {
+          ...input.claim,
+          issue_identifier: input.trackedIssue.identifier,
+          issue_title: input.trackedIssue.title,
+          issue_state: input.trackedIssue.state,
+          issue_state_type: input.trackedIssue.state_type,
+          issue_updated_at: input.trackedIssue.updated_at,
+          task_id: taskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'starting',
+          reason: input.reason,
+          run_id: startedRun.runId,
+          run_manifest_path: startedRun.manifestPath,
+          launch_source: PROVIDER_LAUNCH_SOURCE,
+          launch_token: launchToken
+        });
+        await options.persist();
+        options.publishRuntime?.('provider-intake.refresh');
+      }
+    } finally {
+      scheduleBestEffortRehydrate(rehydrateNow);
     }
-    scheduleBestEffortRehydrate(rehydrateNow);
   };
 
   const releaseClaim = async (input: {
@@ -374,6 +378,16 @@ export function createProviderIssueHandoffService(
     for (const claim of [...options.state.claims]) {
       const claimRuns = runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
       const releasedRun = claim.state === 'released' ? resolveProviderReleaseRun(claim, claimRuns) : null;
+      // Manifest-less inflight claims belong to a fresh launch attempt, so they
+      // must not collapse onto older terminal-completed runs from prior sessions.
+      const manifestlessDetachedClaim =
+        (
+          claim.state === 'starting' ||
+          claim.state === 'resuming' ||
+          claim.state === 'handoff_failed'
+        ) &&
+        !claim.run_manifest_path &&
+        !claim.run_id;
       if (claim.state === 'released') {
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           state: 'released',
@@ -458,7 +472,13 @@ export function createProviderIssueHandoffService(
       }
 
       const completedRun = claimRuns.find((run) => run.status === 'succeeded');
-      if (completedRun) {
+      if (
+        completedRun &&
+        (
+          !manifestlessDetachedClaim ||
+          didRunMatchClaimAttempt(claim, completedRun)
+        )
+      ) {
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           state: 'completed',
           reason: 'provider_issue_rehydrated_completed_run',
@@ -591,6 +611,88 @@ export function createProviderIssueHandoffService(
         last_webhook_timestamp: input.webhookTimestamp,
         accepted_at: existing?.accepted_at ?? null
       };
+
+      if (existing?.state === 'released') {
+        const discoveredReleasedRuns = await discoverProviderIssueRuns(options.paths.runDir, {
+          provider: 'linear',
+          issueId: input.trackedIssue.id
+        });
+        const releasedRun = resolveProviderReleaseRun(existing, discoveredReleasedRuns);
+        const releasedClaimIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
+          existing.issue_updated_at ?? null,
+          releasedRun?.issueUpdatedAt ?? releasedRun?.startedAt ?? null
+        );
+        const releasedWebhookTiming = compareTrackedIssueUpdatedAt({
+          existingIssueUpdatedAt: releasedClaimIssueUpdatedAt,
+          nextIssueUpdatedAt: input.trackedIssue.updated_at
+        });
+        const releaseCancelPending =
+          shouldAttemptReleaseCancel(releasedRun) ||
+          hasPendingReleaseCancel(releasedRun?.manifestPath ?? existing.run_manifest_path);
+        const pendingReleasedReopen = isProviderIssueReleasedPendingReopen(existing.reason ?? null);
+        const replayBlockedByReleasedMetadata =
+          releasedWebhookTiming === 'older' ||
+          (
+            releasedWebhookTiming === 'equal' &&
+            !pendingReleasedReopen
+          );
+        const preserveReleasedIssueMetadata = replayBlockedByReleasedMetadata;
+        const newerWebhookBlockedByDrain =
+          releaseCancelPending &&
+          (
+            releasedWebhookTiming === 'newer' ||
+            releasedWebhookTiming === 'unknown'
+          );
+        if (
+          releaseCancelPending ||
+          replayBlockedByReleasedMetadata
+        ) {
+          const claim = upsertProviderIntakeClaim(options.state, {
+            ...claimBase,
+            issue_identifier:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_identifier
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_identifier
+                  : claimBase.issue_identifier,
+            issue_title:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_title
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_title
+                  : claimBase.issue_title,
+            issue_state:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_state
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_state
+                  : claimBase.issue_state,
+            issue_state_type:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_state_type
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_state_type
+                  : claimBase.issue_state_type,
+            issue_updated_at:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_updated_at
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_updated_at
+                  : claimBase.issue_updated_at,
+            task_id: releasedRun?.taskId ?? existing.task_id,
+            mapping_source: existing.mapping_source,
+            state: 'released',
+            reason:
+              newerWebhookBlockedByDrain
+                ? markProviderIssueReleasedPendingReopen(existing.reason ?? null)
+                : existing.reason ?? 'provider_issue_released',
+            run_id: releasedRun?.runId ?? existing.run_id,
+            run_manifest_path: releasedRun?.manifestPath ?? existing.run_manifest_path,
+          });
+          await options.persist();
+          return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_released', claim };
+        }
+      }
 
       if (
         isTrackedIssueStale({
@@ -956,6 +1058,76 @@ function selectMostRecentTrackedIssueUpdatedAt(
   return primaryIssueUpdatedAt ?? secondaryIssueUpdatedAt ?? null;
 }
 
+function isProviderIssueReleasedPendingReopen(reason: string | null): boolean {
+  return typeof reason === 'string' && reason.startsWith(PROVIDER_RELEASED_PENDING_REOPEN_PREFIX);
+}
+
+function markProviderIssueReleasedPendingReopen(reason: string | null): string {
+  if (isProviderIssueReleasedPendingReopen(reason)) {
+    return reason as string;
+  }
+  return `${PROVIDER_RELEASED_PENDING_REOPEN_PREFIX}${reason ?? 'provider_issue_released'}`;
+}
+
+function didRunFinishAfterClaimLaunch(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'updated_at' | 'launch_started_at'>,
+  run: Pick<ProviderIssueRunRecord, 'startedAt' | 'updatedAt'>
+): boolean {
+  const claimLaunchAt = resolveProviderClaimLaunchAt(claim);
+  const claimUpdatedAt = Date.parse(claimLaunchAt ?? '');
+  if (!Number.isFinite(claimUpdatedAt)) {
+    return false;
+  }
+  const runStartedAt = Date.parse(run.startedAt ?? '');
+  if (Number.isFinite(runStartedAt)) {
+    // Prefer the child start timestamp when present so an older run that only
+    // completed later cannot be rebound onto a newer launch attempt.
+    return runStartedAt >= claimUpdatedAt;
+  }
+  const runUpdatedAt = Date.parse(run.updatedAt ?? '');
+  if (!Number.isFinite(runUpdatedAt)) {
+    return false;
+  }
+  return runUpdatedAt > claimUpdatedAt;
+}
+
+function didRunMatchClaimAttempt(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'updated_at' | 'launch_started_at' | 'issue_updated_at'>,
+  run: Pick<ProviderIssueRunRecord, 'startedAt' | 'updatedAt' | 'issueUpdatedAt'>
+): boolean {
+  if (didRunFinishAfterClaimLaunch(claim, run)) {
+    return true;
+  }
+  if (claim.state !== 'handoff_failed' && claim.state !== 'released') {
+    return false;
+  }
+  const claimIssueUpdatedAt = Date.parse(claim.issue_updated_at ?? '');
+  if (!Number.isFinite(claimIssueUpdatedAt)) {
+    return false;
+  }
+  const runIssueUpdatedAt = Date.parse(run.issueUpdatedAt ?? '');
+  if (Number.isFinite(runIssueUpdatedAt)) {
+    return runIssueUpdatedAt >= claimIssueUpdatedAt;
+  }
+  if (claim.state === 'handoff_failed') {
+    const runStartedAt = Date.parse(run.startedAt ?? '');
+    if (Number.isFinite(runStartedAt)) {
+      return runStartedAt >= claimIssueUpdatedAt;
+    }
+  }
+  const runUpdatedAt = Date.parse(run.updatedAt ?? '');
+  return Number.isFinite(runUpdatedAt) && runUpdatedAt >= claimIssueUpdatedAt;
+}
+
+function resolveProviderClaimLaunchAt(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'updated_at' | 'launch_started_at'>
+): string | null {
+  if (typeof claim.launch_started_at === 'string' && claim.launch_started_at.trim().length > 0) {
+    return claim.launch_started_at;
+  }
+  return claim.state === 'starting' || claim.state === 'resuming' ? claim.updated_at : null;
+}
+
 function compareTrackedIssueUpdatedAt(input: {
   existingIssueUpdatedAt: string | null;
   nextIssueUpdatedAt: string | null;
@@ -1201,9 +1373,27 @@ function resolveProviderReleaseRun(
     return queuedRun;
   }
   if (
-    (claim.state === 'starting' || claim.state === 'resuming') &&
-    claim.run_manifest_path
+    !claim.run_manifest_path &&
+    !claim.run_id &&
+    (
+      claim.state === 'handoff_failed' ||
+      claim.state === 'released'
+    )
   ) {
+    const matchedRun = claimRuns.find((run) => didRunMatchClaimAttempt(claim, run)) ?? null;
+    if (matchedRun) {
+      return matchedRun;
+    }
+    if (claim.state !== 'released' || claim.issue_updated_at) {
+      return null;
+    }
+  }
+  if (
+    claim.state === 'starting' || claim.state === 'resuming'
+  ) {
+    if (!claim.run_manifest_path) {
+      return null;
+    }
     return {
       provider: claim.provider,
       issueId: claim.issue_id,
