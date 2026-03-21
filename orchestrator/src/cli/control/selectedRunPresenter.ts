@@ -4,7 +4,7 @@ import { relative, resolve } from 'node:path';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
-import type { ControlState } from './controlState.js';
+import type { ControlAction, ControlState } from './controlState.js';
 import type {
   ControlSelectedRunPayload,
   ControlSelectedRunRuntimeSnapshot,
@@ -30,6 +30,8 @@ export interface SelectedRunPresenterContext {
   paths: Pick<RunPaths, 'manifestPath' | 'runDir' | 'logPath'>;
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
 }
+
+const BUCKET_ACTIONS = new Set<ControlAction['action']>(['pause', 'resume', 'fail', 'cancel']);
 
 export function buildSelectedRunPublicPayload(selected: SelectedRunContext): ControlSelectedRunPayload {
   return buildProjectionSelectedPayload(selected);
@@ -59,34 +61,67 @@ export function buildUiDataset(input: {
 
   const selected = input.snapshot.selected;
   const selectedSharedFields = selected ? buildUiSelectedRunSharedFields(selected) : null;
-  const bucketInfo = classifyBucket(input.manifest.status, input.control);
-  const approvalsTotal = Array.isArray(input.manifest.approvals) ? input.manifest.approvals.length : 0;
+  const selectedUsesDistinctManifest =
+    Boolean(selected?.manifestPath) && selected?.manifestPath !== input.paths.manifestPath;
+  const effectiveStatus = selected?.rawStatus ?? input.manifest.status;
+  const effectiveLatestAction = selectedUsesDistinctManifest
+    ? normalizeBucketAction(selected?.latestAction)
+    : normalizeBucketAction(selected?.latestAction ?? input.control.latest_action?.action);
+  const bucketInfo = classifyBucket(effectiveStatus, effectiveLatestAction);
+  const approvalsTotal = selectedUsesDistinctManifest
+    ? (selected?.approvalsTotal ?? 0)
+    : Array.isArray(input.manifest.approvals)
+      ? input.manifest.approvals.length
+      : 0;
   const repoRoot = resolveRepoRootFromRunDir(input.paths.runDir);
+  const effectiveManifestPath = selected?.manifestPath ?? input.paths.manifestPath;
+  const effectiveLogPath = selected?.runDir ? resolve(selected.runDir, 'runner.ndjson') : input.paths.logPath;
   const links = {
-    manifest: repoRoot ? relative(repoRoot, input.paths.manifestPath) : input.paths.manifestPath,
-    log: repoRoot ? relative(repoRoot, input.paths.logPath) : input.paths.logPath,
+    manifest: repoRoot ? relative(repoRoot, effectiveManifestPath) : effectiveManifestPath,
+    log: repoRoot ? relative(repoRoot, effectiveLogPath) : effectiveLogPath,
     metrics: null,
     state: null
   };
 
-  const stages = Array.isArray(input.manifest.commands)
-    ? input.manifest.commands.map((command) => ({
-        id: command.id,
-        title: command.title || command.id,
-        status: command.status
-      }))
-    : [];
+  const stages = selectedUsesDistinctManifest
+    ? (selected?.stages ?? [])
+    : Array.isArray(input.manifest.commands)
+      ? input.manifest.commands.map((command) => ({
+          id: command.id,
+          title: command.title || command.id,
+          status: command.status
+        }))
+      : [];
+
+  const effectiveRunId = selected?.runId ?? input.manifest.run_id;
+  const effectiveTaskId = selected?.taskId ?? input.manifest.task_id;
+  const effectiveStartedAt = selectedUsesDistinctManifest
+    ? (selected?.startedAt ?? null)
+    : (selected?.startedAt ?? input.manifest.started_at);
+  const effectiveUpdatedAt = selectedUsesDistinctManifest
+    ? (selected?.updatedAt ?? null)
+    : (selected?.updatedAt ?? input.manifest.updated_at);
+  const effectiveCompletedAt = selectedUsesDistinctManifest
+    ? (selected?.completedAt ?? null)
+    : (selected?.completedAt ?? input.manifest.completed_at);
+  const effectiveSummary = selectedUsesDistinctManifest
+    ? (selected?.summary ?? '')
+    : (selected?.summary ?? input.manifest.summary ?? '');
+  const effectiveTitle =
+    selectedUsesDistinctManifest && effectiveTaskId
+      ? (selected?.pipelineTitle ?? effectiveTaskId)
+      : input.manifest.pipeline_title || effectiveTaskId;
 
   const runEntry = {
-    run_id: input.manifest.run_id,
-    task_id: input.manifest.task_id,
-    status: input.manifest.status,
-    raw_status: selected?.rawStatus ?? input.manifest.status,
-    display_status: selected?.displayStatus ?? input.manifest.status,
+    run_id: effectiveRunId,
+    task_id: effectiveTaskId,
+    status: effectiveStatus,
+    raw_status: effectiveStatus,
+    display_status: selected?.displayStatus ?? effectiveStatus,
     status_reason: selected?.statusReason ?? null,
-    started_at: input.manifest.started_at,
-    updated_at: input.manifest.updated_at,
-    completed_at: input.manifest.completed_at,
+    started_at: effectiveStartedAt,
+    updated_at: effectiveUpdatedAt,
+    completed_at: effectiveCompletedAt,
     stages,
     links,
     approvals_pending: 0,
@@ -104,19 +139,19 @@ export function buildUiDataset(input: {
   };
 
   const taskEntry = {
-    task_id: input.manifest.task_id,
-    title: input.manifest.pipeline_title || input.manifest.task_id,
+    task_id: effectiveTaskId,
+    title: effectiveTitle,
     bucket: bucketInfo.bucket,
     bucket_reason: bucketInfo.reason,
-    status: input.manifest.status,
-    raw_status: selected?.rawStatus ?? input.manifest.status,
-    display_status: selected?.displayStatus ?? input.manifest.status,
+    status: effectiveStatus,
+    raw_status: effectiveStatus,
+    display_status: selected?.displayStatus ?? effectiveStatus,
     status_reason: selected?.statusReason ?? null,
-    last_update: input.manifest.updated_at,
-    latest_run_id: input.manifest.run_id,
+    last_update: effectiveUpdatedAt,
+    latest_run_id: effectiveRunId,
     approvals_pending: 0,
     approvals_total: approvalsTotal,
-    summary: input.manifest.summary ?? '',
+    summary: effectiveSummary,
     question_summary: selectedSharedFields?.question_summary ?? null,
     ...(selectedSharedFields?.tracked ? { tracked: selectedSharedFields.tracked } : {})
   };
@@ -143,15 +178,14 @@ export async function readUiDataset(context: SelectedRunPresenterContext): Promi
 }
 
 function classifyBucket(
-  status: CliManifest['status'],
-  control: ControlState
+  status: string,
+  latestAction: ControlAction['action'] | null
 ): { bucket: string; reason: string } {
   if (status === 'queued') {
     return { bucket: 'pending', reason: 'queued' };
   }
   if (status === 'in_progress') {
-    const latest = control.latest_action?.action ?? null;
-    if (latest === 'pause') {
+    if (latestAction === 'pause') {
       return { bucket: 'ongoing', reason: 'paused' };
     }
     return { bucket: 'active', reason: 'running' };
@@ -160,6 +194,13 @@ function classifyBucket(
     return { bucket: 'complete', reason: 'terminal' };
   }
   return { bucket: 'pending', reason: 'unknown' };
+}
+
+function normalizeBucketAction(value: string | null | undefined): ControlAction['action'] | null {
+  if (!value || !BUCKET_ACTIONS.has(value as ControlAction['action'])) {
+    return null;
+  }
+  return value as ControlAction['action'];
 }
 
 function resolveRepoRootFromRunDir(runDir: string): string | null {

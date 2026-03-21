@@ -6,6 +6,7 @@ var/
 .DS_Store
 .vscode/settings.json
 .runs/
+.workspaces/
 **/:Zone.Identifier
 compliance/permit.local.json
 error.log

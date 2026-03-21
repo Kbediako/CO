@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -185,6 +185,199 @@ describe('ManifestPersister', () => {
     await Promise.all([first, second]);
 
     expect(callCount).toBe(1);
+  });
+
+  it('lets force flush preempt a newly queued wait before the timer interval elapses', async () => {
+    vi.useFakeTimers();
+    try {
+      const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+      const pipeline: PipelineDefinition = {
+        id: 'persister-force-preempt',
+        title: 'Persister Force Preempt Pipeline',
+        stages: [
+          {
+            kind: 'command',
+            id: 'stage',
+            title: 'Stage',
+            command: 'echo ok'
+          }
+        ]
+      };
+
+      const { manifest, paths } = await bootstrapManifest('run-persister-force-preempt', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: env.taskId,
+        approvalPolicy: null
+      });
+
+      let callCount = 0;
+      const persister = new ManifestPersister({
+        manifest,
+        paths,
+        persistIntervalMs: 5_000,
+        writeManifest: async () => {
+          callCount += 1;
+        },
+        writeHeartbeat: async () => {}
+      });
+
+      await persister.schedule({ manifest: true, force: true });
+
+      const queued = persister.schedule({ manifest: true });
+      const forced = persister.schedule({ manifest: true, force: true });
+
+      await vi.advanceTimersByTimeAsync(0);
+      await expect(forced).resolves.toBeUndefined();
+      await expect(queued).resolves.toBeUndefined();
+      expect(callCount).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts the queued wait only after the in-flight flush drains', async () => {
+    vi.useFakeTimers();
+    try {
+      const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+      const pipeline: PipelineDefinition = {
+        id: 'persister-deferred-wait',
+        title: 'Persister Deferred Wait Pipeline',
+        stages: [
+          {
+            kind: 'command',
+            id: 'stage',
+            title: 'Stage',
+            command: 'echo ok'
+          }
+        ]
+      };
+
+      const { manifest, paths } = await bootstrapManifest('run-persister-deferred-wait', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: env.taskId,
+        approvalPolicy: null
+      });
+
+      let callCount = 0;
+      let releaseInFlightFlush: (() => void) | null = null;
+      let markInFlightFlushStarted: (() => void) | null = null;
+      const inFlightFlushStarted = new Promise<void>((resolve) => {
+        markInFlightFlushStarted = resolve;
+      });
+
+      const persister = new ManifestPersister({
+        manifest,
+        paths,
+        persistIntervalMs: 5_000,
+        writeManifest: async () => {
+          callCount += 1;
+          if (callCount === 2) {
+            markInFlightFlushStarted?.();
+            await new Promise<void>((resolve) => {
+              releaseInFlightFlush = resolve;
+            });
+          }
+        },
+        writeHeartbeat: async () => {}
+      });
+
+      await persister.schedule({ manifest: true, force: true });
+
+      const inFlight = persister.schedule({ manifest: true, force: true });
+      await inFlightFlushStarted;
+
+      const queued = persister.schedule({ manifest: true });
+      releaseInFlightFlush?.();
+
+      await vi.advanceTimersByTimeAsync(0);
+      await expect(inFlight).resolves.toBeUndefined();
+
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(callCount).toBe(2);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(queued).resolves.toBeUndefined();
+      expect(callCount).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('recomputes the queued wait after an in-flight flush updates the last persist time', async () => {
+    vi.useFakeTimers();
+    try {
+      const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+      const pipeline: PipelineDefinition = {
+        id: 'persister-deferred-wait-recompute',
+        title: 'Persister Deferred Wait Recompute Pipeline',
+        stages: [
+          {
+            kind: 'command',
+            id: 'stage',
+            title: 'Stage',
+            command: 'echo ok'
+          }
+        ]
+      };
+
+      const { manifest, paths } = await bootstrapManifest('run-persister-deferred-wait-recompute', {
+        env,
+        pipeline,
+        parentRunId: null,
+        taskSlug: env.taskId,
+        approvalPolicy: null
+      });
+
+      let nowMs = 0;
+      let callCount = 0;
+      let releaseInFlightFlush: (() => void) | null = null;
+      let markInFlightFlushStarted: (() => void) | null = null;
+      const inFlightFlushStarted = new Promise<void>((resolve) => {
+        markInFlightFlushStarted = resolve;
+      });
+
+      const persister = new ManifestPersister({
+        manifest,
+        paths,
+        persistIntervalMs: 5_000,
+        now: () => nowMs,
+        writeManifest: async () => {
+          callCount += 1;
+          if (callCount === 2) {
+            markInFlightFlushStarted?.();
+            await new Promise<void>((resolve) => {
+              releaseInFlightFlush = resolve;
+            });
+          }
+        },
+        writeHeartbeat: async () => {}
+      });
+
+      await persister.schedule({ manifest: true, force: true });
+
+      const inFlight = persister.schedule({ manifest: true, force: true });
+      await inFlightFlushStarted;
+
+      nowMs = 2_000;
+      const queued = persister.schedule({ manifest: true });
+      releaseInFlightFlush?.();
+
+      await vi.advanceTimersByTimeAsync(0);
+      await expect(inFlight).resolves.toBeUndefined();
+
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(callCount).toBe(2);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(queued).resolves.toBeUndefined();
+      expect(callCount).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('recovers from failed manifest writes', async () => {

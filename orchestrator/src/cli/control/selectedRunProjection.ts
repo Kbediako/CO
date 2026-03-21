@@ -1,10 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
 import type { ControlAction, ControlState } from './controlState.js';
 import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
+import { resolveLegacyWorkspacePathFromRunDir, resolveManifestWorkspacePath } from '../run/workspacePath.js';
 import {
   buildTrackedLinearPayload,
   type ControlCompatibilitySourceContext,
@@ -152,19 +153,39 @@ async function buildSelectedRunContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<SelectedRunContext | null> {
-  return buildProjectionContextFromParts(snapshot, await resolveProjectionContextParts(context, snapshot));
+  const [parts, controlWorkspacePath] = await Promise.all([
+    resolveProjectionContextParts(context, snapshot),
+    resolveControlWorkspacePath(context)
+  ]);
+  return buildProjectionContextFromParts(
+    snapshot,
+    parts,
+    resolveRunsRootFromRunDir(context.paths.runDir),
+    controlWorkspacePath
+  );
 }
 
 async function buildCompatibilitySourceContextFromSnapshot(
   context: SelectedRunProjectionContext,
   snapshot: SelectedRunManifestSnapshot | null
 ): Promise<ControlCompatibilitySourceContext | null> {
-  return buildProjectionContextFromParts(snapshot, await resolveProjectionContextParts(context, snapshot));
+  const [parts, controlWorkspacePath] = await Promise.all([
+    resolveProjectionContextParts(context, snapshot),
+    resolveControlWorkspacePath(context)
+  ]);
+  return buildProjectionContextFromParts(
+    snapshot,
+    parts,
+    resolveRunsRootFromRunDir(context.paths.runDir),
+    controlWorkspacePath
+  );
 }
 
 function buildProjectionContextFromParts(
   snapshot: SelectedRunManifestSnapshot | null,
-  parts: ProjectionContextParts
+  parts: ProjectionContextParts,
+  controlRunsRoot: string | null,
+  controlWorkspacePath: string | null
 ): SelectedRunContext | null {
   if (!snapshot) {
     return null;
@@ -181,7 +202,12 @@ function buildProjectionContextFromParts(
     rawStatus,
     summary: manifestSummary
   });
-  const workspacePath = resolveRepoRootFromRunDir(parts.runDir) ?? parts.runDir;
+  const workspacePath = resolveSelectedRunWorkspacePath({
+    manifestRecord,
+    manifestPath: snapshot.manifestPath,
+    controlRunsRoot,
+    controlWorkspacePath
+  });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
@@ -220,9 +246,52 @@ function buildProjectionContextFromParts(
     latestAction,
     latestEvent,
     workspacePath,
+    pipelineTitle: readStringValue(manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null,
+    stages: readManifestStageSummaries(manifestRecord),
+    approvalsTotal: readManifestApprovalsTotal(manifestRecord),
+    manifestPath: snapshot.manifestPath,
+    runDir: snapshot.runDir,
     questionSummary,
     tracked
   };
+}
+
+function resolveSelectedRunWorkspacePath(input: {
+  manifestRecord: Record<string, unknown>;
+  manifestPath: string;
+  controlRunsRoot: string | null;
+  controlWorkspacePath: string | null;
+}): string | null {
+  const explicitWorkspacePath = resolveManifestWorkspacePath(input.manifestRecord);
+  if (explicitWorkspacePath) {
+    return explicitWorkspacePath;
+  }
+  if (
+    !input.controlRunsRoot ||
+    !isCliRunManifestPathWithinRunsRoot(input.manifestPath, input.controlRunsRoot)
+  ) {
+    return null;
+  }
+  return input.controlWorkspacePath;
+}
+
+function isCliRunManifestPathWithinRunsRoot(manifestPath: string, runsRoot: string): boolean {
+  const relativePath = relative(runsRoot, manifestPath);
+  if (relativePath === '' || isAbsolute(relativePath)) {
+    return false;
+  }
+  const normalizedRelativePath = relativePath.replace(/\\/g, '/');
+  if (normalizedRelativePath.startsWith('../')) {
+    return false;
+  }
+  const segments = normalizedRelativePath.split('/');
+  return (
+    segments.length === 4 &&
+    segments[0].length > 0 &&
+    segments[1] === 'cli' &&
+    segments[2].length > 0 &&
+    segments[3] === 'manifest.json'
+  );
 }
 
 async function readSelectedRunManifestSnapshotInternal(
@@ -361,9 +430,61 @@ function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boo
   });
 }
 
-function resolveRepoRootFromRunDir(runDir: string): string | null {
-  const candidate = resolve(runDir, '..', '..', '..', '..');
-  return candidate || null;
+function readManifestStageSummaries(manifestRecord: Record<string, unknown>): Array<{
+  id: string;
+  title: string;
+  status: string | null;
+}> {
+  const commands = manifestRecord.commands;
+  if (!Array.isArray(commands)) {
+    return [];
+  }
+  return commands.flatMap((command) => {
+    if (!isRecord(command)) {
+      return [];
+    }
+    const id = readStringValue(command, 'id');
+    if (!id) {
+      return [];
+    }
+    return [
+      {
+        id,
+        title: readStringValue(command, 'title') ?? id,
+        status: readStringValue(command, 'status') ?? null
+      }
+    ];
+  });
+}
+
+function readManifestApprovalsTotal(manifestRecord: Record<string, unknown>): number {
+  return Array.isArray(manifestRecord.approvals) ? manifestRecord.approvals.length : 0;
+}
+
+async function resolveControlWorkspacePath(
+  context: SelectedRunProjectionContext
+): Promise<string | null> {
+  const controlManifest = await readJsonFile<Record<string, unknown>>(context.paths.manifestPath);
+  const explicitWorkspacePath = controlManifest ? resolveManifestWorkspacePath(controlManifest) : null;
+  if (explicitWorkspacePath) {
+    return explicitWorkspacePath;
+  }
+  return resolveSafeLegacyWorkspacePathFromRunDir(context.paths.runDir);
+}
+
+function resolveSafeLegacyWorkspacePathFromRunDir(runDir: string): string | null {
+  const legacyWorkspacePath = resolveLegacyWorkspacePathFromRunDir(runDir);
+  const runsRoot = resolveRunsRootFromRunDir(runDir);
+  if (!runsRoot) {
+    return null;
+  }
+  return normalizePathForComparison(runsRoot) === normalizePathForComparison(join(legacyWorkspacePath, '.runs'))
+    ? legacyWorkspacePath
+    : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function resolveRunsRootFromRunDir(runDir: string): string | null {
@@ -381,6 +502,10 @@ function resolveRunIdFromManifestPath(manifestPath: string): string | null {
   const normalizedPath = manifestPath.replace(/\\/g, '/');
   const match = normalizedPath.match(/\/cli\/([^/]+)\/manifest\.json$/);
   return match?.[1] ?? null;
+}
+
+function normalizePathForComparison(pathname: string): string {
+  return resolve(pathname).replace(/\\/g, '/');
 }
 
 async function resolveProjectionContextParts(
@@ -494,12 +619,17 @@ async function readTaskCompatibilityContexts(
       join(runDir, LINEAR_ADVISORY_STATE_FILE)
     );
 
-    const context = buildProjectionContextFromParts(snapshot, {
-      control,
-      questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
-      runDir,
-      trackedIssue: advisoryState?.tracked_issue ?? null
-    });
+    const context = buildProjectionContextFromParts(
+      snapshot,
+      {
+        control,
+        questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
+        runDir,
+        trackedIssue: advisoryState?.tracked_issue ?? null
+      },
+      resolveRunsRootFromRunDir(runDir),
+      resolveSafeLegacyWorkspacePathFromRunDir(runDir)
+    );
     if (context) {
       discovered.push(context);
     }

@@ -1,8 +1,8 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { spawn } from 'node:child_process';
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readdir, readFile, realpath, stat } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 import {
@@ -22,12 +22,25 @@ import {
 } from './config/delegationConfig.js';
 import { logger } from '../logger.js';
 import { resolveRunPaths } from './run/runPaths.js';
+import type { EnvironmentPaths } from './run/environment.js';
 import { normalizeEnvironmentPaths, normalizeTaskId } from './run/environment.js';
+import { loadManifest } from './run/manifest.js';
+import {
+  ensureProviderWorkspace,
+  resolveProviderResumeWorkspacePath
+} from './run/workspacePath.js';
 import {
   closeControlServerPublicLifecycle,
+  runProviderIssueHandoffRefresh,
+  runProviderIssueHandoffRehydrate,
   startControlServerPublicLifecycle
 } from './control/controlServerPublicLifecycle.js';
-import { createProviderIssueHandoffService } from './control/providerIssueHandoff.js';
+import { resolveLiveLinearTrackedIssueById } from './control/linearDispatchSource.js';
+import { resolveLinearWebhookSourceSetup } from './control/linearWebhookController.js';
+import {
+  createProviderIssueHandoffService,
+  type ProviderIssueHandoffService
+} from './control/providerIssueHandoff.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -48,6 +61,11 @@ interface SpawnManifestCorrelation {
   issueUpdatedAt?: string | null;
   providerControlHostTaskId?: string | null;
   providerControlHostRunId?: string | null;
+}
+
+interface ProviderLaunchSpec {
+  cwd: string;
+  envOverrides: Record<string, string>;
 }
 
 export interface RunControlHostCliShellParams {
@@ -92,17 +110,42 @@ export async function runControlHostCliShell(
     paths,
     config,
     runId,
-    createProviderIssueHandoff: ({ providerIntakeState, persistProviderIntake, publishRuntime }) =>
+    createProviderIssueHandoff: ({
+      providerIntakeState,
+      persistProviderIntake,
+      publishRuntime,
+      readFeatureToggles
+    }) =>
       createProviderIssueHandoffService({
-        paths,
+        paths: { ...paths, repoRoot: env.repoRoot },
         state: providerIntakeState,
         persist: persistProviderIntake,
         startPipelineId,
         publishRuntime,
+        resolveTrackedIssue: async ({ issueId }) => {
+          const runtimeEnv = process.env;
+          const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), runtimeEnv);
+          if ('error' in sourceSetup) {
+            return { kind: 'skip', reason: sourceSetup.error } as const;
+          }
+          const resolution = await resolveLiveLinearTrackedIssueById({
+            issueId,
+            sourceSetup: sourceSetup.sourceSetup,
+            env: runtimeEnv
+          });
+          if (resolution.kind === 'ready') {
+            return { kind: 'ready', trackedIssue: resolution.tracked_issue } as const;
+          }
+          if (shouldReleaseTrackedIssueClaim(resolution.reason)) {
+            return { kind: 'release', reason: resolution.reason } as const;
+          }
+          return { kind: 'skip', reason: resolution.reason } as const;
+        },
         launcher: {
           start: async (input) => {
+            const launchSpec = await resolveProviderStartLaunchSpec(env, input.taskId);
             return await spawnBackgroundCliAndWaitForManifest(
-              env.repoRoot,
+              launchSpec.cwd,
               cliEntrypoint,
               [
                 'start',
@@ -120,6 +163,7 @@ export async function runControlHostCliShell(
               join(env.runsRoot, input.taskId, 'cli'),
               input.taskId,
               {
+                ...launchSpec.envOverrides,
                 [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
                 [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
                 [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
@@ -136,7 +180,8 @@ export async function runControlHostCliShell(
             );
           },
           resume: async (input) => {
-            await spawnBackgroundCli(env.repoRoot, cliEntrypoint, [
+            const launchSpec = await resolveProviderResumeLaunchSpec(env, input.runId);
+            await spawnBackgroundCli(launchSpec.cwd, cliEntrypoint, [
               'resume',
               '--run',
               input.runId,
@@ -145,6 +190,7 @@ export async function runControlHostCliShell(
               '--reason',
               input.reason
             ], {
+              ...launchSpec.envOverrides,
               [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
               [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
               [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
@@ -156,8 +202,14 @@ export async function runControlHostCliShell(
   });
 
   try {
-    await lifecycle.requestContextShared.providerIssueHandoff?.rehydrate();
-    lifecycle.requestContextShared.runtime.publish({ source: 'provider-intake.rehydrate' });
+    if (lifecycle.requestContextShared.providerIssueHandoff) {
+      await runProviderIssueHandoffRehydrate(lifecycle.requestContextShared.providerIssueHandoff);
+    }
+    void beginProviderIssueHandoffStartupRefresh(
+      lifecycle.requestContextShared.providerIssueHandoff,
+      () => lifecycle.requestContextShared.runtime.publish({ source: 'provider-intake.rehydrate' }),
+      lifecycle.triggerProviderRefresh ?? undefined
+    );
 
     const payload = {
       status: 'ready',
@@ -184,7 +236,7 @@ export async function runControlHostCliShell(
 }
 
 async function spawnBackgroundCliAndWaitForManifest(
-  repoRoot: string,
+  cwd: string,
   cliEntrypoint: string,
   args: string[],
   taskRunsRoot: string,
@@ -193,7 +245,7 @@ async function spawnBackgroundCliAndWaitForManifest(
   correlation: SpawnManifestCorrelation | null = null
 ): Promise<SpawnedRunManifestInfo | null> {
   const baselineRuns = await snapshotRunManifests(taskRunsRoot);
-  await spawnBackgroundCli(repoRoot, cliEntrypoint, args, envOverrides);
+  await spawnBackgroundCli(cwd, cliEntrypoint, args, envOverrides);
   return await pollForSpawnManifest({
     taskRunsRoot,
     taskId,
@@ -205,14 +257,14 @@ async function spawnBackgroundCliAndWaitForManifest(
 }
 
 async function spawnBackgroundCli(
-  repoRoot: string,
+  cwd: string,
   cliEntrypoint: string,
   args: string[],
   envOverrides: Record<string, string> = {}
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(process.execPath, [...process.execArgv, cliEntrypoint, ...args], {
-      cwd: repoRoot,
+      cwd,
       env: { ...process.env, ...envOverrides },
       detached: true,
       stdio: 'ignore'
@@ -319,10 +371,100 @@ async function findSpawnManifest(params: {
   return null;
 }
 
+async function resolveProviderStartLaunchSpec(
+  env: EnvironmentPaths,
+  taskId: string
+): Promise<ProviderLaunchSpec> {
+  const workspacePath = await ensureProviderWorkspace(env.repoRoot, taskId);
+  return buildProviderLaunchSpec(env, workspacePath);
+}
+
+async function resolveProviderResumeLaunchSpec(
+  env: EnvironmentPaths,
+  runId: string
+): Promise<ProviderLaunchSpec> {
+  const { manifest, paths } = await loadManifest(env, runId);
+  const resumeTaskId = await resolveProviderResumeTaskId(
+    manifest as unknown as Record<string, unknown>,
+    runId,
+    {
+      runDir: paths.runDir,
+      runsRoot: env.runsRoot
+    }
+  );
+  const workspacePath = await resolveProviderResumeWorkspacePath(
+    env.repoRoot,
+    resumeTaskId,
+    manifest as unknown as Record<string, unknown>
+  );
+  return buildProviderLaunchSpec(env, workspacePath);
+}
+
+function buildProviderLaunchSpec(
+  env: EnvironmentPaths,
+  workspacePath: string
+): ProviderLaunchSpec {
+  return {
+    cwd: workspacePath,
+    envOverrides: {
+      CODEX_ORCHESTRATOR_ROOT: workspacePath,
+      CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
+      CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+    }
+  };
+}
+
+function shouldReleaseTrackedIssueClaim(reason: string): boolean {
+  return (
+    reason === 'dispatch_source_issue_not_found' ||
+    reason === 'dispatch_source_workspace_mismatch' ||
+    reason === 'dispatch_source_team_mismatch' ||
+    reason === 'dispatch_source_project_mismatch'
+  );
+}
+
 export const __test__ = {
+  beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
+  refreshProviderIssueHandoffOnStartup,
+  resolveProviderResumeLaunchSpec,
+  resolveProviderResumeTaskId,
   snapshotRunManifests
 };
+
+function beginProviderIssueHandoffStartupRefresh(
+  providerIssueHandoff: ProviderIssueHandoffService | null | undefined,
+  onSettled?: () => void,
+  refreshProviderIssueHandoff?: (() => Promise<void>) | null
+): Promise<void> {
+  const refreshPromise = refreshProviderIssueHandoff
+    ? Promise.resolve()
+        .then(() => refreshProviderIssueHandoff())
+        .catch((error) => {
+          logger.warn(
+            `Provider issue startup refresh failed: ${(error as Error)?.message ?? String(error)}`
+          );
+        })
+    : refreshProviderIssueHandoffOnStartup(providerIssueHandoff);
+  return refreshPromise.finally(() => {
+    onSettled?.();
+  });
+}
+
+async function refreshProviderIssueHandoffOnStartup(
+  providerIssueHandoff: ProviderIssueHandoffService | null | undefined
+): Promise<void> {
+  if (!providerIssueHandoff) {
+    return;
+  }
+  try {
+    await runProviderIssueHandoffRefresh(providerIssueHandoff);
+  } catch (error) {
+    logger.warn(
+      `Provider issue startup refresh failed: ${(error as Error)?.message ?? String(error)}`
+    );
+  }
+}
 
 function manifestMatchesCorrelation(
   manifest: Record<string, unknown>,
@@ -364,6 +506,65 @@ function readManifestString(manifest: Record<string, unknown>, field: string): s
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+async function resolveProviderResumeTaskId(
+  manifest: Record<string, unknown>,
+  runId: string,
+  pathMetadata?: { runDir: string; runsRoot: string }
+): Promise<string> {
+  const manifestTaskId = readManifestString(manifest, 'task_id');
+  const taskIdCandidate =
+    manifestTaskId ??
+    (pathMetadata
+      ? await deriveProviderResumeTaskIdFromRunDir(pathMetadata.runDir, pathMetadata.runsRoot)
+      : null);
+  if (!taskIdCandidate) {
+    throw new Error(`Unable to derive provider resume manifest task_id for run ${runId}.`);
+  }
+  try {
+    return normalizeTaskId(taskIdCandidate);
+  } catch (error) {
+    throw new Error(
+      `Invalid provider resume manifest task_id for run ${runId}: ${(error as Error)?.message ?? String(error)}`
+    );
+  }
+}
+
+async function deriveProviderResumeTaskIdFromRunDir(
+  runDir: string,
+  runsRoot: string
+): Promise<string | null> {
+  const [resolvedRunDir, resolvedRunsRoot] = await Promise.all([
+    canonicalizePath(runDir),
+    canonicalizePath(runsRoot)
+  ]);
+  const relativeRunDir = relative(resolvedRunsRoot, resolvedRunDir);
+  if (
+    !relativeRunDir ||
+    relativeRunDir === '..' ||
+    relativeRunDir.startsWith(`..${sep}`) ||
+    isAbsolute(relativeRunDir)
+  ) {
+    return null;
+  }
+
+  const segments = relativeRunDir.split(sep).filter((segment) => segment.length > 0);
+  if (segments.length === 3 && segments[1] === 'cli') {
+    return segments[0] ?? null;
+  }
+  if (segments.length === 2) {
+    return segments[0] ?? null;
+  }
+  return null;
+}
+
+async function canonicalizePath(pathname: string): Promise<string> {
+  try {
+    return await realpath(pathname);
+  } catch {
+    return resolve(pathname);
+  }
 }
 
 function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv = process.env): DelegationConfigLayer[] {

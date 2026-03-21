@@ -1188,18 +1188,41 @@ describe('TelegramOversightBridge', () => {
         payload: { summary: 'flush pending projection' }
       });
 
-      await waitForCondition(async () => telegram.sentMessages.length === 2);
-      expect(telegram.sentMessages[1]?.text).toContain('Summary: task needs review');
-
-      const flushedStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
-      const flushedState = JSON.parse(flushedStateRaw) as {
+      let flushedState: {
         next_update_id?: number;
         push?: {
           last_event_seq?: number | null;
           pending_projection_hash?: string | null;
           pending_projection_observed_at?: string | null;
         };
-      };
+      } | null = null;
+      await waitForCondition(async () => {
+        if (telegram.sentMessages.length !== 2) {
+          return false;
+        }
+        const flushedStateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+        const parsed = JSON.parse(flushedStateRaw) as {
+          next_update_id?: number;
+          push?: {
+            last_event_seq?: number | null;
+            pending_projection_hash?: string | null;
+            pending_projection_observed_at?: string | null;
+          };
+        };
+        if (
+          parsed.next_update_id === 52 &&
+          parsed.push?.last_event_seq === 3 &&
+          parsed.push?.pending_projection_hash === null &&
+          parsed.push?.pending_projection_observed_at === null
+        ) {
+          flushedState = parsed;
+          return true;
+        }
+        return false;
+      });
+
+      expect(telegram.sentMessages[1]?.text).toContain('Summary: task needs review');
+      expect(flushedState).not.toBeNull();
       expect(flushedState.next_update_id).toBe(52);
       expect(flushedState.push?.last_event_seq).toBe(3);
       expect(flushedState.push?.pending_projection_hash).toBeNull();

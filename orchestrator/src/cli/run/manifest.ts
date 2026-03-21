@@ -19,6 +19,7 @@ import { loadInstructionSet } from '../../../../packages/orchestrator/src/instru
 import type { EnvironmentPaths } from './environment.js';
 import type { RunPaths } from './runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './runPaths.js';
+import { normalizeWorkspacePath } from './workspacePath.js';
 import { ExperienceStore } from '../../persistence/ExperienceStore.js';
 import { formatExperienceInjections } from '../exec/experience.js';
 import { sanitizeRunId } from '../../persistence/sanitizeRunId.js';
@@ -142,6 +143,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     issue_id: options.issueId ?? null,
     issue_identifier: options.issueIdentifier ?? null,
     issue_updated_at: options.issueUpdatedAt ?? null,
+    workspace_path: normalizeWorkspacePath(env.repoRoot),
     provider_control_host_task_id: providerControlHostLocator.taskId,
     provider_control_host_run_id: providerControlHostLocator.runId,
     summary: null,

@@ -45,6 +45,15 @@ function buildSelectedRun(overrides: Partial<SelectedRunContext> = {}): Selected
       reason: 'operator question'
     },
     workspacePath: '/repo',
+    pipelineTitle: 'Selected Run Presenter',
+    stages: [
+      {
+        id: 'plan',
+        title: 'Plan',
+        status: 'completed'
+      }
+    ],
+    approvalsTotal: 0,
     questionSummary: {
       queuedCount: 1,
       latestQuestion: {
@@ -140,7 +149,7 @@ describe('SelectedRunPresenter', () => {
     });
     expect(dataset.tasks).toHaveLength(1);
     expect(dataset.tasks[0]).toMatchObject({
-      bucket: 'active',
+      bucket: 'ongoing',
       question_summary: {
         queued_count: 1
       }
@@ -167,6 +176,219 @@ describe('SelectedRunPresenter', () => {
       codebase: null,
       activity: [],
       selected: null
+    });
+  });
+
+  it('keeps ui task and run rows on the selected child manifest when one is preferred', () => {
+    const dataset = buildUiDataset({
+      manifest: buildManifest({
+        run_id: 'host-run',
+        task_id: 'host-task',
+        status: 'succeeded',
+        started_at: '2026-03-07T04:10:00.000Z',
+        updated_at: '2026-03-07T04:15:00.000Z',
+        completed_at: '2026-03-07T04:15:00.000Z',
+        summary: 'Control host ready',
+        pipeline_title: 'Control Host'
+      }),
+      snapshot: buildSnapshot(
+        buildSelectedRun({
+          taskId: 'linear-lin-issue-1',
+          runId: 'child-run',
+          startedAt: '2026-03-07T04:20:00.000Z',
+          updatedAt: '2026-03-07T04:21:00.000Z',
+          summary: 'Child run awaiting operator input',
+          pipelineTitle: 'Child Pipeline',
+          stages: [
+            {
+              id: 'build',
+              title: 'Build',
+              status: 'completed'
+            },
+            {
+              id: 'review',
+              title: 'Review',
+              status: 'in_progress'
+            }
+          ],
+          approvalsTotal: 2,
+          manifestPath: '/repo/.runs/linear-lin-issue-1/cli/child-run/manifest.json',
+          runDir: '/repo/.runs/linear-lin-issue-1/cli/child-run'
+        })
+      ),
+      control: CONTROL_STATE,
+      paths: {
+        manifestPath: '/repo/.runs/host-task/cli/host-run/manifest.json',
+        runDir: '/repo/.runs/host-task/cli/host-run',
+        logPath: '/repo/.runs/host-task/cli/host-run/log.txt'
+      },
+      generatedAt: '2026-03-07T04:30:00.000Z'
+    }) as {
+      runs: Array<{
+        run_id?: string;
+        task_id?: string;
+        started_at?: string | null;
+        updated_at?: string | null;
+        completed_at?: string | null;
+        links?: { manifest?: string; log?: string };
+        stages?: unknown[];
+        approvals_total?: number;
+      }>;
+      tasks: Array<{
+        task_id?: string;
+        title?: string;
+        bucket?: string;
+        bucket_reason?: string;
+        last_update?: string | null;
+        latest_run_id?: string | null;
+        summary?: string;
+        approvals_total?: number;
+      }>;
+    };
+
+    expect(dataset.runs[0]).toMatchObject({
+      run_id: 'child-run',
+      task_id: 'linear-lin-issue-1',
+      started_at: '2026-03-07T04:20:00.000Z',
+      updated_at: '2026-03-07T04:21:00.000Z',
+      completed_at: null,
+      approvals_total: 2,
+      stages: [
+        {
+          id: 'build',
+          title: 'Build',
+          status: 'completed'
+        },
+        {
+          id: 'review',
+          title: 'Review',
+          status: 'in_progress'
+        }
+      ],
+      links: {
+        manifest: '.runs/linear-lin-issue-1/cli/child-run/manifest.json',
+        log: '.runs/linear-lin-issue-1/cli/child-run/runner.ndjson'
+      }
+    });
+    expect(dataset.tasks[0]).toMatchObject({
+      task_id: 'linear-lin-issue-1',
+      title: 'Child Pipeline',
+      bucket: 'ongoing',
+      bucket_reason: 'paused',
+      last_update: '2026-03-07T04:21:00.000Z',
+      latest_run_id: 'child-run',
+      summary: 'Child run awaiting operator input',
+      approvals_total: 2
+    });
+  });
+
+  it('does not leak host summary or timestamps when a selected child manifest has null fields', () => {
+    const dataset = buildUiDataset({
+      manifest: buildManifest({
+        run_id: 'host-run',
+        task_id: 'host-task',
+        status: 'succeeded',
+        started_at: '2026-03-07T04:10:00.000Z',
+        updated_at: '2026-03-07T04:15:00.000Z',
+        completed_at: '2026-03-07T04:15:00.000Z',
+        summary: 'Control host ready',
+        pipeline_title: 'Control Host'
+      }),
+      snapshot: buildSnapshot(
+        buildSelectedRun({
+          taskId: 'linear-lin-issue-2',
+          runId: 'child-run-2',
+          startedAt: null,
+          updatedAt: null,
+          completedAt: null,
+          summary: null,
+          pipelineTitle: 'Child Pipeline',
+          manifestPath: '/repo/.runs/linear-lin-issue-2/cli/child-run-2/manifest.json',
+          runDir: '/repo/.runs/linear-lin-issue-2/cli/child-run-2'
+        })
+      ),
+      control: CONTROL_STATE,
+      paths: {
+        manifestPath: '/repo/.runs/host-task/cli/host-run/manifest.json',
+        runDir: '/repo/.runs/host-task/cli/host-run',
+        logPath: '/repo/.runs/host-task/cli/host-run/log.txt'
+      },
+      generatedAt: '2026-03-07T04:31:00.000Z'
+    }) as {
+      runs: Array<{
+        run_id?: string;
+        task_id?: string;
+        started_at?: string | null;
+        updated_at?: string | null;
+        completed_at?: string | null;
+      }>;
+      tasks: Array<{
+        task_id?: string;
+        bucket?: string;
+        bucket_reason?: string;
+        last_update?: string | null;
+        latest_run_id?: string | null;
+        summary?: string;
+      }>;
+    };
+
+    expect(dataset.runs[0]).toMatchObject({
+      run_id: 'child-run-2',
+      task_id: 'linear-lin-issue-2',
+      started_at: null,
+      updated_at: null,
+      completed_at: null
+    });
+    expect(dataset.tasks[0]).toMatchObject({
+      task_id: 'linear-lin-issue-2',
+      bucket: 'ongoing',
+      bucket_reason: 'paused',
+      last_update: null,
+      latest_run_id: 'child-run-2',
+      summary: ''
+    });
+  });
+
+  it('does not leak a host pause action into a selected child manifest with no latest action', () => {
+    const dataset = buildUiDataset({
+      manifest: buildManifest({
+        run_id: 'host-run',
+        task_id: 'host-task',
+        status: 'in_progress'
+      }),
+      snapshot: buildSnapshot(
+        buildSelectedRun({
+          taskId: 'linear-lin-issue-3',
+          runId: 'child-run-3',
+          displayStatus: 'in_progress',
+          statusReason: null,
+          latestAction: null,
+          manifestPath: '/repo/.runs/linear-lin-issue-3/cli/child-run-3/manifest.json',
+          runDir: '/repo/.runs/linear-lin-issue-3/cli/child-run-3'
+        })
+      ),
+      control: {
+        ...CONTROL_STATE,
+        latest_action: {
+          action: 'pause',
+          requested_by: 'operator',
+          reason: 'host only'
+        }
+      },
+      paths: {
+        manifestPath: '/repo/.runs/host-task/cli/host-run/manifest.json',
+        runDir: '/repo/.runs/host-task/cli/host-run',
+        logPath: '/repo/.runs/host-task/cli/host-run/log.txt'
+      },
+      generatedAt: '2026-03-07T04:32:00.000Z'
+    }) as {
+      tasks: Array<{ bucket?: string; bucket_reason?: string; display_status?: string }>;
+    };
+
+    expect(dataset.tasks[0]).toMatchObject({
+      bucket: 'active',
+      bucket_reason: 'running',
+      display_status: 'in_progress'
     });
   });
 });

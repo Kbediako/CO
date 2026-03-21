@@ -31,8 +31,44 @@ const {
   clampQuestionPollWaitMs
 } = delegationServerTest;
 const ORIGINAL_EXIT_CODE = process.exitCode;
+const originalCreateServer = http.createServer;
+const trackedHttpServers = new Set<http.Server>();
+const trackedHttpServerSockets = new Map<http.Server, Set<Socket>>();
 
 let spawnMock: ReturnType<typeof vi.fn>;
+
+function trackHttpServer(server: http.Server): http.Server {
+  if (trackedHttpServers.has(server)) {
+    return server;
+  }
+  const sockets = new Set<Socket>();
+  trackedHttpServers.add(server);
+  trackedHttpServerSockets.set(server, sockets);
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+  return server;
+}
+
+async function closeTrackedHttpServer(server: http.Server): Promise<void> {
+  server.closeIdleConnections?.();
+  server.closeAllConnections?.();
+  const sockets = trackedHttpServerSockets.get(server);
+  sockets?.forEach((socket) => socket.destroy());
+  trackedHttpServerSockets.delete(server);
+  trackedHttpServers.delete(server);
+  if (!server.listening) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    try {
+      server.close(() => resolve());
+    } catch {
+      resolve();
+    }
+  });
+}
 
 vi.mock('node:child_process', () => ({
   spawn: (...args: unknown[]) => spawnMock(...args)
@@ -40,10 +76,20 @@ vi.mock('node:child_process', () => ({
 
 beforeEach(() => {
   spawnMock = vi.fn();
+  trackedHttpServers.clear();
+  trackedHttpServerSockets.clear();
+  (http as typeof http & { createServer: typeof http.createServer }).createServer = ((...args) =>
+    trackHttpServer(originalCreateServer(...args))) as typeof http.createServer;
 });
 
-afterEach(() => {
+afterEach(async () => {
   process.exitCode = ORIGINAL_EXIT_CODE;
+  for (const server of Array.from(trackedHttpServers).reverse()) {
+    await closeTrackedHttpServer(server);
+  }
+  trackedHttpServers.clear();
+  trackedHttpServerSockets.clear();
+  (http as typeof http & { createServer: typeof http.createServer }).createServer = originalCreateServer;
 });
 
 async function setupRun(options: { baseUrl?: string; tokenPath?: string } = {}) {

@@ -42,6 +42,12 @@ export interface ControlTrackedPayload {
   linear: ControlTrackedLinearPayload;
 }
 
+export interface SelectedRunStageSummary {
+  id: string;
+  title: string;
+  status: string | null;
+}
+
 export interface ControlDispatchPilotPayload {
   status?: string | null;
   source_status?: string | null;
@@ -64,7 +70,12 @@ interface SharedSelectedProjectionFields {
   lastError: string | null;
   latestAction: string | null;
   latestEvent: SelectedRunLatestEvent | null;
-  workspacePath: string;
+  workspacePath: string | null;
+  pipelineTitle: string | null;
+  stages: SelectedRunStageSummary[];
+  approvalsTotal: number;
+  manifestPath?: string | null;
+  runDir?: string | null;
   questionSummary: SelectedRunQuestionSummary;
   tracked: ControlTrackedPayload | null;
 }
@@ -105,7 +116,7 @@ export interface ControlSelectedRunPayload {
   latest_action: string | null;
   latest_event: ControlLatestEventPayload | null;
   workspace: {
-    path: string;
+    path: string | null;
   };
   question_summary: ControlQuestionSummaryPayload;
   tracked?: ControlTrackedPayload;
@@ -118,7 +129,7 @@ export interface ControlRunningPayload {
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
-  turn_count: number;
+  turn_count: number | null;
   last_event: string | null;
   last_message: string | null;
   started_at: string | null;
@@ -202,11 +213,11 @@ export interface ControlIssuePayload {
   display_status: string;
   status_reason: string | null;
   workspace: {
-    path: string;
+    path: string | null;
   };
   attempts: {
-    restart_count: number;
-    current_retry_attempt: number;
+    restart_count: number | null;
+    current_retry_attempt: number | null;
   };
   running: ControlRunningPayload | null;
   retry: ControlRetryPayload | null;

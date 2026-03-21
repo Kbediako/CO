@@ -72,6 +72,10 @@ const diagnosticsConfig = {
 };
 
 const TEST_TIMEOUT_MS = 15000;
+const ORIGINAL_ENV = {
+  configOverrides: process.env.CODEX_CONFIG_OVERRIDES,
+  mcpConfigOverrides: process.env.CODEX_MCP_CONFIG_OVERRIDES
+};
 
 describe('CodexOrchestrator CLI', () => {
   let tempDir: string;
@@ -84,6 +88,8 @@ describe('CodexOrchestrator CLI', () => {
     process.env.CODEX_ORCHESTRATOR_RUNS_DIR = runsDir;
     process.env.CODEX_ORCHESTRATOR_OUT_DIR = path.join(tempDir, 'out');
     process.env.MCP_RUNNER_TASK_ID = '0101';
+    process.env.CODEX_CONFIG_OVERRIDES = 'ui.control_enabled=false';
+    delete process.env.CODEX_MCP_CONFIG_OVERRIDES;
 
     await fs.writeFile(
       path.join(tempDir, 'codex.orchestrator.json'),
@@ -100,6 +106,16 @@ describe('CodexOrchestrator CLI', () => {
     delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
     delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
     delete process.env.MCP_RUNNER_TASK_ID;
+    if (ORIGINAL_ENV.configOverrides === undefined) {
+      delete process.env.CODEX_CONFIG_OVERRIDES;
+    } else {
+      process.env.CODEX_CONFIG_OVERRIDES = ORIGINAL_ENV.configOverrides;
+    }
+    if (ORIGINAL_ENV.mcpConfigOverrides === undefined) {
+      delete process.env.CODEX_MCP_CONFIG_OVERRIDES;
+    } else {
+      process.env.CODEX_MCP_CONFIG_OVERRIDES = ORIGINAL_ENV.mcpConfigOverrides;
+    }
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 

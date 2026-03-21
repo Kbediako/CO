@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0972-multi-agent-canonical-compat-alignment.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-02-18
+last_review: 2026-03-21
 ---
 
 ## Summary

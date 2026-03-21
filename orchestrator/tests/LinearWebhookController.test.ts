@@ -364,7 +364,9 @@ describe('LinearWebhookController', () => {
     const emitAuditEvent = vi.fn(async () => undefined);
     const publishRuntime = vi.fn();
     const providerIssueHandoff = {
-      handleAcceptedTrackedIssue: vi.fn(async () => undefined)
+      handleAcceptedTrackedIssue: vi.fn(async () => undefined),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
     };
     const webhookSecret = 'linear-webhook-secret';
     const body = JSON.stringify({
@@ -486,7 +488,9 @@ describe('LinearWebhookController', () => {
     const providerIssueHandoff = {
       handleAcceptedTrackedIssue: vi.fn(async () => {
         throw new Error('provider handoff failed');
-      })
+      }),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
     };
     const webhookSecret = 'linear-webhook-secret';
     const body = JSON.stringify({

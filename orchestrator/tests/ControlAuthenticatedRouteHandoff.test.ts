@@ -9,6 +9,7 @@ import {
   emitDispatchPilotAuditEvents,
   writeControlError
 } from '../src/cli/control/controlServerAuditAndErrorHelpers.js';
+import { runProviderIssueHandoffRefresh } from '../src/cli/control/controlServerPublicLifecycle.js';
 
 vi.mock('../src/cli/control/controlQuestionChildResolution.js', () => ({
   createControlQuestionChildResolutionAdapter: vi.fn()
@@ -18,6 +19,10 @@ vi.mock('../src/cli/control/controlServerAuditAndErrorHelpers.js', () => ({
   emitControlActionAuditEvent: vi.fn(),
   emitDispatchPilotAuditEvents: vi.fn(),
   writeControlError: vi.fn()
+}));
+
+vi.mock('../src/cli/control/controlServerPublicLifecycle.js', () => ({
+  runProviderIssueHandoffRefresh: vi.fn((providerIssueHandoff) => providerIssueHandoff.refresh())
 }));
 
 function createInput() {
@@ -48,6 +53,11 @@ function createInput() {
     persist: {},
     runtime: {},
     eventTransport,
+    providerIssueHandoff: {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    },
     expiryLifecycle: {
       expireConfirmations: vi.fn(async () => undefined),
       expireQuestions: vi.fn(async () => undefined)
@@ -166,6 +176,11 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     expect(adapter.readManifest).toHaveBeenCalledWith('child');
     await assembled.resolveChildQuestion({ question_id: 'q-1' } as never, 'answered');
     expect(adapter.resolveChildQuestion).toHaveBeenCalledWith({ question_id: 'q-1' }, 'answered');
+
+    await assembled.refreshProviderIssues?.();
+    expect(runProviderIssueHandoffRefresh).toHaveBeenCalledWith(context.providerIssueHandoff, {
+      queueIfBusy: true
+    });
   });
 
   it('returns a null task id when the manifest path does not live under a cli task root', () => {

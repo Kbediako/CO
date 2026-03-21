@@ -238,8 +238,8 @@ export function buildCompatibilityRunningEntry(
     state: selected.rawStatus,
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
-    session_id: selected.runId,
-    turn_count: 0,
+    session_id: null,
+    turn_count: null,
     last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
     last_message: selected.latestEvent?.message ?? selected.summary,
     started_at: selected.startedAt,
@@ -259,8 +259,8 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
     state: selected.rawStatus,
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
-    session_id: selected.runId,
-    attempt: 0,
+    session_id: null,
+    attempt: resolveCompatibilityRetryAttempt(),
     last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
     last_message: selected.latestEvent?.message ?? selected.summary,
     started_at: selected.startedAt,
@@ -288,10 +288,7 @@ export function buildCompatibilityIssuePayload(input: {
     workspace: {
       path: input.source.workspacePath
     },
-    attempts: {
-      restart_count: 0,
-      current_retry_attempt: 0
-    },
+    attempts: buildCompatibilityIssueAttempts(input.retry),
     running: input.running,
     retry: input.retry,
     logs: {
@@ -305,6 +302,25 @@ export function buildCompatibilityIssuePayload(input: {
     tracked: input.source.tracked ?? {},
     ...(input.dispatchPilotSummary ? { dispatch_pilot: input.dispatchPilotSummary } : {})
   };
+}
+
+function buildCompatibilityIssueAttempts(
+  retry: ControlRetryPayload | null
+): ControlIssuePayload['attempts'] {
+  if (retry?.attempt === null || retry?.attempt === undefined) {
+    return {
+      restart_count: null,
+      current_retry_attempt: null
+    };
+  }
+  return {
+    restart_count: Math.max(retry.attempt - 1, 0),
+    current_retry_attempt: retry.attempt
+  };
+}
+
+function resolveCompatibilityRetryAttempt(): number | null {
+  return null;
 }
 
 function buildCompatibilityIssueAliases<TSource extends CompatibilityIssueSourceRecord>(selected: TSource): string[] {

@@ -62,6 +62,7 @@ export interface AuthenticatedRouteCompositionContext {
   delegationTokens: DelegationTokenStore;
   persist: AuthenticatedRouteCompositionPersist;
   runtime: AuthenticatedRouteCompositionRuntime;
+  refreshProviderIssues?(): Promise<void>;
   readRequestBody(): Promise<Record<string, unknown>>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
@@ -114,7 +115,10 @@ export function createAuthenticatedRouteDispatcherContext(
         res: context.res,
         presenterContext: context.presenterContext,
         readRequestBody: context.readRequestBody,
-        requestRefresh: () => context.runtime.requestRefresh(),
+        requestRefresh: async () => {
+          await context.refreshProviderIssues?.();
+          await context.runtime.requestRefresh();
+        },
         readDispatchEvaluation: () => context.readDispatchEvaluation(),
         onDispatchEvaluated: (record) => context.onDispatchEvaluated(record)
       }),

@@ -61,6 +61,7 @@ interface ControlServerSeededRuntimeAssemblyOptions {
     providerIntakeState: ProviderIntakeState;
     persistProviderIntake: () => Promise<void>;
     publishRuntime: (source: string) => void;
+    readFeatureToggles: () => ControlState['feature_toggles'];
   }) => ProviderIssueHandoffService) | null;
 }
 
@@ -167,7 +168,8 @@ export function createControlServerSeededRuntimeAssembly(
     options.createProviderIssueHandoff?.({
       providerIntakeState,
       persistProviderIntake: persist.providerIntake,
-      publishRuntime: (source) => controlRuntime.publish({ source })
+      publishRuntime: (source) => controlRuntime.publish({ source }),
+      readFeatureToggles: () => controlStore.snapshot().feature_toggles
     }) ?? null;
   const requestContextShared = {
     token: options.token,

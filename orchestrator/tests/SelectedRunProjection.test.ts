@@ -14,17 +14,30 @@ afterEach(async () => {
   await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-async function createHostPaths() {
+async function createHostPaths(
+  runsRootFactory: (root: string) => string = (root) => join(root, '.runs')
+) {
   const root = await mkdtemp(join(tmpdir(), 'selected-run-projection-'));
   cleanupRoots.push(root);
+  const runsRoot = runsRootFactory(root);
   const env = {
     repoRoot: root,
-    runsRoot: join(root, '.runs'),
+    runsRoot,
     outRoot: join(root, 'out'),
     taskId: 'local-mcp'
   };
   const paths = resolveRunPaths(env, 'control-host');
   await mkdir(paths.runDir, { recursive: true });
+  await writeFile(
+    paths.manifestPath,
+    JSON.stringify({
+      run_id: 'control-host',
+      task_id: 'local-mcp',
+      status: 'in_progress',
+      workspace_path: root
+    }),
+    'utf8'
+  );
   return { root, paths };
 }
 
@@ -206,6 +219,179 @@ describe('SelectedRunProjection', () => {
     });
     expect(selected?.latestEvent).toMatchObject({
       message: 'Using repo-local codex.orchestrator.json.'
+    });
+  });
+
+  it('prefers explicit manifest workspace paths over run-directory inference', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: join(root, '.workspaces', 'linear-lin-issue-1'),
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBe(join(root, '.workspaces', 'linear-lin-issue-1'));
+  });
+
+  it('projects the control-host workspace for child CLI manifests under repo-local overridden runs roots', async () => {
+    const { root, paths } = await createHostPaths((repoRoot) => join(repoRoot, 'custom-runs'));
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, 'custom-runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBe(root);
+  });
+
+  it('projects the control-host workspace for child CLI manifests under external overridden runs roots', async () => {
+    const externalRunsRoot = await mkdtemp(join(tmpdir(), 'selected-run-projection-runs-'));
+    cleanupRoots.push(externalRunsRoot);
+    const { root, paths } = await createHostPaths(() => externalRunsRoot);
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: externalRunsRoot,
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBe(root);
+  });
+
+  it('returns a null workspace path instead of the manifest artefact directory for non-run manifests', async () => {
+    const { root, paths } = await createHostPaths();
+    const externalRunRoot = join(root, 'external-provider-run');
+    await mkdir(externalRunRoot, { recursive: true });
+    const externalManifestPath = join(externalRunRoot, 'manifest.json');
+    await writeFile(
+      externalManifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, externalManifestPath).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBeNull();
+  });
+
+  it('threads child manifest stage, approval, and title metadata into the selected context', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        pipeline_title: 'Child Pipeline',
+        approvals: [{ id: 'approval-1' }, { id: 'approval-2' }],
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: [
+          { id: 'build', title: 'Build', status: 'succeeded' },
+          { id: 'review', title: 'Review', status: 'in_progress' }
+        ]
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      pipelineTitle: 'Child Pipeline',
+      approvalsTotal: 2,
+      stages: [
+        {
+          id: 'build',
+          title: 'Build',
+          status: 'succeeded'
+        },
+        {
+          id: 'review',
+          title: 'Review',
+          status: 'in_progress'
+        }
+      ]
     });
   });
 });

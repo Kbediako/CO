@@ -15,6 +15,7 @@ describe('resolveLiveLinearTrackedIssueById', () => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
       expect(body.query).toContain('$issueId: String!');
       expect(body.query).toContain('issue(id: $issueId)');
+      expect(body.query).toContain('inverseRelations(first: 50)');
       expect(body.variables?.issueId).toBe('lin-issue-1');
       return jsonResponse({
         data: {
@@ -41,6 +42,31 @@ describe('resolveLiveLinearTrackedIssueById', () => {
             project: {
               id: 'lin-project-1',
               name: 'Icon Agency (Bookings)'
+            },
+            inverseRelations: {
+              nodes: [
+                {
+                  type: 'blocks',
+                  issue: {
+                    id: 'lin-blocker-1',
+                    identifier: 'PREPROD-99',
+                    state: {
+                      name: 'Custom Completed',
+                      type: 'completed'
+                    }
+                  }
+                },
+                {
+                  type: 'related',
+                  issue: {
+                    id: 'lin-related-1',
+                    identifier: 'PREPROD-77',
+                    state: {
+                      name: 'In Progress'
+                    }
+                  }
+                }
+              ]
             },
             history: {
               nodes: [
@@ -90,6 +116,14 @@ describe('resolveLiveLinearTrackedIssueById', () => {
         identifier: 'PREPROD-101',
         title: 'Investigate advisory routing',
         state: 'In Progress',
+        blocked_by: [
+          {
+            id: 'lin-blocker-1',
+            identifier: 'PREPROD-99',
+            state: 'Custom Completed',
+            state_type: 'completed'
+          }
+        ],
         team_key: 'PREPROD',
         project_name: 'Icon Agency (Bookings)'
       }

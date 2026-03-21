@@ -2,6 +2,7 @@ import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 const LINEAR_RECENT_ACTIVITY_LIMIT = 3;
+const LINEAR_BLOCKER_LIMIT = 50;
 const DEFAULT_LINEAR_REQUEST_TIMEOUT_MS = 5_000;
 
 export interface LiveLinearTrackedActivity {
@@ -9,6 +10,13 @@ export interface LiveLinearTrackedActivity {
   created_at: string | null;
   actor_name: string | null;
   summary: string;
+}
+
+export interface LiveLinearTrackedBlocker {
+  id: string | null;
+  identifier: string | null;
+  state: string | null;
+  state_type: string | null;
 }
 
 export interface LiveLinearTrackedIssue {
@@ -26,6 +34,7 @@ export interface LiveLinearTrackedIssue {
   project_id: string | null;
   project_name: string | null;
   updated_at: string | null;
+  blocked_by?: LiveLinearTrackedBlocker[];
   recent_activity: LiveLinearTrackedActivity[];
 }
 
@@ -88,8 +97,23 @@ interface LinearIssueNode {
     id?: string | null;
     name?: string | null;
   } | null;
+  inverseRelations?: {
+    nodes?: LinearIssueInverseRelationNode[] | null;
+  } | null;
   history?: {
     nodes?: LinearIssueHistoryNode[] | null;
+  } | null;
+}
+
+interface LinearIssueInverseRelationNode {
+  type?: string | null;
+  issue?: {
+    id?: string | null;
+    identifier?: string | null;
+    state?: {
+      name?: string | null;
+      type?: string | null;
+    } | null;
   } | null;
 }
 
@@ -311,6 +335,19 @@ function buildLinearIssueQuery(sourceSetup: DispatchPilotSourceSetup): {
             id
             name
           }
+          inverseRelations(first: ${LINEAR_BLOCKER_LIMIT}) {
+            nodes {
+              type
+              issue {
+                id
+                identifier
+                state {
+                  name
+                  type
+                }
+              }
+            }
+          }
           history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
             nodes {
               id
@@ -371,6 +408,19 @@ function buildLinearIssueByIdQuery(issueId: string): {
         project {
           id
           name
+        }
+        inverseRelations(first: ${LINEAR_BLOCKER_LIMIT}) {
+          nodes {
+            type
+            issue {
+              id
+              identifier
+              state {
+                name
+                type
+              }
+            }
+          }
         }
         history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
           nodes {
@@ -532,6 +582,7 @@ function parseTrackedIssue(
     project_id: normalizeEnvValue(issue.project?.id),
     project_name: normalizeEnvValue(issue.project?.name),
     updated_at: normalizeIso(issue.updatedAt),
+    blocked_by: extractTrackedIssueBlockers(issue),
     recent_activity: Array.isArray(issue.history?.nodes)
       ? issue.history.nodes
           .map((entry) => buildTrackedActivity(entry))
@@ -554,6 +605,26 @@ function validateTrackedIssueScope(
     return malformed('dispatch_source_project_mismatch');
   }
   return null;
+}
+
+function extractTrackedIssueBlockers(issue: LinearIssueNode): LiveLinearTrackedBlocker[] {
+  if (!Array.isArray(issue.inverseRelations?.nodes)) {
+    return [];
+  }
+  return issue.inverseRelations.nodes.flatMap((node) => {
+    const relationType = normalizeEnvValue(node.type)?.toLowerCase();
+    if (relationType !== 'blocks' || !node.issue) {
+      return [];
+    }
+    return [
+      {
+        id: normalizeEnvValue(node.issue.id),
+        identifier: normalizeEnvValue(node.issue.identifier),
+        state: normalizeEnvValue(node.issue.state?.name),
+        state_type: normalizeEnvValue(node.issue.state?.type)
+      }
+    ];
+  });
 }
 
 function buildTrackedActivity(node: LinearIssueHistoryNode): LiveLinearTrackedActivity | null {

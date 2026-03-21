@@ -108,6 +108,7 @@ describe('bootstrapManifest', () => {
 
       expect(manifest.provider_control_host_task_id).toBe('provider-host-task');
       expect(manifest.provider_control_host_run_id).toBe('provider-host-run');
+      expect(manifest.workspace_path).toBe(repoRoot);
     } finally {
       if (previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE;

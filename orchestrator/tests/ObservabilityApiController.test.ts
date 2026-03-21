@@ -2,11 +2,13 @@ import http from 'node:http';
 
 import { describe, expect, it } from 'vitest';
 
+import { buildCompatibilityProjectionSnapshot } from '../src/cli/control/compatibilityIssuePresenter.js';
 import {
   handleObservabilityApiRequest,
   resolveObservabilityApiRoute
 } from '../src/cli/control/observabilityApiController.js';
 import type { ControlState } from '../src/cli/control/controlState.js';
+import type { ControlCompatibilitySourceContext } from '../src/cli/control/observabilityReadModel.js';
 
 const CONTROL_STATE: ControlState = {
   run_id: 'run-1',
@@ -45,6 +47,42 @@ function createResponseRecorder() {
   } as unknown as http.ServerResponse;
 
   return { res, state };
+}
+
+function buildCompatibilitySource(
+  issueIdentifier: string,
+  overrides: Partial<ControlCompatibilitySourceContext> = {}
+): ControlCompatibilitySourceContext {
+  return {
+    issueIdentifier,
+    issueId: `${issueIdentifier}-id`,
+    taskId: issueIdentifier,
+    runId: `${issueIdentifier}-run`,
+    lookupAliases: [issueIdentifier, `${issueIdentifier}-run`],
+    rawStatus: 'in_progress',
+    displayStatus: 'in_progress',
+    statusReason: null,
+    startedAt: '2026-03-20T00:00:00.000Z',
+    updatedAt: '2026-03-20T00:01:00.000Z',
+    completedAt: null,
+    summary: `${issueIdentifier} summary`,
+    lastError: null,
+    latestAction: null,
+    latestEvent: {
+      at: '2026-03-20T00:01:00.000Z',
+      event: 'in_progress',
+      message: `${issueIdentifier} summary`,
+      requestedBy: null,
+      reason: null
+    },
+    workspacePath: `/tmp/${issueIdentifier}`,
+    questionSummary: {
+      queuedCount: 0,
+      latestQuestion: null
+    },
+    tracked: null,
+    ...overrides
+  };
 }
 
 describe('ObservabilityApiController', () => {
@@ -119,6 +157,65 @@ describe('ObservabilityApiController', () => {
         decision: 'rejected',
         reason: 'method_not_allowed'
       }
+    });
+  });
+
+  it('does not fabricate session, turn, or retry counters in compatibility projections', () => {
+    const runningSource = buildCompatibilitySource('task-1311-running', {
+      displayStatus: 'awaiting_input',
+      statusReason: 'queued_questions',
+      questionSummary: {
+        queuedCount: 1,
+        latestQuestion: {
+          questionId: 'q-1',
+          prompt: 'Proceed?',
+          urgency: 'high',
+          queuedAt: '2026-03-20T00:01:30.000Z'
+        }
+      }
+    });
+    const retryingSource = buildCompatibilitySource('task-1311-retrying', {
+      rawStatus: 'failed',
+      displayStatus: 'failed',
+      updatedAt: '2026-03-20T00:02:00.000Z',
+      summary: 'retry pending'
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: runningSource,
+      running: [runningSource],
+      retrying: [retryingSource],
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null
+    });
+
+    expect(projection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'task-1311-running',
+        display_state: 'awaiting_input',
+        status_reason: 'queued_questions',
+        session_id: null,
+        turn_count: null,
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        }
+      })
+    ]);
+    expect(projection.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'task-1311-retrying',
+        state: 'failed',
+        session_id: null,
+        attempt: null
+      })
+    ]);
+    const retryIssue = projection.issues.find((issue) => issue.issueIdentifier === 'task-1311-retrying');
+    expect(retryIssue?.payload.attempts).toEqual({
+      restart_count: null,
+      current_retry_attempt: null
     });
   });
 });
