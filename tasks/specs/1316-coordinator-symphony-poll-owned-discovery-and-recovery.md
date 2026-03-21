@@ -16,7 +16,7 @@ review_notes:
   - 2026-03-21: Upstream authority for the final remaining blocker is `/Users/kbediako/Code/symphony/SPEC.md:704-739` plus `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/linear/client.ex:13-50,243-260` and `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex:523-567,1311-1313`.
   - 2026-03-21: Current branch truth is that the earlier `1316` discovery/recovery and observability API normalization work are already landed here, and the former final gap of full active-candidate pagination plus fresh poll dispatch ordering and slot budgeting is now implemented on this branch.
   - 2026-03-21: Final Linear default-contract alignment is also landed locally: candidate paging now uses `page size 50` and request timeout `30000 ms`.
-  - 2026-03-21: Current closeout root is `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/`: `01`-`09` passed, `10-review-pre-fix.log` captured the earlier `3` P2 findings, `11-review-rerun.log` is terminal and not clean but its queued-retry dispatch/projection findings are addressed on the current head, and `12-pack-smoke.log` plus `14-live-proof.md` plus PR/merge artifacts remain pending while a fresh clean rerun is still required.
+  - 2026-03-21: Current publication root is `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T211653Z-current-head-closeout/`; it records the current-head review-tool waiver, fresh `pack:smoke`, and the explicit no-fresh-live-proof publication decision while GitHub checks, thread closure, and merge remain open.
 ---
 
 # Technical Specification
@@ -38,24 +38,26 @@ After the landed `1312`-`1315` work and the current `1316` implementation on thi
 ## Current Truth
 
 - Upstream fresh-dispatch ordering and capacity authority is explicit in `/Users/kbediako/Code/symphony/SPEC.md:704-739`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/linear/client.ex:13-50,243-260`, and `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex:523-567,1311-1313`.
-- Current CO still diverges through:
-  - no owned `1316` implementation blocker remains in the pagination/ordering/capacity slice; optional SSH per-host caps remain outside scope and non-blocking
+- Current branch truth for `1316` is:
+  - the owned pagination/ordering/capacity implementation is landed on branch
+  - publication still remains open until the current-head closeout, required GitHub checks, PR thread closure, and merge are complete
+  - optional SSH per-host caps remain outside scope and non-blocking
 - Current CO truth that must be preserved:
   - `1312` same-session continuation inside a live worker session
   - `1313` authoritative runtime snapshot fields
   - `1314` authoritative retry payload truth
   - `1315` is the landed prerequisite retry-owner scheduling slice
   - the earlier `1316` discovery/recovery and `/api/v1` normalization work is already landed on this branch
-- Use `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/` as the active current-head closeout root for this lane: `01`-`09` passed, `10-review-pre-fix.log` captured the earlier `3` P2 findings, `11-review-rerun.log` is terminal and not clean but its queued-retry dispatch/projection findings are addressed on the current head, and `12-pack-smoke.log` plus `14-live-proof.md` plus PR/merge artifacts remain pending while a fresh clean rerun is still required.
-- `1316` is implemented on the current branch, but publication remains open in PR `#283`: as of `2026-03-21`, the PR is `OPEN`, `CHANGES_REQUESTED`, `BEHIND`, and not merge-ready because `Core Lane` failed while `Cloud Canary` and `CodeRabbit` passed.
-- Full parity publication still remains open only while refreshed validation, review, live proof, PR, CI, and merge remain unresolved.
+- Use `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T211653Z-current-head-closeout/` as the active current-head closeout root for this lane: it records the fresh `pack:smoke` log, the current-head review rerun that produced no concrete findings but hit the bounded `active-closeout-bundle-reread` boundary, and the explicit no-fresh-live-proof publication decision.
+- `1316` is implemented on the current branch, but publication remains open in PR `#283` only while the current-head GitHub checks, unresolved actionable thread closure, and merge remain incomplete.
+- Full parity publication still remains open only while current-head review closure, PR checks, and merge remain unresolved.
 
 ## Validation Plan
 
 - docs-review before implementation: `.runs/1316-coordinator-symphony-poll-owned-discovery-and-recovery/cli/2026-03-21T15-25-27-365Z-543bcc14/manifest.json`
-- current closeout root: `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/`
+- current closeout root: `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T211653Z-current-head-closeout/`
 - `01-delegation-guard.log`, `02-spec-guard.log`, `03-build.log`, `04-lint.log`, `05-targeted-tests.log`, `06-full-test.log`, `07-docs-check.log`, `08-docs-freshness.log`, and `09-diff-budget.log` passed
-- `10-review-pre-fix.log` captured the earlier `3` P2 findings
-- `11-review-rerun.log` is terminal and not clean, but its queued-retry dispatch/projection findings are addressed on the current head and now require a fresh clean rerun
-- PR `#283` is the current publication vehicle for this stack; as of `2026-03-21` it is `OPEN`, `CHANGES_REQUESTED`, `BEHIND`, with `Core Lane` failed and `Cloud Canary` plus `CodeRabbit` passing
-- `12-pack-smoke.log`, `14-live-proof.md`, PR, CI, and merge remain pending
+- `10-review.log` is terminal and produced no concrete findings, but it hit the bounded `active-closeout-bundle-reread` boundary and therefore requires the documented review-tool waiver instead of a clean-review claim
+- `09-pack-smoke.log` passed on the current head
+- PR `#283` is the current publication vehicle for this stack; current-head GitHub checks, unresolved actionable thread closure, and merge remain pending
+- no fresh live proof was taken on this head; the closeout pack records that explicit publication decision instead of claiming new live evidence
