@@ -6,7 +6,7 @@
 - Problem Statement: after `1314`, the remaining retry parity blocker is no longer retry payload truth, but retry ownership. Upstream authority in `/Users/kbediako/Code/symphony/SPEC.md:608-626`, `/Users/kbediako/Code/symphony/SPEC.md:743-794`, and `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex:128-145,775-812,1130-1139` expects the orchestrator to own post-worker continuation and failure retries through an in-memory queue with cancelable timers and monotonic due times. CO still relies on persisted wall-clock `retry_due_at` plus the control-host refresh / rehydrate loop to decide when to relaunch.
 - Desired Outcome: open the next truthful bounded slice after `1314` so CO moves retry dispatch ownership closer to Symphony. Post-worker continuation and failure retries should be owned by a dedicated scheduler/runtime seam instead of the 15s refresh cadence, while `/api/v1/state.retrying` and `/api/v1/<issue>` remain truthful and restart-safe. `1315` is necessary but not sufficient for full hardened parity: post-`1315` work still remains around poll-owned discovery/recovery and observability API normalization unless provider-driven discovery is later accepted as an intentional divergence.
 
-## Status Update - 2026-03-22
+## Status Update - 2026-03-21
 - Docs-review for `1315` succeeded at `.runs/1315-coordinator-symphony-post-worker-retry-queue-ownership/cli/2026-03-21T13-04-33-775Z-038089ca/manifest.json`.
 - `1315` implementation is now landed on the current branch through `orchestrator/src/cli/control/providerIssueRetryQueue.ts`, `orchestrator/src/cli/control/providerIssueHandoff.ts`, and the coupled runtime-truth fix in `orchestrator/src/cli/control/controlRuntime.ts`.
 - Focused current-branch regressions now pass in `orchestrator/tests/ProviderIssueHandoff.test.ts` and `orchestrator/tests/ControlRuntime.test.ts`; a refreshed current-head closeout pack for the integrated `1312`-`1315` branch packet is still pending.
@@ -85,5 +85,5 @@
 
 ## Approvals
 - Product: Self-approved for the next bounded retry-ownership parity slice after `1314`.
-- Engineering: Self-approved on 2026-03-22 against the current Symphony SPEC, current Elixir orchestrator behavior, and the refreshed branch publication posture that now reflects the landed `1315` implementation.
+- Engineering: Self-approved on 2026-03-21 against the current Symphony SPEC, current Elixir orchestrator behavior, and the refreshed branch publication posture that now reflects the landed `1315` implementation.
 - Design: N/A

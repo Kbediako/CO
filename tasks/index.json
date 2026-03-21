@@ -8,7 +8,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-22",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
         "task": "tasks/tasks-1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
@@ -24,7 +24,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-22",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
         "task": "tasks/tasks-1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
@@ -40,7 +40,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-22",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
         "task": "tasks/tasks-1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
@@ -56,7 +56,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-22",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
         "task": "tasks/tasks-1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
@@ -72,7 +72,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-22",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
         "task": "tasks/tasks-1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
@@ -88,7 +88,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-22",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
         "task": "tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md",

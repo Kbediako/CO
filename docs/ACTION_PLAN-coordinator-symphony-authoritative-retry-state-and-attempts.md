@@ -11,10 +11,11 @@
   - strict scheduler ownership/cadence parity stays separate from this slice
   - queued retry metadata is the authoritative seam for `1314`; the broader provider-intake claim lifecycle and refresh cadence stay as-is
 
-## Status Update - 2026-03-22
-- Completed on the current branch: `1314` is implemented as part of the integrated `1312`/`1313`/`1314` publication unit.
+## Status Update - 2026-03-21
+- Completed on the current branch: `1314` is implemented as part of the historical integrated `1312`/`1313`/`1314` implemented-on-branch unit.
 - Current-head closeout summary for that integrated unit is `out/1314-coordinator-symphony-authoritative-retry-state-and-attempts/manual/20260321T133006Z-stacked-closeout-refresh/00-summary.md`; do not cite older `20260321T124445Z-stacked-closeout` or `20260321T124510Z-stack-closeout` packs as current-head validation.
-- Still explicitly separate: `1315` remains the next retry-owner slice, and its docs-review succeeded without implying that `1315` implementation is already landed.
+- Current branch truth has since advanced beyond that historical `1314` pack: `1315` and `1316` are also landed on branch in PR `#283`, but publication remains open because the PR is still `OPEN`, `CHANGES_REQUESTED`, `BEHIND`, and not merge-ready after the `Core Lane` failure on `2026-03-21`.
+- Keep the distinction explicit: the `1314` closeout pack proves the `1312`/`1313`/`1314` implementation tranche, not publication or merge readiness for the later stacked `1312`-`1316` branch.
 
 ## Milestones & Sequencing
 1. Register the bounded `1314` packet
@@ -63,4 +64,4 @@
 
 ## Approvals
 - Reviewer: Self-approved for a bounded backend retry-state parity slice after `1313`.
-- Date: 2026-03-22
+- Date: 2026-03-21

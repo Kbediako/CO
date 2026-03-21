@@ -122,7 +122,7 @@ function buildEmptyProviderLinearWorkerTokenUsage(): ProviderLinearWorkerTokenUs
   };
 }
 
-function defaultExecRunner(
+export function defaultExecRunner(
   request: ProviderLinearWorkerExecRequest
 ): Promise<ProviderLinearWorkerExecResult> {
   return new Promise((resolvePromise, reject) => {
@@ -144,8 +144,28 @@ function defaultExecRunner(
       });
     }
 
-    child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('exit', (exitCode) => resolvePromise({ exitCode, stdout, stderr }));
+    let settled = false;
+    const finalizeError = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(error);
+    };
+    const finalizeSuccess = (result: ProviderLinearWorkerExecResult) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolvePromise(result);
+    };
+
+    child.once('error', (error) => {
+      finalizeError(error instanceof Error ? error : new Error(String(error)));
+    });
+    child.once('close', (exitCode) => {
+      finalizeSuccess({ exitCode, stdout, stderr });
+    });
   });
 }
 
@@ -833,13 +853,26 @@ export async function runProviderLinearWorker(
         ? ['exec', '--json', prompt]
         : ['exec', 'resume', '--json', threadId ?? '', prompt];
     const resolved = resolveRuntimeCodexCommand(args, runtimeContext);
-    const execResult = await deps.execRunner({
-      command: resolved.command,
-      args: resolved.args,
-      cwd: context.repoRoot,
-      env: childEnv,
-      mirrorOutput: false
-    });
+    let execResult: ProviderLinearWorkerExecResult;
+    try {
+      execResult = await deps.execRunner({
+        command: resolved.command,
+        args: resolved.args,
+        cwd: context.repoRoot,
+        env: childEnv,
+        mirrorOutput: false
+      });
+    } catch (error) {
+      finalProof = {
+        ...finalProof,
+        owner_phase: 'ended',
+        owner_status: 'failed',
+        end_reason: 'exec_runner_failed',
+        updated_at: deps.now()
+      };
+      await writeProofSnapshot(deps, context.runDir, finalProof);
+      throw error instanceof Error ? error : new Error(String(error));
+    }
     const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
     threadId = parsed.threadId ?? threadId;
     turnId = parsed.turnId ?? turnId;

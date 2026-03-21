@@ -273,14 +273,15 @@ function buildProviderRetryState(
   if (!claim) {
     return null;
   }
+  const active = claim.retry_queued === true;
   const attempt = claim.retry_attempt ?? null;
   const dueAt = claim.retry_due_at ?? null;
   const error = claim.retry_error ?? null;
-  if (attempt === null && dueAt === null && error === null) {
+  if (!active && attempt === null && dueAt === null && error === null) {
     return null;
   }
   return {
-    active: claim.retry_queued === true && attempt !== null,
+    active,
     attempt,
     due_at: dueAt,
     error

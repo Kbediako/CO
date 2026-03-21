@@ -1,17 +1,17 @@
 # PRD - Coordinator Symphony Poll-Owned Discovery Recovery and Observability API Normalization
 
-## Added by Bootstrap 2026-03-22
+## Added by Bootstrap 2026-03-21
 
 ## Summary
 - Problem Statement: after the landed `1312`-`1315` work and the current `1316` implementation on this branch, CO now has poll-backed refresh/reconcile hooks, fresh issue discovery without a new accepted webhook, retry redispatch based on tracker refetch, startup immediate poll on the real control-host path, the Symphony-shaped `/api/v1/refresh`, running/issue/workspace normalization, full active candidate pagination, Symphony-ordered fresh dispatch, slot-capped launch gating, and the final Linear default-contract alignment (`page size 50`, request timeout `30000 ms`). The remaining work is no longer implementation of the blocker itself; it is truthful publication closeout against `/Users/kbediako/Code/symphony/SPEC.md:704-739`, `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex:523-567,1311-1313`, and `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/linear/client.ex:13-50,243-260`.
 - Desired Outcome: close `1316` truthfully by recording the now-landed dispatch behavior, rerunning the required validation/review/live-proof loop, and publishing the lane without overstating anything beyond the verified evidence.
 
-## Status Update - 2026-03-22
+## Status Update - 2026-03-21
 - Current branch posture: the branch now carries implemented `1312`/`1313`/`1314`, the landed `1315` retry-owner slice, and the full owned `1316` discovery/recovery, API-normalization, pagination, ordering, capacity, and Linear-default-alignment work.
 - Current branch truth: `providerIssueHandoff.poll()` now reconciles claims before fresh-candidate processing, fresh eligible issues can be launched on poll without a webhook, queued retries can re-fetch candidates from poll truth, `/api/v1/refresh` returns the queued/coalesced acknowledgement contract, and running/issue/workspace projection semantics have been normalized to the Symphony baseline while keeping additive CO fields.
 - Final implementation delta now landed: `orchestrator/src/cli/control/linearDispatchSource.ts` pages the active Linear candidate set with Symphony defaults (`page size 50`, request timeout `30000 ms`) and preserves ordering metadata, while `orchestrator/src/cli/control/providerIssueHandoff.ts` sorts fresh poll candidates and enforces slot-capped dispatch before launch.
-- Current closeout evidence: `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/` records passed `delegation-guard`, `spec-guard`, `build`, `lint`, targeted tests (`109/109`), full test (`284/284` files, `2097/2097` tests), `docs:check`, `docs:freshness`, and diff-budget with override. `10-review-pre-fix.log` captured the earlier `3` P2 findings. `11-review-rerun.log` is terminal and not clean: it contains a P1 in `orchestrator/src/cli/providerLinearWorkerRunner.ts` about treating non-active Linear states as active in the worker loop, and a P2 in `orchestrator/src/cli/control/controlServerPublicLifecycle.ts` about serializing/coalescing the entire bulk poll fetch path before the handoff lock. `12-pack-smoke.log`, `14-live-proof.md`, PR, and merge remain pending.
-- Truthful remaining boundary after `1316`: implementation is now in place, but parity publication should close only after the open rerun findings are resolved and the remaining full-lane validation/live-proof/PR/merge steps complete cleanly.
+- Current closeout evidence: `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/` records passed `delegation-guard`, `spec-guard`, `build`, `lint`, targeted tests (`109/109`), full test (`284/284` files, `2097/2097` tests), `docs:check`, `docs:freshness`, and diff-budget with override. `10-review-pre-fix.log` captured the earlier `3` P2 findings. `11-review-rerun.log` is terminal and not clean: it captured one P1 around queued null-attempt retry dispatch/recovery and one P2 around compatibility retry timing. Both findings are addressed on the current head, but a fresh clean rerun is still pending. `12-pack-smoke.log`, `14-live-proof.md`, PR, and merge remain pending.
+- Truthful remaining boundary after `1316`: implementation is now in place, but parity publication should close only after the fresh clean rerun lands and the remaining full-lane validation/live-proof/PR/merge steps complete cleanly.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): finish the remaining parity gap truthfully by aligning CO to the spec and Elixir reference instead of carrying stale umbrella wording.
@@ -73,9 +73,9 @@
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`
 
 ## Open Questions
-- No owned implementation blockers remain. The remaining open items are publication-only: the two terminal rerun findings, `pack:smoke`, live proof, PR, and merge.
+- No owned implementation blockers remain. The remaining open items are publication-only: the fresh clean rerun, `pack:smoke`, live proof, PR, and merge.
 
 ## Approvals
 - Product: Self-approved for the final bounded `1316` parity blocker.
-- Engineering: Self-approved on 2026-03-22 against the current Symphony SPEC, Elixir orchestrator dispatch ordering/capacity behavior, and the verified branch state.
+- Engineering: Self-approved on 2026-03-21 against the current Symphony SPEC, Elixir orchestrator dispatch ordering/capacity behavior, and the verified branch state.
 - Design: N/A

@@ -4,7 +4,7 @@ title: Coordinator Symphony Same-Session Continuation After Normal Success
 status: in_progress
 owner: Codex
 created: 2026-03-21
-last_review: 2026-03-22
+last_review: 2026-03-21
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-same-session-continuation-after-normal-success.md
@@ -18,7 +18,7 @@ review_notes:
   - 2026-03-21: `orchestrator/tests/ProviderIssueHandoff.test.ts` still codifies fresh-child-run continuation after `succeeded`, so `1312` cannot be framed as a simple `succeeded -> resume` reroute.
   - 2026-03-21: In this packet, "same-session" means one worker-lifetime app-server session plus stable `thread_id` reuse, not a fixed per-turn `session_id`; the chosen seam is now a provider-specific long-lived worker command/owner inside the existing pipeline model, with `resume(runId)` left rerun-only and post-worker-exit scheduler retry kept separate. `1313` remains the separate follow-on blocker for authoritative runtime snapshot parity.
   - 2026-03-21: Current branch state now lands that provider worker owner plus selected-only proof surfacing; post-worker-exit refresh still starts a fresh provider worker run, so `1312` is a bounded parity slice rather than full closure.
-  - 2026-03-22: Current branch truth is that `1312`, `1313`, and `1314` are one integrated implemented publication unit. Use `out/1314-coordinator-symphony-authoritative-retry-state-and-attempts/manual/20260321T133006Z-stacked-closeout-refresh/00-summary.md` as the current-head closeout summary; older `20260321T124445Z-stacked-closeout` and `20260321T124510Z-stack-closeout` packs are stale for current-head validation.
+  - 2026-03-21: The `1314` closeout pack is now historical evidence for the earlier `1312`/`1313`/`1314` implemented-on-branch tranche; current branch truth for PR `#283` is that `1315` and `1316` are also landed on branch, but publication remains open and the `1316` closeout root is the current validation vehicle.
 ---
 
 # Technical Specification

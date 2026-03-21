@@ -925,9 +925,85 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_rehydrated_completed_run',
       retry_queued: true,
       retry_attempt: 1,
-      retry_due_at: '2026-03-19T04:30:11.001Z',
+      retry_due_at: expect.any(String),
       retry_error: 'retry poll failed: dispatch_source_credentials_missing'
     });
+    expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
+  });
+
+  it('preserves queued retry ownership when a null-attempt retry refetch is skipped', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:21:05.000Z',
+      updated_at: '2026-03-19T04:21:10.000Z',
+      last_delivery_id: null,
+      last_event: null,
+      last_action: null,
+      last_webhook_timestamp: null,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [createTrackedIssue({ updated_at: '2026-03-19T04:21:00.000Z' })],
+      refetchTrackedIssues: async () => ({
+        kind: 'skip',
+        reason: 'dispatch_source_credentials_missing'
+      })
+    });
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    for (let index = 0; index < 8; index += 1) {
+      await vi.advanceTimersByTimeAsync(0);
+      await flushAsyncWork();
+    }
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: expect.any(String),
+      retry_error: 'retry poll failed: dispatch_source_credentials_missing'
+    });
+    expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
   });
 
   it('preserves claims when bulk tracked issue refresh is skipped', async () => {
@@ -2561,6 +2637,87 @@ describe('createProviderIssueHandoffService', () => {
     }));
   });
 
+  it('repairs a persisted accepted retry deadline during rehydrate even when the queued retry has no recorded attempt yet', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'accepted',
+      reason: 'provider_issue_post_worker_exit_refresh_pending',
+      accepted_at: '2026-03-19T04:21:05.000Z',
+      updated_at: '2026-03-19T04:21:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: '/tmp/provider-run/missing-manifest.json',
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: 'not-a-date',
+      retry_error: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-rebuilt',
+        manifestPath: '/tmp/provider-run/rebuilt-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_post_worker_exit_refresh_pending',
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: expect.any(String),
+      retry_error: null
+    });
+    expect(state.claims[0]?.retry_due_at).not.toBe('not-a-date');
+    expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.start);
+
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:21:00.000Z',
+      launchToken: expect.any(String)
+    }));
+  });
+
   it('holds an explicitly queued post-worker-exit retry until due_at and preserves the attempt when the retry queue launches it', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
@@ -3037,7 +3194,10 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
-  it('retries a same-timestamp accepted issue after a fresher relaunch claim failed', async () => {
+  it.each([
+    'provider_issue_start_failed:transient launch failure',
+    'provider_issue_retry_start_failed:transient launch failure'
+  ] as const)('retries a same-timestamp accepted issue after a fresher relaunch claim failed (%s)', async (failureReason) => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
       repoRoot: root,
@@ -3075,7 +3235,7 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'linear-lin-issue-1',
       mapping_source: 'provider_id_fallback',
       state: 'handoff_failed',
-      reason: 'provider_issue_start_failed:transient launch failure',
+      reason: failureReason,
       accepted_at: '2026-03-19T04:21:05.000Z',
       updated_at: '2026-03-19T04:21:10.000Z',
       last_delivery_id: 'delivery-failed-start',
@@ -3141,6 +3301,87 @@ describe('createProviderIssueHandoffService', () => {
       retry_error: null
     });
     expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('requeues a queued retry without a recorded attempt after a fresh start failure', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'accepted',
+      reason: 'provider_issue_post_worker_exit_refresh_pending',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-failed-start',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: '2026-03-19T04:30:05.000Z',
+      retry_error: null
+    } satisfies ProviderIntakeState['claims'][number]);
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('transient launch failure');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await expect(
+      service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:21:00.000Z'
+        }),
+        deliveryId: 'delivery-retry-null-attempt-start-failed',
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_360_100_000
+      })
+    ).rejects.toThrow('Failed to start provider issue CO-2: provider_issue_start_failed:transient launch failure');
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:transient launch failure',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: expect.any(String),
+      retry_error: 'transient launch failure'
+    });
+    expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
   });
 
   it('prefers the fresher discovered completed run timestamp over a stale existing claim', async () => {

@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-authoritative-retry-state-and-attempts
 risk: high
 owners:
   - Codex
-last_review: 2026-03-22
+last_review: 2026-03-21
 ---
 
 ## Added by Bootstrap (refresh as needed)
@@ -33,7 +33,7 @@ last_review: 2026-03-22
 - Residual divergence after `1314`:
   - Symphony still owns retries with an in-memory timer queue, timer cancellation, and monotonic `due_at_ms`
   - CO still uses persisted wall-clock `retry_due_at` plus the control-host refresh / best-effort rehydrate loop to decide when to relaunch
-  - current branch publication posture on `2026-03-22`: `1312`, `1313`, and `1314` are one integrated implemented publication unit; use `out/1314-coordinator-symphony-authoritative-retry-state-and-attempts/manual/20260321T133006Z-stacked-closeout-refresh/00-summary.md` as the current-head closeout summary, do not cite older `20260321T124445Z-stacked-closeout` or `20260321T124510Z-stack-closeout` packs as current-head validation, and keep `1315` separate as the next retry-owner slice
+  - the `1314` closeout pack is now historical evidence for the earlier `1312`/`1313`/`1314` implemented-on-branch tranche; current branch truth for PR `#283` is that `1315` and `1316` are also landed on branch, but publication remains open and the `1316` closeout root is the current validation vehicle
 
 ## Technical Requirements
 Functional requirements:
@@ -85,4 +85,4 @@ Data model changes / migrations:
 
 ## Approvals
 - Reviewer: `docs-review` succeeded for `1314` at `.runs/1314-coordinator-symphony-authoritative-retry-state-and-attempts/cli/2026-03-21T11-38-19-443Z-469bf7c8/manifest.json`.
-- Date: 2026-03-22
+- Date: 2026-03-21

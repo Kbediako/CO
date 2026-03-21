@@ -20,7 +20,7 @@
 2. Record the current closeout pack truth
    - `01`-`09` are passed in `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/`
    - `10-review-pre-fix.log` captured the earlier `3` P2 findings
-   - `11-review-rerun.log` is terminal and not clean, with one P1 plus one P2 still being resolved
+   - `11-review-rerun.log` is terminal and not clean; it captured one P1 around queued null-attempt retry dispatch/recovery and one P2 around compatibility retry timing, and both are addressed on the current head while a fresh clean rerun is still pending
 3. Keep only the publication work open
    - `12-pack-smoke.log` is still pending
    - `14-live-proof.md`, PR, and merge artifacts are still pending
@@ -36,7 +36,7 @@
 ## Validation
 - docs-review for the `1316` packet before implementation: `.runs/1316-coordinator-symphony-poll-owned-discovery-and-recovery/cli/2026-03-21T15-25-27-365Z-543bcc14/manifest.json`
 - `01-delegation-guard.log`, `02-spec-guard.log`, `03-build.log`, `04-lint.log`, `05-targeted-tests.log`, `06-full-test.log`, `07-docs-check.log`, `08-docs-freshness.log`, and `09-diff-budget.log` passed in the current closeout root
-- `11-review-rerun.log` is terminal and not clean, with a P1 in `orchestrator/src/cli/providerLinearWorkerRunner.ts` and a P2 in `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`
+- `11-review-rerun.log` is terminal and not clean, but its queued-retry dispatch/projection findings are addressed on the current head and now require a fresh clean rerun
 - `12-pack-smoke.log`, `14-live-proof.md`, PR, and merge remain pending
 
 ## Risks & Mitigations
@@ -47,4 +47,4 @@
 
 ## Approvals
 - Reviewer: Self-approved for the docs-only closeout refresh of the now-landed `1316` publication slice.
-- Date: 2026-03-22
+- Date: 2026-03-21

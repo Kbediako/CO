@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-post-worker-retry-queue-ownership.md
 risk: high
 owners:
   - Codex
-last_review: 2026-03-22
+last_review: 2026-03-21
 ---
 
 ## Added by Bootstrap (refresh as needed)
@@ -101,4 +101,4 @@ Functional requirements:
 
 ## Approvals
 - Reviewer: docs-review completed via `.runs/1315-coordinator-symphony-post-worker-retry-queue-ownership/cli/2026-03-21T13-04-33-775Z-038089ca/manifest.json`; refreshed current-head closeout/implementation approval remains pending.
-- Date: 2026-03-22
+- Date: 2026-03-21

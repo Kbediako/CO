@@ -4,7 +4,7 @@ title: Coordinator Symphony Authoritative Runtime Snapshot and Observability
 status: in_progress
 owner: Codex
 created: 2026-03-21
-last_review: 2026-03-22
+last_review: 2026-03-21
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-authoritative-runtime-snapshot-observability.md
@@ -17,7 +17,7 @@ review_notes:
   - 2026-03-21: The current branch now lands proof-backed running rows plus aggregate `codex_totals` and latest `rate_limits` through the compatibility/API surfaces.
   - 2026-03-21: Authoritative retry queue ownership stayed separate from `1313` and remained the explicit follow-on slice in `1314`.
   - 2026-03-21: Orchestrator-managed Linear write-back remains outside the parity requirement for this slice.
-  - 2026-03-22: Current branch truth is that `1312`, `1313`, and `1314` are one integrated implemented publication unit. Use `out/1314-coordinator-symphony-authoritative-retry-state-and-attempts/manual/20260321T133006Z-stacked-closeout-refresh/00-summary.md` as the current-head closeout summary; older `20260321T124445Z-stacked-closeout` and `20260321T124510Z-stack-closeout` packs are stale for current-head validation.
+  - 2026-03-21: The `1314` closeout pack is now historical evidence for the earlier `1312`/`1313`/`1314` implemented-on-branch tranche; current branch truth for PR `#283` is that `1315` and `1316` are also landed on branch, but publication remains open and the `1316` closeout root is the current validation vehicle.
 ---
 
 # Technical Specification

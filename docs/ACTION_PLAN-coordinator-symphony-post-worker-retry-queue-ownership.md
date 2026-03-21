@@ -12,7 +12,7 @@
   - `1315` is the next required slice, not the last one; post-`1315` work still remains around poll-owned discovery/recovery and observability API normalization unless provider-driven discovery is later accepted as an intentional divergence
   - broader reconciliation, UI richness, and tracker write-back remain separate
 
-## Status Update - 2026-03-22
+## Status Update - 2026-03-21
 - docs-review for `1315` succeeded at `.runs/1315-coordinator-symphony-post-worker-retry-queue-ownership/cli/2026-03-21T13-04-33-775Z-038089ca/manifest.json`.
 - `1315` implementation is now landed on the current branch, with focused regressions passing in `ProviderIssueHandoff.test.ts` and `ControlRuntime.test.ts`.
 - A refreshed current-head closeout pack for the integrated `1312`-`1315` branch packet is still pending.
@@ -68,4 +68,4 @@
 
 ## Approvals
 - Reviewer: Self-approved for the next bounded retry-ownership parity slice after `1314`.
-- Date: 2026-03-22
+- Date: 2026-03-21

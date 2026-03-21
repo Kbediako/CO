@@ -792,14 +792,19 @@ function buildProviderRetryState(
     'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
   > | null
 ): ControlCompatibilitySourceContext['providerRetryState'] {
-  if (!claim || claim.retry_attempt === null || claim.retry_attempt === undefined) {
+  if (!claim) {
+    return null;
+  }
+  const active = claim.retry_queued === true;
+  const attempt = claim.retry_attempt ?? null;
+  if (!active && attempt === null) {
     return null;
   }
   return {
-    active: claim.retry_queued === true,
-    attempt: claim.retry_attempt,
-    due_at: claim.retry_queued === true ? claim.retry_due_at ?? null : null,
-    error: claim.retry_queued === true ? claim.retry_error ?? null : null
+    active,
+    attempt,
+    due_at: active ? claim.retry_due_at ?? null : null,
+    error: active ? claim.retry_error ?? null : null
   };
 }
 

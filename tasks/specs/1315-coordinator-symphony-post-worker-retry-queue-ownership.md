@@ -4,7 +4,7 @@ title: Coordinator Symphony Post-Worker Retry Queue Ownership
 status: in_progress
 owner: Codex
 created: 2026-03-21
-last_review: 2026-03-22
+last_review: 2026-03-21
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-post-worker-retry-queue-ownership.md
@@ -18,8 +18,8 @@ review_notes:
   - 2026-03-21: `1314` remains the bounded retry-payload truth slice; `1315` is the follow-on retry-owner slice.
   - 2026-03-21: docs-review for `1315` succeeded at `.runs/1315-coordinator-symphony-post-worker-retry-queue-ownership/cli/2026-03-21T13-04-33-775Z-038089ca/manifest.json`.
   - 2026-03-21: `1315` is necessary but not sufficient for full hardened parity; post-`1315` real gaps still remain around poll-owned discovery/recovery, `POST /api/v1/refresh` ack shape, running/issue state semantics, and retry workspace fallback unless provider-driven discovery is later accepted as an intentional divergence.
-  - 2026-03-22: docs-review for `1315` succeeded via `.runs/1315-coordinator-symphony-post-worker-retry-queue-ownership/cli/2026-03-21T13-04-33-775Z-038089ca/manifest.json`.
-  - 2026-03-22: Current branch truth now includes the landed `1315` implementation through `providerIssueRetryQueue.ts`, `providerIssueHandoff.ts`, and the coupled runtime-truth updates. A refreshed current-head closeout pack for the integrated `1312`-`1315` branch packet is still pending.
+  - 2026-03-21: docs-review for `1315` succeeded via `.runs/1315-coordinator-symphony-post-worker-retry-queue-ownership/cli/2026-03-21T13-04-33-775Z-038089ca/manifest.json`.
+  - 2026-03-21: Current branch truth now includes the landed `1315` implementation through `providerIssueRetryQueue.ts`, `providerIssueHandoff.ts`, and the coupled runtime-truth updates. The branch has since advanced to the stacked `1312`-`1316` publication vehicle in PR `#283`, but publication still remains open.
 ---
 
 # Technical Specification

@@ -323,7 +323,7 @@ export function buildProviderIntakeSummary(
 export function hasQueuedProviderIntakeRetry(
   claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'> | null | undefined
 ): boolean {
-  return claim?.retry_queued === true && (claim.retry_attempt ?? null) !== null;
+  return claim?.retry_queued === true;
 }
 
 function normalizeProviderIntakeClaim(

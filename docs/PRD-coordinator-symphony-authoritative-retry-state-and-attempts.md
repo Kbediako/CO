@@ -6,10 +6,10 @@
 - Problem Statement: after `1313`, the remaining backend/API parity blocker was the retry queue model. Upstream authority in `/Users/kbediako/Code/symphony/SPEC.md:1403-1454`, `/Users/kbediako/Code/symphony/SPEC.md:743-747`, and `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex:775-812,1130-1152` expects authoritative retry rows plus issue-level retry/attempt payloads with real `attempt`, `error`, and deadline semantics. The current branch now implements that bounded `1314` slice, but full hardened parity still remains blocked by the broader scheduler/timer ownership model.
 - Desired Outcome: record `1314` truthfully as a delivered retry-state slice. CO now persists a real retry ledger/runtime source and threads it through `/api/v1/state.retrying`, `/api/v1/<issue>.retry`, and `/api/v1/<issue>.attempts`; the remaining scheduler-cadence gap stays explicit as a follow-on lane, not a hidden footnote.
 
-## Status Update - 2026-03-22
-- Current branch state: `1314` is implemented on this branch as part of the integrated `1312`/`1313`/`1314` publication unit.
+## Status Update - 2026-03-21
+- Current branch state: `1314` is implemented on this branch as part of the earlier integrated `1312`/`1313`/`1314` implemented-on-branch unit.
 - Current-head closeout summary for that integrated unit is `out/1314-coordinator-symphony-authoritative-retry-state-and-attempts/manual/20260321T133006Z-stacked-closeout-refresh/00-summary.md`; older `20260321T124445Z-stacked-closeout` and `20260321T124510Z-stack-closeout` packs are stale for current-head validation.
-- The truthful next slice remains `1315`: docs-review succeeded for `1315`, but `1315` implementation is not yet claimed from this branch packet.
+- Current branch truth has since advanced beyond that historical `1314` pack: `1315` and `1316` are also landed on branch in PR `#283`, but publication remains open because the PR is still `OPEN`, `CHANGES_REQUESTED`, `BEHIND`, and not merge-ready after the `Core Lane` failure on `2026-03-21`.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): continue toward full hardened parity after `1313`, but do it truthfully by opening the next bounded slice for retry-state parity instead of claiming that running-row plus aggregate telemetry parity closes the whole backend/API contract.
@@ -76,5 +76,5 @@
 
 ## Approvals
 - Product: Self-approved for the next bounded retry-state parity slice after `1313`.
-- Engineering: Self-approved on 2026-03-22 against the current upstream SPEC, Elixir retry-state behavior, and the refreshed integrated branch publication posture.
+- Engineering: Self-approved on 2026-03-21 against the current upstream SPEC, Elixir retry-state behavior, and the refreshed integrated branch publication posture.
 - Design: N/A

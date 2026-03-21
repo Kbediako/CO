@@ -1757,6 +1757,7 @@ function hasFailedProviderStartReason(reason: string | null | undefined): boolea
     reason &&
       (
         reason.startsWith('provider_issue_start_failed:') ||
+        reason.startsWith(`${PROVIDER_RETRY_START_FAILED_REASON}:`) ||
         reason.startsWith('provider_issue_refresh_start_failed:') ||
         reason.startsWith(`${PROVIDER_POST_WORKER_EXIT_START_FAILED_REASON}:`)
       )
@@ -2247,7 +2248,7 @@ function buildQueuedProviderRetryFields(input: {
     ? resolveCurrentProviderRetryAttempt(input.claim, input.previousRun)
     : resolveNextProviderRetryAttempt(input.claim, input.previousRun);
   if (retryAttempt === null) {
-    return clearProviderRetryFields();
+    return preserveQueuedProviderRetryWithoutAttempt(input);
   }
   return {
     retry_queued: true,
@@ -2256,6 +2257,34 @@ function buildQueuedProviderRetryFields(input: {
       input.preserveExistingDueAt && isValidProviderRetryTimestamp(input.claim.retry_due_at)
         ? input.claim.retry_due_at
         : buildProviderRetryDueAt(input.delayType, retryAttempt),
+    retry_error: input.error
+  };
+}
+
+function preserveQueuedProviderRetryWithoutAttempt(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt' | 'retry_due_at'>;
+  previousRun: ProviderIssueRunRecord | null;
+  error: string | null;
+  preserveCurrentAttempt?: boolean;
+  preserveExistingDueAt?: boolean;
+  delayType: ProviderRetryDelayType;
+}): Pick<
+  ProviderIntakeClaimRecord,
+  'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+> {
+  // Explicit queued claims can exist before any retry run materializes. Keep the
+  // queued state and schedule alive, but only when we are preserving an existing
+  // queued retry rather than inventing retry metadata for unrelated history.
+  if (input.preserveCurrentAttempt !== true || input.claim.retry_queued !== true || input.previousRun) {
+    return clearProviderRetryFields();
+  }
+  return {
+    retry_queued: true,
+    retry_attempt: null,
+    retry_due_at:
+      input.preserveExistingDueAt && isValidProviderRetryTimestamp(input.claim.retry_due_at)
+        ? input.claim.retry_due_at
+        : buildProviderRetryDueAt(input.delayType, 1),
     retry_error: input.error
   };
 }
@@ -2273,7 +2302,7 @@ function clearProviderRetryFields(): Pick<
 }
 
 function resolveCurrentProviderRetryAttempt(
-  claim: Pick<ProviderIntakeClaimRecord, 'retry_attempt'>,
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'>,
   previousRun: ProviderIssueRunRecord | null
 ): number | null {
   if (typeof claim.retry_attempt === 'number' && claim.retry_attempt > 0) {
@@ -2283,7 +2312,7 @@ function resolveCurrentProviderRetryAttempt(
 }
 
 function resolveNextProviderRetryAttempt(
-  claim: Pick<ProviderIntakeClaimRecord, 'retry_attempt'>,
+  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'>,
   previousRun: ProviderIssueRunRecord | null
 ): number | null {
   if (typeof claim.retry_attempt === 'number' && claim.retry_attempt > 0) {

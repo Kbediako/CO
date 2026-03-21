@@ -673,6 +673,63 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('discovers authoritative retry contexts even when the queued retry has no recorded attempt yet', async () => {
+    const { paths } = await createHostPaths();
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-20T01:16:00.000Z',
+      rehydrated_at: '2026-03-20T01:16:00.000Z',
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_rehydrated_resumable_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T01:10:13.574Z',
+          task_id: 'linear-lin-issue-1',
+          mapping_source: 'provider_id_fallback',
+          state: 'resumable',
+          reason: 'provider_issue_rehydrated_resumable_run',
+          accepted_at: '2026-03-20T01:10:13.574Z',
+          updated_at: '2026-03-20T01:16:00.000Z',
+          last_delivery_id: 'delivery-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_000_000,
+          run_id: null,
+          run_manifest_path: null,
+          retry_queued: true,
+          retry_attempt: null,
+          retry_due_at: '2026-03-20T01:17:00.000Z',
+          retry_error: null
+        }
+      ]
+    };
+
+    const retrying = await discoverAuthoritativeRetryCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(retrying).toHaveLength(1);
+    expect(retrying[0]).toMatchObject({
+      issueIdentifier: 'CO-2',
+      displayStatus: 'retrying',
+      rawStatus: 'resumable',
+      summary: 'provider_issue_rehydrated_resumable_run',
+      providerRetryState: {
+        active: true,
+        attempt: null,
+        due_at: '2026-03-20T01:17:00.000Z',
+        error: null
+      }
+    });
+  });
+
   it('synthesizes the deterministic provider workspace for retry-only claims without a manifest snapshot', async () => {
     const { root, paths } = await createHostPaths();
     const providerIntakeState: ProviderIntakeState = {

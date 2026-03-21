@@ -1,6 +1,9 @@
+import type { ChildProcess } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PassThrough } from 'node:stream';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -230,6 +233,58 @@ describe('provider linear worker runner', () => {
       }
     });
     expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('waits for child close before resolving piped stdio capture', async () => {
+    vi.resetModules();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const fakeChild = Object.assign(new EventEmitter(), { stdout, stderr }) as unknown as ChildProcess;
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    const spawnMock = vi.fn(() => fakeChild);
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawn: spawnMock
+    }));
+
+    try {
+      const { defaultExecRunner } = await import('../src/cli/providerLinearWorkerRunner.js');
+      let settled = false;
+      const resultPromise = defaultExecRunner({
+        command: 'codex',
+        args: ['exec'],
+        cwd: tempRoot ?? process.cwd(),
+        env: {},
+        mirrorOutput: false
+      });
+      void resultPromise.then(() => {
+        settled = true;
+      });
+
+      stdout.write('stdout-before-close');
+      stderr.write('stderr-before-close');
+      fakeChild.emit('exit', 0);
+      stdout.end('stdout-after-exit');
+      stderr.end('stderr-after-exit');
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(settled).toBe(false);
+
+      fakeChild.emit('close', 0);
+      await expect(resultPromise).resolves.toEqual({
+        exitCode: 0,
+        stdout: 'stdout-before-closestdout-after-exit',
+        stderr: 'stderr-before-closestderr-after-exit'
+      });
+      expect(spawnMock).toHaveBeenCalledWith('codex', ['exec'], {
+        cwd: tempRoot ?? process.cwd(),
+        env: {},
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
   });
 
   it('continues on the same thread across turns and writes a proof sidecar', async () => {
@@ -463,6 +518,47 @@ describe('provider linear worker runner', () => {
       latest_session_id: 'thread-1-turn-1',
       owner_status: 'failed',
       end_reason: 'codex_exit_2'
+    });
+  });
+
+  it('fails closed when execRunner rejects and writes a failed proof sidecar', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const execRunner = vi.fn(async () => {
+      throw new Error('spawn failed');
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('spawn failed');
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: null,
+      latest_turn_id: null,
+      latest_session_id: null,
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'exec_runner_failed'
     });
   });
 

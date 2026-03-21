@@ -534,6 +534,137 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('keeps queued provider retries active on the selected run when retry attempt is missing', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-1034-current',
+        issue_id: 'issue-1034-current',
+        issue_identifier: 'ISSUE-1034-CURRENT',
+        issue_title: 'Queued retry without recorded attempt',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-07T00:17:00.000Z',
+        task_id: 'task-1034-current',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-03-07T00:17:05.000Z',
+        updated_at: '2026-03-07T00:17:10.000Z',
+        last_delivery_id: 'delivery-selected-retry',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_020_000,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'selected-retry-launch',
+        retry_queued: true,
+        retry_attempt: null,
+        retry_due_at: '2026-03-07T00:17:30.000Z',
+        retry_error: null
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'task-1034-current',
+      providerIntakeState
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1034-current',
+      issue_id: 'issue-1034-current',
+      issue_identifier: 'ISSUE-1034-CURRENT',
+      summary: 'selected run remains current authority',
+      updated_at: '2026-03-07T00:17:00.000Z'
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+
+    expect(selectedSnapshot.selected?.providerRetryState).toEqual({
+      active: true,
+      attempt: null,
+      due_at: '2026-03-07T00:17:30.000Z',
+      error: null
+    });
+  });
+
+  it('keeps authoritative retry due_at metadata when the queued retry has no recorded attempt yet', async () => {
+    const providerIntakeState = createProviderIntakeState([]);
+    const fixture = await createFixture({
+      taskId: 'task-1034-current',
+      providerIntakeState
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1034-current',
+      issue_identifier: 'task-1034-current',
+      summary: 'selected run remains current authority',
+      updated_at: '2026-03-07T00:17:00.000Z'
+    });
+
+    const retryPaths = await createSiblingRun(fixture.root, 'task-1034-retrying', 'run-3', {
+      manifest: {
+        status: 'failed',
+        completed_at: null,
+        summary: 'retryable failure pending rerun',
+        workspace_path: join(fixture.root, '.workspaces', 'task-1034-retrying'),
+        updated_at: '2026-03-07T00:17:00.000Z'
+      }
+    });
+    providerIntakeState.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:task-1034-retrying',
+      issue_id: 'task-1034-retrying',
+      issue_identifier: 'task-1034-retrying',
+      issue_title: 'Retry issue without attempt',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-07T00:17:00.000Z',
+      task_id: 'task-1034-retrying',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-03-07T00:17:05.000Z',
+      updated_at: '2026-03-07T00:17:10.000Z',
+      last_delivery_id: 'delivery-retrying',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_020_000,
+      run_id: 'run-3',
+      run_manifest_path: retryPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'retry-launch',
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: '2026-03-07T00:17:30.000Z',
+      retry_error: null
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const retryEntry = compatibilityProjection.retrying.find(
+      (entry) => entry.issue_identifier === 'task-1034-retrying'
+    );
+    const retryIssue = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'task-1034-retrying'
+    );
+
+    expect(retryEntry).toMatchObject({
+      issue_identifier: 'task-1034-retrying',
+      state: 'resumable',
+      attempt: null,
+      due_at: '2026-03-07T00:17:30.000Z'
+    });
+    expect(retryIssue?.payload.retry).toMatchObject({
+      issue_identifier: 'task-1034-retrying',
+      attempt: null,
+      due_at: '2026-03-07T00:17:30.000Z'
+    });
+    expect(retryIssue?.payload.attempts).toEqual({
+      restart_count: null,
+      current_retry_attempt: null
+    });
+  });
+
   it('preserves authoritative retry attempts on a running issue after a prior restart', async () => {
     const providerIntakeState = createProviderIntakeState([
       {

@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-poll-owned-discovery-and-recovery.md
 risk: high
 owners:
   - Codex
-last_review: 2026-03-22
+last_review: 2026-03-21
 ---
 
 ## Added by Bootstrap (refresh as needed)
@@ -18,7 +18,7 @@ last_review: 2026-03-22
   - `1315` is already landed on the current branch and is a prerequisite for this packet
   - the earlier `1316` poll/recovery and `/api/v1` normalization work are already present on this branch
   - optional dashboard/TUI/Telegram richness and tracker write-back stay out of scope
-  - full parity publication remains open only while the current closeout pack still has unresolved rerun findings plus pending `pack:smoke`, live-proof, PR, and merge artifacts
+  - full parity publication remains open only while the current closeout pack still awaits a fresh clean rerun plus pending `pack:smoke`, live-proof, PR, and merge artifacts
 
 ## Current Branch State
 - Upstream fresh-dispatch ordering and capacity contract:
@@ -69,7 +69,7 @@ Functional requirements:
   - current closeout pack: `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/`
     - `01-delegation-guard.log`, `02-spec-guard.log`, `03-build.log`, `04-lint.log`, `05-targeted-tests.log`, `06-full-test.log`, `07-docs-check.log`, `08-docs-freshness.log`, and `09-diff-budget.log` passed
     - `10-review-pre-fix.log` captured the earlier `3` P2 findings
-    - `11-review-rerun.log` is terminal and not clean, with a P1 in `orchestrator/src/cli/providerLinearWorkerRunner.ts` and a P2 in `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`
+    - `11-review-rerun.log` is terminal and not clean; it captured one P1 around queued null-attempt retry dispatch/recovery and one P2 around compatibility retry timing, both of which are addressed on the current head while a fresh clean rerun is still pending
     - `12-pack-smoke.log`, `14-live-proof.md`, and PR/merge artifacts remain pending
 - Rollout verification:
   - live control-host proof shows fresh issues launching in Symphony order when multiple active candidates are available
@@ -79,8 +79,8 @@ Functional requirements:
   - inspect for stale ordering metadata or unexpected null-priority behavior
 
 ## Open Questions
-- No owned implementation blockers remain. The remaining open items are publication-only: the P1/P2 rerun findings, `pack:smoke`, live proof, PR, and merge.
+- No owned implementation blockers remain. The remaining open items are publication-only: the fresh clean rerun, `pack:smoke`, live proof, PR, and merge.
 
 ## Approvals
-- Reviewer: docs-review succeeded for the registered packet; the closeout pack has `01`-`09` green, `10-review-pre-fix.log` recorded the earlier `3` P2 findings, `11-review-rerun.log` is terminal and not clean with one P1 plus one P2 still being resolved, and publication closeout still awaits `pack:smoke`, live proof, PR, and merge.
-- Date: 2026-03-22
+- Reviewer: docs-review succeeded for the registered packet; the closeout pack has `01`-`09` green, `10-review-pre-fix.log` recorded the earlier `3` P2 findings, `11-review-rerun.log` is terminal and not clean but its queued-retry dispatch/projection findings are now addressed on the current head, and publication closeout still awaits a fresh clean rerun plus `pack:smoke`, live proof, PR, and merge.
+- Date: 2026-03-21
