@@ -987,8 +987,8 @@ function assessProviderTrackedIssueEligibility(
   const isActiveState = (normalizedState !== null && ACTIVE_PROVIDER_ISSUE_STATES.has(normalizedState)) || isStartedState;
 
   if (
-    !normalizedState ||
-    TERMINAL_PROVIDER_ISSUE_STATES.has(normalizedState) ||
+    (normalizedState === null && !isStartedState) ||
+    (normalizedState !== null && TERMINAL_PROVIDER_ISSUE_STATES.has(normalizedState)) ||
     (normalizedStateType !== null && TERMINAL_PROVIDER_ISSUE_STATE_TYPES.has(normalizedStateType)) ||
     !isActiveState
   ) {

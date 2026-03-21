@@ -1,8 +1,8 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { spawn } from 'node:child_process';
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readdir, readFile, realpath, stat } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 
 import {
@@ -383,8 +383,15 @@ async function resolveProviderResumeLaunchSpec(
   env: EnvironmentPaths,
   runId: string
 ): Promise<ProviderLaunchSpec> {
-  const { manifest } = await loadManifest(env, runId);
-  const resumeTaskId = resolveProviderResumeTaskId(manifest as unknown as Record<string, unknown>, runId);
+  const { manifest, paths } = await loadManifest(env, runId);
+  const resumeTaskId = await resolveProviderResumeTaskId(
+    manifest as unknown as Record<string, unknown>,
+    runId,
+    {
+      runDir: paths.runDir,
+      runsRoot: env.runsRoot
+    }
+  );
   const workspacePath = await resolveProviderResumeWorkspacePath(
     env.repoRoot,
     resumeTaskId,
@@ -431,11 +438,13 @@ function beginProviderIssueHandoffStartupRefresh(
   refreshProviderIssueHandoff?: (() => Promise<void>) | null
 ): Promise<void> {
   const refreshPromise = refreshProviderIssueHandoff
-    ? refreshProviderIssueHandoff().catch((error) => {
-        logger.warn(
-          `Provider issue startup refresh failed: ${(error as Error)?.message ?? String(error)}`
-        );
-      })
+    ? Promise.resolve()
+        .then(() => refreshProviderIssueHandoff())
+        .catch((error) => {
+          logger.warn(
+            `Provider issue startup refresh failed: ${(error as Error)?.message ?? String(error)}`
+          );
+        })
     : refreshProviderIssueHandoffOnStartup(providerIssueHandoff);
   return refreshPromise.finally(() => {
     onSettled?.();
@@ -499,20 +508,62 @@ function readManifestString(manifest: Record<string, unknown>, field: string): s
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function resolveProviderResumeTaskId(
+async function resolveProviderResumeTaskId(
   manifest: Record<string, unknown>,
-  runId: string
-): string {
+  runId: string,
+  pathMetadata?: { runDir: string; runsRoot: string }
+): Promise<string> {
   const manifestTaskId = readManifestString(manifest, 'task_id');
-  if (!manifestTaskId) {
-    return normalizeTaskId(runId);
+  const taskIdCandidate =
+    manifestTaskId ??
+    (pathMetadata
+      ? await deriveProviderResumeTaskIdFromRunDir(pathMetadata.runDir, pathMetadata.runsRoot)
+      : null);
+  if (!taskIdCandidate) {
+    throw new Error(`Unable to derive provider resume manifest task_id for run ${runId}.`);
   }
   try {
-    return normalizeTaskId(manifestTaskId);
+    return normalizeTaskId(taskIdCandidate);
   } catch (error) {
     throw new Error(
       `Invalid provider resume manifest task_id for run ${runId}: ${(error as Error)?.message ?? String(error)}`
     );
+  }
+}
+
+async function deriveProviderResumeTaskIdFromRunDir(
+  runDir: string,
+  runsRoot: string
+): Promise<string | null> {
+  const [resolvedRunDir, resolvedRunsRoot] = await Promise.all([
+    canonicalizePath(runDir),
+    canonicalizePath(runsRoot)
+  ]);
+  const relativeRunDir = relative(resolvedRunsRoot, resolvedRunDir);
+  if (
+    !relativeRunDir ||
+    relativeRunDir === '..' ||
+    relativeRunDir.startsWith(`..${sep}`) ||
+    isAbsolute(relativeRunDir)
+  ) {
+    return null;
+  }
+
+  const segments = relativeRunDir.split(sep).filter((segment) => segment.length > 0);
+  if (segments.length === 3 && segments[1] === 'cli') {
+    return segments[0] ?? null;
+  }
+  if (segments.length === 2) {
+    return segments[0] ?? null;
+  }
+  return null;
+}
+
+async function canonicalizePath(pathname: string): Promise<string> {
+  try {
+    return await realpath(pathname);
+  } catch {
+    return resolve(pathname);
   }
 }
 

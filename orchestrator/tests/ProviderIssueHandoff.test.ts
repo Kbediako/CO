@@ -304,6 +304,53 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('accepts started issues when the provider state name is missing', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: null,
+        state_type: 'started'
+      }),
+      deliveryId: 'delivery-started-null-state',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_021_000
+    });
+
+    expect(result.kind).toBe('start');
+    expect(launcher.start).toHaveBeenCalledWith({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:00:00.000Z',
+      launchToken: expect.any(String)
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      issue_state: null,
+      issue_state_type: 'started'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('captures the started run identity immediately while keeping the handoff inflight until rehydrate confirms activity', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

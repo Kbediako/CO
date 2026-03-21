@@ -3,7 +3,7 @@
 ## Added by Bootstrap 2026-03-20
 
 ## Summary
-- Problem Statement: `1311` is an in-progress hardening lane, not a truthful parity closeout. The current branch has now landed the bounded provider/workspace/eligibility/test-teardown tranche, the March 21 review-follow-up tranche, the same-tick manifest-persister force-preempt fix, and the released-claim cancel-retry follow-up for skipped provider refreshes through per-manifest deduped background retry, but full Symphony parity is still not closed against `/Users/kbediako/Code/symphony/SPEC.md` and the current Elixir reference.
+- Problem Statement: `1311` is an in-progress hardening lane, not a truthful parity closeout. The current branch has now landed the bounded provider/workspace/eligibility/test-teardown tranche, the March 21 review-follow-up tranche, the same-tick manifest-persister force-preempt fix, the released-claim cancel-retry follow-up for skipped provider refreshes through per-manifest deduped background retry, and the latest post-review hardening for missing-state started issues plus legacy resume task recovery, but full Symphony parity is still not closed against `/Users/kbediako/Code/symphony/SPEC.md` and the current Elixir reference.
 - Desired Outcome: Keep the packet aligned to verified branch truth: provider control-host continuation/retry handoff for active issues is materially covered, issue eligibility and provider-managed terminal workspace cleanup are hardened, explicit refreshes no longer drop behind startup `rehydrate()`, selected-run workspace fallback stays truthful under overridden runs roots, forced manifest writes no longer wait behind a same-tick scheduled persist, and the remaining real blockers stay explicit.
 
 ## User Request Translation (Context Anchor)
@@ -12,9 +12,10 @@
   - landed fixes are recorded explicitly: deterministic workspace recreation plus prune; legacy resume deterministic workspace fallback; resume workspace-root confinement validation; startup immediate refresh; queued/null release fail-closed behavior; released-claim stability on rehydrate; released-claim cancel retry during skipped provider refresh; selected child-manifest UI metadata truthfulness; compatibility `session_id` null handling
   - landed fixes now also include active-issue eligibility for `Todo` plus Linear `state_type=started` issues, a Todo blocker rule that uses Linear blocker `state.type` when present (falling back to blocker state names), and terminal-only cleanup for provider-managed `.workspaces/<taskId>` on release/startup replay
   - landed fixes now also include queued follow-up refresh for authenticated/manual refresh requests that arrive during in-flight provider handoff work, selected-run workspace fallback for child CLI manifests under repo-local and external overridden runs roots, and real repo-root provider workspace cleanup when `CODEX_ORCHESTRATOR_RUNS_DIR` is outside the repository
+  - landed fixes now also include started-issue eligibility when the provider leaves `state=null` but still reports `state_type=started`, legacy provider resume fallback that recovers the task id from the resolved run path when manifest `task_id` is missing, and startup refresh wrapping that keeps sync-throwing injected callbacks on the catch/finally path
   - provider control-host continuation/retry handoff for active issues is described as materially covered, but full parity remains open
   - remaining blockers stay explicit: live observability is not yet an authoritative runtime snapshot for turn/retry/token/rate-limit counters, and active-issue continuation after a normal success still starts a fresh child run instead of continuing the same session
-  - validation is described truthfully: `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs` passed with `5` subagent manifests found; `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`; `npm run build`, `npm run lint`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed; the focused release-cancel retry regression pack passed `4/4` files and `61/61` tests; the persister fast-path regression pack passed `2/2` files and `16/16` tests; a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`; and local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2019/2019` tests in `199.49s`
+  - validation is described truthfully: `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs` passed with `5` subagent manifests found; `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`; `npm run build` and `npm run lint` passed; the current post-review focused hardening pack passed `3/3` files and `59/59` tests across `ProviderIssueHandoff`, `ProviderIssueHandoffRefreshSerialization`, and `ControlHostCliShell`; the persister fast-path regression pack passed `2/2` files and `16/16` tests; a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`; and local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2022/2022` tests in `199.04s`
 - Constraints / non-goals:
   - do not claim full hardened parity closed on this branch
   - do not treat focused validation passes as equivalent to a terminal-green full suite
@@ -54,7 +55,9 @@
   - queued/null release fail-closed behavior is landed
   - released-claim stability on rehydrate is landed
   - released claims retry child cancellation during skipped provider refresh without reopening overlapping refresh/cancel cycles
-  - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, with a Todo blocker rule that prefers Linear blocker `state.type` over display-name matching
+  - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, including the `state=null` edge when the provider still marks the issue as `started`, with a Todo blocker rule that prefers Linear blocker `state.type` over display-name matching
+  - legacy resume fallback now recovers the deterministic workspace task from the resolved run path when manifest `task_id` is absent
+  - injected startup refresh callbacks stay on the catch/finally path even if they throw synchronously
   - terminal-only cleanup for provider-managed `.workspaces/<taskId>` is landed on release/startup replay
   - explicit refreshes now queue one follow-up pass instead of being dropped behind an in-flight `refresh()` or `rehydrate()`
   - selected-run workspace fallback remains truthful under repo-local and external overridden runs roots
@@ -80,11 +83,11 @@
 - `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`.
 - `npm run build` passed.
 - `npm run lint` passed.
-- The focused release-cancel retry regression pack passed `4/4` files and `61/61` tests.
+- The current post-review focused hardening pack passed `3/3` files and `59/59` tests across `orchestrator/tests/ProviderIssueHandoff.test.ts`, `orchestrator/tests/ProviderIssueHandoffRefreshSerialization.test.ts`, and `orchestrator/tests/ControlHostCliShell.test.ts`.
 - The persister fast-path regression pack passed `2/2` files and `16/16` tests.
 - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` all passed on the current head.
 - A trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms` after the persister fix.
-- Local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2019/2019` tests in `199.49s`.
+- Local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2022/2022` tests in `199.04s`.
 
 ## Approvals
 - Product: Self-approved to keep the `1311` packet truthful to the current branch.

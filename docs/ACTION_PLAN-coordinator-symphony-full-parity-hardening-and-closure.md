@@ -13,13 +13,13 @@
 ## Milestones & Sequencing
 1. Landed on the current branch
    - deterministic workspace recreation plus prune
-   - legacy resume deterministic workspace fallback
+   - legacy resume deterministic workspace fallback, including task recovery from the resolved run path when manifest `task_id` is missing
    - resume workspace-root confinement validation
-   - startup immediate refresh
+   - startup immediate refresh, including sync-throw-safe injected refresh wrapping
    - queued/null release fail-closed behavior
    - released-claim stability on rehydrate
    - released-claim cancel retry during skipped provider refresh without reopening overlapping refresh/cancel cycles
-   - issue eligibility widened to `Todo` plus custom Linear `state_type=started` active states, with a Todo blocker rule that prefers Linear blocker `state.type`
+   - issue eligibility widened to `Todo` plus custom Linear `state_type=started` active states, including the missing-state started edge, with a Todo blocker rule that prefers Linear blocker `state.type`
    - terminal-only cleanup for provider-managed `.workspaces/<taskId>` on release/startup replay
    - explicit authenticated/manual refreshes queue one follow-up pass during in-flight provider handoff work
    - selected-run workspace fallback remains truthful under repo-local and external overridden runs roots
@@ -35,11 +35,11 @@
    - `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`
    - `npm run build` passed
    - `npm run lint` passed
-   - the focused release-cancel retry regression pack passed `4/4` files and `61/61` tests
+   - the current post-review focused hardening pack passed `3/3` files and `59/59` tests
    - the persister fast-path regression pack passed `2/2` files and `16/16` tests
    - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed
    - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-   - local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2019/2019` tests in `199.49s`
+   - local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2022/2022` tests in `199.04s`
 4. Closeout rule
    - do not claim full hardened parity closed until the remaining blockers are resolved, even though the local suite is terminal green
 
@@ -53,10 +53,10 @@
 ## Validation
 - Verified checks to keep quoted consistently:
   - `npm run build`
-  - the focused release-cancel retry regression pack: `4/4` files and `61/61` tests
+  - the current post-review focused hardening pack: `3/3` files and `59/59` tests
   - the persister fast-path regression pack: `2/2` files and `16/16` tests
   - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke`
-  - full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test`: `283/283` files and `2019/2019` tests
+  - full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test`: `283/283` files and `2022/2022` tests
 
 ## Risks & Mitigations
 - Risk: stale docs reintroduce an optimistic parity-closeout claim.

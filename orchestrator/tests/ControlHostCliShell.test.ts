@@ -280,6 +280,37 @@ describe('controlHostCliShell manifest discovery', () => {
     });
   });
 
+  it('derives legacy provider resume task ids from the resolved run path when manifest task_id is absent', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    await initializeRepo(tempRoot);
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const legacyRunDir = join(env.runsRoot, 'linear-lin-issue-1', 'run-child');
+    await mkdir(legacyRunDir, { recursive: true });
+    await writeFile(
+      join(legacyRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'run-child'
+      }),
+      'utf8'
+    );
+
+    const spec = await resolveProviderResumeLaunchSpec(env, 'run-child');
+
+    expect(spec).toEqual({
+      cwd: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
+      envOverrides: {
+        CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
+        CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
+        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+      }
+    });
+  });
+
   it('ignores manifest workspace paths outside the deterministic provider workspace root on resume', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
     await initializeRepo(tempRoot);
@@ -408,5 +439,19 @@ describe('controlHostCliShell startup refresh', () => {
 
     await expect(refreshProviderIssueHandoffOnStartup(providerIssueHandoff)).resolves.toBeUndefined();
     expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps injected startup refresh callbacks on the catch/finally path when they throw synchronously', async () => {
+    const publish = vi.fn();
+    const refreshProviderIssueHandoff = vi.fn(() => {
+      throw new Error('sync refresh failure');
+    });
+
+    await expect(
+      beginProviderIssueHandoffStartupRefresh(undefined, publish, refreshProviderIssueHandoff)
+    ).resolves.toBeUndefined();
+
+    expect(refreshProviderIssueHandoff).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
   });
 });

@@ -28,7 +28,9 @@ last_review: 2026-03-21
   - released-claim stability on rehydrate
   - released-claim cancel retry during skipped provider refresh without reopening overlapping refresh/cancel cycles
   - explicit authenticated/manual refresh requests now queue one follow-up pass instead of being dropped behind in-flight provider handoff work
-  - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names
+  - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, including the `state=null` started edge, with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names
+  - legacy provider resume fallback now derives the task id from the resolved run path when manifest `task_id` is absent
+  - injected startup refresh callbacks stay on the catch/finally path even if they throw synchronously
   - terminal-only cleanup for provider-managed `.workspaces/<taskId>` is present on release/startup replay
   - provider workspace cleanup now resolves against the real repo root when `CODEX_ORCHESTRATOR_RUNS_DIR` lives outside the repository
   - forced manifest writes now preempt same-tick scheduled persister waits instead of inheriting the full heartbeat interval
@@ -45,7 +47,9 @@ last_review: 2026-03-21
 - Landed/maintained requirements:
   - workspace recreation and pruning must stay deterministic across provider starts and resume paths
   - legacy resume paths must recover the deterministic workspace rather than silently drifting to the shared repo root
+  - legacy resume fallback must recover task identity from the resolved run path when manifest metadata is incomplete
   - resume/startup flows must validate workspace-root confinement before launching child work
+  - startup refresh wrappers must preserve `onSettled()` even when an injected callback throws before returning a promise
   - startup refresh must run immediately enough to reconcile provider state without waiting for a later poll
   - explicit refresh requests during in-flight startup/rehydrate work must queue one follow-up refresh without reopening overlap between provider handoff operations
   - queued/null release handling must fail closed, and released claims must remain stable across rehydrate
@@ -82,11 +86,11 @@ last_review: 2026-03-21
   - `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`
   - `npm run build` passed
   - `npm run lint` passed
-  - the focused release-cancel retry regression pack passed `4/4` files and `61/61` tests
+  - the current post-review focused hardening pack passed `3/3` files and `59/59` tests across `ProviderIssueHandoff`, `ProviderIssueHandoffRefreshSerialization`, and `ControlHostCliShell`
   - the persister fast-path regression pack passed `2/2` files and `16/16` tests
   - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed
   - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-  - local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2019/2019` tests in `199.49s`; the earlier quiet tail reflected long late suites (`tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts`), not a persister deadlock
+  - local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2022/2022` tests in `199.04s`; the earlier quiet tail still reflects long late suites (`tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts`), not a persister deadlock
 - Closure gate:
   - do not claim parity closeout until the remaining blockers are resolved, even though the local suite is now terminal green again
 
