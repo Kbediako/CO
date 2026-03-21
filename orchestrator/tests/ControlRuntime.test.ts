@@ -1505,6 +1505,8 @@ describe('ControlRuntime', () => {
       manifest: {
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'run-1',
         status: 'in_progress',
         summary: 'child run is active'
       }

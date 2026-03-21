@@ -109,18 +109,26 @@ async function flushAsyncWork(turns = 8): Promise<void> {
   }
 }
 
-async function waitForMockCalls(
-  mockFn: { mock: { calls: unknown[][] } },
-  expectedCalls = 1,
-  turns = 32
+async function waitForCondition(
+  predicate: () => boolean,
+  turns = 256
 ): Promise<void> {
   for (let index = 0; index < turns; index += 1) {
-    if (mockFn.mock.calls.length >= expectedCalls) {
+    if (predicate()) {
       return;
     }
     await vi.advanceTimersByTimeAsync(0);
     await flushAsyncWork();
   }
+  throw new Error(`Condition not met after ${turns} timer turns.`);
+}
+
+async function waitForMockCalls(
+  mockFn: { mock: { calls: unknown[][] } },
+  expectedCalls = 1,
+  turns = 256
+): Promise<void> {
+  await waitForCondition(() => mockFn.mock.calls.length >= expectedCalls, turns);
 }
 
 describe('createProviderIssueHandoffService', () => {
@@ -961,10 +969,9 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await vi.advanceTimersByTimeAsync(1_001);
-    for (let index = 0; index < 8; index += 1) {
-      await vi.advanceTimersByTimeAsync(0);
-      await flushAsyncWork();
-    }
+    await waitForCondition(
+      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing'
+    );
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -1036,10 +1043,9 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await vi.advanceTimersByTimeAsync(1_001);
-    for (let index = 0; index < 8; index += 1) {
-      await vi.advanceTimersByTimeAsync(0);
-      await flushAsyncWork();
-    }
+    await waitForCondition(
+      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing'
+    );
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
