@@ -2113,29 +2113,31 @@ describe('createProviderIssueHandoffService', () => {
 
     try {
       await service.refresh();
+
+      await vi.waitFor(() => {
+        expect(endpoint.actions).toEqual([
+          expect.objectContaining({
+            action: 'cancel',
+            reason: 'provider_issue_released:not_active'
+          })
+        ]);
+      });
+      expect(queuedEndpoint.actions).toEqual([]);
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        run_id: 'run-child',
+        run_manifest_path: childPaths.manifestPath
+      });
+      await expect(access(workspacePath)).resolves.toBeUndefined();
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
     } finally {
       await endpoint.close();
       await queuedEndpoint.close();
     }
-
-    expect(endpoint.actions).toEqual([
-      expect.objectContaining({
-        action: 'cancel',
-        reason: 'provider_issue_released:not_active'
-      })
-    ]);
-    expect(queuedEndpoint.actions).toEqual([]);
-    expect(state.claims[0]).toMatchObject({
-      state: 'released',
-      reason: 'provider_issue_released:not_active',
-      issue_state: 'Done',
-      issue_state_type: 'completed',
-      run_id: 'run-child',
-      run_manifest_path: childPaths.manifestPath
-    });
-    await expect(access(workspacePath)).resolves.toBeUndefined();
-    expect(launcher.start).not.toHaveBeenCalled();
-    expect(launcher.resume).not.toHaveBeenCalled();
   });
 
   it('releases inactive issues on refresh and cancels a queued child run before it becomes active', async () => {
@@ -2221,16 +2223,18 @@ describe('createProviderIssueHandoffService', () => {
 
     try {
       await service.refresh();
+      await vi.waitFor(() => {
+        expect(endpoint.actions).toEqual([
+          expect.objectContaining({
+            action: 'cancel',
+            reason: 'provider_issue_released:not_active'
+          })
+        ]);
+      });
     } finally {
       await endpoint.close();
     }
 
-    expect(endpoint.actions).toEqual([
-      expect.objectContaining({
-        action: 'cancel',
-        reason: 'provider_issue_released:not_active'
-      })
-    ]);
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',

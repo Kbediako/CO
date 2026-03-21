@@ -118,6 +118,14 @@ export function createProviderIssueHandoffService(
   const startPipelineId = options.startPipelineId ?? 'diagnostics';
   const allowedRunRoots = [resolve(options.paths.runDir, '..', '..', '..')];
   const repoRoot = resolve(options.paths.repoRoot);
+  const releaseCancelInFlight = new Map<
+    string,
+    {
+      attempt: Promise<boolean>;
+      retryRequested: boolean;
+      retryConsumed: boolean;
+    }
+  >();
 
   const launchResumeForRun = async (input: {
     claim: ProviderIntakeClaimRecord;
@@ -291,22 +299,69 @@ export function createProviderIssueHandoffService(
     if (transitioned) {
       options.publishRuntime?.('provider-intake.refresh');
     }
-    if (shouldAttemptReleaseCancel(input.releaseRun) && input.releaseRun?.manifestPath) {
+    await retryReleaseCancel({
+      releaseRun: input.releaseRun,
+      reason: input.nextReason
+    });
+  };
+
+  const hasPendingReleaseCancel = (manifestPath: string | null | undefined): boolean =>
+    Boolean(manifestPath && releaseCancelInFlight.has(manifestPath));
+
+  const retryReleaseCancel = async (input: {
+    releaseRun: ProviderIssueRunRecord | null;
+    reason: string;
+  }): Promise<void> => {
+    const manifestPath = input.releaseRun?.manifestPath ?? null;
+    if (!shouldAttemptReleaseCancel(input.releaseRun) || !manifestPath) {
+      return;
+    }
+    const existingAttempt = releaseCancelInFlight.get(manifestPath);
+    if (existingAttempt) {
+      if (!existingAttempt.retryConsumed) {
+        existingAttempt.retryRequested = true;
+      }
+      await existingAttempt.attempt;
+      return;
+    }
+    const performCancelAttempt = async (): Promise<boolean> => {
       try {
         await callChildControlEndpoint({
-          manifestPath: input.releaseRun.manifestPath,
+          manifestPath,
           payload: {
             action: 'cancel',
             requested_by: 'control-host',
-            reason: input.nextReason
+            reason: input.reason
           },
           allowedRunRoots
         });
+        return true;
       } catch {
         // Keep the claim released and let the next rehydrate/refresh retry cancellation
         // while the child run drains.
+        return false;
       }
-    }
+    };
+    const cancelState = {
+      retryRequested: false,
+      retryConsumed: false,
+      attempt: Promise.resolve(false)
+    };
+    cancelState.attempt = (async (): Promise<boolean> => {
+      let delivered = await performCancelAttempt();
+      while (!delivered && cancelState.retryRequested && !cancelState.retryConsumed) {
+        cancelState.retryRequested = false;
+        cancelState.retryConsumed = true;
+        delivered = await performCancelAttempt();
+      }
+      return delivered;
+    })().finally(() => {
+      if (releaseCancelInFlight.get(manifestPath) === cancelState) {
+        releaseCancelInFlight.delete(manifestPath);
+      }
+    });
+    releaseCancelInFlight.set(manifestPath, cancelState);
+    await cancelState.attempt;
   };
 
   const rehydrateNow = async (): Promise<{ hasPendingClaims: boolean }> => {
@@ -576,6 +631,8 @@ export function createProviderIssueHandoffService(
         issueId: input.trackedIssue.id
       });
       const latestExisting = readProviderIntakeClaim(options.state, providerKey);
+      const releasedRun =
+        latestExisting?.state === 'released' ? resolveProviderReleaseRun(latestExisting, discoveredRuns) : null;
       const latestClaimBase = {
         ...claimBase,
         accepted_at: latestExisting?.accepted_at ?? claimBase.accepted_at
@@ -613,6 +670,19 @@ export function createProviderIssueHandoffService(
 
       const latestRun = discoveredRuns[0] ?? null;
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+        if (hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)) {
+          const claim = upsertProviderIntakeClaim(options.state, {
+            ...latestClaimBase,
+            task_id: latestRun.taskId,
+            mapping_source: latestExisting?.mapping_source ?? mappingSource,
+            state: latestExisting?.state ?? 'ignored',
+            reason: latestExisting?.reason ?? 'provider_issue_release_cancel_inflight',
+            run_id: latestRun.runId,
+            run_manifest_path: latestRun.manifestPath,
+          });
+          await options.persist();
+          return { kind: 'ignored', reason: 'provider_issue_release_cancel_inflight', claim };
+        }
         const launchToken = createProviderLaunchToken();
         const inflightClaim = upsertProviderIntakeClaim(options.state, {
           ...latestClaimBase,
@@ -779,6 +849,12 @@ export function createProviderIssueHandoffService(
           });
 
           if (resolution.kind === 'skip') {
+            if (claim.state === 'released') {
+              void retryReleaseCancel({
+                releaseRun,
+                reason: claim.reason ?? 'provider_issue_released'
+              });
+            }
             continue;
           }
           if (resolution.kind === 'release') {
@@ -812,6 +888,9 @@ export function createProviderIssueHandoffService(
           // Once a child run reaches a terminal state, an unchanged active issue remains
           // eligible for another session until provider state leaves the active set.
           if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
+            if (hasPendingReleaseCancel(releaseRun?.manifestPath ?? latestRun.manifestPath)) {
+              continue;
+            }
             await launchResumeForRun({
               claim,
               trackedIssue: resolution.trackedIssue,

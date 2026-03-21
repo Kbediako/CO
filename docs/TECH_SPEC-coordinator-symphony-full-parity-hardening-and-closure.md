@@ -26,6 +26,7 @@ last_review: 2026-03-21
   - startup immediate refresh
   - queued/null release fail-closed behavior
   - released-claim stability on rehydrate
+  - released-claim cancel retry during skipped provider refresh without reopening overlapping refresh/cancel cycles
   - explicit authenticated/manual refresh requests now queue one follow-up pass instead of being dropped behind in-flight provider handoff work
   - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names
   - terminal-only cleanup for provider-managed `.workspaces/<taskId>` is present on release/startup replay
@@ -78,13 +79,14 @@ last_review: 2026-03-21
 ## Validation Plan
 - Current verified checks:
   - `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs` passed (`5` subagent manifests found)
-  - `node scripts/spec-guard.mjs --dry-run` passed
+  - `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`
   - `npm run build` passed
   - `npm run lint` passed
-  - the March 21 review-fix regression pack passed `5/5` files and `70/70` tests
+  - the focused release-cancel retry regression pack passed `4/4` files and `61/61` tests
   - the persister fast-path regression pack passed `2/2` files and `16/16` tests
+  - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed
   - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-  - local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `282/282` files and `2014/2014` tests in `204.37s`; the earlier quiet tail reflected long late suites (`tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts`), not a persister deadlock
+  - local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal again at `283/283` files and `2019/2019` tests in `199.49s`; the earlier quiet tail reflected long late suites (`tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts`), not a persister deadlock
 - Closure gate:
   - do not claim parity closeout until the remaining blockers are resolved, even though the local suite is now terminal green again
 
@@ -93,5 +95,5 @@ last_review: 2026-03-21
 - Whether same-session continuation should be implemented inside the provider/control-host architecture, or moved into a dedicated follow-on session-owner lane.
 
 ## Approvals
-- Reviewer: Codex (top-level orchestrator)
+- Reviewer: Codex (top-level orchestrator; internal docs/state review only, not a claim that PR #282 is already externally approved)
 - Date: 2026-03-21
