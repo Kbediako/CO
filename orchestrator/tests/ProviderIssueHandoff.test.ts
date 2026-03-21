@@ -4414,6 +4414,7 @@ describe('createProviderIssueHandoffService', () => {
       })),
       resume: vi.fn(async () => undefined)
     };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     const service = createProviderIssueHandoffService({
       paths,
@@ -4430,6 +4431,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
 
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(launcher.start).not.toHaveBeenCalled();
