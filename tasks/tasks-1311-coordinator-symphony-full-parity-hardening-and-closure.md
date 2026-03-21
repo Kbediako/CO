@@ -11,6 +11,7 @@
 - [x] ACTION_PLAN updated to separate the landed tranche from the still-open parity blockers. Evidence: `docs/ACTION_PLAN-coordinator-symphony-full-parity-hardening-and-closure.md`.
 - [x] `docs/TASKS.md` updated with the truthful `1311` in-progress snapshot. Evidence: `docs/TASKS.md`.
 - [x] Checklist mirrored to `.agent/task/1311-coordinator-symphony-full-parity-hardening-and-closure.md`. Evidence: `.agent/task/1311-coordinator-symphony-full-parity-hardening-and-closure.md`.
+- [x] Pre-implementation task/spec review approval is recorded against user intent. Evidence: `tasks/specs/1311-coordinator-symphony-full-parity-hardening-and-closure.md` review note dated `2026-03-20`.
 
 ## Implementation
 - [x] Deterministic workspace recreation plus prune, legacy resume deterministic workspace fallback including missing-`task_id` task recovery from the resolved run path, and resume workspace-root confinement validation landed. Evidence: `orchestrator/src/cli/run/workspacePath.ts`, `orchestrator/src/cli/controlHostCliShell.ts`, `orchestrator/src/cli/run/manifest.ts`, `orchestrator/tests/WorkspacePath.test.ts`, `orchestrator/tests/ControlHostCliShell.test.ts`, `orchestrator/tests/Manifest.test.ts`.
@@ -23,6 +24,7 @@
 - [ ] Same-session continuation matches the upstream long-lived session model after a normal successful turn.
 
 ## Validation
+- [x] Docs-review manifest recorded for checklist traceability. Evidence: `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T10-25-11-174Z-514b632e/manifest.json`.
 - [x] `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs`. Evidence: passed with `5` subagent manifests found.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: exited successfully on the current March 21 head but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`.
 - [x] `npm run build`. Evidence: passed on the current branch.
@@ -31,5 +33,6 @@
 - [x] Persister fast-path regression pack. Evidence: `2/2` files and `16/16` tests passed; trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`.
 - [x] Released-claim cancel retry stays deduped across skipped refreshes and can issue one follow-up retry after a failed in-flight cancel without blocking refresh completion. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/tests/ProviderIssueHandoffRefreshSerialization.test.ts`.
 - [x] `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke`. Evidence: all passed on the current March 21 head; diff-budget accepted the explicit override on the current task-scoped diff.
-- [ ] Local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal on the current March 21 head. Evidence: the latest reruns reached the post-`tests/cli-frontend-test.spec.ts` quiet tail without a terminal summary on this head, so current-head full-suite totals are not claimed.
-- [ ] Terminal-green review/closeout evidence for `1311`. Evidence: the latest uncommitted `npm run review` rerun wrote `output.log` plus `telemetry.json` under `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/review/` but terminated on the startup-anchor boundary after pre-anchor `codex-skills` and `codex-memories` reads, without surfacing a concrete finding; closeout remains blocked on a pushed-head GitHub rerun plus unresolved actionable PR threads reaching zero.
+- [x] Local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal on the current March 21 head. Evidence: `Test Files 283 passed (283)`, `Tests 2044 passed (2044)`, `Duration 206.73s`.
+- [x] Local `npm run review -- --manifest .runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/manifest.json` reached a clean terminal result on the current head. Evidence: `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/review/output.log` plus `telemetry.json`, verdict: no concrete correctness regression in the diff-scoped changes.
+- [ ] GitHub PR closeout evidence for the pushed head. Evidence: after commit `af444e98f3faf0ae09007fad8fe95be206e36744`, PR `#282` is still awaiting current-head check completion and the remaining unresolved actionable PR threads reaching zero.

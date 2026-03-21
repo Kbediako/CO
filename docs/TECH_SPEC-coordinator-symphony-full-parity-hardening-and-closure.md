@@ -14,7 +14,7 @@ last_review: 2026-03-21
 - Objective: Keep `1311` truthful to the current branch state. The hardening tranche below is landed, but full Symphony parity is still not closed.
 - Scope: record the landed workspace/lifecycle/UI/compatibility fixes, keep the remaining blockers explicit, and describe validation without overstating parity closure.
 - Constraints:
-  - parity claims are governed by `/Users/kbediako/Code/symphony/SPEC.md` when the Elixir tree drifts
+  - parity claims are governed by `Symphony SPEC.md` when the Elixir tree drifts
   - tracker writes remain outside the core blocker set
   - full parity cannot be claimed while the remaining blockers are still present
 
@@ -91,15 +91,15 @@ last_review: 2026-03-21
   - the persister fast-path regression pack passed `2/2` files and `16/16` tests
   - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed
   - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-  - the latest uncommitted `npm run review` terminated on the startup-anchor boundary after pre-anchor `codex-skills` and `codex-memories` reads without a concrete finding
-  - the latest local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` reruns reached the post-`tests/cli-frontend-test.spec.ts` quiet tail without a terminal summary on this head
+  - the latest local `npm run review -- --manifest .runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/manifest.json` reached a clean terminal result with no concrete correctness regression in the diff-scoped changes
+  - the latest local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green on this head at `283/283` files and `2044/2044` tests in `206.73s`
 - Closure gate:
-  - do not claim parity closeout until the remaining blockers are resolved, even though the local suite is now terminal green again
+  - do not claim parity closeout until the remaining blockers are resolved; the current head now has terminal local validation, but that evidence only closes this bounded slice and not the remaining architectural parity gaps
 
 ## Open Questions
 - Whether `1311` should add authoritative live counter capture directly, or explicitly defer those fields into a narrower follow-on without pretending parity is closed.
 - Whether same-session continuation should be implemented inside the provider/control-host architecture, or moved into a dedicated follow-on session-owner lane.
 
 ## Approvals
-- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the current startup-anchor review-tooling boundary rather than by a clean local rerun; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
+- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the clean 2026-03-21 local review rerun on the current head; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
 - Date: 2026-03-21

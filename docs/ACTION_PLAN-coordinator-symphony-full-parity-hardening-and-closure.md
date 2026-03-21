@@ -6,7 +6,7 @@
 - Goal: Keep the `1311` mirrors aligned to current branch truth after the bounded parity tranche, the March 21 review-fix tranche, and the manifest-persister fast-path hardening landed, and prevent optimistic parity-closeout wording.
 - Scope: document the landed hardening tranche, the remaining real blockers, and the exact validation posture.
 - Assumptions:
-  - `/Users/kbediako/Code/symphony/SPEC.md` remains the parity authority when upstream spec and Elixir behavior differ
+  - `Symphony SPEC.md` remains the parity authority when upstream spec and Elixir behavior differ
   - provider control-host continuation/retry handoff for active issues is materially covered on the current branch
   - full parity is still not closed
 
@@ -40,26 +40,27 @@
    - the persister fast-path regression pack passed `2/2` files and `16/16` tests
    - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed
    - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-   - the latest uncommitted `npm run review` terminated on the startup-anchor boundary after pre-anchor `codex-skills`/`codex-memories` reads without a concrete finding
-   - the latest local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` reruns reached the post-`tests/cli-frontend-test.spec.ts` quiet tail without a terminal summary on this head
+   - the latest local `npm run review -- --manifest .runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/manifest.json` reached a clean terminal result with no concrete correctness regression in the diff-scoped changes
+   - the latest local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green on this head at `283/283` files and `2044/2044` tests in `206.73s`
 4. Closeout rule
-   - do not claim full hardened parity closed until the remaining blockers are resolved, even though the local suite is terminal green
+   - do not claim full hardened parity closed until the remaining blockers are resolved, even though the current head now has terminal local validation and local review cleanly reran
 
 ## Dependencies
-- `/Users/kbediako/Code/symphony/SPEC.md`
-- `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`
-- `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/agent_runner.ex`
-- `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/workspace.ex`
+- `Symphony SPEC.md`
+- `elixir/lib/symphony_elixir/orchestrator.ex`
+- `elixir/lib/symphony_elixir/agent_runner.ex`
+- `elixir/lib/symphony_elixir/workspace.ex`
 - existing CO provider/control-host surfaces in `orchestrator/src/cli/control*`
 
 ## Validation
 - Verified checks to keep quoted consistently:
+  - docs-review manifest: `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T10-25-11-174Z-514b632e/manifest.json`
   - `npm run build`
   - the current detached-run hardening regression pack: `5/5` files and `72/72` tests
   - the persister fast-path regression pack: `2/2` files and `16/16` tests
   - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke`
-  - the latest uncommitted `npm run review` startup-anchor termination with no concrete finding
-  - the latest local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` quiet-tail recurrence after `tests/cli-frontend-test.spec.ts`, without a terminal summary on this head
+  - the latest local `npm run review -- --manifest .runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/manifest.json` terminal clean verdict
+  - the latest local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test`: `283/283` files and `2044/2044` tests in `206.73s`
 
 ## Risks & Mitigations
 - Risk: stale docs reintroduce an optimistic parity-closeout claim.
@@ -72,5 +73,5 @@
   - Mitigation: keep the continuation wording narrow and tie closure to upstream-faithful same-session ownership.
 
 ## Approvals
-- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the successful 2026-03-21 uncommitted review rerun; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
+- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the successful 2026-03-21 local review rerun on the current head; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
 - Date: 2026-03-21

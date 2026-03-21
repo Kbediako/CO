@@ -1391,7 +1391,15 @@ function resolveProviderReleaseRun(
   if (matchedIdentityRun) {
     return matchedIdentityRun;
   }
+  const syntheticDetachedReleaseRunId =
+    !claim.run_manifest_path &&
+    claim.run_id === claim.task_id &&
+    (
+      claim.state === 'handoff_failed' ||
+      claim.state === 'released'
+    );
   if (
+    !syntheticDetachedReleaseRunId &&
     (claim.run_id || claim.run_manifest_path) &&
     (
       claim.state === 'handoff_failed' ||

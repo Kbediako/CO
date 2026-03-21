@@ -3109,6 +3109,108 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('reattaches a released claim after upgrading a manifest-only starting claim that synthesized run_id from task_id', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'linear-lin-issue-1';
+    const acceptedAt = new Date(Date.now() - 1_500).toISOString();
+    const launchStartedAt = new Date(Date.now() - 1_000).toISOString();
+    const issueUpdatedAt = new Date(Date.now() - 500).toISOString();
+    const childStartedAt = new Date(Date.parse(launchStartedAt) + 1).toISOString();
+    const childUpdatedAt = new Date(Date.parse(childStartedAt) + 1_000).toISOString();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-upgraded-release');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: issueUpdatedAt,
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: acceptedAt,
+      updated_at: launchStartedAt,
+      last_delivery_id: 'delivery-manifest-only-starting',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: null,
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'manifest-only-starting-token',
+      launch_started_at: launchStartedAt
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: async () => ({
+        kind: 'release',
+        reason: 'not_active'
+      })
+    });
+
+    await service.refresh();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      task_id: taskId,
+      run_id: taskId,
+      run_manifest_path: childPaths.manifestPath
+    });
+
+    state.claims[0] = {
+      ...state.claims[0],
+      run_manifest_path: null
+    };
+
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-upgraded-release',
+        task_id: taskId,
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: issueUpdatedAt,
+        started_at: childStartedAt,
+        updated_at: childUpdatedAt
+      }),
+      'utf8'
+    );
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      task_id: taskId,
+      run_id: 'run-upgraded-release',
+      run_manifest_path: childPaths.manifestPath,
+      launch_started_at: launchStartedAt
+    });
+  });
+
   it('reattaches a handoff_failed claim to its persisted run_id when a resumed child loses only the manifest path', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
