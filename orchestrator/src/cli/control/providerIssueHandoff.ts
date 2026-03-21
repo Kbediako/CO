@@ -988,6 +988,18 @@ export function createProviderIssueHandoffService(
             continue;
           }
 
+          if (
+            claim.state === 'released' &&
+            shouldAttemptReleaseCancel(releaseRun) &&
+            releaseRun?.status !== null
+          ) {
+            void retryReleaseCancel({
+              releaseRun,
+              reason: claim.reason ?? 'provider_issue_released'
+            });
+            continue;
+          }
+
           if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
             continue;
           }

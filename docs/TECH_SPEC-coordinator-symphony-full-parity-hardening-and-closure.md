@@ -27,6 +27,7 @@ last_review: 2026-03-21
   - queued/null release fail-closed behavior
   - released-claim stability on rehydrate
   - released-claim cancel retry during skipped provider refresh without reopening overlapping refresh/cancel cycles
+  - released claims now also retry queued or active child cancellation on a later ready refresh after transient cancel failure instead of stopping at the early return before the fallback resume/start path
   - explicit authenticated/manual refresh requests now queue one follow-up pass instead of being dropped behind in-flight provider handoff work
   - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, including the `state=null` started edge, with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names
   - legacy provider resume fallback now derives the task id from the resolved run path when manifest `task_id` is absent
@@ -35,6 +36,7 @@ last_review: 2026-03-21
   - provider workspace cleanup now resolves against the real repo root when `CODEX_ORCHESTRATOR_RUNS_DIR` lives outside the repository
   - forced manifest writes now preempt same-tick scheduled persister waits instead of inheriting the full heartbeat interval
   - detached released/handoff_failed reattachment now prefers child `started_at` when present so older runs that merely finish late do not rebind to a newer launch anchor
+  - detached released/handoff_failed recovery now also falls back to current-attempt issue timing for resumed children whose original `started_at` predates the stored launch anchor, and synthetic task-id `run_id` fallbacks no longer block reattachment after manifest loss
   - selected child-manifest UI metadata truthfulness
   - selected-run workspace fallback stays truthful for child CLI manifests under repo-local and external overridden runs roots
   - compatibility `session_id` null handling
@@ -83,16 +85,17 @@ last_review: 2026-03-21
 
 ## Validation Plan
 - Current verified checks:
+  - the pre-implementation `docs-review` gate succeeded at `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T10-25-11-174Z-514b632e/manifest.json`
   - `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs` passed (`5` subagent manifests found)
   - `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`
   - `npm run build` passed
   - `npm run lint` passed
-  - the current detached-run hardening regression pack passed `5/5` files and `72/72` tests across `ProviderIssueHandoff`, `ProviderIssueHandoffRefreshSerialization`, `ProviderIntakeState`, `ControlServerSeedLoading`, and `ControlServerStartupInputPreparation`
+  - the current detached-run hardening regression pack passed `5/5` files and `79/79` tests across `ProviderIssueHandoff`, `ProviderIssueHandoffRefreshSerialization`, `ProviderIntakeState`, `ControlServerSeedLoading`, and `ControlServerStartupInputPreparation`
   - the persister fast-path regression pack passed `2/2` files and `16/16` tests
-  - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed
+  - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed on the current head
   - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-  - the latest local `npm run review -- --manifest .runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/manifest.json` reached a clean terminal result with no concrete correctness regression in the diff-scoped changes
-  - the latest local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green on this head at `283/283` files and `2044/2044` tests in `206.73s`
+  - the prior P2 PRD/docs mirror drift is addressed in the current packet, and the local review obligation is closed via `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`
+  - the latest local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green on this head at `283/283` files and `2046/2046` tests in `202.70s`
 - Closure gate:
   - do not claim parity closeout until the remaining blockers are resolved; the current head now has terminal local validation, but that evidence only closes this bounded slice and not the remaining architectural parity gaps
 
@@ -101,5 +104,5 @@ last_review: 2026-03-21
 - Whether same-session continuation should be implemented inside the provider/control-host architecture, or moved into a dedicated follow-on session-owner lane.
 
 ## Approvals
-- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the clean 2026-03-21 local review rerun on the current head; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
+- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the current local review loop; the prior P2 PRD/docs mirror drift is addressed in the current packet, the final current-head review step is closed via `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`, and PR loop closeout still depends on GitHub reruns settling plus unresolved actionable threads reaching zero on the pushed head.
 - Date: 2026-03-21

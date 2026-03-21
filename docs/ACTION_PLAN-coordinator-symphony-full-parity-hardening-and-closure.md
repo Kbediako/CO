@@ -18,7 +18,7 @@
    - startup immediate refresh, including sync-throw-safe injected refresh wrapping
    - queued/null release fail-closed behavior
    - released-claim stability on rehydrate
-   - released-claim cancel retry during skipped provider refresh without reopening overlapping refresh/cancel cycles
+   - released-claim cancel retry during skipped provider refresh without reopening overlapping refresh/cancel cycles, plus later ready-refresh retry for already-released queued or active child runs after transient cancel failure
    - issue eligibility widened to `Todo` plus custom Linear `state_type=started` active states, including the missing-state started edge, with a Todo blocker rule that prefers Linear blocker `state.type`
    - terminal-only cleanup for provider-managed `.workspaces/<taskId>` on release/startup replay
    - explicit authenticated/manual refreshes queue one follow-up pass during in-flight provider handoff work
@@ -26,24 +26,26 @@
    - provider workspace cleanup stays bound to the real repo root when `CODEX_ORCHESTRATOR_RUNS_DIR` is outside the repository
    - forced manifest writes preempt same-tick scheduled persister waits instead of inheriting the heartbeat interval
    - detached released/handoff-failed claims only reattach to child runs that actually started after the launch anchor when manifest `started_at` is present, instead of trusting a later terminal `updated_at`
+   - detached released/handoff-failed claims also recover resumed children from current-attempt issue timing when the stored launch anchor is newer than the child’s original `started_at`, and synthetic task-id `run_id` fallbacks no longer block reattachment after manifest loss
    - selected child-manifest UI metadata truthfulness
    - compatibility `session_id` null handling
 2. Remaining before truthful parity closeout
    - live observability must become an authoritative runtime snapshot for turn/retry/token/rate-limit counters, or those counters must be explicitly deferred
    - active-issue continuation after a normal success must move from fresh-child-run continuation to upstream-faithful same-session continuation
 3. Validation posture to keep in the mirrors
+   - the pre-implementation `docs-review` gate succeeded at `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T10-25-11-174Z-514b632e/manifest.json`
    - `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs` passed (`5` subagent manifests found)
    - `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`
    - `npm run build` passed
    - `npm run lint` passed
-   - the current detached-run hardening regression pack passed `5/5` files and `72/72` tests
+   - the current detached-run hardening regression pack passed `5/5` files and `79/79` tests
    - the persister fast-path regression pack passed `2/2` files and `16/16` tests
-   - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed
+   - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed on the current head
    - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-   - the latest local `npm run review -- --manifest .runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/manifest.json` reached a clean terminal result with no concrete correctness regression in the diff-scoped changes
-   - the latest local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green on this head at `283/283` files and `2044/2044` tests in `206.73s`
+   - the prior P2 PRD/docs mirror drift is addressed in the current packet, and the local review obligation is closed via `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`
+   - the latest local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green on this head at `283/283` files and `2046/2046` tests in `202.70s`
 4. Closeout rule
-   - do not claim full hardened parity closed until the remaining blockers are resolved, even though the current head now has terminal local validation and local review cleanly reran
+   - do not claim full hardened parity closed until the remaining blockers are resolved, even though the current head now has terminal local validation
 
 ## Dependencies
 - `Symphony SPEC.md`
@@ -56,22 +58,22 @@
 - Verified checks to keep quoted consistently:
   - docs-review manifest: `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T10-25-11-174Z-514b632e/manifest.json`
   - `npm run build`
-  - the current detached-run hardening regression pack: `5/5` files and `72/72` tests
+  - the current detached-run hardening regression pack: `5/5` files and `79/79` tests
   - the persister fast-path regression pack: `2/2` files and `16/16` tests
   - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke`
-  - the latest local `npm run review -- --manifest .runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T14-10-57-240Z-e0985583/manifest.json` terminal clean verdict
-  - the latest local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test`: `283/283` files and `2044/2044` tests in `206.73s`
+  - the prior P2 PRD/docs mirror drift is addressed in the current packet, and the local review obligation is closed via `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`
+  - the latest local full `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test`: `283/283` files and `2046/2046` tests in `202.70s`
 
 ## Risks & Mitigations
 - Risk: stale docs reintroduce an optimistic parity-closeout claim.
-  - Mitigation: keep the landed fixes, remaining blockers, and current non-terminal full-suite/review status identical across all `1311` mirrors.
-- Risk: focused validation passes get misread as a fully green branch.
-  - Mitigation: keep the still-open architectural blockers explicit and record that the latest local full-suite reruns are non-terminal on this head.
+  - Mitigation: keep the landed fixes, remaining blockers, and current local validation/review status identical across all `1311` mirrors.
+- Risk: local gate-green status gets misread as a full parity closure.
+  - Mitigation: keep the still-open architectural blockers explicit and distinguish local gate-green evidence from truthful parity closure.
 - Risk: the persister fix gets overstated into a full parity claim.
   - Mitigation: keep the fix scoped to local lifecycle timing truthfulness and leave the remaining architectural blockers explicit.
 - Risk: same-session continuation gets overstated from fresh-child-run continuation behavior.
   - Mitigation: keep the continuation wording narrow and tie closure to upstream-faithful same-session ownership.
 
 ## Approvals
-- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the successful 2026-03-21 local review rerun on the current head; PR loop closeout still depends on GitHub reruns settling and unresolved actionable threads reaching zero on the pushed head.
+- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the current local review loop; the prior P2 PRD/docs mirror drift is addressed in the current packet, the final current-head review step is closed via `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`, and PR loop closeout still depends on GitHub reruns settling plus unresolved actionable threads reaching zero on the pushed head.
 - Date: 2026-03-21

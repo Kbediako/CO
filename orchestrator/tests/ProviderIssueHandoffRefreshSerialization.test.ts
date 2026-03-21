@@ -683,7 +683,114 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
-  it('defers refresh resume while a released queued run is still being canceled', async () => {
+  it('retries released active child cancellation on a later ready refresh after a transient release failure', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-active');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'task-1303-active',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const cancelCalls: Array<Record<string, unknown>> = [];
+    vi.spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint').mockImplementation(
+      async ({ payload }) => {
+        cancelCalls.push(payload);
+        throw new Error('cancel failed');
+      }
+    );
+
+    let resolveTrackedIssueCallCount = 0;
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue: async () => {
+        resolveTrackedIssueCallCount += 1;
+        if (resolveTrackedIssueCallCount === 1) {
+          return {
+            kind: 'release',
+            reason: 'not_active'
+          };
+        }
+        return {
+          kind: 'ready',
+          trackedIssue: createTrackedIssue()
+        };
+      }
+    });
+
+    await service.refresh();
+    expect(cancelCalls).toHaveLength(1);
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+
+    await service.refresh();
+
+    expect(resolveTrackedIssueCallCount).toBe(2);
+    expect(cancelCalls).toHaveLength(2);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'run-active',
+      run_manifest_path: childPaths.manifestPath
+    });
+  });
+
+  it('retries released queued child cancellation on a later ready refresh after a transient release failure', async () => {
     const { root, paths } = await createHostPaths();
     const queuedEnv = {
       repoRoot: root,
@@ -832,17 +939,30 @@ describe('runProviderIssueHandoffRefresh', () => {
 
     await service.refresh();
     expect(resolveTrackedIssueCallCount).toBe(3);
-    expect(launcher.resume).toHaveBeenCalledWith({
-      runId: 'run-failed',
-      actor: 'control-host',
-      reason: 'provider-refresh',
-      launchToken: expect.any(String)
+    await vi.waitFor(() => {
+      expect(cancelCalls).toEqual([
+        expect.objectContaining({
+          action: 'cancel',
+          reason: 'provider_issue_released:not_active'
+        }),
+        expect.objectContaining({
+          action: 'cancel',
+          reason: 'provider_issue_released:not_active'
+        })
+      ]);
+      expect(pendingCancels).toBe(1);
     });
+    expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
-      state: 'resuming',
-      reason: 'provider_issue_refresh_resume_launched',
-      run_id: 'run-failed',
-      run_manifest_path: failedPaths.manifestPath
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'run-queued',
+      run_manifest_path: queuedPaths.manifestPath
+    });
+
+    settleNextCancel('resolve');
+    await vi.waitFor(() => {
+      expect(pendingCancels).toBe(0);
     });
   });
 });
