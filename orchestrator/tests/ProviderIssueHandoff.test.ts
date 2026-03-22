@@ -3295,6 +3295,7 @@ describe('createProviderIssueHandoffService', () => {
       })),
       resume: vi.fn(async () => undefined)
     };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     const service = createProviderIssueHandoffService({
       paths,
@@ -3311,12 +3312,13 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
 
     expect(launcher.start).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(1_001);
     await flushAsyncWork();
-    await waitForMockCalls(launcher.start);
+    await waitForMockCalls(launcher.start, 1, 1024);
 
     expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.start.mock.calls[0]?.[0]).toEqual(
@@ -4774,7 +4776,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1_001);
     await flushAsyncWork();
-    await waitForMockCalls(launcher.start);
+    await waitForMockCalls(launcher.start, 1, 1024);
 
     expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       taskId: 'linear-lin-issue-1',
@@ -6899,7 +6901,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await vi.advanceTimersByTimeAsync(10_001);
     await flushAsyncWork();
-    await waitForMockCalls(launcher.resume);
+    await waitForMockCalls(launcher.resume, 1, 1024);
 
     expect(launcher.resume.mock.calls[0]?.[0]).toEqual({
       runId: 'run-failed',
