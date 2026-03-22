@@ -382,6 +382,257 @@ describe('TrackerDispatchPilot', () => {
     });
   });
 
+  it('skips review-handoff and blocked Todo issues when choosing a live Linear recommendation', async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          data: {
+            viewer: {
+              organization: {
+                id: 'lin-workspace-1'
+              }
+            },
+            issues: {
+              pageInfo: {
+                hasNextPage: false,
+                endCursor: null
+              },
+              nodes: [
+                {
+                  id: 'lin-issue-review',
+                  identifier: 'PREPROD-100',
+                  title: 'Already in review',
+                  priority: 1,
+                  createdAt: '2026-03-05T01:00:00.000Z',
+                  updatedAt: '2026-03-06T02:10:00.000Z',
+                  state: {
+                    name: 'In Review',
+                    type: 'started'
+                  },
+                  team: {
+                    id: 'lin-team-live',
+                    key: 'PREPROD',
+                    name: 'PRE-PRO/PRODUCTION'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'Icon Agency (Bookings)'
+                  },
+                  inverseRelations: { nodes: [] },
+                  history: { nodes: [] }
+                },
+                {
+                  id: 'lin-issue-blocked',
+                  identifier: 'PREPROD-101',
+                  title: 'Blocked todo',
+                  priority: 1,
+                  createdAt: '2026-03-05T02:00:00.000Z',
+                  updatedAt: '2026-03-06T02:05:00.000Z',
+                  state: {
+                    name: 'Todo',
+                    type: 'unstarted'
+                  },
+                  team: {
+                    id: 'lin-team-live',
+                    key: 'PREPROD',
+                    name: 'PRE-PRO/PRODUCTION'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'Icon Agency (Bookings)'
+                  },
+                  inverseRelations: {
+                    nodes: [
+                      {
+                        type: 'blocks',
+                        issue: {
+                          id: 'lin-blocker-1',
+                          identifier: 'PREPROD-099',
+                          state: {
+                            name: 'In Progress',
+                            type: 'started'
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  history: { nodes: [] }
+                },
+                {
+                  id: 'lin-issue-active',
+                  identifier: 'PREPROD-102',
+                  title: 'Runnable issue',
+                  priority: 2,
+                  createdAt: '2026-03-05T03:00:00.000Z',
+                  updatedAt: '2026-03-06T02:00:00.000Z',
+                  state: {
+                    name: 'In Progress',
+                    type: 'started'
+                  },
+                  team: {
+                    id: 'lin-team-live',
+                    key: 'PREPROD',
+                    name: 'PRE-PRO/PRODUCTION'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'Icon Agency (Bookings)'
+                  },
+                  inverseRelations: { nodes: [] },
+                  history: { nodes: [] }
+                }
+              ]
+            }
+          }
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+    const evaluation = await evaluateTrackerDispatchPilotAsync({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: true,
+          source: {
+            provider: 'linear',
+            live: true,
+            workspace_id: 'lin-workspace-1',
+            team_id: 'lin-team-live',
+            project_id: 'lin-project-1'
+          }
+        }
+      },
+      defaultIssueIdentifier: 'task-1014',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      } as NodeJS.ProcessEnv,
+      fetchImpl
+    });
+
+    expect(evaluation.summary).toMatchObject({
+      status: 'ready',
+      source_status: 'ready'
+    });
+    expect(evaluation.failure).toBeNull();
+    expect(evaluation.recommendation).toMatchObject({
+      issue_identifier: 'PREPROD-102',
+      tracked_issue: {
+        identifier: 'PREPROD-102',
+        title: 'Runnable issue',
+        state: 'In Progress'
+      }
+    });
+  });
+
+  it('preserves provider order when multiple live Linear issues remain eligible', async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          data: {
+            viewer: {
+              organization: {
+                id: 'lin-workspace-1'
+              }
+            },
+            issues: {
+              pageInfo: {
+                hasNextPage: false,
+                endCursor: null
+              },
+              nodes: [
+                {
+                  id: 'lin-issue-newer',
+                  identifier: 'PREPROD-200',
+                  title: 'Newest eligible issue',
+                  priority: 3,
+                  createdAt: '2026-03-06T01:00:00.000Z',
+                  updatedAt: '2026-03-06T02:10:00.000Z',
+                  state: {
+                    name: 'In Progress',
+                    type: 'started'
+                  },
+                  team: {
+                    id: 'lin-team-live',
+                    key: 'PREPROD',
+                    name: 'PRE-PRO/PRODUCTION'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'Icon Agency (Bookings)'
+                  },
+                  inverseRelations: { nodes: [] },
+                  history: { nodes: [] }
+                },
+                {
+                  id: 'lin-issue-older',
+                  identifier: 'PREPROD-199',
+                  title: 'Older but higher dispatch priority',
+                  priority: 1,
+                  createdAt: '2026-03-05T01:00:00.000Z',
+                  updatedAt: '2026-03-06T02:00:00.000Z',
+                  state: {
+                    name: 'In Progress',
+                    type: 'started'
+                  },
+                  team: {
+                    id: 'lin-team-live',
+                    key: 'PREPROD',
+                    name: 'PRE-PRO/PRODUCTION'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'Icon Agency (Bookings)'
+                  },
+                  inverseRelations: { nodes: [] },
+                  history: { nodes: [] }
+                }
+              ]
+            }
+          }
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+    const evaluation = await evaluateTrackerDispatchPilotAsync({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: true,
+          source: {
+            provider: 'linear',
+            live: true,
+            workspace_id: 'lin-workspace-1',
+            team_id: 'lin-team-live',
+            project_id: 'lin-project-1'
+          }
+        }
+      },
+      defaultIssueIdentifier: 'task-1014',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      } as NodeJS.ProcessEnv,
+      fetchImpl
+    });
+
+    expect(evaluation.summary).toMatchObject({
+      status: 'ready',
+      source_status: 'ready'
+    });
+    expect(evaluation.failure).toBeNull();
+    expect(evaluation.recommendation).toMatchObject({
+      issue_identifier: 'PREPROD-200',
+      tracked_issue: {
+        identifier: 'PREPROD-200',
+        title: 'Newest eligible issue',
+        state: 'In Progress'
+      }
+    });
+  });
+
   it('fails closed when live Linear confidence is outside the allowed range', async () => {
     const fetchImpl: typeof fetch = async () =>
       new Response(

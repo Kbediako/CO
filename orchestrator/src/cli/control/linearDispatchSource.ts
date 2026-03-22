@@ -1,9 +1,15 @@
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
+import {
+  executeLinearGraphql,
+  resolveLinearApiToken,
+  resolveLinearRequestTimeoutMs,
+  type LinearGraphqlFailure,
+  type LinearGraphqlPayload
+} from './linearGraphqlClient.js';
+import { isProviderLinearTrackedIssueEligibleForExecution } from './providerLinearWorkflowStates.js';
 
-const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 const LINEAR_RECENT_ACTIVITY_LIMIT = 3;
 const LINEAR_BLOCKER_LIMIT = 50;
-const DEFAULT_LINEAR_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE = 50;
 
 export interface LiveLinearTrackedActivity {
@@ -166,51 +172,28 @@ export async function resolveLiveLinearDispatchRecommendation(input: {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }): Promise<LiveLinearDispatchResolution> {
-  const env = input.env ?? process.env;
-  const fetchImpl = input.fetchImpl ?? fetch;
-  const token = resolveLinearApiToken(env);
-  if (!token) {
-    return unavailable('dispatch_source_credentials_missing');
-  }
-  const timeoutMs = resolveLinearRequestTimeoutMs(env);
-
-  const sourceSetup = resolveLinearSourceSetup(input.sourceSetup, env);
-  if (!sourceSetup.workspace_id && !sourceSetup.team_id && !sourceSetup.project_id) {
-    return malformed('dispatch_source_binding_missing');
-  }
-
-  const query = buildLinearIssueQuery(sourceSetup);
-  const queryResult = await executeLinearQuery({
-    token,
-    timeoutMs,
-    fetchImpl,
-    query: query.query,
-    variables: query.variables
-  });
-  if (!queryResult.ok) {
-    return queryResult.resolution;
-  }
-
-  const workspaceId = queryResult.payload.data?.viewer?.organization?.id?.trim() ?? null;
-  if (sourceSetup.workspace_id && workspaceId && sourceSetup.workspace_id !== workspaceId) {
-    return malformed('dispatch_source_workspace_mismatch');
-  }
-
-  const issue = queryResult.payload.data?.issues?.nodes?.[0] ?? null;
-  if (!issue) {
-    return unavailable('dispatch_source_issue_not_found');
-  }
-
-  const trackedIssue = parseTrackedIssue(issue, {
-    workspaceId: sourceSetup.workspace_id ?? workspaceId
-  });
-  if (!trackedIssue) {
-    return malformed('dispatch_source_provider_response_invalid');
-  }
-
   const confidence = readNumberValue(input.source, 'confidence', 'score') ?? null;
   if (confidence !== null && (confidence < 0 || confidence > 1)) {
     return malformed('dispatch_source_confidence_out_of_range');
+  }
+
+  const trackedIssuesResolution = await resolveLiveLinearTrackedIssues({
+    sourceSetup: input.sourceSetup,
+    env: input.env,
+    fetchImpl: input.fetchImpl,
+    limit: DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE,
+    sortForDispatch: false,
+    stopWhenEligibleForExecution: true
+  });
+  if (trackedIssuesResolution.kind !== 'ready') {
+    return trackedIssuesResolution;
+  }
+
+  const trackedIssue =
+    trackedIssuesResolution.tracked_issues.find(isProviderLinearTrackedIssueEligibleForExecution) ??
+    null;
+  if (!trackedIssue) {
+    return unavailable('dispatch_source_issue_not_found');
   }
 
   return {
@@ -312,6 +295,8 @@ export async function resolveLiveLinearTrackedIssues(input: {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
   limit?: number;
+  sortForDispatch?: boolean;
+  stopWhenEligibleForExecution?: boolean;
 }): Promise<LiveLinearTrackedIssuesResolution> {
   const env = input.env ?? process.env;
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -356,6 +341,7 @@ export async function resolveLiveLinearTrackedIssues(input: {
     const nodes = Array.isArray(queryResult.payload.data?.issues?.nodes)
       ? queryResult.payload.data?.issues?.nodes ?? []
       : [];
+    let stopScanning = false;
     for (const node of nodes) {
       const trackedIssue = parseTrackedIssue(node ?? {}, {
         workspaceId: sourceSetup.workspace_id ?? workspaceId
@@ -372,6 +358,18 @@ export async function resolveLiveLinearTrackedIssues(input: {
       }
       seenIssueIds.add(trackedIssue.id);
       trackedIssues.push(trackedIssue);
+      if (
+        input.stopWhenEligibleForExecution === true &&
+        isProviderLinearTrackedIssueEligibleForExecution(trackedIssue)
+      ) {
+        stopScanning = true;
+        break;
+      }
+    }
+
+    if (stopScanning) {
+      hasNextPage = false;
+      continue;
     }
 
     const nextCursor = resolveLinearTrackedIssuesNextCursor(queryResult.payload.data?.issues?.pageInfo ?? null);
@@ -387,7 +385,10 @@ export async function resolveLiveLinearTrackedIssues(input: {
 
   return {
     kind: 'ready',
-    tracked_issues: sortLiveLinearTrackedIssuesForDispatch(trackedIssues),
+    tracked_issues:
+      input.sortForDispatch === false
+        ? trackedIssues
+        : sortLiveLinearTrackedIssuesForDispatch(trackedIssues),
     source_setup: sourceSetup
   };
 }
@@ -408,99 +409,6 @@ export function sortLiveLinearTrackedIssuesForDispatch(
 
     return left.identifier.localeCompare(right.identifier);
   });
-}
-
-function buildLinearIssueQuery(sourceSetup: DispatchPilotSourceSetup): {
-  query: string;
-  variables: Record<string, string>;
-} {
-  const variableDefinitions: string[] = [];
-  const filterParts: string[] = [];
-  const variables: Record<string, string> = {};
-
-  if (sourceSetup.team_id) {
-    variableDefinitions.push('$teamId: ID!');
-    filterParts.push('team: { id: { eq: $teamId } }');
-    variables.teamId = sourceSetup.team_id;
-  }
-  if (sourceSetup.project_id) {
-    variableDefinitions.push('$projectId: ID!');
-    filterParts.push('project: { id: { eq: $projectId } }');
-    variables.projectId = sourceSetup.project_id;
-  }
-  filterParts.push('state: { type: { nin: ["completed", "canceled"] } }');
-  const variableSection = variableDefinitions.length > 0 ? `(${variableDefinitions.join(', ')})` : '';
-  const filterSection = filterParts.length > 0 ? `, filter: { ${filterParts.join(' ')} }` : '';
-
-  return {
-    query: `query ResolveLiveLinearDispatch${variableSection} {
-      viewer {
-        organization {
-          id
-        }
-      }
-      issues(orderBy: updatedAt, first: 1${filterSection}) {
-        nodes {
-          id
-          identifier
-          title
-          url
-          updatedAt
-          state {
-            name
-            type
-          }
-          team {
-            id
-            key
-            name
-          }
-          project {
-            id
-            name
-          }
-          inverseRelations(first: ${LINEAR_BLOCKER_LIMIT}) {
-            nodes {
-              type
-              issue {
-                id
-                identifier
-                state {
-                  name
-                  type
-                }
-              }
-            }
-          }
-          history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
-            nodes {
-              id
-              createdAt
-              actor {
-                name
-                displayName
-              }
-              fromState {
-                name
-              }
-              toState {
-                name
-              }
-              fromProject {
-                name
-              }
-              toProject {
-                name
-              }
-              fromTitle
-              toTitle
-            }
-          }
-        }
-      }
-    }`,
-    variables
-  };
 }
 
 function buildLinearTrackedIssuesQuery(
@@ -696,57 +604,31 @@ async function executeLinearQuery(input: {
 }): Promise<
   | {
       ok: true;
-      payload: { data?: LinearIssueQueryResponse; errors?: Array<{ message?: string }> };
+      payload: LinearGraphqlPayload<LinearIssueQueryResponse>;
     }
-  | {
+    | {
       ok: false;
       resolution: LiveLinearFailureResolution;
     }
 > {
-  const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), input.timeoutMs);
-  const response = await input.fetchImpl(LINEAR_GRAPHQL_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: input.token
-    },
-    body: JSON.stringify({
-      query: input.query,
-      variables: input.variables
-    }),
-    signal: abortController.signal
-  })
-    .catch(() => null)
-    .finally(() => clearTimeout(timeout));
+  const result = await executeLinearGraphql<LinearIssueQueryResponse>({
+    token: input.token,
+    timeoutMs: input.timeoutMs,
+    fetchImpl: input.fetchImpl,
+    query: input.query,
+    variables: input.variables
+  });
 
-  if (!response) {
+  if (!result.ok) {
     return {
       ok: false,
-      resolution: unavailable('dispatch_source_provider_request_failed')
-    };
-  }
-
-  let payload: { data?: LinearIssueQueryResponse; errors?: Array<{ message?: string }> };
-  try {
-    payload = (await response.json()) as { data?: LinearIssueQueryResponse; errors?: Array<{ message?: string }> };
-  } catch {
-    return {
-      ok: false,
-      resolution: malformed('dispatch_source_provider_response_invalid')
-    };
-  }
-
-  if (!response.ok || (Array.isArray(payload.errors) && payload.errors.length > 0)) {
-    return {
-      ok: false,
-      resolution: unavailable('dispatch_source_provider_request_failed')
+      resolution: mapLinearGraphqlFailureToDispatchResolution(result.failure)
     };
   }
 
   return {
     ok: true,
-    payload
+    payload: result.payload
   };
 }
 
@@ -779,23 +661,6 @@ export function resolveLinearSourceSetup(
     team_id: sourceSetup.team_id ?? normalizeEnvValue(env.CO_LINEAR_TEAM_ID),
     project_id: sourceSetup.project_id ?? normalizeEnvValue(env.CO_LINEAR_PROJECT_ID)
   };
-}
-
-function resolveLinearApiToken(env: NodeJS.ProcessEnv): string | null {
-  return (
-    normalizeEnvValue(env.CO_LINEAR_API_TOKEN) ??
-    normalizeEnvValue(env.CO_LINEAR_API_KEY) ??
-    normalizeEnvValue(env.LINEAR_API_KEY)
-  );
-}
-
-function resolveLinearRequestTimeoutMs(env: NodeJS.ProcessEnv): number {
-  const raw = normalizeEnvValue(env.CO_LINEAR_REQUEST_TIMEOUT_MS);
-  if (!raw) {
-    return DEFAULT_LINEAR_REQUEST_TIMEOUT_MS;
-  }
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_LINEAR_REQUEST_TIMEOUT_MS;
 }
 
 function normalizeLinearTrackedIssueLimit(limit: number | undefined): number {
@@ -934,6 +799,13 @@ function buildDefaultRationale(issue: LiveLinearTrackedIssue, defaultIssueIdenti
     defaultIssueIdentifier ? `for ${defaultIssueIdentifier}` : null
   ].filter((value): value is string => Boolean(value));
   return fragments.join(', ');
+}
+
+function mapLinearGraphqlFailureToDispatchResolution(failure: LinearGraphqlFailure): LiveLinearFailureResolution {
+  if (failure.kind === 'response_invalid') {
+    return malformed('dispatch_source_provider_response_invalid');
+  }
+  return unavailable('dispatch_source_provider_request_failed');
 }
 
 function unavailable(reason: string): LiveLinearFailureResolution {

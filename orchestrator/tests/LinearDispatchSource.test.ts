@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  resolveLiveLinearDispatchRecommendation,
   resolveLiveLinearTrackedIssueById,
   resolveLiveLinearTrackedIssues
 } from '../src/cli/control/linearDispatchSource.js';
@@ -545,6 +546,88 @@ describe('resolveLiveLinearTrackedIssues', () => {
     await expect(promise).resolves.toMatchObject({
       kind: 'unavailable',
       reason: 'dispatch_source_provider_request_failed'
+    });
+  });
+});
+
+describe('resolveLiveLinearDispatchRecommendation', () => {
+  it('stops paging once the first eligible live issue is found in provider order', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        variables?: { after?: string | null; limit?: number };
+      };
+      if ((body.variables?.after ?? null) !== null) {
+        throw new Error('live recommendation should not fetch later pages once an eligible issue is found');
+      }
+      expect(body.variables?.limit).toBe(50);
+      return jsonResponse({
+        data: {
+          viewer: {
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issues: {
+            pageInfo: {
+              hasNextPage: true,
+              endCursor: 'cursor-1'
+            },
+            nodes: [
+              {
+                id: 'lin-issue-newest',
+                identifier: 'PREPROD-201',
+                title: 'Newest eligible issue',
+                priority: 3,
+                createdAt: '2026-03-20T04:00:00.000Z',
+                updatedAt: '2026-03-21T04:00:00.000Z',
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              }
+            ]
+          }
+        }
+      });
+    });
+
+    const result = await resolveLiveLinearDispatchRecommendation({
+      source: {
+        provider: 'linear',
+        live: true
+      },
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      defaultIssueIdentifier: 'task-1014',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issue: {
+        identifier: 'PREPROD-201',
+        title: 'Newest eligible issue',
+        state: 'In Progress'
+      }
     });
   });
 });

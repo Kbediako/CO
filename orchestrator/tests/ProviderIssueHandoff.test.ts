@@ -953,6 +953,80 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('falls back to single-issue resolution when poll truth omits a completed claimed issue', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-03-19T04:00:00.000Z',
+      updated_at: '2026-03-19T04:00:00.000Z',
+      last_delivery_id: null,
+      last_event: null,
+      last_action: null,
+      last_webhook_timestamp: null,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:00:10.000Z',
+      retry_error: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async ({ issueId }) => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: 'CO-2',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-03-19T04:10:00.000Z'
+        })
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: []
+    });
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:10:00.000Z',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+  });
+
   it('releases a queued retry when the retry candidate refetch no longer returns the issue', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
@@ -1017,6 +1091,90 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_found',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+  });
+
+  it('falls back to single-issue resolution when queued retry refetch omits a completed issue', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:21:05.000Z',
+      updated_at: '2026-03-19T04:21:10.000Z',
+      last_delivery_id: null,
+      last_event: null,
+      last_action: null,
+      last_webhook_timestamp: null,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async ({ issueId }) => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: 'CO-2',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-03-19T04:31:00.000Z'
+        })
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [createTrackedIssue({ updated_at: '2026-03-19T04:21:00.000Z' })],
+      refetchTrackedIssues: async () => ({
+        kind: 'ready',
+        trackedIssues: []
+      })
+    });
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    await waitForCondition(() => state.claims[0]?.state === 'released');
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:31:00.000Z',
       retry_queued: null,
       retry_attempt: null,
       retry_due_at: null,
@@ -1334,7 +1492,56 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
-  it('accepts custom active started states even when the state name is not In Progress', async () => {
+  it('accepts Merging and Rework as active workflow states', async () => {
+    for (const workflowState of ['Merging', 'Rework']) {
+      const { paths } = await createHostPaths();
+      const state = createProviderIntakeState();
+      const persist = vi.fn(async () => undefined);
+      const launcher = {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      };
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'diagnostics'
+      });
+
+      const result = await service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue({
+          state: workflowState,
+          state_type: 'started'
+        }),
+        deliveryId: `delivery-${workflowState.toLowerCase().replace(/\s+/gu, '-')}`,
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_360_020_000
+      });
+
+      expect(result.kind).toBe('start');
+      expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+        taskId: 'linear-lin-issue-1',
+        pipelineId: 'diagnostics',
+        provider: 'linear',
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-2',
+        issueUpdatedAt: '2026-03-19T04:00:00.000Z',
+        launchToken: expect.any(String)
+      }));
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'starting',
+        issue_state: workflowState,
+        issue_state_type: 'started'
+      });
+      expect(persist).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('accepts custom started states when they are non-terminal and not a review handoff alias', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const persist = vi.fn(async () => undefined);
@@ -1353,13 +1560,13 @@ describe('createProviderIssueHandoffService', () => {
 
     const result = await service.handleAcceptedTrackedIssue({
       trackedIssue: createTrackedIssue({
-        state: 'In Review',
+        state: 'QA Ready',
         state_type: 'started'
       }),
       deliveryId: 'delivery-started-custom-state',
       event: 'Issue',
       action: 'update',
-      webhookTimestamp: 1_742_360_020_000
+      webhookTimestamp: 1_742_360_020_250
     });
 
     expect(result.kind).toBe('start');
@@ -1375,11 +1582,177 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       state: 'starting',
-      issue_state: 'In Review',
+      issue_state: 'QA Ready',
       issue_state_type: 'started'
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['Human Review', 'In Review'])(
+    'ignores %s issues even when Linear marks them started',
+    async (reviewState) => {
+      const { paths } = await createHostPaths();
+      const state = createProviderIntakeState();
+      const persist = vi.fn(async () => undefined);
+      const launcher = {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      };
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'diagnostics'
+      });
+
+      const result = await service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue({
+          state: reviewState,
+          state_type: 'started'
+        }),
+        deliveryId: `delivery-${reviewState.toLowerCase().replace(/\s+/gu, '-')}-started`,
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_360_020_500
+      });
+
+      expect(result).toMatchObject({
+        kind: 'ignored',
+        reason: 'provider_issue_state_not_active'
+      });
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'ignored',
+        reason: 'provider_issue_state_not_active',
+        issue_state: reviewState,
+        issue_state_type: 'started'
+      });
+      expect(persist).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['Human Review', 'In Review'])(
+    'releases an active run promptly when a direct webhook moves the issue to %s',
+    async (reviewState) => {
+      const { root, paths } = await createHostPaths();
+      const childEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-webhook-review-release'
+      };
+      const childPaths = resolveRunPaths(childEnv, 'run-webhook-review-release');
+      await mkdir(childPaths.runDir, { recursive: true });
+      await writeFile(
+        childPaths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-webhook-review-release',
+          task_id: 'task-webhook-review-release',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_updated_at: '2026-03-19T04:20:00.000Z',
+          workspace_path: join(root, '.workspaces', 'task-webhook-review-release'),
+          updated_at: '2026-03-19T04:30:00.000Z'
+        }),
+        'utf8'
+      );
+      const endpoint = await createControlEndpointServer();
+      await writeFile(
+        join(childPaths.runDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: endpoint.baseUrl,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+      await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+
+      const state = createProviderIntakeState();
+      state.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        task_id: 'task-webhook-review-release',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_run_already_active',
+        accepted_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:20:10.000Z',
+        last_delivery_id: 'delivery-in-progress',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_049_000,
+        run_id: 'run-webhook-review-release',
+        run_manifest_path: childPaths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'webhook-review-release-token'
+      });
+
+      const persist = vi.fn(async () => undefined);
+      const launcher = {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      };
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'diagnostics'
+      });
+
+      try {
+        const result = await service.handleAcceptedTrackedIssue({
+          trackedIssue: createTrackedIssue({
+            state: reviewState,
+            state_type: 'started',
+            updated_at: '2026-03-19T04:30:00.000Z'
+          }),
+          deliveryId: `delivery-${reviewState.toLowerCase().replace(/\s+/gu, '-')}-webhook-release`,
+          event: 'Issue',
+          action: 'update',
+          webhookTimestamp: 1_742_360_050_500
+        });
+
+        expect(result).toMatchObject({
+          kind: 'ignored',
+          reason: 'provider_issue_released:not_active'
+        });
+        await vi.waitFor(() => {
+          expect(endpoint.actions).toEqual([
+            expect.objectContaining({
+              action: 'cancel',
+              reason: 'provider_issue_released:not_active'
+            })
+          ]);
+        });
+      } finally {
+        await endpoint.close();
+      }
+
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: reviewState,
+        issue_state_type: 'started',
+        run_id: 'run-webhook-review-release',
+        run_manifest_path: childPaths.manifestPath
+      });
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+    }
+  );
 
   it('accepts started issues when the provider state name is missing', async () => {
     const { paths } = await createHostPaths();
@@ -1807,6 +2180,150 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'run-active',
       run_manifest_path: activePaths.manifestPath,
       task_id: 'task-1303-active'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('launches a new start when the only active child run belongs to a different pipeline during duplicate-event discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1318-other-pipeline'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-other-pipeline');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-other-pipeline',
+        task_id: 'task-1318-other-pipeline',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-started',
+        manifestPath: '/tmp/provider-run/run-started-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        updated_at: '2026-03-19T04:22:00.000Z'
+      }),
+      deliveryId: 'delivery-other-pipeline-active',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_200_500
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:22:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-started',
+      run_manifest_path: '/tmp/provider-run/run-started-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(persist).toHaveBeenCalledTimes(2);
+  });
+
+  it('reattaches a legacy active child run without pipeline_id during duplicate-event discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-legacy-no-pipeline'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-legacy-active');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-legacy-active',
+        task_id: 'task-legacy-no-pipeline',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:20:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        updated_at: '2026-03-19T04:22:00.000Z'
+      }),
+      deliveryId: 'delivery-legacy-active',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_200_500
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_run_already_active'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_run_already_active',
+      run_id: 'run-legacy-active',
+      run_manifest_path: activePaths.manifestPath,
+      task_id: 'task-legacy-no-pipeline'
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -2267,7 +2784,7 @@ describe('createProviderIssueHandoffService', () => {
       'utf8'
     );
 
-    const launchedAt = new Date(Date.now() - 60_000).toISOString();
+    const launchedAt = new Date().toISOString();
     const state = createProviderIntakeState();
     state.claims.push({
       provider: 'linear',
@@ -2311,6 +2828,159 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'run-active',
       run_manifest_path: activePaths.manifestPath,
       task_id: 'task-1303-active'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a starting claim detached during explicit restart rehydrate when the only active child run belongs to a different pipeline', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1318-other-pipeline'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-other-pipeline');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-other-pipeline',
+        task_id: 'task-1318-other-pipeline',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launchedAt = new Date().toISOString();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: launchedAt,
+      updated_at: launchedAt,
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-1'
+    });
+    const persist = vi.fn(async () => undefined);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      task_id: 'linear-lin-issue-1',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-1'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('reattaches a legacy active child run without pipeline_id during explicit restart rehydrate', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-legacy-no-pipeline'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-legacy-active');
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-legacy-active',
+        task_id: 'task-legacy-no-pipeline',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const launchedAt = new Date().toISOString();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: launchedAt,
+      updated_at: launchedAt,
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_000_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-1'
+    });
+    const persist = vi.fn(async () => undefined);
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'provider-linear-worker'
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      task_id: 'task-legacy-no-pipeline',
+      run_id: 'run-legacy-active',
+      run_manifest_path: activePaths.manifestPath
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -4240,6 +4910,121 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
+
+  it.each(['Human Review', 'In Review'])(
+    'releases %s issues without cleaning their provider workspace',
+    async (reviewState) => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-human-review'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-human-review');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-human-review',
+        task_id: 'task-1303-human-review',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        workspace_path: join(root, '.workspaces', 'task-1303-human-review'),
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const endpoint = await createControlEndpointServer();
+    await writeFile(
+      join(childPaths.runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: endpoint.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-human-review');
+    await mkdir(workspacePath, { recursive: true });
+    await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-human-review',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-human-review',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-human-review',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'human-review-launch-token'
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: reviewState,
+          state_type: 'started'
+        })
+      })
+    });
+
+    try {
+      await service.refresh();
+      await vi.waitFor(() => {
+        expect(endpoint.actions).toEqual([
+          expect.objectContaining({
+            action: 'cancel',
+            reason: 'provider_issue_released:not_active'
+          })
+        ]);
+      });
+    } finally {
+      await endpoint.close();
+    }
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: reviewState,
+      issue_state_type: 'started',
+      run_id: 'run-human-review',
+      run_manifest_path: childPaths.manifestPath
+    });
+    await expect(access(workspacePath)).resolves.toBeUndefined();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    }
+  );
 
   it('keeps manifest-less starting claim workspaces intact when refresh releases them', async () => {
     const { root, paths } = await createHostPaths();

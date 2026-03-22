@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260322-1318-coordinator-symphony-current-linear-operational-parity",
+      "title": "Coordinator Symphony Current Linear Operational Parity",
+      "relates_to": "tasks/tasks-1318-coordinator-symphony-current-linear-operational-parity.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-22",
+      "paths": {
+        "spec": "tasks/specs/1318-coordinator-symphony-current-linear-operational-parity.md",
+        "task": "tasks/tasks-1318-coordinator-symphony-current-linear-operational-parity.md",
+        "agent_task": ".agent/task/1318-coordinator-symphony-current-linear-operational-parity.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-current-linear-operational-parity.md"
+      }
+    },
+    {
       "id": "20260322-1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency",
       "title": "Coordinator Live Linear Restarted-Issue Intake and Dispatch Consistency",
       "relates_to": "tasks/tasks-1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
