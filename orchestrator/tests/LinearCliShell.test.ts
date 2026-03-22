@@ -154,6 +154,54 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('preserves raw inline workpad body text instead of trimming surrounding newlines', async () => {
+    const upsertProviderLinearWorkpadCommentMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'upsert-workpad',
+          action: 'noop',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          comment: {
+            id: 'comment-1',
+            body: '\n## Codex Workpad\n\nPlan\n',
+            url: null,
+            created_at: null,
+            updated_at: null
+          },
+          source_setup: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['upsert-workpad'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          body: '\n## Codex Workpad\n\nPlan\n'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        upsertProviderLinearWorkpadComment: upsertProviderLinearWorkpadCommentMock,
+        getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        log: vi.fn()
+      }
+    );
+
+    expect(upsertProviderLinearWorkpadCommentMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      body: '\n## Codex Workpad\n\nPlan\n',
+      commentId: null,
+      sourceSetup: null,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      }
+    });
+  });
+
   it('sets a non-zero exit code when a structured Linear operation fails', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();
@@ -291,5 +339,104 @@ describe('runLinearCliShell', () => {
       'linear audit warning: failed to append audit entry to /tmp/provider-linear-audit.jsonl: disk full'
     );
     expect(setExitCode).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'unknown subcommands',
+      params: {
+        positionals: ['unknown'],
+        flags: {}
+      },
+      expected: {
+        code: 'linear_unknown_subcommand',
+        message: 'Unknown linear subcommand: unknown',
+        status: 422
+      }
+    },
+    {
+      name: 'missing required flags',
+      params: {
+        positionals: ['issue-context'],
+        flags: {}
+      },
+      expected: {
+        code: 'linear_missing_flag',
+        message: '--issue-id is required.',
+        status: 422
+      }
+    },
+    {
+      name: 'unknown flags',
+      params: {
+        positionals: ['issue-context'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          bogus: 'value'
+        }
+      },
+      expected: {
+        code: 'linear_unknown_flag',
+        message: 'Unknown linear flag: --bogus',
+        status: 422
+      }
+    }
+  ])('emits machine-readable json for %s', async ({ params, expected }) => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await expect(
+      runLinearCliShell(
+        {
+          ...params,
+          printHelp: vi.fn()
+        },
+        {
+          log,
+          setExitCode
+        }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: expected
+    });
+    expect(setExitCode).toHaveBeenCalledWith(1);
+  });
+
+  it('emits machine-readable json when a local runtime error escapes argument validation', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await expect(
+      runLinearCliShell(
+        {
+          positionals: ['upsert-workpad'],
+          flags: {
+            'issue-id': 'lin-issue-1',
+            'body-file': '/missing/workpad.md'
+          },
+          printHelp: vi.fn()
+        },
+        {
+          readTextFile: vi.fn(async () => {
+            throw new Error('ENOENT: missing workpad file');
+          }),
+          log,
+          setExitCode
+        }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'linear_cli_error',
+        message: 'ENOENT: missing workpad file',
+        status: 500
+      }
+    });
+    expect(setExitCode).toHaveBeenCalledWith(1);
   });
 });

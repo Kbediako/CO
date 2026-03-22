@@ -551,15 +551,56 @@ describe('resolveLiveLinearTrackedIssues', () => {
 });
 
 describe('resolveLiveLinearDispatchRecommendation', () => {
-  it('stops paging once the first eligible live issue is found in provider order', async () => {
+  it('selects the first eligible issue in dispatch order rather than provider page order', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         variables?: { after?: string | null; limit?: number };
       };
-      if ((body.variables?.after ?? null) !== null) {
-        throw new Error('live recommendation should not fetch later pages once an eligible issue is found');
-      }
       expect(body.variables?.limit).toBe(50);
+      if ((body.variables?.after ?? null) === null) {
+        return jsonResponse({
+          data: {
+            viewer: {
+              organization: {
+                id: 'lin-workspace-1'
+              }
+            },
+            issues: {
+              pageInfo: {
+                hasNextPage: true,
+                endCursor: 'cursor-1'
+              },
+              nodes: [
+                {
+                  id: 'lin-issue-newest',
+                  identifier: 'PREPROD-201',
+                  title: 'Newest eligible issue',
+                  priority: 3,
+                  createdAt: '2026-03-20T04:00:00.000Z',
+                  updatedAt: '2026-03-21T04:00:00.000Z',
+                  state: {
+                    name: 'In Progress',
+                    type: 'started'
+                  },
+                  team: {
+                    id: 'lin-team-1',
+                    key: 'PREPROD',
+                    name: 'PRE-PRO/PRODUCTION'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'Icon Agency (Bookings)'
+                  },
+                  inverseRelations: { nodes: [] },
+                  history: { nodes: [] }
+                }
+              ]
+            }
+          }
+        });
+      }
+
+      expect(body.variables?.after).toBe('cursor-1');
       return jsonResponse({
         data: {
           viewer: {
@@ -569,17 +610,17 @@ describe('resolveLiveLinearDispatchRecommendation', () => {
           },
           issues: {
             pageInfo: {
-              hasNextPage: true,
-              endCursor: 'cursor-1'
+              hasNextPage: false,
+              endCursor: null
             },
             nodes: [
               {
-                id: 'lin-issue-newest',
-                identifier: 'PREPROD-201',
-                title: 'Newest eligible issue',
-                priority: 3,
-                createdAt: '2026-03-20T04:00:00.000Z',
-                updatedAt: '2026-03-21T04:00:00.000Z',
+                id: 'lin-issue-priority',
+                identifier: 'PREPROD-101',
+                title: 'Higher-priority eligible issue',
+                priority: 1,
+                createdAt: '2026-03-18T04:00:00.000Z',
+                updatedAt: '2026-03-20T04:00:00.000Z',
                 state: {
                   name: 'In Progress',
                   type: 'started'
@@ -620,12 +661,12 @@ describe('resolveLiveLinearDispatchRecommendation', () => {
       fetchImpl
     });
 
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({
       kind: 'ready',
       tracked_issue: {
-        identifier: 'PREPROD-201',
-        title: 'Newest eligible issue',
+        identifier: 'PREPROD-101',
+        title: 'Higher-priority eligible issue',
         state: 'In Progress'
       }
     });

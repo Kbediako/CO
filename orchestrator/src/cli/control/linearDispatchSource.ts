@@ -181,9 +181,7 @@ export async function resolveLiveLinearDispatchRecommendation(input: {
     sourceSetup: input.sourceSetup,
     env: input.env,
     fetchImpl: input.fetchImpl,
-    limit: DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE,
-    sortForDispatch: false,
-    stopWhenEligibleForExecution: true
+    limit: DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE
   });
   if (trackedIssuesResolution.kind !== 'ready') {
     return trackedIssuesResolution;

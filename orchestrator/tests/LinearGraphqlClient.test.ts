@@ -76,12 +76,61 @@ describe('linearGraphqlClient', () => {
     });
   });
 
-  it('resolves auth and timeout from the existing Linear env keys', () => {
+  it('treats non-ok responses as request failures without parsing the response body', async () => {
+    const json = vi.fn();
+    const result = await executeLinearGraphql({
+      token: 'lin-api-token',
+      timeoutMs: 30_000,
+      fetchImpl: vi.fn(async () =>
+        ({
+          ok: false,
+          status: 503,
+          json
+        }) as Response
+      ),
+      query: 'query Viewer { viewer { id } }'
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      failure: {
+        kind: 'request_failed',
+        status: 503,
+        errors: []
+      }
+    });
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it('resolves auth and timeout from the Linear env keys with the expected precedence', () => {
     expect(
       resolveLinearApiToken({
-        CO_LINEAR_API_KEY: 'legacy-token'
+        CO_LINEAR_API_TOKEN: ' primary-token ',
+        CO_LINEAR_API_KEY: 'legacy-token',
+        LINEAR_API_KEY: 'fallback-token'
+      })
+    ).toBe('primary-token');
+    expect(
+      resolveLinearApiToken({
+        CO_LINEAR_API_TOKEN: '   ',
+        CO_LINEAR_API_KEY: ' legacy-token ',
+        LINEAR_API_KEY: 'fallback-token'
       })
     ).toBe('legacy-token');
+    expect(
+      resolveLinearApiToken({
+        CO_LINEAR_API_TOKEN: '',
+        CO_LINEAR_API_KEY: '   ',
+        LINEAR_API_KEY: ' fallback-token '
+      })
+    ).toBe('fallback-token');
+    expect(
+      resolveLinearApiToken({
+        CO_LINEAR_API_TOKEN: '',
+        CO_LINEAR_API_KEY: '   ',
+        LINEAR_API_KEY: ''
+      })
+    ).toBeNull();
     expect(
       resolveLinearRequestTimeoutMs({
         CO_LINEAR_REQUEST_TIMEOUT_MS: '45000'

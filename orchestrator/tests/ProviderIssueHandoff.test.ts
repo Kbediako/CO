@@ -1638,6 +1638,40 @@ describe('createProviderIssueHandoffService', () => {
     'releases an active run promptly when a direct webhook moves the issue to %s',
     async (reviewState) => {
       const { root, paths } = await createHostPaths();
+      const otherEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-webhook-review-release-other-pipeline'
+      };
+      const otherPaths = resolveRunPaths(otherEnv, 'run-webhook-review-release-other-pipeline');
+      await mkdir(otherPaths.runDir, { recursive: true });
+      await writeFile(
+        otherPaths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-webhook-review-release-other-pipeline',
+          task_id: 'task-webhook-review-release-other-pipeline',
+          pipeline_id: 'provider-linear-worker',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_updated_at: '2026-03-19T04:20:00.000Z',
+          updated_at: '2026-03-19T04:31:00.000Z'
+        }),
+        'utf8'
+      );
+      const otherEndpoint = await createControlEndpointServer();
+      await writeFile(
+        join(otherPaths.runDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: otherEndpoint.baseUrl,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+      await writeFile(otherPaths.controlAuthPath, JSON.stringify({ token: 'other-child-token' }), 'utf8');
+
       const childEnv = {
         repoRoot: root,
         runsRoot: join(root, '.runs'),
@@ -1651,6 +1685,7 @@ describe('createProviderIssueHandoffService', () => {
         JSON.stringify({
           run_id: 'run-webhook-review-release',
           task_id: 'task-webhook-review-release',
+          pipeline_id: 'diagnostics',
           status: 'in_progress',
           issue_provider: 'linear',
           issue_id: 'lin-issue-1',
@@ -1737,8 +1772,10 @@ describe('createProviderIssueHandoffService', () => {
             })
           ]);
         });
+        expect(otherEndpoint.actions).toEqual([]);
       } finally {
         await endpoint.close();
+        await otherEndpoint.close();
       }
 
       expect(state.claims[0]).toMatchObject({
@@ -4549,7 +4586,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
-  it('releases inactive issues on refresh and cancels the active child run', async () => {
+  it('releases inactive issues on refresh and cancels only the matching-pipeline child run', async () => {
     const { root, paths } = await createHostPaths();
     const queuedEnv = {
       repoRoot: root,
@@ -4564,12 +4601,13 @@ describe('createProviderIssueHandoffService', () => {
       JSON.stringify({
         run_id: 'run-queued',
         task_id: 'task-1303-000-queued',
-        status: 'queued',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
         issue_updated_at: '2026-03-19T04:20:00.000Z',
-        updated_at: '2026-03-19T04:29:00.000Z'
+        updated_at: '2026-03-19T04:31:00.000Z'
       }),
       'utf8'
     );
@@ -4597,6 +4635,7 @@ describe('createProviderIssueHandoffService', () => {
       JSON.stringify({
         run_id: 'run-child',
         task_id: 'task-1303-active',
+        pipeline_id: 'diagnostics',
         status: 'in_progress',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
@@ -4657,6 +4696,7 @@ describe('createProviderIssueHandoffService', () => {
       state,
       persist,
       launcher,
+      startPipelineId: 'diagnostics',
       resolveTrackedIssue: async () => ({
         kind: 'ready',
         trackedIssue: createTrackedIssue({
@@ -6329,8 +6369,32 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('keeps released claims released during rehydrate while an in-progress child run still exists', async () => {
+  it('keeps released claims bound to the matching pipeline during rehydrate while another pipeline stays active', async () => {
     const { root, paths } = await createHostPaths();
+    const otherEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-active-other-pipeline'
+    };
+    const otherPaths = resolveRunPaths(otherEnv, 'run-active-other-pipeline');
+    await mkdir(otherPaths.runDir, { recursive: true });
+    await writeFile(
+      otherPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active-other-pipeline',
+        task_id: 'task-1303-active-other-pipeline',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+
     const childEnv = {
       repoRoot: root,
       runsRoot: join(root, '.runs'),
@@ -6344,6 +6408,7 @@ describe('createProviderIssueHandoffService', () => {
       JSON.stringify({
         run_id: 'run-active',
         task_id: 'task-1303-active',
+        pipeline_id: 'diagnostics',
         status: 'in_progress',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
@@ -6385,6 +6450,7 @@ describe('createProviderIssueHandoffService', () => {
       paths,
       state,
       persist,
+      startPipelineId: 'diagnostics',
       launcher: {
         start: vi.fn(async () => null),
         resume: vi.fn(async () => undefined)

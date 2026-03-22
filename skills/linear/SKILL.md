@@ -42,6 +42,7 @@ The body must contain the `## Codex Workpad` marker.
 ## State Transition
 
 Move the issue by state name. The helper resolves the target `stateId` from the issue's team workflow states.
+Use `Human Review` when the team exposes that exact state and `In Review` when the live team uses that review-handoff alias.
 
 ```bash
 codex-orchestrator linear transition \
@@ -66,6 +67,6 @@ codex-orchestrator linear attach-pr \
 
 - Move `Todo` to `In Progress` before active coding when the issue is unblocked.
 - Keep exactly one active `## Codex Workpad` comment current.
-- Attach the PR before handing off to `Human Review`.
-- Stop coding in `Human Review`.
+- Attach the PR before handing off to `Human Review` or the live-team alias `In Review`.
+- Stop coding in `Human Review` or `In Review`.
 - Treat `Merging` and `Rework` as active workflow states.

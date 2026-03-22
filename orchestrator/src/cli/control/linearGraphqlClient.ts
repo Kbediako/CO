@@ -61,6 +61,17 @@ export async function executeLinearGraphql<TData>(input: {
     };
   }
 
+  if (!response.ok) {
+    return {
+      ok: false,
+      failure: {
+        kind: 'request_failed',
+        status: response.status,
+        errors: []
+      }
+    };
+  }
+
   let payload: LinearGraphqlPayload<TData>;
   try {
     payload = (await response.json()) as LinearGraphqlPayload<TData>;
@@ -83,17 +94,6 @@ export async function executeLinearGraphql<TData>(input: {
         kind: 'graphql_error',
         status: response.status,
         errors
-      }
-    };
-  }
-
-  if (!response.ok) {
-    return {
-      ok: false,
-      failure: {
-        kind: 'request_failed',
-        status: response.status,
-        errors: []
       }
     };
   }

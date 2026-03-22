@@ -167,6 +167,37 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('keeps a caller-supplied persisted scope authoritative instead of backfilling missing fields from env', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () => jsonResponse(buildIssueContextBody()));
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: null,
+        project_id: null
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token',
+        CO_LINEAR_TEAM_ID: 'lin-team-from-env',
+        CO_LINEAR_PROJECT_ID: 'lin-project-from-env'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      source_setup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: null,
+        project_id: null
+      }
+    });
+  });
+
   it('updates an existing workpad comment instead of creating a duplicate', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -510,6 +541,155 @@ describe('providerLinearWorkflowFacade', () => {
         title: 'PR 123',
         url: 'https://github.com/openai/codex-orchestrator/pull/123',
         source_type: 'url'
+      },
+      source_setup: null
+    });
+  });
+
+  it('normalizes 2xx GraphQL errors to an upstream-safe status code', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse({
+        errors: [{ message: 'Linear returned operation errors.' }]
+      })
+    );
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'issue-context',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 502,
+        details: {
+          errors: ['Linear returned operation errors.']
+        }
+      }
+    });
+  });
+
+  it('dedupes existing PR attachments using canonicalized GitHub URLs', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            attachments: {
+              nodes: [
+                {
+                  id: 'attachment-pr',
+                  title: 'PR 123',
+                  url: 'https://github.com/openai/codex-orchestrator/pull/123',
+                  sourceType: 'github'
+                }
+              ]
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearAttachGitHubPr') || body.query?.includes('ProviderLinearAttachUrl')) {
+        throw new Error('attach mutation should not run when a canonical-equivalent PR link already exists');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await attachProviderLinearIssuePr({
+      issueId: 'lin-issue-1',
+      url: 'https://www.github.com/openai/codex-orchestrator/pull/123/files?utm_source=test#discussion_r1',
+      title: 'PR 123',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'attach-pr',
+      action: 'noop',
+      via: 'existing',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      attachment: {
+        id: 'attachment-pr',
+        title: 'PR 123',
+        url: 'https://github.com/openai/codex-orchestrator/pull/123',
+        source_type: 'github'
+      },
+      source_setup: null
+    });
+  });
+
+  it('canonicalizes noisy GitHub PR URLs before creating a new attachment', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearAttachGitHubPr')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          url: 'https://github.com/openai/codex-orchestrator/pull/123',
+          title: 'PR 123'
+        });
+        return jsonResponse({
+          data: {
+            attachmentLinkGitHubPR: {
+              success: true,
+              attachment: {
+                id: 'attachment-1',
+                title: 'PR 123',
+                url: 'https://github.com/openai/codex-orchestrator/pull/123',
+                sourceType: 'github'
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearAttachUrl')) {
+        throw new Error('URL fallback should not run when the GitHub PR attachment succeeds');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await attachProviderLinearIssuePr({
+      issueId: 'lin-issue-1',
+      url: 'https://www.github.com/openai/codex-orchestrator/pull/123/files?utm_source=test#discussion_r1',
+      title: 'PR 123',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'attach-pr',
+      action: 'attached',
+      via: 'github_pr',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      attachment: {
+        id: 'attachment-1',
+        title: 'PR 123',
+        url: 'https://github.com/openai/codex-orchestrator/pull/123',
+        source_type: 'github'
       },
       source_setup: null
     });

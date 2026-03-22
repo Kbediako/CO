@@ -584,7 +584,8 @@ export function createProviderIssueHandoffService(
     for (const claim of [...options.state.claims]) {
       const claimRuns = runsByProviderIssue.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? [];
       const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(claimRuns, startPipelineId);
-      const releasedRun = claim.state === 'released' ? resolveProviderReleaseRun(claim, claimRuns) : null;
+      const releasedRun =
+        claim.state === 'released' ? resolveProviderReleaseRun(claim, attachableClaimRuns) : null;
       // Manifest-less inflight claims belong to a fresh launch attempt, so they
       // must not collapse onto older terminal-completed runs from prior sessions.
       const manifestlessDetachedClaim =
@@ -1098,7 +1099,7 @@ export function createProviderIssueHandoffService(
       }
 
       const latestRun = attachableClaimRuns[0] ?? null;
-      const releaseRun = resolveProviderReleaseRun(claim, claimRuns);
+      const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
       const resolution = await resolveRetryDispatchResolution(claim);
 
       if (resolution.kind === 'skip') {
@@ -1200,7 +1201,11 @@ export function createProviderIssueHandoffService(
           provider: 'linear',
           issueId: input.trackedIssue.id
         });
-        const releasedRun = resolveProviderReleaseRun(existing, discoveredReleasedRuns);
+        const attachableReleasedRuns = filterProviderIssueRunsForStartPipeline(
+          discoveredReleasedRuns,
+          startPipelineId
+        );
+        const releasedRun = resolveProviderReleaseRun(existing, attachableReleasedRuns);
         const releasedClaimIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
           existing.issue_updated_at ?? null,
           releasedRun?.issueUpdatedAt ?? releasedRun?.startedAt ?? null
@@ -1301,7 +1306,11 @@ export function createProviderIssueHandoffService(
             provider: 'linear',
             issueId: input.trackedIssue.id
           });
-          const releaseRun = resolveProviderReleaseRun(existing, existingRuns);
+          const attachableExistingRuns = filterProviderIssueRunsForStartPipeline(
+            existingRuns,
+            startPipelineId
+          );
+          const releaseRun = resolveProviderReleaseRun(existing, attachableExistingRuns);
           const shouldReleaseExistingRun =
             existing.state === 'starting' ||
             existing.state === 'resuming' ||
@@ -1341,7 +1350,9 @@ export function createProviderIssueHandoffService(
       );
       const latestExisting = readProviderIntakeClaim(options.state, providerKey);
       const releasedRun =
-        latestExisting?.state === 'released' ? resolveProviderReleaseRun(latestExisting, discoveredRuns) : null;
+        latestExisting?.state === 'released'
+          ? resolveProviderReleaseRun(latestExisting, attachableDiscoveredRuns)
+          : null;
       const latestClaimBase = {
         ...claimBase,
         accepted_at: latestExisting?.accepted_at ?? claimBase.accepted_at
@@ -1614,7 +1625,7 @@ export function createProviderIssueHandoffService(
             startPipelineId
           );
           const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
-          const releaseRun = resolveProviderReleaseRun(claim, claimRuns);
+          const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
           const latestRun = attachableClaimRuns[0] ?? null;
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,

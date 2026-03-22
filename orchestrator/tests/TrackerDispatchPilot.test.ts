@@ -526,7 +526,7 @@ describe('TrackerDispatchPilot', () => {
     });
   });
 
-  it('preserves provider order when multiple live Linear issues remain eligible', async () => {
+  it('uses dispatch ordering when multiple live Linear issues remain eligible', async () => {
     const fetchImpl: typeof fetch = async () =>
       new Response(
         JSON.stringify({
@@ -624,10 +624,10 @@ describe('TrackerDispatchPilot', () => {
     });
     expect(evaluation.failure).toBeNull();
     expect(evaluation.recommendation).toMatchObject({
-      issue_identifier: 'PREPROD-200',
+      issue_identifier: 'PREPROD-199',
       tracked_issue: {
-        identifier: 'PREPROD-200',
-        title: 'Newest eligible issue',
+        identifier: 'PREPROD-199',
+        title: 'Older but higher dispatch priority',
         state: 'In Progress'
       }
     });

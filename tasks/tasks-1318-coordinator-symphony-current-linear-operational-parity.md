@@ -30,6 +30,7 @@
 - [x] `docs-review` for the new planning packet. Evidence: `.runs/1318-coordinator-symphony-current-linear-operational-parity/cli/2026-03-22T08-53-40-103Z-9a43d120/manifest.json`.
 - [x] `npm run docs:check`. Evidence: `.runs/1318-coordinator-symphony-current-linear-operational-parity/cli/2026-03-22T08-53-40-103Z-9a43d120/manifest.json`.
 - [x] `npm run docs:freshness`. Evidence: `.runs/1318-coordinator-symphony-current-linear-operational-parity/cli/2026-03-22T08-53-40-103Z-9a43d120/manifest.json`.
+- [x] `node scripts/diff-budget.mjs` rerun with the explicit `1318` override reason, and the same waiver is recorded on PR `#286` through the `diff-budget-override` label plus `Diff budget override:` PR body line. Evidence: local validation rerun on 2026-03-22 after the PR feedback patchset, PR `#286`.
 
 ## Implementation
 - [x] Implement the worker-visible Linear mutation substrate. Evidence: `orchestrator/src/cli/control/linearGraphqlClient.ts`, `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`, `orchestrator/src/cli/linearCliShell.ts`, `bin/codex-orchestrator.ts`.

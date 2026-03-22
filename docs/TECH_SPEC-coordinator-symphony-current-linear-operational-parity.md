@@ -36,7 +36,7 @@ last_review: 2026-03-22
   - provider worker prompt contract with single-workpad, PR attachment, and review-handoff instructions
   - shared workflow-state classification that treats `Human Review` and `In Review` as handoff states while keeping `Merging` and `Rework` active
   - provider-linear-worker proof now records helper-operation attempts/outcomes through an env-gated local audit trail summarized into `provider-linear-worker-proof.json`
-  - live closeout still pending: clean validation, worker-path proof on `provider-linear-worker`, PR feedback, and merge
+  - local validation and live `provider-linear-worker` proof are now closed: the live proof recorded `7/7` successful helper operations and a terminal `Done` transition for `CO-1`, and follow-on provider-intake reconciliation recorded the released `not_active` terminal refresh state
 - Chosen implementation boundary for `1318`:
   - add a structured worker-visible Linear helper surface exposed through `codex-orchestrator linear ...`
   - back that helper with the existing Linear GraphQL auth/timeout transport seam instead of a new provider bridge
@@ -89,14 +89,14 @@ last_review: 2026-03-22
   - add explicit state classification helpers for current Symphony workflow states
   - add narrow proof or read-model fields only if needed to surface the latest workflow mutation outcomes
 - External dependencies / integrations:
-  - `/Users/kbediako/Code/symphony/SPEC.md`
-  - `/Users/kbediako/Code/symphony/elixir/README.md`
-  - `/Users/kbediako/Code/symphony/elixir/WORKFLOW.md`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/codex/dynamic_tool.ex`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/tracker.ex`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/linear/adapter.ex`
-  - `/Users/kbediako/Code/symphony/elixir/test/symphony_elixir/live_e2e_test.exs`
-  - `/Users/kbediako/Code/symphony/.codex/skills/linear/SKILL.md`
+  - Symphony `SPEC.md`
+  - Symphony Elixir `README.md`
+  - Symphony Elixir `WORKFLOW.md`
+  - Symphony Elixir `lib/symphony_elixir/codex/dynamic_tool.ex`
+  - Symphony Elixir `lib/symphony_elixir/tracker.ex`
+  - Symphony Elixir `lib/symphony_elixir/linear/adapter.ex`
+  - Symphony Elixir `test/symphony_elixir/live_e2e_test.exs`
+  - Symphony Linear skill guide (`linear` SKILL)
   - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
   - `orchestrator/src/cli/control/linearDispatchSource.ts`
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`

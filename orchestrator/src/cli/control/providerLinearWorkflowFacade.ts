@@ -532,7 +532,8 @@ export async function attachProviderLinearIssuePr(input: {
   if (!url) {
     return failure('attach-pr', 'linear_pr_url_missing', 'PR URL is required.', 422);
   }
-  if (!isGitHubPullRequestUrl(url)) {
+  const parsedPullRequestUrl = parseGitHubPullRequestUrl(url);
+  if (!parsedPullRequestUrl) {
     return failure(
       'attach-pr',
       'linear_pr_url_invalid',
@@ -551,7 +552,10 @@ export async function attachProviderLinearIssuePr(input: {
     return failure('attach-pr', context.error.code, context.error.message, context.error.status, context.error.details);
   }
 
-  const existingAttachment = context.issue.attachments.find((entry) => normalizeOptionalString(entry.url) === url) ?? null;
+  const existingAttachment =
+    context.issue.attachments.find(
+      (entry) => parseGitHubPullRequestUrl(entry.url)?.comparisonKey === parsedPullRequestUrl.comparisonKey
+    ) ?? null;
   if (existingAttachment) {
     return {
       ok: true,
@@ -575,7 +579,7 @@ export async function attachProviderLinearIssuePr(input: {
     query: buildAttachGithubPrMutation(),
     variables: {
       issueId: context.issue.id,
-      url,
+      url: parsedPullRequestUrl.canonicalUrl,
       title
     }
   });
@@ -607,8 +611,8 @@ export async function attachProviderLinearIssuePr(input: {
     query: buildAttachUrlMutation(),
     variables: {
       issueId: context.issue.id,
-      url,
-      title: title ?? url
+      url: parsedPullRequestUrl.canonicalUrl,
+      title: title ?? parsedPullRequestUrl.canonicalUrl
     }
   });
   if (!urlResult.ok) {
@@ -1063,15 +1067,23 @@ function resolveWorkflowSourceSetup(
   sourceSetup: DispatchPilotSourceSetup | null | undefined,
   env: NodeJS.ProcessEnv
 ): DispatchPilotSourceSetup | null {
-  const resolved = resolveLinearSourceSetup(
-    {
-      provider: 'linear',
-      workspace_id: sourceSetup?.workspace_id ?? null,
-      team_id: sourceSetup?.team_id ?? null,
-      project_id: sourceSetup?.project_id ?? null
-    },
-    env
-  );
+  const resolved =
+    sourceSetup == null
+      ? resolveLinearSourceSetup(
+          {
+            provider: 'linear',
+            workspace_id: null,
+            team_id: null,
+            project_id: null
+          },
+          env
+        )
+      : {
+          provider: 'linear' as const,
+          workspace_id: sourceSetup.workspace_id ?? null,
+          team_id: sourceSetup.team_id ?? null,
+          project_id: sourceSetup.project_id ?? null
+        };
   return resolved.workspace_id || resolved.team_id || resolved.project_id ? resolved : null;
 }
 
@@ -1253,7 +1265,7 @@ function mapGraphqlFailure(failureValue: LinearGraphqlFailure): ProviderLinearWo
     return {
       code: 'linear_graphql_error',
       message: 'Linear GraphQL returned operation errors.',
-      status: failureValue.status ?? 422,
+      status: normalizeGraphqlFailureStatus(failureValue.status),
       details: {
         errors: failureValue.errors.map((entry) => entry.message ?? 'unknown_error')
       }
@@ -1401,17 +1413,50 @@ function normalizeComparableValue(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function isGitHubPullRequestUrl(value: string): boolean {
+function normalizeGraphqlFailureStatus(status: number | null | undefined): number {
+  return typeof status === 'number' && Number.isFinite(status) && status >= 400 ? status : 502;
+}
+
+function parseGitHubPullRequestUrl(
+  value: string | null | undefined
+): {
+  canonicalUrl: string;
+  comparisonKey: string;
+} | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+
   let parsed: URL;
   try {
-    parsed = new URL(value);
+    parsed = new URL(normalized);
   } catch {
-    return false;
+    return null;
   }
   const hostname = parsed.hostname.toLowerCase();
   if (hostname !== 'github.com' && hostname !== 'www.github.com') {
-    return false;
+    return null;
   }
   const segments = parsed.pathname.split('/').filter(Boolean);
-  return segments.length >= 4 && segments[2] === 'pull' && /^\d+$/u.test(segments[3] ?? '');
+  const owner = normalizeRequiredString(segments[0] ?? null);
+  const repo = normalizeRequiredString(segments[1] ?? null);
+  const resource = normalizeComparableValue(segments[2] ?? '');
+  const pullNumber = normalizePullRequestNumber(segments[3] ?? null);
+  if (!owner || !repo || resource !== 'pull' || !pullNumber) {
+    return null;
+  }
+
+  return {
+    canonicalUrl: `https://github.com/${owner}/${repo}/pull/${pullNumber}`,
+    comparisonKey: `https://github.com/${owner.toLowerCase()}/${repo.toLowerCase()}/pull/${pullNumber}`
+  };
+}
+
+function normalizePullRequestNumber(value: string | null | undefined): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized || !/^\d+$/u.test(normalized)) {
+    return null;
+  }
+  return String(Number.parseInt(normalized, 10));
 }

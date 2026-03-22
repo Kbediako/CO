@@ -46,6 +46,19 @@ interface LinearCliShellDependencies {
   setExitCode: (code: number) => void;
 }
 
+interface LinearCliUsageFailureResult {
+  ok: false;
+  error: {
+    code: string;
+    message: string;
+    status: number;
+  };
+}
+
+type LinearCliUsageError = Error & {
+  result: LinearCliUsageFailureResult;
+};
+
 const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   getProviderLinearIssueContext,
   upsertProviderLinearWorkpadComment,
@@ -67,88 +80,98 @@ export async function runLinearCliShell(
   overrides: Partial<LinearCliShellDependencies> = {}
 ): Promise<void> {
   const dependencies = { ...DEFAULT_DEPENDENCIES, ...overrides };
-  const env = dependencies.getEnv();
-  const positionals = [...params.positionals];
-  const subcommand = positionals.shift();
-  const wantsHelp =
-    params.flags['help'] === true
-    || params.flags['--help'] === true
-    || params.flags['h'] === true
-    || !subcommand
-    || subcommand === 'help'
-    || subcommand === '--help'
-    || subcommand === '-h';
+  try {
+    const env = dependencies.getEnv();
+    const positionals = [...params.positionals];
+    const subcommand = positionals.shift();
+    const wantsHelp =
+      params.flags['help'] === true
+      || params.flags['--help'] === true
+      || params.flags['h'] === true
+      || !subcommand
+      || subcommand === 'help'
+      || subcommand === '--help'
+      || subcommand === '-h';
 
-  if (wantsHelp) {
-    params.printHelp();
-    return;
-  }
+    if (wantsHelp) {
+      params.printHelp();
+      return;
+    }
 
-  if (positionals.length > 0) {
-    throw new Error(`linear does not accept extra positional arguments: ${positionals.join(' ')}`);
-  }
+    if (positionals.length > 0) {
+      throw usageError(
+        'linear_extra_arguments',
+        `linear does not accept extra positional arguments: ${positionals.join(' ')}`
+      );
+    }
 
-  switch (subcommand) {
-    case 'issue-context': {
-      assertAllowedFlags(params.flags, ['format', 'issue-id', 'workspace-id', 'team-id', 'project-id']);
-      const result = await dependencies.getProviderLinearIssueContext({
-        issueId: requireFlag(params.flags, 'issue-id'),
-        sourceSetup: readSourceSetup(params.flags),
-        env
-      });
-      await recordAuditResult(result, params.flags, env, dependencies);
-      emitJsonResult(result, dependencies);
-      return;
+    switch (subcommand) {
+      case 'issue-context': {
+        assertAllowedFlags(params.flags, ['format', 'issue-id', 'workspace-id', 'team-id', 'project-id']);
+        const result = await dependencies.getProviderLinearIssueContext({
+          issueId: requireFlag(params.flags, 'issue-id'),
+          sourceSetup: readSourceSetup(params.flags),
+          env
+        });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'upsert-workpad': {
+        assertAllowedFlags(params.flags, [
+          'format',
+          'issue-id',
+          'workspace-id',
+          'team-id',
+          'project-id',
+          'body',
+          'body-file',
+          'comment-id'
+        ]);
+        const result = await dependencies.upsertProviderLinearWorkpadComment({
+          issueId: requireFlag(params.flags, 'issue-id'),
+          body: await resolveBody(params.flags, dependencies.readTextFile),
+          commentId: readStringFlag(params.flags, 'comment-id') ?? null,
+          sourceSetup: readSourceSetup(params.flags),
+          env
+        });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'transition': {
+        assertAllowedFlags(params.flags, ['format', 'issue-id', 'workspace-id', 'team-id', 'project-id', 'state']);
+        const result = await dependencies.transitionProviderLinearIssueState({
+          issueId: requireFlag(params.flags, 'issue-id'),
+          stateName: requireFlag(params.flags, 'state'),
+          sourceSetup: readSourceSetup(params.flags),
+          env
+        });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'attach-pr': {
+        assertAllowedFlags(params.flags, ['format', 'issue-id', 'workspace-id', 'team-id', 'project-id', 'url', 'title']);
+        const result = await dependencies.attachProviderLinearIssuePr({
+          issueId: requireFlag(params.flags, 'issue-id'),
+          url: requireFlag(params.flags, 'url'),
+          title: readStringFlag(params.flags, 'title') ?? null,
+          sourceSetup: readSourceSetup(params.flags),
+          env
+        });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      default:
+        throw usageError('linear_unknown_subcommand', `Unknown linear subcommand: ${subcommand}`);
     }
-    case 'upsert-workpad': {
-      assertAllowedFlags(params.flags, [
-        'format',
-        'issue-id',
-        'workspace-id',
-        'team-id',
-        'project-id',
-        'body',
-        'body-file',
-        'comment-id'
-      ]);
-      const result = await dependencies.upsertProviderLinearWorkpadComment({
-        issueId: requireFlag(params.flags, 'issue-id'),
-        body: await resolveBody(params.flags, dependencies.readTextFile),
-        commentId: readStringFlag(params.flags, 'comment-id') ?? null,
-        sourceSetup: readSourceSetup(params.flags),
-        env
-      });
-      await recordAuditResult(result, params.flags, env, dependencies);
-      emitJsonResult(result, dependencies);
-      return;
-    }
-    case 'transition': {
-      assertAllowedFlags(params.flags, ['format', 'issue-id', 'workspace-id', 'team-id', 'project-id', 'state']);
-      const result = await dependencies.transitionProviderLinearIssueState({
-        issueId: requireFlag(params.flags, 'issue-id'),
-        stateName: requireFlag(params.flags, 'state'),
-        sourceSetup: readSourceSetup(params.flags),
-        env
-      });
-      await recordAuditResult(result, params.flags, env, dependencies);
-      emitJsonResult(result, dependencies);
-      return;
-    }
-    case 'attach-pr': {
-      assertAllowedFlags(params.flags, ['format', 'issue-id', 'workspace-id', 'team-id', 'project-id', 'url', 'title']);
-      const result = await dependencies.attachProviderLinearIssuePr({
-        issueId: requireFlag(params.flags, 'issue-id'),
-        url: requireFlag(params.flags, 'url'),
-        title: readStringFlag(params.flags, 'title') ?? null,
-        sourceSetup: readSourceSetup(params.flags),
-        env
-      });
-      await recordAuditResult(result, params.flags, env, dependencies);
-      emitJsonResult(result, dependencies);
-      return;
-    }
-    default:
-      throw new Error(`Unknown linear subcommand: ${subcommand}`);
+  } catch (error) {
+    emitJsonResult(
+      isLinearCliUsageError(error) ? error.result : failureResult('linear_cli_error', resolveErrorMessage(error), 500),
+      dependencies
+    );
   }
 }
 
@@ -166,21 +189,26 @@ function assertAllowedFlags(flags: ArgMap, allowed: string[]): void {
   const allowedSet = new Set([...allowed, 'help', '--help', 'h']);
   for (const key of Object.keys(flags)) {
     if (!allowedSet.has(key)) {
-      throw new Error(`Unknown linear flag: --${key}`);
+      throw usageError('linear_unknown_flag', `Unknown linear flag: --${key}`);
     }
   }
   const format = flags['format'];
   if (format !== undefined && format !== 'json') {
-    throw new Error('linear only supports --format json.');
+    throw usageError('linear_format_unsupported', 'linear only supports --format json.');
   }
 }
 
 function requireFlag(flags: ArgMap, key: string): string {
   const value = readStringFlag(flags, key);
   if (!value) {
-    throw new Error(`--${key} is required.`);
+    throw usageError('linear_missing_flag', `--${key} is required.`);
   }
   return value;
+}
+
+function readRawStringFlag(flags: ArgMap, key: string): string | undefined {
+  const value = flags[key];
+  return typeof value === 'string' ? value : undefined;
 }
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
@@ -211,18 +239,49 @@ async function resolveBody(
   flags: ArgMap,
   readTextFile: (path: string) => Promise<string>
 ): Promise<string> {
-  const inlineBody = readStringFlag(flags, 'body');
+  const inlineBody = readRawStringFlag(flags, 'body');
   const bodyFile = readStringFlag(flags, 'body-file');
-  if (inlineBody && bodyFile) {
-    throw new Error('Use either --body or --body-file, not both.');
+  const hasInlineBody = typeof inlineBody === 'string' && inlineBody.trim().length > 0;
+  if (hasInlineBody && bodyFile) {
+    throw usageError('linear_body_conflict', 'Use either --body or --body-file, not both.');
   }
-  if (inlineBody) {
+  if (hasInlineBody) {
     return inlineBody;
   }
   if (bodyFile) {
     return await readTextFile(bodyFile);
   }
-  throw new Error('--body or --body-file is required.');
+  throw usageError('linear_body_missing', '--body or --body-file is required.');
+}
+
+function usageError(code: string, message: string): LinearCliUsageError {
+  const error = new Error(message) as LinearCliUsageError;
+  error.result = failureResult(code, message, 422);
+  return error;
+}
+
+function isLinearCliUsageError(error: unknown): error is LinearCliUsageError {
+  return (
+    error instanceof Error
+    && typeof (error as Partial<LinearCliUsageError>).result?.error?.code === 'string'
+    && typeof (error as Partial<LinearCliUsageError>).result?.error?.message === 'string'
+    && typeof (error as Partial<LinearCliUsageError>).result?.error?.status === 'number'
+  );
+}
+
+function failureResult(code: string, message: string, status: number): LinearCliUsageFailureResult {
+  return {
+    ok: false,
+    error: {
+      code,
+      message,
+      status
+    }
+  };
+}
+
+function resolveErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 type LinearCliResult =
