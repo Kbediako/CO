@@ -290,6 +290,23 @@ export function createProviderIssueHandoffService(
 
   rebuildRetryQueue();
 
+  const buildTrackedIssueClaimFields = (
+    trackedIssue: Pick<
+      LiveLinearTrackedIssue,
+      'identifier' | 'title' | 'state' | 'state_type' | 'updated_at' | 'blocked_by'
+    >
+  ): Pick<
+    ProviderIntakeClaimRecord,
+    'issue_identifier' | 'issue_title' | 'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'issue_blocked_by'
+  > => ({
+    issue_identifier: trackedIssue.identifier,
+    issue_title: trackedIssue.title,
+    issue_state: trackedIssue.state,
+    issue_state_type: trackedIssue.state_type,
+    issue_updated_at: trackedIssue.updated_at,
+    ...(trackedIssue.blocked_by === undefined ? {} : { issue_blocked_by: trackedIssue.blocked_by })
+  });
+
   const launchResumeForRun = async (input: {
     claim: ProviderIntakeClaimRecord;
     trackedIssue: LiveLinearTrackedIssue;
@@ -302,11 +319,7 @@ export function createProviderIssueHandoffService(
     const launchToken = createProviderLaunchToken();
     await upsertProviderClaimAndPersist({
       ...input.claim,
-      issue_identifier: input.trackedIssue.identifier,
-      issue_title: input.trackedIssue.title,
-      issue_state: input.trackedIssue.state,
-      issue_state_type: input.trackedIssue.state_type,
-      issue_updated_at: input.trackedIssue.updated_at,
+      ...buildTrackedIssueClaimFields(input.trackedIssue),
       task_id: input.run.taskId,
       state: 'resuming',
       reason: input.reason,
@@ -332,11 +345,7 @@ export function createProviderIssueHandoffService(
       const failureReason = input.failureReason ?? 'provider_issue_refresh_resume_failed';
       await upsertProviderClaimAndPersist({
         ...input.claim,
-        issue_identifier: input.trackedIssue.identifier,
-        issue_title: input.trackedIssue.title,
-        issue_state: input.trackedIssue.state,
-        issue_state_type: input.trackedIssue.state_type,
-        issue_updated_at: input.trackedIssue.updated_at,
+        ...buildTrackedIssueClaimFields(input.trackedIssue),
         task_id: input.run.taskId,
         state: 'handoff_failed',
         reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
@@ -370,11 +379,7 @@ export function createProviderIssueHandoffService(
     const launchToken = createProviderLaunchToken();
     await upsertProviderClaimAndPersist({
       ...input.claim,
-      issue_identifier: input.trackedIssue.identifier,
-      issue_title: input.trackedIssue.title,
-      issue_state: input.trackedIssue.state,
-      issue_state_type: input.trackedIssue.state_type,
-      issue_updated_at: input.trackedIssue.updated_at,
+      ...buildTrackedIssueClaimFields(input.trackedIssue),
       task_id: taskId,
       mapping_source: 'provider_id_fallback',
       state: 'starting',
@@ -408,11 +413,7 @@ export function createProviderIssueHandoffService(
       const failureReason = input.failureReason ?? 'provider_issue_refresh_start_failed';
       await upsertProviderClaimAndPersist({
         ...input.claim,
-        issue_identifier: input.trackedIssue.identifier,
-        issue_title: input.trackedIssue.title,
-        issue_state: input.trackedIssue.state,
-        issue_state_type: input.trackedIssue.state_type,
-        issue_updated_at: input.trackedIssue.updated_at,
+        ...buildTrackedIssueClaimFields(input.trackedIssue),
         task_id: taskId,
         mapping_source: 'provider_id_fallback',
         state: 'handoff_failed',
@@ -434,11 +435,7 @@ export function createProviderIssueHandoffService(
     const claim = startedRun
       ? upsertProviderIntakeClaim(options.state, {
           ...input.claim,
-          issue_identifier: input.trackedIssue.identifier,
-          issue_title: input.trackedIssue.title,
-          issue_state: input.trackedIssue.state,
-          issue_state_type: input.trackedIssue.state_type,
-          issue_updated_at: input.trackedIssue.updated_at,
+          ...buildTrackedIssueClaimFields(input.trackedIssue),
           task_id: taskId,
           mapping_source: 'provider_id_fallback',
           state: 'starting',
@@ -472,7 +469,7 @@ export function createProviderIssueHandoffService(
     releaseRun: ProviderIssueRunRecord | null;
     trackedIssue?: Pick<
       LiveLinearTrackedIssue,
-      'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
+      'identifier' | 'title' | 'state' | 'state_type' | 'updated_at' | 'blocked_by'
     > | null;
     cleanupWorkspace?: boolean;
   }): Promise<void> => {
@@ -480,7 +477,11 @@ export function createProviderIssueHandoffService(
     const nextTaskId = input.releaseRun?.taskId ?? input.claim.task_id;
     const nextRunId = input.releaseRun?.runId ?? input.claim.run_id;
     const nextManifestPath = input.releaseRun?.manifestPath ?? input.claim.run_manifest_path;
+    const trackedIssueFields = input.trackedIssue
+      ? buildTrackedIssueClaimFields(input.trackedIssue)
+      : null;
     const transitioned = hasProviderClaimTransitioned(input.claim, {
+      ...(trackedIssueFields ?? {}),
       state: 'released',
       reason: input.nextReason,
       task_id: nextTaskId,
@@ -495,6 +496,7 @@ export function createProviderIssueHandoffService(
       issue_state: input.trackedIssue?.state ?? input.claim.issue_state,
       issue_state_type: input.trackedIssue?.state_type ?? input.claim.issue_state_type,
       issue_updated_at: input.trackedIssue?.updated_at ?? input.claim.issue_updated_at,
+      issue_blocked_by: input.trackedIssue?.blocked_by ?? input.claim.issue_blocked_by ?? null,
       task_id: nextTaskId,
       state: 'released',
       reason: input.nextReason,
@@ -885,14 +887,37 @@ export function createProviderIssueHandoffService(
     previousRun: ProviderIssueRunRecord | null;
     trackedIssueRefetch: ProviderTrackedIssueRefetch | null;
   }): Promise<ProviderIntakeClaimRecord> => {
-    if (
-      !hasQueuedProviderIntakeRetry(input.claim) ||
-      isValidProviderRetryTimestamp(input.claim.retry_due_at)
-    ) {
-      if (input.claim.retry_queued === true && input.trackedIssueRefetch) {
+    if (!hasQueuedProviderIntakeRetry(input.claim)) {
+      return input.claim;
+    }
+    if (isValidProviderRetryTimestamp(input.claim.retry_due_at)) {
+      if (input.trackedIssueRefetch) {
         queuedRetryTrackedIssueRefetches.set(input.claim.provider_key, input.trackedIssueRefetch);
       }
-      return input.claim;
+      const trackedIssueFields = buildTrackedIssueClaimFields(input.trackedIssue);
+      const transitioned = hasProviderClaimTransitioned(input.claim, {
+        ...trackedIssueFields,
+        state: input.claim.state,
+        reason: input.claim.reason,
+        task_id: input.claim.task_id,
+        run_id: input.claim.run_id,
+        run_manifest_path: input.claim.run_manifest_path,
+        retry_queued: input.claim.retry_queued,
+        retry_attempt: input.claim.retry_attempt,
+        retry_due_at: input.claim.retry_due_at,
+        retry_error: input.claim.retry_error
+      });
+      if (!transitioned) {
+        return input.claim;
+      }
+      const queuedRetrySnapshot = captureProviderStateSnapshot();
+      const nextClaim = upsertProviderIntakeClaim(options.state, {
+        ...input.claim,
+        ...trackedIssueFields
+      });
+      await persistStateOrRollback(queuedRetrySnapshot);
+      options.publishRuntime?.('provider-intake.refresh');
+      return nextClaim;
     }
 
     const queuedRetryFields = buildQueuedProviderRetryFields({
@@ -909,11 +934,7 @@ export function createProviderIssueHandoffService(
     const queuedRetrySnapshot = captureProviderStateSnapshot();
     const nextClaim = upsertProviderIntakeClaim(options.state, {
       ...input.claim,
-      issue_identifier: input.trackedIssue.identifier,
-      issue_title: input.trackedIssue.title,
-      issue_state: input.trackedIssue.state,
-      issue_state_type: input.trackedIssue.state_type,
-      issue_updated_at: input.trackedIssue.updated_at,
+      ...buildTrackedIssueClaimFields(input.trackedIssue),
       task_id: input.previousRun?.taskId ?? input.claim.task_id,
       run_id: input.previousRun?.runId ?? input.claim.run_id,
       run_manifest_path: input.previousRun?.manifestPath ?? input.claim.run_manifest_path,
@@ -1184,11 +1205,7 @@ export function createProviderIssueHandoffService(
         provider: 'linear' as const,
         provider_key: providerKey,
         issue_id: input.trackedIssue.id,
-        issue_identifier: input.trackedIssue.identifier,
-        issue_title: input.trackedIssue.title,
-        issue_state: input.trackedIssue.state,
-        issue_state_type: input.trackedIssue.state_type,
-        issue_updated_at: input.trackedIssue.updated_at,
+        ...buildTrackedIssueClaimFields(input.trackedIssue),
         last_delivery_id: input.deliveryId,
         last_event: input.event,
         last_action: input.action,
@@ -1267,6 +1284,12 @@ export function createProviderIssueHandoffService(
                 : preserveReleasedIssueMetadata
                   ? existing.issue_updated_at
                   : claimBase.issue_updated_at,
+            issue_blocked_by:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_blocked_by
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_blocked_by
+                  : claimBase.issue_blocked_by,
             task_id: releasedRun?.taskId ?? existing.task_id,
             mapping_source: existing.mapping_source,
             state: 'released',
@@ -1709,6 +1732,7 @@ export function createProviderIssueHandoffService(
               delayType: 'failure'
             });
             const transitioned = hasProviderClaimTransitioned(currentClaim, {
+              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
               state: 'resumable',
               reason: 'provider_issue_rehydrated_resumable_run',
               task_id: latestRun.taskId,
@@ -1719,11 +1743,7 @@ export function createProviderIssueHandoffService(
             const refreshResumableSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
               ...currentClaim,
-              issue_identifier: resolution.trackedIssue.identifier,
-              issue_title: resolution.trackedIssue.title,
-              issue_state: resolution.trackedIssue.state,
-              issue_state_type: resolution.trackedIssue.state_type,
-              issue_updated_at: resolution.trackedIssue.updated_at,
+              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
               task_id: latestRun.taskId,
               state: 'resumable',
               reason: 'provider_issue_rehydrated_resumable_run',
@@ -1749,6 +1769,7 @@ export function createProviderIssueHandoffService(
               delayType: 'continuation'
             });
             const transitioned = hasProviderClaimTransitioned(currentClaim, {
+              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
               state: 'completed',
               reason: 'provider_issue_rehydrated_completed_run',
               task_id: latestRun.taskId,
@@ -1759,11 +1780,7 @@ export function createProviderIssueHandoffService(
             const refreshCompletedSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
               ...currentClaim,
-              issue_identifier: resolution.trackedIssue.identifier,
-              issue_title: resolution.trackedIssue.title,
-              issue_state: resolution.trackedIssue.state,
-              issue_state_type: resolution.trackedIssue.state_type,
-              issue_updated_at: resolution.trackedIssue.updated_at,
+              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
               task_id: latestRun.taskId,
               state: 'completed',
               reason: 'provider_issue_rehydrated_completed_run',
@@ -2465,6 +2482,12 @@ function hasProviderClaimTransitioned(
   claim: ProviderIntakeClaimRecord,
   next: Pick<
     ProviderIntakeClaimRecord,
+    | 'issue_identifier'
+    | 'issue_title'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_updated_at'
+    | 'issue_blocked_by'
     | 'state'
     | 'reason'
     | 'task_id'
@@ -2474,9 +2497,57 @@ function hasProviderClaimTransitioned(
     | 'retry_attempt'
     | 'retry_due_at'
     | 'retry_error'
-  >
+  > | (
+    Pick<
+      ProviderIntakeClaimRecord,
+      | 'state'
+      | 'reason'
+      | 'task_id'
+      | 'run_id'
+      | 'run_manifest_path'
+      | 'retry_queued'
+      | 'retry_attempt'
+      | 'retry_due_at'
+      | 'retry_error'
+    > &
+      Partial<
+        Pick<
+          ProviderIntakeClaimRecord,
+          | 'issue_identifier'
+          | 'issue_title'
+          | 'issue_state'
+          | 'issue_state_type'
+          | 'issue_updated_at'
+          | 'issue_blocked_by'
+        >
+      >
+  )
 ): boolean {
   return (
+    (
+      next.issue_identifier !== undefined &&
+      claim.issue_identifier !== next.issue_identifier
+    ) ||
+    (
+      next.issue_title !== undefined &&
+      claim.issue_title !== next.issue_title
+    ) ||
+    (
+      next.issue_state !== undefined &&
+      claim.issue_state !== next.issue_state
+    ) ||
+    (
+      next.issue_state_type !== undefined &&
+      claim.issue_state_type !== next.issue_state_type
+    ) ||
+    (
+      next.issue_updated_at !== undefined &&
+      claim.issue_updated_at !== next.issue_updated_at
+    ) ||
+    (
+      next.issue_blocked_by !== undefined &&
+      !areProviderIssueBlockersEqual(claim.issue_blocked_by ?? null, next.issue_blocked_by ?? null)
+    ) ||
     claim.state !== next.state ||
     claim.reason !== next.reason ||
     claim.task_id !== next.task_id ||
@@ -2487,6 +2558,29 @@ function hasProviderClaimTransitioned(
     (claim.retry_due_at ?? null) !== (next.retry_due_at ?? null) ||
     (claim.retry_error ?? null) !== (next.retry_error ?? null)
   );
+}
+
+function areProviderIssueBlockersEqual(
+  left: ProviderIntakeClaimRecord['issue_blocked_by'],
+  right: ProviderIntakeClaimRecord['issue_blocked_by']
+): boolean {
+  const leftBlockers = left ?? null;
+  const rightBlockers = right ?? null;
+  if (leftBlockers === rightBlockers) {
+    return true;
+  }
+  if (!leftBlockers || !rightBlockers || leftBlockers.length !== rightBlockers.length) {
+    return false;
+  }
+  return leftBlockers.every((blocker, index) => {
+    const other = rightBlockers[index];
+    return (
+      blocker?.id === other?.id &&
+      blocker?.identifier === other?.identifier &&
+      blocker?.state === other?.state &&
+      blocker?.state_type === other?.state_type
+    );
+  });
 }
 
 function isProviderClaimRehydrationTimedOut(
@@ -2731,7 +2825,13 @@ async function resolveTrackedIssuePollResolutionWithFallback(
 function buildTrackedIssueSnapshotFromClaim(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'issue_id' | 'issue_identifier' | 'issue_title' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+    | 'issue_id'
+    | 'issue_identifier'
+    | 'issue_title'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_updated_at'
+    | 'issue_blocked_by'
   >
 ): LiveLinearTrackedIssue {
   return {
@@ -2749,7 +2849,7 @@ function buildTrackedIssueSnapshotFromClaim(
     project_id: null,
     project_name: null,
     updated_at: claim.issue_updated_at,
-    blocked_by: [],
+    blocked_by: claim.issue_blocked_by ?? [],
     recent_activity: []
   };
 }

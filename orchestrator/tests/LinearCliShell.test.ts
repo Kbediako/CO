@@ -275,6 +275,79 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('records only the explicitly requested scope for failed audit entries', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const attachProviderLinearIssuePrMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').attachProviderLinearIssuePr>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'attach-pr',
+          error: {
+            code: 'linear_graphql_error',
+            message: 'Linear GraphQL returned operation errors.',
+            status: 422
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['attach-pr'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          'workspace-id': 'lin-workspace-1',
+          url: 'https://github.com/openai/codex-orchestrator/pull/123'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        attachProviderLinearIssuePr: attachProviderLinearIssuePrMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CO_LINEAR_TEAM_ID: 'lin-team-1',
+          CO_LINEAR_PROJECT_ID: 'lin-project-1',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-03-22T12:00:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'attach-pr',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 422
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-03-22T12:00:00.000Z',
+      operation: 'attach-pr',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: null,
+        project_id: null
+      },
+      action: null,
+      via: null,
+      state: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: 'linear_graphql_error',
+      error_message: 'Linear GraphQL returned operation errors.'
+    });
+  });
+
   it('does not fail a successful helper call when audit append best-effort logging fails', async () => {
     const log = vi.fn();
     const warn = vi.fn();

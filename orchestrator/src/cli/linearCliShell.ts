@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 
 import {
-  hasLinearSourceBinding,
   resolveLinearSourceSetup,
 } from './control/linearDispatchSource.js';
 import {
@@ -403,8 +402,12 @@ function buildAuditEntry(
 }
 
 function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): DispatchPilotSourceSetup | null {
-  const sourceSetup = resolveLinearSourceSetup(
-    readSourceSetup(flags) ?? {
+  const sourceSetup = readSourceSetup(flags);
+  if (sourceSetup) {
+    return sourceSetup;
+  }
+  const resolved = resolveLinearSourceSetup(
+    {
       provider: 'linear',
       workspace_id: null,
       team_id: null,
@@ -412,5 +415,5 @@ function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): Dispatc
     },
     env
   );
-  return hasLinearSourceBinding(sourceSetup) ? sourceSetup : null;
+  return resolved.workspace_id || resolved.team_id || resolved.project_id ? resolved : null;
 }

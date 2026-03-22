@@ -3949,6 +3949,140 @@ describe('createProviderIssueHandoffService', () => {
     }));
   });
 
+  it('persists blocker metadata for queued retries before a restart falls back to snapshot-only dispatch', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      issue_blocked_by: null,
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:21:05.000Z',
+      updated_at: '2026-03-19T04:21:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    });
+
+    let persistedState = normalizeProviderIntakeState(
+      JSON.parse(JSON.stringify(state)) as ProviderIntakeState
+    );
+    const persist = vi.fn(async () => {
+      persistedState = normalizeProviderIntakeState(
+        JSON.parse(JSON.stringify(state)) as ProviderIntakeState
+      );
+    });
+
+    const liveService = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Todo',
+          state_type: 'unstarted',
+          updated_at: '2026-03-19T04:21:00.000Z',
+          blocked_by: [
+            {
+              id: 'lin-blocker-1',
+              identifier: 'CO-9',
+              state: 'In Progress',
+              state_type: 'started'
+            }
+          ]
+        })
+      })
+    });
+
+    await liveService.refresh();
+
+    expect(persist).toHaveBeenCalled();
+    expect(persistedState.claims[0]?.issue_blocked_by).toEqual([
+      {
+        id: 'lin-blocker-1',
+        identifier: 'CO-9',
+        state: 'In Progress',
+        state_type: 'started'
+      }
+    ]);
+
+    const restartedLauncher = {
+      start: vi.fn(async () => ({
+        runId: 'run-restarted',
+        manifestPath: '/tmp/provider-run/restarted-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    createProviderIssueHandoffService({
+      paths,
+      state: persistedState,
+      persist: vi.fn(async () => undefined),
+      launcher: restartedLauncher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    await flushAsyncWork();
+    await waitForCondition(
+      () =>
+        persistedState.claims[0]?.state === 'released' &&
+        persistedState.claims[0]?.reason === 'provider_issue_released:todo_blocked_by_non_terminal'
+    );
+
+    expect(restartedLauncher.start).not.toHaveBeenCalled();
+    expect(restartedLauncher.resume).not.toHaveBeenCalled();
+  });
+
   it('rebuilds queued retry ownership on rehydrate and dispatches exactly once while a refresh overlaps the due-boundary launch', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
@@ -4152,6 +4286,212 @@ describe('createProviderIssueHandoffService', () => {
     await waitForMockCalls(launcher.start, 1, 1024);
 
     expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        taskId: 'linear-lin-issue-1',
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-2'
+      })
+    );
+  });
+
+  it('releases snapshot-only Todo retries when persisted blocker metadata is still non-terminal', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      issue_blocked_by: [
+        {
+          id: 'lin-blocker-1',
+          identifier: 'CO-9',
+          state: 'In Progress',
+          state_type: 'started'
+        }
+      ],
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:21:05.000Z',
+      updated_at: '2026-03-19T04:21:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-continuation',
+        manifestPath: '/tmp/provider-run/continuation-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    await flushAsyncWork();
+    await waitForCondition(
+      () =>
+        state.claims[0]?.state === 'released' &&
+        state.claims[0]?.reason === 'provider_issue_released:todo_blocked_by_non_terminal'
+    );
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]?.retry_queued).toBeNull();
+    expect(state.claims[0]?.retry_due_at).toBeNull();
+  });
+
+  it('continues snapshot-only Todo retries when persisted blocker metadata is terminal', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      issue_blocked_by: [
+        {
+          id: 'lin-blocker-1',
+          identifier: 'CO-9',
+          state: 'Done',
+          state_type: 'completed'
+        }
+      ],
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:21:05.000Z',
+      updated_at: '2026-03-19T04:21:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-continuation',
+        manifestPath: '/tmp/provider-run/continuation-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.start, 1, 1024);
+
+    expect(launcher.resume).not.toHaveBeenCalled();
     expect(launcher.start.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         taskId: 'linear-lin-issue-1',
@@ -5859,6 +6199,9 @@ describe('createProviderIssueHandoffService', () => {
 
       const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
       expect(scheduledTimeoutCount).toBe(1);
+      const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+      expect(delayMs).toBeGreaterThanOrEqual(999);
+      expect(delayMs).toBeLessThanOrEqual(1_000);
       getLatestScheduledTimeoutCallback(setTimeoutSpy)();
       await flushAsyncWork();
       await waitForMockCalls(launcher.start, 1, 1024);
@@ -6328,6 +6671,104 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_released:not_active',
       issue_state: 'Done',
       issue_state_type: 'completed'
+    });
+  });
+
+  it('publishes released-claim refreshes when only tracked issue metadata changes', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_blocked_by: null,
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const publishRuntime = vi.fn();
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      publishRuntime,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-03-19T04:40:00.000Z',
+          blocked_by: [
+            {
+              id: 'lin-blocker-1',
+              identifier: 'CO-9',
+              state: 'Done',
+              state_type: 'completed'
+            }
+          ]
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_updated_at: '2026-03-19T04:40:00.000Z',
+      issue_blocked_by: [
+        {
+          id: 'lin-blocker-1',
+          identifier: 'CO-9',
+          state: 'Done',
+          state_type: 'completed'
+        }
+      ]
     });
   });
 
@@ -6814,6 +7255,91 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'run-active',
       run_manifest_path: childPaths.manifestPath
     });
+  });
+
+  it('preserves released blocker metadata when an equal-timestamp replay arrives with different blockers', async () => {
+    const { paths } = await createHostPaths();
+    const existingBlockers = [
+      {
+        id: 'lin-blocker-existing',
+        identifier: 'CO-9',
+        state: 'Todo',
+        state_type: 'unstarted'
+      }
+    ];
+    const incomingBlockers = [
+      {
+        id: 'lin-blocker-incoming',
+        identifier: 'CO-10',
+        state: 'In Progress',
+        state_type: 'started'
+      }
+    ];
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_blocked_by: existingBlockers,
+      task_id: 'task-1303-released',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-released',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-released',
+      run_manifest_path: '/tmp/run-released/manifest.json',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:20:00.000Z',
+        blocked_by: incomingBlockers
+      }),
+      deliveryId: 'delivery-released-replay',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_200_000
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(result.claim).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:20:00.000Z'
+    });
+    expect(result.claim.issue_blocked_by).toEqual(existingBlockers);
+    expect(state.claims[0]?.issue_blocked_by).toEqual(existingBlockers);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
   });
 
   it('relaunches a newer accepted webhook replay after the release drain has settled', async () => {
