@@ -575,6 +575,112 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-fresh')).toBeUndefined();
   });
 
+  it('does not launch more owned accepted claims than the configured poll slot budget', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-owned-1',
+        issue_id: 'lin-issue-owned-1',
+        issue_identifier: 'CO-1',
+        issue_title: 'Owned claim one',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        task_id: null,
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_accepted',
+        accepted_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:20:10.000Z',
+        last_delivery_id: null,
+        last_event: null,
+        last_action: null,
+        last_webhook_timestamp: null,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-owned-2',
+        issue_id: 'lin-issue-owned-2',
+        issue_identifier: 'CO-2',
+        issue_title: 'Owned claim two',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        task_id: null,
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_accepted',
+        accepted_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:20:10.000Z',
+        last_delivery_id: null,
+        last_event: null,
+        last_action: null,
+        last_webhook_timestamp: null,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      }
+    );
+
+    const launcher = {
+      start: vi.fn(async ({ issueId }: { issueId: string }) => ({
+        runId: `run-${issueId}`,
+        manifestPath: `/tmp/provider-run/${issueId}.json`
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      }),
+      resolveTrackedIssue: async ({ issueId }) => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: issueId === 'lin-issue-owned-1' ? 'CO-1' : 'CO-2',
+          updated_at: '2026-03-19T04:21:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        issueId: 'lin-issue-owned-1'
+      })
+    );
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-owned-1')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      run_id: 'run-lin-issue-owned-1',
+      run_manifest_path: '/tmp/provider-run/lin-issue-owned-1.json'
+    });
+    expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-owned-2')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
   it('treats ignored retry-owning poll outcomes as occupied poll slots', async () => {
     const { root, paths } = await createHostPaths();
     const completedEnv = {
@@ -3122,6 +3228,104 @@ describe('createProviderIssueHandoffService', () => {
       issueUpdatedAt: '2026-03-19T04:21:00.000Z',
       launchToken: expect.any(String)
     }));
+  });
+
+  it('dispatches persisted queued retries after the first refresh without an explicit rehydrate', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:21:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:21:05.000Z',
+      updated_at: '2026-03-19T04:21:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-continuation',
+        manifestPath: '/tmp/provider-run/continuation-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:21:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.start);
+
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        taskId: 'linear-lin-issue-1',
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-2'
+      })
+    );
   });
 
   it('keeps duplicate equal-timestamp deliveries ignored after a succeeded child run', async () => {

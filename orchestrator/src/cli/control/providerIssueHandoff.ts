@@ -284,6 +284,8 @@ export function createProviderIssueHandoffService(
     }
   }
 
+  rebuildRetryQueue();
+
   const launchResumeForRun = async (input: {
     claim: ProviderIntakeClaimRecord;
     trackedIssue: LiveLinearTrackedIssue;
@@ -1707,6 +1709,9 @@ export function createProviderIssueHandoffService(
           }
 
           if (!latestRun) {
+            if (!pollDispatchBudget.canDispatch(resolution.trackedIssue)) {
+              continue;
+            }
             await launchStartForTrackedIssue({
               claim: currentClaim,
               trackedIssue: resolution.trackedIssue,
