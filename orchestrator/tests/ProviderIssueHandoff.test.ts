@@ -2838,6 +2838,7 @@ describe('createProviderIssueHandoffService', () => {
       })),
       resume: vi.fn(async () => undefined)
     };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     const service = createProviderIssueHandoffService({
       paths,
@@ -2854,6 +2855,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -4537,6 +4539,7 @@ describe('createProviderIssueHandoffService', () => {
       }),
       resume: vi.fn(async () => undefined)
     };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     const service = createProviderIssueHandoffService({
       paths,
@@ -4553,6 +4556,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await expect(service.refresh()).resolves.toBeUndefined();
+    await waitForMockCalls(setTimeoutSpy);
 
     expect(launcher.start).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1_001);
@@ -6647,6 +6651,7 @@ describe('createProviderIssueHandoffService', () => {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
     };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     const service = createProviderIssueHandoffService({
       paths,
@@ -6662,6 +6667,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
