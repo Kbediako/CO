@@ -257,6 +257,126 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('fails closed when commentId points at an unresolved human comment', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: '## Codex Workpad\n\nUpdated plan',
+      commentId: 'comment-note',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'linear_workpad_comment_id_invalid',
+        message: 'Comment id must reference an unresolved Codex workpad comment.',
+        status: 422,
+        details: {
+          comment_id: 'comment-note'
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates the caller-selected unresolved workpad comment when commentId is valid', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-workpad-target',
+                  body: '## Codex Workpad\n\nTarget plan',
+                  url: 'https://linear.app/comment/workpad-target',
+                  createdAt: '2026-03-22T07:00:00.000Z',
+                  updatedAt: '2026-03-22T07:30:00.000Z',
+                  resolvedAt: null
+                },
+                {
+                  id: 'comment-workpad-current',
+                  body: '## Codex Workpad\n\nCurrent plan',
+                  url: 'https://linear.app/comment/workpad-current',
+                  createdAt: '2026-03-22T09:00:00.000Z',
+                  updatedAt: '2026-03-22T09:30:00.000Z',
+                  resolvedAt: null
+                }
+              ]
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad-target',
+          body: '## Codex Workpad\n\nUpdated plan'
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad-target',
+                url: 'https://linear.app/comment/workpad-target',
+                body: '## Codex Workpad\n\nUpdated plan'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: '## Codex Workpad\n\nUpdated plan',
+      commentId: 'comment-workpad-target',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-workpad-target',
+        url: 'https://linear.app/comment/workpad-target',
+        body: '## Codex Workpad\n\nUpdated plan',
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
   it('ignores resolved workpad comments when selecting the active workpad', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {

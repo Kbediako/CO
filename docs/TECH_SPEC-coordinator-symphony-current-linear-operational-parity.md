@@ -108,21 +108,17 @@ last_review: 2026-03-22
 
 ## Validation Plan
 - Tests / checks:
-  - docs-review for the planning packet
-  - `npm run docs:check`
-  - `npm run docs:freshness`
-  - implementation follow-on must run the full validation floor, plus live Linear proof of comment/state transitions
+  - docs-review passed for the planning packet in `.runs/1318-coordinator-symphony-current-linear-operational-parity/cli/2026-03-22T08-53-40-103Z-9a43d120/manifest.json`
+  - `npm run docs:check` passed during the implementation closeout lane
+  - `npm run docs:freshness` passed during the implementation closeout lane
+  - the full implementation validation floor ran before PR handoff, including delegation guard, spec guard, build, lint, test, diff-budget override recording, review, and `npm run pack:smoke`
 - Rollout verification:
-  - future implementation must prove at least one real Linear ticket can be:
-    - moved into the correct active state at kickoff
-    - updated through the persistent workpad contract
-    - moved into the correct handoff/completed state by the worker
-    - kept consistent with CO's provider-intake/read surfaces
-  - future live proof must distinguish local child-run success from ticket lifecycle completion in Linear
-  - future live proof must run through the `provider-linear-worker` pipeline, not `diagnostics`, so the actual worker mutation path is exercised
+  - live proof executed through the `provider-linear-worker` pipeline, not `diagnostics`, in `out/1318-coordinator-symphony-current-linear-operational-parity/manual/20260322T130632Z-live-provider-linear-worker-proof/`
+  - that proof exercised worker-owned Linear kickoff, persistent workpad updates, PR linkage, and terminal completion behavior against a real Linear ticket
+  - the terminal reconciliation follow-up in `out/1318-coordinator-symphony-current-linear-operational-parity/manual/20260322T133000Z-provider-intake-terminal-refresh-proof/10-reconciliation-summary.json` showed CO's provider-intake/read surfaces catching up from released/not-found drift to the final completed ticket state
 - Monitoring / alerts:
-  - future observability must record ticket-write attempts/outcomes separately from local run completion
-  - future provider lifecycle proof should show behavior when a ticket enters `Human Review` or `In Review`, `Merging`, `Rework`, and terminal states
+  - provider observability now distinguishes worker-owned ticket-write outcomes from local run completion
+  - the live/provider proof set captured the operational state map exercised for `Human Review` or live-team `In Review`, `Merging`, `Rework`, and terminal `Done`
 
 ## Open Questions
 - Should CO aim for exact current Symphony state names plus the proven `Human Review`/`In Review` alias by default, or explicit project-specific mapping with a Symphony-compatible preset?

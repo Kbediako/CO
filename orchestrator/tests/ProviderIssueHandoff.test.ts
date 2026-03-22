@@ -1791,6 +1791,117 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
+  it('preserves a foreign-pipeline active claim when a direct webhook moves the issue to Human Review', async () => {
+    const { root, paths } = await createHostPaths();
+    const otherEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-webhook-review-foreign-pipeline'
+    };
+    const otherPaths = resolveRunPaths(otherEnv, 'run-webhook-review-foreign-pipeline');
+    await mkdir(otherPaths.runDir, { recursive: true });
+    await writeFile(
+      otherPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-webhook-review-foreign-pipeline',
+        task_id: 'task-webhook-review-foreign-pipeline',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+    const otherEndpoint = await createControlEndpointServer();
+    await writeFile(
+      join(otherPaths.runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: otherEndpoint.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(otherPaths.controlAuthPath, JSON.stringify({ token: 'other-child-token' }), 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-webhook-review-foreign-pipeline',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_run_already_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-in-progress',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_049_000,
+      run_id: 'run-webhook-review-foreign-pipeline',
+      run_manifest_path: otherPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'webhook-review-foreign-pipeline-token'
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    try {
+      const result = await service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue({
+          state: 'Human Review',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:30:00.000Z'
+        }),
+        deliveryId: 'delivery-human-review-foreign-pipeline',
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_742_360_050_500
+      });
+
+      expect(result).toMatchObject({
+        kind: 'ignored',
+        reason: 'provider_issue_state_not_active'
+      });
+      expect(otherEndpoint.actions).toEqual([]);
+    } finally {
+      await otherEndpoint.close();
+    }
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_run_already_active',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      run_id: 'run-webhook-review-foreign-pipeline',
+      run_manifest_path: otherPaths.manifestPath
+    });
+    expect(persist).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('accepts started issues when the provider state name is missing', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

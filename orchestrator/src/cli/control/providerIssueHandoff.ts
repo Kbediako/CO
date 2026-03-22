@@ -1311,6 +1311,23 @@ export function createProviderIssueHandoffService(
             startPipelineId
           );
           const releaseRun = resolveProviderReleaseRun(existing, attachableExistingRuns);
+          const hasForeignActiveExistingRun =
+            !releaseRun &&
+            existingRuns.some(
+              (run) =>
+                (run.status === 'in_progress' || run.status === 'queued') &&
+                !doesProviderIssueRunMatchStartPipeline(run, startPipelineId)
+            );
+          if (
+            hasForeignActiveExistingRun &&
+            (
+              existing.state === 'starting' ||
+              existing.state === 'resuming' ||
+              existing.state === 'running'
+            )
+          ) {
+            return { kind: 'ignored', reason: eligibility.claimReason, claim: existing };
+          }
           const shouldReleaseExistingRun =
             existing.state === 'starting' ||
             existing.state === 'resuming' ||

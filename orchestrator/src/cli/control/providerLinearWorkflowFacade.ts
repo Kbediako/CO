@@ -341,13 +341,26 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
-  const selectedComment =
-    (
-      requestedCommentId
-        ? context.issue.comments.find((entry) => entry.id === requestedCommentId && entry.resolved_at === null) ?? null
-        : null
-    ) ??
-    context.issue.workpad_comment;
+  let selectedComment: ProviderLinearWorkflowComment | null;
+  if (requestedCommentId) {
+    selectedComment =
+      context.issue.comments.find(
+        (entry) => entry.id === requestedCommentId && entry.resolved_at === null && hasWorkpadMarker(entry.body)
+      ) ?? null;
+    if (!selectedComment) {
+      return failure(
+        'upsert-workpad',
+        'linear_workpad_comment_id_invalid',
+        'Comment id must reference an unresolved Codex workpad comment.',
+        422,
+        {
+          comment_id: requestedCommentId
+        }
+      );
+    }
+  } else {
+    selectedComment = context.issue.workpad_comment;
+  }
 
   if (selectedComment && selectedComment.body === body) {
     return {
