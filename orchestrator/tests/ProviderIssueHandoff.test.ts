@@ -904,10 +904,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await vi.advanceTimersByTimeAsync(1_001);
-    for (let index = 0; index < 16 && state.claims[0]?.state !== 'released'; index += 1) {
-      await vi.advanceTimersByTimeAsync(0);
-      await flushAsyncWork();
-    }
+    await waitForCondition(() => state.claims[0]?.state === 'released');
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
