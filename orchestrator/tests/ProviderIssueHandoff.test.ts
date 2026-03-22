@@ -109,6 +109,14 @@ async function flushAsyncWork(turns = 8): Promise<void> {
   }
 }
 
+const realSetImmediate = globalThis.setImmediate.bind(globalThis);
+
+async function waitForRealEventLoopTurn(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    realSetImmediate(resolve);
+  });
+}
+
 async function waitForCondition(
   predicate: () => boolean,
   turns = 256
@@ -119,6 +127,7 @@ async function waitForCondition(
     }
     await vi.advanceTimersByTimeAsync(0);
     await flushAsyncWork();
+    await waitForRealEventLoopTurn();
   }
   throw new Error(`Condition not met after ${turns} timer turns.`);
 }
@@ -4416,7 +4425,6 @@ describe('createProviderIssueHandoffService', () => {
       })),
       resume: vi.fn(async () => undefined)
     };
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     const service = createProviderIssueHandoffService({
       paths,
@@ -4433,7 +4441,11 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await service.refresh();
-    await waitForMockCalls(setTimeoutSpy);
+    await waitForCondition(
+      () =>
+        state.claims[0]?.retry_queued === true &&
+        state.claims[0]?.retry_due_at === '2026-03-19T04:30:01.000Z'
+    );
 
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(launcher.start).not.toHaveBeenCalled();
