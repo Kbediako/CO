@@ -1,7 +1,49 @@
 {
   "version": 1,
-  "generated_at": "2026-03-21",
+  "generated_at": "2026-03-22",
   "entries": [
+    {
+      "path": ".agent/task/1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
     {
       "path": ".agent/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
@@ -6047,7 +6089,7 @@
       "path": "docs/codex-orchestrator-issues.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-02-19",
+      "last_review": "2026-03-22",
       "cadence_days": 30
     },
     {

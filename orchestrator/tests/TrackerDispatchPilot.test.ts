@@ -365,7 +365,7 @@ describe('TrackerDispatchPilot', () => {
     });
     expect(evaluation.failure).toBeNull();
     expect(evaluation.recommendation).toMatchObject({
-      issue_identifier: 'task-1014',
+      issue_identifier: 'PREPROD-101',
       dispatch_id: 'dispatch-advisory-live-linear',
       tracked_issue: {
         identifier: 'PREPROD-101',
