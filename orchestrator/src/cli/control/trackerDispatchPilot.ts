@@ -309,7 +309,7 @@ export async function evaluateTrackerDispatchPilotAsync(input: {
     configured: resolved.configured,
     sourceSetup: liveResolution.source_setup,
     recommendation: {
-      issue_identifier: input.defaultIssueIdentifier ?? null,
+      issue_identifier: liveResolution.tracked_issue.identifier ?? input.defaultIssueIdentifier ?? null,
       dispatch_id: liveResolution.dispatch_id,
       summary: liveResolution.summary,
       rationale: liveResolution.rationale,

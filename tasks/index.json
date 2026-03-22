@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260322-1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency",
+      "title": "Coordinator Live Linear Restarted-Issue Intake and Dispatch Consistency",
+      "relates_to": "tasks/tasks-1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-22",
+      "paths": {
+        "spec": "tasks/specs/1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+        "task": "tasks/tasks-1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+        "agent_task": ".agent/task/1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md"
+      }
+    },
+    {
       "id": "20260322-1316-coordinator-symphony-poll-owned-discovery-and-recovery",
       "title": "Coordinator Symphony Poll-Owned Discovery Recovery and Observability API Normalization",
       "relates_to": "tasks/tasks-1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",

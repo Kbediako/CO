@@ -2926,6 +2926,21 @@ describe('ControlServer', () => {
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const realFetch = globalThis.fetch;
     let linearFetchCount = 0;
+    const events: import('../src/cli/events/runEventStream.js').RunEventStreamEntry[] = [];
+    const eventStream = {
+      append: async (entry: { event: string; actor: string; payload: Record<string, unknown> }) => {
+        const record = {
+          seq: events.length + 1,
+          event: entry.event,
+          actor: entry.actor,
+          payload: entry.payload,
+          ts: new Date().toISOString()
+        };
+        events.push(record);
+        return record;
+      },
+      close: async () => undefined
+    } as unknown as import('../src/cli/events/runEventStream.js').RunEventStream;
 
     vi.stubEnv('CO_LINEAR_API_TOKEN', 'lin-api-token');
     vi.stubGlobal('fetch', async (input, init) => {
@@ -2996,6 +3011,7 @@ describe('ControlServer', () => {
     const server = await ControlServer.start({
       paths,
       config,
+      eventStream,
       runId: 'run-1'
     });
 
@@ -3011,17 +3027,31 @@ describe('ControlServer', () => {
       expect(dispatchRes.status).toBe(200);
       const dispatchPayload = (await dispatchRes.json()) as {
         recommendation?: {
+          issue_identifier?: string | null;
           tracked_issue?: {
             identifier?: string;
             title?: string;
             team_key?: string;
           } | null;
         } | null;
+        traceability?: {
+          issue_identifier?: string | null;
+        } | null;
       };
+      expect(dispatchPayload.recommendation?.issue_identifier).toBe('PREPROD-101');
       expect(dispatchPayload.recommendation?.tracked_issue).toMatchObject({
         identifier: 'PREPROD-101',
         title: 'Investigate advisory routing',
         team_key: 'PREPROD'
+      });
+      expect(dispatchPayload.traceability?.issue_identifier).toBe('PREPROD-101');
+      const evaluatedEvent = events.find((entry) => entry.event === 'dispatch_pilot_evaluated');
+      const viewedEvent = events.find((entry) => entry.event === 'dispatch_pilot_viewed');
+      expect((evaluatedEvent?.payload ?? {}) as Record<string, unknown>).toMatchObject({
+        issue_identifier: 'PREPROD-101'
+      });
+      expect((viewedEvent?.payload ?? {}) as Record<string, unknown>).toMatchObject({
+        issue_identifier: 'PREPROD-101'
       });
       expect(linearFetchCount).toBe(1);
 
