@@ -3,7 +3,8 @@ import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 const LINEAR_RECENT_ACTIVITY_LIMIT = 3;
 const LINEAR_BLOCKER_LIMIT = 50;
-const DEFAULT_LINEAR_REQUEST_TIMEOUT_MS = 5_000;
+const DEFAULT_LINEAR_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE = 50;
 
 export interface LiveLinearTrackedActivity {
   id: string;
@@ -24,6 +25,7 @@ export interface LiveLinearTrackedIssue {
   id: string;
   identifier: string;
   title: string;
+  description?: string | null;
   url: string | null;
   state: string | null;
   state_type: string | null;
@@ -33,6 +35,8 @@ export interface LiveLinearTrackedIssue {
   team_name: string | null;
   project_id: string | null;
   project_name: string | null;
+  priority?: number | null;
+  created_at?: string | null;
   updated_at: string | null;
   blocked_by?: LiveLinearTrackedBlocker[];
   recent_activity: LiveLinearTrackedActivity[];
@@ -66,6 +70,14 @@ export type LiveLinearTrackedIssueResolution =
     }
   | LiveLinearFailureResolution;
 
+export type LiveLinearTrackedIssuesResolution =
+  | {
+      kind: 'ready';
+      tracked_issues: LiveLinearTrackedIssue[];
+      source_setup: DispatchPilotSourceSetup;
+    }
+  | LiveLinearFailureResolution;
+
 interface LinearIssueQueryResponse {
   viewer?: {
     organization?: {
@@ -75,6 +87,10 @@ interface LinearIssueQueryResponse {
   issue?: LinearIssueNode | null;
   issues?: {
     nodes?: LinearIssueNode[] | null;
+    pageInfo?: {
+      hasNextPage?: boolean | null;
+      endCursor?: string | null;
+    } | null;
   } | null;
 }
 
@@ -82,7 +98,10 @@ interface LinearIssueNode {
   id?: string | null;
   identifier?: string | null;
   title?: string | null;
+  description?: string | null;
   url?: string | null;
+  priority?: number | null;
+  createdAt?: string | null;
   updatedAt?: string | null;
   state?: {
     name?: string | null;
@@ -218,7 +237,7 @@ export async function resolveLiveLinearDispatchRecommendation(input: {
 
 export async function resolveLiveLinearTrackedIssueById(input: {
   issueId: string;
-  sourceSetup: DispatchPilotSourceSetup;
+  sourceSetup?: DispatchPilotSourceSetup | null;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }): Promise<LiveLinearTrackedIssueResolution> {
@@ -235,8 +254,8 @@ export async function resolveLiveLinearTrackedIssueById(input: {
   }
   const timeoutMs = resolveLinearRequestTimeoutMs(env);
 
-  const sourceSetup = resolveLinearSourceSetup(input.sourceSetup, env);
-  if (!sourceSetup.workspace_id && !sourceSetup.team_id && !sourceSetup.project_id) {
+  const sourceSetup = input.sourceSetup ? resolveLinearSourceSetup(input.sourceSetup, env) : null;
+  if (input.sourceSetup && !sourceSetup?.workspace_id && !sourceSetup?.team_id && !sourceSetup?.project_id) {
     return malformed('dispatch_source_binding_missing');
   }
 
@@ -253,7 +272,7 @@ export async function resolveLiveLinearTrackedIssueById(input: {
   }
 
   const workspaceId = queryResult.payload.data?.viewer?.organization?.id?.trim() ?? null;
-  if (sourceSetup.workspace_id && workspaceId && sourceSetup.workspace_id !== workspaceId) {
+  if (sourceSetup?.workspace_id && workspaceId && sourceSetup.workspace_id !== workspaceId) {
     return malformed('dispatch_source_workspace_mismatch');
   }
 
@@ -263,15 +282,17 @@ export async function resolveLiveLinearTrackedIssueById(input: {
   }
 
   const trackedIssue = parseTrackedIssue(issue, {
-    workspaceId: sourceSetup.workspace_id ?? workspaceId
+    workspaceId: sourceSetup?.workspace_id ?? workspaceId
   });
   if (!trackedIssue) {
     return malformed('dispatch_source_provider_response_invalid');
   }
 
-  const scopeMismatch = validateTrackedIssueScope(trackedIssue, sourceSetup);
-  if (scopeMismatch) {
-    return scopeMismatch;
+  if (sourceSetup) {
+    const scopeMismatch = validateTrackedIssueScope(trackedIssue, sourceSetup);
+    if (scopeMismatch) {
+      return scopeMismatch;
+    }
   }
 
   return {
@@ -284,6 +305,109 @@ export async function resolveLiveLinearTrackedIssueById(input: {
       project_id: trackedIssue.project_id
     }
   };
+}
+
+export async function resolveLiveLinearTrackedIssues(input: {
+  sourceSetup: DispatchPilotSourceSetup;
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+  limit?: number;
+}): Promise<LiveLinearTrackedIssuesResolution> {
+  const env = input.env ?? process.env;
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const token = resolveLinearApiToken(env);
+  if (!token) {
+    return unavailable('dispatch_source_credentials_missing');
+  }
+  const timeoutMs = resolveLinearRequestTimeoutMs(env);
+
+  const sourceSetup = resolveLinearSourceSetup(input.sourceSetup, env);
+  if (!sourceSetup.workspace_id && !sourceSetup.team_id && !sourceSetup.project_id) {
+    return malformed('dispatch_source_binding_missing');
+  }
+
+  const trackedIssues: LiveLinearTrackedIssue[] = [];
+  const seenIssueIds = new Set<string>();
+  let workspaceId: string | null = null;
+  let afterCursor: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const query = buildLinearTrackedIssuesQuery(sourceSetup, input.limit, afterCursor);
+    const queryResult = await executeLinearQuery({
+      token,
+      timeoutMs,
+      fetchImpl,
+      query: query.query,
+      variables: query.variables
+    });
+    if (!queryResult.ok) {
+      return queryResult.resolution;
+    }
+
+    const responseWorkspaceId = queryResult.payload.data?.viewer?.organization?.id?.trim() ?? null;
+    if (workspaceId === null) {
+      workspaceId = responseWorkspaceId;
+    }
+    if (sourceSetup.workspace_id && responseWorkspaceId && sourceSetup.workspace_id !== responseWorkspaceId) {
+      return malformed('dispatch_source_workspace_mismatch');
+    }
+
+    const nodes = Array.isArray(queryResult.payload.data?.issues?.nodes)
+      ? queryResult.payload.data?.issues?.nodes ?? []
+      : [];
+    for (const node of nodes) {
+      const trackedIssue = parseTrackedIssue(node ?? {}, {
+        workspaceId: sourceSetup.workspace_id ?? workspaceId
+      });
+      if (!trackedIssue) {
+        continue;
+      }
+      const scopeMismatch = validateTrackedIssueScope(trackedIssue, sourceSetup);
+      if (scopeMismatch) {
+        return scopeMismatch;
+      }
+      if (seenIssueIds.has(trackedIssue.id)) {
+        continue;
+      }
+      seenIssueIds.add(trackedIssue.id);
+      trackedIssues.push(trackedIssue);
+    }
+
+    const nextCursor = resolveLinearTrackedIssuesNextCursor(queryResult.payload.data?.issues?.pageInfo ?? null);
+    if (nextCursor === null) {
+      hasNextPage = false;
+      continue;
+    }
+    if (nextCursor === undefined) {
+      return malformed('dispatch_source_provider_response_invalid');
+    }
+    afterCursor = nextCursor;
+  }
+
+  return {
+    kind: 'ready',
+    tracked_issues: sortLiveLinearTrackedIssuesForDispatch(trackedIssues),
+    source_setup: sourceSetup
+  };
+}
+
+export function sortLiveLinearTrackedIssuesForDispatch(
+  trackedIssues: readonly LiveLinearTrackedIssue[]
+): LiveLinearTrackedIssue[] {
+  return [...trackedIssues].sort((left, right) => {
+    const priorityDiff = resolveTrackedIssuePriorityRank(left) - resolveTrackedIssuePriorityRank(right);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    const createdAtDiff = resolveTrackedIssueCreatedAtSortKey(left) - resolveTrackedIssueCreatedAtSortKey(right);
+    if (createdAtDiff !== 0) {
+      return createdAtDiff;
+    }
+
+    return left.identifier.localeCompare(right.identifier);
+  });
 }
 
 function buildLinearIssueQuery(sourceSetup: DispatchPilotSourceSetup): {
@@ -379,6 +503,114 @@ function buildLinearIssueQuery(sourceSetup: DispatchPilotSourceSetup): {
   };
 }
 
+function buildLinearTrackedIssuesQuery(
+  sourceSetup: DispatchPilotSourceSetup,
+  limit: number | undefined,
+  afterCursor: string | null
+): {
+  query: string;
+  variables: Record<string, string | number | null>;
+} {
+  const variableDefinitions = ['$limit: Int!', '$after: String'];
+  const filterParts: string[] = [];
+  const variables: Record<string, string | number | null> = {
+    limit: normalizeLinearTrackedIssueLimit(limit),
+    after: afterCursor
+  };
+
+  if (sourceSetup.team_id) {
+    variableDefinitions.push('$teamId: ID!');
+    filterParts.push('team: { id: { eq: $teamId } }');
+    variables.teamId = sourceSetup.team_id;
+  }
+  if (sourceSetup.project_id) {
+    variableDefinitions.push('$projectId: ID!');
+    filterParts.push('project: { id: { eq: $projectId } }');
+    variables.projectId = sourceSetup.project_id;
+  }
+  filterParts.push('state: { type: { nin: ["completed", "canceled"] } }');
+
+  const variableSection = `(${variableDefinitions.join(', ')})`;
+  const filterSection = `, filter: { ${filterParts.join(' ')} }`;
+
+  return {
+    query: `query ResolveLiveLinearTrackedIssues${variableSection} {
+      viewer {
+        organization {
+          id
+        }
+      }
+      issues(orderBy: updatedAt, first: $limit, after: $after${filterSection}) {
+        nodes {
+          id
+          identifier
+          title
+          description
+          url
+          priority
+          createdAt
+          updatedAt
+          state {
+            name
+            type
+          }
+          team {
+            id
+            key
+            name
+          }
+          project {
+            id
+            name
+          }
+          inverseRelations(first: ${LINEAR_BLOCKER_LIMIT}) {
+            nodes {
+              type
+              issue {
+                id
+                identifier
+                state {
+                  name
+                  type
+                }
+              }
+            }
+          }
+          history(first: ${LINEAR_RECENT_ACTIVITY_LIMIT}) {
+            nodes {
+              id
+              createdAt
+              actor {
+                name
+                displayName
+              }
+              fromState {
+                name
+              }
+              toState {
+                name
+              }
+              fromProject {
+                name
+              }
+              toProject {
+                name
+              }
+              fromTitle
+              toTitle
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }`,
+    variables
+  };
+}
+
 function buildLinearIssueByIdQuery(issueId: string): {
   query: string;
   variables: Record<string, string>;
@@ -394,6 +626,7 @@ function buildLinearIssueByIdQuery(issueId: string): {
         id
         identifier
         title
+        description
         url
         updatedAt
         state {
@@ -459,7 +692,7 @@ async function executeLinearQuery(input: {
   timeoutMs: number;
   fetchImpl: typeof fetch;
   query: string;
-  variables: Record<string, string>;
+  variables: Record<string, string | number | null>;
 }): Promise<
   | {
       ok: true;
@@ -517,6 +750,17 @@ async function executeLinearQuery(input: {
   };
 }
 
+function resolveLinearTrackedIssuesNextCursor(
+  pageInfo: { hasNextPage?: boolean | null; endCursor?: string | null } | null
+): string | null | undefined {
+  if (pageInfo?.hasNextPage !== true) {
+    return null;
+  }
+
+  const endCursor = normalizeEnvValue(pageInfo.endCursor);
+  return endCursor ?? undefined;
+}
+
 export function hasLinearApiCredentials(env?: NodeJS.ProcessEnv): boolean {
   return resolveLinearApiToken(env ?? process.env) !== null;
 }
@@ -554,6 +798,12 @@ function resolveLinearRequestTimeoutMs(env: NodeJS.ProcessEnv): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_LINEAR_REQUEST_TIMEOUT_MS;
 }
 
+function normalizeLinearTrackedIssueLimit(limit: number | undefined): number {
+  return Number.isInteger(limit) && (limit ?? 0) > 0
+    ? Math.min(limit as number, DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE)
+    : DEFAULT_LINEAR_TRACKED_ISSUE_PAGE_SIZE;
+}
+
 function parseTrackedIssue(
   issue: LinearIssueNode,
   input: {
@@ -572,6 +822,7 @@ function parseTrackedIssue(
     id,
     identifier,
     title,
+    description: normalizeEnvValue((issue as LinearIssueNode & { description?: string | null }).description),
     url: normalizeEnvValue(issue.url),
     state: normalizeEnvValue(issue.state?.name),
     state_type: normalizeEnvValue(issue.state?.type),
@@ -581,6 +832,8 @@ function parseTrackedIssue(
     team_name: normalizeEnvValue(issue.team?.name),
     project_id: normalizeEnvValue(issue.project?.id),
     project_name: normalizeEnvValue(issue.project?.name),
+    priority: normalizeTrackedIssuePriority(issue.priority),
+    created_at: normalizeIso(issue.createdAt),
     updated_at: normalizeIso(issue.updatedAt),
     blocked_by: extractTrackedIssueBlockers(issue),
     recent_activity: Array.isArray(issue.history?.nodes)
@@ -589,6 +842,25 @@ function parseTrackedIssue(
           .filter((entry): entry is LiveLinearTrackedActivity => entry !== null)
       : []
   };
+}
+
+function resolveTrackedIssuePriorityRank(issue: Pick<LiveLinearTrackedIssue, 'priority'>): number {
+  return normalizeTrackedIssuePriority(issue.priority) ?? 5;
+}
+
+function resolveTrackedIssueCreatedAtSortKey(issue: Pick<LiveLinearTrackedIssue, 'created_at'>): number {
+  const createdAt = normalizeIso(issue.created_at);
+  if (!createdAt) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const parsed = Date.parse(createdAt);
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+function normalizeTrackedIssuePriority(value: number | null | undefined): number | null {
+  return Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 4
+    ? (value as number)
+    : null;
 }
 
 function validateTrackedIssueScope(

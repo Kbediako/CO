@@ -32,7 +32,19 @@ function createSharedContext(
 ): ControlRequestSharedContext {
   const runtimeSnapshot = {
     readSelectedRunSnapshot: vi.fn(async () => ({ selected: null, dispatchPilot: null, tracked: null })),
-    readCompatibilityProjection: vi.fn(async () => ({ selected: null, running: [], retrying: [], tracked: null })),
+    readCompatibilityProjection: vi.fn(async () => ({
+      selected: null,
+      running: [],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      tracked: null
+    })),
     readDispatchEvaluation: vi.fn(async () => ({
       issueIdentifier: null,
       evaluation: {

@@ -29,13 +29,17 @@ import {
   ensureProviderWorkspace,
   resolveProviderResumeWorkspacePath
 } from './run/workspacePath.js';
+import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from './providerLinearWorkerRunner.js';
 import {
   closeControlServerPublicLifecycle,
   runProviderIssueHandoffRefresh,
   runProviderIssueHandoffRehydrate,
   startControlServerPublicLifecycle
 } from './control/controlServerPublicLifecycle.js';
-import { resolveLiveLinearTrackedIssueById } from './control/linearDispatchSource.js';
+import {
+  resolveLiveLinearTrackedIssueById,
+  resolveLiveLinearTrackedIssues
+} from './control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from './control/linearWebhookController.js';
 import {
   createProviderIssueHandoffService,
@@ -48,6 +52,7 @@ type OutputFormat = 'json' | 'text';
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 5_000;
 const SPAWN_MANIFEST_WAIT_INTERVAL_MS = 100;
+const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
 
 interface SpawnedRunManifestInfo {
   runId: string;
@@ -68,6 +73,13 @@ interface ProviderLaunchSpec {
   envOverrides: Record<string, string>;
 }
 
+interface ProviderLinearSourceScope {
+  provider: 'linear';
+  workspaceId?: string | null;
+  teamId?: string | null;
+  projectId?: string | null;
+}
+
 export interface RunControlHostCliShellParams {
   flags: ArgMap;
   printHelp: () => void;
@@ -84,7 +96,8 @@ export async function runControlHostCliShell(
   const baseEnv = normalizeEnvironmentPaths(resolveEnvironmentPaths());
   const taskId = normalizeTaskId(readStringFlag(params.flags, 'task') ?? 'local-mcp');
   const runId = readStringFlag(params.flags, 'run') ?? 'control-host';
-  const startPipelineId = readStringFlag(params.flags, 'pipeline') ?? 'diagnostics';
+  const startPipelineId =
+    readStringFlag(params.flags, 'pipeline') ?? DEFAULT_PROVIDER_START_PIPELINE_ID;
   const format: OutputFormat = readStringFlag(params.flags, 'format') === 'json' ? 'json' : 'text';
   const env = { ...baseEnv, taskId };
   const paths = resolveRunPaths(env, runId);
@@ -122,6 +135,7 @@ export async function runControlHostCliShell(
         persist: persistProviderIntake,
         startPipelineId,
         publishRuntime,
+        readFeatureToggles,
         resolveTrackedIssue: async ({ issueId }) => {
           const runtimeEnv = process.env;
           const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), runtimeEnv);
@@ -138,6 +152,21 @@ export async function runControlHostCliShell(
           }
           if (shouldReleaseTrackedIssueClaim(resolution.reason)) {
             return { kind: 'release', reason: resolution.reason } as const;
+          }
+          return { kind: 'skip', reason: resolution.reason } as const;
+        },
+        resolveTrackedIssues: async () => {
+          const runtimeEnv = process.env;
+          const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), runtimeEnv);
+          if ('error' in sourceSetup) {
+            return { kind: 'skip', reason: sourceSetup.error } as const;
+          }
+          const resolution = await resolveLiveLinearTrackedIssues({
+            sourceSetup: sourceSetup.sourceSetup,
+            env: runtimeEnv
+          });
+          if (resolution.kind === 'ready') {
+            return { kind: 'ready', trackedIssues: resolution.tracked_issues } as const;
           }
           return { kind: 'skip', reason: resolution.reason } as const;
         },
@@ -164,6 +193,7 @@ export async function runControlHostCliShell(
               input.taskId,
               {
                 ...launchSpec.envOverrides,
+                ...buildProviderLinearSourceEnvOverrides(input),
                 [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
                 [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
                 [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
@@ -202,13 +232,14 @@ export async function runControlHostCliShell(
   });
 
   try {
-    if (lifecycle.requestContextShared.providerIssueHandoff) {
-      await runProviderIssueHandoffRehydrate(lifecycle.requestContextShared.providerIssueHandoff);
-    }
+    await rehydrateProviderIssueHandoffOnStartup(lifecycle.requestContextShared.providerIssueHandoff);
+    const providerRefreshStartupTrigger = lifecycle.providerRefreshStartupTrigger ?? null;
+    lifecycle.providerRefreshStartupTrigger = null;
     void beginProviderIssueHandoffStartupRefresh(
       lifecycle.requestContextShared.providerIssueHandoff,
       () => lifecycle.requestContextShared.runtime.publish({ source: 'provider-intake.rehydrate' }),
-      lifecycle.triggerProviderRefresh ?? undefined
+      lifecycle.triggerProviderRefresh ?? undefined,
+      providerRefreshStartupTrigger
     );
 
     const payload = {
@@ -397,7 +428,25 @@ async function resolveProviderResumeLaunchSpec(
     resumeTaskId,
     manifest as unknown as Record<string, unknown>
   );
-  return buildProviderLaunchSpec(env, workspacePath);
+  const launchSpec = buildProviderLaunchSpec(env, workspacePath);
+  return {
+    ...launchSpec,
+    envOverrides: {
+      ...launchSpec.envOverrides,
+      ...(await resolveProviderResumeLinearSourceEnvOverrides(paths.runDir))
+    }
+  };
+}
+
+function buildProviderLinearSourceEnvOverrides(input: ProviderLinearSourceScope): Record<string, string> {
+  const workspaceId = normalizeProviderLinearSourceValue(input.workspaceId);
+  const teamId = normalizeProviderLinearSourceValue(input.teamId);
+  const projectId = normalizeProviderLinearSourceValue(input.projectId);
+  return {
+    CO_LINEAR_WORKSPACE_ID: workspaceId ?? '',
+    CO_LINEAR_TEAM_ID: teamId ?? '',
+    CO_LINEAR_PROJECT_ID: projectId ?? ''
+  };
 }
 
 function buildProviderLaunchSpec(
@@ -423,20 +472,76 @@ function shouldReleaseTrackedIssueClaim(reason: string): boolean {
   );
 }
 
+async function resolveProviderResumeLinearSourceEnvOverrides(runDir: string): Promise<Record<string, string>> {
+  const sourceScope = await readProviderLinearSourceScopeFromProof(runDir);
+  return buildProviderLinearSourceEnvOverrides(
+    sourceScope ?? {
+      provider: 'linear',
+      workspaceId: null,
+      teamId: null,
+      projectId: null
+    }
+  );
+}
+
+async function readProviderLinearSourceScopeFromProof(
+  runDir: string
+): Promise<ProviderLinearSourceScope | null> {
+  try {
+    const raw = await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+    return parseProviderLinearSourceScopeFromProof(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function parseProviderLinearSourceScopeFromProof(input: unknown): ProviderLinearSourceScope | null {
+  if (!isRecord(input) || !isRecord(input.source_setup) || input.source_setup.provider !== 'linear') {
+    return null;
+  }
+  return {
+    provider: 'linear',
+    workspaceId:
+      typeof input.source_setup.workspace_id === 'string' ? input.source_setup.workspace_id : null,
+    teamId: typeof input.source_setup.team_id === 'string' ? input.source_setup.team_id : null,
+    projectId: typeof input.source_setup.project_id === 'string' ? input.source_setup.project_id : null
+  };
+}
+
 export const __test__ = {
+  DEFAULT_PROVIDER_START_PIPELINE_ID,
+  buildProviderLinearSourceEnvOverrides,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
+  rehydrateProviderIssueHandoffOnStartup,
   refreshProviderIssueHandoffOnStartup,
   resolveProviderResumeLaunchSpec,
   resolveProviderResumeTaskId,
   snapshotRunManifests
 };
 
+function normalizeProviderLinearSourceValue(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 function beginProviderIssueHandoffStartupRefresh(
   providerIssueHandoff: ProviderIssueHandoffService | null | undefined,
   onSettled?: () => void,
-  refreshProviderIssueHandoff?: (() => Promise<void>) | null
+  refreshProviderIssueHandoff?: (() => Promise<void>) | null,
+  startupRefreshTrigger?: NodeJS.Timeout | null
 ): Promise<void> {
+  if (startupRefreshTrigger) {
+    clearTimeout(startupRefreshTrigger);
+  }
   const refreshPromise = refreshProviderIssueHandoff
     ? Promise.resolve()
         .then(() => refreshProviderIssueHandoff())
@@ -462,6 +567,21 @@ async function refreshProviderIssueHandoffOnStartup(
   } catch (error) {
     logger.warn(
       `Provider issue startup refresh failed: ${(error as Error)?.message ?? String(error)}`
+    );
+  }
+}
+
+async function rehydrateProviderIssueHandoffOnStartup(
+  providerIssueHandoff: ProviderIssueHandoffService | null | undefined
+): Promise<void> {
+  if (!providerIssueHandoff) {
+    return;
+  }
+  try {
+    await runProviderIssueHandoffRehydrate(providerIssueHandoff);
+  } catch (error) {
+    logger.warn(
+      `Provider issue startup rehydrate failed: ${(error as Error)?.message ?? String(error)}`
     );
   }
 }

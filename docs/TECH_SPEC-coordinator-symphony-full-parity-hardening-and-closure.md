@@ -5,104 +5,63 @@ relates_to: docs/PRD-coordinator-symphony-full-parity-hardening-and-closure.md
 risk: high
 owners:
   - Codex
-last_review: 2026-03-21
+last_review: 2026-03-22
 ---
 
 ## Added by Bootstrap (refresh as needed)
 
 ## Summary
-- Objective: Keep `1311` truthful to the current branch state. The hardening tranche below is landed, but full Symphony parity is still not closed.
-- Scope: record the landed workspace/lifecycle/UI/compatibility fixes, keep the remaining blockers explicit, and describe validation without overstating parity closure.
+- Objective: keep `1311` truthful as an umbrella/historical lane rather than the current publication unit.
+- Scope: point at the active implemented unit, keep the remaining blockers explicit, and describe validation without overstating parity closure.
 - Constraints:
   - parity claims are governed by `Symphony SPEC.md` when the Elixir tree drifts
   - tracker writes remain outside the core blocker set
-  - full parity cannot be claimed while the remaining blockers are still present
+  - full parity cannot be claimed while the `1316` publication closeout pack is still non-terminal
 
 ## Current Branch State
-- Landed fixes:
-  - deterministic workspace recreation plus prune
-  - legacy resume deterministic workspace fallback
-  - resume workspace-root confinement validation
-  - startup immediate refresh
-  - queued/null release fail-closed behavior
-  - released-claim stability on rehydrate
-  - released-claim cancel retry during skipped provider refresh without reopening overlapping refresh/cancel cycles
-  - released claims now also retry queued or active child cancellation on a later ready refresh after transient cancel failure instead of stopping at the early return before the fallback resume/start path
-  - explicit authenticated/manual refresh requests now queue one follow-up pass instead of being dropped behind in-flight provider handoff work
-  - issue eligibility now covers `Todo` plus Linear `state_type=started` issues, including the `state=null` started edge, with a Todo blocker rule that prefers Linear blocker `state.type` and falls back to blocker state names
-  - legacy provider resume fallback now derives the task id from the resolved run path when manifest `task_id` is absent
-  - injected startup refresh callbacks stay on the catch/finally path even if they throw synchronously
-  - terminal-only cleanup for provider-managed `.workspaces/<taskId>` is present on release/startup replay
-  - provider workspace cleanup now resolves against the real repo root when `CODEX_ORCHESTRATOR_RUNS_DIR` lives outside the repository
-  - forced manifest writes now preempt same-tick scheduled persister waits instead of inheriting the full heartbeat interval
-  - detached released/handoff_failed reattachment now prefers child `started_at` when present so older runs that merely finish late do not rebind to a newer launch anchor
-  - detached released/handoff_failed recovery now also falls back to current-attempt issue timing for resumed children whose original `started_at` predates the stored launch anchor, and synthetic task-id `run_id` fallbacks no longer block reattachment after manifest loss
-  - selected child-manifest UI metadata truthfulness
-  - selected-run workspace fallback stays truthful for child CLI manifests under repo-local and external overridden runs roots
-  - compatibility `session_id` null handling
-- Continuation posture:
-  - provider control-host continuation/retry handoff for active issues is materially covered, but full parity is still not closed
+- Publication posture:
+  - the implemented publication unit on the current branch is the integrated `1312`-`1316` stack, not `1311`
+- Current branch truth:
+  - `1312` lands same-session continuation inside a single provider worker run
+  - `1313` lands authoritative runtime snapshot fields for visible running rows plus live-surfaced `codex_totals` and latest `rate_limits`
+  - `1314` lands authoritative retry rows plus issue-level `retry` and `attempts` payloads
+  - the current head also fixes selected-run provider-child projection under repo-local and external overridden runs roots
 - Remaining blockers:
-  - live observability is still not an authoritative runtime snapshot for turn/retry/token/rate-limit counters
-  - active-issue continuation after a normal success still starts a fresh child run instead of continuing the same session
+  - `1315` retry-owner scheduling is now landed on the current branch
+  - the earlier `1316` poll/recovery and `/api/v1` normalization work is also landed on the current branch
+  - full parity still remains open only because publication closeout is not yet terminal clean: `11-review-rerun.log` is terminal and not clean, and `12-pack-smoke.log`, `14-live-proof.md`, PR, CI, and merge remain pending
 
 ## Technical Requirements
-- Landed/maintained requirements:
-  - workspace recreation and pruning must stay deterministic across provider starts and resume paths
-  - legacy resume paths must recover the deterministic workspace rather than silently drifting to the shared repo root
-  - legacy resume fallback must recover task identity from the resolved run path when manifest metadata is incomplete
-  - resume/startup flows must validate workspace-root confinement before launching child work
-  - startup refresh wrappers must preserve `onSettled()` even when an injected callback throws before returning a promise
-  - startup refresh must run immediately enough to reconcile provider state without waiting for a later poll
-  - explicit refresh requests during in-flight startup/rehydrate work must queue one follow-up refresh without reopening overlap between provider handoff operations
-  - queued/null release handling must fail closed, and released claims must remain stable across rehydrate
-  - provider workspace cleanup must resolve against the real repository root rather than assuming `.runs` lives under the repo root
-  - forced manifest writes must be able to preempt a same-tick scheduled persist without waiting for the heartbeat interval
-  - selected-run/UI compatibility payloads must expose truthful child-manifest metadata and preserve `session_id=null` where no session exists
 - Remaining requirements:
-  - add authoritative runtime capture for live turn/retry/token/rate-limit counters or explicitly defer those counters out of parity scope
-  - replace fresh-child-run continuation after success with upstream-faithful same-session continuation
+  - keep `1311` framed as umbrella/historical context rather than the current publication unit
+  - keep `1315` and `1316` recorded as landed on the current branch
+  - point current-head closeout truth at the active `1316` closeout pack for the integrated `1312`-`1316` stack
 - Interfaces / contracts:
-  - selected child-manifest metadata must stay truthful in read models and UI surfaces
-  - compatibility issue payloads must keep `session_id` nullable rather than inventing values
-  - release/retry bookkeeping must remain fail-closed across queued/null and rehydrate paths
+  - the umbrella docs must clearly distinguish historical `1311` evidence from the active `1312`-`1316` publication evidence
+  - tracker-write ownership must stay out of the blocker set unless a later slice proves otherwise
 
 ## Architecture & Data
-- Workspace/lifecycle surfaces touched by the landed tranche:
-  - `orchestrator/src/cli/run/workspacePath.ts`
-  - `orchestrator/src/cli/controlHostCliShell.ts`
-  - `orchestrator/src/cli/run/manifest.ts`
-  - `orchestrator/src/cli/control/providerIssueHandoff.ts`
-  - `orchestrator/src/cli/control/providerIntakeState.ts`
-  - `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`
-  - `orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts`
-- Read-model/UI surfaces touched by the landed tranche:
-  - `orchestrator/src/cli/control/selectedRunProjection.ts`
-  - `orchestrator/src/cli/control/selectedRunPresenter.ts`
-  - `orchestrator/src/cli/control/compatibilityIssuePresenter.ts`
-  - `orchestrator/src/cli/control/observabilityReadModel.ts`
-  - `packages/orchestrator-status-ui/*`
+- Primary upstream authorities:
+  - `/Users/kbediako/Code/symphony/SPEC.md`
+  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`
+  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/agent_runner.ex`
+- Primary CO evidence surfaces:
+  - `docs/TASKS.md`
+  - `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/`
+  - `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`
 
 ## Validation Plan
 - Current verified checks:
-  - the pre-implementation `docs-review` gate succeeded at `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T10-25-11-174Z-514b632e/manifest.json`
-  - `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure node scripts/delegation-guard.mjs` passed (`5` subagent manifests found)
-  - `node scripts/spec-guard.mjs --dry-run` exited successfully but reported unrelated stale-review advisories for specs `0971`, `0972`, and `0974`
-  - `npm run build` passed
-  - `npm run lint` passed
-  - the current detached-run hardening regression pack passed `5/5` files and `79/79` tests across `ProviderIssueHandoff`, `ProviderIssueHandoffRefreshSerialization`, `ProviderIntakeState`, `ControlServerSeedLoading`, and `ControlServerStartupInputPreparation`
-  - the persister fast-path regression pack passed `2/2` files and `16/16` tests
-  - `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs` with the explicit March 21 override, and `npm run pack:smoke` passed on the current head
-  - a trivial `CodexOrchestrator.start()` repro dropped from about `5.1s` to about `112ms`
-  - the prior P2 PRD/docs mirror drift is addressed in the current packet, and the local review obligation is closed via `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`
-  - the latest local `MCP_RUNNER_TASK_ID=1311-coordinator-symphony-full-parity-hardening-and-closure npm run test` is terminal green on this head at `283/283` files and `2046/2046` tests in `202.70s`
+  - the pre-implementation `docs-review` gate for the umbrella lane succeeded at `.runs/1311-coordinator-symphony-full-parity-hardening-and-closure/cli/2026-03-20T10-25-11-174Z-514b632e/manifest.json`
+  - historical bounded `1311` validation remains recorded in `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`
+  - current-head integrated validation and publication posture for the active implementation unit now live in `out/1316-coordinator-symphony-poll-owned-discovery-and-recovery/manual/20260321T164742Z-stacked-closeout/`, where `01`-`09` passed, `10-review-pre-fix.log` captured the earlier `3` P2 findings, and `11-review-rerun.log` is terminal and not clean with one P1 plus one P2 still being resolved
 - Closure gate:
-  - do not claim parity closeout until the remaining blockers are resolved; the current head now has terminal local validation, but that evidence only closes this bounded slice and not the remaining architectural parity gaps
+  - do not claim parity closeout until the `1316` rerun findings are resolved and the pending `pack:smoke`, live-proof, PR, and merge steps are complete
 
 ## Open Questions
-- Whether `1311` should add authoritative live counter capture directly, or explicitly defer those fields into a narrower follow-on without pretending parity is closed.
-- Whether same-session continuation should be implemented inside the provider/control-host architecture, or moved into a dedicated follow-on session-owner lane.
+- Whether provider-driven discovery should be retired in favor of poll-owned discovery/recovery, or explicitly documented as an intentional divergence.
+- Whether any further split remains necessary after the now-implemented `1316` lane once publication closes.
 
 ## Approvals
-- Reviewer status: the earlier Codex reviewer-request/waiver contingency is superseded by the current local review loop; the prior P2 PRD/docs mirror drift is addressed in the current packet, the final current-head review step is closed via `out/1311-coordinator-symphony-full-parity-hardening-and-closure/manual/20260321T070133Z-closeout/14-review-stall-override.md`, and PR loop closeout still depends on GitHub reruns settling plus unresolved actionable threads reaching zero on the pushed head.
-- Date: 2026-03-21
+- Reviewer status: `1311` now remains an umbrella/historical packet only; active review and PR loop closeout belong to the later implementation publication units.
+- Date: 2026-03-22

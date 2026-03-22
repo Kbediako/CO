@@ -6,6 +6,7 @@ import type {
   SelectedRunContext
 } from '../src/cli/control/observabilityReadModel.js';
 import type { ControlState } from '../src/cli/control/controlState.js';
+import type { ProviderLinearWorkerProof } from '../src/cli/providerLinearWorkerRunner.js';
 import type { CliManifest } from '../src/cli/types.js';
 
 const CONTROL_STATE: ControlState = {
@@ -86,6 +87,35 @@ function buildSelectedRun(overrides: Partial<SelectedRunContext> = {}): Selected
   };
 }
 
+function buildProviderLinearWorkerProof(
+  overrides: Partial<ProviderLinearWorkerProof> = {}
+): ProviderLinearWorkerProof {
+  return {
+    issue_id: 'issue-1037',
+    issue_identifier: 'ISSUE-1037',
+    thread_id: 'thread-1',
+    latest_turn_id: 'turn-2',
+    latest_session_id: 'thread-1-turn-2',
+    latest_session_id_source: 'derived_from_thread_and_turn',
+    turn_count: 2,
+    last_event: 'task_complete',
+    last_message: 'done',
+    last_event_at: '2026-03-07T04:21:30.000Z',
+    tokens: {
+      input_tokens: 12,
+      output_tokens: 8,
+      total_tokens: 20
+    },
+    rate_limits: null,
+    owner_phase: 'ended',
+    owner_status: 'succeeded',
+    workspace_path: '/repo',
+    end_reason: 'issue_inactive',
+    updated_at: '2026-03-07T04:21:30.000Z',
+    ...overrides
+  };
+}
+
 function buildSnapshot(selected: SelectedRunContext | null): ControlSelectedRunRuntimeSnapshot {
   return {
     selected,
@@ -120,7 +150,11 @@ describe('SelectedRunPresenter', () => {
   it('builds selected-run ui dataset entries with relative links and selected payload', () => {
     const dataset = buildUiDataset({
       manifest: buildManifest(),
-      snapshot: buildSnapshot(buildSelectedRun()),
+      snapshot: buildSnapshot(
+        buildSelectedRun({
+          providerLinearWorkerProof: buildProviderLinearWorkerProof()
+        })
+      ),
       control: CONTROL_STATE,
       paths: {
         manifestPath: '/repo/.runs/task-1037/cli/run-1/manifest.json',
@@ -130,7 +164,16 @@ describe('SelectedRunPresenter', () => {
       generatedAt: '2026-03-07T04:30:00.000Z'
     }) as {
       generated_at: string;
-      selected: { issue_identifier?: string; display_status?: string } | null;
+      selected:
+        | {
+            issue_identifier?: string;
+            display_status?: string;
+            provider_linear_worker_proof?: {
+              thread_id?: string | null;
+              turn_count?: number;
+            };
+          }
+        | null;
       runs: Array<{ links?: { manifest?: string; log?: string } }>;
       tasks: Array<{ bucket?: string; question_summary?: { queued_count?: number } | null }>;
     };
@@ -138,7 +181,11 @@ describe('SelectedRunPresenter', () => {
     expect(dataset.generated_at).toBe('2026-03-07T04:30:00.000Z');
     expect(dataset.selected).toMatchObject({
       issue_identifier: 'ISSUE-1037',
-      display_status: 'paused'
+      display_status: 'paused',
+      provider_linear_worker_proof: {
+        thread_id: 'thread-1',
+        turn_count: 2
+      }
     });
     expect(dataset.runs).toHaveLength(1);
     expect(dataset.runs[0]).toMatchObject({

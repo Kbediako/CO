@@ -11,6 +11,7 @@ import {
   readCompatibilityRefresh,
   readCompatibilityState,
   readDispatchExtension,
+  type CompatibilityRefreshAcknowledgement,
   type DispatchExtensionResult,
   type ObservabilityPresenterContext,
   type ObservabilitySurfaceResponse
@@ -44,7 +45,7 @@ export interface ObservabilityApiControllerContext {
   res: http.ServerResponse;
   presenterContext: ObservabilityPresenterContext;
   readRequestBody(): Promise<unknown>;
-  requestRefresh(): Promise<void>;
+  requestRefresh(): Promise<CompatibilityRefreshAcknowledgement>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
     evaluation: DispatchExtensionResult['evaluation'];

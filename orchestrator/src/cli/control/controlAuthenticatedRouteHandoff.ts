@@ -10,7 +10,10 @@ import {
   emitDispatchPilotAuditEvents,
   writeControlError
 } from './controlServerAuditAndErrorHelpers.js';
-import { runProviderIssueHandoffRefresh } from './controlServerPublicLifecycle.js';
+import {
+  type ProviderIssueHandoffRefreshRequestOutcome,
+  runProviderIssueHandoffRefresh
+} from './controlServerPublicLifecycle.js';
 import { readJsonBody } from './controlServerRequestBodyHelpers.js';
 
 export interface ControlAuthenticatedRouteHandoffInput {
@@ -45,12 +48,12 @@ export function createControlAuthenticatedRouteContext(
     delegationTokens: input.context.delegationTokens,
     persist: input.context.persist,
     runtime: input.context.runtime,
-    refreshProviderIssues: () =>
+    refreshProviderIssues: (): Promise<ProviderIssueHandoffRefreshRequestOutcome | null> =>
       input.context.providerIssueHandoff
         ? runProviderIssueHandoffRefresh(input.context.providerIssueHandoff, {
             queueIfBusy: true
           })
-        : Promise.resolve(),
+        : Promise.resolve(null),
     readRequestBody: () => readJsonBody(input.req),
     readDispatchEvaluation: () => input.runtimeSnapshot.readDispatchEvaluation(),
     onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(input.context, record),

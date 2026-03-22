@@ -20,6 +20,8 @@ import type { ControlStateStore } from './controlState.js';
 import type { ConfirmationStore } from './confirmations.js';
 import type { QuestionRecord } from './questions.js';
 import type { DelegationTokenStore } from './delegationTokens.js';
+import type { ProviderIssueHandoffRefreshRequestOutcome } from './controlServerPublicLifecycle.js';
+import type { CompatibilityRefreshAcknowledgement } from './observabilitySurface.js';
 
 type PresenterContext =
   Parameters<typeof handleUiDataRequest>[0]['presenterContext'] &
@@ -62,7 +64,7 @@ export interface AuthenticatedRouteCompositionContext {
   delegationTokens: DelegationTokenStore;
   persist: AuthenticatedRouteCompositionPersist;
   runtime: AuthenticatedRouteCompositionRuntime;
-  refreshProviderIssues?(): Promise<void>;
+  refreshProviderIssues?(): Promise<ProviderIssueHandoffRefreshRequestOutcome | null>;
   readRequestBody(): Promise<Record<string, unknown>>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
@@ -116,8 +118,10 @@ export function createAuthenticatedRouteDispatcherContext(
         presenterContext: context.presenterContext,
         readRequestBody: context.readRequestBody,
         requestRefresh: async () => {
-          await context.refreshProviderIssues?.();
+          const requestedAt = new Date().toISOString();
+          const providerRefresh = await context.refreshProviderIssues?.();
           await context.runtime.requestRefresh();
+          return buildRefreshAcknowledgement(requestedAt, providerRefresh ?? null);
         },
         readDispatchEvaluation: () => context.readDispatchEvaluation(),
         onDispatchEvaluated: (record) => context.onDispatchEvaluated(record)
@@ -355,5 +359,17 @@ export function createAuthenticatedRouteDispatcherContext(
           }),
         publishRuntime: (source) => context.runtime.publish({ source })
       })
+  };
+}
+
+function buildRefreshAcknowledgement(
+  requestedAt: string,
+  providerRefresh: ProviderIssueHandoffRefreshRequestOutcome | null
+): CompatibilityRefreshAcknowledgement {
+  return {
+    queued: providerRefresh?.queued ?? true,
+    coalesced: providerRefresh?.coalesced ?? false,
+    requested_at: requestedAt,
+    operations: providerRefresh ? ['poll', 'reconcile'] : ['reconcile']
   };
 }

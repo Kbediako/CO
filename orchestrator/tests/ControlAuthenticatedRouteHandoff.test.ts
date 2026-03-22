@@ -21,9 +21,9 @@ vi.mock('../src/cli/control/controlServerAuditAndErrorHelpers.js', () => ({
   writeControlError: vi.fn()
 }));
 
-vi.mock('../src/cli/control/controlServerPublicLifecycle.js', () => ({
-  runProviderIssueHandoffRefresh: vi.fn((providerIssueHandoff) => providerIssueHandoff.refresh())
-}));
+  vi.mock('../src/cli/control/controlServerPublicLifecycle.js', () => ({
+    runProviderIssueHandoffRefresh: vi.fn((providerIssueHandoff) => providerIssueHandoff.refresh())
+  }));
 
 function createInput() {
   const req = {
@@ -56,7 +56,10 @@ function createInput() {
     providerIssueHandoff: {
       handleAcceptedTrackedIssue: vi.fn(),
       rehydrate: vi.fn(async () => undefined),
-      refresh: vi.fn(async () => undefined)
+      refresh: vi.fn(async () => ({
+        queued: true,
+        coalesced: false
+      }))
     },
     expiryLifecycle: {
       expireConfirmations: vi.fn(async () => undefined),
@@ -177,7 +180,10 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     await assembled.resolveChildQuestion({ question_id: 'q-1' } as never, 'answered');
     expect(adapter.resolveChildQuestion).toHaveBeenCalledWith({ question_id: 'q-1' }, 'answered');
 
-    await assembled.refreshProviderIssues?.();
+    await expect(assembled.refreshProviderIssues?.()).resolves.toEqual({
+      queued: true,
+      coalesced: false
+    });
     expect(runProviderIssueHandoffRefresh).toHaveBeenCalledWith(context.providerIssueHandoff, {
       queueIfBusy: true
     });
@@ -208,5 +214,18 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     expect(assembled.authKind).toBe('session');
     await expect(assembled.expireConfirmations()).resolves.toBeUndefined();
     await expect(assembled.expireQuestions()).resolves.toBeUndefined();
+  });
+
+  it('returns a null provider refresh outcome when no provider handoff is present', async () => {
+    const { input } = createInput();
+    input.context = {
+      ...input.context,
+      providerIssueHandoff: null
+    } as never;
+
+    const assembled = createControlAuthenticatedRouteContext(input);
+
+    await expect(assembled.refreshProviderIssues?.()).resolves.toBeNull();
+    expect(runProviderIssueHandoffRefresh).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,86 @@
 {
   "items": [
     {
+      "id": "20260322-1316-coordinator-symphony-poll-owned-discovery-and-recovery",
+      "title": "Coordinator Symphony Poll-Owned Discovery Recovery and Observability API Normalization",
+      "relates_to": "tasks/tasks-1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-21",
+      "paths": {
+        "spec": "tasks/specs/1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+        "task": "tasks/tasks-1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+        "agent_task": ".agent/task/1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-poll-owned-discovery-and-recovery.md"
+      }
+    },
+    {
+      "id": "20260321-1315-coordinator-symphony-post-worker-retry-queue-ownership",
+      "title": "Coordinator Symphony Post-Worker Retry Queue Ownership",
+      "relates_to": "tasks/tasks-1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-21",
+      "paths": {
+        "spec": "tasks/specs/1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
+        "task": "tasks/tasks-1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
+        "agent_task": ".agent/task/1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-post-worker-retry-queue-ownership.md"
+      }
+    },
+    {
+      "id": "20260321-1314-coordinator-symphony-authoritative-retry-state-and-attempts",
+      "title": "Coordinator Symphony Authoritative Retry State and Attempts",
+      "relates_to": "tasks/tasks-1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-21",
+      "paths": {
+        "spec": "tasks/specs/1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+        "task": "tasks/tasks-1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+        "agent_task": ".agent/task/1314-coordinator-symphony-authoritative-retry-state-and-attempts.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-authoritative-retry-state-and-attempts.md"
+      }
+    },
+    {
+      "id": "20260321-1313-coordinator-symphony-authoritative-runtime-snapshot-observability",
+      "title": "Coordinator Symphony Authoritative Runtime Snapshot and Observability",
+      "relates_to": "tasks/tasks-1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-21",
+      "paths": {
+        "spec": "tasks/specs/1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+        "task": "tasks/tasks-1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+        "agent_task": ".agent/task/1313-coordinator-symphony-authoritative-runtime-snapshot-observability.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-authoritative-runtime-snapshot-observability.md"
+      }
+    },
+    {
+      "id": "20260321-1312-coordinator-symphony-same-session-continuation-after-normal-success",
+      "title": "Coordinator Symphony Same-Session Continuation After Normal Success",
+      "relates_to": "tasks/tasks-1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-21",
+      "paths": {
+        "spec": "tasks/specs/1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
+        "task": "tasks/tasks-1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
+        "agent_task": ".agent/task/1312-coordinator-symphony-same-session-continuation-after-normal-success.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-same-session-continuation-after-normal-success.md"
+      }
+    },
+    {
       "id": "20260320-1311-coordinator-symphony-full-parity-hardening-and-closure",
       "title": "Coordinator Symphony Full-Parity Hardening and Closure",
       "relates_to": "tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md",
@@ -8,7 +88,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-20",
+      "last_review": "2026-03-21",
       "paths": {
         "spec": "tasks/specs/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
         "task": "tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md",
