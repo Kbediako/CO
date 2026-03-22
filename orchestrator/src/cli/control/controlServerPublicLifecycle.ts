@@ -129,6 +129,7 @@ export async function closeControlServerPublicLifecycle(
   if (state.providerRefreshTimer) {
     clearInterval(state.providerRefreshTimer);
   }
+  await clearQueuedProviderIssueRetriesOnShutdown(state.requestContextShared);
   return closeControlServerOwnedRuntime({
     server: state.server,
     requestContextShared: state.requestContextShared,
@@ -367,4 +368,33 @@ function clearProviderIssueHandoffOperationState(
   if (!state.active && !state.queuedRefresh) {
     providerIssueHandoffOperations.delete(providerIssueHandoff);
   }
+}
+
+async function clearQueuedProviderIssueRetriesOnShutdown(
+  requestContextShared: Pick<ControlRequestSharedContext, 'providerIntakeState'> & {
+    persist?: ControlRequestSharedContext['persist'];
+  }
+): Promise<void> {
+  const providerIntakeState = requestContextShared.providerIntakeState;
+  const persistProviderIntake = requestContextShared.persist?.providerIntake;
+  if (!providerIntakeState || !persistProviderIntake) {
+    return;
+  }
+
+  let mutated = false;
+  for (const claim of providerIntakeState.claims) {
+    if (claim.retry_queued !== true && claim.retry_due_at == null) {
+      continue;
+    }
+    claim.retry_queued = false;
+    claim.retry_due_at = null;
+    mutated = true;
+  }
+
+  if (!mutated) {
+    return;
+  }
+
+  providerIntakeState.updated_at = new Date().toISOString();
+  await persistProviderIntake().catch(() => undefined);
 }

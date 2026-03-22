@@ -305,9 +305,12 @@ export async function loadProviderLinearWorkerContext(
   if (!issueId || !issueIdentifier) {
     throw new Error('Provider worker requires issue_id and issue_identifier in env or manifest.');
   }
+  const manifestWorkspacePath =
+    normalizeOptionalString(manifest.workspace_path) ??
+    normalizeOptionalString(manifest.workspacePath);
   const repoRoot =
     normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT) ??
-    normalizeOptionalString(manifest.workspace_path) ??
+    manifestWorkspacePath ??
     process.cwd();
   const runId =
     normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID) ??
@@ -318,10 +321,7 @@ export async function loadProviderLinearWorkerContext(
     runDir: dirname(manifestPath),
     repoRoot,
     runId,
-    workspacePath:
-      normalizeOptionalString(manifest.workspace_path) ??
-      normalizeOptionalString(manifest.workspacePath) ??
-      repoRoot,
+    workspacePath: manifestWorkspacePath ?? repoRoot,
     sourceSetup: resolveProviderLinearWorkerSourceSetup(env),
     issueId,
     issueIdentifier,

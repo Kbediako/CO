@@ -168,6 +168,7 @@ function createControlRuntimeSnapshot(
         .map((source) => enrichProjectionSourceWithProviderRetryState(source, context.providerIntakeState))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const fallbackRetrying = discoveredCollections.retrying
+        .concat(isSelectedManifestRetryFallbackCandidate(selectedManifest, selected) ? [selected] : [])
         .map((source) => enrichProjectionSourceWithProviderRetryState(source, context.providerIntakeState))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
@@ -337,6 +338,29 @@ function scoreProviderClaimMatch(
     score += 10;
   }
   return score;
+}
+
+function isSelectedManifestRetryFallbackCandidate(
+  selectedManifest: Awaited<ReturnType<ReturnType<typeof createSelectedRunProjectionReader>['readSelectedRunManifestSnapshot']>>,
+  selected: ControlCompatibilitySourceContext | null
+): selected is ControlCompatibilitySourceContext {
+  if (!selectedManifest || !selected || selected.completedAt !== null) {
+    return false;
+  }
+  const manifestRecord = selectedManifest.manifestRecord;
+  const provider =
+    normalizeManifestString(manifestRecord.issue_provider) ??
+    normalizeManifestString(manifestRecord.issueProvider);
+  const status = normalizeManifestString(manifestRecord.status);
+  return provider === 'linear' && (status === 'failed' || status === 'cancelled');
+}
+
+function normalizeManifestString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {

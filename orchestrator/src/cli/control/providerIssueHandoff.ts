@@ -168,7 +168,6 @@ export function createProviderIssueHandoffService(
   >();
   let refreshLifecycleChain: Promise<void> = Promise.resolve();
   let bestEffortRehydrateTimer: NodeJS.Timeout | null = null;
-  let bestEffortRehydrateFailureCount = 0;
   const queuedRetryTrackedIssueRefetches = new Map<string, ProviderTrackedIssueRefetch>();
 
   const runWithRefreshLifecycleLock = async <T>(operation: () => Promise<T>): Promise<T> => {
@@ -237,7 +236,9 @@ export function createProviderIssueHandoffService(
     return claim;
   };
 
-  const scheduleBestEffortRehydrateWithRefreshLock = (): void => {
+  const scheduleBestEffortRehydrateWithRefreshLock = (
+    attempt = 1
+  ): void => {
     if (bestEffortRehydrateTimer) {
       return;
     }
@@ -245,15 +246,13 @@ export function createProviderIssueHandoffService(
       bestEffortRehydrateTimer = null;
       void runWithRefreshLifecycleLock(rehydrateNow)
         .then((result) => {
-          bestEffortRehydrateFailureCount = 0;
-          if (result.hasPendingClaims) {
-            scheduleBestEffortRehydrateWithRefreshLock();
+          if (result.hasPendingClaims && attempt < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
+            scheduleBestEffortRehydrateWithRefreshLock(attempt + 1);
           }
         })
         .catch(() => {
-          bestEffortRehydrateFailureCount += 1;
-          if (bestEffortRehydrateFailureCount < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
-            scheduleBestEffortRehydrateWithRefreshLock();
+          if (attempt < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
+            scheduleBestEffortRehydrateWithRefreshLock(attempt + 1);
           }
         });
     }, BEST_EFFORT_REHYDRATE_DELAY_MS);
@@ -995,8 +994,8 @@ export function createProviderIssueHandoffService(
       | null
     > => {
     const trackedIssueRefetch =
-      queuedRetryTrackedIssueRefetches.get(claim.provider_key) ??
       options.resolveTrackedIssues ??
+      queuedRetryTrackedIssueRefetches.get(claim.provider_key) ??
       null;
     if (!trackedIssueRefetch) {
       return null;

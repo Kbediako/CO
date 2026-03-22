@@ -963,7 +963,7 @@ describe('ControlRuntime', () => {
     }
   });
 
-  it('aggregates only surfaced running and retrying telemetry into runtime rows and codex totals', async () => {
+  it('excludes completed sibling telemetry from runtime rows and codex totals', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
     try {

@@ -141,6 +141,7 @@ export async function discoverCompatibilityCollectionContexts(
   if (!runsRoot) {
     return { running: [], retrying: [], all: [] };
   }
+  const controlWorkspacePath = await resolveControlWorkspacePath(context);
 
   const running: ControlCompatibilitySourceContext[] = [];
   const retrying: ControlCompatibilitySourceContext[] = [];
@@ -154,7 +155,8 @@ export async function discoverCompatibilityCollectionContexts(
 
     const discoveredContexts = await readTaskCompatibilityContexts(join(runsRoot, taskEntry, 'cli'), {
       excludeRunId: taskEntry === currentTaskId ? currentRunId : null,
-      providerIntakeState: context.providerIntakeState
+      providerIntakeState: context.providerIntakeState,
+      controlWorkspacePath
     });
     all.push(...discoveredContexts.map((entry) => entry.context));
     for (const entry of discoveredContexts) {
@@ -667,6 +669,7 @@ async function readTaskCompatibilityContexts(
   options: {
     excludeRunId?: string | null;
     providerIntakeState?: ProviderIntakeState;
+    controlWorkspacePath?: string | null;
   } = {}
 ): Promise<DiscoveredTaskCompatibilityContext[]> {
   const discovered: DiscoveredTaskCompatibilityContext[] = [];
@@ -712,7 +715,7 @@ async function readTaskCompatibilityContexts(
         )
       },
       resolveRunsRootFromRunDir(runDir),
-      resolveSafeLegacyWorkspacePathFromRunDir(runDir),
+      options.controlWorkspacePath ?? resolveSafeLegacyWorkspacePathFromRunDir(runDir),
       findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot)
     );
     if (context) {
