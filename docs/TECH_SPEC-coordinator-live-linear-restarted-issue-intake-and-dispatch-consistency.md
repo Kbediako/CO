@@ -89,5 +89,6 @@ last_review: 2026-03-22
 - Is there any remaining stale fallback path in dispatch shaping beyond `controlRuntime.ts` and `trackerDispatchPilot.ts` that can still leak a prior issue identifier under timing pressure?
 
 ## Approvals
+- Standalone pre-implementation review: approved before implementation via `docs-review` manifest `.runs/1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency/cli/2026-03-22T04-14-00-475Z-008b6375/manifest.json`.
 - Reviewer: `docs-review` succeeded for `1317` at `.runs/1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency/cli/2026-03-22T04-14-00-475Z-008b6375/manifest.json`.
 - Date: 2026-03-22
