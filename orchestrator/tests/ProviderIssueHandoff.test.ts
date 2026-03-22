@@ -4896,15 +4896,16 @@ describe('createProviderIssueHandoffService', () => {
       });
 
       await expect(service.refresh()).resolves.toBeUndefined();
+      await waitForMockCalls(setTimeoutSpy);
 
       expect(launcher.resume).not.toHaveBeenCalled();
       expect(launcher.start).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(1_001);
-    await flushAsyncWork();
-    await waitForMockCalls(launcher.start);
+      await vi.advanceTimersByTimeAsync(1_001);
+      await flushAsyncWork();
+      await waitForMockCalls(launcher.start);
 
-    expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
         taskId: 'linear-lin-issue-1',
         pipelineId: 'diagnostics',
         provider: 'linear',
