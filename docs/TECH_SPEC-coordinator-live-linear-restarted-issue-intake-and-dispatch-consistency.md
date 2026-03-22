@@ -11,7 +11,7 @@ last_review: 2026-03-22
 ## Added by Bootstrap (refresh as needed)
 
 ## Summary
-- Objective: determine whether the reported post-PR-283 live Linear mismatch still represents a repo-side parity bug on current `main`, and if so land the smallest correct fix. The lane must separate historical handoff evidence from the current live recheck because the current control host already shows `CO-1` rehydrated and `/api/v1/dispatch` internally consistent.
+- Objective: determine whether the reported post-PR-283 live Linear mismatch still represents a repo-side parity bug on current `main`, and if so, land the smallest correct fix. The lane must separate historical handoff evidence from the current live recheck because the current control host already shows `CO-1` rehydrated and `/api/v1/dispatch` internally consistent.
 - Scope: audit persisted intake/advisory state, `/api/v1/dispatch`, and the code paths that shape those surfaces; implement only the smallest fix that still remains on current code. The confirmed current bug class is dispatch response shaping, not a currently reproduced intake replay failure.
 - Constraints:
   - preserve provider-intake and execution-authority boundaries
