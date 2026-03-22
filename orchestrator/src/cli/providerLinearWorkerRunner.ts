@@ -12,6 +12,14 @@ import {
   resolveLiveLinearTrackedIssueById,
   type LiveLinearTrackedIssue
 } from './control/linearDispatchSource.js';
+import {
+  isProviderLinearTrackedIssueEligibleForExecution,
+} from './control/providerLinearWorkflowStates.js';
+import {
+  PROVIDER_LINEAR_AUDIT_ENV_VAR,
+  summarizeProviderLinearAuditPath,
+  type ProviderLinearAuditSummary
+} from './control/providerLinearWorkflowAudit.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import {
@@ -24,10 +32,8 @@ import {
 import { resolveCodexHome } from './utils/codexPaths.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
+export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
-const ACTIVE_PROVIDER_ISSUE_STATES = new Set(['todo', 'in progress']);
-const TERMINAL_PROVIDER_ISSUE_STATES = new Set(['closed', 'cancelled', 'canceled', 'duplicate', 'done']);
-const TERMINAL_PROVIDER_ISSUE_STATE_TYPES = new Set(['completed', 'cancelled', 'canceled']);
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
@@ -68,6 +74,7 @@ export interface ProviderLinearWorkerProof {
   owner_status: 'in_progress' | 'succeeded' | 'failed';
   workspace_path: string | null;
   source_setup?: DispatchPilotSourceSetup | null;
+  linear_audit: ProviderLinearAuditSummary | null;
   end_reason: string | null;
   updated_at: string;
 }
@@ -362,7 +369,8 @@ function buildBlockersSection(issue: LiveLinearTrackedIssue): string[] {
 export function buildProviderWorkerPrompt(
   issue: LiveLinearTrackedIssue,
   turnNumber: number,
-  maxTurns: number
+  maxTurns: number,
+  helperCommand: string
 ): string {
   if (turnNumber > 1) {
     return [
@@ -372,6 +380,11 @@ export function buildProviderWorkerPrompt(
       `- This is continuation turn #${turnNumber} of ${maxTurns} for the current provider worker run.`,
       '- Resume from the current workspace and workpad state instead of restarting from scratch.',
       '- The original task instructions and prior turn context are already present in this thread, so do not restate them before acting.',
+      `- Keep the same workflow contract and continue using \`${helperCommand}\` for ticket updates with Linear issue id \`${issue.id}\` (not the human identifier \`${issue.identifier}\`).`,
+      `- Keep exactly one persistent \`## Codex Workpad\` comment current, and use \`${helperCommand} issue-context --issue-id ${issue.id}\` to inspect the team workflow states before any transition.`,
+      '- If the issue is `Todo` and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
+      '- Default Symphony handoff states are `Human Review`, `Merging`, and `Rework`, but some teams expose `In Review` instead of `Human Review`; always use the team\'s actual workflow names.',
+      '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`). Treat `Merging` and `Rework` as active flows only when the team exposes them.',
       '- Focus on the remaining ticket work and do not end the turn while the issue stays active unless you are truly blocked.'
     ].join('\n');
   }
@@ -383,6 +396,14 @@ export function buildProviderWorkerPrompt(
     '- Work in the current repository and workspace state.',
     '- Focus on completing the Linear issue in the current workspace.',
     '- Be concrete and action-oriented. Use tools where needed.',
+    `- Use \`${helperCommand}\` for Linear reads and writes in this run with Linear issue id \`${issue.id}\` (not the human identifier \`${issue.identifier}\`).`,
+    `- Use \`${helperCommand} issue-context --issue-id ${issue.id}\` to inspect the team workflow states before any transition.`,
+    '- If the issue is `Todo` and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
+    '- Maintain exactly one persistent `## Codex Workpad` comment on the issue. Reuse and update it in place; do not create extra progress or summary comments.',
+    '- Default Symphony handoff states are `Human Review`, `Merging`, and `Rework`, but some teams expose `In Review` instead of `Human Review`; always use the team\'s actual workflow names.',
+    '- Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`).',
+    '- `Human Review` and `In Review` are stop-coding handoff states. Do not keep coding once the issue reaches the team\'s review state.',
+    '- Treat `Merging` and `Rework` as active workflow states only when the team exposes them.',
     issue.url ? `- Linear URL: ${issue.url}` : null,
     issue.state ? `- Current state: ${issue.state}` : null,
     `- This is turn #1 of ${maxTurns} for the current worker run.`,
@@ -682,36 +703,7 @@ export function deriveLatestTurnSessionId(input: {
 }
 
 function isTrackedIssueActive(issue: LiveLinearTrackedIssue): boolean {
-  const state = normalizeOptionalString(issue.state)?.toLowerCase() ?? null;
-  const stateType = normalizeOptionalString(issue.state_type)?.toLowerCase() ?? null;
-  const isStartedState = stateType === 'started';
-  const isTodoState = state === 'todo';
-  const isActiveState = (state !== null && ACTIVE_PROVIDER_ISSUE_STATES.has(state)) || isStartedState;
-  if (
-    (state === null && !isStartedState) ||
-    (state !== null && TERMINAL_PROVIDER_ISSUE_STATES.has(state)) ||
-    (stateType !== null && TERMINAL_PROVIDER_ISSUE_STATE_TYPES.has(stateType)) ||
-    !isActiveState
-  ) {
-    return false;
-  }
-  if (isTodoState && todoIssueBlockedByNonTerminal(issue.blocked_by)) {
-    return false;
-  }
-  return true;
-}
-
-function todoIssueBlockedByNonTerminal(
-  blockers: LiveLinearTrackedIssue['blocked_by'] | null | undefined
-): boolean {
-  return (blockers ?? []).some((blocker) => {
-    const blockerStateType = normalizeOptionalString(blocker.state_type)?.toLowerCase() ?? null;
-    if (blockerStateType !== null) {
-      return !TERMINAL_PROVIDER_ISSUE_STATE_TYPES.has(blockerStateType);
-    }
-    const blockerState = normalizeOptionalString(blocker.state)?.toLowerCase() ?? null;
-    return blockerState === null || !TERMINAL_PROVIDER_ISSUE_STATES.has(blockerState);
-  });
+  return isProviderLinearTrackedIssueEligibleForExecution(issue);
 }
 
 async function resolveProviderLinearWorkerRuntimeContext(
@@ -754,9 +746,15 @@ function buildProofPath(runDir: string): string {
 async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,
   runDir: string,
+  auditPath: string,
   proof: ProviderLinearWorkerProof
-): Promise<void> {
-  await deps.writeProof(buildProofPath(runDir), proof);
+): Promise<ProviderLinearWorkerProof> {
+  const hydratedProof = {
+    ...proof,
+    linear_audit: await summarizeProviderLinearAuditPath(auditPath)
+  };
+  await deps.writeProof(buildProofPath(runDir), hydratedProof);
+  return hydratedProof;
 }
 
 export async function runProviderLinearWorker(
@@ -782,6 +780,9 @@ export async function runProviderLinearWorker(
     ...env,
     ...runtimeContext.env
   };
+  const auditPath = resolve(context.runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME);
+  childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
+  const helperCommand = resolveProviderLinearHelperCommand(childEnv);
   if (shouldForceNonInteractive(childEnv)) {
     childEnv.CODEX_NON_INTERACTIVE = childEnv.CODEX_NON_INTERACTIVE ?? '1';
     childEnv.CODEX_NO_INTERACTIVE = childEnv.CODEX_NO_INTERACTIVE ?? '1';
@@ -805,11 +806,12 @@ export async function runProviderLinearWorker(
     owner_status: 'in_progress',
     workspace_path: context.workspacePath,
     source_setup: context.sourceSetup,
+    linear_audit: null,
     end_reason: null,
     updated_at: deps.now()
   };
 
-  await writeProofSnapshot(deps, context.runDir, finalProof);
+  finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
   const readTrackedIssueWithFailClosedProof = async (): Promise<LiveLinearTrackedIssue> => {
     try {
       return await deps.readTrackedIssue({
@@ -825,7 +827,7 @@ export async function runProviderLinearWorker(
         end_reason: 'tracked_issue_read_failed',
         updated_at: deps.now()
       };
-      await writeProofSnapshot(deps, context.runDir, finalProof);
+      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
   };
@@ -842,12 +844,12 @@ export async function runProviderLinearWorker(
       end_reason: 'issue_inactive',
       updated_at: deps.now()
     };
-    await writeProofSnapshot(deps, context.runDir, finalProof);
+    finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
     return finalProof;
   }
 
   for (let turnNumber = 1; turnNumber <= context.maxTurns; turnNumber += 1) {
-    const prompt = buildProviderWorkerPrompt(issue, turnNumber, context.maxTurns);
+    const prompt = buildProviderWorkerPrompt(issue, turnNumber, context.maxTurns, helperCommand);
     const args =
       turnNumber === 1
         ? ['exec', '--json', prompt]
@@ -870,7 +872,7 @@ export async function runProviderLinearWorker(
         end_reason: 'exec_runner_failed',
         updated_at: deps.now()
       };
-      await writeProofSnapshot(deps, context.runDir, finalProof);
+      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
     const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
@@ -895,10 +897,11 @@ export async function runProviderLinearWorker(
       owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
       workspace_path: context.workspacePath,
       source_setup: context.sourceSetup,
+      linear_audit: finalProof.linear_audit,
       end_reason: null,
       updated_at: deps.now()
     };
-    await writeProofSnapshot(deps, context.runDir, finalProof);
+    finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
 
     if (execResult.exitCode !== 0) {
       finalProof = {
@@ -908,7 +911,7 @@ export async function runProviderLinearWorker(
         end_reason: `codex_exit_${execResult.exitCode ?? 'unknown'}`,
         updated_at: deps.now()
       };
-      await writeProofSnapshot(deps, context.runDir, finalProof);
+      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
       throw new Error(
         `provider-linear-worker turn ${turnNumber} failed with exit code ${execResult.exitCode ?? 'unknown'}`
       );
@@ -922,7 +925,7 @@ export async function runProviderLinearWorker(
         end_reason: 'thread_id_missing',
         updated_at: deps.now()
       };
-      await writeProofSnapshot(deps, context.runDir, finalProof);
+      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
       throw new Error('provider-linear-worker could not determine thread_id from Codex JSONL output.');
     }
 
@@ -935,7 +938,7 @@ export async function runProviderLinearWorker(
         end_reason: 'issue_inactive',
         updated_at: deps.now()
       };
-      await writeProofSnapshot(deps, context.runDir, finalProof);
+      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
       return finalProof;
     }
 
@@ -947,7 +950,7 @@ export async function runProviderLinearWorker(
         end_reason: 'max_turns_reached_issue_still_active',
         updated_at: deps.now()
       };
-      await writeProofSnapshot(deps, context.runDir, finalProof);
+      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
       return finalProof;
     }
   }
@@ -959,8 +962,16 @@ export async function runProviderLinearWorker(
     end_reason: 'worker_completed',
     updated_at: deps.now()
   };
-  await writeProofSnapshot(deps, context.runDir, finalProof);
+  finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
   return finalProof;
+}
+
+function resolveProviderLinearHelperCommand(env: NodeJS.ProcessEnv): string {
+  const packageRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PACKAGE_ROOT);
+  if (!packageRoot) {
+    return 'codex-orchestrator linear';
+  }
+  return `node "${join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js')}" linear`;
 }
 
 async function main(): Promise<void> {

@@ -147,6 +147,7 @@ describe('prepareControlServerStartupInputs', () => {
           issue_state: 'In Progress',
           issue_state_type: 'started',
           issue_updated_at: '2026-03-12T00:04:00.000Z',
+          issue_blocked_by: null,
           task_id: 'linear-issue-1',
           mapping_source: 'provider_id_fallback',
           state: 'starting',

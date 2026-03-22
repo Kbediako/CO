@@ -3,6 +3,48 @@
   "generated_at": "2026-03-22",
   "entries": [
     {
+      "path": ".agent/task/1318-coordinator-symphony-current-linear-operational-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-current-linear-operational-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-current-linear-operational-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-current-linear-operational-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1318-coordinator-symphony-current-linear-operational-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1318-coordinator-symphony-current-linear-operational-parity.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-22",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1317-coordinator-live-linear-restarted-issue-intake-and-dispatch-consistency.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
