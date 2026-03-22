@@ -534,6 +534,42 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('falls back to manifest-only retry compatibility rows when provider intake state has no claims', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1034-current',
+      providerIntakeState: createProviderIntakeState([])
+    });
+
+    await createSiblingRun(fixture.root, 'task-1034-retrying', 'run-3', {
+      manifest: {
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'issue-1034-retrying',
+        issue_identifier: 'ISSUE-1034-RETRYING',
+        summary: 'retryable failure pending rerun',
+        workspace_path: join(fixture.root, '.workspaces', 'task-1034-retrying'),
+        updated_at: '2026-03-07T00:17:00.000Z'
+      }
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const fallbackRetry = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1034-RETRYING'
+    );
+
+    expect(compatibilityProjection.retrying.map((entry) => entry.issue_identifier)).toEqual([
+      'ISSUE-1034-RETRYING'
+    ]);
+    expect(fallbackRetry?.payload.retry).toMatchObject({
+      issue_identifier: 'ISSUE-1034-RETRYING',
+      state: 'failed',
+      workspace_path: join(fixture.root, '.workspaces', 'task-1034-retrying'),
+      error: 'retryable failure pending rerun',
+      last_event: 'failed',
+      last_message: 'retryable failure pending rerun'
+    });
+  });
+
   it('keeps queued provider retries active on the selected run when retry attempt is missing', async () => {
     const providerIntakeState = createProviderIntakeState([
       {

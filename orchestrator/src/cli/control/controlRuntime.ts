@@ -181,7 +181,8 @@ function createControlRuntimeSnapshot(
       ].filter((entry, index, collection) =>
         collection.findIndex((candidate) => candidate.runId === entry.runId) === index
       );
-      const retryingSource = context.providerIntakeState ? authoritativeRetrying : fallbackRetrying;
+      const retryingSource =
+        (context.providerIntakeState?.claims.length ?? 0) > 0 ? authoritativeRetrying : fallbackRetrying;
       const retrying = retryingSource.filter(
         (entry, index, collection) =>
           collection.findIndex((candidate) => candidate.issueIdentifier === entry.issueIdentifier) === index

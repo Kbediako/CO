@@ -165,7 +165,7 @@ export async function discoverCompatibilityCollectionContexts(
         running.push(discovered);
         continue;
       }
-      if (!context.providerIntakeState && entry.retryFallbackEligible) {
+      if ((context.providerIntakeState?.claims.length ?? 0) === 0 && entry.retryFallbackEligible) {
         retrying.push(discovered);
       }
     }
