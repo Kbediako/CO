@@ -4040,7 +4040,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await vi.advanceTimersByTimeAsync(1_001);
     await flushAsyncWork();
-    await waitForMockCalls(launcher.start);
+    await waitForMockCalls(launcher.start, 1, 1024);
 
     const refreshPromise = service.refresh();
     await flushAsyncWork();
