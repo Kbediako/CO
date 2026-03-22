@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260322-linear-856c1318-524f-4db3-8d4a-b357ec51c304",
+      "title": "Archive Automation Policy Mismatch for Linked PRD TECH_SPEC and ACTION_PLAN Docs",
+      "relates_to": "tasks/tasks-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-22",
+      "paths": {
+        "spec": "tasks/specs/linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
+        "task": "tasks/tasks-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
+        "agent_task": ".agent/task/linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",
+        "docs": "docs/TECH_SPEC-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md"
+      }
+    },
+    {
       "id": "20260322-1316-coordinator-symphony-poll-owned-discovery-and-recovery",
       "title": "Coordinator Symphony Poll-Owned Discovery Recovery and Observability API Normalization",
       "relates_to": "tasks/tasks-1316-coordinator-symphony-poll-owned-discovery-and-recovery.md",

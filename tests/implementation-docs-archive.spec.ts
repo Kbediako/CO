@@ -18,7 +18,10 @@ type InitOptions = {
     slug: string;
     status: string;
     completed_at: string;
-    path: string;
+    relates_to: string;
+    paths: {
+      docs: string;
+    };
   }>;
 };
 
@@ -60,7 +63,10 @@ async function initRepository(options: InitOptions = {}): Promise<string> {
     slug: 'archive-test',
     status: 'succeeded',
     completed_at: '2025-01-01',
-    path: 'docs/PRD-archive-test.md',
+    relates_to: 'tasks/tasks-9999-archive-test.md',
+    paths: {
+      docs: 'docs/PRD-archive-test.md'
+    },
     ...(options.taskOverrides ?? {})
   };
 
@@ -146,5 +152,102 @@ describe('implementation-docs-archive script', () => {
 
     const after = JSON.parse(await readFile(registryPath, 'utf8'));
     expect(after).toEqual(before);
+  });
+
+  it('archives linked PRD, TECH_SPEC, and ACTION_PLAN docs for plain star patterns', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md', 'docs/TECH_SPEC-*.md', 'docs/ACTION_PLAN-*.md']
+      }
+    });
+
+    await writeFile(
+      join(repo, 'docs', 'PRD-archive-test.md'),
+      [
+        '# PRD Archive Test',
+        '',
+        '- TECH_SPEC: `docs/TECH_SPEC-archive-test.md`',
+        '- ACTION_PLAN: `docs/ACTION_PLAN-archive-test.md`',
+        ''
+      ].join('\n')
+    );
+    await writeFile(join(repo, 'docs', 'TECH_SPEC-archive-test.md'), '# TECH_SPEC\n\nSome content.\n');
+    await writeFile(join(repo, 'docs', 'ACTION_PLAN-archive-test.md'), '# ACTION_PLAN\n\nSome content.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    for (const relativePath of [
+      'docs/PRD-archive-test.md',
+      'docs/TECH_SPEC-archive-test.md',
+      'docs/ACTION_PLAN-archive-test.md'
+    ]) {
+      const stubContent = await readFile(join(repo, relativePath), 'utf8');
+      const payloadContent = await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive', relativePath),
+        'utf8'
+      );
+
+      expect(stubContent).toContain('<!-- docs-archive:stub -->');
+      expect(payloadContent).toMatch(/^# /m);
+    }
+  });
+
+  it('archives linked docs when tasks/index uses canonical paths.docs entries', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        paths: {
+          docs: 'docs/TECH_SPEC-archive-test.md'
+        }
+      },
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md', 'docs/TECH_SPEC-*.md', 'docs/ACTION_PLAN-*.md']
+      }
+    });
+
+    await writeFile(join(repo, 'docs', 'PRD-archive-test.md'), '# PRD\n\nSome content.\n');
+    await writeFile(
+      join(repo, 'docs', 'TECH_SPEC-archive-test.md'),
+      [
+        '# TECH_SPEC Archive Test',
+        '',
+        '- PRD: `docs/PRD-archive-test.md`',
+        '- ACTION_PLAN: `docs/ACTION_PLAN-archive-test.md`',
+        ''
+      ].join('\n')
+    );
+    await writeFile(join(repo, 'docs', 'ACTION_PLAN-archive-test.md'), '# ACTION_PLAN\n\nSome content.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    for (const relativePath of [
+      'docs/PRD-archive-test.md',
+      'docs/TECH_SPEC-archive-test.md',
+      'docs/ACTION_PLAN-archive-test.md'
+    ]) {
+      const stubContent = await readFile(join(repo, relativePath), 'utf8');
+      const payloadContent = await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive', relativePath),
+        'utf8'
+      );
+
+      expect(stubContent).toContain('<!-- docs-archive:stub -->');
+      expect(payloadContent).toMatch(/^# /m);
+    }
   });
 });

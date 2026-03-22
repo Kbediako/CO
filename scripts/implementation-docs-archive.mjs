@@ -52,13 +52,39 @@ function formatDate(date) {
 }
 
 function globToRegExp(pattern) {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  const regex = `^${escaped.replace(/\\\*/g, '.*')}$`;
+  const regex = `^${pattern
+    .split('*')
+    .map((segment) => segment.replace(/[.+^${}()|[\]\\]/g, '\\$&'))
+    .join('.*')}$`;
   return new RegExp(regex);
 }
 
 function matchesAnyPattern(value, patterns) {
   return patterns.some((regex) => regex.test(value));
+}
+
+function collectIndexedDocPaths(item) {
+  if (!item || typeof item !== 'object') {
+    return [];
+  }
+
+  const candidates = [];
+  if (typeof item.path === 'string' && item.path.trim()) {
+    candidates.push(item.path.trim());
+  }
+
+  const indexedDocsPath =
+    item.paths &&
+    typeof item.paths === 'object' &&
+    typeof item.paths.docs === 'string' &&
+    item.paths.docs.trim()
+      ? item.paths.docs.trim()
+      : '';
+  if (indexedDocsPath) {
+    candidates.push(indexedDocsPath);
+  }
+
+  return [...new Set(candidates.map((entry) => toPosixPath(entry)))];
 }
 
 function parsePolicy(raw, policyPath) {
@@ -235,8 +261,7 @@ async function main() {
     }
     const docPaths = new Set();
 
-    if (typeof item.path === 'string' && item.path.trim()) {
-      const normalized = toPosixPath(item.path.trim());
+    for (const normalized of collectIndexedDocPaths(item)) {
       docPaths.add(normalized);
       const abs = path.resolve(repoRoot, normalized);
       if (await pathExists(abs)) {
