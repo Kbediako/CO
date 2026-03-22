@@ -140,6 +140,19 @@ async function waitForMockCalls(
   await waitForCondition(() => mockFn.mock.calls.length >= expectedCalls, turns);
 }
 
+function getLatestScheduledTimeoutCallback(
+  setTimeoutSpy: { mock: { calls: unknown[][] } }
+): () => void {
+  for (let index = setTimeoutSpy.mock.calls.length - 1; index >= 0; index -= 1) {
+    const [callback] = setTimeoutSpy.mock.calls[index] ?? [];
+    if (typeof callback !== 'function') {
+      continue;
+    }
+    return callback as () => void;
+  }
+  throw new Error('No scheduled timeout callback found.');
+}
+
 describe('createProviderIssueHandoffService', () => {
   it('persists a starting claim before launching a deterministic start for a started Linear issue', async () => {
     const { paths } = await createHostPaths();
@@ -5838,10 +5851,17 @@ describe('createProviderIssueHandoffService', () => {
 
       expect(launcher.resume).not.toHaveBeenCalled();
       expect(launcher.start).not.toHaveBeenCalled();
+      await waitForCondition(
+        () =>
+          state.claims[0]?.retry_queued === true &&
+          state.claims[0]?.retry_due_at === '2026-03-19T04:30:01.000Z'
+      );
 
-      await vi.advanceTimersByTimeAsync(1_001);
+      const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+      expect(scheduledTimeoutCount).toBe(1);
+      getLatestScheduledTimeoutCallback(setTimeoutSpy)();
       await flushAsyncWork();
-      await waitForMockCalls(launcher.start);
+      await waitForMockCalls(launcher.start, 1, 1024);
 
       expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
         taskId: 'linear-lin-issue-1',
@@ -5865,7 +5885,7 @@ describe('createProviderIssueHandoffService', () => {
         retry_due_at: null,
         retry_error: null
       });
-      expect(setTimeoutSpy).toHaveBeenCalled();
+      expect(setTimeoutSpy.mock.calls.length).toBeGreaterThan(scheduledTimeoutCount);
     }
   );
 
