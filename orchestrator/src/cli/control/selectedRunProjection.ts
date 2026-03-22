@@ -560,18 +560,14 @@ function resolveRunsRootFromRunDir(runDir: string): string | null {
 
 function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
   const segments = normalizePathForComparison(manifestPath).split('/').filter((segment) => segment.length > 0);
-  const cliIndex = segments.lastIndexOf('cli');
-  if (cliIndex <= 0) {
+  const manifestIndex = segments[segments.length - 1] === 'manifest.json' ? segments.length - 1 : segments.length;
+  if (manifestIndex < 3) {
     return null;
   }
-  const trailingSegments = segments.length - cliIndex - 1;
-  if (trailingSegments < 1 || trailingSegments > 2) {
+  if (segments[manifestIndex - 2] !== 'cli') {
     return null;
   }
-  if (trailingSegments === 2 && segments[segments.length - 1] !== 'manifest.json') {
-    return null;
-  }
-  return segments[cliIndex - 1] ?? null;
+  return segments[manifestIndex - 3] ?? null;
 }
 
 function resolveRunIdFromManifestPath(manifestPath: string): string | null {

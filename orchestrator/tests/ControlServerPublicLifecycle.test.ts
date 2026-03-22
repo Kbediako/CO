@@ -660,6 +660,10 @@ describe('startControlServerPublicLifecycle', () => {
 });
 
 describe('closeControlServerPublicLifecycle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('delegates owned shutdown through the ready-instance lifecycle closer', async () => {
     const state = {
       server: { kind: 'server' } as unknown as http.Server,
@@ -672,6 +676,72 @@ describe('closeControlServerPublicLifecycle', () => {
 
     await closeControlServerPublicLifecycle(state);
 
+    expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
+      server: state.server,
+      requestContextShared: state.requestContextShared,
+      lifecycleState: state.lifecycleState
+    });
+  });
+
+  it('preserves persisted queued provider retry ownership across shutdown', async () => {
+    const persistProviderIntake = vi.fn(async () => undefined);
+    const requestContextShared = {
+      clients: new Set(),
+      providerIntakeState: {
+        updated_at: '2026-03-22T00:00:00.000Z',
+        claims: [
+          {
+            provider: 'linear',
+            provider_key: 'linear:lin-issue-1',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-2',
+            issue_title: 'Autonomous intake handoff',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-03-19T04:21:00.000Z',
+            task_id: 'task-1303-completed',
+            mapping_source: 'provider_id_fallback',
+            state: 'completed',
+            reason: 'provider_issue_rehydrated_completed_run',
+            accepted_at: '2026-03-19T04:21:05.000Z',
+            updated_at: '2026-03-19T04:21:10.000Z',
+            last_delivery_id: 'delivery-completed',
+            last_event: 'Issue',
+            last_action: 'update',
+            last_webhook_timestamp: 1_742_360_050_000,
+            run_id: 'run-completed',
+            run_manifest_path: '/tmp/provider-run/completed-manifest.json',
+            launch_source: null,
+            launch_token: null,
+            retry_queued: true,
+            retry_attempt: 1,
+            retry_due_at: '2026-03-22T00:05:00.000Z',
+            retry_error: null
+          }
+        ]
+      },
+      persist: {
+        providerIntake: persistProviderIntake
+      }
+    } as unknown as ControlRequestSharedContext;
+    const state = {
+      server: { kind: 'server' } as unknown as http.Server,
+      requestContextShared,
+      lifecycleState: {
+        expiryLifecycle: { close: vi.fn() },
+        bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+      } as unknown as ControlServerOwnedLifecycleState
+    } satisfies ControlServerPublicLifecycleState;
+
+    await closeControlServerPublicLifecycle(state);
+
+    expect(requestContextShared.providerIntakeState?.claims[0]).toMatchObject({
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-22T00:05:00.000Z',
+      retry_error: null
+    });
+    expect(persistProviderIntake).not.toHaveBeenCalled();
     expect(closeControlServerOwnedRuntime).toHaveBeenCalledWith({
       server: state.server,
       requestContextShared: state.requestContextShared,
