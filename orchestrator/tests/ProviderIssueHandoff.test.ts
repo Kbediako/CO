@@ -4384,7 +4384,12 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(1_001);
+    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+    expect(scheduledTimeoutCount).toBe(1);
+    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+    expect(delayMs).toBeGreaterThanOrEqual(999);
+    expect(delayMs).toBeLessThanOrEqual(1_000);
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
     await waitForCondition(
       () =>
