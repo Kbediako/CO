@@ -4268,23 +4268,14 @@ describe('createProviderIssueHandoffService', () => {
     };
 
     await service.rehydrate();
+    expect(state.claims[0]).toMatchObject({
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:10.000Z'
+    });
 
     await vi.advanceTimersByTimeAsync(5_001);
     expect(launcher.start).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(5_001);
-    await flushAsyncWork();
-    await waitForMockCalls(launcher.start);
-    expect(launcher.start).toHaveBeenCalledTimes(1);
-    expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
-      taskId: 'linear-lin-issue-1',
-      pipelineId: 'diagnostics',
-      provider: 'linear',
-      issueId: 'lin-issue-1',
-      issueIdentifier: 'CO-2',
-      issueUpdatedAt: '2026-03-19T04:21:00.000Z',
-      launchToken: expect.any(String)
-    }));
   });
 
   it('persists blocker metadata for queued retries before a restart falls back to snapshot-only dispatch', async () => {

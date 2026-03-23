@@ -54,4 +54,33 @@ describe('provider issue retry queue', () => {
     await vi.advanceTimersByTimeAsync(1_000);
     expect(fire).toHaveBeenCalledTimes(1);
   });
+
+  it('replaces an older queued retry when the same key is resynced with a newer dueAt', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const queue = createProviderIssueRetryQueue();
+    const fire = vi.fn<() => Promise<void> | void>();
+
+    queue.sync([
+      {
+        key: 'linear:issue-1',
+        dueAt: '2026-03-19T04:30:05.000Z',
+        fire
+      }
+    ]);
+    queue.sync([
+      {
+        key: 'linear:issue-1',
+        dueAt: '2026-03-19T04:30:10.000Z',
+        fire
+      }
+    ]);
+
+    await vi.advanceTimersByTimeAsync(5_001);
+    expect(fire).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fire).toHaveBeenCalledTimes(1);
+  });
 });
