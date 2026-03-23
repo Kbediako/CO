@@ -4732,6 +4732,12 @@ describe('createProviderIssueHandoffService', () => {
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
     await waitForMockCalls(persist, persistCallsBeforeRetry + 1, 1_024);
+    await waitForCondition(
+      () =>
+        state.claims[0]?.state === 'released' &&
+        state.claims[0]?.reason === 'provider_issue_released:todo_blocked_by_non_terminal',
+      1_024
+    );
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
