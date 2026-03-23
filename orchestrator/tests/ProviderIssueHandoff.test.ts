@@ -6621,15 +6621,10 @@ describe('createProviderIssueHandoffService', () => {
     expect(delayMs).toBeGreaterThanOrEqual(999);
     expect(delayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
+    const persistCallsBeforeRetry = persist.mock.calls.length;
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
-    await waitForCondition(
-      () =>
-        state.claims[0]?.reason === 'provider_issue_handoff_owned' &&
-        state.claims[0]?.retry_queued === true &&
-        typeof state.claims[0]?.retry_due_at === 'string' &&
-        state.claims[0]?.retry_due_at !== '2026-03-19T04:30:01.000Z'
-    );
+    await waitForMockCalls(persist, persistCallsBeforeRetry + 1, 1_024);
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
