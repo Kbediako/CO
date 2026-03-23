@@ -3,6 +3,48 @@
   "generated_at": "2026-03-23",
   "entries": [
     {
+      "path": ".agent/task/1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-symphony-post-merge-retry-timer-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-symphony-post-merge-retry-timer-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-symphony-post-merge-retry-timer-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-23",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1320-coordinator-symphony-post-merge-retry-timer-follow-up.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-23",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
