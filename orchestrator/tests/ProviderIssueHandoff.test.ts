@@ -4699,6 +4699,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_error: null
     });
 
+    const persist = vi.fn(async () => undefined);
     const launcher = {
       start: vi.fn(async () => ({
         runId: 'run-continuation',
@@ -4711,7 +4712,7 @@ describe('createProviderIssueHandoffService', () => {
     const service = createProviderIssueHandoffService({
       paths,
       state,
-      persist: vi.fn(async () => undefined),
+      persist,
       launcher,
       startPipelineId: 'diagnostics'
     });
@@ -4727,13 +4728,10 @@ describe('createProviderIssueHandoffService', () => {
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
     expect(delayMs).toBeGreaterThanOrEqual(999);
     expect(delayMs).toBeLessThanOrEqual(1_000);
+    const persistCallsBeforeRetry = persist.mock.calls.length;
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
-    await waitForCondition(
-      () =>
-        state.claims[0]?.state === 'released' &&
-        state.claims[0]?.reason === 'provider_issue_released:todo_blocked_by_non_terminal'
-    );
+    await waitForMockCalls(persist, persistCallsBeforeRetry + 1, 1_024);
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -6753,9 +6751,10 @@ describe('createProviderIssueHandoffService', () => {
     expect(delayMs).toBeGreaterThanOrEqual(999);
     expect(delayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
+    const startCallsBeforeRetry = launcher.start.mock.calls.length;
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
-    await waitForMockCalls(launcher.start);
+    await waitForMockCalls(launcher.start, startCallsBeforeRetry + 1, 1_024);
 
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
