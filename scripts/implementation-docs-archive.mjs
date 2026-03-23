@@ -465,7 +465,7 @@ async function main() {
     stray_candidates: []
   };
 
-  async function archiveDoc({ relativePath, reason, context }) {
+  async function loadContainedDoc(relativePath, context) {
     const containedPath = await resolveContainedPath(repoRoot, relativePath, {
       allowMissing: true,
       resolvedRepoRoot
@@ -473,15 +473,27 @@ async function main() {
     if (!containedPath) {
       report.skipped.push({ path: relativePath, reason: 'outside_repo', context });
       report.totals.skipped += 1;
-      return;
+      return null;
     }
     if (!containedPath.exists || !(await pathExists(containedPath.absolutePath))) {
-      report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context });
+      report.skipped.push({ path: containedPath.relativePath, reason: 'missing_on_disk', context });
       report.totals.skipped += 1;
+      return null;
+    }
+
+    return {
+      containedPath,
+      content: await readFile(containedPath.absolutePath, 'utf8')
+    };
+  }
+
+  async function archiveDoc({ relativePath, reason, context, loadedDoc = null }) {
+    const loaded = loadedDoc ?? (await loadContainedDoc(relativePath, context));
+    if (!loaded) {
       return;
     }
 
-    const content = await readFile(containedPath.absolutePath, 'utf8');
+    const { containedPath, content } = loaded;
     if (content.includes(ARCHIVE_MARKER)) {
       report.skipped.push({ path: relativePath, reason: 'already_stubbed', context });
       report.totals.skipped += 1;
@@ -528,15 +540,13 @@ async function main() {
   }
 
   for (const candidate of taskCandidates) {
-    const relativePath = candidate.path;
-    const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await pathExists(absPath))) {
-      report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context: candidate });
-      report.totals.skipped += 1;
+    const loadedDoc = await loadContainedDoc(candidate.path, candidate);
+    if (!loadedDoc) {
       continue;
     }
 
-    const content = await readFile(absPath, 'utf8');
+    const { containedPath, content } = loadedDoc;
+    const relativePath = containedPath.relativePath;
     const lineCount = content.split('\n').length;
     const registryEntry = registryMap.get(relativePath);
     const status = typeof registryEntry?.status === 'string' ? registryEntry.status : '';
@@ -576,21 +586,21 @@ async function main() {
     await archiveDoc({
       relativePath,
       reason: eligibleReasons.join(','),
-      context: { ...candidate, lineCount }
+      context: { ...candidate, lineCount },
+      loadedDoc
     });
   }
 
   for (const relativePath of strayCandidates) {
-    const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await pathExists(absPath))) {
-      report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context: { type: 'stray' } });
-      report.totals.skipped += 1;
+    const loadedDoc = await loadContainedDoc(relativePath, { type: 'stray' });
+    if (!loadedDoc) {
       continue;
     }
 
-    const content = await readFile(absPath, 'utf8');
+    const { containedPath, content } = loadedDoc;
+    const normalizedRelativePath = containedPath.relativePath;
     const lineCount = content.split('\n').length;
-    const registryEntry = registryMap.get(relativePath);
+    const registryEntry = registryMap.get(normalizedRelativePath);
     const status = typeof registryEntry?.status === 'string' ? registryEntry.status : '';
     const reviewDate = parseIsoDate(registryEntry?.last_review ?? null);
 
@@ -600,11 +610,11 @@ async function main() {
       last_review: registryEntry?.last_review ?? null,
       lineCount
     };
-    report.stray_candidates.push({ path: relativePath, context: strayContext });
+    report.stray_candidates.push({ path: normalizedRelativePath, context: strayContext });
 
-    const allowlistReason = getAllowlistReason(relativePath, null);
+    const allowlistReason = getAllowlistReason(normalizedRelativePath, null);
     if (allowlistReason) {
-      report.skipped.push({ path: relativePath, reason: allowlistReason, context: strayContext });
+      report.skipped.push({ path: normalizedRelativePath, reason: allowlistReason, context: strayContext });
       report.totals.skipped += 1;
       continue;
     }
@@ -627,15 +637,16 @@ async function main() {
     }
 
     if (eligibleReasons.length === 0) {
-      report.skipped.push({ path: relativePath, reason: 'not_eligible', context: strayContext });
+      report.skipped.push({ path: normalizedRelativePath, reason: 'not_eligible', context: strayContext });
       report.totals.skipped += 1;
       continue;
     }
 
     await archiveDoc({
-      relativePath,
+      relativePath: normalizedRelativePath,
       reason: eligibleReasons.join(','),
-      context: strayContext
+      context: strayContext,
+      loadedDoc
     });
   }
 

@@ -301,23 +301,19 @@ describe('implementation-docs-archive script', () => {
     expect(await readFile(outsideFile, 'utf8')).toBe(outsideContent);
   });
 
-  it('ignores indexed paths that escape the repo through symlink targets', async () => {
+  it('skips derived task packet symlinks outside the repo before preflight reads', async () => {
     const repo = await initRepository({
       policyOverrides: {
-        doc_patterns: ['docs/PRD-outside.md']
-      },
-      taskOverrides: {
-        paths: {
-          docs: 'docs/PRD-outside.md'
-        }
+        retain_days: 99999,
+        max_lines: 99999
       }
     });
     const outsideDir = await mkdtemp(join(tmpdir(), 'impl-docs-archive-symlink-outside-'));
     createdDirs.push(outsideDir);
 
-    const outsideFile = join(outsideDir, 'PRD-outside.md');
-    await writeFile(outsideFile, '# Outside\n\nSensitive content.\n', 'utf8');
-    await symlink(outsideFile, join(repo, 'docs', 'PRD-outside.md'));
+    const outsideDocDir = join(outsideDir, 'outside-doc-dir');
+    await mkdir(outsideDocDir);
+    await symlink(outsideDocDir, join(repo, 'tasks', 'tasks-9999-archive-test.md'));
 
     await execFileAsync('node', [scriptPath], {
       cwd: repo,
@@ -337,7 +333,14 @@ describe('implementation-docs-archive script', () => {
     );
 
     expect(report.totals.archived).toBe(0);
-    expect(await readFile(outsideFile, 'utf8')).toContain('Sensitive content.');
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'outside_repo'
+        })
+      ])
+    );
     await expect(
       readFile(
         join(
@@ -345,8 +348,8 @@ describe('implementation-docs-archive script', () => {
           'out',
           'implementation-docs-archive-automation',
           'docs-archive',
-          'docs',
-          'PRD-outside.md'
+          'tasks',
+          'tasks-9999-archive-test.md'
         ),
         'utf8'
       )
