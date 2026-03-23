@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -18,7 +18,13 @@ type InitOptions = {
     slug: string;
     status: string;
     completed_at: string;
-    path: string;
+    relates_to: string;
+    paths: {
+      docs?: string;
+      task?: string;
+      spec?: string;
+      agent_task?: string;
+    };
   }>;
 };
 
@@ -28,6 +34,8 @@ async function initRepository(options: InitOptions = {}): Promise<string> {
 
   await mkdir(join(dir, 'docs'), { recursive: true });
   await mkdir(join(dir, 'tasks'), { recursive: true });
+  await mkdir(join(dir, 'tasks', 'specs'), { recursive: true });
+  await mkdir(join(dir, '.agent', 'task'), { recursive: true });
 
   const policy = {
     version: 1,
@@ -60,7 +68,10 @@ async function initRepository(options: InitOptions = {}): Promise<string> {
     slug: 'archive-test',
     status: 'succeeded',
     completed_at: '2025-01-01',
-    path: 'docs/PRD-archive-test.md',
+    relates_to: 'tasks/tasks-9999-archive-test.md',
+    paths: {
+      docs: 'docs/PRD-archive-test.md'
+    },
     ...(options.taskOverrides ?? {})
   };
 
@@ -146,5 +157,243 @@ describe('implementation-docs-archive script', () => {
 
     const after = JSON.parse(await readFile(registryPath, 'utf8'));
     expect(after).toEqual(before);
+  });
+
+  it('archives linked PRD, TECH_SPEC, and ACTION_PLAN docs for plain star patterns', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md', 'docs/TECH_SPEC-*.md', 'docs/ACTION_PLAN-*.md']
+      }
+    });
+
+    await writeFile(
+      join(repo, 'docs', 'PRD-archive-test.md'),
+      [
+        '# PRD Archive Test',
+        '',
+        '- TECH_SPEC: `docs/TECH_SPEC-archive-test.md`',
+        '- ACTION_PLAN: `docs/ACTION_PLAN-archive-test.md`',
+        ''
+      ].join('\n')
+    );
+    await writeFile(join(repo, 'docs', 'TECH_SPEC-archive-test.md'), '# TECH_SPEC\n\nSome content.\n');
+    await writeFile(join(repo, 'docs', 'ACTION_PLAN-archive-test.md'), '# ACTION_PLAN\n\nSome content.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    for (const relativePath of [
+      'docs/PRD-archive-test.md',
+      'docs/TECH_SPEC-archive-test.md',
+      'docs/ACTION_PLAN-archive-test.md'
+    ]) {
+      const stubContent = await readFile(join(repo, relativePath), 'utf8');
+      const payloadContent = await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive', relativePath),
+        'utf8'
+      );
+
+      expect(stubContent).toContain('<!-- docs-archive:stub -->');
+      expect(payloadContent).toMatch(/^# /m);
+    }
+  });
+
+  it('archives linked docs when tasks/index uses canonical paths.docs entries', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        paths: {
+          docs: 'docs/TECH_SPEC-archive-test.md'
+        }
+      },
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md', 'docs/TECH_SPEC-*.md', 'docs/ACTION_PLAN-*.md']
+      }
+    });
+
+    await writeFile(join(repo, 'docs', 'PRD-archive-test.md'), '# PRD\n\nSome content.\n');
+    await writeFile(
+      join(repo, 'docs', 'TECH_SPEC-archive-test.md'),
+      [
+        '# TECH_SPEC Archive Test',
+        '',
+        '- PRD: `docs/PRD-archive-test.md`',
+        '- ACTION_PLAN: `docs/ACTION_PLAN-archive-test.md`',
+        ''
+      ].join('\n')
+    );
+    await writeFile(join(repo, 'docs', 'ACTION_PLAN-archive-test.md'), '# ACTION_PLAN\n\nSome content.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    for (const relativePath of [
+      'docs/PRD-archive-test.md',
+      'docs/TECH_SPEC-archive-test.md',
+      'docs/ACTION_PLAN-archive-test.md'
+    ]) {
+      const stubContent = await readFile(join(repo, relativePath), 'utf8');
+      const payloadContent = await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive', relativePath),
+        'utf8'
+      );
+
+      expect(stubContent).toContain('<!-- docs-archive:stub -->');
+      expect(payloadContent).toMatch(/^# /m);
+    }
+  });
+
+  it('ignores indexed paths that resolve outside the repo root', async () => {
+    const repo = await initRepository();
+    const outsideDir = await mkdtemp(join(tmpdir(), 'impl-docs-archive-outside-'));
+    createdDirs.push(outsideDir);
+
+    const outsideFile = join(outsideDir, 'outside.md');
+    const outsideRelative = relative(repo, outsideFile).split(sep).join('/');
+    const outsideContent = '# Outside\n\nSensitive content.\n';
+
+    await writeFile(outsideFile, outsideContent);
+    await writeFile(
+      join(repo, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '9999',
+              slug: 'archive-test',
+              status: 'succeeded',
+              completed_at: '2025-01-01',
+              relates_to: 'tasks/tasks-9999-archive-test.md',
+              paths: {
+                docs: outsideRelative
+              }
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    expect(await readFile(outsideFile, 'utf8')).toBe(outsideContent);
+  });
+
+  it('skips derived task packet symlinks outside the repo before preflight reads', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        retain_days: 99999,
+        max_lines: 99999
+      }
+    });
+    const outsideDir = await mkdtemp(join(tmpdir(), 'impl-docs-archive-symlink-outside-'));
+    createdDirs.push(outsideDir);
+
+    const outsideDocDir = join(outsideDir, 'outside-doc-dir');
+    await mkdir(outsideDocDir);
+    await symlink(outsideDocDir, join(repo, 'tasks', 'tasks-9999-archive-test.md'));
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'outside_repo'
+        })
+      ])
+    );
+    await expect(
+      readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive',
+          'tasks',
+          'tasks-9999-archive-test.md'
+        ),
+        'utf8'
+      )
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('keeps explicit task packet paths out of stray archiving', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        status: 'in_progress',
+        paths: {
+          docs: 'docs/TECH_SPEC-archive-test.md',
+          task: 'tasks/tasks-custom-archive-test.md',
+          spec: 'tasks/specs/custom-archive-test.md',
+          agent_task: '.agent/task/custom-archive-test.md'
+        }
+      },
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md', 'tasks/specs/*.md', '.agent/task/*.md']
+      }
+    });
+
+    const packetFiles = [
+      ['tasks/tasks-custom-archive-test.md', '# Task Checklist\n\nCustom checklist.\n'],
+      ['tasks/specs/custom-archive-test.md', '# TECH_SPEC\n\nCustom spec.\n'],
+      ['.agent/task/custom-archive-test.md', '# Agent Task\n\nCustom agent task.\n']
+    ] as const;
+
+    for (const [relativePath, content] of packetFiles) {
+      await writeFile(join(repo, relativePath), content);
+    }
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    for (const [relativePath, content] of packetFiles) {
+      expect(await readFile(join(repo, relativePath), 'utf8')).toBe(content);
+    }
   });
 });

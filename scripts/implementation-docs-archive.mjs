@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
@@ -52,13 +52,141 @@ function formatDate(date) {
 }
 
 function globToRegExp(pattern) {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  const regex = `^${escaped.replace(/\\\*/g, '.*')}$`;
+  const regex = `^${pattern
+    .split('*')
+    .map((segment) => segment.replace(/[.+^${}()|[\]\\]/g, '\\$&'))
+    .join('.*')}$`;
   return new RegExp(regex);
 }
 
 function matchesAnyPattern(value, patterns) {
   return patterns.some((regex) => regex.test(value));
+}
+
+function collectIndexedDocPaths(item) {
+  if (!item || typeof item !== 'object') {
+    return [];
+  }
+
+  const candidates = [];
+  if (typeof item.path === 'string' && item.path.trim()) {
+    candidates.push(item.path.trim());
+  }
+  if (typeof item.relates_to === 'string' && item.relates_to.trim()) {
+    candidates.push(item.relates_to.trim());
+  }
+
+  if (item.paths && typeof item.paths === 'object') {
+    for (const key of ['docs', 'task', 'spec', 'agent_task']) {
+      const value =
+        typeof item.paths[key] === 'string' && item.paths[key].trim()
+          ? item.paths[key].trim()
+          : '';
+      if (value) {
+        candidates.push(value);
+      }
+    }
+  }
+
+  return [...new Set(candidates.map((entry) => toPosixPath(entry)))];
+}
+
+function toContainedRepoRelativePath(repoRoot, absolutePath) {
+  const repoRelative = toPosixPath(path.relative(repoRoot, absolutePath));
+  if (
+    !repoRelative ||
+    repoRelative === '..' ||
+    repoRelative.startsWith('../') ||
+    path.isAbsolute(repoRelative)
+  ) {
+    return null;
+  }
+  return repoRelative;
+}
+
+async function resolvePathOrExistingParent(absolutePath) {
+  const missingSegments = [];
+  let currentPath = absolutePath;
+
+  while (true) {
+    try {
+      return {
+        resolvedPath: await realpath(currentPath),
+        missingSuffix:
+          missingSegments.length > 0 ? path.join(...missingSegments.reverse()) : ''
+      };
+    } catch (error) {
+      if (!error || typeof error !== 'object' || error.code !== 'ENOENT') {
+        throw error;
+      }
+
+      const parentPath = path.dirname(currentPath);
+      if (parentPath === currentPath) {
+        throw error;
+      }
+
+      missingSegments.push(path.basename(currentPath));
+      currentPath = parentPath;
+    }
+  }
+}
+
+async function resolveContainedPath(repoRoot, candidate, options = {}) {
+  const { allowMissing = false, resolvedRepoRoot = null } = options;
+  if (typeof candidate !== 'string') {
+    return null;
+  }
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const absolutePath = path.resolve(repoRoot, trimmed);
+  const lexicalRelative = toContainedRepoRelativePath(repoRoot, absolutePath);
+  if (!lexicalRelative) {
+    return null;
+  }
+
+  const canonicalRepoRoot = resolvedRepoRoot ?? (await realpath(repoRoot));
+
+  try {
+    const canonicalAbsolutePath = await realpath(absolutePath);
+    const canonicalRelative = toContainedRepoRelativePath(canonicalRepoRoot, canonicalAbsolutePath);
+    if (!canonicalRelative) {
+      return null;
+    }
+    return {
+      absolutePath: canonicalAbsolutePath,
+      relativePath: canonicalRelative,
+      exists: true
+    };
+  } catch (error) {
+    if (!allowMissing || !error || typeof error !== 'object' || error.code !== 'ENOENT') {
+      return null;
+    }
+
+    try {
+      const { resolvedPath, missingSuffix } = await resolvePathOrExistingParent(absolutePath);
+      const canonicalAbsolutePath = missingSuffix
+        ? path.join(resolvedPath, missingSuffix)
+        : resolvedPath;
+      const canonicalRelative = toContainedRepoRelativePath(canonicalRepoRoot, canonicalAbsolutePath);
+      if (!canonicalRelative) {
+        return null;
+      }
+      return {
+        absolutePath: canonicalAbsolutePath,
+        relativePath: canonicalRelative,
+        exists: false
+      };
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function normalizeRepoRelativePath(repoRoot, candidate, options = {}) {
+  const containedPath = await resolveContainedPath(repoRoot, candidate, options);
+  return containedPath?.relativePath ?? null;
 }
 
 function parsePolicy(raw, policyPath) {
@@ -205,6 +333,7 @@ async function main() {
 
   const policy = parsePolicy(policyRaw, policyPath);
   const registry = JSON.parse(registryRaw);
+  const resolvedRepoRoot = await realpath(repoRoot);
   const registryEntries = Array.isArray(registry?.entries) ? registry.entries : [];
   const registryMap = new Map();
   for (const entry of registryEntries) {
@@ -235,14 +364,26 @@ async function main() {
     }
     const docPaths = new Set();
 
-    if (typeof item.path === 'string' && item.path.trim()) {
-      const normalized = toPosixPath(item.path.trim());
-      docPaths.add(normalized);
-      const abs = path.resolve(repoRoot, normalized);
-      if (await pathExists(abs)) {
-        const content = await readFile(abs, 'utf8');
+    for (const indexedPath of collectIndexedDocPaths(item)) {
+      const containedIndexedPath = await resolveContainedPath(repoRoot, indexedPath, {
+        allowMissing: true,
+        resolvedRepoRoot
+      });
+      if (!containedIndexedPath) {
+        continue;
+      }
+
+      docPaths.add(containedIndexedPath.relativePath);
+      if (containedIndexedPath.exists && (await pathExists(containedIndexedPath.absolutePath))) {
+        const content = await readFile(containedIndexedPath.absolutePath, 'utf8');
         for (const ref of extractDocReferences(content, docRegexes)) {
-          docPaths.add(ref);
+          const normalizedRef = await normalizeRepoRelativePath(repoRoot, ref, {
+            allowMissing: true,
+            resolvedRepoRoot
+          });
+          if (normalizedRef) {
+            docPaths.add(normalizedRef);
+          }
         }
       }
     }
@@ -324,15 +465,35 @@ async function main() {
     stray_candidates: []
   };
 
-  async function archiveDoc({ relativePath, reason, context }) {
-    const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await pathExists(absPath))) {
-      report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context });
+  async function loadContainedDoc(relativePath, context) {
+    const containedPath = await resolveContainedPath(repoRoot, relativePath, {
+      allowMissing: true,
+      resolvedRepoRoot
+    });
+    if (!containedPath) {
+      report.skipped.push({ path: relativePath, reason: 'outside_repo', context });
       report.totals.skipped += 1;
+      return null;
+    }
+    if (!containedPath.exists || !(await pathExists(containedPath.absolutePath))) {
+      report.skipped.push({ path: containedPath.relativePath, reason: 'missing_on_disk', context });
+      report.totals.skipped += 1;
+      return null;
+    }
+
+    return {
+      containedPath,
+      content: await readFile(containedPath.absolutePath, 'utf8')
+    };
+  }
+
+  async function archiveDoc({ relativePath, reason, context, loadedDoc = null }) {
+    const loaded = loadedDoc ?? (await loadContainedDoc(relativePath, context));
+    if (!loaded) {
       return;
     }
 
-    const content = await readFile(absPath, 'utf8');
+    const { containedPath, content } = loaded;
     if (content.includes(ARCHIVE_MARKER)) {
       report.skipped.push({ path: relativePath, reason: 'already_stubbed', context });
       report.totals.skipped += 1;
@@ -341,7 +502,7 @@ async function main() {
 
     const lines = content.split('\n');
     const headerLine = lines.find((line) => line.trim().startsWith('# ')) || null;
-    const archiveRelativePath = toPosixPath(relativePath);
+    const archiveRelativePath = containedPath.relativePath;
     const archiveUrl = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archiveRelativePath}`;
     const stub = buildStubContent({
       headerLine,
@@ -358,7 +519,7 @@ async function main() {
       if (!(await pathExists(payloadPath))) {
         throw new Error(`Archive payload missing after write: ${payloadPath}`);
       }
-      await writeFile(absPath, stub);
+      await writeFile(containedPath.absolutePath, stub);
     }
 
     const entry = ensureRegistryEntry(registryMap, relativePath, {
@@ -379,15 +540,13 @@ async function main() {
   }
 
   for (const candidate of taskCandidates) {
-    const relativePath = candidate.path;
-    const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await pathExists(absPath))) {
-      report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context: candidate });
-      report.totals.skipped += 1;
+    const loadedDoc = await loadContainedDoc(candidate.path, candidate);
+    if (!loadedDoc) {
       continue;
     }
 
-    const content = await readFile(absPath, 'utf8');
+    const { containedPath, content } = loadedDoc;
+    const relativePath = containedPath.relativePath;
     const lineCount = content.split('\n').length;
     const registryEntry = registryMap.get(relativePath);
     const status = typeof registryEntry?.status === 'string' ? registryEntry.status : '';
@@ -427,21 +586,21 @@ async function main() {
     await archiveDoc({
       relativePath,
       reason: eligibleReasons.join(','),
-      context: { ...candidate, lineCount }
+      context: { ...candidate, lineCount },
+      loadedDoc
     });
   }
 
   for (const relativePath of strayCandidates) {
-    const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await pathExists(absPath))) {
-      report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context: { type: 'stray' } });
-      report.totals.skipped += 1;
+    const loadedDoc = await loadContainedDoc(relativePath, { type: 'stray' });
+    if (!loadedDoc) {
       continue;
     }
 
-    const content = await readFile(absPath, 'utf8');
+    const { containedPath, content } = loadedDoc;
+    const normalizedRelativePath = containedPath.relativePath;
     const lineCount = content.split('\n').length;
-    const registryEntry = registryMap.get(relativePath);
+    const registryEntry = registryMap.get(normalizedRelativePath);
     const status = typeof registryEntry?.status === 'string' ? registryEntry.status : '';
     const reviewDate = parseIsoDate(registryEntry?.last_review ?? null);
 
@@ -451,11 +610,11 @@ async function main() {
       last_review: registryEntry?.last_review ?? null,
       lineCount
     };
-    report.stray_candidates.push({ path: relativePath, context: strayContext });
+    report.stray_candidates.push({ path: normalizedRelativePath, context: strayContext });
 
-    const allowlistReason = getAllowlistReason(relativePath, null);
+    const allowlistReason = getAllowlistReason(normalizedRelativePath, null);
     if (allowlistReason) {
-      report.skipped.push({ path: relativePath, reason: allowlistReason, context: strayContext });
+      report.skipped.push({ path: normalizedRelativePath, reason: allowlistReason, context: strayContext });
       report.totals.skipped += 1;
       continue;
     }
@@ -478,15 +637,16 @@ async function main() {
     }
 
     if (eligibleReasons.length === 0) {
-      report.skipped.push({ path: relativePath, reason: 'not_eligible', context: strayContext });
+      report.skipped.push({ path: normalizedRelativePath, reason: 'not_eligible', context: strayContext });
       report.totals.skipped += 1;
       continue;
     }
 
     await archiveDoc({
-      relativePath,
+      relativePath: normalizedRelativePath,
       reason: eligibleReasons.join(','),
-      context: strayContext
+      context: strayContext,
+      loadedDoc
     });
   }
 

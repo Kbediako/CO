@@ -66,32 +66,75 @@ export async function collectDocFiles(repoRoot) {
   return results;
 }
 
+function normalizeSlashPath(value) {
+  return value.replace(/\\/g, '/');
+}
+
+const SAFE_TASK_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]*$/u;
+
+function normalizeTaskKeyCandidate(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const normalized = value.trim();
+  if (!normalized || !SAFE_TASK_KEY_PATTERN.test(normalized)) {
+    return '';
+  }
+  return normalized;
+}
+
+function extractTaskKeyFromPath(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const normalized = normalizeSlashPath(value.trim());
+  if (!normalized) {
+    return '';
+  }
+
+  const patterns = [
+    /^tasks\/tasks-([A-Za-z0-9][A-Za-z0-9-]*)\.md$/u,
+    /^tasks\/specs\/([A-Za-z0-9][A-Za-z0-9-]*)\.md$/u,
+    /^\.agent\/task\/([A-Za-z0-9][A-Za-z0-9-]*)\.md$/u
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return '';
+}
+
 export function normalizeTaskKey(item) {
   if (!item || typeof item !== 'object') {
     return null;
   }
   const id = typeof item.id === 'string' ? item.id.trim() : '';
   const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
-  const taskPath =
-    typeof item.path === 'string'
-      ? item.path.trim()
-      : typeof item.relates_to === 'string'
-      ? item.relates_to.trim()
-      : '';
-  const taskPathMatch = taskPath.match(
-    /(?:^|\/)(?:tasks-)?([0-9]{4}-[A-Za-z0-9-]+)\.md$/u
-  );
-  const taskPathSlug = taskPathMatch?.[1] ?? '';
+  const taskPathCandidates = [
+    item?.paths?.task,
+    item?.relates_to,
+    item?.path,
+    item?.paths?.spec,
+    item?.paths?.agent_task
+  ];
+  const taskPathSlug =
+    taskPathCandidates
+      .map((value) => extractTaskKeyFromPath(value))
+      .find((value) => value.length > 0) ?? '';
   const datePrefixedIdMatch = id.match(/^\d{8}-([0-9]{4}-[A-Za-z0-9-]+)$/u);
-  const datePrefixedSlug = datePrefixedIdMatch?.[1] ?? '';
+  const datePrefixedSlug = normalizeTaskKeyCandidate(datePrefixedIdMatch?.[1] ?? '');
   if (slug && id && slug.startsWith(`${id}-`)) {
-    return slug;
+    return normalizeTaskKeyCandidate(slug) || null;
   }
   if (id && slug) {
-    return `${id}-${slug}`;
+    return normalizeTaskKeyCandidate(`${id}-${slug}`) || null;
   }
   if (slug) {
-    return slug;
+    return normalizeTaskKeyCandidate(slug) || null;
   }
   if (taskPathSlug) {
     return taskPathSlug;
@@ -100,7 +143,7 @@ export function normalizeTaskKey(item) {
     return datePrefixedSlug;
   }
   if (id) {
-    return id;
+    return normalizeTaskKeyCandidate(id) || null;
   }
   return null;
 }
