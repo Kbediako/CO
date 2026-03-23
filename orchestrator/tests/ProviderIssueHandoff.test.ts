@@ -7099,8 +7099,13 @@ describe('createProviderIssueHandoffService', () => {
       retry_error: null
     });
 
+    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+    expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
+    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+    expect(delayMs).toBeGreaterThanOrEqual(999);
+    expect(delayMs).toBeLessThanOrEqual(1_000);
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
-    await vi.advanceTimersByTimeAsync(1_001);
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, startCallsBeforeRetry + 1, 1_024);
 
@@ -7212,12 +7217,15 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
     expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
+    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+    expect(delayMs).toBeGreaterThanOrEqual(999);
+    expect(delayMs).toBeLessThanOrEqual(1_000);
     await waitForCondition(
       () =>
         state.claims[0]?.retry_queued === true &&
         state.claims[0]?.retry_due_at === '2026-03-19T04:30:01.000Z'
     );
-    await vi.advanceTimersByTimeAsync(1_001);
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 1, 1024);
 
@@ -7353,7 +7361,10 @@ describe('createProviderIssueHandoffService', () => {
 
       const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
       expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
-      await vi.advanceTimersByTimeAsync(1_001);
+      const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+      expect(delayMs).toBeGreaterThanOrEqual(999);
+      expect(delayMs).toBeLessThanOrEqual(1_000);
+      getLatestScheduledTimeoutCallback(setTimeoutSpy)();
       await flushAsyncWork();
       await waitForMockCalls(launcher.start, 1, 1024);
 
