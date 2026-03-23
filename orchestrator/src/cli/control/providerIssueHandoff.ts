@@ -1327,7 +1327,10 @@ export function createProviderIssueHandoffService(
         const releaseCancelPending =
           shouldAttemptReleaseCancel(releasedRun) ||
           hasPendingReleaseCancel(releasedRun?.manifestPath ?? existing.run_manifest_path);
-        const pendingReleasedReopen = isProviderIssueReleasedPendingReopen(existing.reason ?? null);
+        const pendingReleasedReopen = shouldReopenReleasedClaimAtCurrentTimestamp({
+          claim: existing,
+          trackedIssue: input.trackedIssue
+        });
         const replayBlockedByReleasedMetadata =
           releasedWebhookTiming === 'older' ||
           (
@@ -2120,24 +2123,47 @@ function markProviderIssueReleasedPendingReopen(reason: string | null): string {
   return `${PROVIDER_RELEASED_PENDING_REOPEN_PREFIX}${reason ?? 'provider_issue_released'}`;
 }
 
-function shouldReopenReleasedClaimOnRefresh(input: {
-  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'issue_updated_at'>;
-  releaseRun: ProviderIssueRunRecord | null;
-  trackedIssue: Pick<LiveLinearTrackedIssue, 'updated_at'>;
+function shouldReopenReleasedClaimAtCurrentTimestamp(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'reason'>;
+  trackedIssue: Pick<
+    LiveLinearTrackedIssue,
+    'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+  >;
 }): boolean {
   if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
     return true;
   }
+  if (input.claim.reason !== 'provider_issue_released:assignee_changed') {
+    return false;
+  }
+  return isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(input.trackedIssue);
+}
 
+function shouldReopenReleasedClaimOnRefresh(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'issue_updated_at'>;
+  releaseRun: ProviderIssueRunRecord | null;
+  trackedIssue: Pick<
+    LiveLinearTrackedIssue,
+    'updated_at' | 'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+  >;
+}): boolean {
   const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
     input.claim.issue_updated_at ?? null,
     input.releaseRun?.issueUpdatedAt ?? input.releaseRun?.startedAt ?? null
   );
+  const updatedAtComparison = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
+    nextIssueUpdatedAt: input.trackedIssue.updated_at
+  });
   return (
-    compareTrackedIssueUpdatedAt({
-      existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
-      nextIssueUpdatedAt: input.trackedIssue.updated_at
-    }) === 'newer'
+    updatedAtComparison === 'newer' ||
+    (
+      updatedAtComparison === 'equal' &&
+      shouldReopenReleasedClaimAtCurrentTimestamp({
+        claim: input.claim,
+        trackedIssue: input.trackedIssue
+      })
+    )
   );
 }
 
@@ -2241,14 +2267,11 @@ function assessProviderTrackedIssueEligibility(
 ): ProviderTrackedIssueEligibility {
   const workflowState = classifyProviderLinearWorkflowState(trackedIssue);
   const hasViewerIdentity = typeof trackedIssue.viewer_id === 'string' && trackedIssue.viewer_id.length > 0;
-  const hasAssigneeIdentity =
-    trackedIssue.assignee_id === null ||
-    (typeof trackedIssue.assignee_id === 'string' && trackedIssue.assignee_id.length > 0);
   const assigneeChanged =
     options.hasExistingClaim === true &&
     hasViewerIdentity &&
-    hasAssigneeIdentity &&
-    trackedIssue.assignee_id !== trackedIssue.viewer_id;
+    trackedIssue.assignee_id !== null &&
+    !isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(trackedIssue);
   if (assigneeChanged && workflowState.isTerminal !== true) {
     return {
       eligible: false,
