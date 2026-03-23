@@ -344,7 +344,8 @@ describe('codex-orchestrator command surface', () => {
         CODEX_REVIEW_MONITOR_INTERVAL_SECONDS: '0',
         DIFF_BUDGET_OVERRIDE_REASON:
           'cli command-surface review shell test exercises non-interactive handoff against the stacked branch baseline'
-      }
+      },
+      CLI_BOOT_TIMEOUT
     );
 
     expect(stdout).toContain('Codex review handoff (non-interactive):');
@@ -353,7 +354,7 @@ describe('codex-orchestrator command surface', () => {
     const prompt = await readFile(join(runDir, 'review', 'prompt.txt'), 'utf8');
     expect(prompt).toContain('Evidence manifest:');
     expect(prompt).toContain('sample-run/manifest.json');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints start help without preparing a run', async () => {
     const { stdout } = await runCli(['start', '--help']);

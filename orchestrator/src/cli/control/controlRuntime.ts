@@ -224,10 +224,14 @@ function createControlRuntimeSnapshot(
 
     const promise = (async () => {
       const snapshot = await readSelectedRunSnapshot();
-      const issueIdentifier = snapshot.selected?.issueIdentifier ?? null;
+      const selectedIssueIdentifier = snapshot.selected?.issueIdentifier ?? null;
+      const evaluation = await liveLinearAdvisoryRuntime.readDispatchEvaluation(selectedIssueIdentifier);
       return {
-        issueIdentifier,
-        evaluation: await liveLinearAdvisoryRuntime.readDispatchEvaluation(issueIdentifier)
+        issueIdentifier:
+          evaluation.recommendation?.tracked_issue?.identifier ??
+          evaluation.recommendation?.issue_identifier ??
+          selectedIssueIdentifier,
+        evaluation
       };
     })();
 

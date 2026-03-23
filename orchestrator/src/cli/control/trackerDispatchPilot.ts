@@ -309,7 +309,7 @@ export async function evaluateTrackerDispatchPilotAsync(input: {
     configured: resolved.configured,
     sourceSetup: liveResolution.source_setup,
     recommendation: {
-      issue_identifier: input.defaultIssueIdentifier ?? null,
+      issue_identifier: liveResolution.tracked_issue.identifier ?? input.defaultIssueIdentifier ?? null,
       dispatch_id: liveResolution.dispatch_id,
       summary: liveResolution.summary,
       rationale: liveResolution.rationale,
@@ -489,6 +489,11 @@ function parseDispatchPilotSource(
     project_id: readStringValue(bindingSource, 'project_id', 'projectId') ?? null
   };
 
+  const confidence = readNumberValue(source, 'confidence', 'score') ?? null;
+  if (confidence !== null && (confidence < 0 || confidence > 1)) {
+    return { kind: 'malformed', reason: 'dispatch_source_confidence_out_of_range' };
+  }
+
   if (isLiveDispatchSource(source)) {
     return {
       kind: 'live_linear',
@@ -512,10 +517,6 @@ function parseDispatchPilotSource(
   const dispatchId = readStringValue(source, 'dispatch_id', 'dispatchId') ?? 'dispatch-advisory';
   const issueIdentifier = readStringValue(source, 'issue_identifier', 'issueIdentifier') ?? defaultIssueIdentifier;
   const rationale = readStringValue(source, 'rationale', 'reason') ?? null;
-  const confidence = readNumberValue(source, 'confidence', 'score') ?? null;
-  if (confidence !== null && (confidence < 0 || confidence > 1)) {
-    return { kind: 'malformed', reason: 'dispatch_source_confidence_out_of_range' };
-  }
 
   const generatedAtRaw = readStringValue(source, 'generated_at', 'generatedAt');
   let generatedAt: string | null = null;

@@ -27,6 +27,7 @@ import { runInitCliShell } from '../orchestrator/src/cli/initCliShell.js';
 import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
 import { runDevtoolsCliShell } from '../orchestrator/src/cli/devtoolsCliShell.js';
 import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
+import { runLinearCliShell } from '../orchestrator/src/cli/linearCliShell.js';
 import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliRequestShell } from '../orchestrator/src/cli/flowCliRequestShell.js';
@@ -139,6 +140,9 @@ async function main(): Promise<void> {
         break;
       case 'codex':
         await handleCodex(args);
+        break;
+      case 'linear':
+        await handleLinear(args);
         break;
       case 'devtools':
         await handleDevtools(args);
@@ -998,6 +1002,11 @@ async function handleSkills(rawArgs: string[]): Promise<void> {
   await runSkillsCliShell({ positionals, flags, printHelp: printSkillsHelp });
 }
 
+async function handleLinear(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  await runLinearCliShell({ positionals, flags, printHelp: printLinearHelp });
+}
+
 async function handleMcp(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
@@ -1395,6 +1404,7 @@ Commands:
     --only <skills>       Install only selected skills (comma-separated).
     --codex-home <path>   Override the target Codex home directory.
     --format json         Emit machine-readable output.
+  linear <subcommand>     Run worker-visible Linear helper operations.
   mcp serve [--repo <path>] [--dry-run] [-- <extra args>]
   mcp enable [--servers <csv>] [--yes] [--format json]
     --servers <csv>       Comma-separated MCP server names to enable (default: all disabled).
@@ -1445,6 +1455,46 @@ Commands:
     --only <skills>         Install only selected skills (comma-separated).
     --codex-home <path>     Override the target Codex home directory.
     --format json           Emit machine-readable output.
+`);
+}
+
+function printLinearHelp(): void {
+  console.log(`Usage: codex-orchestrator linear <subcommand> [options]
+
+Subcommands:
+  issue-context
+    --issue-id <id>       Linear issue id/key to inspect.
+    --workspace-id <id>   Optional workspace scope check (falls back to env when configured).
+    --team-id <id>        Optional team scope check (falls back to env when configured).
+    --project-id <id>     Optional project scope check (falls back to env when configured).
+    --format json         Emit machine-readable output.
+
+  upsert-workpad
+    --issue-id <id>       Linear issue id/key to update.
+    --body <text>         Workpad body to create/update.
+    --body-file <path>    Read workpad body from a file.
+    --comment-id <id>     Optional persisted workpad comment id.
+    --workspace-id <id>   Optional workspace scope check.
+    --team-id <id>        Optional team scope check.
+    --project-id <id>     Optional project scope check.
+    --format json         Emit machine-readable output.
+
+  transition
+    --issue-id <id>       Linear issue id/key to update.
+    --state <name>        Destination Linear state name (resolved to stateId via team workflow states).
+    --workspace-id <id>   Optional workspace scope check.
+    --team-id <id>        Optional team scope check.
+    --project-id <id>     Optional project scope check.
+    --format json         Emit machine-readable output.
+
+  attach-pr
+    --issue-id <id>       Linear issue id/key to update.
+    --url <url>           GitHub PR URL to attach.
+    --title <title>       Optional attachment title.
+    --workspace-id <id>   Optional workspace scope check.
+    --team-id <id>        Optional team scope check.
+    --project-id <id>     Optional project scope check.
+    --format json         Emit machine-readable output.
 `);
 }
 

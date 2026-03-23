@@ -12,10 +12,15 @@ import {
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
   runProviderLinearWorker,
+  PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   type ProviderLinearWorkerDependencies
 } from '../src/cli/providerLinearWorkerRunner.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
+import {
+  PROVIDER_LINEAR_AUDIT_ENV_VAR,
+  appendProviderLinearAuditEntry
+} from '../src/cli/control/providerLinearWorkflowAudit.js';
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
@@ -176,14 +181,29 @@ describe('provider linear worker runner', () => {
   it('builds a full first-turn prompt and a continuation prompt', () => {
     const issue = createTrackedIssue();
 
-    const firstPrompt = buildProviderWorkerPrompt(issue, 1, 5);
-    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5);
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const firstPrompt = buildProviderWorkerPrompt(issue, 1, 5, helperCommand);
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand);
 
     expect(firstPrompt).toContain('You are the provider worker for Linear issue CO-2');
     expect(firstPrompt).toContain('Issue description:');
     expect(firstPrompt).toContain('Recent activity:');
+    expect(firstPrompt).toContain(helperCommand);
+    expect(firstPrompt).toContain('Linear issue id `lin-issue-1`');
+    expect(firstPrompt).toContain('not the human identifier `CO-2`');
+    expect(firstPrompt).toContain('exactly one persistent `## Codex Workpad` comment');
+    expect(firstPrompt).toContain(`Use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
+    expect(firstPrompt).toContain('move it into the team\'s actual started state before active coding instead of assuming a fixed state name');
+    expect(firstPrompt).toContain('some teams expose `In Review` instead of `Human Review`');
+    expect(firstPrompt).toContain('Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`)');
     expect(continuationPrompt).toContain('Continuation guidance:');
     expect(continuationPrompt).toContain('do not restate them before acting');
+    expect(continuationPrompt).toContain(helperCommand);
+    expect(continuationPrompt).toContain('Linear issue id `lin-issue-1`');
+    expect(continuationPrompt).toContain('Keep exactly one persistent `## Codex Workpad` comment current');
+    expect(continuationPrompt).toContain(`use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
+    expect(continuationPrompt).toContain('move it into the team\'s actual started state before active coding instead of assuming a fixed state name');
+    expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`)');
   });
 
   it('parses thread and turn lineage from codex jsonl output', () => {
@@ -309,28 +329,95 @@ describe('provider linear worker runner', () => {
           mirrorOutput: boolean;
         }) => Promise<{ exitCode: number; stdout: string; stderr: string }>
       >()
-      .mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: [
-          '{"type":"thread.started","thread_id":"thread-1"}',
-          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
-          '{"params":{"tokenUsage":{"total":{"input_tokens":12,"output_tokens":8,"total_tokens":20}}}}',
-          '{"rate_limits":{"limit_id":"coding","primary":{"remaining":42}}}',
-          '{"type":"event_msg","payload":{"type":"agent_message","message":"turn 1 complete"}}',
-          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:00.500Z"}}'
-        ].join('\n'),
-        stderr: ''
+      .mockImplementationOnce(async (request) => {
+        const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
+        expect(auditPath).toBe(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME));
+        await appendProviderLinearAuditEntry(String(auditPath), {
+          recorded_at: '2026-03-21T09:00:00.100Z',
+          operation: 'issue-context',
+          ok: true,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: 'In Progress',
+          comment_id: null,
+          attachment_id: null,
+          error_code: null,
+          error_message: null
+        });
+        await appendProviderLinearAuditEntry(String(auditPath), {
+          recorded_at: '2026-03-21T09:00:00.200Z',
+          operation: 'upsert-workpad',
+          ok: true,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: 'created',
+          via: null,
+          state: null,
+          comment_id: 'comment-1',
+          attachment_id: null,
+          error_code: null,
+          error_message: null
+        });
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+            '{"params":{"tokenUsage":{"total":{"input_tokens":12,"output_tokens":8,"total_tokens":20}}}}',
+            '{"rate_limits":{"limit_id":"coding","primary":{"remaining":42}}}',
+            '{"type":"event_msg","payload":{"type":"agent_message","message":"turn 1 complete"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:00.500Z"}}'
+          ].join('\n'),
+          stderr: ''
+        };
       })
-      .mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: [
-          '{"type":"thread.started","thread_id":"thread-1"}',
-          '{"type":"turn_context","payload":{"turn_id":"turn-2"}}',
-          '{"params":{"msg":{"payload":{"info":{"total_token_usage":{"input_tokens":21,"output_tokens":13,"total_tokens":34}}}}}}',
-          '{"type":"event_msg","payload":{"type":"agent_message","message":"turn 2 complete"}}',
-          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-2","timestamp":"2026-03-21T09:00:01.500Z"}}'
-        ].join('\n'),
-        stderr: ''
+      .mockImplementationOnce(async (request) => {
+        const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
+        await appendProviderLinearAuditEntry(String(auditPath), {
+          recorded_at: '2026-03-21T09:00:01.100Z',
+          operation: 'attach-pr',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: null,
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_graphql_error',
+          error_message: 'Linear GraphQL returned operation errors.'
+        });
+        await appendProviderLinearAuditEntry(String(auditPath), {
+          recorded_at: '2026-03-21T09:00:01.200Z',
+          operation: 'transition',
+          ok: true,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: 'updated',
+          via: null,
+          state: 'In Review',
+          comment_id: null,
+          attachment_id: null,
+          error_code: null,
+          error_message: null
+        });
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-2"}}',
+            '{"params":{"msg":{"payload":{"info":{"total_token_usage":{"input_tokens":21,"output_tokens":13,"total_tokens":34}}}}}}',
+            '{"type":"event_msg","payload":{"type":"agent_message","message":"turn 2 complete"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-2","timestamp":"2026-03-21T09:00:01.500Z"}}'
+          ].join('\n'),
+          stderr: ''
+        };
       });
 
     const proof = await runProviderLinearWorker(
@@ -386,6 +473,13 @@ describe('provider linear worker runner', () => {
           remaining: 42
         }
       },
+      linear_audit: {
+        path: join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME),
+        attempted_count: 4,
+        success_count: 3,
+        failure_count: 1,
+        latest_recorded_at: '2026-03-21T09:00:01.200Z'
+      },
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -405,6 +499,36 @@ describe('provider linear worker runner', () => {
         input_tokens: 21,
         output_tokens: 13,
         total_tokens: 34
+      },
+      linear_audit: {
+        path: join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME),
+        attempted_count: 4,
+        success_count: 3,
+        failure_count: 1,
+        latest_recorded_at: '2026-03-21T09:00:01.200Z',
+        latest_by_operation: {
+          'issue-context': {
+            operation: 'issue-context',
+            ok: true,
+            state: 'In Progress'
+          },
+          'upsert-workpad': {
+            operation: 'upsert-workpad',
+            ok: true,
+            action: 'created',
+            comment_id: 'comment-1'
+          },
+          'attach-pr': {
+            operation: 'attach-pr',
+            ok: false,
+            error_code: 'linear_graphql_error'
+          },
+          transition: {
+            operation: 'transition',
+            ok: true,
+            state: 'In Review'
+          }
+        }
       },
       end_reason: 'issue_inactive'
     });
@@ -740,66 +864,69 @@ describe('provider linear worker runner', () => {
     });
   });
 
-  it('stops after a completed turn when the tracked issue moves to a non-active state', async () => {
-    const { manifestPath, runDir } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
-      .mockResolvedValueOnce(createTrackedIssue())
-      .mockResolvedValueOnce(
-        createTrackedIssue({
-          state: 'Backlog',
-          state_type: 'unstarted'
-        })
+  it.each(['Human Review', 'In Review'])(
+    'stops after a completed turn when the tracked issue moves to %s',
+    async (reviewState) => {
+      const { manifestPath, runDir } = await createManifestRoot();
+      const readTrackedIssue = vi
+        .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+        .mockResolvedValueOnce(createTrackedIssue())
+        .mockResolvedValueOnce(
+          createTrackedIssue({
+            state: reviewState,
+            state_type: 'started'
+          })
+        );
+      const execRunner = vi.fn(async () => ({
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      }));
+
+      const proof = await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue,
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
       );
-    const execRunner = vi.fn(async () => ({
-      exitCode: 0,
-      stdout: [
-        '{"type":"thread.started","thread_id":"thread-1"}',
-        '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
-        '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
-      ].join('\n'),
-      stderr: ''
-    }));
 
-    const proof = await runProviderLinearWorker(
-      {
-        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
-        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
-        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
-        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
-      },
-      {
-        readTrackedIssue,
-        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
-        execRunner,
-        now: vi
-          .fn()
-          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
-          .mockReturnValue('2026-03-21T09:00:01.000Z'),
-        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
-      }
-    );
+      expect(execRunner).toHaveBeenCalledTimes(1);
+      expect(proof).toMatchObject({
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        turn_count: 1,
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive'
+      });
 
-    expect(execRunner).toHaveBeenCalledTimes(1);
-    expect(proof).toMatchObject({
-      thread_id: 'thread-1',
-      latest_turn_id: 'turn-1',
-      latest_session_id: 'thread-1-turn-1',
-      turn_count: 1,
-      owner_status: 'succeeded',
-      end_reason: 'issue_inactive'
-    });
-
-    const written = JSON.parse(
-      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
-    ) as Record<string, unknown>;
-    expect(written).toMatchObject({
-      thread_id: 'thread-1',
-      latest_turn_id: 'turn-1',
-      turn_count: 1,
-      end_reason: 'issue_inactive'
-    });
-  });
+      const written = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(written).toMatchObject({
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        turn_count: 1,
+        end_reason: 'issue_inactive'
+      });
+    }
+  );
 
   it('stops after a completed turn when the tracked issue moves to Todo with a non-terminal blocker', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
@@ -875,6 +1002,63 @@ describe('provider linear worker runner', () => {
     const readTrackedIssue = vi
       .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
       .mockResolvedValue(createTrackedIssue());
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner: vi.fn(async () => ({
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+          ].join('\n'),
+          stderr: ''
+        })),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      turn_count: 1,
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active'
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      end_reason: 'max_turns_reached_issue_still_active'
+    });
+  });
+
+  it('treats custom started states as active when they are non-terminal and not a review handoff alias', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValue(
+        createTrackedIssue({
+          state: 'QA Ready',
+          state_type: 'started'
+        })
+      );
 
     const proof = await runProviderLinearWorker(
       {

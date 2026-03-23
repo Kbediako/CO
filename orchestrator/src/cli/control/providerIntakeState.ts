@@ -29,6 +29,7 @@ export interface ProviderIntakeClaimRecord {
   issue_state: string | null;
   issue_state_type: string | null;
   issue_updated_at: string | null;
+  issue_blocked_by?: LiveLinearTrackedIssue['blocked_by'] | null;
   task_id: string;
   mapping_source: ProviderTaskMappingSource;
   state: ProviderIntakeClaimState;
@@ -198,6 +199,10 @@ export function upsertProviderIntakeClaim(
     issue_state: input.issue_state ?? null,
     issue_state_type: input.issue_state_type ?? null,
     issue_updated_at: input.issue_updated_at ?? null,
+    issue_blocked_by:
+      input.issue_blocked_by === undefined
+        ? normalizeProviderIssueBlockedBy(existing?.issue_blocked_by)
+        : normalizeProviderIssueBlockedBy(input.issue_blocked_by),
     task_id: input.task_id,
     mapping_source: input.mapping_source,
     state: input.state,
@@ -363,6 +368,7 @@ function normalizeProviderIntakeClaim(
     issue_state: typeof input.issue_state === 'string' ? input.issue_state : null,
     issue_state_type: typeof input.issue_state_type === 'string' ? input.issue_state_type : null,
     issue_updated_at: typeof input.issue_updated_at === 'string' ? input.issue_updated_at : null,
+    issue_blocked_by: normalizeProviderIssueBlockedBy(input.issue_blocked_by),
     task_id: input.task_id,
     mapping_source: 'provider_id_fallback',
     state,
@@ -395,6 +401,20 @@ function normalizeProviderIntakeClaim(
 
 function normalizeRetryQueued(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null;
+}
+
+function normalizeProviderIssueBlockedBy(
+  value: LiveLinearTrackedIssue['blocked_by'] | null | undefined
+): LiveLinearTrackedIssue['blocked_by'] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  return value.map((blocker) => ({
+    id: typeof blocker?.id === 'string' ? blocker.id : null,
+    identifier: typeof blocker?.identifier === 'string' ? blocker.identifier : null,
+    state: typeof blocker?.state === 'string' ? blocker.state : null,
+    state_type: typeof blocker?.state_type === 'string' ? blocker.state_type : null
+  }));
 }
 
 function normalizeRetryAttempt(value: unknown): number | null {

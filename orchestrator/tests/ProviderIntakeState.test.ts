@@ -18,6 +18,61 @@ function createProviderIntakeState(): ProviderIntakeState {
 }
 
 describe('upsertProviderIntakeClaim', () => {
+  it('preserves blocker metadata when a later update omits it', () => {
+    const state = createProviderIntakeState();
+
+    upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      issue_blocked_by: [
+        {
+          id: 'lin-blocker-1',
+          identifier: 'CO-9',
+          state: 'In Progress',
+          state_type: 'started'
+        }
+      ],
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      run_id: 'run-1',
+      run_manifest_path: '/tmp/run-1/manifest.json'
+    });
+
+    const claim = upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:00:01.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:todo_blocked_by_non_terminal',
+      run_id: 'run-1',
+      run_manifest_path: '/tmp/run-1/manifest.json'
+    });
+
+    expect(claim.issue_blocked_by).toEqual([
+      {
+        id: 'lin-blocker-1',
+        identifier: 'CO-9',
+        state: 'In Progress',
+        state_type: 'started'
+      }
+    ]);
+  });
+
   it('preserves launch provenance when the run identity is unchanged and no new launch fields are supplied', () => {
     const state = createProviderIntakeState();
 
@@ -297,6 +352,71 @@ describe('upsertProviderIntakeClaim', () => {
 });
 
 describe('normalizeProviderIntakeState', () => {
+  it('normalizes persisted blocker metadata for rehydrated claims', () => {
+    const normalized = normalizeProviderIntakeState({
+      schema_version: 1,
+      updated_at: '2026-03-19T04:50:00.000Z',
+      rehydrated_at: null,
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_rehydrated_completed_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'Todo',
+          issue_state_type: 'unstarted',
+          issue_updated_at: '2026-03-19T04:40:00.000Z',
+          issue_blocked_by: [
+            {
+              id: 'lin-blocker-1',
+              identifier: 'CO-9',
+              state: 'In Progress',
+              state_type: 'started'
+            },
+            {
+              id: 123,
+              identifier: null,
+              state: 'Done',
+              state_type: {}
+            }
+          ],
+          task_id: 'linear-lin-issue-1',
+          mapping_source: 'provider_id_fallback',
+          state: 'completed',
+          reason: 'provider_issue_rehydrated_completed_run',
+          accepted_at: '2026-03-19T04:40:05.000Z',
+          updated_at: '2026-03-19T04:40:10.000Z',
+          last_delivery_id: 'delivery-completed',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_050_000,
+          run_id: 'run-1',
+          run_manifest_path: '/tmp/run-1/manifest.json',
+          launch_source: null,
+          launch_token: null
+        }
+      ]
+    });
+
+    expect(normalized.claims[0]?.issue_blocked_by).toEqual([
+      {
+        id: 'lin-blocker-1',
+        identifier: 'CO-9',
+        state: 'In Progress',
+        state_type: 'started'
+      },
+      {
+        id: null,
+        identifier: null,
+        state: 'Done',
+        state_type: null
+      }
+    ]);
+  });
+
   it('leaves launch_started_at unset for legacy control-host handoff_failed claims', () => {
     const normalized = normalizeProviderIntakeState({
       schema_version: 1,
