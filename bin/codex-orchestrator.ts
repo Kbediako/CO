@@ -1480,7 +1480,7 @@ Subcommands:
     --format json         Emit machine-readable output.
 
   delete-workpad
-    --issue-id <id>       Linear issue id/key to update.
+    --issue-id <id>       Linear issue id/key whose workpad should be deleted.
     --comment-id <id>     Optional persisted workpad comment id to delete.
     --workspace-id <id>   Optional workspace scope check.
     --team-id <id>        Optional team scope check.

@@ -17,6 +17,9 @@ describe('codex-orchestrator linear help', () => {
     expect(result.status).toBe(0);
     expect(result.stderr).toBe('');
     expect(result.stdout).toContain('delete-workpad');
-    expect(result.stdout).toContain('--comment-id <id>     Optional persisted workpad comment id to delete.');
+    expect(result.stdout).toMatch(
+      /--issue-id <id>\s+Linear issue id\/key whose workpad should be deleted\./
+    );
+    expect(result.stdout).toMatch(/--comment-id <id>\s+Optional persisted workpad comment id to delete\./);
   });
 });

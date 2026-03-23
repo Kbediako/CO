@@ -386,11 +386,11 @@ export function buildProviderWorkerPrompt(
       '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
       '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
       '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work.',
-      '- `Human Review` and `In Review` are wait states for the worker. If the issue is in either review state, do not code; wait and poll for review or status updates.',
+      '- `Human Review` and `In Review` are review handoff states for the worker. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
       '- `Merging` and `Rework` are optional active workflow states only when the team exposes them.',
       '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.',
       '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
-      '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and switch to waiting for updates.',
+      '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.',
       '- Focus on the remaining ticket work and do not end the turn while the issue stays active unless you are truly blocked.'
     ].join('\n');
   }
@@ -411,7 +411,7 @@ export function buildProviderWorkerPrompt(
     '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
     '- Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`).',
     '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work.',
-    '- `Human Review` and `In Review` are stop-coding handoff states. If the issue is in either review state, do not code; wait and poll for review or status updates.',
+    '- `Human Review` and `In Review` are stop-coding handoff states. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
     '- Treat `Merging` and `Rework` as active workflow states only when the team exposes them.',
     '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.',
     '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',

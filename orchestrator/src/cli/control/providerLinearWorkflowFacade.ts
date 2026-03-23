@@ -551,9 +551,11 @@ export async function deleteProviderLinearWorkpadComment(input: {
     return failureFromGraphql('delete-workpad', deleteResult.failure);
   }
 
-  const deletedCommentId =
-    normalizeRequiredString(deleteResult.payload.data?.commentDelete?.entityId) ?? selectedComment.id;
-  if (deleteResult.payload.data?.commentDelete?.success !== true) {
+  const rawDeletedCommentId = normalizeRequiredString(deleteResult.payload.data?.commentDelete?.entityId);
+  if (
+    deleteResult.payload.data?.commentDelete?.success !== true &&
+    rawDeletedCommentId !== selectedComment.id
+  ) {
     return failure(
       'delete-workpad',
       'comment_delete_failed',
@@ -561,6 +563,7 @@ export async function deleteProviderLinearWorkpadComment(input: {
       503
     );
   }
+  const deletedCommentId = rawDeletedCommentId ?? selectedComment.id;
 
   return {
     ok: true,

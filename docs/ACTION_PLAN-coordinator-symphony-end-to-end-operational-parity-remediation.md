@@ -47,13 +47,13 @@
 
 ## Dependencies
 - Current Symphony authorities:
-  - `/Users/kbediako/Code/symphony/SPEC.md`
-  - `/Users/kbediako/Code/symphony/elixir/README.md`
-  - `/Users/kbediako/Code/symphony/elixir/WORKFLOW.md`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/tracker.ex`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/linear/adapter.ex`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`
-  - `/Users/kbediako/Code/symphony/elixir/test/symphony_elixir/live_e2e_test.exs`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: SPEC.md`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/README.md`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/WORKFLOW.md`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/lib/symphony_elixir/tracker.ex`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/lib/symphony_elixir/linear/adapter.ex`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/lib/symphony_elixir/orchestrator.ex`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/test/symphony_elixir/live_e2e_test.exs`
 - Current CO seams:
   - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`
@@ -95,5 +95,5 @@
   - Mitigation: keep read-model cleanup as an explicit milestone with live dispatch verification.
 
 ## Approvals
-- Reviewer: Pending `1319` docs-review.
+- Reviewer: `1319` docs-review approved.
 - Date: 2026-03-23

@@ -572,6 +572,96 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('treats an already-removed workpad comment as an idempotent delete success', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearDeleteComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad'
+        });
+        return jsonResponse({
+          data: {
+            commentDelete: {
+              success: false,
+              entityId: 'comment-workpad'
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await deleteProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'delete-workpad',
+      action: 'deleted',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment_id: 'comment-workpad',
+      source_setup: null
+    });
+  });
+
+  it('fails delete-workpad when Linear reports failure without confirming the deleted comment id', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearDeleteComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad'
+        });
+        return jsonResponse({
+          data: {
+            commentDelete: {
+              success: false,
+              entityId: null
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await deleteProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'delete-workpad',
+      error: {
+        code: 'comment_delete_failed',
+        message: 'Linear comment delete did not succeed.',
+        status: 503
+      }
+    });
+  });
+
   it('resolves a state name to a state id before transitioning the issue', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {

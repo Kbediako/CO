@@ -1825,6 +1825,25 @@ export function createProviderIssueHandoffService(
           }
 
           if (claim.state === 'released') {
+            if (resolution.kind === 'owned') {
+              const currentClaim =
+                claim.retry_queued === true
+                  ? await ensureQueuedProviderRetryDeadline({
+                      claim,
+                      trackedIssue: resolution.trackedIssue,
+                      previousRun: latestRun,
+                      trackedIssueRefetch
+                    })
+                  : claim;
+              await retainOwnedHandoffClaim({
+                claim: currentClaim,
+                trackedIssue: resolution.trackedIssue,
+                run: resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun,
+                state: currentClaim.state,
+                reason: 'provider_issue_handoff_owned'
+              });
+              continue;
+            }
             if (!shouldReopenReleasedClaimOnRefresh({
               claim,
               releaseRun,

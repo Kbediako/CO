@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0976-context-alignment-checker-option2.md
 risk: high
 owners:
   - Codex
-last_review: 2026-02-20
+last_review: 2026-03-23
 ---
 
 ## Summary

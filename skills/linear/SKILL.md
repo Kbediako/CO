@@ -90,7 +90,7 @@ codex-orchestrator linear attach-pr \
   - the latest `origin/main` is merged into the branch
   - PR checks are green
   - the workpad is refreshed to match the current implementation and remaining risks
-- `Human Review` and `In Review` are wait states. Do not keep coding there; wait and poll for review or status updates instead. Use patience-first monitoring semantics while the review state remains unchanged.
+- `Human Review` and `In Review` are review handoff states. Do not keep coding there; refresh the workpad if needed, record the handoff clearly, and end the turn instead of polling inside the same run.
 - `Rework` means a full reset on the same issue. Close the previous PR, delete the old workpad, create a fresh branch from `origin/main`, create a new bootstrap workpad, then execute end to end again before handing the issue back to `Human Review` or `In Review`.
 - `Merging` means the issue is still active. Follow `skills/land/SKILL.md` to shepherd the PR through checks, conflicts, approvals, and merge completion.
 - Only move the issue to `Done` after the PR is actually merged. `Merging` and `Rework` are active workflow states only when the team exposes them.

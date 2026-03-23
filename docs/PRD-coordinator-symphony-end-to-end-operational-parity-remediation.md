@@ -89,14 +89,14 @@
   - live session capability is sufficient to read and mutate Linear issue content; live team workflow-state creation appears technically possible through current GraphQL auth, but should only be done with exact scoped mutations and verification
   - dispatch traceability leakage is a separate read-model bug caused by a broader fallback chain than the actual recommendation payload
 - Dependencies / Integrations:
-  - `/Users/kbediako/Code/symphony/SPEC.md`
-  - `/Users/kbediako/Code/symphony/elixir/README.md`
-  - `/Users/kbediako/Code/symphony/elixir/WORKFLOW.md`
-  - `/Users/kbediako/Code/symphony/.codex/skills/linear/SKILL.md`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/tracker.ex`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/linear/adapter.ex`
-  - `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/orchestrator.ex`
-  - `/Users/kbediako/Code/symphony/elixir/test/symphony_elixir/live_e2e_test.exs`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: SPEC.md`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/README.md`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/WORKFLOW.md`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: .codex/skills/linear/SKILL.md`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/lib/symphony_elixir/tracker.ex`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/lib/symphony_elixir/linear/adapter.ex`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/lib/symphony_elixir/orchestrator.ex`
+  - `symphony@a164593aacb3db4d6808adc5a87173d906726406: elixir/test/symphony_elixir/live_e2e_test.exs`
   - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`
   - `orchestrator/src/cli/control/providerLinearWorkflowStates.ts`

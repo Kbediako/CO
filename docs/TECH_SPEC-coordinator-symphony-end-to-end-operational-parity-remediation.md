@@ -51,7 +51,7 @@
   - workflow-state eligibility helpers should be grounded in the named active-state set (`Todo`, `In Progress`, `Rework`, `Merging`) rather than the broader Linear `started` type
   - the worker-visible Linear helper surface needs a bounded workpad-removal operation so `Rework` can retire the old `## Codex Workpad` comment before creating a new one
 - External dependencies / integrations:
-  - current Symphony source of truth at `/Users/kbediako/Code/symphony` (`HEAD = a164593aacb3db4d6808adc5a87173d906726406`)
+  - current Symphony source of truth audited at `symphony@a164593aacb3db4d6808adc5a87173d906726406`
   - current live Linear workspace/team/project configured through `CO_LINEAR_*` environment variables and the existing `codex-orchestrator linear` helper
 
 ## Current Audit Baseline
@@ -129,5 +129,5 @@
 - Whether CO should later add an explicit review watcher/resume seam beyond Symphony's current runtime boundary, while keeping the current parity claim truthful to the existing Elixir implementation.
 
 ## Approvals
-- Reviewer: Pending `1319` docs-review.
+- Reviewer: `1319` docs-review approved.
 - Date: 2026-03-23

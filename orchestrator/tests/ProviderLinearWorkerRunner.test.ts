@@ -74,6 +74,9 @@ function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): Li
     state: 'In Progress',
     state_type: 'started',
     workspace_id: 'workspace-1',
+    viewer_id: 'viewer-1',
+    assignee_id: 'viewer-1',
+    assignee_name: 'Codex',
     team_id: 'team-1',
     team_key: 'CO',
     team_name: 'CO',
@@ -201,7 +204,7 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`)');
     expect(firstPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(firstPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work');
-    expect(firstPrompt).toContain('If the issue is in either review state, do not code; wait and poll for review or status updates.');
+    expect(firstPrompt).toContain('If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.');
     expect(firstPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.');
     expect(firstPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
     expect(firstPrompt).toContain('close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`');
@@ -219,11 +222,11 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(continuationPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(continuationPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work');
-    expect(continuationPrompt).toContain('If the issue is in either review state, do not code; wait and poll for review or status updates.');
+    expect(continuationPrompt).toContain('If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.');
     expect(continuationPrompt).toContain('`Merging` and `Rework` are optional active workflow states only when the team exposes them.');
     expect(continuationPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.');
     expect(continuationPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
-    expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`)');
+    expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.');
   });
 
   it('parses thread and turn lineage from codex jsonl output', () => {
