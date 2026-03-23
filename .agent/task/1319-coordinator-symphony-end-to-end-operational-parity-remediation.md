@@ -36,11 +36,11 @@
 - [x] `docs-review` for the `1319` packet. Evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
 - [x] `npm run docs:check`. Evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
 - [x] `npm run docs:freshness`. Evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
-- [ ] `node scripts/diff-budget.mjs` if docs packet exceeds budget.
+- [x] `node scripts/diff-budget.mjs` if docs packet exceeds budget. Evidence: override accepted on 2026-03-23 with `DIFF_BUDGET_OVERRIDE_REASON="1319 couples the docs-first packet, Symphony/Elixir workflow-state parity, assignee-gated dispatch and handoff fixes, Ready queue aliasing, Rework reset/workpad deletion support, read-model truthfulness cleanup, and the focused regressions needed to prove that contract." node scripts/diff-budget.mjs`.
 
 ## Implementation
-- [ ] Land explicit named active-state routing, live-team `Ready` queue aliasing, and review handoff / feedback / rework / merge / done lifecycle parity.
-- [ ] Add exact `Rework` reset semantics, including bounded workpad removal support.
-- [ ] Fix stale `/api/v1/dispatch` traceability fallback.
+- [x] Land explicit named active-state routing, live-team `Ready` queue aliasing, and review handoff / feedback / rework / merge / done lifecycle parity. Evidence: `orchestrator/src/cli/control/providerLinearWorkflowStates.ts`, `orchestrator/src/cli/control/linearDispatchSource.ts`, `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `skills/linear/SKILL.md`, focused regressions on 2026-03-23.
+- [x] Add exact `Rework` reset semantics, including bounded workpad removal support. Evidence: `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`, `orchestrator/src/cli/control/providerLinearWorkflowAudit.ts`, `orchestrator/src/cli/linearCliShell.ts`, `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`, `orchestrator/tests/LinearCliShell.test.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
+- [x] Fix stale `/api/v1/dispatch` traceability fallback. Evidence: `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/trackerDispatchPilot.ts`, `orchestrator/tests/ControlRuntime.test.ts`, `orchestrator/tests/TrackerDispatchPilot.test.ts`.
 - [ ] Validate locally and with one live Linear retest.
 - [ ] Open PR, handle feedback, merge, and return to clean `main`.

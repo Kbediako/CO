@@ -40,6 +40,14 @@ codex-orchestrator linear upsert-workpad \
 
 The body must contain the `## Codex Workpad` marker.
 
+Delete the current unresolved workpad comment when a Symphony-style `Rework` reset requires a fresh attempt:
+
+```bash
+codex-orchestrator linear delete-workpad \
+  --issue-id "$ISSUE_ID" \
+  --format json
+```
+
 ## State Transition
 
 Move the issue by state name. The helper resolves the target `stateId` from the issue's team workflow states.
@@ -66,7 +74,7 @@ codex-orchestrator linear attach-pr \
 
 ## Workflow Notes
 
-- Move `Todo` to `In Progress` before active coding when the issue is unblocked.
+- Move `Todo` or the live team's equivalent queued state (for CO, `Ready`) to the actual started state before active coding when the issue is unblocked.
 - Use the Linear issue id, not the human identifier, for helper commands.
 - Keep exactly one active `## Codex Workpad` comment current. Refresh it before new work, before review handoff, after rework, and after merge completion. Do not create duplicate progress comments.
 - Always read `issue-context` before any transition so you use the team's actual workflow state names.
@@ -83,6 +91,6 @@ codex-orchestrator linear attach-pr \
   - PR checks are green
   - the workpad is refreshed to match the current implementation and remaining risks
 - `Human Review` and `In Review` are wait states. Do not keep coding there; wait and poll for review or status updates instead. Use patience-first monitoring semantics while the review state remains unchanged.
-- `Rework` means the same issue, workpad, and PR resume active ownership. Address review-requested changes, rerun the relevant validation, refresh the workpad, and hand the issue back to `Human Review` or `In Review`.
+- `Rework` means a full reset on the same issue. Close the previous PR, delete the old workpad, create a fresh branch from `origin/main`, create a new bootstrap workpad, then execute end to end again before handing the issue back to `Human Review` or `In Review`.
 - `Merging` means the issue is still active. Follow `skills/land/SKILL.md` to shepherd the PR through checks, conflicts, approvals, and merge completion.
 - Only move the issue to `Done` after the PR is actually merged. `Merging` and `Rework` are active workflow states only when the team exposes them.

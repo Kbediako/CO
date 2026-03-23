@@ -875,4 +875,81 @@ describe('resolveLiveLinearDispatchRecommendation', () => {
       reason: 'dispatch_source_issue_not_found'
     });
   });
+
+  it('treats Ready as the live Todo-equivalent queue state when selecting a fresh dispatch target', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          viewer: {
+            id: 'viewer-1',
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issues: {
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null
+            },
+            nodes: [
+              {
+                id: 'lin-issue-ready',
+                identifier: 'PREPROD-104',
+                title: 'Queued Ready issue should dispatch',
+                priority: 1,
+                createdAt: '2026-03-20T04:00:00.000Z',
+                updatedAt: '2026-03-20T06:00:00.000Z',
+                assignee: {
+                  id: 'viewer-1',
+                  displayName: 'Codex'
+                },
+                state: {
+                  name: 'Ready',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              }
+            ]
+          }
+        }
+      })
+    );
+
+    const result = await resolveLiveLinearDispatchRecommendation({
+      source: {
+        provider: 'linear',
+        live: true
+      },
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      defaultIssueIdentifier: 'task-1014',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issue: {
+        identifier: 'PREPROD-104',
+        state: 'Ready',
+        state_type: 'unstarted'
+      }
+    });
+  });
 });

@@ -8,8 +8,10 @@ import {
 } from './control/linearDispatchSource.js';
 import {
   attachProviderLinearIssuePr,
+  deleteProviderLinearWorkpadComment,
   getProviderLinearIssueContext,
   type ProviderLinearAttachPrResult,
+  type ProviderLinearDeleteWorkpadResult,
   type ProviderLinearIssueContextResult,
   type ProviderLinearTransitionResult,
   type ProviderLinearUpsertWorkpadResult,
@@ -34,6 +36,7 @@ export interface RunLinearCliShellParams {
 interface LinearCliShellDependencies {
   getProviderLinearIssueContext: typeof getProviderLinearIssueContext;
   upsertProviderLinearWorkpadComment: typeof upsertProviderLinearWorkpadComment;
+  deleteProviderLinearWorkpadComment: typeof deleteProviderLinearWorkpadComment;
   transitionProviderLinearIssueState: typeof transitionProviderLinearIssueState;
   attachProviderLinearIssuePr: typeof attachProviderLinearIssuePr;
   appendAuditEntry: typeof appendProviderLinearAuditEntry;
@@ -61,6 +64,7 @@ type LinearCliUsageError = Error & {
 const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   getProviderLinearIssueContext,
   upsertProviderLinearWorkpadComment,
+  deleteProviderLinearWorkpadComment,
   transitionProviderLinearIssueState,
   attachProviderLinearIssuePr,
   appendAuditEntry: appendProviderLinearAuditEntry,
@@ -130,6 +134,25 @@ export async function runLinearCliShell(
         const result = await dependencies.upsertProviderLinearWorkpadComment({
           issueId: requireFlag(params.flags, 'issue-id'),
           body: await resolveBody(params.flags, dependencies.readTextFile),
+          commentId: readStringFlag(params.flags, 'comment-id') ?? null,
+          sourceSetup: readSourceSetup(params.flags),
+          env
+        });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'delete-workpad': {
+        assertAllowedFlags(params.flags, [
+          'format',
+          'issue-id',
+          'workspace-id',
+          'team-id',
+          'project-id',
+          'comment-id'
+        ]);
+        const result = await dependencies.deleteProviderLinearWorkpadComment({
+          issueId: requireFlag(params.flags, 'issue-id'),
           commentId: readStringFlag(params.flags, 'comment-id') ?? null,
           sourceSetup: readSourceSetup(params.flags),
           env
@@ -286,6 +309,7 @@ function resolveErrorMessage(error: unknown): string {
 type LinearCliResult =
   | ProviderLinearIssueContextResult
   | ProviderLinearUpsertWorkpadResult
+  | ProviderLinearDeleteWorkpadResult
   | ProviderLinearTransitionResult
   | ProviderLinearAttachPrResult;
 
@@ -362,6 +386,22 @@ function buildAuditEntry(
         via: null,
         state: null,
         comment_id: result.comment.id,
+        attachment_id: null,
+        error_code: null,
+        error_message: null
+      };
+    case 'delete-workpad':
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: true,
+        issue_id: result.issue.id,
+        issue_identifier: result.issue.identifier,
+        source_setup: result.source_setup,
+        action: result.action,
+        via: null,
+        state: null,
+        comment_id: result.comment_id,
         attachment_id: null,
         error_code: null,
         error_message: null

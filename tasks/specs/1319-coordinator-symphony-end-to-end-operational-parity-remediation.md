@@ -63,8 +63,8 @@ review_notes:
   - already exposes workpad/PR mutation continuity as a capability, but not as an owned later-lifecycle flow
   - now classifies review handoff explicitly, keeps `Rework` and `Merging` active, and fixes stale dispatch traceability
   - now has assignee-aware fresh dispatch/claim gating and repo-local workflow plus land-skill contract
-  - still accepts arbitrary non-review `state_type: started` states as active, which is broader than current Symphony's explicit `active_states` contract
-  - still needs explicit `Ready` queue aliasing and exact `Rework` reset semantics to match the current Symphony workflow contract truthfully
+  - now honors the explicit named `active_states` contract instead of accepting arbitrary non-review `state_type: started` states as active
+  - now routes `Ready` as the live `Todo` equivalent and exposes exact `Rework` reset semantics, including bounded workpad removal support
   - has no automated follow-up issue creation flow
   - has no workflow cleanup hook / attached-PR auto-close behavior
   - has no workflow-file hot reload / last-known-good fallback seam

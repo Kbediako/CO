@@ -202,6 +202,59 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('routes delete-workpad into the facade and emits json', async () => {
+    const log = vi.fn();
+    const deleteProviderLinearWorkpadCommentMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').deleteProviderLinearWorkpadComment>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'delete-workpad',
+          action: 'deleted',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          comment_id: 'comment-1',
+          source_setup: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['delete-workpad'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          'comment-id': 'comment-1'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        deleteProviderLinearWorkpadComment: deleteProviderLinearWorkpadCommentMock,
+        getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        log
+      }
+    );
+
+    expect(deleteProviderLinearWorkpadCommentMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      commentId: 'comment-1',
+      sourceSetup: null,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      }
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: true,
+      operation: 'delete-workpad',
+      action: 'deleted',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment_id: 'comment-1',
+      source_setup: null
+    });
+  });
+
   it('sets a non-zero exit code when a structured Linear operation fails', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();

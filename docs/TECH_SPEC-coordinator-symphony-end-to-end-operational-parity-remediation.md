@@ -86,9 +86,9 @@
     - proof/read surfaces now distinguish review handoff from generic inactivity and surface same-assignee review handoffs truthfully in the intake summary
   - fresh dispatch/claim selection is now assignee-aware for viewer-owned or unassigned issues
   - provider worker prompt now points at repo-local `linear` and `land` skills for rework and merge behavior
-  - active execution eligibility is still broader than current Symphony because CO falls back to any non-review `state_type: started` state instead of the explicit named active-state set
-  - live CO still lacks an explicit queue alias for `Ready`, so queued issues do not yet map cleanly to Symphony's `Todo` pickup behavior
-  - current repo-local `Rework` contract still diverges from Symphony by reusing the same PR/workpad instead of closing the PR, removing the workpad, and restarting from a fresh branch
+  - active execution eligibility now honors the explicit named active-state set from current Symphony instead of falling back to arbitrary non-review `state_type: started` states
+  - live CO now routes `Ready` as the queue alias for Symphony `Todo`, so queued issues map cleanly into the active workflow contract
+  - current repo-local `Rework` contract now matches the stated Symphony reset semantics by closing the prior PR, removing the old workpad, and restarting from a fresh branch/workpad attempt
   - no automated follow-up issue creation path
   - no workflow cleanup hook / attached-PR auto-close path
   - no workflow-file hot reload or last-known-good fallback seam

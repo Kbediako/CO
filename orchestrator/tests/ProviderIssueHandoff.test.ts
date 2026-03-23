@@ -1550,6 +1550,56 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores accepted Ready issues when any blocker is still non-terminal', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'Ready',
+        state_type: 'unstarted',
+        blocked_by: [
+          {
+            id: 'lin-blocker-1',
+            identifier: 'CO-9',
+            state: 'In Progress'
+          }
+        ]
+      }),
+      deliveryId: 'delivery-ready-blocked',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_012_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_todo_blocked_by_non_terminal'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'ignored',
+      reason: 'provider_issue_todo_blocked_by_non_terminal',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('accepts Merging and Rework as active workflow states', async () => {
     for (const workflowState of ['Merging', 'Rework']) {
       const { paths } = await createHostPaths();
