@@ -20,6 +20,10 @@ export type ProviderIntakeClaimState =
   | 'duplicate'
   | 'handoff_failed';
 
+export type ProviderIntakeSummaryState =
+  | ProviderIntakeClaimState
+  | 'handoff_owned';
+
 export interface ProviderIntakeClaimRecord {
   provider: 'linear';
   provider_key: string;
@@ -29,6 +33,8 @@ export interface ProviderIntakeClaimRecord {
   issue_state: string | null;
   issue_state_type: string | null;
   issue_updated_at: string | null;
+  issue_assignee_id?: string | null;
+  issue_assignee_name?: string | null;
   issue_blocked_by?: LiveLinearTrackedIssue['blocked_by'] | null;
   task_id: string;
   mapping_source: ProviderTaskMappingSource;
@@ -68,9 +74,11 @@ export interface ProviderIntakeSummaryPayload {
   issue_state: string | null;
   issue_state_type: string | null;
   issue_updated_at: string | null;
+  issue_assignee_id?: string | null;
+  issue_assignee_name?: string | null;
   task_id: string;
   mapping_source: ProviderTaskMappingSource;
-  state: ProviderIntakeClaimState;
+  state: ProviderIntakeSummaryState;
   reason: string | null;
   run_id: string | null;
   updated_at: string;
@@ -199,6 +207,8 @@ export function upsertProviderIntakeClaim(
     issue_state: input.issue_state ?? null,
     issue_state_type: input.issue_state_type ?? null,
     issue_updated_at: input.issue_updated_at ?? null,
+    issue_assignee_id: input.issue_assignee_id ?? null,
+    issue_assignee_name: input.issue_assignee_name ?? null,
     issue_blocked_by:
       input.issue_blocked_by === undefined
         ? normalizeProviderIssueBlockedBy(existing?.issue_blocked_by)
@@ -316,9 +326,11 @@ export function buildProviderIntakeSummary(
     issue_state: claim.issue_state,
     issue_state_type: claim.issue_state_type,
     issue_updated_at: claim.issue_updated_at,
+    issue_assignee_id: claim.issue_assignee_id ?? null,
+    issue_assignee_name: claim.issue_assignee_name ?? null,
     task_id: claim.task_id,
     mapping_source: claim.mapping_source,
-    state: claim.state,
+    state: deriveProviderIntakeSummaryState(claim),
     reason: claim.reason,
     run_id: claim.run_id,
     updated_at: claim.updated_at
@@ -368,6 +380,10 @@ function normalizeProviderIntakeClaim(
     issue_state: typeof input.issue_state === 'string' ? input.issue_state : null,
     issue_state_type: typeof input.issue_state_type === 'string' ? input.issue_state_type : null,
     issue_updated_at: typeof input.issue_updated_at === 'string' ? input.issue_updated_at : null,
+    issue_assignee_id:
+      typeof input.issue_assignee_id === 'string' ? input.issue_assignee_id : null,
+    issue_assignee_name:
+      typeof input.issue_assignee_name === 'string' ? input.issue_assignee_name : null,
     issue_blocked_by: normalizeProviderIssueBlockedBy(input.issue_blocked_by),
     task_id: input.task_id,
     mapping_source: 'provider_id_fallback',
@@ -446,6 +462,18 @@ function normalizeClaimState(value: string): ProviderIntakeClaimState {
     default:
       return 'ignored';
   }
+}
+
+function deriveProviderIntakeSummaryState(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason'>
+): ProviderIntakeSummaryState {
+  if (
+    claim.state === 'handoff_failed' &&
+    claim.reason === 'provider_issue_handoff_owned'
+  ) {
+    return 'handoff_owned';
+  }
+  return claim.state;
 }
 
 function compareProviderClaims(

@@ -1,6 +1,7 @@
 # Linear
 
 Use this skill when a CO worker or operator needs to read or mutate Linear through the repo's worker-owned helper surface.
+Pair it with `skills/land/SKILL.md` once an attached PR enters the merge shepherding phase.
 
 ## Commands
 
@@ -66,7 +67,22 @@ codex-orchestrator linear attach-pr \
 ## Workflow Notes
 
 - Move `Todo` to `In Progress` before active coding when the issue is unblocked.
-- Keep exactly one active `## Codex Workpad` comment current.
+- Use the Linear issue id, not the human identifier, for helper commands.
+- Keep exactly one active `## Codex Workpad` comment current. Refresh it before new work, before review handoff, after rework, and after merge completion. Do not create duplicate progress comments.
+- Always read `issue-context` before any transition so you use the team's actual workflow state names.
 - Attach the PR before handing off to `Human Review` or the live-team alias `In Review`.
-- Stop coding in `Human Review` or `In Review`.
-- Treat `Merging` and `Rework` as active workflow states.
+- If a PR is already attached, run a full PR feedback sweep before any new implementation work:
+  - check top-level PR comments
+  - check inline review comments and unresolved review threads
+  - check review summaries / decisions
+  - resolve each actionable item or post explicit, justified pushback
+- Before handing off to `Human Review` or `In Review`, the completion bar is:
+  - required validation is green
+  - actionable PR feedback is handled or explicitly pushed back
+  - the latest `origin/main` is merged into the branch
+  - PR checks are green
+  - the workpad is refreshed to match the current implementation and remaining risks
+- `Human Review` and `In Review` are wait states. Do not keep coding there; wait and poll for review or status updates instead. Use patience-first monitoring semantics while the review state remains unchanged.
+- `Rework` means the same issue, workpad, and PR resume active ownership. Address review-requested changes, rerun the relevant validation, refresh the workpad, and hand the issue back to `Human Review` or `In Review`.
+- `Merging` means the issue is still active. Follow `skills/land/SKILL.md` to shepherd the PR through checks, conflicts, approvals, and merge completion.
+- Only move the issue to `Done` after the PR is actually merged. `Merging` and `Rework` are active workflow states only when the team exposes them.

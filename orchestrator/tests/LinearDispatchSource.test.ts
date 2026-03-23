@@ -671,4 +671,208 @@ describe('resolveLiveLinearDispatchRecommendation', () => {
       }
     });
   });
+
+  it('skips issues assigned to someone else and selects the current viewer issue', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          viewer: {
+            id: 'viewer-1',
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issues: {
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null
+            },
+            nodes: [
+              {
+                id: 'lin-issue-foreign',
+                identifier: 'PREPROD-100',
+                title: 'Higher-priority issue owned by someone else',
+                priority: 1,
+                createdAt: '2026-03-18T04:00:00.000Z',
+                updatedAt: '2026-03-20T04:00:00.000Z',
+                assignee: {
+                  id: 'viewer-2',
+                  displayName: 'Other Owner'
+                },
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              },
+              {
+                id: 'lin-issue-owned',
+                identifier: 'PREPROD-101',
+                title: 'Viewer-owned issue',
+                priority: 2,
+                createdAt: '2026-03-19T04:00:00.000Z',
+                updatedAt: '2026-03-20T05:00:00.000Z',
+                assignee: {
+                  id: 'viewer-1',
+                  displayName: 'Codex'
+                },
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              },
+              {
+                id: 'lin-issue-unassigned',
+                identifier: 'PREPROD-102',
+                title: 'Unassigned fallback issue',
+                priority: 3,
+                createdAt: '2026-03-20T04:00:00.000Z',
+                updatedAt: '2026-03-20T06:00:00.000Z',
+                state: {
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              }
+            ]
+          }
+        }
+      })
+    );
+
+    const result = await resolveLiveLinearDispatchRecommendation({
+      source: {
+        provider: 'linear',
+        live: true
+      },
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      defaultIssueIdentifier: 'task-1014',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issue: {
+        identifier: 'PREPROD-101',
+        title: 'Viewer-owned issue',
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex'
+      }
+    });
+  });
+
+  it('skips started states that are outside the explicit active-state allowlist', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          viewer: {
+            id: 'viewer-1',
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issues: {
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null
+            },
+            nodes: [
+              {
+                id: 'lin-issue-blocked',
+                identifier: 'PREPROD-103',
+                title: 'Blocked issue should not dispatch',
+                priority: 1,
+                createdAt: '2026-03-20T04:00:00.000Z',
+                updatedAt: '2026-03-20T06:00:00.000Z',
+                assignee: {
+                  id: 'viewer-1',
+                  displayName: 'Codex'
+                },
+                state: {
+                  name: 'Blocked',
+                  type: 'started'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'PREPROD',
+                  name: 'PRE-PRO/PRODUCTION'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'Icon Agency (Bookings)'
+                },
+                inverseRelations: { nodes: [] },
+                history: { nodes: [] }
+              }
+            ]
+          }
+        }
+      })
+    );
+
+    const result = await resolveLiveLinearDispatchRecommendation({
+      source: {
+        provider: 'linear',
+        live: true
+      },
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      defaultIssueIdentifier: 'task-1014',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      kind: 'unavailable',
+      status: 503,
+      code: 'dispatch_source_unavailable',
+      reason: 'dispatch_source_issue_not_found'
+    });
+  });
 });

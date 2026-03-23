@@ -88,6 +88,9 @@ function createTrackedIssue(
     url: null,
     state: 'In Progress',
     state_type: 'started',
+    viewer_id: 'viewer-1',
+    assignee_id: 'viewer-1',
+    assignee_name: 'Codex',
     workspace_id: 'workspace-1',
     team_id: 'team-1',
     team_key: 'CO',
@@ -243,6 +246,48 @@ describe('createProviderIssueHandoffService', () => {
       provider_key: 'linear:lin-issue-1',
       state: 'starting',
       reason: 'provider_issue_start_launched',
+      last_delivery_id: null,
+      last_event: 'poll_tick',
+      last_action: 'reconcile',
+      last_webhook_timestamp: null
+    });
+    expect(persist).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores a fresh poll candidate when the issue is assigned to someone else', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          assignee_id: 'viewer-2',
+          assignee_name: 'Other Owner'
+        })
+      ]
+    });
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      provider_key: 'linear:lin-issue-1',
+      state: 'ignored',
+      reason: 'provider_issue_assignee_changed',
+      issue_assignee_id: 'viewer-2',
+      issue_assignee_name: 'Other Owner',
       last_delivery_id: null,
       last_event: 'poll_tick',
       last_action: 'reconcile',
@@ -1554,7 +1599,7 @@ describe('createProviderIssueHandoffService', () => {
     }
   });
 
-  it('accepts custom started states when they are non-terminal and not a review handoff alias', async () => {
+  it('ignores custom started states that are outside the explicit active-state allowlist', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const persist = vi.fn(async () => undefined);
@@ -1582,19 +1627,15 @@ describe('createProviderIssueHandoffService', () => {
       webhookTimestamp: 1_742_360_020_250
     });
 
-    expect(result.kind).toBe('start');
-    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
-      taskId: 'linear-lin-issue-1',
-      pipelineId: 'diagnostics',
-      provider: 'linear',
-      issueId: 'lin-issue-1',
-      issueIdentifier: 'CO-2',
-      issueUpdatedAt: '2026-03-19T04:00:00.000Z',
-      launchToken: expect.any(String)
-    }));
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_state_not_active'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
-      state: 'starting',
+      state: 'ignored',
+      reason: 'provider_issue_state_not_active',
       issue_state: 'QA Ready',
       issue_state_type: 'started'
     });
@@ -1648,7 +1689,7 @@ describe('createProviderIssueHandoffService', () => {
   );
 
   it.each(['Human Review', 'In Review'])(
-    'releases an active run promptly when a direct webhook moves the issue to %s',
+    'keeps an active claim lifecycle-owned when a direct webhook moves the issue to %s for the same assignee',
     async (reviewState) => {
       const { root, paths } = await createHostPaths();
       const otherEnv = {
@@ -1775,16 +1816,9 @@ describe('createProviderIssueHandoffService', () => {
 
         expect(result).toMatchObject({
           kind: 'ignored',
-          reason: 'provider_issue_released:not_active'
+          reason: 'provider_issue_handoff_owned'
         });
-        await vi.waitFor(() => {
-          expect(endpoint.actions).toEqual([
-            expect.objectContaining({
-              action: 'cancel',
-              reason: 'provider_issue_released:not_active'
-            })
-          ]);
-        });
+        expect(endpoint.actions).toEqual([]);
         expect(otherEndpoint.actions).toEqual([]);
       } finally {
         await endpoint.close();
@@ -1792,11 +1826,139 @@ describe('createProviderIssueHandoffService', () => {
       }
 
       expect(state.claims[0]).toMatchObject({
-        state: 'released',
-        reason: 'provider_issue_released:not_active',
+        state: 'running',
+        reason: 'provider_issue_handoff_owned',
         issue_state: reviewState,
         issue_state_type: 'started',
+        issue_assignee_id: 'viewer-1',
+        issue_assignee_name: 'Codex',
         run_id: 'run-webhook-review-release',
+        run_manifest_path: childPaths.manifestPath
+      });
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['Human Review', 'In Review'])(
+    'releases an active run when a direct webhook moves the issue to %s for a different assignee',
+    async (reviewState) => {
+      const { root, paths } = await createHostPaths();
+      const childEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-webhook-review-assignee-release'
+      };
+      const childPaths = resolveRunPaths(childEnv, 'run-webhook-review-assignee-release');
+      await mkdir(childPaths.runDir, { recursive: true });
+      await writeFile(
+        childPaths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-webhook-review-assignee-release',
+          task_id: 'task-webhook-review-assignee-release',
+          pipeline_id: 'diagnostics',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_updated_at: '2026-03-19T04:20:00.000Z',
+          updated_at: '2026-03-19T04:30:00.000Z'
+        }),
+        'utf8'
+      );
+      const endpoint = await createControlEndpointServer();
+      await writeFile(
+        join(childPaths.runDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: endpoint.baseUrl,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+      await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+
+      const state = createProviderIntakeState();
+      state.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        issue_assignee_id: 'viewer-1',
+        issue_assignee_name: 'Codex',
+        task_id: 'task-webhook-review-assignee-release',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_run_already_active',
+        accepted_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:20:10.000Z',
+        last_delivery_id: 'delivery-in-progress',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_049_000,
+        run_id: 'run-webhook-review-assignee-release',
+        run_manifest_path: childPaths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'webhook-review-assignee-release-token'
+      });
+
+      const persist = vi.fn(async () => undefined);
+      const launcher = {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      };
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'diagnostics'
+      });
+
+      try {
+        const result = await service.handleAcceptedTrackedIssue({
+          trackedIssue: createTrackedIssue({
+            state: reviewState,
+            state_type: 'started',
+            updated_at: '2026-03-19T04:30:00.000Z',
+            assignee_id: 'viewer-2',
+            assignee_name: 'Other Owner'
+          }),
+          deliveryId: `delivery-${reviewState.toLowerCase().replace(/\s+/gu, '-')}-assignee-release`,
+          event: 'Issue',
+          action: 'update',
+          webhookTimestamp: 1_742_360_050_500
+        });
+
+        expect(result).toMatchObject({
+          kind: 'ignored',
+          reason: 'provider_issue_released:assignee_changed'
+        });
+        await vi.waitFor(() => {
+          expect(endpoint.actions).toEqual([
+            expect.objectContaining({
+              action: 'cancel',
+              reason: 'provider_issue_released:assignee_changed'
+            })
+          ]);
+        });
+      } finally {
+        await endpoint.close();
+      }
+
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:assignee_changed',
+        issue_state: reviewState,
+        issue_state_type: 'started',
+        issue_assignee_id: 'viewer-2',
+        issue_assignee_name: 'Other Owner',
+        run_id: 'run-webhook-review-assignee-release',
         run_manifest_path: childPaths.manifestPath
       });
       expect(launcher.start).not.toHaveBeenCalled();
@@ -1895,7 +2057,7 @@ describe('createProviderIssueHandoffService', () => {
 
       expect(result).toMatchObject({
         kind: 'ignored',
-        reason: 'provider_issue_state_not_active'
+        reason: 'provider_issue_handoff_owned'
       });
       expect(otherEndpoint.actions).toEqual([]);
     } finally {
@@ -1904,18 +2066,18 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(state.claims[0]).toMatchObject({
       state: 'running',
-      reason: 'provider_issue_run_already_active',
-      issue_state: 'In Progress',
+      reason: 'provider_issue_handoff_owned',
+      issue_state: 'Human Review',
       issue_state_type: 'started',
       run_id: 'run-webhook-review-foreign-pipeline',
       run_manifest_path: otherPaths.manifestPath
     });
-    expect(persist).not.toHaveBeenCalled();
+    expect(persist).toHaveBeenCalledTimes(1);
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('accepts started issues when the provider state name is missing', async () => {
+  it('ignores issues when the provider state name is missing even if Linear marks them started', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const persist = vi.fn(async () => undefined);
@@ -1943,19 +2105,15 @@ describe('createProviderIssueHandoffService', () => {
       webhookTimestamp: 1_742_360_021_000
     });
 
-    expect(result.kind).toBe('start');
-    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
-      taskId: 'linear-lin-issue-1',
-      pipelineId: 'diagnostics',
-      provider: 'linear',
-      issueId: 'lin-issue-1',
-      issueIdentifier: 'CO-2',
-      issueUpdatedAt: '2026-03-19T04:00:00.000Z',
-      launchToken: expect.any(String)
-    }));
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_state_not_active'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
-      state: 'starting',
+      state: 'ignored',
+      reason: 'provider_issue_state_not_active',
       issue_state: null,
       issue_state_type: 'started'
     });
@@ -5421,117 +5579,235 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it.each(['Human Review', 'In Review'])(
-    'releases %s issues without cleaning their provider workspace',
+    'keeps %s issues lifecycle-owned on refresh for the same assignee without cleaning their provider workspace',
     async (reviewState) => {
-    const { root, paths } = await createHostPaths();
-    const childEnv = {
-      repoRoot: root,
-      runsRoot: join(root, '.runs'),
-      outRoot: join(root, 'out'),
-      taskId: 'task-1303-human-review'
-    };
-    const childPaths = resolveRunPaths(childEnv, 'run-human-review');
-    await mkdir(childPaths.runDir, { recursive: true });
-    await writeFile(
-      childPaths.manifestPath,
-      JSON.stringify({
-        run_id: 'run-human-review',
-        task_id: 'task-1303-human-review',
-        status: 'queued',
-        issue_provider: 'linear',
+      const { root, paths } = await createHostPaths();
+      const childEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-1303-human-review'
+      };
+      const childPaths = resolveRunPaths(childEnv, 'run-human-review');
+      await mkdir(childPaths.runDir, { recursive: true });
+      await writeFile(
+        childPaths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-human-review',
+          task_id: 'task-1303-human-review',
+          status: 'queued',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_updated_at: '2026-03-19T04:20:00.000Z',
+          workspace_path: join(root, '.workspaces', 'task-1303-human-review'),
+          updated_at: '2026-03-19T04:30:00.000Z'
+        }),
+        'utf8'
+      );
+      const endpoint = await createControlEndpointServer();
+      await writeFile(
+        join(childPaths.runDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: endpoint.baseUrl,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+      await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+      const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-human-review');
+      await mkdir(workspacePath, { recursive: true });
+      await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+
+      const state = createProviderIntakeState();
+      state.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
         issue_updated_at: '2026-03-19T04:20:00.000Z',
-        workspace_path: join(root, '.workspaces', 'task-1303-human-review'),
-        updated_at: '2026-03-19T04:30:00.000Z'
-      }),
-      'utf8'
-    );
-    const endpoint = await createControlEndpointServer();
-    await writeFile(
-      join(childPaths.runDir, 'control_endpoint.json'),
-      JSON.stringify({
-        base_url: endpoint.baseUrl,
-        token_path: 'control_auth.json'
-      }),
-      'utf8'
-    );
-    await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
-    const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-human-review');
-    await mkdir(workspacePath, { recursive: true });
-    await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
-
-    const state = createProviderIntakeState();
-    state.claims.push({
-      provider: 'linear',
-      provider_key: 'linear:lin-issue-1',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-2',
-      issue_title: 'Autonomous intake handoff',
-      issue_state: 'In Progress',
-      issue_state_type: 'started',
-      issue_updated_at: '2026-03-19T04:20:00.000Z',
-      task_id: 'task-1303-human-review',
-      mapping_source: 'provider_id_fallback',
-      state: 'starting',
-      reason: 'provider_issue_start_launched',
-      accepted_at: '2026-03-19T04:20:05.000Z',
-      updated_at: '2026-03-19T04:20:10.000Z',
-      last_delivery_id: 'delivery-human-review',
-      last_event: 'Issue',
-      last_action: 'update',
-      last_webhook_timestamp: 1_742_360_050_000,
-      run_id: 'run-human-review',
-      run_manifest_path: childPaths.manifestPath,
-      launch_source: 'control-host',
-      launch_token: 'human-review-launch-token'
-    });
-
-    const persist = vi.fn(async () => undefined);
-    const launcher = {
-      start: vi.fn(async () => null),
-      resume: vi.fn(async () => undefined)
-    };
-
-    const service = createProviderIssueHandoffService({
-      paths,
-      state,
-      persist,
-      launcher,
-      resolveTrackedIssue: async () => ({
-        kind: 'ready',
-        trackedIssue: createTrackedIssue({
-          state: reviewState,
-          state_type: 'started'
-        })
-      })
-    });
-
-    try {
-      await service.refresh();
-      await vi.waitFor(() => {
-        expect(endpoint.actions).toEqual([
-          expect.objectContaining({
-            action: 'cancel',
-            reason: 'provider_issue_released:not_active'
-          })
-        ]);
+        issue_assignee_id: 'viewer-1',
+        issue_assignee_name: 'Codex',
+        task_id: 'task-1303-human-review',
+        mapping_source: 'provider_id_fallback',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        accepted_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:20:10.000Z',
+        last_delivery_id: 'delivery-human-review',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_050_000,
+        run_id: 'run-human-review',
+        run_manifest_path: childPaths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'human-review-launch-token'
       });
-    } finally {
-      await endpoint.close();
-    }
 
-    expect(state.claims[0]).toMatchObject({
-      state: 'released',
-      reason: 'provider_issue_released:not_active',
-      issue_state: reviewState,
-      issue_state_type: 'started',
-      run_id: 'run-human-review',
-      run_manifest_path: childPaths.manifestPath
-    });
-    await expect(access(workspacePath)).resolves.toBeUndefined();
-    expect(launcher.start).not.toHaveBeenCalled();
-    expect(launcher.resume).not.toHaveBeenCalled();
+      const persist = vi.fn(async () => undefined);
+      const launcher = {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      };
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        resolveTrackedIssue: async () => ({
+          kind: 'ready',
+          trackedIssue: createTrackedIssue({
+            state: reviewState,
+            state_type: 'started'
+          })
+        })
+      });
+
+      try {
+        await service.refresh();
+        expect(endpoint.actions).toEqual([]);
+      } finally {
+        await endpoint.close();
+      }
+
+      expect(state.claims[0]).toMatchObject({
+        state: 'handoff_failed',
+        reason: 'provider_issue_handoff_owned',
+        issue_state: reviewState,
+        issue_state_type: 'started',
+        issue_assignee_id: 'viewer-1',
+        issue_assignee_name: 'Codex',
+        run_id: 'run-human-review',
+        run_manifest_path: childPaths.manifestPath
+      });
+      await expect(access(workspacePath)).resolves.toBeUndefined();
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['Human Review', 'In Review'])(
+    'releases %s issues on refresh when the assignee moves away without cleaning their provider workspace',
+    async (reviewState) => {
+      const { root, paths } = await createHostPaths();
+      const childEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-1303-human-review-assignee-release'
+      };
+      const childPaths = resolveRunPaths(childEnv, 'run-human-review-assignee-release');
+      await mkdir(childPaths.runDir, { recursive: true });
+      await writeFile(
+        childPaths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-human-review-assignee-release',
+          task_id: 'task-1303-human-review-assignee-release',
+          status: 'queued',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_updated_at: '2026-03-19T04:20:00.000Z',
+          workspace_path: join(root, '.workspaces', 'task-1303-human-review-assignee-release'),
+          updated_at: '2026-03-19T04:30:00.000Z'
+        }),
+        'utf8'
+      );
+      const endpoint = await createControlEndpointServer();
+      await writeFile(
+        join(childPaths.runDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: endpoint.baseUrl,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+      await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+      const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-human-review-assignee-release');
+      await mkdir(workspacePath, { recursive: true });
+      await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+
+      const state = createProviderIntakeState();
+      state.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        issue_assignee_id: 'viewer-1',
+        issue_assignee_name: 'Codex',
+        task_id: 'task-1303-human-review-assignee-release',
+        mapping_source: 'provider_id_fallback',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        accepted_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:20:10.000Z',
+        last_delivery_id: 'delivery-human-review',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_050_000,
+        run_id: 'run-human-review-assignee-release',
+        run_manifest_path: childPaths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'human-review-launch-token'
+      });
+
+      const persist = vi.fn(async () => undefined);
+      const launcher = {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      };
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        resolveTrackedIssue: async () => ({
+          kind: 'ready',
+          trackedIssue: createTrackedIssue({
+            state: reviewState,
+            state_type: 'started',
+            assignee_id: 'viewer-2',
+            assignee_name: 'Other Owner'
+          })
+        })
+      });
+
+      try {
+        await service.refresh();
+        await vi.waitFor(() => {
+          expect(endpoint.actions).toEqual([
+            expect.objectContaining({
+              action: 'cancel',
+              reason: 'provider_issue_released:assignee_changed'
+            })
+          ]);
+        });
+      } finally {
+        await endpoint.close();
+      }
+
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:assignee_changed',
+        issue_state: reviewState,
+        issue_state_type: 'started',
+        issue_assignee_id: 'viewer-2',
+        issue_assignee_name: 'Other Owner',
+        run_id: 'run-human-review-assignee-release',
+        run_manifest_path: childPaths.manifestPath
+      });
+      await expect(access(workspacePath)).resolves.toBeUndefined();
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
     }
   );
 
@@ -5858,6 +6134,122 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('keeps a queued post-worker-exit retry lifecycle-owned through review without relaunching coding work', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-review-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-review-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-review-completed',
+        task_id: 'task-1303-review-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'task-1303-review-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-review-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-review-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-unexpected',
+        manifestPath: '/tmp/provider-run/unexpected-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Human Review',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:20:00.000Z'
+        })
+      })
+    });
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    await flushAsyncWork();
+    await waitForCondition(
+      () =>
+        state.claims[0]?.reason === 'provider_issue_handoff_owned' &&
+        state.claims[0]?.retry_queued === true &&
+        typeof state.claims[0]?.retry_due_at === 'string' &&
+        state.claims[0]?.retry_due_at !== '2026-03-19T04:30:01.000Z'
+    );
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_handoff_owned',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'task-1303-review-completed',
+      run_id: 'run-review-completed',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_error: null
+    });
+    expect(Date.parse(state.claims[0]?.retry_due_at ?? '')).toBeGreaterThan(
+      Date.parse('2026-03-19T04:30:01.000Z')
+    );
   });
 
   it('queues a post-worker-exit scheduler retry on refresh and lets the retry owner launch it at the due boundary', async () => {
@@ -6679,6 +7071,94 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('cleans terminal released provider workspaces during refresh startup replay even when the assignee changed', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        workspace_path: join(root, '.workspaces', 'task-1303-completed'),
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-completed');
+    await mkdir(workspacePath, { recursive: true });
+    await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          assignee_id: 'viewer-2',
+          assignee_name: 'Other Owner'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    await expect(access(workspacePath)).rejects.toThrow();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed'
+    });
+  });
+
   it('publishes released-claim refreshes when only tracked issue metadata changes', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -7347,6 +7827,81 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('preserves released assignee metadata when an equal-timestamp replay arrives with a different assignee', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'task-1303-released',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-released',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-released',
+      run_manifest_path: '/tmp/run-released/manifest.json',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:20:00.000Z',
+        assignee_id: 'viewer-2',
+        assignee_name: 'Other Owner'
+      }),
+      deliveryId: 'delivery-released-assignee-replay',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_200_000
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(result.claim).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Todo',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex'
+    });
+    expect(state.claims[0]).toMatchObject({
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('relaunches a newer accepted webhook replay after the release drain has settled', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -7611,6 +8166,110 @@ describe('createProviderIssueHandoffService', () => {
     expect(state.claims[0]).toMatchObject({
       state: 'starting',
       reason: 'provider_issue_start_launched',
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-reopened',
+      run_manifest_path: '/tmp/provider-run/reopened-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+  });
+
+  it('relaunches a released claim during refresh when the live issue becomes active with a newer update', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-released-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-reopened',
+        manifestPath: '/tmp/provider-run/reopened-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-1',
+          identifier: 'CO-2',
+          state: 'Rework',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:40:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:40:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:40:00.000Z',
       task_id: 'linear-lin-issue-1',
       run_id: 'run-reopened',
       run_manifest_path: '/tmp/provider-run/reopened-manifest.json',

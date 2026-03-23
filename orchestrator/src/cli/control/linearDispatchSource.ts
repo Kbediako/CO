@@ -35,6 +35,9 @@ export interface LiveLinearTrackedIssue {
   url: string | null;
   state: string | null;
   state_type: string | null;
+  viewer_id: string | null;
+  assignee_id: string | null;
+  assignee_name: string | null;
   workspace_id: string | null;
   team_id: string | null;
   team_key: string | null;
@@ -86,6 +89,7 @@ export type LiveLinearTrackedIssuesResolution =
 
 interface LinearIssueQueryResponse {
   viewer?: {
+    id?: string | null;
     organization?: {
       id?: string | null;
     } | null;
@@ -112,6 +116,11 @@ interface LinearIssueNode {
   state?: {
     name?: string | null;
     type?: string | null;
+  } | null;
+  assignee?: {
+    id?: string | null;
+    name?: string | null;
+    displayName?: string | null;
   } | null;
   team?: {
     id?: string | null;
@@ -188,7 +197,9 @@ export async function resolveLiveLinearDispatchRecommendation(input: {
   }
 
   const trackedIssue =
-    trackedIssuesResolution.tracked_issues.find(isProviderLinearTrackedIssueEligibleForExecution) ??
+    trackedIssuesResolution.tracked_issues.find(
+      isLiveLinearTrackedIssueEligibleForFreshDispatch
+    ) ??
     null;
   if (!trackedIssue) {
     return unavailable('dispatch_source_issue_not_found');
@@ -263,7 +274,8 @@ export async function resolveLiveLinearTrackedIssueById(input: {
   }
 
   const trackedIssue = parseTrackedIssue(issue, {
-    workspaceId: sourceSetup?.workspace_id ?? workspaceId
+    workspaceId: sourceSetup?.workspace_id ?? workspaceId,
+    viewerId: queryResult.payload.data?.viewer?.id?.trim() ?? null
   });
   if (!trackedIssue) {
     return malformed('dispatch_source_provider_response_invalid');
@@ -342,7 +354,8 @@ export async function resolveLiveLinearTrackedIssues(input: {
     let stopScanning = false;
     for (const node of nodes) {
       const trackedIssue = parseTrackedIssue(node ?? {}, {
-        workspaceId: sourceSetup.workspace_id ?? workspaceId
+        workspaceId: sourceSetup.workspace_id ?? workspaceId,
+        viewerId: queryResult.payload.data?.viewer?.id?.trim() ?? null
       });
       if (!trackedIssue) {
         continue;
@@ -358,7 +371,7 @@ export async function resolveLiveLinearTrackedIssues(input: {
       trackedIssues.push(trackedIssue);
       if (
         input.stopWhenEligibleForExecution === true &&
-        isProviderLinearTrackedIssueEligibleForExecution(trackedIssue)
+        isLiveLinearTrackedIssueEligibleForFreshDispatch(trackedIssue)
       ) {
         stopScanning = true;
         break;
@@ -409,6 +422,31 @@ export function sortLiveLinearTrackedIssuesForDispatch(
   });
 }
 
+export function isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(
+  issue: Pick<LiveLinearTrackedIssue, 'viewer_id' | 'assignee_id'>
+): boolean {
+  if (issue.assignee_id === null) {
+    return true;
+  }
+  return (
+    typeof issue.viewer_id === 'string' &&
+    issue.viewer_id.length > 0 &&
+    issue.assignee_id === issue.viewer_id
+  );
+}
+
+export function isLiveLinearTrackedIssueEligibleForFreshDispatch(
+  issue: Pick<
+    LiveLinearTrackedIssue,
+    'state' | 'state_type' | 'blocked_by' | 'viewer_id' | 'assignee_id'
+  >
+): boolean {
+  return (
+    isProviderLinearTrackedIssueEligibleForExecution(issue) &&
+    isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(issue)
+  );
+}
+
 function buildLinearTrackedIssuesQuery(
   sourceSetup: DispatchPilotSourceSetup,
   limit: number | undefined,
@@ -442,6 +480,7 @@ function buildLinearTrackedIssuesQuery(
   return {
     query: `query ResolveLiveLinearTrackedIssues${variableSection} {
       viewer {
+        id
         organization {
           id
         }
@@ -456,6 +495,11 @@ function buildLinearTrackedIssuesQuery(
           priority
           createdAt
           updatedAt
+          assignee {
+            id
+            name
+            displayName
+          }
           state {
             name
             type
@@ -524,6 +568,7 @@ function buildLinearIssueByIdQuery(issueId: string): {
   return {
     query: `query ResolveLiveLinearTrackedIssueById($issueId: String!) {
       viewer {
+        id
         organization {
           id
         }
@@ -535,6 +580,11 @@ function buildLinearIssueByIdQuery(issueId: string): {
         description
         url
         updatedAt
+        assignee {
+          id
+          name
+          displayName
+        }
         state {
           name
           type
@@ -671,6 +721,7 @@ function parseTrackedIssue(
   issue: LinearIssueNode,
   input: {
     workspaceId: string | null;
+    viewerId: string | null;
   }
 ): LiveLinearTrackedIssue | null {
   const id = normalizeEnvValue(issue.id);
@@ -689,6 +740,9 @@ function parseTrackedIssue(
     url: normalizeEnvValue(issue.url),
     state: normalizeEnvValue(issue.state?.name),
     state_type: normalizeEnvValue(issue.state?.type),
+    viewer_id: input.viewerId,
+    assignee_id: normalizeEnvValue(issue.assignee?.id),
+    assignee_name: normalizeEnvValue(issue.assignee?.displayName ?? issue.assignee?.name),
     workspace_id: input.workspaceId,
     team_id: normalizeEnvValue(issue.team?.id),
     team_key: normalizeEnvValue(issue.team?.key),

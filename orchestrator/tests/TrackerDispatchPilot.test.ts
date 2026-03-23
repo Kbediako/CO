@@ -633,6 +633,94 @@ describe('TrackerDispatchPilot', () => {
     });
   });
 
+  it('returns ready without a recommendation when all live Linear issues are assigned to someone else', async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          data: {
+            viewer: {
+              id: 'viewer-1',
+              organization: {
+                id: 'lin-workspace-1'
+              }
+            },
+            issues: {
+              pageInfo: {
+                hasNextPage: false,
+                endCursor: null
+              },
+              nodes: [
+                {
+                  id: 'lin-issue-foreign',
+                  identifier: 'PREPROD-300',
+                  title: 'Assigned to another engineer',
+                  priority: 1,
+                  createdAt: '2026-03-06T01:00:00.000Z',
+                  updatedAt: '2026-03-06T02:10:00.000Z',
+                  state: {
+                    name: 'In Progress',
+                    type: 'started'
+                  },
+                  assignee: {
+                    id: 'viewer-2',
+                    displayName: 'Other Engineer'
+                  },
+                  team: {
+                    id: 'lin-team-live',
+                    key: 'PREPROD',
+                    name: 'PRE-PRO/PRODUCTION'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'Icon Agency (Bookings)'
+                  },
+                  inverseRelations: { nodes: [] },
+                  history: { nodes: [] }
+                }
+              ]
+            }
+          }
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+    const evaluation = await evaluateTrackerDispatchPilotAsync({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: true,
+          source: {
+            provider: 'linear',
+            live: true,
+            workspace_id: 'lin-workspace-1',
+            team_id: 'lin-team-live',
+            project_id: 'lin-project-1'
+          }
+        }
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      } as NodeJS.ProcessEnv,
+      fetchImpl
+    });
+
+    expect(evaluation.summary).toMatchObject({
+      status: 'ready',
+      source_status: 'ready',
+      reason: 'dispatch_source_no_eligible_issue',
+      source_setup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-live',
+        project_id: 'lin-project-1'
+      }
+    });
+    expect(evaluation.recommendation).toBeNull();
+    expect(evaluation.failure).toBeNull();
+  });
+
   it('fails closed when live Linear confidence is outside the allowed range', async () => {
     const fetchImpl: typeof fetch = async () =>
       new Response(
