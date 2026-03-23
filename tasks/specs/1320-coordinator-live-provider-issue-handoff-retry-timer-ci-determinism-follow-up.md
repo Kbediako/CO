@@ -61,5 +61,5 @@ review_notes:
 - `npm run docs:check`
 - `npm run docs:freshness`
 - `node scripts/diff-budget.mjs`
-- review
+- `codex-orchestrator review`
 - `npm run pack:smoke` if downstream-facing surfaces are touched
