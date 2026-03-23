@@ -6180,21 +6180,23 @@ describe('createProviderIssueHandoffService', () => {
       resume: vi.fn(async () => undefined)
     };
 
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:30:00.000Z',
+        assignee_id: null,
+        assignee_name: null
+      })
+    }));
+
     const service = createProviderIssueHandoffService({
       paths,
       state,
       persist,
       launcher,
-      resolveTrackedIssue: async () => ({
-        kind: 'ready',
-        trackedIssue: createTrackedIssue({
-          state: 'Merging',
-          state_type: 'started',
-          updated_at: '2026-03-19T04:30:00.000Z',
-          assignee_id: null,
-          assignee_name: null
-        })
-      })
+      resolveTrackedIssue
     });
 
     try {
@@ -6206,8 +6208,14 @@ describe('createProviderIssueHandoffService', () => {
       await endpoint.close();
     }
 
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-1'
+    });
     expect(state.claims[0]).toMatchObject({
       state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
       issue_state: 'In Progress',
       issue_state_type: 'started',
       issue_assignee_id: 'viewer-1',
@@ -6215,13 +6223,6 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'run-refresh-merging-unassigned-owned',
       run_manifest_path: childPaths.manifestPath
     });
-    expect([
-      'provider_issue_handoff_owned',
-      'provider_issue_run_already_active',
-      'provider_issue_rehydrated_active_run'
-    ]).toContain(
-      state.claims[0]?.reason ?? ''
-    );
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
