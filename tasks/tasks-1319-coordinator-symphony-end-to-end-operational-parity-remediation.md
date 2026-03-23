@@ -12,7 +12,7 @@
 - [x] `tasks/index.json` registers the `1319` TECH_SPEC entry. Evidence: `tasks/index.json`.
 - [x] `docs/TASKS.md` updated with the `1319` snapshot. Evidence: `docs/TASKS.md`.
 - [x] Checklist mirrored to `.agent/task/1319-coordinator-symphony-end-to-end-operational-parity-remediation.md`. Evidence: `.agent/task/1319-coordinator-symphony-end-to-end-operational-parity-remediation.md`.
-- [x] docs-review recorded for `1319`. Evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
+- [x] docs-review approved the `1319` packet for implementation with no blocking docs-first follow-up. Evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
 - [x] Implementation-docs archive policy reviewed for this active remediation lane; archival remains deferred until implementation closes. Evidence: `docs/implementation-docs-archive-policy.json`.
 
 ## Investigation
