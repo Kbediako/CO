@@ -27,7 +27,7 @@
 - `orchestrator/src/cli/controlHostCliShell.ts`
 - `orchestrator/src/cli/control/providerIssueHandoff.ts`
 - control-host observability files under `orchestrator/src/cli/control/`
-- Symphony baseline under `/Users/kbediako/Code/symphony`
+- Symphony baseline from a local checkout referenced via `$SYMPHONY_BASE` (set it to your Symphony clone when reproducing the parity audit)
 
 ## Validation
 - Checks / tests:

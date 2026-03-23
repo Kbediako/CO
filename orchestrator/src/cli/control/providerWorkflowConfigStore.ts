@@ -31,6 +31,9 @@ export function createProviderWorkflowConfigStore(
 ): ProviderWorkflowConfigStore {
   const sourcePath = resolveRepoConfigPath(createOptions.env);
   const snapshotPath = join(createOptions.runDir, PROVIDER_WORKFLOW_SNAPSHOT_FILE);
+  // This store assumes serialized access from the single-threaded control-host
+  // runtime loop. `attemptReload`, `bootstrapped`, `lastObservedRevision`, and
+  // `state` are not concurrency-safe without an explicit lock.
   let bootstrapped = false;
   let lastObservedRevision: string | null = null;
   let state: ControlProviderWorkflowPayload = {
@@ -43,6 +46,11 @@ export function createProviderWorkflowConfigStore(
     last_error_at: null,
     last_error: null
   };
+
+  function shouldCacheFailedRevision(error: unknown): boolean {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    return code === undefined || code === 'ENOENT';
+  }
 
   async function bootstrap(): Promise<ControlProviderWorkflowPayload> {
     const nextState = await attemptReload({ startup: true });
@@ -110,7 +118,9 @@ export function createProviderWorkflowConfigStore(
       return state;
     } catch (error) {
       const reason = (error as Error).message;
-      lastObservedRevision = revision ?? 'missing';
+      if (shouldCacheFailedRevision(error)) {
+        lastObservedRevision = revision ?? 'missing';
+      }
       if (reloadOptions.startup || !state.snapshot_path) {
         throw new Error(`Failed to load provider workflow config path=${sourcePath}: ${reason}`);
       }

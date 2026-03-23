@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -100,6 +100,46 @@ describe('providerWorkflowConfigStore', () => {
     expect(recoveredSnapshot.pipelines[0]?.title).toBe('Provider worker v2');
   });
 
+  it('retries the same failed revision after a transient read error clears', async () => {
+    const configPath = getRepoConfigPath();
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    const snapshotPath = await store.getLaunchConfigPath();
+    const initialSnapshot = await readFile(snapshotPath, 'utf8');
+
+    await writeRepoConfig(buildValidProviderConfig('v2'));
+    await chmod(configPath, 0o000);
+    try {
+      const degraded = await store.refresh();
+
+      expect(degraded.status).toBe('reload_failed');
+      expect(degraded.snapshot_path).toBe(snapshotPath);
+      expect(degraded.last_error).toBeTruthy();
+      expect(await readFile(snapshotPath, 'utf8')).toBe(initialSnapshot);
+    } finally {
+      await chmod(configPath, 0o644);
+    }
+
+    const recovered = await store.refresh();
+    const recoveredSnapshot = JSON.parse(await readFile(snapshotPath, 'utf8')) as {
+      pipelines: Array<{ title: string }>;
+    };
+
+    expect(recovered.status).toBe('ready');
+    expect(recovered.last_error).toBeNull();
+    expect(recoveredSnapshot.pipelines[0]?.title).toBe('Provider worker v2');
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('keeping last known good configuration')
+    );
+  });
+
   it('watches the resolved repo-config override path when one is provided', async () => {
     const overridePath = join(workspaceRoot, 'config', 'provider.json');
     process.env[REPO_CONFIG_PATH_ENV_KEY] = overridePath;
@@ -132,12 +172,16 @@ function buildEnv(repoRoot: string): EnvironmentPaths {
 }
 
 async function writeRepoConfig(config: Record<string, unknown> | string): Promise<void> {
-  const configPath = join(workspaceRoot, 'codex.orchestrator.json');
+  const configPath = getRepoConfigPath();
   const raw = typeof config === 'string' ? config : `${JSON.stringify(config, null, 2)}\n`;
   await writeFile(configPath, raw, 'utf8');
   revisionTick += 1;
   const revisionTime = new Date(Date.UTC(2026, 2, 24, 0, 0, revisionTick));
   await utimes(configPath, revisionTime, revisionTime);
+}
+
+function getRepoConfigPath(): string {
+  return join(workspaceRoot, 'codex.orchestrator.json');
 }
 
 function buildValidProviderConfig(version: string): Record<string, unknown> {
