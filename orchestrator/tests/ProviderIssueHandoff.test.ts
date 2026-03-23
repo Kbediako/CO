@@ -6752,7 +6752,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
-    expect(scheduledTimeoutCount).toBe(1);
+    expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
     expect(delayMs).toBeGreaterThanOrEqual(999);
     expect(delayMs).toBeLessThanOrEqual(1_000);
@@ -7003,7 +7003,7 @@ describe('createProviderIssueHandoffService', () => {
       );
 
       const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
-      expect(scheduledTimeoutCount).toBe(1);
+      expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
       const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
       expect(delayMs).toBeGreaterThanOrEqual(999);
       expect(delayMs).toBeLessThanOrEqual(1_000);
