@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
@@ -299,6 +299,58 @@ describe('implementation-docs-archive script', () => {
     });
 
     expect(await readFile(outsideFile, 'utf8')).toBe(outsideContent);
+  });
+
+  it('ignores indexed paths that escape the repo through symlink targets', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-outside.md']
+      },
+      taskOverrides: {
+        paths: {
+          docs: 'docs/PRD-outside.md'
+        }
+      }
+    });
+    const outsideDir = await mkdtemp(join(tmpdir(), 'impl-docs-archive-symlink-outside-'));
+    createdDirs.push(outsideDir);
+
+    const outsideFile = join(outsideDir, 'PRD-outside.md');
+    await writeFile(outsideFile, '# Outside\n\nSensitive content.\n', 'utf8');
+    await symlink(outsideFile, join(repo, 'docs', 'PRD-outside.md'));
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(await readFile(outsideFile, 'utf8')).toContain('Sensitive content.');
+    await expect(
+      readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive',
+          'docs',
+          'PRD-outside.md'
+        ),
+        'utf8'
+      )
+    ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('keeps explicit task packet paths out of stray archiving', async () => {

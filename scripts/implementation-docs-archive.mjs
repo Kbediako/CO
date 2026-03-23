@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
@@ -91,15 +91,7 @@ function collectIndexedDocPaths(item) {
   return [...new Set(candidates.map((entry) => toPosixPath(entry)))];
 }
 
-function normalizeRepoRelativePath(repoRoot, candidate) {
-  if (typeof candidate !== 'string') {
-    return null;
-  }
-  const trimmed = candidate.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const absolutePath = path.resolve(repoRoot, trimmed);
+function toContainedRepoRelativePath(repoRoot, absolutePath) {
   const repoRelative = toPosixPath(path.relative(repoRoot, absolutePath));
   if (
     !repoRelative ||
@@ -110,6 +102,91 @@ function normalizeRepoRelativePath(repoRoot, candidate) {
     return null;
   }
   return repoRelative;
+}
+
+async function resolvePathOrExistingParent(absolutePath) {
+  const missingSegments = [];
+  let currentPath = absolutePath;
+
+  while (true) {
+    try {
+      return {
+        resolvedPath: await realpath(currentPath),
+        missingSuffix:
+          missingSegments.length > 0 ? path.join(...missingSegments.reverse()) : ''
+      };
+    } catch (error) {
+      if (!error || typeof error !== 'object' || error.code !== 'ENOENT') {
+        throw error;
+      }
+
+      const parentPath = path.dirname(currentPath);
+      if (parentPath === currentPath) {
+        throw error;
+      }
+
+      missingSegments.push(path.basename(currentPath));
+      currentPath = parentPath;
+    }
+  }
+}
+
+async function resolveContainedPath(repoRoot, candidate, options = {}) {
+  const { allowMissing = false, resolvedRepoRoot = null } = options;
+  if (typeof candidate !== 'string') {
+    return null;
+  }
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const absolutePath = path.resolve(repoRoot, trimmed);
+  const lexicalRelative = toContainedRepoRelativePath(repoRoot, absolutePath);
+  if (!lexicalRelative) {
+    return null;
+  }
+
+  const canonicalRepoRoot = resolvedRepoRoot ?? (await realpath(repoRoot));
+
+  try {
+    const canonicalAbsolutePath = await realpath(absolutePath);
+    const canonicalRelative = toContainedRepoRelativePath(canonicalRepoRoot, canonicalAbsolutePath);
+    if (!canonicalRelative) {
+      return null;
+    }
+    return {
+      absolutePath: canonicalAbsolutePath,
+      relativePath: canonicalRelative,
+      exists: true
+    };
+  } catch (error) {
+    if (!allowMissing || !error || typeof error !== 'object' || error.code !== 'ENOENT') {
+      return null;
+    }
+
+    try {
+      const { resolvedPath, missingSuffix } = await resolvePathOrExistingParent(absolutePath);
+      const canonicalAbsolutePath = missingSuffix
+        ? path.join(resolvedPath, missingSuffix)
+        : resolvedPath;
+      const canonicalRelative = toContainedRepoRelativePath(canonicalRepoRoot, canonicalAbsolutePath);
+      if (!canonicalRelative) {
+        return null;
+      }
+      return {
+        absolutePath: canonicalAbsolutePath,
+        relativePath: canonicalRelative,
+        exists: false
+      };
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function normalizeRepoRelativePath(repoRoot, candidate, options = {}) {
+  const containedPath = await resolveContainedPath(repoRoot, candidate, options);
+  return containedPath?.relativePath ?? null;
 }
 
 function parsePolicy(raw, policyPath) {
@@ -256,6 +333,7 @@ async function main() {
 
   const policy = parsePolicy(policyRaw, policyPath);
   const registry = JSON.parse(registryRaw);
+  const resolvedRepoRoot = await realpath(repoRoot);
   const registryEntries = Array.isArray(registry?.entries) ? registry.entries : [];
   const registryMap = new Map();
   for (const entry of registryEntries) {
@@ -287,17 +365,22 @@ async function main() {
     const docPaths = new Set();
 
     for (const indexedPath of collectIndexedDocPaths(item)) {
-      const normalized = normalizeRepoRelativePath(repoRoot, indexedPath);
-      if (!normalized) {
+      const containedIndexedPath = await resolveContainedPath(repoRoot, indexedPath, {
+        allowMissing: true,
+        resolvedRepoRoot
+      });
+      if (!containedIndexedPath) {
         continue;
       }
 
-      docPaths.add(normalized);
-      const abs = path.resolve(repoRoot, normalized);
-      if (await pathExists(abs)) {
-        const content = await readFile(abs, 'utf8');
+      docPaths.add(containedIndexedPath.relativePath);
+      if (containedIndexedPath.exists && (await pathExists(containedIndexedPath.absolutePath))) {
+        const content = await readFile(containedIndexedPath.absolutePath, 'utf8');
         for (const ref of extractDocReferences(content, docRegexes)) {
-          const normalizedRef = normalizeRepoRelativePath(repoRoot, ref);
+          const normalizedRef = await normalizeRepoRelativePath(repoRoot, ref, {
+            allowMissing: true,
+            resolvedRepoRoot
+          });
           if (normalizedRef) {
             docPaths.add(normalizedRef);
           }
@@ -383,14 +466,22 @@ async function main() {
   };
 
   async function archiveDoc({ relativePath, reason, context }) {
-    const absPath = path.resolve(repoRoot, relativePath);
-    if (!(await pathExists(absPath))) {
+    const containedPath = await resolveContainedPath(repoRoot, relativePath, {
+      allowMissing: true,
+      resolvedRepoRoot
+    });
+    if (!containedPath) {
+      report.skipped.push({ path: relativePath, reason: 'outside_repo', context });
+      report.totals.skipped += 1;
+      return;
+    }
+    if (!containedPath.exists || !(await pathExists(containedPath.absolutePath))) {
       report.skipped.push({ path: relativePath, reason: 'missing_on_disk', context });
       report.totals.skipped += 1;
       return;
     }
 
-    const content = await readFile(absPath, 'utf8');
+    const content = await readFile(containedPath.absolutePath, 'utf8');
     if (content.includes(ARCHIVE_MARKER)) {
       report.skipped.push({ path: relativePath, reason: 'already_stubbed', context });
       report.totals.skipped += 1;
@@ -399,7 +490,7 @@ async function main() {
 
     const lines = content.split('\n');
     const headerLine = lines.find((line) => line.trim().startsWith('# ')) || null;
-    const archiveRelativePath = toPosixPath(relativePath);
+    const archiveRelativePath = containedPath.relativePath;
     const archiveUrl = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archiveRelativePath}`;
     const stub = buildStubContent({
       headerLine,
@@ -416,7 +507,7 @@ async function main() {
       if (!(await pathExists(payloadPath))) {
         throw new Error(`Archive payload missing after write: ${payloadPath}`);
       }
-      await writeFile(absPath, stub);
+      await writeFile(containedPath.absolutePath, stub);
     }
 
     const entry = ensureRegistryEntry(registryMap, relativePath, {
