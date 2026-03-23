@@ -6868,6 +6868,13 @@ describe('createProviderIssueHandoffService', () => {
     await waitForMockCalls(setTimeoutSpy);
 
     expect(launcher.start).not.toHaveBeenCalled();
+    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+    expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
+    await waitForCondition(
+      () =>
+        state.claims[0]?.retry_queued === true &&
+        state.claims[0]?.retry_due_at === '2026-03-19T04:30:01.000Z'
+    );
     await vi.advanceTimersByTimeAsync(1_001);
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 1, 1024);
