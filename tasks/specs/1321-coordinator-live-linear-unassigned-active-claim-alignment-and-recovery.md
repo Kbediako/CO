@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-coordinator-live-linear-unassigned-active-
 related_tasks:
   - tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md
 review_notes:
+  - 2026-03-23: Pre-implementation review approved via docs-review manifest `.runs/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/cli/2026-03-23T10-29-46-034Z-08278ec8/manifest.json`; checklist mirrored in `tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md`.
   - 2026-03-23: Opened after live `CO-3` remained `Merging` and recommended by `/api/v1/dispatch`, but persisted intake still recorded the claim as `released:assignee_changed`.
   - 2026-03-23: The current mismatch is internal to CO: fresh dispatch already accepts viewer-owned or unassigned issues, while existing-claim eligibility still treats `assignee_id: null` as a reassignment away from Codex.
   - 2026-03-23: The already-stuck live claim also needs a small refresh recovery seam because released claims currently reopen only on newer `updated_at`.

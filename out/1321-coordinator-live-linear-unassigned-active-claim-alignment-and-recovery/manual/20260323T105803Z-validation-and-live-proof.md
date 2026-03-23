@@ -8,13 +8,13 @@
 - Focused regressions passed:
   - `npx vitest run --config vitest.config.core.ts orchestrator/tests/ProviderIssueHandoff.test.ts -t "keeps an active claim lifecycle-owned when a direct webhook moves the issue to Human Review with assignee_id null|keeps an active claim lifecycle-owned when a direct webhook moves the issue to In Review with assignee_id null|relaunches a released assignee-changed claim on a same-timestamp webhook when Merging with assignee_id null|relaunches a released assignee-changed claim on refresh when Merging with assignee_id null stays at the same timestamp"` -> `4 passed`.
 - Focused file validation passed:
-  - `npx vitest run --config vitest.config.core.ts orchestrator/tests/ProviderIssueHandoff.test.ts` -> `127 passed`.
-- `npm run test` was executed twice. In both runs the visible suite stayed green through the last visible files, then hit the known host-local Vitest teardown hang with the worker left idle/listening on `*:24678`. Treat PR CI as the authoritative terminal full-suite proof for this lane.
+  - `npx vitest run --config vitest.config.core.ts orchestrator/tests/ProviderIssueHandoff.test.ts` -> `130 passed`.
+- `npm run test` was executed again on the patched head. The visible suite stayed green through the last visible files, then hit the known host-local Vitest teardown hang with `node (vitest)` left idle/listening on `*:24678`; the idle process was killed after confirming the listener. Treat PR CI as the authoritative terminal full-suite proof for this lane.
 - `npm run docs:check`: passed.
 - `npm run docs:freshness`: passed.
 - `node scripts/diff-budget.mjs`: override accepted with `DIFF_BUDGET_OVERRIDE_REASON="Docs-first 1321 lane requires the full task packet plus the narrow providerIssueHandoff/runtime regression coverage for live CO-3 recovery."`
 - `npm run review`: completed in non-interactive handoff mode; review prompt written to `.runs/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/cli/2026-03-23T10-29-46-034Z-08278ec8/review/prompt.txt`.
-- `npm run pack:smoke`: not required because this lane only changed docs, `providerIssueHandoff` runtime logic, and its tests. No downstream CLI/package/skills/review-wrapper surfaces changed.
+- `npm run pack:smoke`: passed.
 
 ## Live CO-3 Proof
 - Current control-host state already moved past the original stuck bug without another Linear flip. The live host restarted onto `http://127.0.0.1:63632` with token created at `2026-03-23T10:51:43.413Z`, and `.runs/local-mcp/cli/control-host/provider-intake-state.json` rebound `CO-3` to run `2026-03-23T10-51-47-708Z-411eb683` with `state: "running"` and `reason: "provider_issue_rehydrated_active_run"`.

@@ -16,14 +16,15 @@
 3. Implement the smallest runtime fix in `providerIssueHandoff.ts` and the focused `ProviderIssueHandoff.test.ts` regressions.
 4. Run focused tests, then the full validation floor, then a bounded review/elegance pass.
 5. Restart the local control host on the patched tree and verify `CO-3` reclaims without another operator flip.
-6. Monitor the resumed `CO-3` flow through PR `#289`, handle feedback/checks, merge the lane PR, and return the repo to clean `main`.
+6. Monitor the resumed `CO-3` flow, handle feedback/checks on PR `#290`, merge the lane PR, and return the repo to clean `main`.
+7. Archive the implementation packet per `docs/implementation-docs-archive-policy.json` after merge or record the fallback required for `npm run docs:archive-implementation`.
 
 ## Dependencies
 - live local control host in tmux session `co-control-host`
 - live `CO-3` issue context and `/api/v1/dispatch`
 - `orchestrator/src/cli/control/providerIssueHandoff.ts`
 - `orchestrator/tests/ProviderIssueHandoff.test.ts`
-- PR `#289`
+- PR `#290`
 
 ## Validation
 - Checks / tests:
@@ -38,7 +39,7 @@
 - Risk: a shared null-assignee fix changes existing review-handoff behavior as well as active-state behavior.
   - Mitigation: keep tests explicit for foreign-assignee release behavior and document any review-state change truthfully in the packet.
 - Risk: the ownership fix alone leaves the already-released live claim stuck.
-  - Mitigation: add the smallest refresh-only released-claim recovery seam and prove it live on `CO-3`.
+  - Mitigation: add the smallest released-claim recovery seam and prove it live on `CO-3`.
 - Risk: live proof is blocked by stale local control-host code.
   - Mitigation: rebuild and restart the existing host only after validation is green.
 

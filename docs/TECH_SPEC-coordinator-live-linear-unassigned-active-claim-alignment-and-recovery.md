@@ -40,7 +40,7 @@
 - External dependencies / integrations:
   - live local control host and authenticated `/api/v1/dispatch`
   - live Linear issue-context for `CO-3`
-  - GitHub PR `#289`
+- GitHub PR `#290`
 
 ## Current Truth
 - Live `issue-context` for `CO-3` reports state `Merging`, `state.type = started`, and `assignee_id: null`.
@@ -72,7 +72,7 @@
 - Rollout verification:
   - rebuild/restart the local control host on the patched tree
   - prove `CO-3` reclaims without another operator Linear state flip
-  - prove the resumed run begins conflict/merge handling for PR `#289`
+  - prove the resumed run reclaims `CO-3` truthfully and record that this lane ships via PR `#290` while superseding stale PR `#289`
 - Monitoring / alerts:
   - provider-intake should move away from `released:assignee_changed` for active unassigned `CO-3`
   - live `/api/v1/dispatch` should remain internally consistent while the resumed run is active

@@ -2147,6 +2147,9 @@ function shouldReopenReleasedClaimOnRefresh(input: {
     'updated_at' | 'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
   >;
 }): boolean {
+  if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
+    return true;
+  }
   const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
     input.claim.issue_updated_at ?? null,
     input.releaseRun?.issueUpdatedAt ?? input.releaseRun?.startedAt ?? null
@@ -2266,10 +2269,8 @@ function assessProviderTrackedIssueEligibility(
   } = {}
 ): ProviderTrackedIssueEligibility {
   const workflowState = classifyProviderLinearWorkflowState(trackedIssue);
-  const hasViewerIdentity = typeof trackedIssue.viewer_id === 'string' && trackedIssue.viewer_id.length > 0;
   const assigneeChanged =
     options.hasExistingClaim === true &&
-    hasViewerIdentity &&
     trackedIssue.assignee_id !== null &&
     !isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(trackedIssue);
   if (assigneeChanged && workflowState.isTerminal !== true) {

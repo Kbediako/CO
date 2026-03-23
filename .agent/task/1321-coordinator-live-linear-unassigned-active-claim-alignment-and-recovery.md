@@ -34,9 +34,10 @@
 - [x] `npm run docs:freshness`. Evidence: `out/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/manual/20260323T105803Z-validation-and-live-proof.md`.
 - [x] `node scripts/diff-budget.mjs`. Evidence: `out/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/manual/20260323T105803Z-validation-and-live-proof.md`.
 - [x] `npm run review`. Evidence: `.runs/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/cli/2026-03-23T10-29-46-034Z-08278ec8/review/prompt.txt`, `out/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/manual/20260323T105803Z-validation-and-live-proof.md`.
-- [x] `npm run pack:smoke` if required by touched downstream-facing surfaces. Evidence: not required for this lane; see `out/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/manual/20260323T105803Z-validation-and-live-proof.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/manual/20260323T105803Z-validation-and-live-proof.md`.
 - [x] Live control-host retest proves `CO-3` reclaims from `Merging` without another operator flip. Evidence: `.runs/linear-902af7c9-9c23-4805-a652-5280723334d7/cli/2026-03-23T10-51-47-708Z-411eb683/manifest.json`, `.runs/linear-902af7c9-9c23-4805-a652-5280723334d7/cli/2026-03-23T10-51-47-708Z-411eb683/provider-linear-worker-proof.json`, `out/1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery/manual/20260323T105803Z-validation-and-live-proof.md`.
 
 ## Delivery
 - [ ] Open PR for `1321`, handle feedback, and wait for required checks to reach terminal green.
+- [ ] Verify unresolved actionable review threads = `0` or record a waiver with evidence in PR review threads/task notes before merging.
 - [ ] Merge, return local repo to clean `main`, and record final closeout evidence.
