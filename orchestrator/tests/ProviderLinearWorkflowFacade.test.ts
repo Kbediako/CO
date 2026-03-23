@@ -662,6 +662,65 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('fails delete-workpad without comment_id when multiple unresolved workpads exist', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-workpad-newer',
+                  body: '## Codex Workpad\n\nNew plan',
+                  url: 'https://linear.app/comment/workpad-newer',
+                  createdAt: '2026-03-22T10:00:00.000Z',
+                  updatedAt: '2026-03-22T10:30:00.000Z',
+                  resolvedAt: null
+                },
+                {
+                  id: 'comment-workpad-older',
+                  body: '## Codex Workpad\n\nOld plan',
+                  url: 'https://linear.app/comment/workpad-older',
+                  createdAt: '2026-03-22T09:00:00.000Z',
+                  updatedAt: '2026-03-22T09:30:00.000Z',
+                  resolvedAt: null
+                }
+              ]
+            }
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await deleteProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'delete-workpad',
+      error: {
+        code: 'ambiguous_workpad_state',
+        message:
+          'Multiple unresolved Codex workpad comments exist; provide comment_id to delete one explicitly.',
+        status: 409,
+        details: {
+          comment_ids: ['comment-workpad-newer', 'comment-workpad-older']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('resolves a state name to a state id before transitioning the issue', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {

@@ -34,16 +34,16 @@
 
 ## Validation
 - [x] `docs-review` for the `1319` packet. Evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
-- [ ] `node scripts/delegation-guard.mjs`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`.
-- [ ] `npm run build`.
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [x] `npm run docs:check`. Evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
-- [x] `npm run docs:freshness`. Evidence: `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `node scripts/delegation-guard.mjs --task 1319-coordinator-symphony-end-to-end-operational-parity-remediation` on 2026-03-23.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `node scripts/spec-guard.mjs --dry-run` on 2026-03-23.
+- [x] `npm run build`. Evidence: `npm run build` on 2026-03-23.
+- [x] `npm run lint`. Evidence: `npm run lint` on 2026-03-23.
+- [x] `npm run test`. Evidence: `npm run test` on 2026-03-23 (`290/290` files, `2220/2220` tests).
+- [x] `npm run docs:check`. Evidence: `npm run docs:check` on 2026-03-23.
+- [x] `npm run docs:freshness`. Evidence: `npm run docs:freshness` on 2026-03-23.
 - [x] `node scripts/diff-budget.mjs` if docs packet exceeds budget. Evidence: override accepted on 2026-03-23 with `DIFF_BUDGET_OVERRIDE_REASON="1319 couples the docs-first packet, Symphony/Elixir workflow-state parity, assignee-gated dispatch and handoff fixes, Ready queue aliasing, Rework reset/workpad deletion support, read-model truthfulness cleanup, and the focused regressions needed to prove that contract." node scripts/diff-budget.mjs`.
-- [ ] `npm run review`.
-- [ ] `npm run pack:smoke`.
+- [x] `npm run review`. Evidence: `FORCE_CODEX_REVIEW=1 npm run review -- --manifest .runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/manifest.json` on 2026-03-23, `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/review/output.log`, `.runs/1319-coordinator-symphony-end-to-end-operational-parity-remediation/cli/2026-03-22T22-49-07-295Z-b0f31229/review/telemetry.json`.
+- [x] `npm run pack:smoke`. Evidence: `npm run pack:smoke` on 2026-03-23.
 
 ## Implementation
 - [x] Land explicit named active-state routing, live-team `Ready` queue aliasing, and review handoff / feedback / rework / merge / done lifecycle parity. Evidence: `orchestrator/src/cli/control/providerLinearWorkflowStates.ts`, `orchestrator/src/cli/control/linearDispatchSource.ts`, `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `skills/linear/SKILL.md`, focused regressions on 2026-03-23.

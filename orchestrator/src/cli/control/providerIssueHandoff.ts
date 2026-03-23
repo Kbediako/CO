@@ -548,9 +548,12 @@ export function createProviderIssueHandoffService(
       issue_state: input.trackedIssue?.state ?? input.claim.issue_state,
       issue_state_type: input.trackedIssue?.state_type ?? input.claim.issue_state_type,
       issue_updated_at: input.trackedIssue?.updated_at ?? input.claim.issue_updated_at,
-      issue_assignee_id: input.trackedIssue?.assignee_id ?? input.claim.issue_assignee_id ?? null,
+      issue_assignee_id:
+        input.trackedIssue != null ? input.trackedIssue.assignee_id : (input.claim.issue_assignee_id ?? null),
       issue_assignee_name:
-        input.trackedIssue?.assignee_name ?? input.claim.issue_assignee_name ?? null,
+        input.trackedIssue != null
+          ? input.trackedIssue.assignee_name
+          : (input.claim.issue_assignee_name ?? null),
       issue_blocked_by: input.trackedIssue?.blocked_by ?? input.claim.issue_blocked_by ?? null,
       task_id: nextTaskId,
       state: 'released',

@@ -521,7 +521,19 @@ export async function deleteProviderLinearWorkpadComment(input: {
       );
     }
   } else {
-    selectedComment = context.issue.workpad_comment;
+    const unresolvedWorkpads = findUnresolvedWorkpadComments(context.issue.comments);
+    if (unresolvedWorkpads.length > 1) {
+      return failure(
+        'delete-workpad',
+        'ambiguous_workpad_state',
+        'Multiple unresolved Codex workpad comments exist; provide comment_id to delete one explicitly.',
+        409,
+        {
+          comment_ids: unresolvedWorkpads.map((entry) => entry.id)
+        }
+      );
+    }
+    selectedComment = unresolvedWorkpads[0] ?? null;
   }
 
   if (!selectedComment) {
@@ -1346,9 +1358,15 @@ function parseAttachment(
 function findWorkpadComment(
   comments: readonly ProviderLinearWorkflowComment[]
 ): ProviderLinearWorkflowComment | null {
+  return findUnresolvedWorkpadComments(comments)[0] ?? null;
+}
+
+function findUnresolvedWorkpadComments(
+  comments: readonly ProviderLinearWorkflowComment[]
+): ProviderLinearWorkflowComment[] {
   const candidates = comments.filter((entry) => entry.resolved_at === null && hasWorkpadMarker(entry.body));
   if (candidates.length === 0) {
-    return null;
+    return [];
   }
 
   return [...candidates].sort((left, right) => {
@@ -1357,7 +1375,7 @@ function findWorkpadComment(
     const normalizedLeft = Number.isFinite(leftTimestamp) ? leftTimestamp : 0;
     const normalizedRight = Number.isFinite(rightTimestamp) ? rightTimestamp : 0;
     return normalizedRight - normalizedLeft;
-  })[0] ?? null;
+  });
 }
 
 function hasWorkpadMarker(body: string): boolean {

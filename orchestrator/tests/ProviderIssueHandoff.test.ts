@@ -2018,6 +2018,132 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
+  it.each(['Human Review', 'In Review'])(
+    'preserves an explicit live unassignment when a direct webhook moves the issue to %s',
+    async (reviewState) => {
+      const { root, paths } = await createHostPaths();
+      const childEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'task-webhook-review-unassigned-release'
+      };
+      const childPaths = resolveRunPaths(childEnv, 'run-webhook-review-unassigned-release');
+      await mkdir(childPaths.runDir, { recursive: true });
+      await writeFile(
+        childPaths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-webhook-review-unassigned-release',
+          task_id: 'task-webhook-review-unassigned-release',
+          pipeline_id: 'diagnostics',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_updated_at: '2026-03-19T04:20:00.000Z',
+          updated_at: '2026-03-19T04:30:00.000Z'
+        }),
+        'utf8'
+      );
+      const endpoint = await createControlEndpointServer();
+      await writeFile(
+        join(childPaths.runDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: endpoint.baseUrl,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+      await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+
+      const state = createProviderIntakeState();
+      state.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_title: 'Autonomous intake handoff',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        issue_assignee_id: 'viewer-1',
+        issue_assignee_name: 'Codex',
+        task_id: 'task-webhook-review-unassigned-release',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_run_already_active',
+        accepted_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:20:10.000Z',
+        last_delivery_id: 'delivery-in-progress',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_049_000,
+        run_id: 'run-webhook-review-unassigned-release',
+        run_manifest_path: childPaths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'webhook-review-unassigned-release-token'
+      });
+
+      const persist = vi.fn(async () => undefined);
+      const launcher = {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      };
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'diagnostics'
+      });
+
+      try {
+        const result = await service.handleAcceptedTrackedIssue({
+          trackedIssue: createTrackedIssue({
+            state: reviewState,
+            state_type: 'started',
+            updated_at: '2026-03-19T04:30:00.000Z',
+            assignee_id: null,
+            assignee_name: null
+          }),
+          deliveryId: `delivery-${reviewState.toLowerCase().replace(/\s+/gu, '-')}-unassigned-release`,
+          event: 'Issue',
+          action: 'update',
+          webhookTimestamp: 1_742_360_050_500
+        });
+
+        expect(result).toMatchObject({
+          kind: 'ignored',
+          reason: 'provider_issue_released:assignee_changed'
+        });
+        await vi.waitFor(() => {
+          expect(endpoint.actions).toEqual([
+            expect.objectContaining({
+              action: 'cancel',
+              reason: 'provider_issue_released:assignee_changed'
+            })
+          ]);
+        });
+      } finally {
+        await endpoint.close();
+      }
+
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:assignee_changed',
+        issue_state: reviewState,
+        issue_state_type: 'started',
+        issue_assignee_id: null,
+        issue_assignee_name: null,
+        run_id: 'run-webhook-review-unassigned-release',
+        run_manifest_path: childPaths.manifestPath
+      });
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+    }
+  );
+
   it('preserves a foreign-pipeline active claim when a direct webhook moves the issue to Human Review', async () => {
     const { root, paths } = await createHostPaths();
     const otherEnv = {
