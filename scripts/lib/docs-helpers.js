@@ -70,6 +70,19 @@ function normalizeSlashPath(value) {
   return value.replace(/\\/g, '/');
 }
 
+const SAFE_TASK_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]*$/u;
+
+function normalizeTaskKeyCandidate(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const normalized = value.trim();
+  if (!normalized || !SAFE_TASK_KEY_PATTERN.test(normalized)) {
+    return '';
+  }
+  return normalized;
+}
+
 function extractTaskKeyFromPath(value) {
   if (typeof value !== 'string') {
     return '';
@@ -80,9 +93,9 @@ function extractTaskKeyFromPath(value) {
   }
 
   const patterns = [
-    /^tasks\/tasks-(.+)\.md$/u,
-    /^tasks\/specs\/(.+)\.md$/u,
-    /^\.agent\/task\/(.+)\.md$/u
+    /^tasks\/tasks-([A-Za-z0-9][A-Za-z0-9-]*)\.md$/u,
+    /^tasks\/specs\/([A-Za-z0-9][A-Za-z0-9-]*)\.md$/u,
+    /^\.agent\/task\/([A-Za-z0-9][A-Za-z0-9-]*)\.md$/u
   ];
 
   for (const pattern of patterns) {
@@ -113,15 +126,15 @@ export function normalizeTaskKey(item) {
       .map((value) => extractTaskKeyFromPath(value))
       .find((value) => value.length > 0) ?? '';
   const datePrefixedIdMatch = id.match(/^\d{8}-([0-9]{4}-[A-Za-z0-9-]+)$/u);
-  const datePrefixedSlug = datePrefixedIdMatch?.[1] ?? '';
+  const datePrefixedSlug = normalizeTaskKeyCandidate(datePrefixedIdMatch?.[1] ?? '');
   if (slug && id && slug.startsWith(`${id}-`)) {
-    return slug;
+    return normalizeTaskKeyCandidate(slug) || null;
   }
   if (id && slug) {
-    return `${id}-${slug}`;
+    return normalizeTaskKeyCandidate(`${id}-${slug}`) || null;
   }
   if (slug) {
-    return slug;
+    return normalizeTaskKeyCandidate(slug) || null;
   }
   if (taskPathSlug) {
     return taskPathSlug;
@@ -130,7 +143,7 @@ export function normalizeTaskKey(item) {
     return datePrefixedSlug;
   }
   if (id) {
-    return id;
+    return normalizeTaskKeyCandidate(id) || null;
   }
   return null;
 }

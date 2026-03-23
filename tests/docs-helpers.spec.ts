@@ -32,4 +32,14 @@ describe('normalizeTaskKey', () => {
       })
     ).toBe('linear-856c1318-524f-4db3-8d4a-b357ec51c304');
   });
+
+  it('rejects malformed path-derived task keys with traversal segments', () => {
+    expect(
+      normalizeTaskKey({
+        paths: {
+          task: 'tasks/tasks-../../../tmp/secret.md'
+        }
+      })
+    ).toBeNull();
+  });
 });
