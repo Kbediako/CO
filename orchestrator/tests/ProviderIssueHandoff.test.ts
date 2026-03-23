@@ -4274,7 +4274,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await vi.advanceTimersByTimeAsync(5_001);
     await flushAsyncWork();
-    await waitForMockCalls(launcher.start);
+    await waitForMockCalls(launcher.start, 1, 1_024);
     expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       taskId: 'linear-lin-issue-1',
@@ -4834,7 +4834,13 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(1_001);
+    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+    expect(scheduledTimeoutCount).toBe(1);
+    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+    expect(delayMs).toBeGreaterThanOrEqual(999);
+    expect(delayMs).toBeLessThanOrEqual(1_000);
+    vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 1, 1024);
 
@@ -6862,6 +6868,13 @@ describe('createProviderIssueHandoffService', () => {
     await waitForMockCalls(setTimeoutSpy);
 
     expect(launcher.start).not.toHaveBeenCalled();
+    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+    expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
+    await waitForCondition(
+      () =>
+        state.claims[0]?.retry_queued === true &&
+        state.claims[0]?.retry_due_at === '2026-03-19T04:30:01.000Z'
+    );
     await vi.advanceTimersByTimeAsync(1_001);
     await flushAsyncWork();
     await waitForMockCalls(launcher.start, 1, 1024);
