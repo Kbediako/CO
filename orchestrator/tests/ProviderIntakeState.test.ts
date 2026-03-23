@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildProviderIntakeSummary,
   normalizeProviderIntakeState,
   type ProviderIntakeState,
   upsertProviderIntakeClaim
@@ -348,6 +349,38 @@ describe('upsertProviderIntakeClaim', () => {
 
     expect(claim.updated_at).toBe('2026-03-19T04:02:00.000Z');
     expect(claim.launch_started_at).toBeNull();
+  });
+});
+
+describe('buildProviderIntakeSummary', () => {
+  it('surfaces same-assignee review handoff retries as handoff_owned instead of handoff_failed', () => {
+    const state = createProviderIntakeState();
+
+    upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_handoff_owned',
+      run_id: 'run-1',
+      run_manifest_path: '/tmp/run-1/manifest.json'
+    });
+
+    expect(buildProviderIntakeSummary(state)).toMatchObject({
+      issue_identifier: 'CO-2',
+      state: 'handoff_owned',
+      reason: 'provider_issue_handoff_owned',
+      run_id: 'run-1'
+    });
   });
 });
 

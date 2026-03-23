@@ -6,6 +6,7 @@ const ACTIVE_PROVIDER_LINEAR_WORKFLOW_STATES = new Set([
   'merging',
   'rework'
 ]);
+const TODO_EQUIVALENT_PROVIDER_LINEAR_WORKFLOW_STATES = new Set(['todo', 'ready']);
 const HANDOFF_PROVIDER_LINEAR_WORKFLOW_STATES = new Set(['human review', 'in review']);
 const TERMINAL_PROVIDER_LINEAR_WORKFLOW_STATES = new Set([
   'closed',
@@ -29,6 +30,18 @@ export interface ProviderLinearWorkflowStateClassification {
   isActive: boolean;
 }
 
+export type ProviderLinearWorkerLifecyclePhase =
+  | 'active'
+  | 'review_handoff'
+  | 'inactive';
+
+export interface ProviderLinearWorkerLifecycleClassification {
+  workflowState: ProviderLinearWorkflowStateClassification;
+  isExecutionEligible: boolean;
+  phase: ProviderLinearWorkerLifecyclePhase;
+  terminalReason: 'issue_review_handoff' | 'issue_inactive' | null;
+}
+
 export function normalizeProviderLinearWorkflowState(
   value: string | null | undefined
 ): string | null {
@@ -45,7 +58,9 @@ export function classifyProviderLinearWorkflowState(input: {
 }): ProviderLinearWorkflowStateClassification {
   const normalizedState = normalizeProviderLinearWorkflowState(input.state);
   const normalizedStateType = normalizeProviderLinearWorkflowState(input.state_type);
-  const isTodo = normalizedState === 'todo';
+  const isTodo =
+    normalizedState !== null &&
+    TODO_EQUIVALENT_PROVIDER_LINEAR_WORKFLOW_STATES.has(normalizedState);
   const isHandoff =
     normalizedState !== null && HANDOFF_PROVIDER_LINEAR_WORKFLOW_STATES.has(normalizedState);
   const isTerminal =
@@ -56,10 +71,10 @@ export function classifyProviderLinearWorkflowState(input: {
   const isActive =
     !isHandoff &&
     !isTerminal &&
+    normalizedState !== null &&
     (
-      (normalizedState !== null &&
-        ACTIVE_PROVIDER_LINEAR_WORKFLOW_STATES.has(normalizedState)) ||
-      normalizedStateType === 'started'
+      ACTIVE_PROVIDER_LINEAR_WORKFLOW_STATES.has(normalizedState) ||
+      TODO_EQUIVALENT_PROVIDER_LINEAR_WORKFLOW_STATES.has(normalizedState)
     );
 
   return {
@@ -92,18 +107,59 @@ export function providerLinearTodoBlockedByNonTerminal(
   });
 }
 
-export function isProviderLinearTrackedIssueEligibleForExecution(
-  issue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'blocked_by'>
-): boolean {
-  const workflowState = classifyProviderLinearWorkflowState(issue);
-  if (!workflowState.isActive) {
+function isProviderLinearWorkflowStateExecutionEligible(input: {
+  workflowState: ProviderLinearWorkflowStateClassification;
+  blockers: LiveLinearTrackedIssue['blocked_by'] | null | undefined;
+}): boolean {
+  if (!input.workflowState.isActive) {
     return false;
   }
   if (
-    workflowState.isTodo &&
-    providerLinearTodoBlockedByNonTerminal(issue.blocked_by)
+    input.workflowState.isTodo &&
+    providerLinearTodoBlockedByNonTerminal(input.blockers)
   ) {
     return false;
   }
   return true;
+}
+
+export function classifyProviderLinearWorkerLifecycle(
+  issue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'blocked_by'>
+): ProviderLinearWorkerLifecycleClassification {
+  const workflowState = classifyProviderLinearWorkflowState(issue);
+  const isExecutionEligible = isProviderLinearWorkflowStateExecutionEligible({
+    workflowState,
+    blockers: issue.blocked_by
+  });
+
+  if (isExecutionEligible) {
+    return {
+      workflowState,
+      isExecutionEligible,
+      phase: 'active',
+      terminalReason: null
+    };
+  }
+
+  if (workflowState.isHandoff) {
+    return {
+      workflowState,
+      isExecutionEligible,
+      phase: 'review_handoff',
+      terminalReason: 'issue_review_handoff'
+    };
+  }
+
+  return {
+    workflowState,
+    isExecutionEligible,
+    phase: 'inactive',
+    terminalReason: 'issue_inactive'
+  };
+}
+
+export function isProviderLinearTrackedIssueEligibleForExecution(
+  issue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'blocked_by'>
+): boolean {
+  return classifyProviderLinearWorkerLifecycle(issue).isExecutionEligible;
 }

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260323-1319-coordinator-symphony-end-to-end-operational-parity-remediation",
+      "title": "Coordinator Symphony End-to-End Operational Parity Remediation",
+      "relates_to": "tasks/tasks-1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-23",
+      "paths": {
+        "spec": "tasks/specs/1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
+        "task": "tasks/tasks-1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
+        "agent_task": ".agent/task/1319-coordinator-symphony-end-to-end-operational-parity-remediation.md",
+        "docs": "docs/TECH_SPEC-coordinator-symphony-end-to-end-operational-parity-remediation.md"
+      }
+    },
+    {
       "id": "20260322-linear-856c1318-524f-4db3-8d4a-b357ec51c304",
       "title": "Archive Automation Policy Mismatch for Linked PRD TECH_SPEC and ACTION_PLAN Docs",
       "relates_to": "tasks/tasks-linear-856c1318-524f-4db3-8d4a-b357ec51c304.md",

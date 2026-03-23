@@ -74,6 +74,9 @@ function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): Li
     state: 'In Progress',
     state_type: 'started',
     workspace_id: 'workspace-1',
+    viewer_id: 'viewer-1',
+    assignee_id: 'viewer-1',
+    assignee_name: 'Codex',
     team_id: 'team-1',
     team_key: 'CO',
     team_name: 'CO',
@@ -191,19 +194,39 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain(helperCommand);
     expect(firstPrompt).toContain('Linear issue id `lin-issue-1`');
     expect(firstPrompt).toContain('not the human identifier `CO-2`');
-    expect(firstPrompt).toContain('exactly one persistent `## Codex Workpad` comment');
+    expect(firstPrompt).toContain('`skills/linear/SKILL.md`');
+    expect(firstPrompt).toContain('`skills/land/SKILL.md`');
+    expect(firstPrompt).toContain('exactly one active `## Codex Workpad` comment');
     expect(firstPrompt).toContain(`Use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
-    expect(firstPrompt).toContain('move it into the team\'s actual started state before active coding instead of assuming a fixed state name');
-    expect(firstPrompt).toContain('some teams expose `In Review` instead of `Human Review`');
+    expect(firstPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
+    expect(firstPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
+    expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(firstPrompt).toContain('Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`)');
+    expect(firstPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
+    expect(firstPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work');
+    expect(firstPrompt).toContain('If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.');
+    expect(firstPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.');
+    expect(firstPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
+    expect(firstPrompt).toContain('close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`');
     expect(continuationPrompt).toContain('Continuation guidance:');
     expect(continuationPrompt).toContain('do not restate them before acting');
+    expect(continuationPrompt).not.toContain('Resume from the current workspace and workpad state instead of restarting from scratch.');
     expect(continuationPrompt).toContain(helperCommand);
     expect(continuationPrompt).toContain('Linear issue id `lin-issue-1`');
-    expect(continuationPrompt).toContain('Keep exactly one persistent `## Codex Workpad` comment current');
+    expect(continuationPrompt).toContain('`skills/linear/SKILL.md`');
+    expect(continuationPrompt).toContain('`skills/land/SKILL.md`');
+    expect(continuationPrompt).toContain('Keep exactly one active `## Codex Workpad` comment current');
     expect(continuationPrompt).toContain(`use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
-    expect(continuationPrompt).toContain('move it into the team\'s actual started state before active coding instead of assuming a fixed state name');
-    expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`)');
+    expect(continuationPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
+    expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
+    expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
+    expect(continuationPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
+    expect(continuationPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work');
+    expect(continuationPrompt).toContain('If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.');
+    expect(continuationPrompt).toContain('`Merging` and `Rework` are optional active workflow states only when the team exposes them.');
+    expect(continuationPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.');
+    expect(continuationPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
+    expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.');
   });
 
   it('parses thread and turn lineage from codex jsonl output', () => {
@@ -865,6 +888,58 @@ describe('provider linear worker runner', () => {
   });
 
   it.each(['Human Review', 'In Review'])(
+    'does not launch a codex turn when the tracked issue is already in %s before turn 1',
+    async (reviewState) => {
+      const { manifestPath, runDir } = await createManifestRoot();
+      const execRunner = vi.fn();
+
+      const proof = await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child'
+        },
+        {
+          readTrackedIssue: vi.fn(async () =>
+            createTrackedIssue({
+              state: reviewState,
+              state_type: 'started'
+            })
+          ),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      );
+
+      expect(execRunner).not.toHaveBeenCalled();
+      expect(proof).toMatchObject({
+        thread_id: null,
+        latest_turn_id: null,
+        latest_session_id: null,
+        turn_count: 0,
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+
+      const written = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(written).toMatchObject({
+        thread_id: null,
+        latest_turn_id: null,
+        latest_session_id: null,
+        turn_count: 0,
+        end_reason: 'issue_review_handoff'
+      });
+    }
+  );
+
+  it.each(['Human Review', 'In Review'])(
     'stops after a completed turn when the tracked issue moves to %s',
     async (reviewState) => {
       const { manifestPath, runDir } = await createManifestRoot();
@@ -913,7 +988,7 @@ describe('provider linear worker runner', () => {
         latest_session_id: 'thread-1-turn-1',
         turn_count: 1,
         owner_status: 'succeeded',
-        end_reason: 'issue_inactive'
+        end_reason: 'issue_review_handoff'
       });
 
       const written = JSON.parse(
@@ -923,7 +998,7 @@ describe('provider linear worker runner', () => {
         thread_id: 'thread-1',
         latest_turn_id: 'turn-1',
         turn_count: 1,
-        end_reason: 'issue_inactive'
+        end_reason: 'issue_review_handoff'
       });
     }
   );
@@ -1049,14 +1124,14 @@ describe('provider linear worker runner', () => {
     });
   });
 
-  it('treats custom started states as active when they are non-terminal and not a review handoff alias', async () => {
+  it('treats Ready as the live Todo-equivalent queue state even though Linear marks it unstarted', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const readTrackedIssue = vi
       .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
       .mockResolvedValue(
         createTrackedIssue({
-          state: 'QA Ready',
-          state_type: 'started'
+          state: 'Ready',
+          state_type: 'unstarted'
         })
       );
 
@@ -1103,6 +1178,65 @@ describe('provider linear worker runner', () => {
       thread_id: 'thread-1',
       latest_turn_id: 'turn-1',
       end_reason: 'max_turns_reached_issue_still_active'
+    });
+  });
+
+  it('treats custom started states outside the explicit active-state set as inactive', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValue(
+        createTrackedIssue({
+          state: 'QA Ready',
+          state_type: 'started'
+        })
+      );
+    const execRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+        '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+      ].join('\n'),
+      stderr: ''
+    }));
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: null,
+      latest_turn_id: null,
+      latest_session_id: null,
+      turn_count: 0,
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive'
+    });
+    expect(execRunner).not.toHaveBeenCalled();
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: null,
+      latest_turn_id: null,
+      end_reason: 'issue_inactive'
     });
   });
 });

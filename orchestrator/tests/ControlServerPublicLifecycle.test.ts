@@ -52,12 +52,16 @@ function buildTrackedIssue(id: string): LiveLinearTrackedIssue {
     state: 'Todo',
     state_type: 'unstarted',
     workspace_id: null,
+    viewer_id: null,
+    assignee_id: null,
+    assignee_name: null,
     team_id: null,
     team_key: null,
     team_name: null,
     project_id: null,
     project_name: null,
     updated_at: '2026-03-22T00:00:00.000Z',
+    blocked_by: [],
     recent_activity: []
   };
 }

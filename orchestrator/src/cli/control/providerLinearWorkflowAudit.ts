@@ -5,7 +5,12 @@ import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 
 export const PROVIDER_LINEAR_AUDIT_ENV_VAR = 'CODEX_PROVIDER_LINEAR_AUDIT_PATH';
 
-export type ProviderLinearAuditOperation = 'issue-context' | 'upsert-workpad' | 'transition' | 'attach-pr';
+export type ProviderLinearAuditOperation =
+  | 'issue-context'
+  | 'upsert-workpad'
+  | 'delete-workpad'
+  | 'transition'
+  | 'attach-pr';
 
 export interface ProviderLinearAuditEntry {
   recorded_at: string;
@@ -107,6 +112,7 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
   if (
     operation !== 'issue-context'
     && operation !== 'upsert-workpad'
+    && operation !== 'delete-workpad'
     && operation !== 'transition'
     && operation !== 'attach-pr'
   ) {
