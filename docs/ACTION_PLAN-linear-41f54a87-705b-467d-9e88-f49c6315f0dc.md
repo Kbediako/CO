@@ -16,7 +16,7 @@
 ## Milestones & Sequencing
 1) Register the docs-first packet for `linear-41f54a87-705b-467d-9e88-f49c6315f0dc`, update `tasks/index.json`, update `docs/TASKS.md`, and keep the single persistent `## Codex Workpad` comment current.
 2) Run docs-review with an explicit delegation override for this worker run, because subagent spawning is unavailable in-session.
-3) Implement a control-host provider workflow/config store that validates startup state, snapshots the effective config, records reload failures, and retains the last known good snapshot after startup failures.
+3) Implement a control-host provider workflow/config store that validates startup state, snapshots the effective config, records reload failures, and retains the last known good snapshot after reload failures following a successful startup.
 4) Thread the store into provider child launch/resume behavior by adding an explicit repo-config path override and exposing workflow health through current observability reads.
 5) Add focused tests for startup failure, good-to-bad reload retention, and bad-to-good recovery.
 6) Run validation, refresh the docs packet and workpad with final evidence, prepare the PR, and stop coding at `In Review`.
