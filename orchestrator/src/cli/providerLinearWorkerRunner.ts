@@ -13,7 +13,7 @@ import {
   type LiveLinearTrackedIssue
 } from './control/linearDispatchSource.js';
 import {
-  isProviderLinearTrackedIssueEligibleForExecution,
+  classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
@@ -378,13 +378,19 @@ export function buildProviderWorkerPrompt(
       '',
       '- The previous Codex turn completed normally, but the Linear issue is still in an active state.',
       `- This is continuation turn #${turnNumber} of ${maxTurns} for the current provider worker run.`,
-      '- Resume from the current workspace and workpad state instead of restarting from scratch.',
       '- The original task instructions and prior turn context are already present in this thread, so do not restate them before acting.',
       `- Keep the same workflow contract and continue using \`${helperCommand}\` for ticket updates with Linear issue id \`${issue.id}\` (not the human identifier \`${issue.identifier}\`).`,
-      `- Keep exactly one persistent \`## Codex Workpad\` comment current, and use \`${helperCommand} issue-context --issue-id ${issue.id}\` to inspect the team workflow states before any transition.`,
-      '- If the issue is `Todo` and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
-      '- Default Symphony handoff states are `Human Review`, `Merging`, and `Rework`, but some teams expose `In Review` instead of `Human Review`; always use the team\'s actual workflow names.',
-      '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`). Treat `Merging` and `Rework` as active flows only when the team exposes them.',
+      '- Follow the repo-local workflow skills: `skills/linear/SKILL.md` for workpad, review, and rework behavior, and `skills/land/SKILL.md` for the merge shepherding loop once the issue reaches `Merging`.',
+      `- Keep exactly one active \`## Codex Workpad\` comment current, refresh it before new work and before any review handoff, and use \`${helperCommand} issue-context --issue-id ${issue.id}\` to inspect the team workflow states before any transition.`,
+      '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
+      '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
+      '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
+      '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work.',
+      '- `Human Review` and `In Review` are review handoff states for the worker. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
+      '- `Merging` and `Rework` are optional active workflow states only when the team exposes them.',
+      '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.',
+      '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
+      '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.',
       '- Focus on the remaining ticket work and do not end the turn while the issue stays active unless you are truly blocked.'
     ].join('\n');
   }
@@ -397,13 +403,18 @@ export function buildProviderWorkerPrompt(
     '- Focus on completing the Linear issue in the current workspace.',
     '- Be concrete and action-oriented. Use tools where needed.',
     `- Use \`${helperCommand}\` for Linear reads and writes in this run with Linear issue id \`${issue.id}\` (not the human identifier \`${issue.identifier}\`).`,
+    '- Follow the repo-local workflow skills: `skills/linear/SKILL.md` for workpad, review, and rework behavior, and `skills/land/SKILL.md` for the merge shepherding loop once the issue reaches `Merging`.',
     `- Use \`${helperCommand} issue-context --issue-id ${issue.id}\` to inspect the team workflow states before any transition.`,
-    '- If the issue is `Todo` and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
-    '- Maintain exactly one persistent `## Codex Workpad` comment on the issue. Reuse and update it in place; do not create extra progress or summary comments.',
-    '- Default Symphony handoff states are `Human Review`, `Merging`, and `Rework`, but some teams expose `In Review` instead of `Human Review`; always use the team\'s actual workflow names.',
+    '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
+    '- Maintain exactly one active `## Codex Workpad` comment on the issue. Reuse and update it in place during a single attempt; on `Rework`, remove the old workpad before creating the fresh reset workpad. Do not create extra progress or summary comments.',
+    '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
+    '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
     '- Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`).',
-    '- `Human Review` and `In Review` are stop-coding handoff states. Do not keep coding once the issue reaches the team\'s review state.',
+    '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work.',
+    '- `Human Review` and `In Review` are stop-coding handoff states. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
     '- Treat `Merging` and `Rework` as active workflow states only when the team exposes them.',
+    '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.',
+    '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
     issue.url ? `- Linear URL: ${issue.url}` : null,
     issue.state ? `- Current state: ${issue.state}` : null,
     `- This is turn #1 of ${maxTurns} for the current worker run.`,
@@ -702,10 +713,6 @@ export function deriveLatestTurnSessionId(input: {
   };
 }
 
-function isTrackedIssueActive(issue: LiveLinearTrackedIssue): boolean {
-  return isProviderLinearTrackedIssueEligibleForExecution(issue);
-}
-
 async function resolveProviderLinearWorkerRuntimeContext(
   env: NodeJS.ProcessEnv,
   repoRoot: string,
@@ -835,13 +842,14 @@ export async function runProviderLinearWorker(
   let issue = await readTrackedIssueWithFailClosedProof();
   let threadId: string | null = null;
   let turnId: string | null = null;
+  let lifecycle = classifyProviderLinearWorkerLifecycle(issue);
 
-  if (!isTrackedIssueActive(issue)) {
+  if (!lifecycle.isExecutionEligible) {
     finalProof = {
       ...finalProof,
       owner_phase: 'ended',
       owner_status: 'succeeded',
-      end_reason: 'issue_inactive',
+      end_reason: lifecycle.terminalReason,
       updated_at: deps.now()
     };
     finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
@@ -930,12 +938,13 @@ export async function runProviderLinearWorker(
     }
 
     issue = await readTrackedIssueWithFailClosedProof();
-    if (!isTrackedIssueActive(issue)) {
+    lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+    if (!lifecycle.isExecutionEligible) {
       finalProof = {
         ...finalProof,
         owner_phase: 'ended',
         owner_status: 'succeeded',
-        end_reason: 'issue_inactive',
+        end_reason: lifecycle.terminalReason,
         updated_at: deps.now()
       };
       finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);

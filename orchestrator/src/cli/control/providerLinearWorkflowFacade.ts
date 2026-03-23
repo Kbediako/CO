@@ -12,7 +12,12 @@ const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
 
-type ProviderLinearOperation = 'issue-context' | 'upsert-workpad' | 'transition' | 'attach-pr';
+type ProviderLinearOperation =
+  | 'issue-context'
+  | 'upsert-workpad'
+  | 'delete-workpad'
+  | 'transition'
+  | 'attach-pr';
 type ProviderLinearOperationFailure<T extends ProviderLinearOperation> = {
   ok: false;
   operation: T;
@@ -97,6 +102,21 @@ export type ProviderLinearUpsertWorkpadResult =
   | {
       ok: false;
       operation: 'upsert-workpad';
+      error: ProviderLinearWorkflowError;
+    };
+
+export type ProviderLinearDeleteWorkpadResult =
+  | {
+      ok: true;
+      operation: 'delete-workpad';
+      action: 'deleted' | 'noop';
+      issue: Pick<ProviderLinearIssueContext, 'id' | 'identifier'>;
+      comment_id: string | null;
+      source_setup: DispatchPilotSourceSetup | null;
+    }
+  | {
+      ok: false;
+      operation: 'delete-workpad';
       error: ProviderLinearWorkflowError;
     };
 
@@ -229,6 +249,13 @@ interface CommentMutationResponse {
       url?: string | null;
       body?: string | null;
     } | null;
+  } | null;
+}
+
+interface DeleteMutationResponse {
+  commentDelete?: {
+    success?: boolean | null;
+    entityId?: string | null;
   } | null;
 }
 
@@ -434,6 +461,131 @@ export async function upsertProviderLinearWorkpadComment(input: {
       identifier: context.issue.identifier
     },
     comment: createdComment,
+    source_setup: session.session.sourceSetup
+  };
+}
+
+export async function deleteProviderLinearWorkpadComment(input: {
+  issueId: string;
+  commentId?: string | null;
+  sourceSetup?: DispatchPilotSourceSetup | null;
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+}): Promise<ProviderLinearDeleteWorkpadResult> {
+  const issueId = normalizeRequiredString(input.issueId);
+  if (!issueId) {
+    return failure('delete-workpad', 'linear_issue_id_missing', 'Linear issue id is required.', 422);
+  }
+
+  const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
+  if (!session.ok) {
+    return failure(
+      'delete-workpad',
+      session.error.code,
+      session.error.message,
+      session.error.status,
+      session.error.details
+    );
+  }
+
+  const context = await readIssueContext(session.session, issueId);
+  if (!context.ok) {
+    return failure(
+      'delete-workpad',
+      context.error.code,
+      context.error.message,
+      context.error.status,
+      context.error.details
+    );
+  }
+
+  const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
+  let selectedComment: ProviderLinearWorkflowComment | null;
+  if (requestedCommentId) {
+    selectedComment =
+      context.issue.comments.find(
+        (entry) =>
+          entry.id === requestedCommentId &&
+          entry.resolved_at === null &&
+          hasWorkpadMarker(entry.body)
+      ) ?? null;
+    if (!selectedComment) {
+      return failure(
+        'delete-workpad',
+        'linear_workpad_comment_id_invalid',
+        'Comment id must reference an unresolved Codex workpad comment.',
+        422,
+        {
+          comment_id: requestedCommentId
+        }
+      );
+    }
+  } else {
+    const unresolvedWorkpads = findUnresolvedWorkpadComments(context.issue.comments);
+    if (unresolvedWorkpads.length > 1) {
+      return failure(
+        'delete-workpad',
+        'ambiguous_workpad_state',
+        'Multiple unresolved Codex workpad comments exist; provide comment_id to delete one explicitly.',
+        409,
+        {
+          comment_ids: unresolvedWorkpads.map((entry) => entry.id)
+        }
+      );
+    }
+    selectedComment = unresolvedWorkpads[0] ?? null;
+  }
+
+  if (!selectedComment) {
+    return {
+      ok: true,
+      operation: 'delete-workpad',
+      action: 'noop',
+      issue: {
+        id: context.issue.id,
+        identifier: context.issue.identifier
+      },
+      comment_id: null,
+      source_setup: session.session.sourceSetup
+    };
+  }
+
+  const deleteResult = await executeLinearGraphql<DeleteMutationResponse>({
+    token: session.session.token,
+    timeoutMs: session.session.timeoutMs,
+    fetchImpl: session.session.fetchImpl,
+    query: buildDeleteCommentMutation(),
+    variables: {
+      id: selectedComment.id
+    }
+  });
+  if (!deleteResult.ok) {
+    return failureFromGraphql('delete-workpad', deleteResult.failure);
+  }
+
+  const rawDeletedCommentId = normalizeRequiredString(deleteResult.payload.data?.commentDelete?.entityId);
+  if (
+    deleteResult.payload.data?.commentDelete?.success !== true &&
+    rawDeletedCommentId !== selectedComment.id
+  ) {
+    return failure(
+      'delete-workpad',
+      'comment_delete_failed',
+      'Linear comment delete did not succeed.',
+      503
+    );
+  }
+  const deletedCommentId = rawDeletedCommentId ?? selectedComment.id;
+
+  return {
+    ok: true,
+    operation: 'delete-workpad',
+    action: 'deleted',
+    issue: {
+      id: context.issue.id,
+      identifier: context.issue.identifier
+    },
+    comment_id: deletedCommentId,
     source_setup: session.session.sourceSetup
   };
 }
@@ -1031,6 +1183,15 @@ function buildUpdateCommentMutation(): string {
   }`;
 }
 
+function buildDeleteCommentMutation(): string {
+  return `mutation ProviderLinearDeleteComment($id: String!) {
+    commentDelete(id: $id) {
+      success
+      entityId
+    }
+  }`;
+}
+
 function buildIssueTransitionMutation(): string {
   return `mutation ProviderLinearMoveIssue($id: String!, $stateId: String!) {
     issueUpdate(id: $id, input: { stateId: $stateId }) {
@@ -1197,9 +1358,15 @@ function parseAttachment(
 function findWorkpadComment(
   comments: readonly ProviderLinearWorkflowComment[]
 ): ProviderLinearWorkflowComment | null {
+  return findUnresolvedWorkpadComments(comments)[0] ?? null;
+}
+
+function findUnresolvedWorkpadComments(
+  comments: readonly ProviderLinearWorkflowComment[]
+): ProviderLinearWorkflowComment[] {
   const candidates = comments.filter((entry) => entry.resolved_at === null && hasWorkpadMarker(entry.body));
   if (candidates.length === 0) {
-    return null;
+    return [];
   }
 
   return [...candidates].sort((left, right) => {
@@ -1208,7 +1375,7 @@ function findWorkpadComment(
     const normalizedLeft = Number.isFinite(leftTimestamp) ? leftTimestamp : 0;
     const normalizedRight = Number.isFinite(rightTimestamp) ? rightTimestamp : 0;
     return normalizedRight - normalizedLeft;
-  })[0] ?? null;
+  });
 }
 
 function hasWorkpadMarker(body: string): boolean {

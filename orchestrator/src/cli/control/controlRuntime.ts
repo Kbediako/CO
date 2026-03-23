@@ -230,7 +230,7 @@ function createControlRuntimeSnapshot(
         issueIdentifier:
           evaluation.recommendation?.tracked_issue?.identifier ??
           evaluation.recommendation?.issue_identifier ??
-          selectedIssueIdentifier,
+          null,
         evaluation
       };
     })();

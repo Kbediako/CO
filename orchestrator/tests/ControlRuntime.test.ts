@@ -1404,6 +1404,48 @@ describe('ControlRuntime', () => {
     expect(linearFetchCount).toBe(2);
   });
 
+  it('does not fall back to the selected run identifier when dispatch evaluation has no tracked issue or recommendation identifier', async () => {
+    vi.spyOn(liveLinearAdvisoryRuntimeModule, 'createLiveLinearAdvisoryRuntime').mockImplementation(
+      () =>
+        ({
+          readSnapshotSummary: () => ({
+            advisory_only: true,
+            configured: true,
+            enabled: false,
+            kill_switch: false,
+            status: 'disabled',
+            source_status: 'disabled',
+            reason: 'pilot_disabled_default_off',
+            source_setup: null
+          }),
+          readDispatchEvaluation: async () => ({
+            summary: {
+              advisory_only: true,
+              configured: true,
+              enabled: false,
+              kill_switch: false,
+              status: 'disabled',
+              source_status: 'disabled',
+              reason: 'pilot_disabled_default_off',
+              source_setup: null
+            },
+            recommendation: null,
+            failure: null
+          }),
+          invalidate: () => {}
+        }) satisfies ReturnType<typeof liveLinearAdvisoryRuntimeModule.createLiveLinearAdvisoryRuntime>
+    );
+
+    const fixture = await createFixture({
+      taskId: 'task-1024-no-dispatch-issue'
+    });
+
+    const dispatch = await fixture.runtime.snapshot().readDispatchEvaluation();
+
+    expect(dispatch.issueIdentifier).toBeNull();
+    expect(dispatch.evaluation.recommendation).toBeNull();
+  });
+
   it('retries explicit dispatch reads after a transient live evaluation failure on the same snapshot', async () => {
     let dispatchReadCount = 0;
     vi.spyOn(liveLinearAdvisoryRuntimeModule, 'createLiveLinearAdvisoryRuntime').mockImplementation(

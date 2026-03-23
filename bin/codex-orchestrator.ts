@@ -1479,6 +1479,14 @@ Subcommands:
     --project-id <id>     Optional project scope check.
     --format json         Emit machine-readable output.
 
+  delete-workpad
+    --issue-id <id>       Linear issue id/key whose workpad should be deleted.
+    --comment-id <id>     Optional persisted workpad comment id to delete.
+    --workspace-id <id>   Optional workspace scope check.
+    --team-id <id>        Optional team scope check.
+    --project-id <id>     Optional project scope check.
+    --format json         Emit machine-readable output.
+
   transition
     --issue-id <id>       Linear issue id/key to update.
     --state <name>        Destination Linear state name (resolved to stateId via team workflow states).

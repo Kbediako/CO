@@ -2606,7 +2606,7 @@ describe('ControlServer', () => {
         advisory_only?: boolean;
         dispatch_pilot?: { status?: string; source_status?: string };
         recommendation?: unknown;
-        traceability?: { decision?: string; reason?: string };
+        traceability?: { decision?: string; reason?: string; issue_identifier?: string | null };
       };
       expect(dispatchPayload.advisory_only).toBe(true);
       expect(dispatchPayload.dispatch_pilot).toMatchObject({
@@ -2615,6 +2615,7 @@ describe('ControlServer', () => {
       });
       expect(dispatchPayload.recommendation).toBeNull();
       expect(dispatchPayload.traceability?.decision).toBe('acknowledged');
+      expect(dispatchPayload.traceability?.issue_identifier).toBeNull();
       expect(dispatchPayload.traceability?.reason).toBe('pilot_disabled_default_off');
 
       const reservedEncodedRes = await fetch(new URL('/api/v1/%64ispatch', baseUrl), {
@@ -2642,6 +2643,7 @@ describe('ControlServer', () => {
       expectedSourceStatus: string;
       expectedFailureCode: string | null;
       expectRecommendation: boolean;
+      expectedTraceabilityIssueIdentifier: string | null;
       expectedSourceSetup: { provider: 'linear'; workspace_id: string | null; team_id: string | null; project_id: string | null } | null;
     }> = [
       {
@@ -2652,6 +2654,7 @@ describe('ControlServer', () => {
         expectedSourceStatus: 'disabled',
         expectedFailureCode: null,
         expectRecommendation: false,
+        expectedTraceabilityIssueIdentifier: null,
         expectedSourceSetup: null
       },
       {
@@ -2671,6 +2674,7 @@ describe('ControlServer', () => {
         expectedSourceStatus: 'ready',
         expectedFailureCode: null,
         expectRecommendation: true,
+        expectedTraceabilityIssueIdentifier: 'task-0940',
         expectedSourceSetup: {
           provider: 'linear',
           workspace_id: null,
@@ -2694,6 +2698,7 @@ describe('ControlServer', () => {
         expectedSourceStatus: 'blocked',
         expectedFailureCode: null,
         expectRecommendation: false,
+        expectedTraceabilityIssueIdentifier: null,
         expectedSourceSetup: {
           provider: 'linear',
           workspace_id: null,
@@ -2711,6 +2716,7 @@ describe('ControlServer', () => {
         expectedSourceStatus: 'unavailable',
         expectedFailureCode: 'dispatch_source_unavailable',
         expectRecommendation: false,
+        expectedTraceabilityIssueIdentifier: null,
         expectedSourceSetup: null
       },
       {
@@ -2728,6 +2734,7 @@ describe('ControlServer', () => {
         expectedSourceStatus: 'malformed',
         expectedFailureCode: 'dispatch_source_malformed',
         expectRecommendation: false,
+        expectedTraceabilityIssueIdentifier: null,
         expectedSourceSetup: null
       }
     ];
@@ -2840,7 +2847,7 @@ describe('ControlServer', () => {
         expect(dispatchPayload.traceability?.decision).toBe(
           scenario.expectedFailureCode ? 'rejected' : 'acknowledged'
         );
-        expect(dispatchPayload.traceability?.issue_identifier).toBe('task-0940');
+        expect(dispatchPayload.traceability?.issue_identifier).toBe(scenario.expectedTraceabilityIssueIdentifier);
         expect(typeof dispatchPayload.traceability?.reason).toBe('string');
 
         const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
@@ -2885,6 +2892,7 @@ describe('ControlServer', () => {
         expect(evaluatedEvent).toBeDefined();
         expect(viewedEvent).toBeDefined();
         expect((evaluatedEvent?.payload ?? {}) as Record<string, unknown>).toMatchObject({
+          issue_identifier: scenario.expectedTraceabilityIssueIdentifier,
           decision: scenario.expectedFailureCode
             ? 'fail_closed'
             : scenario.expectedDispatchStatus === 'ready'
@@ -2892,6 +2900,7 @@ describe('ControlServer', () => {
               : 'blocked'
         });
         expect((viewedEvent?.payload ?? {}) as Record<string, unknown>).toMatchObject({
+          issue_identifier: scenario.expectedTraceabilityIssueIdentifier,
           http_status: scenario.expectedStatus,
           recommendation_available: scenario.expectRecommendation,
           decision: scenario.expectedFailureCode

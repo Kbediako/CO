@@ -295,6 +295,20 @@ export async function evaluateTrackerDispatchPilotAsync(input: {
   });
 
   if (liveResolution.kind !== 'ready') {
+    if (
+      liveResolution.kind === 'unavailable' &&
+      liveResolution.reason === 'dispatch_source_issue_not_found'
+    ) {
+      return {
+        summary: buildReadySummary({
+          configured: resolved.configured,
+          sourceSetup: source.sourceSetup,
+          reason: 'dispatch_source_no_eligible_issue'
+        }),
+        recommendation: null,
+        failure: null
+      };
+    }
     return buildFailureEvaluation({
       configured: resolved.configured,
       sourceStatus: liveResolution.kind === 'malformed' ? 'malformed' : 'unavailable',

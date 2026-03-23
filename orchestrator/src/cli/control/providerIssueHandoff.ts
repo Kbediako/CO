@@ -11,6 +11,7 @@ import {
   resolveProviderWorkspacePath
 } from '../run/workspacePath.js';
 import {
+  isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned,
   sortLiveLinearTrackedIssuesForDispatch,
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
@@ -145,15 +146,43 @@ const PROVIDER_FAILURE_RETRY_MAX_BACKOFF_MS = 300_000;
 const DEFAULT_PROVIDER_MAX_CONCURRENT_AGENTS = 10;
 
 type ProviderTrackedIssueEligibility =
-  | { eligible: true }
+  | {
+      eligible: true;
+      claimReason: 'provider_issue_handoff_owned' | null;
+    }
   | {
       eligible: false;
-      claimReason: 'provider_issue_state_not_active' | 'provider_issue_todo_blocked_by_non_terminal';
+      claimReason:
+        | 'provider_issue_state_not_active'
+        | 'provider_issue_todo_blocked_by_non_terminal'
+        | 'provider_issue_assignee_changed';
       releaseReason:
         | 'provider_issue_released:not_active'
-        | 'provider_issue_released:todo_blocked_by_non_terminal';
+        | 'provider_issue_released:todo_blocked_by_non_terminal'
+        | 'provider_issue_released:assignee_changed';
       cleanupWorkspace: boolean;
     };
+
+type ProviderTrackedIssueRefreshDisposition =
+  | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
+  | { kind: 'owned'; trackedIssue: LiveLinearTrackedIssue }
+  | {
+      kind: 'release';
+      reason: string;
+      trackedIssue: Pick<
+        LiveLinearTrackedIssue,
+        | 'identifier'
+        | 'title'
+        | 'state'
+        | 'state_type'
+        | 'updated_at'
+        | 'assignee_id'
+        | 'assignee_name'
+        | 'blocked_by'
+      > | null;
+      cleanupWorkspace: boolean;
+    }
+  | { kind: 'skip'; reason: string };
 
 export function createProviderIssueHandoffService(
   options: CreateProviderIssueHandoffServiceOptions
@@ -293,17 +322,33 @@ export function createProviderIssueHandoffService(
   const buildTrackedIssueClaimFields = (
     trackedIssue: Pick<
       LiveLinearTrackedIssue,
-      'identifier' | 'title' | 'state' | 'state_type' | 'updated_at' | 'blocked_by'
+      | 'identifier'
+      | 'title'
+      | 'state'
+      | 'state_type'
+      | 'updated_at'
+      | 'assignee_id'
+      | 'assignee_name'
+      | 'blocked_by'
     >
   ): Pick<
     ProviderIntakeClaimRecord,
-    'issue_identifier' | 'issue_title' | 'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'issue_blocked_by'
+    | 'issue_identifier'
+    | 'issue_title'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_updated_at'
+    | 'issue_assignee_id'
+    | 'issue_assignee_name'
+    | 'issue_blocked_by'
   > => ({
     issue_identifier: trackedIssue.identifier,
     issue_title: trackedIssue.title,
     issue_state: trackedIssue.state,
     issue_state_type: trackedIssue.state_type,
     issue_updated_at: trackedIssue.updated_at,
+    issue_assignee_id: trackedIssue.assignee_id,
+    issue_assignee_name: trackedIssue.assignee_name,
     ...(trackedIssue.blocked_by === undefined ? {} : { issue_blocked_by: trackedIssue.blocked_by })
   });
 
@@ -469,7 +514,14 @@ export function createProviderIssueHandoffService(
     releaseRun: ProviderIssueRunRecord | null;
     trackedIssue?: Pick<
       LiveLinearTrackedIssue,
-      'identifier' | 'title' | 'state' | 'state_type' | 'updated_at' | 'blocked_by'
+      | 'identifier'
+      | 'title'
+      | 'state'
+      | 'state_type'
+      | 'updated_at'
+      | 'assignee_id'
+      | 'assignee_name'
+      | 'blocked_by'
     > | null;
     cleanupWorkspace?: boolean;
   }): Promise<void> => {
@@ -496,6 +548,12 @@ export function createProviderIssueHandoffService(
       issue_state: input.trackedIssue?.state ?? input.claim.issue_state,
       issue_state_type: input.trackedIssue?.state_type ?? input.claim.issue_state_type,
       issue_updated_at: input.trackedIssue?.updated_at ?? input.claim.issue_updated_at,
+      issue_assignee_id:
+        input.trackedIssue != null ? input.trackedIssue.assignee_id : (input.claim.issue_assignee_id ?? null),
+      issue_assignee_name:
+        input.trackedIssue != null
+          ? input.trackedIssue.assignee_name
+          : (input.claim.issue_assignee_name ?? null),
       issue_blocked_by: input.trackedIssue?.blocked_by ?? input.claim.issue_blocked_by ?? null,
       task_id: nextTaskId,
       state: 'released',
@@ -952,20 +1010,7 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord;
     trackedIssuesByKey?: Map<string, LiveLinearTrackedIssue> | null;
     consumedTrackedIssueKeys?: Set<string>;
-  }):
-    Promise<
-      | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
-      | {
-          kind: 'release';
-          reason: string;
-          trackedIssue: Pick<
-            LiveLinearTrackedIssue,
-            'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
-          > | null;
-          cleanupWorkspace: boolean;
-        }
-      | { kind: 'skip'; reason: string }
-    > => {
+  }): Promise<ProviderTrackedIssueRefreshDisposition> => {
     if (input.trackedIssuesByKey) {
       const providerKey = buildProviderIssueKey(input.claim.provider, input.claim.issue_id);
       if (input.trackedIssuesByKey.has(providerKey)) {
@@ -987,15 +1032,19 @@ export function createProviderIssueHandoffService(
       issueId: input.claim.issue_id
     });
     if (resolution.kind === 'ready') {
-      const eligibility = assessProviderTrackedIssueEligibility(resolution.trackedIssue);
-      if (eligibility.eligible) {
-        return resolution;
+      const authority = assessProviderTrackedIssueEligibility(resolution.trackedIssue, {
+        hasExistingClaim: true
+      });
+      if (authority.eligible) {
+        return authority.claimReason === 'provider_issue_handoff_owned'
+          ? { kind: 'owned', trackedIssue: resolution.trackedIssue }
+          : resolution;
       }
       return {
         kind: 'release',
-        reason: stripProviderIssueReleasedPrefix(eligibility.releaseReason),
+        reason: stripProviderIssueReleasedPrefix(authority.releaseReason),
         trackedIssue: resolution.trackedIssue,
-        cleanupWorkspace: eligibility.cleanupWorkspace
+        cleanupWorkspace: authority.cleanupWorkspace
       };
     }
     if (resolution.kind === 'release') {
@@ -1013,16 +1062,7 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord
   ):
     Promise<
-      | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
-      | {
-          kind: 'release';
-          reason: string;
-          trackedIssue: Pick<
-            LiveLinearTrackedIssue,
-            'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
-          > | null;
-          cleanupWorkspace: boolean;
-        }
+      | ProviderTrackedIssueRefreshDisposition
       | { kind: 'skip'; reason: string }
       | null
     > => {
@@ -1059,22 +1099,33 @@ export function createProviderIssueHandoffService(
     };
   };
 
+  const retainOwnedHandoffClaim = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: LiveLinearTrackedIssue;
+    run?: ProviderIssueRunRecord | null;
+    state?: ProviderIntakeClaimRecord['state'];
+    reason?: string;
+    claimMetadata?: Partial<
+      Pick<
+        ProviderIntakeClaimRecord,
+        'accepted_at' | 'last_delivery_id' | 'last_event' | 'last_action' | 'last_webhook_timestamp'
+      >
+    >;
+  }): Promise<ProviderIntakeClaimRecord> =>
+    await upsertProviderClaimAndPersist({
+      ...input.claim,
+      ...buildTrackedIssueClaimFields(input.trackedIssue),
+      ...(input.claimMetadata ?? {}),
+      task_id: input.run?.taskId ?? input.claim.task_id,
+      state: input.state ?? input.claim.state,
+      reason: input.reason ?? 'provider_issue_handoff_owned',
+      run_id: input.run?.runId ?? input.claim.run_id,
+      run_manifest_path: input.run?.manifestPath ?? input.claim.run_manifest_path,
+    });
+
   const resolveRetryDispatchResolution = async (
     claim: ProviderIntakeClaimRecord
-  ):
-    Promise<
-      | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
-      | {
-          kind: 'release';
-          reason: string;
-          trackedIssue: Pick<
-            LiveLinearTrackedIssue,
-            'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
-          > | null;
-          cleanupWorkspace: boolean;
-        }
-      | { kind: 'skip'; reason: string }
-    > => {
+  ): Promise<ProviderTrackedIssueRefreshDisposition> => {
     const pollResolution = await resolveRetryDispatchResolutionFromPoll(claim);
     if (pollResolution) {
       return pollResolution;
@@ -1082,15 +1133,19 @@ export function createProviderIssueHandoffService(
 
     if (!options.resolveTrackedIssue) {
       const trackedIssue = buildTrackedIssueSnapshotFromClaim(claim);
-      const eligibility = assessProviderTrackedIssueEligibility(trackedIssue);
-      if (eligibility.eligible) {
-        return { kind: 'ready', trackedIssue };
+      const authority = assessProviderTrackedIssueEligibility(trackedIssue, {
+        hasExistingClaim: true
+      });
+      if (authority.eligible) {
+        return authority.claimReason === 'provider_issue_handoff_owned'
+          ? { kind: 'owned', trackedIssue }
+          : { kind: 'ready', trackedIssue };
       }
       return {
         kind: 'release',
-        reason: stripProviderIssueReleasedPrefix(eligibility.releaseReason),
+        reason: stripProviderIssueReleasedPrefix(authority.releaseReason),
         trackedIssue,
-        cleanupWorkspace: eligibility.cleanupWorkspace
+        cleanupWorkspace: authority.cleanupWorkspace
       };
     }
 
@@ -1147,6 +1202,44 @@ export function createProviderIssueHandoffService(
           trackedIssue: resolution.trackedIssue,
           cleanupWorkspace: resolution.cleanupWorkspace
         });
+        return;
+      }
+
+      if (resolution.kind === 'owned') {
+        const queuedRetryFields = buildQueuedProviderRetryFields({
+          claim,
+          previousRun: latestRun,
+          error: claim.retry_error ?? resolveProviderRetryErrorFromRun(latestRun),
+          preserveCurrentAttempt: true,
+          delayType: resolveProviderRetryDelayType({
+            claim,
+            previousRun: latestRun
+          })
+        });
+        const transitioned = hasProviderClaimTransitioned(claim, {
+          ...buildTrackedIssueClaimFields(resolution.trackedIssue),
+          state: claim.state,
+          reason: 'provider_issue_handoff_owned',
+          task_id: latestRun?.taskId ?? claim.task_id,
+          run_id: latestRun?.runId ?? claim.run_id,
+          run_manifest_path: latestRun?.manifestPath ?? claim.run_manifest_path,
+          ...queuedRetryFields
+        });
+        const ownedRetrySnapshot = captureProviderStateSnapshot();
+        upsertProviderIntakeClaim(options.state, {
+          ...claim,
+          ...buildTrackedIssueClaimFields(resolution.trackedIssue),
+          task_id: latestRun?.taskId ?? claim.task_id,
+          state: claim.state,
+          reason: 'provider_issue_handoff_owned',
+          run_id: latestRun?.runId ?? claim.run_id,
+          run_manifest_path: latestRun?.manifestPath ?? claim.run_manifest_path,
+          ...queuedRetryFields
+        });
+        await persistStateOrRollback(ownedRetrySnapshot);
+        if (transitioned) {
+          options.publishRuntime?.('provider-intake.refresh');
+        }
         return;
       }
 
@@ -1284,6 +1377,18 @@ export function createProviderIssueHandoffService(
                 : preserveReleasedIssueMetadata
                   ? existing.issue_updated_at
                   : claimBase.issue_updated_at,
+            issue_assignee_id:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_assignee_id
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_assignee_id ?? null
+                  : claimBase.issue_assignee_id,
+            issue_assignee_name:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_assignee_name
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_assignee_name ?? null
+                  : claimBase.issue_assignee_name,
             issue_blocked_by:
               newerWebhookBlockedByDrain
                 ? claimBase.issue_blocked_by
@@ -1322,7 +1427,9 @@ export function createProviderIssueHandoffService(
         return { kind: 'ignored', reason: 'provider_issue_stale', claim };
       }
 
-      const eligibility = assessProviderTrackedIssueEligibility(input.trackedIssue);
+      const eligibility = assessProviderTrackedIssueEligibility(input.trackedIssue, {
+        hasExistingClaim: existing !== null
+      });
       if (!eligibility.eligible) {
         if (existing) {
           const existingRuns = await discoverProviderIssueRuns(options.paths.runDir, {
@@ -1378,6 +1485,21 @@ export function createProviderIssueHandoffService(
           run_manifest_path: existing?.run_manifest_path ?? null,
         });
         return { kind: 'ignored', reason: eligibility.claimReason, claim };
+      }
+
+      if (existing && eligibility.claimReason === 'provider_issue_handoff_owned') {
+        const claim = await retainOwnedHandoffClaim({
+          claim: existing,
+          trackedIssue: input.trackedIssue,
+          claimMetadata: {
+            accepted_at: existing.accepted_at,
+            last_delivery_id: input.deliveryId,
+            last_event: input.event,
+            last_action: input.action,
+            last_webhook_timestamp: input.webhookTimestamp
+          }
+        });
+        return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_handoff_owned', claim };
       }
 
       const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir, {
@@ -1705,6 +1827,67 @@ export function createProviderIssueHandoffService(
             continue;
           }
 
+          if (claim.state === 'released') {
+            if (resolution.kind === 'owned') {
+              const currentClaim =
+                claim.retry_queued === true
+                  ? await ensureQueuedProviderRetryDeadline({
+                      claim,
+                      trackedIssue: resolution.trackedIssue,
+                      previousRun: latestRun,
+                      trackedIssueRefetch
+                    })
+                  : claim;
+              await retainOwnedHandoffClaim({
+                claim: currentClaim,
+                trackedIssue: resolution.trackedIssue,
+                run: resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun,
+                state: currentClaim.state,
+                reason: 'provider_issue_handoff_owned'
+              });
+              continue;
+            }
+            if (!shouldReopenReleasedClaimOnRefresh({
+              claim,
+              releaseRun,
+              trackedIssue: resolution.trackedIssue
+            })) {
+              continue;
+            }
+            if (!pollDispatchBudget.canDispatch(resolution.trackedIssue)) {
+              continue;
+            }
+            await launchStartForTrackedIssue({
+              claim,
+              trackedIssue: resolution.trackedIssue,
+              reason: 'provider_issue_refresh_start_launched',
+              previousRun: latestRun
+            });
+            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            continue;
+          }
+
+          if (resolution.kind === 'owned') {
+            const currentClaim =
+              claim.retry_queued === true
+                ? await ensureQueuedProviderRetryDeadline({
+                    claim,
+                    trackedIssue: resolution.trackedIssue,
+                    previousRun: latestRun,
+                    trackedIssueRefetch
+                  })
+                : claim;
+            await retainOwnedHandoffClaim({
+              claim: currentClaim,
+              trackedIssue: resolution.trackedIssue,
+              run: resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun,
+              state: currentClaim.state,
+              reason: 'provider_issue_handoff_owned'
+            });
+            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            continue;
+          }
+
           if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
             noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
             continue;
@@ -1937,6 +2120,27 @@ function markProviderIssueReleasedPendingReopen(reason: string | null): string {
   return `${PROVIDER_RELEASED_PENDING_REOPEN_PREFIX}${reason ?? 'provider_issue_released'}`;
 }
 
+function shouldReopenReleasedClaimOnRefresh(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'issue_updated_at'>;
+  releaseRun: ProviderIssueRunRecord | null;
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'updated_at'>;
+}): boolean {
+  if (isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)) {
+    return true;
+  }
+
+  const latestReleasedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
+    input.claim.issue_updated_at ?? null,
+    input.releaseRun?.issueUpdatedAt ?? input.releaseRun?.startedAt ?? null
+  );
+  return (
+    compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: latestReleasedIssueUpdatedAt,
+      nextIssueUpdatedAt: input.trackedIssue.updated_at
+    }) === 'newer'
+  );
+}
+
 function didRunFinishAfterClaimLaunch(
   claim: Pick<ProviderIntakeClaimRecord, 'state' | 'updated_at' | 'launch_started_at'>,
   run: Pick<ProviderIssueRunRecord, 'startedAt' | 'updatedAt'>
@@ -2027,9 +2231,40 @@ function compareTrackedIssueUpdatedAt(input: {
 }
 
 function assessProviderTrackedIssueEligibility(
-  trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'blocked_by'>
+  trackedIssue: Pick<
+    LiveLinearTrackedIssue,
+    'state' | 'state_type' | 'viewer_id' | 'assignee_id' | 'blocked_by'
+  >,
+  options: {
+    hasExistingClaim?: boolean;
+  } = {}
 ): ProviderTrackedIssueEligibility {
   const workflowState = classifyProviderLinearWorkflowState(trackedIssue);
+  const hasViewerIdentity = typeof trackedIssue.viewer_id === 'string' && trackedIssue.viewer_id.length > 0;
+  const hasAssigneeIdentity =
+    trackedIssue.assignee_id === null ||
+    (typeof trackedIssue.assignee_id === 'string' && trackedIssue.assignee_id.length > 0);
+  const assigneeChanged =
+    options.hasExistingClaim === true &&
+    hasViewerIdentity &&
+    hasAssigneeIdentity &&
+    trackedIssue.assignee_id !== trackedIssue.viewer_id;
+  if (assigneeChanged && workflowState.isTerminal !== true) {
+    return {
+      eligible: false,
+      claimReason: 'provider_issue_assignee_changed',
+      releaseReason: 'provider_issue_released:assignee_changed',
+      cleanupWorkspace: false
+    };
+  }
+
+  if (options.hasExistingClaim === true && workflowState.isHandoff) {
+    return {
+      eligible: true,
+      claimReason: 'provider_issue_handoff_owned'
+    };
+  }
+
   if (!isProviderLinearTrackedIssueEligibleForExecution(trackedIssue)) {
     return {
       eligible: false,
@@ -2047,7 +2282,22 @@ function assessProviderTrackedIssueEligibility(
     };
   }
 
-  return { eligible: true };
+  if (
+    options.hasExistingClaim !== true &&
+    !isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(trackedIssue)
+  ) {
+    return {
+      eligible: false,
+      claimReason: 'provider_issue_assignee_changed',
+      releaseReason: 'provider_issue_released:assignee_changed',
+      cleanupWorkspace: false
+    };
+  }
+
+  return {
+    eligible: true,
+    claimReason: null
+  };
 }
 
 function isTerminalTrackedIssueState(
@@ -2487,6 +2737,8 @@ function hasProviderClaimTransitioned(
     | 'issue_state'
     | 'issue_state_type'
     | 'issue_updated_at'
+    | 'issue_assignee_id'
+    | 'issue_assignee_name'
     | 'issue_blocked_by'
     | 'state'
     | 'reason'
@@ -2518,6 +2770,8 @@ function hasProviderClaimTransitioned(
           | 'issue_state'
           | 'issue_state_type'
           | 'issue_updated_at'
+          | 'issue_assignee_id'
+          | 'issue_assignee_name'
           | 'issue_blocked_by'
         >
       >
@@ -2543,6 +2797,14 @@ function hasProviderClaimTransitioned(
     (
       next.issue_updated_at !== undefined &&
       claim.issue_updated_at !== next.issue_updated_at
+    ) ||
+    (
+      next.issue_assignee_id !== undefined &&
+      (claim.issue_assignee_id ?? null) !== (next.issue_assignee_id ?? null)
+    ) ||
+    (
+      next.issue_assignee_name !== undefined &&
+      (claim.issue_assignee_name ?? null) !== (next.issue_assignee_name ?? null)
     ) ||
     (
       next.issue_blocked_by !== undefined &&
@@ -2729,16 +2991,7 @@ function resolveTrackedIssuePollResolution(
   claim: Pick<ProviderIntakeClaimRecord, 'provider' | 'issue_id'>,
   trackedIssuesByKey: Map<string, LiveLinearTrackedIssue>
 ):
-  | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
-  | {
-      kind: 'release';
-      reason: string;
-      trackedIssue: Pick<
-        LiveLinearTrackedIssue,
-        'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
-      > | null;
-      cleanupWorkspace: boolean;
-    } {
+  | ProviderTrackedIssueRefreshDisposition {
   const trackedIssue = trackedIssuesByKey.get(buildProviderIssueKey(claim.provider, claim.issue_id)) ?? null;
   if (!trackedIssue) {
     return {
@@ -2749,8 +3002,16 @@ function resolveTrackedIssuePollResolution(
     };
   }
 
-  const eligibility = assessProviderTrackedIssueEligibility(trackedIssue);
+  const eligibility = assessProviderTrackedIssueEligibility(trackedIssue, {
+    hasExistingClaim: true
+  });
   if (eligibility.eligible) {
+    if (eligibility.claimReason === 'provider_issue_handoff_owned') {
+      return {
+        kind: 'owned',
+        trackedIssue
+      };
+    }
     return {
       kind: 'ready',
       trackedIssue
@@ -2770,19 +3031,7 @@ async function resolveTrackedIssuePollResolutionWithFallback(
   trackedIssuesByKey: Map<string, LiveLinearTrackedIssue>,
   resolveTrackedIssue?: CreateProviderIssueHandoffServiceOptions['resolveTrackedIssue']
 ):
-  Promise<
-    | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
-    | {
-        kind: 'release';
-        reason: string;
-        trackedIssue: Pick<
-          LiveLinearTrackedIssue,
-          'identifier' | 'title' | 'state' | 'state_type' | 'updated_at'
-        > | null;
-        cleanupWorkspace: boolean;
-      }
-    | { kind: 'skip'; reason: string }
-  > {
+  Promise<ProviderTrackedIssueRefreshDisposition | { kind: 'skip'; reason: string }> {
   const pollResolution = resolveTrackedIssuePollResolution(claim, trackedIssuesByKey);
   if (
     pollResolution.kind !== 'release' ||
@@ -2798,8 +3047,16 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     issueId: claim.issue_id
   });
   if (directResolution.kind === 'ready') {
-    const eligibility = assessProviderTrackedIssueEligibility(directResolution.trackedIssue);
+    const eligibility = assessProviderTrackedIssueEligibility(directResolution.trackedIssue, {
+      hasExistingClaim: true
+    });
     if (eligibility.eligible) {
+      if (eligibility.claimReason === 'provider_issue_handoff_owned') {
+        return {
+          kind: 'owned',
+          trackedIssue: directResolution.trackedIssue
+        };
+      }
       return directResolution;
     }
     return {
@@ -2831,6 +3088,8 @@ function buildTrackedIssueSnapshotFromClaim(
     | 'issue_state'
     | 'issue_state_type'
     | 'issue_updated_at'
+    | 'issue_assignee_id'
+    | 'issue_assignee_name'
     | 'issue_blocked_by'
   >
 ): LiveLinearTrackedIssue {
@@ -2842,6 +3101,9 @@ function buildTrackedIssueSnapshotFromClaim(
     url: null,
     state: claim.issue_state,
     state_type: claim.issue_state_type,
+    viewer_id: null,
+    assignee_id: claim.issue_assignee_id ?? null,
+    assignee_name: claim.issue_assignee_name ?? null,
     workspace_id: null,
     team_id: null,
     team_key: null,
