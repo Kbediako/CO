@@ -15,11 +15,12 @@
 
 ## Milestones & Sequencing
 1) Register the docs-first packet for `linear-41f54a87-705b-467d-9e88-f49c6315f0dc`, update `tasks/index.json`, update `docs/TASKS.md`, and keep the single persistent `## Codex Workpad` comment current.
-2) Run docs-review with an explicit delegation override for this worker run, because subagent spawning is unavailable in-session.
+2) Run docs-review with an explicit delegation override for this worker run because subagent spawning is unavailable in-session.
 3) Implement a control-host provider workflow/config store that validates startup state, snapshots the effective config, records reload failures, and retains the last known good snapshot after reload failures following a successful startup.
 4) Thread the store into provider child launch/resume behavior by adding an explicit repo-config path override and exposing workflow health through current observability reads.
 5) Add focused tests for startup failure, good-to-bad reload retention, and bad-to-good recovery.
 6) Run validation, refresh the docs packet and workpad with final evidence, prepare the PR, and stop coding at `In Review`.
+7) After merge, archive the implementation-doc packet per `docs/implementation-docs-archive-policy.json` through the automation workflow (sync to `doc-archives` and open the stub PR) or the manual fallback `npm run docs:archive-implementation`, then record the resulting archive PR URL or fallback evidence in the closeout packet and `docs/TASKS.md` when the archive window is reached.
 
 ## Dependencies
 - `codex.orchestrator.json`
@@ -42,6 +43,7 @@
   - `node scripts/diff-budget.mjs`
   - `npm run review`
   - `npm run pack:smoke`
+  - `npm run docs:archive-implementation` (manual fallback when the archive window is reached and automation is unavailable)
 - Rollback plan:
   - remove the control-host workflow/config store and override wiring if it changes behavior outside the provider workflow seam
   - keep the issue in an active workflow state until the fix or blocker is explicit
@@ -56,7 +58,7 @@
 
 ## Approvals
 - Reviewer: docs-review complete
-- Date: 2026-03-24
+- Date: 2026-03-23
 
 ## Manifest Evidence
 - Docs-review manifest: `.runs/linear-41f54a87-705b-467d-9e88-f49c6315f0dc/cli/2026-03-23T21-28-58-155Z-8084cffd/manifest.json`
