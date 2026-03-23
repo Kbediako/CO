@@ -72,19 +72,44 @@ function collectIndexedDocPaths(item) {
   if (typeof item.path === 'string' && item.path.trim()) {
     candidates.push(item.path.trim());
   }
+  if (typeof item.relates_to === 'string' && item.relates_to.trim()) {
+    candidates.push(item.relates_to.trim());
+  }
 
-  const indexedDocsPath =
-    item.paths &&
-    typeof item.paths === 'object' &&
-    typeof item.paths.docs === 'string' &&
-    item.paths.docs.trim()
-      ? item.paths.docs.trim()
-      : '';
-  if (indexedDocsPath) {
-    candidates.push(indexedDocsPath);
+  if (item.paths && typeof item.paths === 'object') {
+    for (const key of ['docs', 'task', 'spec', 'agent_task']) {
+      const value =
+        typeof item.paths[key] === 'string' && item.paths[key].trim()
+          ? item.paths[key].trim()
+          : '';
+      if (value) {
+        candidates.push(value);
+      }
+    }
   }
 
   return [...new Set(candidates.map((entry) => toPosixPath(entry)))];
+}
+
+function normalizeRepoRelativePath(repoRoot, candidate) {
+  if (typeof candidate !== 'string') {
+    return null;
+  }
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const absolutePath = path.resolve(repoRoot, trimmed);
+  const repoRelative = toPosixPath(path.relative(repoRoot, absolutePath));
+  if (
+    !repoRelative ||
+    repoRelative === '..' ||
+    repoRelative.startsWith('../') ||
+    path.isAbsolute(repoRelative)
+  ) {
+    return null;
+  }
+  return repoRelative;
 }
 
 function parsePolicy(raw, policyPath) {
@@ -261,13 +286,21 @@ async function main() {
     }
     const docPaths = new Set();
 
-    for (const normalized of collectIndexedDocPaths(item)) {
+    for (const indexedPath of collectIndexedDocPaths(item)) {
+      const normalized = normalizeRepoRelativePath(repoRoot, indexedPath);
+      if (!normalized) {
+        continue;
+      }
+
       docPaths.add(normalized);
       const abs = path.resolve(repoRoot, normalized);
       if (await pathExists(abs)) {
         const content = await readFile(abs, 'utf8');
         for (const ref of extractDocReferences(content, docRegexes)) {
-          docPaths.add(ref);
+          const normalizedRef = normalizeRepoRelativePath(repoRoot, ref);
+          if (normalizedRef) {
+            docPaths.add(normalizedRef);
+          }
         }
       }
     }
