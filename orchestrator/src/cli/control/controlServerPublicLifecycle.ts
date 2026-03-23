@@ -16,6 +16,7 @@ import type {
   ProviderTrackedIssuePollResolution
 } from './providerIssueHandoff.js';
 import type { ProviderIntakeState } from './providerIntakeState.js';
+import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
@@ -45,6 +46,7 @@ export interface StartControlServerPublicLifecycleOptions {
   config: EffectiveDelegationConfig;
   eventStream?: Pick<RunEventStream, 'append'>;
   runId: string;
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
   createProviderIssueHandoff?: ((input: {
     providerIntakeState: ProviderIntakeState;
     persistProviderIntake: () => Promise<void>;
@@ -80,6 +82,7 @@ export async function startControlServerPublicLifecycle(
     eventStream: options.eventStream,
     runId: options.runId,
     sessionTtlMs: SESSION_TTL_MS,
+    providerWorkflowConfigStore: options.providerWorkflowConfigStore,
     createProviderIssueHandoff: options.createProviderIssueHandoff
   });
 
