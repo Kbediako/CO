@@ -11,6 +11,11 @@ export function normalizeTaskKey(
         slug?: string;
         path?: string;
         relates_to?: string;
+        paths?: {
+          task?: string;
+          spec?: string;
+          agent_task?: string;
+        };
       }
     | null
     | undefined
