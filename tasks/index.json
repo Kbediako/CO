@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260324-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514",
+      "title": "CO Reduce Review Long Tails and Make Review Evidence Accounting Truthful",
+      "relates_to": "tasks/tasks-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-24",
+      "paths": {
+        "spec": "tasks/specs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
+        "task": "tasks/tasks-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
+        "agent_task": ".agent/task/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
+        "docs": "docs/TECH_SPEC-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md"
+      }
+    },
+    {
       "id": "20260324-1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback",
       "title": "Coordinator Live Linear Snapshot-Only Retry Assignee-Identity Fallback",
       "relates_to": "tasks/tasks-1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",

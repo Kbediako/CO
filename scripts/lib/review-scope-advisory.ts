@@ -17,6 +17,8 @@ const DEFAULT_LARGE_SCOPE_FILE_THRESHOLD = 25;
 const DEFAULT_LARGE_SCOPE_LINE_THRESHOLD = 1200;
 const REVIEW_LARGE_SCOPE_FILE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD';
 const REVIEW_LARGE_SCOPE_LINE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD';
+export const REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY =
+  'CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON';
 
 export interface ReviewScopeCliOptions {
   base?: string;
@@ -160,7 +162,8 @@ export function formatScopeMetrics(scope: ReviewScopeAssessment): string | null 
 export function logReviewScopeAssessment(
   scope: ReviewScopeAssessment,
   scopeMetrics: string | null,
-  logger: ReviewScopeLogger = console
+  logger: ReviewScopeLogger = console,
+  overrideReason: string | null = null
 ): void {
   if (scope.mode !== 'uncommitted') {
     return;
@@ -177,24 +180,56 @@ export function logReviewScopeAssessment(
   logger.warn(
     `[run-review] large uncommitted review scope detected (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines).`
   );
+  if (overrideReason) {
+    logger.warn(
+      `[run-review] large uncommitted review scope override accepted via ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY}: ${overrideReason}`
+    );
+    return;
+  }
   logger.warn(
-    '[run-review] this scope profile is known to produce long CO review traversals; prefer scoped reviews (`--base`/`--commit`) when practical.'
+    `[run-review] large uncommitted review scope now requires --base/--commit or ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY} for an auditable override.`
   );
 }
 
 export function buildLargeScopeAdvisoryPromptLines(
   scope: ReviewScopeAssessment,
-  scopeMetrics: string | null
+  scopeMetrics: string | null,
+  overrideReason: string | null = null
 ): string[] {
   if (scope.mode !== 'uncommitted' || !scope.largeScope) {
     return [];
   }
   const detail = scopeMetrics ?? 'metrics unavailable';
-  return [
+  const lines = [
     `Scope advisory: large uncommitted diff detected (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines).`,
+  ];
+  if (overrideReason) {
+    lines.push(`Large-scope override recorded: ${overrideReason}`);
+  }
+  lines.push(
     'Prioritize highest-risk findings first and report actionable issues early; avoid exhaustive low-signal traversal before surfacing initial findings.',
     'If full coverage is incomplete, call out residual risk areas explicitly.'
-  ];
+  );
+  return lines;
+}
+
+export function resolveLargeScopeOverrideReason(
+  env: NodeJS.ProcessEnv = process.env
+): string | null {
+  const reason = env[REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY]?.trim();
+  return reason && reason.length > 0 ? reason : null;
+}
+
+export function getLargeScopeGateError(
+  scope: ReviewScopeAssessment,
+  scopeMetrics: string | null,
+  overrideReason: string | null
+): string | null {
+  if (scope.mode !== 'uncommitted' || !scope.largeScope || overrideReason) {
+    return null;
+  }
+  const detail = scopeMetrics ?? 'metrics unavailable';
+  return `large uncommitted review scope requires explicit scoping or override (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines). Rerun with --base <ref> or --commit <sha>, or set ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY}=\"<reason>\" to record an auditable override.`;
 }
 
 function resolveLargeScopeFileThreshold(env: NodeJS.ProcessEnv): number {
@@ -319,3 +354,8 @@ async function tryGit(args: string[], repoRoot: string): Promise<string | null> 
     return null;
   }
 }
+
+export {
+  REVIEW_LARGE_SCOPE_FILE_THRESHOLD_ENV_KEY,
+  REVIEW_LARGE_SCOPE_LINE_THRESHOLD_ENV_KEY
+};

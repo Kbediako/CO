@@ -136,14 +136,25 @@ while [[ "\${1:-}" == "-c" ]]; do
 done
 if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
   {
+    echo "---"
     if [[ "\${#config_overrides[@]}" -gt 0 ]]; then
       for override in "\${config_overrides[@]}"; do
         echo "config=$override"
       done
     fi
     echo "argv=$*"
-  } > "\${RUN_REVIEW_ARGS_LOG}"
+  } >> "\${RUN_REVIEW_ARGS_LOG}"
 fi
+has_arg() {
+  local needle="$1"
+  shift
+  for arg in "$@"; do
+    if [[ "$arg" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
 if [[ "\${1:-}" == "--help" ]]; then
   if [[ "\${RUN_REVIEW_MODE:-ok}" == "delete-after-help" ]]; then
     rm -f "$0"
@@ -156,6 +167,120 @@ fi
     mode="\${RUN_REVIEW_MODE:-ok}"
     if [[ "$mode" == "hang" ]]; then
       while true; do sleep 1; done
+    fi
+    if [[ "$mode" == "reject-scoped-prompt" ]]; then
+      if has_arg "--base" "$@"; then
+        echo "custom prompt cannot be combined with --base" >&2
+        exit 1
+      fi
+      if has_arg "--commit" "$@"; then
+        echo "custom prompt cannot be combined with --commit" >&2
+        exit 1
+      fi
+      if has_arg "--uncommitted" "$@"; then
+        echo "custom prompt cannot be combined with --uncommitted" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-scoped-prompt-generic-diff-scoping" ]]; then
+      if has_arg "--base" "$@" || has_arg "--commit" "$@" || has_arg "--uncommitted" "$@"; then
+        echo "custom prompt cannot be combined with diff scoping" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-scoped-prompt-usage-footer" ]]; then
+      if has_arg "--base" "$@"; then
+        echo "custom prompt cannot be combined with diff scoping" >&2
+        echo "Usage: codex review [options]" >&2
+        echo "  --base <ref>" >&2
+        echo "  --commit <sha>" >&2
+        exit 1
+      fi
+      if has_arg "--commit" "$@"; then
+        echo "custom prompt cannot be combined with diff scoping" >&2
+        echo "Usage: codex review [options]" >&2
+        echo "  --base <ref>" >&2
+        echo "  --commit <sha>" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-title" ]]; then
+      if has_arg "--title" "$@"; then
+        echo "unknown option --title" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-title-usage-footer" ]]; then
+      if has_arg "--title" "$@"; then
+        echo "unknown option --title" >&2
+        echo "Usage: codex review [options]" >&2
+        echo "  --base <ref>" >&2
+        echo "  --commit <sha>" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-title-prompt-usage-footer" ]]; then
+      if has_arg "--title" "$@"; then
+        echo "custom prompt cannot be combined with --title" >&2
+        echo "Usage: codex review [options]" >&2
+        echo "  --base <ref>" >&2
+        echo "  --commit <sha>" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-title-base-incompatibility" ]]; then
+      if has_arg "--title" "$@"; then
+        echo "--title cannot be used with --base" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-title-base-incompatibility-double-quoted" ]]; then
+      if has_arg "--title" "$@"; then
+        echo '--title cannot be used with "--base"' >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-base-unknown-option" ]]; then
+      if has_arg "--base" "$@"; then
+        echo "unknown option --base" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-base-quoted-unknown-option" ]]; then
+      if has_arg "--base" "$@"; then
+        echo "unknown option '--base'" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
     fi
     if [[ "$mode" == "term-graceful-timeout" ]]; then
       trap 'echo "term-sentinel"; exit 0' TERM
@@ -230,6 +355,101 @@ fi
         done
       done
     fi
+    if [[ "$mode" == "relevant-reinspection-dwell-term-nonzero" ]]; then
+      trap 'echo "term-nonzero"; exit 7' TERM
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.05
+        done
+      done
+    fi
+    if [[ "$mode" == "relevant-reinspection-dwell-heavy-term-nonzero" ]]; then
+      on_term() {
+        echo "thinking"
+        echo "exec"
+        echo "/bin/zsh -lc 'npm -C /tmp/run-review-heavy run typecheck -- run-review' in /tmp/run-review-heavy"
+        echo "term-heavy"
+        sleep 0.1
+        exit 143
+      }
+      trap on_term TERM
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.05
+        done
+      done
+    fi
+    if [[ "$mode" == "relevant-reinspection-dwell-slow-term-exit" ]]; then
+      trap 'sleep 1.2; echo "term-slow-success"; exit 0' TERM
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.01
+        done
+      done
+    fi
+    if [[ "$mode" == "relevant-reinspection-verdict-drift" ]]; then
+      trap 'exit 0' TERM
+      targets=(
+        "file-1.py"
+        "file-2.py"
+        "file-1.py"
+        "file-2.py"
+        "file-1.py"
+        "file-2.py"
+        "file-1.py"
+        "file-2.py"
+      )
+      for target in "\${targets[@]}"; do
+        echo "thinking"
+        echo "I am still considering whether file review output confirms the same unresolved issue."
+        echo "I am still considering whether file review output confirms the same unresolved issue."
+        echo "I am still considering whether file review output confirms the same unresolved issue."
+        echo "I am still considering whether file review output confirms the same unresolved issue."
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,40p \${target}' in /Users/kbediako/Code/CO"
+        sleep 0.01
+      done
+      while true; do sleep 1; done
+    fi
     if [[ "$mode" == "relevant-reinspection-dwell-fast-exit" ]]; then
       commands=(
         "sed -n 1,20p file-1.py"
@@ -249,6 +469,39 @@ fi
       done
       sleep 0.15
       exit 0
+    fi
+    if [[ "$mode" == "relevant-reinspection-dwell-meta-surface-term-success" ]]; then
+      on_term() {
+        for _ in $(seq 1 6); do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
+          sleep 0.06
+        done
+        exit 0
+      }
+      trap on_term TERM
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.01
+        done
+      done
     fi
     if [[ "$mode" == "relevant-reinspection-concrete-output" ]]; then
       commands=(
@@ -903,6 +1156,13 @@ exit 2
   return binPath;
 }
 
+function parseArgsLogInvocations(argsLog: string): string[] {
+  return argsLog
+    .split(/^---$/m)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
 function baseEnv(sandbox: string, codexBin: string): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -934,8 +1194,11 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_SURFACE;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
+  delete env.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON;
   delete env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
   delete env.CODEX_ORCHESTRATOR_RUN_DIR;
+  delete env.CODEX_ORCHESTRATOR_RUNS_DIR;
+  delete env.CODEX_ORCHESTRATOR_OUT_DIR;
   delete env.MCP_RUNNER_TASK_ID;
   delete env.TASK;
   delete env.CODEX_ORCHESTRATOR_TASK_ID;
@@ -1035,6 +1298,28 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('Codex review handoff (non-interactive):');
     expect(result.stdout).toContain('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
+  });
+
+  it('still emits a non-interactive handoff prompt for large uncommitted scope without requiring an override', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
+    }
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, '/missing/codex'),
+      FORCE_CODEX_REVIEW: '0',
+      CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Codex review handoff (non-interactive):');
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Scope advisory: large uncommitted diff detected');
   });
 
   it('adds bounded review constraints by default and allows heavy-command override', async () => {
@@ -1979,30 +2264,67 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('codex review timed out after 1s');
   });
 
-  it('warns and injects a scope advisory when uncommitted scope is large', async () => {
+  it('fails large uncommitted review scope unless an explicit override is recorded', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    const argsLogPath = join(sandbox, 'review-args.log');
     for (const file of files) {
       await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
     }
 
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
       CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
       CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stdout).toContain('review scope metrics: 3 files, 6 lines.');
+    expect(result.stderr).toContain('large uncommitted review scope detected');
+    expect(result.stderr).toContain(
+      'large uncommitted review scope requires explicit scoping or override'
+    );
+    const reviewInvocations = parseArgsLogInvocations(
+      await readFile(argsLogPath, 'utf8').catch(() => '')
+    ).filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(0);
+  });
+
+  it('allows large uncommitted review scope only with an auditable override', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    const argsLogPath = join(sandbox, 'review-args.log');
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
+    }
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
+      CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2',
+      CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON: 'operator requested full working-tree review'
     });
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('review scope metrics: 3 files, 6 lines.');
     expect(result.stderr).toContain('large uncommitted review scope detected');
-    expect(result.stderr).toContain('prefer scoped reviews (`--base`/`--commit`)');
+    expect(result.stderr).toContain('large uncommitted review scope override accepted');
 
     const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Scope advisory: large uncommitted diff detected');
+    expect(prompt).toContain('Large-scope override recorded: operator requested full working-tree review');
     expect(prompt).toContain('Prioritize highest-risk findings first');
+    const reviewInvocations = parseArgsLogInvocations(
+      await readFile(argsLogPath, 'utf8').catch(() => '')
+    ).filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations.length).toBeGreaterThanOrEqual(1);
   });
 
   it('uses path-only uncommitted scope notes in prompts', async () => {
@@ -2104,6 +2426,530 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).not.toContain('R100\t');
   });
 
+  it('fails when explicit base scope would be dropped after a CLI scope rejection', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-scoped-prompt',
+        RUN_REVIEW_ARGS_LOG: argsLogPath
+      },
+      ['--base', baseRef]
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+  });
+
+  it('fails when explicit base scope is rejected with a generic unknown-option error', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-base-unknown-option',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--base', baseRef]
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+  });
+
+  it('still blocks dropping explicit base scope when a pipeline-owned large-scope override is set', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-scoped-prompt',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON:
+          'Pipeline-owned implementation gate review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
+      },
+      ['--base', baseRef]
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+  });
+
+  it('fails when explicit uncommitted scope would be dropped after a CLI scope rejection', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await writeFile(join(sandbox, 'file-1.txt'), 'updated-file-1.txt\n', 'utf8');
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-scoped-prompt',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--uncommitted']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    expect(result.stderr).toContain('explicit `--uncommitted` review scope must remain auditable');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('argv=review --uncommitted');
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toContain('explicit `--uncommitted` review scope must remain auditable');
+  });
+
+  it('fails when explicit uncommitted scope is rejected with generic diff-scoping wording', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await writeFile(join(sandbox, 'file-1.txt'), 'updated-file-1.txt\n', 'utf8');
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-scoped-prompt-generic-diff-scoping',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--uncommitted']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    expect(result.stderr).toContain('explicit `--uncommitted` review scope must remain auditable');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('argv=review --uncommitted');
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toContain('explicit `--uncommitted` review scope must remain auditable');
+  });
+
+  it('blocks unscoped fallback retry when prompt incompatibility mentions the scope only in a usage footer', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-scoped-prompt-usage-footer',
+        RUN_REVIEW_ARGS_LOG: argsLogPath
+      },
+      ['--base', baseRef]
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+  });
+
+  it('preserves unrelated CLI option failures instead of rewriting them as scope-gate errors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
+    }
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1',
+        CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+        CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('unknown option --title');
+    expect(result.stderr).not.toContain('retrying without flags would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    expect(invocations.length).toBeGreaterThan(0);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).not.toContain('remove explicit review scope');
+  });
+
+  it('preserves unrelated CLI option failures when the CLI usage footer lists explicit scope flags', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
+    }
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title-usage-footer',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1',
+        CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+        CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('unknown option --title');
+    expect(result.stderr).not.toContain('retrying without flags would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    expect(invocations.length).toBeGreaterThan(0);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).not.toContain('remove explicit review scope');
+  });
+
+  it('preserves prompt incompatibility failures for unrelated options even when the CLI usage footer lists scope flags', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
+    }
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title-prompt-usage-footer',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1',
+        CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+        CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('custom prompt cannot be combined with --title');
+    expect(result.stderr).not.toContain('retrying without flags would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    expect(invocations.length).toBeGreaterThan(0);
+    expect(
+      invocations.some(
+        (entry) =>
+          entry.includes('argv=review') &&
+          entry.includes('--title Sample review') &&
+          entry.includes(`--base ${baseRef}`)
+      )
+    ).toBe(true);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).not.toContain('remove explicit review scope');
+  });
+
+  it('fails when a title/base incompatibility would drop explicit base scope', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title-base-incompatibility',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('--title cannot be used with --base');
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+  });
+
+  it('fails when a quoted title/base incompatibility would drop explicit base scope', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title-base-incompatibility-double-quoted',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('--title cannot be used with "--base"');
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+  });
+
+  it('fails when quoted explicit base scope rejection would drop explicit base scope', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-base-quoted-unknown-option',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain("unknown option '--base'");
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+  });
+
+  it('does not treat scope flag text inside title values as an explicit scope flag', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-base-unknown-option'
+      },
+      ['--title', 'docs mention --base handling']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('stdout-ok');
+    expect(result.stderr).toContain('stderr-ok');
+  });
+
   it('renders uncommitted rename scope notes as paired paths', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -2135,12 +2981,13 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '99',
-      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '10'
+      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '10',
+      CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON: 'explicitly validating untracked-line counting'
     });
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('review scope metrics: 1 files, 30 lines.');
-    expect(result.stderr).toContain('large uncommitted review scope detected');
+    expect(result.stderr).toContain('large uncommitted review scope override accepted');
   });
 
   it('skips non-regular untracked paths when computing scope line metrics', async () => {
@@ -2669,7 +3516,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(4);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('fails bounded diff review when repetitive relevant reinspection persists without concrete findings', async () => {
+  it('successfully bounds diff review when repetitive relevant reinspection persists without concrete findings after startup anchor', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
@@ -2682,14 +3529,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       CODEX_REVIEW_TIMEOUT_SECONDS: '60'
     });
 
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
-    expect(result.stderr).not.toContain('low-signal review drift detected');
-    expect(result.stderr).not.toContain('codex review timed out after');
+    expect(result.exitCode).toBe(0);
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         startupAnchorObserved: boolean;
         distinctInspectionTargets: number;
@@ -2698,12 +3548,199 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         concreteOutputSignals: number;
       };
     };
-    expect(telemetry.status).toBe('failed');
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
     expect(telemetry.summary.startupAnchorObserved).toBe(true);
     expect(telemetry.summary.distinctInspectionTargets).toBe(1);
     expect(telemetry.summary.maxInspectionTargetHits).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.metaSurfaceSignals).toBe(0);
     expect(telemetry.summary.concreteOutputSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails when a bounded success stop is followed by a non-zero review exit', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-term-nonzero',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded success stop');
+    expect(result.stderr).toContain('termination boundary: relevant-reinspection-dwell (post-startup-anchor).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails when a heavy command appears during bounded-success shutdown', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-heavy-term-nonzero',
+      CODEX_REVIEW_ENFORCE_BOUNDED_MODE: '1',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('codex review attempted heavy command in bounded mode');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+      summary: {
+        heavyCommandStarts: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.termination_boundary).toBeNull();
+    expect(telemetry.summary.heavyCommandStarts.length).toBeGreaterThan(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('preserves a bounded success stop when shutdown is slower than a later stall poll', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-slow-term-exit',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0.1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails when meta-surface expansion appears during bounded-success shutdown', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-meta-surface-term-success',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '0.2',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+    expect(result.stderr).toContain('termination boundary: meta-surface-expansion');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+      summary: {
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'meta-surface-kinds'
+      })
+    );
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toEqual(
+      expect.arrayContaining(['codex-memories', 'codex-skills'])
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails when verdict-stability drift is already active alongside post-startup relevant reinspection', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-verdict-drift',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('verdict-stability drift detected');
+    expect(result.stderr).toContain('termination boundary: verdict-stability');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'verdict-stability'
+      })
+    );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('preserves relevant dwell termination provenance when the review exits naturally before the poller fires', async () => {
@@ -2719,11 +3756,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       CODEX_REVIEW_TIMEOUT_SECONDS: '60'
     });
 
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
-    expect(result.stderr).toContain(
-      'termination boundary: relevant-reinspection-dwell (post-startup-anchor).'
-    );
+    expect(result.exitCode).toBe(0);
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -2735,7 +3768,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         sample: string | null;
       } | null;
     };
-    expect(telemetry.status).toBe('failed');
+    expect(telemetry.status).toBe('succeeded');
     expect(telemetry.termination_boundary).toEqual(
       expect.objectContaining({
         kind: 'relevant-reinspection-dwell',

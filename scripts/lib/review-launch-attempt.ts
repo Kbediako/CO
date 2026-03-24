@@ -72,11 +72,13 @@ interface ResolvedReviewCommand {
 interface ReviewRunResult {
   preview: string;
   state: ReviewExecutionState;
+  terminationBoundary?: ReviewTerminationBoundaryRecord | null;
 }
 
 export interface ReviewLaunchAttemptShellOptions {
   cliOptions: ReviewLaunchCliOptions;
   prompt: string;
+  retryWithoutScopeFlagsGateError?: string | null;
   runtimeContext: RuntimeCodexCommandContext;
   repoRoot: string;
   manifestPath: string;
@@ -176,6 +178,9 @@ export async function runReviewLaunchAttemptShell(
     disableDelegationMcp
   });
   const resolvedScoped = resolveCommand(scopedReviewArgs, options.runtimeContext);
+  const launchedWithExplicitScope = scopedReviewArgs.some(
+    (arg) => arg === '--base' || arg === '--commit' || arg === '--uncommitted'
+  );
   console.log(`Review prompt saved to: ${path.relative(options.repoRoot, options.artifactPaths.promptPath)}`);
   console.log(`Review output log: ${path.relative(options.repoRoot, options.artifactPaths.outputLogPath)}`);
   console.log(
@@ -183,7 +188,12 @@ export async function runReviewLaunchAttemptShell(
   );
 
   const reportSuccess = async (execution: ReviewRunResult): Promise<void> => {
-    const telemetryPayload = await options.writeTelemetry(execution.state, 'succeeded');
+    const telemetryPayload = await options.writeTelemetry(
+      execution.state,
+      'succeeded',
+      null,
+      execution.terminationBoundary ?? null
+    );
     console.log(`Review output saved to: ${path.relative(options.repoRoot, options.artifactPaths.outputLogPath)}`);
     if (telemetryPayload) {
       console.log(
@@ -250,6 +260,34 @@ export async function runReviewLaunchAttemptShell(
     return;
   } catch (error) {
     if (shouldRetryWithoutScopeFlags(error)) {
+      if (launchedWithExplicitScope) {
+        if (
+          options.retryWithoutScopeFlagsGateError &&
+          shouldRewriteRetryFailureAsScopeGate(error, options.cliOptions)
+        ) {
+          const retryGateError = buildRetryWithoutScopeFlagsGateError(
+            error,
+            options.repoRoot,
+            options.retryWithoutScopeFlagsGateError
+          );
+          await reportFailure(retryGateError);
+          throw retryGateError;
+        }
+        await reportFailure(error);
+        throw error;
+      }
+      if (
+        options.retryWithoutScopeFlagsGateError &&
+        shouldRewriteRetryFailureAsScopeGate(error, options.cliOptions)
+      ) {
+        const retryGateError = buildRetryWithoutScopeFlagsGateError(
+          error,
+          options.repoRoot,
+          options.retryWithoutScopeFlagsGateError
+        );
+        await reportFailure(retryGateError);
+        throw retryGateError;
+      }
       console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
       const unscopedArgs = buildReviewArgs(options.cliOptions, options.prompt, {
         includeScopeFlags: false,
@@ -462,4 +500,115 @@ function shouldRetryWithoutScopeFlags(error: unknown): boolean {
     combined.includes('custom prompt') ||
     combined.includes('with a prompt')
   );
+}
+
+function shouldRewriteRetryFailureAsScopeGate(
+  error: unknown,
+  cliOptions: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'uncommitted'>
+): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const scopeFlag = resolveScopeFlag(cliOptions);
+  const scopeFlagToken = scopeFlag?.args[0]?.toLowerCase() ?? null;
+  if (!scopeFlagToken) {
+    return false;
+  }
+  const preview = 'outputPreview' in error ? String((error as any).outputPreview ?? '') : '';
+  const message = 'message' in error ? String((error as any).message ?? '') : '';
+  const combined = `${message}\n${preview}`.toLowerCase();
+  const lines = combined
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return (
+    hasExplicitScopeFlagRejectionSignal(lines, scopeFlagToken) ||
+    lines.some(
+      (line) =>
+        line.includes(scopeFlagToken) &&
+        hasPromptScopeFlagRejectionSignal(line)
+    ) ||
+    hasPromptScopeIncompatibilitySignal(lines, scopeFlagToken)
+  );
+}
+
+function hasExplicitScopeFlagRejectionSignal(lines: string[], scopeFlagToken: string): boolean {
+  const escapedScopeFlagToken = escapeForRegExp(scopeFlagToken);
+  const quotedOrBareScopeFlagToken = `(?:['"]${escapedScopeFlagToken}['"]|${escapedScopeFlagToken})`;
+  const tokenBoundary = `(?=$|\\s|[),.:;])`;
+  const directScopeRejectionPatterns = [
+    new RegExp(`(?:unknown option|unknown flag|unrecognized option)\\s+${quotedOrBareScopeFlagToken}${tokenBoundary}`),
+    new RegExp(`^(?:option\\s+)?${quotedOrBareScopeFlagToken}\\s+(?:cannot be used with|cannot be combined|is incompatible with)`),
+    new RegExp(`^(?:flag\\s+)?${quotedOrBareScopeFlagToken}\\s+(?:cannot be used with|cannot be combined|is incompatible with)`),
+    new RegExp(`.+(?:cannot be used with|cannot be combined|incompatible with)\\s+${quotedOrBareScopeFlagToken}${tokenBoundary}`)
+  ];
+  return lines.some((line) => directScopeRejectionPatterns.some((pattern) => pattern.test(line)));
+}
+
+function hasPromptScopeFlagRejectionSignal(line: string): boolean {
+  const mentionsPrompt =
+    line.includes('prompt cannot') ||
+    line.includes('custom prompt') ||
+    line.includes('with a prompt');
+  if (!mentionsPrompt) {
+    return false;
+  }
+  return (
+    line.includes('unknown option') ||
+    line.includes('unknown flag') ||
+    line.includes('unrecognized option') ||
+    line.includes('cannot be used with') ||
+    line.includes('cannot be combined') ||
+    line.includes('incompatible with') ||
+    line.includes('prompt cannot') ||
+    line.includes('custom prompt') ||
+    line.includes('with a prompt')
+  );
+}
+
+function hasPromptScopeIncompatibilitySignal(
+  lines: string[],
+  _scopeFlagToken: string
+): boolean {
+  return lines.some((line) => {
+    const mentionsPrompt =
+      line.includes('prompt cannot') ||
+      line.includes('custom prompt') ||
+      line.includes('with a prompt');
+    if (!mentionsPrompt) {
+      return false;
+    }
+    return (
+      line.includes('diff scoping') ||
+      line.includes('diff-scoping') ||
+      line.includes('review scope') ||
+      line.includes('scope flags')
+    );
+  });
+}
+
+function buildRetryWithoutScopeFlagsGateError(
+  error: unknown,
+  repoRoot: string,
+  retryWithoutScopeFlagsGateError: string
+): CodexReviewError {
+  const originalError = error instanceof CodexReviewError ? error : null;
+  return new CodexReviewError(
+    `codex CLI rejected the explicit review scope flags, and retrying without them would remove explicit review scope. ${retryWithoutScopeFlagsGateError}`,
+    {
+      exitCode:
+        typeof originalError?.exitCode === 'number' && originalError.exitCode > 0
+          ? originalError.exitCode
+          : 1,
+      signal: originalError?.signal ?? null,
+      timedOut: false,
+      outputPreview: originalError?.outputPreview ?? '',
+      reviewState: originalError?.reviewState ?? new ReviewExecutionState({ repoRoot }),
+      terminationBoundary: originalError?.terminationBoundary ?? null
+    }
+  );
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
