@@ -511,8 +511,9 @@ async function waitForChildExit(
       if (heavyCommandHandle) {
         clearInterval(heavyCommandHandle);
       }
-      if (killHandle && !hardKillArmed) {
+      if (killHandle) {
         clearTimeout(killHandle);
+        killHandle = undefined;
       }
       child.removeListener('error', onError);
       child.removeListener('close', onClose);

@@ -136,13 +136,14 @@ while [[ "\${1:-}" == "-c" ]]; do
 done
 if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
   {
+    echo "---"
     if [[ "\${#config_overrides[@]}" -gt 0 ]]; then
       for override in "\${config_overrides[@]}"; do
         echo "config=$override"
       done
     fi
     echo "argv=$*"
-  } > "\${RUN_REVIEW_ARGS_LOG}"
+  } >> "\${RUN_REVIEW_ARGS_LOG}"
 fi
 if [[ "\${1:-}" == "--help" ]]; then
   if [[ "\${RUN_REVIEW_MODE:-ok}" == "delete-after-help" ]]; then
@@ -347,7 +348,7 @@ fi
       done
     fi
     if [[ "$mode" == "relevant-reinspection-dwell-slow-term-exit" ]]; then
-      trap 'sleep 0.2; echo "term-slow-success"; exit 0' TERM
+      trap 'sleep 1.2; echo "term-slow-success"; exit 0' TERM
       commands=(
         "sed -n 1,20p file-1.py"
         "sed -n 21,40p file-1.py"
@@ -1095,6 +1096,13 @@ exit 2
   await writeFile(binPath, script, 'utf8');
   await chmod(binPath, 0o755);
   return binPath;
+}
+
+function parseArgsLogInvocations(argsLog: string): string[] {
+  return argsLog
+    .split(/^---$/m)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }
 
 function baseEnv(sandbox: string, codexBin: string): Record<string, string | undefined> {
@@ -2552,8 +2560,23 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('unknown option --title');
     expect(result.stderr).not.toContain('retrying without flags would remove explicit review scope');
     const argsLog = await readFile(argsLogPath, 'utf8');
-    expect(argsLog).toContain('argv=review --title Sample review');
-    expect(argsLog).not.toContain(`--base ${baseRef}`);
+    const invocations = parseArgsLogInvocations(argsLog);
+    expect(invocations.length).toBeGreaterThan(0);
+    expect(
+      invocations.some(
+        (entry) =>
+          entry.includes('argv=review') &&
+          entry.includes('--title Sample review') &&
+          entry.includes(`--base ${baseRef}`)
+      )
+    ).toBe(true);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations.length).toBeGreaterThan(0);
+    expect(
+      reviewInvocations.every((entry) =>
+        !entry.includes('--title Sample review') || entry.includes(`--base ${baseRef}`)
+      )
+    ).toBe(true);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2595,8 +2618,23 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('unknown option --title');
     expect(result.stderr).not.toContain('retrying without flags would remove explicit review scope');
     const argsLog = await readFile(argsLogPath, 'utf8');
-    expect(argsLog).toContain('argv=review --title Sample review');
-    expect(argsLog).not.toContain(`--base ${baseRef}`);
+    const invocations = parseArgsLogInvocations(argsLog);
+    expect(invocations.length).toBeGreaterThan(0);
+    expect(
+      invocations.some(
+        (entry) =>
+          entry.includes('argv=review') &&
+          entry.includes('--title Sample review') &&
+          entry.includes(`--base ${baseRef}`)
+      )
+    ).toBe(true);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations.length).toBeGreaterThan(0);
+    expect(
+      reviewInvocations.every((entry) =>
+        !entry.includes('--title Sample review') || entry.includes(`--base ${baseRef}`)
+      )
+    ).toBe(true);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
