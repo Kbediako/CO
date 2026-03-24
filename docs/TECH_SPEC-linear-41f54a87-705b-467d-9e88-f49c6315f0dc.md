@@ -55,7 +55,7 @@ last_review: 2026-03-24
 ## Architecture & Data
 - Architecture / design adjustments:
   - introduce a control-host provider workflow/config store that validates and snapshots the effective provider config at startup, then monitors reload attempts against the source repo config
-  - add a repo-config path override in config loading so provider child runs can consume the cached last-known-good snapshot instead of rereading the broken source file
+  - add a repo-config path override in config loading, so provider child runs can consume the cached last-known-good snapshot instead of rereading the broken source file
   - thread the workflow health state into existing observability read models/controllers
 - Data model changes / migrations:
   - add local control-host snapshot metadata and status fields only; no migration expected
