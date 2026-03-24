@@ -528,7 +528,7 @@ function shouldRewriteRetryFailureAsScopeGate(
         line.includes(scopeFlagToken) &&
         hasPromptScopeFlagRejectionSignal(line)
     ) ||
-    hasPromptScopeIncompatibilitySignal(combined, scopeFlagToken)
+    hasPromptScopeIncompatibilitySignal(lines, scopeFlagToken)
   );
 }
 
@@ -567,20 +567,24 @@ function hasPromptScopeFlagRejectionSignal(line: string): boolean {
 }
 
 function hasPromptScopeIncompatibilitySignal(
-  combined: string,
-  scopeFlagToken: string
+  lines: string[],
+  _scopeFlagToken: string
 ): boolean {
-  const mentionsPrompt =
-    combined.includes('prompt cannot') ||
-    combined.includes('custom prompt') ||
-    combined.includes('with a prompt');
-  const mentionsScope =
-    combined.includes(scopeFlagToken) ||
-    combined.includes('diff scoping') ||
-    combined.includes('diff-scoping') ||
-    combined.includes('review scope') ||
-    combined.includes('scope flags');
-  return mentionsPrompt && mentionsScope;
+  return lines.some((line) => {
+    const mentionsPrompt =
+      line.includes('prompt cannot') ||
+      line.includes('custom prompt') ||
+      line.includes('with a prompt');
+    if (!mentionsPrompt) {
+      return false;
+    }
+    return (
+      line.includes('diff scoping') ||
+      line.includes('diff-scoping') ||
+      line.includes('review scope') ||
+      line.includes('scope flags')
+    );
+  });
 }
 
 function buildRetryWithoutScopeFlagsGateError(

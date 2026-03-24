@@ -234,6 +234,18 @@ fi
       echo "stderr-ok" >&2
       exit 0
     fi
+    if [[ "$mode" == "reject-title-prompt-usage-footer" ]]; then
+      if has_arg "--title" "$@"; then
+        echo "custom prompt cannot be combined with --title" >&2
+        echo "Usage: codex review [options]" >&2
+        echo "  --base <ref>" >&2
+        echo "  --commit <sha>" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
     if [[ "$mode" == "reject-title-base-incompatibility" ]]; then
       if has_arg "--title" "$@"; then
         echo "--title cannot be used with --base" >&2
@@ -2731,6 +2743,57 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(reviewInvocations).toHaveLength(1);
     expect(reviewInvocations[0]).toContain('--title Sample review');
     expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).not.toContain('remove explicit review scope');
+  });
+
+  it('preserves prompt incompatibility failures for unrelated options even when the CLI usage footer lists scope flags', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
+    }
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title-prompt-usage-footer',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1',
+        CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+        CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('custom prompt cannot be combined with --title');
+    expect(result.stderr).not.toContain('retrying without flags would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    expect(invocations.length).toBeGreaterThan(0);
+    expect(
+      invocations.some(
+        (entry) =>
+          entry.includes('argv=review') &&
+          entry.includes('--title Sample review') &&
+          entry.includes(`--base ${baseRef}`)
+      )
+    ).toBe(true);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
