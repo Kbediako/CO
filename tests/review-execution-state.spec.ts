@@ -443,6 +443,34 @@ describe('ReviewExecutionState', () => {
     expect(payload.termination_boundary).toBeNull();
   });
 
+  it('preserves an explicit termination boundary on successful telemetry payloads', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+    const boundary = {
+      kind: 'relevant-reinspection-dwell',
+      provenance: 'post-startup-anchor',
+      reason:
+        'bounded review relevant-reinspection dwell boundary violated after 1s via sed -n 1,20p file-1.py.',
+      sample: 'sed -n 1,20p file-1.py'
+    } as const;
+
+    const payload = state.buildTelemetryPayload({
+      status: 'succeeded',
+      terminationBoundary: boundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(payload.termination_boundary).toEqual({
+      kind: 'relevant-reinspection-dwell',
+      provenance: 'post-startup-anchor',
+      reason: expect.stringContaining('[redacted relevant-reinspection-dwell sample'),
+      sample:
+        '[redacted relevant-reinspection-dwell sample; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw sample]'
+    });
+  });
+
   it('projects validation-suite command-intent violations into first-class termination boundary records', () => {
     const state = new ReviewExecutionState({ startedAtMs: 0 });
 

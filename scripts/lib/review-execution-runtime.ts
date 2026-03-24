@@ -139,7 +139,11 @@ function writeToStreamSafely(target: NodeJS.WriteStream, chunk: Buffer): void {
 
 export async function runCodexReview(
   options: RunCodexReviewOptions
-): Promise<{ preview: string; state: ReviewExecutionState }> {
+): Promise<{
+  preview: string;
+  state: ReviewExecutionState;
+  terminationBoundary: ReviewTerminationBoundaryRecord | null;
+}> {
   const detached = process.platform !== 'win32';
   const child: ChildProcess = spawn(options.command, options.args, {
     stdio: options.stdio,
@@ -209,7 +213,7 @@ export async function runCodexReview(
   };
 
   try {
-    await waitForChildExit(child, {
+    const terminationBoundary = await waitForChildExit(child, {
       timeoutMs: options.timeoutMs,
       stallTimeoutMs: options.stallTimeoutMs,
       startupLoopTimeoutMs: options.startupLoopTimeoutMs,
@@ -243,7 +247,11 @@ export async function runCodexReview(
       onCleanup: cleanup
     });
     await outputClosed;
-    return { preview: executionState.getPreview(), state: executionState };
+    return {
+      preview: executionState.getPreview(),
+      state: executionState,
+      terminationBoundary
+    };
   } catch (error) {
     cleanup();
     await outputClosed;
@@ -343,6 +351,49 @@ function formatCommandIntentBoundaryFailure(boundaryState: ReviewCommandIntentBo
   return `codex review crossed the bounded command-intent boundary (${kindLabel}): ${boundaryState.violationSample}. ${guidance}`;
 }
 
+const SIGTERM_EXIT_CODE = 128 + 15;
+
+function isAcceptableSuccessfulBoundaryExit(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+  requestedTermination: boolean
+): boolean {
+  if (code === 0) {
+    return true;
+  }
+  if (!requestedTermination) {
+    return false;
+  }
+  return signal === 'SIGTERM' || code === SIGTERM_EXIT_CODE;
+}
+
+function formatExitOutcome(code: number | null, signal: NodeJS.Signals | null): string {
+  if (typeof code === 'number') {
+    return signal ? `code ${code} (signal ${signal})` : `code ${code}`;
+  }
+  if (signal) {
+    return `signal ${signal}`;
+  }
+  return 'without a clean exit signal';
+}
+
+function buildSuccessfulBoundaryExitFailure(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+  terminationBoundary: ReviewTerminationBoundaryRecord | null
+): CodexReviewError {
+  return new CodexReviewError(
+    `codex review reached a bounded success stop but exited with ${formatExitOutcome(code, signal)}`,
+    {
+      exitCode: typeof code === 'number' && code > 0 ? code : 1,
+      signal,
+      timedOut: false,
+      outputPreview: '',
+      terminationBoundary
+    }
+  );
+}
+
 interface WaitForChildExitOptions {
   timeoutMs: number | null;
   stallTimeoutMs: number | null;
@@ -377,12 +428,13 @@ interface WaitForChildExitOptions {
 async function waitForChildExit(
   child: ChildProcess,
   options: WaitForChildExitOptions
-): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
+): Promise<ReviewTerminationBoundaryRecord | null> {
+  return await new Promise<ReviewTerminationBoundaryRecord | null>((resolve, reject) => {
     let settled = false;
     let handlesCleared = false;
     let cleanupCompleted = false;
     let pendingTermination: CodexReviewError | null = null;
+    let pendingSuccessfulTerminationBoundary: ReviewTerminationBoundaryRecord | null = null;
     let timeoutHandle: NodeJS.Timeout | undefined;
     let stallHandle: NodeJS.Timeout | undefined;
     let startupLoopHandle: NodeJS.Timeout | undefined;
@@ -546,21 +598,40 @@ async function waitForChildExit(
           const relevantReinspectionBoundaryState =
             options.getRelevantReinspectionDwellBoundaryState();
           if (relevantReinspectionBoundaryState.triggered) {
-            reject(
-              new CodexReviewError(
-                relevantReinspectionBoundaryState.reason ??
-                  'bounded review relevant-reinspection dwell boundary violated',
-                {
-                  exitCode: typeof code === 'number' && code > 0 ? code : 1,
+            const relevantReinspectionBoundary =
+              pendingSuccessfulTerminationBoundary ??
+              options.getTerminationBoundaryRecord('relevant-reinspection-dwell');
+            if (relevantReinspectionBoundaryState.anchorObserved) {
+              if (
+                isAcceptableSuccessfulBoundaryExit(
+                  code,
                   signal,
-                  timedOut: false,
-                  outputPreview: '',
-                  terminationBoundary:
-                    options.getTerminationBoundaryRecord('relevant-reinspection-dwell')
-                }
-              )
-            );
-            return;
+                  pendingSuccessfulTerminationBoundary !== null
+                )
+              ) {
+                pendingSuccessfulTerminationBoundary = relevantReinspectionBoundary;
+              } else {
+                reject(
+                  buildSuccessfulBoundaryExitFailure(code, signal, relevantReinspectionBoundary)
+                );
+                return;
+              }
+            } else {
+              reject(
+                new CodexReviewError(
+                  relevantReinspectionBoundaryState.reason ??
+                    'bounded review relevant-reinspection dwell boundary violated',
+                  {
+                    exitCode: typeof code === 'number' && code > 0 ? code : 1,
+                    signal,
+                    timedOut: false,
+                    outputPreview: '',
+                    terminationBoundary: relevantReinspectionBoundary
+                  }
+                )
+              );
+              return;
+            }
           }
         }
         const verdictStabilityState = options.getVerdictStabilityState();
@@ -607,8 +678,18 @@ async function waitForChildExit(
           );
           return;
         }
+        if (pendingSuccessfulTerminationBoundary) {
+          if (isAcceptableSuccessfulBoundaryExit(code, signal, true)) {
+            resolve(pendingSuccessfulTerminationBoundary);
+            return;
+          }
+          reject(
+            buildSuccessfulBoundaryExitFailure(code, signal, pendingSuccessfulTerminationBoundary)
+          );
+          return;
+        }
         if (code === 0) {
-          resolve();
+          resolve(null);
           return;
         }
         const suffix = signal ? ` (signal ${signal})` : '';
@@ -631,7 +712,12 @@ async function waitForChildExit(
       timedOut = true,
       terminationBoundary: ReviewTerminationBoundaryRecord | null = null
     ) => {
-      if (settled || pendingTermination || child.exitCode !== null) {
+      if (
+        settled ||
+        pendingTermination ||
+        pendingSuccessfulTerminationBoundary ||
+        child.exitCode !== null
+      ) {
         return;
       }
 
@@ -642,6 +728,29 @@ async function waitForChildExit(
         outputPreview: '',
         terminationBoundary
       });
+      signalChildProcess(child, 'SIGTERM', options.detached);
+      hardKillArmed = true;
+      killHandle = setTimeout(() => {
+        if (child.exitCode === null) {
+          signalChildProcess(child, 'SIGKILL', options.detached);
+        }
+      }, 5000);
+      killHandle.unref();
+    };
+
+    const requestSuccessfulTermination = (
+      terminationBoundary: ReviewTerminationBoundaryRecord | null
+    ) => {
+      if (
+        settled ||
+        pendingTermination ||
+        pendingSuccessfulTerminationBoundary ||
+        child.exitCode !== null
+      ) {
+        return;
+      }
+
+      pendingSuccessfulTerminationBoundary = terminationBoundary;
       signalChildProcess(child, 'SIGTERM', options.detached);
       hardKillArmed = true;
       killHandle = setTimeout(() => {
@@ -804,10 +913,16 @@ async function waitForChildExit(
         if (!boundaryState.triggered) {
           return;
         }
+        const terminationBoundary =
+          options.getTerminationBoundaryRecord('relevant-reinspection-dwell');
+        if (boundaryState.anchorObserved) {
+          requestSuccessfulTermination(terminationBoundary);
+          return;
+        }
         requestTermination(
           `${boundaryState.reason ?? 'bounded review relevant-reinspection dwell boundary violated'} (set ${REVIEW_LOW_SIGNAL_TIMEOUT_ENV_KEY}=0 to disable).`,
           false,
-          options.getTerminationBoundaryRecord('relevant-reinspection-dwell')
+          terminationBoundary
         );
       }, 250);
       relevantReinspectionHandle.unref();

@@ -766,11 +766,11 @@ export class ReviewExecutionState {
       status: options.status,
       error: options.error ?? null,
       terminationBoundary:
-        options.status === 'failed'
-          ? explicitTerminationBoundaryProvided
-            ? options.terminationBoundary ?? null
-            : this.getTerminationBoundaryRecord(options.error ?? null)
-          : null,
+        explicitTerminationBoundaryProvided
+          ? options.terminationBoundary ?? null
+          : options.status === 'failed'
+            ? this.getTerminationBoundaryRecord(options.error ?? null)
+            : null,
       outputLogPath: options.outputLogPath,
       repoRoot: options.repoRoot,
       includeRawTelemetry: options.includeRawTelemetry,

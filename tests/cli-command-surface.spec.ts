@@ -342,6 +342,8 @@ describe('codex-orchestrator command surface', () => {
         ...process.env,
         NOTES: 'Goal: launch review via CLI shell | Summary: non-interactive handoff | Risks: arg forwarding',
         CODEX_REVIEW_MONITOR_INTERVAL_SECONDS: '0',
+        CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON:
+          'cli command-surface review shell test intentionally exercises unscoped non-interactive handoff',
         DIFF_BUDGET_OVERRIDE_REASON:
           'cli command-surface review shell test exercises non-interactive handoff against the stacked branch baseline'
       },

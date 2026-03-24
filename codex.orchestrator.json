@@ -90,6 +90,7 @@
         "env": {
           "SKIP_DIFF_BUDGET": "1",
           "CODEX_REVIEW_NON_INTERACTIVE": "1",
+          "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned docs relevance advisory review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
           "NOTES": "Goal: docs relevance advisory | Summary: semantic docs relevance review lane with manifest context | Risks: advisory-only lane; false positives/negatives possible"
         },
         "allowFailure": true,
@@ -199,6 +200,8 @@
             "DIFF_BUDGET_STAGE": "1",
             "CODEX_REVIEW_NON_INTERACTIVE": "1",
             "FORCE_CODEX_REVIEW": "1",
+            "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned implementation gate review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
+            "CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY": "1",
             "NOTES": "Goal: implementation gate review handoff | Summary: automated prompt with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
           }
         }
@@ -233,6 +236,8 @@
             "SKIP_DIFF_BUDGET": "1",
             "CODEX_REVIEW_NON_INTERACTIVE": "1",
             "FORCE_CODEX_REVIEW": "1",
+            "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned docs review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
+            "CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY": "1",
             "NOTES": "Goal: docs review gate review handoff | Summary: automated prompt with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
           }
         }

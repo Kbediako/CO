@@ -48,6 +48,42 @@ describe('review-execution-telemetry', () => {
     await expect(readFile(telemetryPath, 'utf8')).resolves.toContain('"status": "succeeded"');
   });
 
+  it('persists success telemetry with an explicit termination boundary when the review ended via bounded completion', async () => {
+    const sandbox = await makeSandbox();
+    const outputLogPath = join(sandbox, 'review', 'output.log');
+    const telemetryPath = join(sandbox, 'review', 'telemetry.json');
+    await mkdir(join(sandbox, 'review'), { recursive: true });
+    const state = new ReviewExecutionState({ repoRoot: sandbox });
+    const terminationBoundary = {
+      kind: 'relevant-reinspection-dwell',
+      provenance: 'post-startup-anchor',
+      reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+      sample: 'sed -n 1,20p file-1.py'
+    } as const;
+
+    const payload = await writeReviewExecutionTelemetry({
+      state,
+      status: 'succeeded',
+      terminationBoundary,
+      outputLogPath,
+      repoRoot: sandbox,
+      telemetryPath,
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(payload?.termination_boundary).toEqual({
+      kind: 'relevant-reinspection-dwell',
+      provenance: 'post-startup-anchor',
+      reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+      sample:
+        '[redacted relevant-reinspection-dwell sample; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw sample]'
+    });
+    await expect(readFile(telemetryPath, 'utf8')).resolves.toContain(
+      '"kind": "relevant-reinspection-dwell"'
+    );
+  });
+
   it('persists failure telemetry with an explicit termination boundary', async () => {
     const sandbox = await makeSandbox();
     const outputLogPath = join(sandbox, 'review', 'output.log');

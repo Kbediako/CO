@@ -72,6 +72,7 @@ interface ResolvedReviewCommand {
 interface ReviewRunResult {
   preview: string;
   state: ReviewExecutionState;
+  terminationBoundary?: ReviewTerminationBoundaryRecord | null;
 }
 
 export interface ReviewLaunchAttemptShellOptions {
@@ -183,7 +184,12 @@ export async function runReviewLaunchAttemptShell(
   );
 
   const reportSuccess = async (execution: ReviewRunResult): Promise<void> => {
-    const telemetryPayload = await options.writeTelemetry(execution.state, 'succeeded');
+    const telemetryPayload = await options.writeTelemetry(
+      execution.state,
+      'succeeded',
+      null,
+      execution.terminationBoundary ?? null
+    );
     console.log(`Review output saved to: ${path.relative(options.repoRoot, options.artifactPaths.outputLogPath)}`);
     if (telemetryPayload) {
       console.log(

@@ -230,6 +230,72 @@ fi
         done
       done
     fi
+    if [[ "$mode" == "relevant-reinspection-dwell-term-nonzero" ]]; then
+      trap 'echo "term-nonzero"; exit 7' TERM
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.05
+        done
+      done
+    fi
+    if [[ "$mode" == "relevant-reinspection-dwell-slow-term-exit" ]]; then
+      trap 'sleep 0.2; echo "term-slow-success"; exit 0' TERM
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.01
+        done
+      done
+    fi
+    if [[ "$mode" == "relevant-reinspection-verdict-drift" ]]; then
+      trap 'exit 0' TERM
+      targets=(
+        "file-1.py"
+        "file-2.py"
+        "file-1.py"
+        "file-2.py"
+        "file-1.py"
+        "file-2.py"
+        "file-1.py"
+        "file-2.py"
+      )
+      for target in "\${targets[@]}"; do
+        echo "thinking"
+        echo "I am still considering whether file review output confirms the same unresolved issue."
+        echo "I am still considering whether file review output confirms the same unresolved issue."
+        echo "I am still considering whether file review output confirms the same unresolved issue."
+        echo "I am still considering whether file review output confirms the same unresolved issue."
+        echo "exec"
+        echo "/bin/zsh -lc 'sed -n 1,40p \${target}' in /Users/kbediako/Code/CO"
+        sleep 0.01
+      done
+      while true; do sleep 1; done
+    fi
     if [[ "$mode" == "relevant-reinspection-dwell-fast-exit" ]]; then
       commands=(
         "sed -n 1,20p file-1.py"
@@ -934,8 +1000,11 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_SURFACE;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
+  delete env.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON;
   delete env.CODEX_ORCHESTRATOR_MANIFEST_PATH;
   delete env.CODEX_ORCHESTRATOR_RUN_DIR;
+  delete env.CODEX_ORCHESTRATOR_RUNS_DIR;
+  delete env.CODEX_ORCHESTRATOR_OUT_DIR;
   delete env.MCP_RUNNER_TASK_ID;
   delete env.TASK;
   delete env.CODEX_ORCHESTRATOR_TASK_ID;
@@ -1035,6 +1104,28 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('Codex review handoff (non-interactive):');
     expect(result.stdout).toContain('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
+  });
+
+  it('still emits a non-interactive handoff prompt for large uncommitted scope without requiring an override', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
+    }
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, '/missing/codex'),
+      FORCE_CODEX_REVIEW: '0',
+      CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Codex review handoff (non-interactive):');
+    const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
+    const prompt = await readFile(promptPath, 'utf8');
+    expect(prompt).toContain('Scope advisory: large uncommitted diff detected');
   });
 
   it('adds bounded review constraints by default and allows heavy-command override', async () => {
@@ -1979,7 +2070,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('codex review timed out after 1s');
   });
 
-  it('warns and injects a scope advisory when uncommitted scope is large', async () => {
+  it('fails large uncommitted review scope unless an explicit override is recorded', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
@@ -1994,14 +2085,39 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
     });
 
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stdout).toContain('review scope metrics: 3 files, 6 lines.');
+    expect(result.stderr).toContain('large uncommitted review scope detected');
+    expect(result.stderr).toContain(
+      'large uncommitted review scope requires explicit scoping or override'
+    );
+  });
+
+  it('allows large uncommitted review scope only with an auditable override', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
+    }
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2',
+      CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON: 'operator requested full working-tree review'
+    });
+
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('review scope metrics: 3 files, 6 lines.');
     expect(result.stderr).toContain('large uncommitted review scope detected');
-    expect(result.stderr).toContain('prefer scoped reviews (`--base`/`--commit`)');
+    expect(result.stderr).toContain('large uncommitted review scope override accepted');
 
     const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Scope advisory: large uncommitted diff detected');
+    expect(prompt).toContain('Large-scope override recorded: operator requested full working-tree review');
     expect(prompt).toContain('Prioritize highest-risk findings first');
   });
 
@@ -2135,12 +2251,13 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '99',
-      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '10'
+      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '10',
+      CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON: 'explicitly validating untracked-line counting'
     });
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('review scope metrics: 1 files, 30 lines.');
-    expect(result.stderr).toContain('large uncommitted review scope detected');
+    expect(result.stderr).toContain('large uncommitted review scope override accepted');
   });
 
   it('skips non-regular untracked paths when computing scope line metrics', async () => {
@@ -2669,7 +2786,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.distinctInspectionTargets).toBeLessThanOrEqual(4);
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
-  it('fails bounded diff review when repetitive relevant reinspection persists without concrete findings', async () => {
+  it('successfully bounds diff review when repetitive relevant reinspection persists without concrete findings after startup anchor', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
@@ -2682,14 +2799,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       CODEX_REVIEW_TIMEOUT_SECONDS: '60'
     });
 
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
-    expect(result.stderr).not.toContain('low-signal review drift detected');
-    expect(result.stderr).not.toContain('codex review timed out after');
+    expect(result.exitCode).toBe(0);
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+        reason: string;
+        sample: string | null;
+      } | null;
       summary: {
         startupAnchorObserved: boolean;
         distinctInspectionTargets: number;
@@ -2698,12 +2818,119 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         concreteOutputSignals: number;
       };
     };
-    expect(telemetry.status).toBe('failed');
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
     expect(telemetry.summary.startupAnchorObserved).toBe(true);
     expect(telemetry.summary.distinctInspectionTargets).toBe(1);
     expect(telemetry.summary.maxInspectionTargetHits).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.metaSurfaceSignals).toBe(0);
     expect(telemetry.summary.concreteOutputSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails when a bounded success stop is followed by a non-zero review exit', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-term-nonzero',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('bounded success stop');
+    expect(result.stderr).toContain('termination boundary: relevant-reinspection-dwell (post-startup-anchor).');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('preserves a bounded success stop when shutdown is slower than a later stall poll', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-slow-term-exit',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0.1',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails when verdict-stability drift is already active alongside post-startup relevant reinspection', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-verdict-drift',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_VERDICT_STABILITY_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('verdict-stability drift detected');
+    expect(result.stderr).toContain('termination boundary: verdict-stability');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      termination_boundary: {
+        kind: string;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'verdict-stability'
+      })
+    );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('preserves relevant dwell termination provenance when the review exits naturally before the poller fires', async () => {
@@ -2719,11 +2946,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       CODEX_REVIEW_TIMEOUT_SECONDS: '60'
     });
 
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('relevant-reinspection dwell boundary violated');
-    expect(result.stderr).toContain(
-      'termination boundary: relevant-reinspection-dwell (post-startup-anchor).'
-    );
+    expect(result.exitCode).toBe(0);
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -2735,7 +2958,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         sample: string | null;
       } | null;
     };
-    expect(telemetry.status).toBe('failed');
+    expect(telemetry.status).toBe('succeeded');
     expect(telemetry.termination_boundary).toEqual(
       expect.objectContaining({
         kind: 'relevant-reinspection-dwell',

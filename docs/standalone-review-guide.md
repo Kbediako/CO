@@ -75,7 +75,9 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
   - Allow unrestricted heavy command execution (including explicit validation suites and direct validation-runner launches): `CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1`
   - Enforce bounded mode (hard-stop on remaining heavy command starts outside the default command-intent boundary): `CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1`
 - `codex-orchestrator review` emits patience-first runtime checkpoints every 60s by default (`elapsed` + `idle` visibility while waiting).
-- `codex-orchestrator review` auto-detects large uncommitted scopes and injects a prompt advisory to prioritize highest-risk findings early (helps CO-scale diffs where exhaustive traversal can take a long time).
+- Large uncommitted review scope is now explicit and auditable: when thresholds trip, rerun with `--base` / `--commit` or set `CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON="<reason>"`. Accepted overrides are logged and copied into the review prompt.
+- In the default bounded `diff` path, repeated post-startup-anchor relevant rereads now terminate as a successful bounded completion instead of drifting toward a late failure; the success-side `termination_boundary` is preserved in `review/telemetry.json`.
+- Pipeline-owned review gates can require terminal review-evidence consistency by setting `CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY=1`; an explicit waiver can be recorded with `CODEX_REVIEW_EVIDENCE_WAIVER_REASON="<reason>"`.
 - Optional timeout/stall/startup-loop guards:
   - `CODEX_REVIEW_TIMEOUT_SECONDS=<seconds>` (`0` disables when set); when this guard fires, runtime telemetry records a first-class `timeout` termination boundary
   - `CODEX_REVIEW_STALL_TIMEOUT_SECONDS=<seconds>` (`0` disables when set); when this guard fires, runtime telemetry records a first-class `stall` termination boundary
@@ -89,6 +91,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - Optional large-scope thresholds:
   - `CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD=<count>` (default `25`)
   - `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD=<count>` (default `1200`)
+  - `CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON="<reason>"` (required when large uncommitted scope is intentional and you are not using `--base` / `--commit`)
 - `codex-orchestrator review` writes artifacts under `<runDir>/review/`, where `<runDir>` tracks the resolved manifest lineage: it uses `CODEX_ORCHESTRATOR_RUN_DIR` only when that directory contains the resolved manifest, otherwise it falls back to `dirname(manifestPath)`.
 - Prompt artifact: `<runDir>/review/prompt.txt` (always).
 - Review transcript: `<runDir>/review/output.log` (when `codex review` runs, for example with `FORCE_CODEX_REVIEW=1`).

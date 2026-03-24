@@ -1,4 +1,5 @@
 import { createWriteStream } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { ExecEvent, UnifiedExecRunResult } from '../../../../packages/orchestrator/src/index.js';
@@ -27,6 +28,10 @@ const EMIT_COMMAND_STREAM_MIRRORS = EnvUtils.getBoolean('CODEX_ORCHESTRATOR_EMIT
 export const MAX_CAPTURED_CHUNK_EVENTS = EnvUtils.getInt('CODEX_ORCHESTRATOR_EXEC_EVENT_MAX_CHUNKS', 500);
 const MAX_COLLAB_TOOL_CALLS = EnvUtils.getInt('CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS', 200);
 const PACKAGE_ROOT = findPackageRoot();
+const REVIEW_EVIDENCE_CONSISTENCY_ENV_KEY = 'CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY';
+const REVIEW_EVIDENCE_WAIVER_REASON_ENV_KEY = 'CODEX_REVIEW_EVIDENCE_WAIVER_REASON';
+const REVIEW_TELEMETRY_POLL_INTERVAL_MS = 50;
+const REVIEW_TELEMETRY_WAIT_TIMEOUT_MS = 2_000;
 
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
@@ -53,6 +58,20 @@ interface CommandRunResult {
 }
 
 type CollabToolCallRecord = NonNullable<CliManifest['collab_tool_calls']>[number];
+
+interface ReviewTelemetryEvidencePayload {
+  generated_at?: unknown;
+  output_log_path?: unknown;
+  status?: unknown;
+}
+
+interface ReviewEvidenceMismatch {
+  message: string;
+  telemetryPath: string;
+  telemetryStatus: string | null;
+  telemetryGeneratedAt: string | null;
+  telemetryOutputLogPath: string | null;
+}
 
 export async function runCommandStage(
   context: CommandRunnerContext,
@@ -305,11 +324,56 @@ export async function runCommandStage(
       timedOut,
       timeoutMs: timeoutBoundMs
     });
+    const reviewEvidenceMismatch = shouldEnforceReviewEvidenceConsistency(stage)
+      ? await verifyReviewEvidenceConsistency({
+          env,
+          paths,
+          expectedStatus: result.status === 'succeeded' ? 'succeeded' : 'failed',
+          startedAt: entry.started_at
+        })
+      : null;
+    const reviewEvidenceWaiverReason = resolveReviewEvidenceWaiverReason(execEnv);
+    let effectiveSummary = summary;
+    let forceReviewEvidenceFailure = false;
+
+    if (reviewEvidenceMismatch) {
+      if (reviewEvidenceWaiverReason) {
+        effectiveSummary = `${summary} (review evidence waiver: ${reviewEvidenceWaiverReason}; ${reviewEvidenceMismatch.message})`;
+        writeEvent({
+          type: 'command:waiver',
+          waiver: 'review-evidence-consistency',
+          reason: reviewEvidenceWaiverReason,
+          telemetry_path: relativeToRepo(env, reviewEvidenceMismatch.telemetryPath),
+          detail: reviewEvidenceMismatch.message
+        });
+        events?.log({
+          stageId: stage.id,
+          stageIndex: index,
+          level: 'warn',
+          source: 'system',
+          message: `Review evidence waiver applied: ${reviewEvidenceMismatch.message}`
+        });
+      } else {
+        effectiveSummary =
+          result.status === 'succeeded'
+            ? `Review evidence mismatch: ${reviewEvidenceMismatch.message}`
+            : `Review evidence mismatch after command failure: ${reviewEvidenceMismatch.message} Command result: ${summary}`;
+        forceReviewEvidenceFailure = true;
+      }
+    }
+    const effectiveExitCode =
+      forceReviewEvidenceFailure && normalizedExitCode === 0 ? 1 : normalizedExitCode;
 
     entry.completed_at = isoTimestamp();
-    entry.exit_code = normalizedExitCode;
-    entry.summary = summary;
-    entry.status = result.status === 'succeeded' ? 'succeeded' : stage.allowFailure ? 'skipped' : 'failed';
+    entry.exit_code = effectiveExitCode;
+    entry.summary = effectiveSummary;
+    entry.status = forceReviewEvidenceFailure
+      ? 'failed'
+      : result.status === 'succeeded'
+        ? 'succeeded'
+        : stage.allowFailure
+          ? 'skipped'
+          : 'failed';
 
     if (collabBuffer.trim()) {
       const record = parseCollabToolCallLine(collabBuffer, stage.id, entry.index);
@@ -343,11 +407,14 @@ export async function runCommandStage(
     if (result.status !== 'succeeded') {
       const failureReason = timedOut ? 'timed_out' : 'command_failed';
       const errorDetails: Record<string, unknown> = {
-        exit_code: normalizedExitCode,
+        exit_code: effectiveExitCode,
         sandbox_state: result.sandboxState,
         stderr: stderrText,
         failure_reason: failureReason
       };
+      if (effectiveExitCode !== normalizedExitCode) {
+        errorDetails.command_exit_code = normalizedExitCode;
+      }
       if (result.signal) {
         errorDetails.signal = result.signal;
       }
@@ -376,6 +443,45 @@ export async function runCommandStage(
       );
     }
 
+    if (forceReviewEvidenceFailure && reviewEvidenceMismatch) {
+      if (entry.error_file) {
+        writeEvent({
+          type: 'command:warning',
+          warning: 'review-evidence-inconsistent',
+          preserved_error_file: entry.error_file,
+          telemetry_path: relativeToRepo(env, reviewEvidenceMismatch.telemetryPath),
+          detail: reviewEvidenceMismatch.message
+        });
+        events?.log({
+          stageId: stage.id,
+          stageIndex: index,
+          level: 'warn',
+          source: 'system',
+          message: `Review evidence mismatch preserved alongside the original command failure: ${reviewEvidenceMismatch.message}`
+        });
+      } else {
+        entry.error_file = await appendCommandError(
+          env,
+          paths,
+          manifest,
+          entry,
+          'review-evidence-inconsistent',
+          {
+            exit_code: effectiveExitCode,
+            command_exit_code: normalizedExitCode,
+            sandbox_state: result.sandboxState,
+            expected_review_status: result.status === 'succeeded' ? 'succeeded' : 'failed',
+            telemetry_status: reviewEvidenceMismatch.telemetryStatus,
+            telemetry_generated_at: reviewEvidenceMismatch.telemetryGeneratedAt,
+            telemetry_output_log_path: reviewEvidenceMismatch.telemetryOutputLogPath,
+            telemetry_path: relativeToRepo(env, reviewEvidenceMismatch.telemetryPath),
+            failure_reason: 'review_evidence_inconsistent',
+            detail: reviewEvidenceMismatch.message
+          }
+        );
+      }
+    }
+
     await persistManifest(paths, manifest, persister, { force: true });
     events?.stageCompleted({
       stageId: stage.id,
@@ -388,13 +494,163 @@ export async function runCommandStage(
       logPath: entry.log_path
     });
 
-    return { exitCode: normalizedExitCode, summary };
+    return { exitCode: effectiveExitCode, summary: effectiveSummary };
   } finally {
     unsubscribe();
     runnerLog.end();
     commandLog.end();
     privacyLog.end();
   }
+}
+
+function shouldEnforceReviewEvidenceConsistency(stage: CommandStage): boolean {
+  return (
+    parseBooleanEnvFlag(stage.env?.[REVIEW_EVIDENCE_CONSISTENCY_ENV_KEY]) &&
+    isReviewCommandStage(stage)
+  );
+}
+
+function isReviewCommandStage(stage: CommandStage): boolean {
+  const stageId = stage.id.trim().toLowerCase();
+  if (stageId === 'review') {
+    return true;
+  }
+  const haystack = `${stage.title} ${stage.command}`.toLowerCase();
+  return (
+    haystack.includes('npm run review') ||
+    haystack.includes('codex review') ||
+    haystack.includes('codex-orchestrator review') ||
+    haystack.includes('run-review.ts') ||
+    haystack.includes('run-review.js')
+  );
+}
+
+function resolveReviewEvidenceWaiverReason(env: NodeJS.ProcessEnv): string | null {
+  const reason = env[REVIEW_EVIDENCE_WAIVER_REASON_ENV_KEY]?.trim();
+  return reason && reason.length > 0 ? reason : null;
+}
+
+function parseBooleanEnvFlag(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+async function verifyReviewEvidenceConsistency(options: {
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  expectedStatus: 'succeeded' | 'failed';
+  startedAt: string | null | undefined;
+}): Promise<ReviewEvidenceMismatch | null> {
+  const telemetryPath = join(options.paths.runDir, 'review', 'telemetry.json');
+  const telemetry = await waitForReviewTelemetryEvidence(telemetryPath);
+  if (!telemetry) {
+    return {
+      message: 'review telemetry is missing, unreadable, or incomplete at terminal stage closeout.',
+      telemetryPath,
+      telemetryStatus: null,
+      telemetryGeneratedAt: null,
+      telemetryOutputLogPath: null
+    };
+  }
+
+  const generatedAt =
+    typeof telemetry.generated_at === 'string' && telemetry.generated_at.trim().length > 0
+      ? telemetry.generated_at
+      : null;
+  if (!generatedAt) {
+    return {
+      message: 'review telemetry is missing generated_at, so terminal evidence freshness cannot be verified.',
+      telemetryPath,
+      telemetryStatus: coerceTelemetryString(telemetry.status),
+      telemetryGeneratedAt: null,
+      telemetryOutputLogPath: coerceTelemetryString(telemetry.output_log_path)
+    };
+  }
+  const generatedAtMs = Date.parse(generatedAt);
+  if (!Number.isFinite(generatedAtMs)) {
+    return {
+      message: `review telemetry generated_at is invalid (${generatedAt}).`,
+      telemetryPath,
+      telemetryStatus: coerceTelemetryString(telemetry.status),
+      telemetryGeneratedAt: generatedAt,
+      telemetryOutputLogPath: coerceTelemetryString(telemetry.output_log_path)
+    };
+  }
+
+  const startedAtMs = typeof options.startedAt === 'string' ? Date.parse(options.startedAt) : Number.NaN;
+  if (Number.isFinite(startedAtMs) && generatedAtMs < startedAtMs) {
+    return {
+      message: `review telemetry is stale (generated_at ${generatedAt} precedes stage start ${options.startedAt}).`,
+      telemetryPath,
+      telemetryStatus: coerceTelemetryString(telemetry.status),
+      telemetryGeneratedAt: generatedAt,
+      telemetryOutputLogPath: coerceTelemetryString(telemetry.output_log_path)
+    };
+  }
+
+  const telemetryStatus = coerceTelemetryString(telemetry.status);
+  if (telemetryStatus !== options.expectedStatus) {
+    return {
+      message: `review telemetry status ${telemetryStatus ?? '<missing>'} does not match terminal stage result ${options.expectedStatus}.`,
+      telemetryPath,
+      telemetryStatus,
+      telemetryGeneratedAt: generatedAt,
+      telemetryOutputLogPath: coerceTelemetryString(telemetry.output_log_path)
+    };
+  }
+
+  const expectedOutputLogPath = relativeToRepo(
+    options.env,
+    join(options.paths.runDir, 'review', 'output.log')
+  );
+  const telemetryOutputLogPath = coerceTelemetryString(telemetry.output_log_path);
+  if (telemetryOutputLogPath !== expectedOutputLogPath) {
+    return {
+      message: `review telemetry output_log_path ${telemetryOutputLogPath ?? '<missing>'} does not match the active run artifact ${expectedOutputLogPath}.`,
+      telemetryPath,
+      telemetryStatus,
+      telemetryGeneratedAt: generatedAt,
+      telemetryOutputLogPath
+    };
+  }
+
+  return null;
+}
+
+async function waitForReviewTelemetryEvidence(
+  telemetryPath: string
+): Promise<ReviewTelemetryEvidencePayload | null> {
+  const deadline = Date.now() + REVIEW_TELEMETRY_WAIT_TIMEOUT_MS;
+  for (;;) {
+    try {
+      const raw = await readFile(telemetryPath, 'utf8');
+      const parsed = JSON.parse(raw) as ReviewTelemetryEvidencePayload | null;
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch {
+      // Best-effort polling only; keep waiting until the short deadline expires.
+    }
+    if (Date.now() >= deadline) {
+      return null;
+    }
+    await delay(REVIEW_TELEMETRY_POLL_INTERVAL_MS);
+  }
+}
+
+function coerceTelemetryString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function runtimeSessionIdOrNull(value: string | null | undefined): string | null {

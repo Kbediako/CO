@@ -31,7 +31,11 @@ import {
 import {
   runReviewLaunchAttemptShell
 } from './lib/review-launch-attempt.js';
-import { prepareReviewNonInteractiveHandoffShell } from './lib/review-non-interactive-handoff.js';
+import {
+  prepareReviewNonInteractiveHandoffShell,
+  shouldForceNonInteractive,
+  shouldPrintNonInteractiveHandoff
+} from './lib/review-non-interactive-handoff.js';
 import {
   buildActiveCloseoutProvenanceLines,
   buildReviewPromptContext,
@@ -51,11 +55,13 @@ import {
 } from './lib/review-execution-telemetry.js';
 import {
   assessReviewScope,
+  getLargeScopeGateError,
   buildLargeScopeAdvisoryPromptLines,
   buildScopeNotes,
   collectReviewScopePaths,
   formatScopeMetrics,
   logReviewScopeAssessment,
+  resolveLargeScopeOverrideReason,
   resolveEffectiveScopeMode
 } from './lib/review-scope-advisory.js';
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
@@ -385,8 +391,28 @@ async function main(): Promise<void> {
   }
   const scopeAssessment = await assessReviewScope(options, repoRoot);
   const scopeMetrics = formatScopeMetrics(scopeAssessment);
-  logReviewScopeAssessment(scopeAssessment, scopeMetrics);
-  const scopeAdvisoryPromptLines = buildLargeScopeAdvisoryPromptLines(scopeAssessment, scopeMetrics);
+  const largeScopeOverrideReason = resolveLargeScopeOverrideReason(process.env);
+  const stdinIsTTY = process.stdin?.isTTY === true;
+  const promptOnlyHandoff = shouldPrintNonInteractiveHandoff({
+    env: process.env,
+    nonInteractive:
+      options.nonInteractive ?? shouldForceNonInteractive(process.env, stdinIsTTY),
+    stdinIsTTY
+  });
+  logReviewScopeAssessment(scopeAssessment, scopeMetrics, console, largeScopeOverrideReason);
+  const largeScopeGateError = getLargeScopeGateError(
+    scopeAssessment,
+    scopeMetrics,
+    largeScopeOverrideReason
+  );
+  if (largeScopeGateError && !promptOnlyHandoff) {
+    throw new Error(largeScopeGateError);
+  }
+  const scopeAdvisoryPromptLines = buildLargeScopeAdvisoryPromptLines(
+    scopeAssessment,
+    scopeMetrics,
+    largeScopeOverrideReason
+  );
   if (scopeAdvisoryPromptLines.length > 0) {
     promptLines.push('', ...scopeAdvisoryPromptLines);
   }
@@ -405,7 +431,7 @@ async function main(): Promise<void> {
       repoRoot,
       runnerLogExists,
       runnerLogPath,
-      stdinIsTTY: process.stdin?.isTTY === true
+      stdinIsTTY
     });
   if (handedOff) {
     return;
@@ -596,5 +622,6 @@ Environment:
   MANIFEST                       Alternative manifest path source.
   MCP_RUNNER_TASK_ID / TASK      Task id fallback when --task is omitted.
   ${REVIEW_SURFACE_ENV_KEY}      Review surface fallback when --surface is omitted.
+  CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON  Auditable override for large uncommitted review scope gating.
 `);
 }
