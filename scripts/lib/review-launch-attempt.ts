@@ -515,12 +515,13 @@ function shouldRewriteRetryFailureAsScopeGate(
 
 function hasExplicitScopeFlagRejectionSignal(lines: string[], scopeFlagToken: string): boolean {
   const escapedScopeFlagToken = escapeForRegExp(scopeFlagToken);
-  const optionalQuotedScopeFlagToken = `(?:['"\`])?${escapedScopeFlagToken}(?:['"\`])?`;
+  const quotedOrBareScopeFlagToken = `(?:['"]${escapedScopeFlagToken}['"]|${escapedScopeFlagToken})`;
+  const tokenBoundary = `(?=$|\\s|[),.:;])`;
   const directScopeRejectionPatterns = [
-    new RegExp(`(?:unknown option|unknown flag|unrecognized option)\\s+${optionalQuotedScopeFlagToken}`),
-    new RegExp(`^(?:option\\s+)?${optionalQuotedScopeFlagToken}\\s+(?:cannot be used with|cannot be combined|is incompatible with)`),
-    new RegExp(`^(?:flag\\s+)?${optionalQuotedScopeFlagToken}\\s+(?:cannot be used with|cannot be combined|is incompatible with)`),
-    new RegExp(`.+(?:cannot be used with|cannot be combined|incompatible with)\\s+${optionalQuotedScopeFlagToken}`)
+    new RegExp(`(?:unknown option|unknown flag|unrecognized option)\\s+${quotedOrBareScopeFlagToken}${tokenBoundary}`),
+    new RegExp(`^(?:option\\s+)?${quotedOrBareScopeFlagToken}\\s+(?:cannot be used with|cannot be combined|is incompatible with)`),
+    new RegExp(`^(?:flag\\s+)?${quotedOrBareScopeFlagToken}\\s+(?:cannot be used with|cannot be combined|is incompatible with)`),
+    new RegExp(`.+(?:cannot be used with|cannot be combined|incompatible with)\\s+${quotedOrBareScopeFlagToken}${tokenBoundary}`)
   ];
   return lines.some((line) => directScopeRejectionPatterns.some((pattern) => pattern.test(line)));
 }
