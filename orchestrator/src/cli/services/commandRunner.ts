@@ -332,7 +332,7 @@ export async function runCommandStage(
           startedAt: entry.started_at
         })
       : null;
-    const reviewEvidenceWaiverReason = resolveReviewEvidenceWaiverReason(execEnv);
+    const reviewEvidenceWaiverReason = resolveReviewEvidenceWaiverReason(stage.env);
     let effectiveSummary = summary;
     let forceReviewEvidenceFailure = false;
 
@@ -525,8 +525,10 @@ function isReviewCommandStage(stage: CommandStage): boolean {
   );
 }
 
-function resolveReviewEvidenceWaiverReason(env: NodeJS.ProcessEnv): string | null {
-  const reason = env[REVIEW_EVIDENCE_WAIVER_REASON_ENV_KEY]?.trim();
+function resolveReviewEvidenceWaiverReason(
+  env: Record<string, string> | NodeJS.ProcessEnv | undefined
+): string | null {
+  const reason = env?.[REVIEW_EVIDENCE_WAIVER_REASON_ENV_KEY]?.trim();
   return reason && reason.length > 0 ? reason : null;
 }
 

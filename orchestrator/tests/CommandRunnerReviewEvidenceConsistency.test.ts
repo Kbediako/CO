@@ -158,6 +158,33 @@ describe('runCommandStage review evidence consistency', () => {
     expect(commandLog).toContain('"waiver":"review-evidence-consistency"');
   });
 
+  it('ignores inherited review evidence waiver env unless the review stage declares it explicitly', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, { status: 'failed', error: 'review bounded out' });
+      return buildSuccessfulExecResult();
+    };
+
+    const previous = process.env.CODEX_REVIEW_EVIDENCE_WAIVER_REASON;
+    process.env.CODEX_REVIEW_EVIDENCE_WAIVER_REASON =
+      'leaked global waiver should not downgrade enforced review stages';
+
+    try {
+      const { env, manifest, paths, stage } = await bootstrapReviewStage();
+      const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.summary).toContain('Review evidence mismatch');
+      expect(result.summary).not.toContain('review evidence waiver');
+      expect(manifest.commands[0]?.status).toBe('failed');
+    } finally {
+      if (previous === undefined) {
+        delete process.env.CODEX_REVIEW_EVIDENCE_WAIVER_REASON;
+      } else {
+        process.env.CODEX_REVIEW_EVIDENCE_WAIVER_REASON = previous;
+      }
+    }
+  });
+
   it('preserves the original command failure artifact when review telemetry is missing', async () => {
     mockState.runImpl = async () => buildFailedExecResult('codex review unavailable\n', 2);
 

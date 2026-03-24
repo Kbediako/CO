@@ -224,6 +224,15 @@ fi
       echo "stderr-ok" >&2
       exit 0
     fi
+    if [[ "$mode" == "reject-title-base-incompatibility" ]]; then
+      if [[ "$*" == *"--title"* ]]; then
+        echo "--title cannot be used with --base" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
     if [[ "$mode" == "term-graceful-timeout" ]]; then
       trap 'echo "term-sentinel"; exit 0' TERM
       echo "thinking"
@@ -2571,10 +2580,12 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       )
     ).toBe(true);
     const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
-    expect(reviewInvocations.length).toBeGreaterThan(0);
+    expect(reviewInvocations.length).toBeGreaterThanOrEqual(2);
     expect(
-      reviewInvocations.every((entry) =>
-        !entry.includes('--title Sample review') || entry.includes(`--base ${baseRef}`)
+      reviewInvocations.some(
+        (entry) =>
+          entry.includes('argv=review --title Sample review') &&
+          !entry.includes(`--base ${baseRef}`)
       )
     ).toBe(true);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
@@ -2629,12 +2640,63 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       )
     ).toBe(true);
     const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
-    expect(reviewInvocations.length).toBeGreaterThan(0);
+    expect(reviewInvocations.length).toBeGreaterThanOrEqual(2);
     expect(
-      reviewInvocations.every((entry) =>
-        !entry.includes('--title Sample review') || entry.includes(`--base ${baseRef}`)
+      reviewInvocations.some(
+        (entry) =>
+          entry.includes('argv=review --title Sample review') &&
+          !entry.includes(`--base ${baseRef}`)
       )
     ).toBe(true);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).not.toContain('remove explicit review scope');
+  });
+
+  it('preserves non-prompt scope incompatibility failures instead of rewriting them as scope-gate errors', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title-base-incompatibility',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('--title cannot be used with --base');
+    expect(result.stderr).not.toContain('retrying without them would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations.length).toBeGreaterThanOrEqual(2);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+    expect(
+      reviewInvocations.some(
+        (entry) =>
+          entry.includes('argv=review --title Sample review') &&
+          !entry.includes(`--base ${baseRef}`)
+      )
+    ).toBe(true);
+
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;

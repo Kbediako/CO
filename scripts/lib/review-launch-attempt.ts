@@ -499,7 +499,6 @@ function shouldRewriteRetryFailureAsScopeGate(
   const message = 'message' in error ? String((error as any).message ?? '') : '';
   const combined = `${message}\n${preview}`.toLowerCase();
   const lines = combined
-    .toLowerCase()
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
@@ -507,13 +506,20 @@ function shouldRewriteRetryFailureAsScopeGate(
     lines.some(
       (line) =>
         line.includes(scopeFlagToken) &&
-        hasScopeFlagRejectionSignal(line)
+        hasPromptScopeFlagRejectionSignal(line)
     ) ||
     hasPromptScopeIncompatibilitySignal(combined, scopeFlagToken)
   );
 }
 
-function hasScopeFlagRejectionSignal(line: string): boolean {
+function hasPromptScopeFlagRejectionSignal(line: string): boolean {
+  const mentionsPrompt =
+    line.includes('prompt cannot') ||
+    line.includes('custom prompt') ||
+    line.includes('with a prompt');
+  if (!mentionsPrompt) {
+    return false;
+  }
   return (
     line.includes('unknown option') ||
     line.includes('unknown flag') ||
