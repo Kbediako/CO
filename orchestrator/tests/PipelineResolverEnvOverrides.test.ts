@@ -265,13 +265,13 @@ describe('PipelineResolver env overrides', () => {
 
     expect(implementationReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(implementationReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
-    expect(implementationReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toContain(
-      'Pipeline-owned implementation gate review accepts large uncommitted scope'
+    expect(implementationReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toBe(
+      'Pipeline-owned implementation gate review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
     );
     expect(docsReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(docsReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
-    expect(docsReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toContain(
-      'Pipeline-owned docs review accepts large uncommitted scope'
+    expect(docsReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toBe(
+      'Pipeline-owned docs review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
     );
   });
 });

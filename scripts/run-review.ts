@@ -6,8 +6,8 @@
  * Note: some codex CLI versions reject combining diff-scoping flags
  * (`--uncommitted`, `--base`, `--commit`) with a custom prompt. This wrapper
  * always supplies a custom prompt (to include manifest evidence), so it will
- * try real scope flags first and fall back to embedding scope hints into the
- * prompt if the CLI rejects the flag/prompt combination.
+ * try real scope flags first and only fall back when that does not remove the
+ * caller's explicit scope or audit trail.
  */
 
 import { spawn } from 'node:child_process';
@@ -89,6 +89,21 @@ interface CliOptions {
   disableDelegationMcp?: boolean;
   surface?: ReviewSurface;
   help?: boolean;
+}
+
+function buildExplicitScopeRetryGateError(
+  options: Pick<CliOptions, 'base' | 'commit' | 'uncommitted'>
+): string | null {
+  if (options.commit) {
+    return 'explicit `--commit` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.';
+  }
+  if (options.base) {
+    return 'explicit `--base` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.';
+  }
+  if (options.uncommitted) {
+    return 'explicit `--uncommitted` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.';
+  }
+  return null;
 }
 
 function installStdioErrorGuards(): void {
@@ -405,6 +420,20 @@ async function main(): Promise<void> {
     scopeMetrics,
     largeScopeOverrideReason
   );
+  const explicitScopeRetryGateError = buildExplicitScopeRetryGateError(options);
+  const retryWithoutScopeFlagsAssessment =
+    explicitScopeRetryGateError !== null || resolveEffectiveScopeMode(options) === 'uncommitted'
+      ? null
+      : await assessReviewScope({}, repoRoot);
+  const retryWithoutScopeFlagsGateError =
+    explicitScopeRetryGateError ??
+    (retryWithoutScopeFlagsAssessment === null
+      ? null
+      : getLargeScopeGateError(
+          retryWithoutScopeFlagsAssessment,
+          formatScopeMetrics(retryWithoutScopeFlagsAssessment),
+          null
+        ));
   if (largeScopeGateError && !promptOnlyHandoff) {
     throw new Error(largeScopeGateError);
   }
@@ -524,6 +553,7 @@ async function main(): Promise<void> {
   await runReviewLaunchAttemptShell({
     cliOptions: options,
     prompt,
+    retryWithoutScopeFlagsGateError,
     runtimeContext,
     repoRoot,
     manifestPath,

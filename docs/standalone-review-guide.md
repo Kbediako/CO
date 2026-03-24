@@ -76,6 +76,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
   - Enforce bounded mode (hard-stop on remaining heavy command starts outside the default command-intent boundary): `CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1`
 - `codex-orchestrator review` emits patience-first runtime checkpoints every 60s by default (`elapsed` + `idle` visibility while waiting).
 - Large uncommitted review scope is now explicit and auditable: when thresholds trip, rerun with `--base` / `--commit` or set `CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON="<reason>"`. Accepted overrides are logged and copied into the review prompt.
+- If the CLI rejects an explicitly requested scope flag (`--uncommitted`, `--base`, or `--commit`), the wrapper now fails instead of silently dropping that explicit scope; this keeps the review surface and audit trail truthful.
 - In the default bounded `diff` path, repeated post-startup-anchor relevant rereads now terminate as a successful bounded completion instead of drifting toward a late failure; the success-side `termination_boundary` is preserved in `review/telemetry.json`.
 - Pipeline-owned review gates can require terminal review-evidence consistency by setting `CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY=1`; an explicit waiver can be recorded with `CODEX_REVIEW_EVIDENCE_WAIVER_REASON="<reason>"`.
 - Optional timeout/stall/startup-loop guards:

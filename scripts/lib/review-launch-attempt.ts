@@ -78,6 +78,7 @@ interface ReviewRunResult {
 export interface ReviewLaunchAttemptShellOptions {
   cliOptions: ReviewLaunchCliOptions;
   prompt: string;
+  retryWithoutScopeFlagsGateError?: string | null;
   runtimeContext: RuntimeCodexCommandContext;
   repoRoot: string;
   manifestPath: string;
@@ -256,6 +257,18 @@ export async function runReviewLaunchAttemptShell(
     return;
   } catch (error) {
     if (shouldRetryWithoutScopeFlags(error)) {
+      if (
+        options.retryWithoutScopeFlagsGateError &&
+        shouldRewriteRetryFailureAsScopeGate(error, options.cliOptions)
+      ) {
+        const retryGateError = buildRetryWithoutScopeFlagsGateError(
+          error,
+          options.repoRoot,
+          options.retryWithoutScopeFlagsGateError
+        );
+        await reportFailure(retryGateError);
+        throw retryGateError;
+      }
       console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
       const unscopedArgs = buildReviewArgs(options.cliOptions, options.prompt, {
         includeScopeFlags: false,
@@ -467,5 +480,88 @@ function shouldRetryWithoutScopeFlags(error: unknown): boolean {
     combined.includes('prompt cannot') ||
     combined.includes('custom prompt') ||
     combined.includes('with a prompt')
+  );
+}
+
+function shouldRewriteRetryFailureAsScopeGate(
+  error: unknown,
+  cliOptions: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'uncommitted'>
+): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const scopeFlag = resolveScopeFlag(cliOptions);
+  const scopeFlagToken = scopeFlag?.args[0]?.toLowerCase() ?? null;
+  if (!scopeFlagToken) {
+    return false;
+  }
+  const preview = 'outputPreview' in error ? String((error as any).outputPreview ?? '') : '';
+  const message = 'message' in error ? String((error as any).message ?? '') : '';
+  const combined = `${message}\n${preview}`.toLowerCase();
+  const lines = combined
+    .toLowerCase()
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return (
+    lines.some(
+      (line) =>
+        line.includes(scopeFlagToken) &&
+        hasScopeFlagRejectionSignal(line)
+    ) ||
+    hasPromptScopeIncompatibilitySignal(combined, scopeFlagToken)
+  );
+}
+
+function hasScopeFlagRejectionSignal(line: string): boolean {
+  return (
+    line.includes('unknown option') ||
+    line.includes('unknown flag') ||
+    line.includes('unrecognized option') ||
+    line.includes('cannot be used with') ||
+    line.includes('cannot be combined') ||
+    line.includes('incompatible with') ||
+    line.includes('prompt cannot') ||
+    line.includes('custom prompt') ||
+    line.includes('with a prompt')
+  );
+}
+
+function hasPromptScopeIncompatibilitySignal(
+  combined: string,
+  scopeFlagToken: string
+): boolean {
+  const mentionsPrompt =
+    combined.includes('prompt cannot') ||
+    combined.includes('custom prompt') ||
+    combined.includes('with a prompt');
+  const mentionsScope =
+    combined.includes(scopeFlagToken) ||
+    combined.includes('diff scoping') ||
+    combined.includes('diff-scoping') ||
+    combined.includes('review scope') ||
+    combined.includes('scope flags');
+  return mentionsPrompt && mentionsScope;
+}
+
+function buildRetryWithoutScopeFlagsGateError(
+  error: unknown,
+  repoRoot: string,
+  retryWithoutScopeFlagsGateError: string
+): CodexReviewError {
+  const originalError = error instanceof CodexReviewError ? error : null;
+  return new CodexReviewError(
+    `codex CLI rejected the explicit review scope flags, and retrying without them would remove explicit review scope. ${retryWithoutScopeFlagsGateError}`,
+    {
+      exitCode:
+        typeof originalError?.exitCode === 'number' && originalError.exitCode > 0
+          ? originalError.exitCode
+          : 1,
+      signal: originalError?.signal ?? null,
+      timedOut: false,
+      outputPreview: originalError?.outputPreview ?? '',
+      reviewState: originalError?.reviewState ?? new ReviewExecutionState({ repoRoot }),
+      terminationBoundary: originalError?.terminationBoundary ?? null
+    }
   );
 }

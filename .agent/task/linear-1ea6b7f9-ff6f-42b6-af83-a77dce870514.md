@@ -21,24 +21,24 @@
 - [x] Delegation override was explicitly recorded for this worker run because subagent spawning is unavailable in-session. Evidence: `tasks/specs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md`.
 
 ## Implementation
-- [ ] Add a bounded success-side low-yield stop for post-startup diff reviews without regressing legitimate deep reviews.
-- [ ] Make review-gated manifest/run-summary consumers require truthful terminal evidence or an explicit waiver.
-- [ ] Tighten large uncommitted review scope to require `--base`, `--commit`, or an explicit override.
-- [ ] Update standalone review docs/config text to match the new behavior.
-- [ ] Add focused regressions across `tests/run-review.spec.ts`, `tests/review-execution-state.spec.ts`, `tests/review-execution-telemetry.spec.ts`, and any current large-scope advisory test equivalent.
+- [x] Add a bounded success-side low-yield stop for post-startup diff reviews without regressing legitimate deep reviews. Evidence: `scripts/lib/review-execution-runtime.ts`, `scripts/lib/review-execution-state.ts`, `tests/review-execution-state.spec.ts`, `tests/run-review.spec.ts`.
+- [x] Make review-gated manifest/run-summary consumers require truthful terminal evidence or an explicit waiver. Evidence: `scripts/run-review.ts`, `orchestrator/src/cli/services/commandRunner.ts`, `orchestrator/tests/CommandRunnerReviewEvidenceConsistency.test.ts`, `tests/review-execution-telemetry.spec.ts`, `tests/run-review.spec.ts`.
+- [x] Tighten large uncommitted review scope to require `--base`, `--commit`, or an explicit override. Evidence: `scripts/run-review.ts`, `scripts/lib/review-scope-advisory.ts`, `scripts/lib/review-launch-attempt.ts`, `orchestrator/tests/PipelineResolverEnvOverrides.test.ts`, `tests/review-launch-attempt.spec.ts`, `tests/run-review.spec.ts`.
+- [x] Update standalone review docs/config text to match the new behavior. Evidence: `docs/standalone-review-guide.md`, `codex.orchestrator.json`.
+- [x] Add focused regressions across `tests/run-review.spec.ts`, `tests/review-execution-state.spec.ts`, `tests/review-execution-telemetry.spec.ts`, and the current large-scope advisory seam. Evidence: `tests/run-review.spec.ts`, `tests/review-execution-state.spec.ts`, `tests/review-execution-telemetry.spec.ts`, `tests/review-launch-attempt.spec.ts`, `orchestrator/tests/PipelineResolverEnvOverrides.test.ts`.
 
 ## Validation
-- [ ] `DELEGATION_GUARD_OVERRIDE_REASON="subagent spawning unavailable in-session for this provider worker" node dist/bin/codex-orchestrator.js start docs-review --format json --no-interactive --task linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514`.
-- [ ] `DELEGATION_GUARD_OVERRIDE_REASON="subagent spawning unavailable in-session for this provider worker" node scripts/delegation-guard.mjs`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`.
-- [ ] `npm run build`.
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run docs:check`.
-- [ ] `npm run docs:freshness`.
-- [ ] `node scripts/diff-budget.mjs`.
-- [ ] `npm run review`.
-- [ ] `npm run pack:smoke`.
+- [x] `DELEGATION_GUARD_OVERRIDE_REASON="Provider worker run could not delegate because spawn_agent is unavailable without explicit user authorization in this session." DIFF_BUDGET_OVERRIDE_REASON="Shared stacked provider-worker branch already exceeds the origin/main diff budget; CO-16 validation is scoped on top of that baseline and the local slice is intentionally smaller than the branch aggregate." node dist/bin/codex-orchestrator.js start implementation-gate --format json --no-interactive --task linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`, `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/review/telemetry.json`.
+- [x] `DELEGATION_GUARD_OVERRIDE_REASON="Provider worker run could not delegate because spawn_agent is unavailable without explicit user authorization in this session." node scripts/delegation-guard.mjs`. Evidence: `out/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/manual/20260324T1305Z-delegation-guard.log`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`.
+- [x] `npm run build`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`.
+- [x] `npm run lint`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`.
+- [x] `npm run test`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`.
+- [x] `npm run docs:check`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`.
+- [x] `npm run docs:freshness`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`.
+- [x] `npm run review -- --manifest "$CODEX_ORCHESTRATOR_MANIFEST_PATH" --surface diff`. Evidence: `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/manifest.json`, `.runs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/cli/2026-03-24T12-55-39-408Z-97722664/review/telemetry.json`.
+- [x] `npm run pack:smoke`. Evidence: `out/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514/manual/20260324T1305Z-pack-smoke.log`.
 
 ## Delivery
 - [ ] Open PR for `CO-16`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.

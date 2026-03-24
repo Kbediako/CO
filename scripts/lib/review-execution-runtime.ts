@@ -308,8 +308,23 @@ function waitForReadableClosure(stream: NodeJS.ReadableStream | null | undefined
   });
 }
 
-async function waitForOutputSettlement(): Promise<void> {
-  await new Promise<void>((resolve) => setTimeout(resolve, 25));
+async function waitForOutputSettlement(getLastOutputAtMs: () => number): Promise<void> {
+  let lastOutputAtMs = getLastOutputAtMs();
+  let stablePasses = 0;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    const currentLastOutputAtMs = getLastOutputAtMs();
+    if (currentLastOutputAtMs === lastOutputAtMs) {
+      stablePasses += 1;
+      if (stablePasses >= 2) {
+        return;
+      }
+      continue;
+    }
+    lastOutputAtMs = currentLastOutputAtMs;
+    stablePasses = 0;
+  }
 }
 
 function envFlagEnabled(value: string | undefined): boolean {
@@ -537,7 +552,7 @@ async function waitForChildExit(
         } catch {
           // Best-effort drain only; fall through to current runtime state.
         }
-        await waitForOutputSettlement();
+        await waitForOutputSettlement(options.getLastOutputAtMs);
         cleanup();
         if (pendingTermination) {
           reject(pendingTermination);
@@ -667,11 +682,11 @@ async function waitForChildExit(
           return;
         }
         const blockedCommand = options.getBlockedHeavyCommand();
-        if (code === 0 && options.blockHeavyCommands && blockedCommand) {
+        if (options.blockHeavyCommands && blockedCommand) {
           reject(
             new CodexReviewError(formatBoundedHeavyCommandFailure(blockedCommand), {
-              exitCode: 1,
-              signal: null,
+              exitCode: typeof code === 'number' && code > 0 ? code : 1,
+              signal,
               timedOut: false,
               outputPreview: ''
             })
