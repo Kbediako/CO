@@ -34,6 +34,7 @@ import {
   normalizeProviderIntakeState,
   type ProviderIntakeState
 } from './providerIntakeState.js';
+import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
   LINEAR_ADVISORY_STATE_FILE,
   PROVIDER_INTAKE_STATE_FILE
@@ -57,6 +58,7 @@ interface ControlServerSeededRuntimeAssemblyOptions {
   delegationSeed: { tokens?: DelegationTokenRecord[] } | null;
   linearAdvisorySeed: LinearAdvisoryState | null;
   providerIntakeSeed: ProviderIntakeState | null;
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
   createProviderIssueHandoff?: ((input: {
     providerIntakeState: ProviderIntakeState;
     persistProviderIntake: () => Promise<void>;
@@ -144,7 +146,8 @@ export function createControlServerSeededRuntimeAssembly(
     questionQueue,
     paths: options.paths,
     linearAdvisoryState,
-    providerIntakeState
+    providerIntakeState,
+    providerWorkflowConfigStore: options.providerWorkflowConfigStore
   });
 
   const clients = new Set<http.ServerResponse>();

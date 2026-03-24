@@ -321,6 +321,7 @@ export async function readCompatibilityState(
     rate_limits: projection.rateLimits,
     selected: projection.selected,
     ...(projection.providerIntake ? { provider_intake: projection.providerIntake } : {}),
+    ...(projection.providerWorkflow ? { provider_workflow: projection.providerWorkflow } : {}),
     ...(projection.dispatchPilot ? { dispatch_pilot: projection.dispatchPilot } : {}),
     ...(projection.tracked ? { tracked: projection.tracked } : {})
   };

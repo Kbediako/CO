@@ -98,7 +98,8 @@ export function buildCompatibilityProjectionSnapshot(
     selected: selectedPayload,
     dispatchPilot: snapshot.dispatchPilot,
     tracked: snapshot.tracked,
-    providerIntake: snapshot.providerIntake
+    providerIntake: snapshot.providerIntake,
+    providerWorkflow: snapshot.providerWorkflow
   };
 }
 

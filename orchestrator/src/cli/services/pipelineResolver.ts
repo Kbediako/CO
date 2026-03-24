@@ -1,6 +1,11 @@
 import process from 'node:process';
 import { EnvironmentPaths } from '../run/environment.js';
-import { loadPackageConfig, loadUserConfig, type UserConfig } from '../config/userConfig.js';
+import {
+  loadPackageConfig,
+  loadUserConfig,
+  resolveRepoConfigPath,
+  type UserConfig
+} from '../config/userConfig.js';
 import { resolvePipeline } from '../pipelines/index.js';
 import {
   loadDesignConfig,
@@ -67,9 +72,13 @@ export class PipelineResolver {
       this.logInfo(`[design-config] using defaults (missing file at ${designConfig.path})`, quiet);
     }
     const repoConfigRequired = isRepoConfigRequired(runtimeEnv);
-    const userConfig = await loadUserConfig(env, { allowPackageFallback: !repoConfigRequired, quiet });
+    const userConfig = await loadUserConfig(env, {
+      allowPackageFallback: !repoConfigRequired,
+      quiet,
+      processEnv: runtimeEnv
+    });
     if (repoConfigRequired && userConfig?.source !== 'repo') {
-      throw new Error(formatRepoConfigRequiredError(env.repoRoot));
+      throw new Error(formatRepoConfigRequiredError(resolveRepoConfigPath(env, runtimeEnv)));
     }
     let configNotice: string | null = null;
     if (userConfig?.source === 'package') {

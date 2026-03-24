@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { PipelineResolver } from '../src/cli/services/pipelineResolver.js';
 import type { ManifestPersister } from '../src/cli/run/manifestPersister.js';
+import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { runOrchestratorResumePreparationShell } from '../src/cli/services/orchestratorResumePreparationShell.js';
 
 const initialEnvSnapshot = {
   CODEX_ORCHESTRATOR_RUNTIME_MODE: process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE,
   CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
+  [REPO_CONFIG_PATH_ENV_KEY]: process.env[REPO_CONFIG_PATH_ENV_KEY],
   CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE,
   CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID:
     process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID,
@@ -447,5 +449,56 @@ describe('runOrchestratorResumePreparationShell', () => {
 
     expect(result.runtimeModeResolution).toEqual({ mode: 'cli', source: 'env' });
     expect(applyRequestedRuntimeMode).toHaveBeenCalledWith(manifest, 'cli');
+  });
+
+  it('reports the resolved repo-config override path when strict repo config is required', async () => {
+    process.env[REPO_CONFIG_PATH_ENV_KEY] = 'config/provider-snapshot.json';
+
+    await expect(
+      runOrchestratorResumePreparationShell({
+        baseEnv: {
+          repoRoot: '/tmp/repo',
+          taskId: 'task-base',
+          runsRoot: '/tmp/repo/.runs',
+          outRoot: '/tmp/repo/out'
+        } as never,
+        options: { runId: 'run-1' },
+        validateResumeToken: vi.fn(async () => undefined),
+        applyRequestedRuntimeMode: vi.fn(),
+        loadManifestImpl: vi.fn(async () => ({
+          manifest: {
+            task_id: 'task-1',
+            pipeline_id: 'pipeline-1',
+            plan_target_id: null,
+            runtime_mode_requested: 'appserver',
+            runtime_mode: 'appserver',
+            heartbeat_interval_seconds: 1,
+            run_id: 'run-1'
+          } as never,
+          paths: {
+            runDir: '/tmp/repo/.runs/task-1/run-1',
+            manifestPath: '/tmp/repo/.runs/task-1/run-1/manifest.json',
+            logPath: '/tmp/repo/.runs/task-1/run-1/runner.ndjson'
+          } as never
+        })),
+        overrideTaskEnvironmentImpl: vi.fn((env) => ({ ...env, taskId: 'task-1' })),
+        createResolver: () =>
+          ({
+            loadDesignConfig: vi.fn(async () => null),
+            resolveDesignEnvOverrides: vi.fn(() => ({}))
+          }) as unknown as PipelineResolver,
+        isRepoConfigRequiredImpl: vi.fn(() => true),
+        loadUserConfigImpl: vi.fn(async () => ({ source: 'package' })),
+        loadPackageConfigImpl: vi.fn(async () => null),
+        resolvePipelineForResumeImpl: vi.fn(),
+        recordResumeEventImpl: vi.fn(),
+        resetForResumeImpl: vi.fn(),
+        updateHeartbeatImpl: vi.fn(),
+        prepareRunImpl: vi.fn(),
+        resolveRuntimeModeImpl: vi.fn(),
+        appendSummaryImpl: vi.fn(),
+        createPersister: vi.fn()
+      })
+    ).rejects.toThrow('/tmp/repo/config/provider-snapshot.json');
   });
 });
