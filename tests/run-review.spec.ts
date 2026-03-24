@@ -233,9 +233,27 @@ fi
       echo "stderr-ok" >&2
       exit 0
     fi
+    if [[ "$mode" == "reject-title-base-incompatibility-double-quoted" ]]; then
+      if [[ "$*" == *"--title"* ]]; then
+        echo '--title cannot be used with "--base"' >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
     if [[ "$mode" == "reject-base-unknown-option" ]]; then
       if [[ "$*" == *"--base"* ]]; then
         echo "unknown option --base" >&2
+        exit 1
+      fi
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "reject-base-quoted-unknown-option" ]]; then
+      if [[ "$*" == *"--base"* ]]; then
+        echo "unknown option '--base'" >&2
         exit 1
       fi
       echo "stdout-ok"
@@ -2731,6 +2749,90 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('--title cannot be used with --base');
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+  });
+
+  it('fails when a quoted title/base incompatibility would drop explicit base scope', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title-base-incompatibility-double-quoted',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('--title cannot be used with "--base"');
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const invocations = parseArgsLogInvocations(argsLog);
+    const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+  });
+
+  it('fails when quoted explicit base scope rejection would drop explicit base scope', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-base-quoted-unknown-option',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1'
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain("unknown option '--base'");
     expect(result.stderr).toContain('retrying without them would remove explicit review scope');
     const argsLog = await readFile(argsLogPath, 'utf8');
     const invocations = parseArgsLogInvocations(argsLog);

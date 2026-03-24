@@ -515,6 +515,120 @@ Usage: codex review [options]
     expect(logTerminationBoundaryFallback).toHaveBeenCalledTimes(1);
   });
 
+  it('fails instead of retrying when a quoted explicit base scope rejection would drop scope', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
+    const launchArgs: string[][] = [];
+    const failureState = makeState(sandbox);
+    const writeTelemetry = vi.fn().mockResolvedValue(null);
+    const logTerminationBoundaryFallback = vi.fn();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      runReviewLaunchAttemptShell({
+        cliOptions: { task: 'sample-task', base: 'origin/main', title: 'Sample review' },
+        prompt: 'Prompt body',
+        retryWithoutScopeFlagsGateError:
+          'explicit `--base` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.',
+        runtimeContext: {} as any,
+        repoRoot: sandbox,
+        manifestPath,
+        artifactPaths,
+        autoIssueLogEnabled: false,
+        telemetryDebugEnabled: false,
+        telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+        ensureReviewCommandAvailableFn: async () => {},
+        resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
+        runReview: async (resolved) => {
+          launchArgs.push(resolved.args);
+          throw new CodexReviewError("unknown option '--base'", {
+            exitCode: 1,
+            signal: null,
+            timedOut: false,
+            outputPreview: "unknown option '--base'",
+            reviewState: failureState
+          });
+        },
+        writeTelemetry,
+        logTelemetrySummary: () => {
+          throw new Error('telemetry summary should not run when telemetry persistence returns null');
+        },
+        logTerminationBoundaryFallback
+      })
+    ).rejects.toThrow('retrying without them would remove explicit review scope');
+
+    expect(launchArgs).toHaveLength(1);
+    expect(launchArgs[0]).toContain('--base');
+    expect(launchArgs[0]).toContain('--title');
+    expect(writeTelemetry).toHaveBeenCalledTimes(1);
+    expect(writeTelemetry).toHaveBeenCalledWith(
+      failureState,
+      'failed',
+      expect.stringContaining('explicit `--base` review scope must remain auditable'),
+      null
+    );
+    expect(logTerminationBoundaryFallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails instead of retrying when a quoted title/base incompatibility would drop scope', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
+    const launchArgs: string[][] = [];
+    const failureState = makeState(sandbox);
+    const writeTelemetry = vi.fn().mockResolvedValue(null);
+    const logTerminationBoundaryFallback = vi.fn();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      runReviewLaunchAttemptShell({
+        cliOptions: { task: 'sample-task', base: 'origin/main', title: 'Sample review' },
+        prompt: 'Prompt body',
+        retryWithoutScopeFlagsGateError:
+          'explicit `--base` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.',
+        runtimeContext: {} as any,
+        repoRoot: sandbox,
+        manifestPath,
+        artifactPaths,
+        autoIssueLogEnabled: false,
+        telemetryDebugEnabled: false,
+        telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+        ensureReviewCommandAvailableFn: async () => {},
+        resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
+        runReview: async (resolved) => {
+          launchArgs.push(resolved.args);
+          throw new CodexReviewError('--title cannot be used with "--base"', {
+            exitCode: 1,
+            signal: null,
+            timedOut: false,
+            outputPreview: '--title cannot be used with "--base"',
+            reviewState: failureState
+          });
+        },
+        writeTelemetry,
+        logTelemetrySummary: () => {
+          throw new Error('telemetry summary should not run when telemetry persistence returns null');
+        },
+        logTerminationBoundaryFallback
+      })
+    ).rejects.toThrow('retrying without them would remove explicit review scope');
+
+    expect(launchArgs).toHaveLength(1);
+    expect(launchArgs[0]).toContain('--base');
+    expect(launchArgs[0]).toContain('--title');
+    expect(writeTelemetry).toHaveBeenCalledTimes(1);
+    expect(writeTelemetry).toHaveBeenCalledWith(
+      failureState,
+      'failed',
+      expect.stringContaining('explicit `--base` review scope must remain auditable'),
+      null
+    );
+    expect(logTerminationBoundaryFallback).toHaveBeenCalledTimes(1);
+  });
+
   it('captures failure state and partial-output hint when the retry also fails on a timeout boundary', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
