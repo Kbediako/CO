@@ -15,6 +15,7 @@ import {
   sortLiveLinearTrackedIssuesForDispatch,
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
+import { resolveLinearApiTokenFingerprint } from './linearGraphqlClient.js';
 import {
   classifyProviderLinearWorkflowState,
   isProviderLinearTrackedIssueEligibleForExecution,
@@ -176,6 +177,7 @@ type ProviderTrackedIssueRefreshDisposition =
         | 'state'
         | 'state_type'
         | 'updated_at'
+        | 'viewer_id'
         | 'assignee_id'
         | 'assignee_name'
         | 'blocked_by'
@@ -327,6 +329,7 @@ export function createProviderIssueHandoffService(
       | 'state'
       | 'state_type'
       | 'updated_at'
+      | 'viewer_id'
       | 'assignee_id'
       | 'assignee_name'
       | 'blocked_by'
@@ -338,6 +341,8 @@ export function createProviderIssueHandoffService(
     | 'issue_state'
     | 'issue_state_type'
     | 'issue_updated_at'
+    | 'issue_viewer_id'
+    | 'issue_viewer_auth_fingerprint'
     | 'issue_assignee_id'
     | 'issue_assignee_name'
     | 'issue_blocked_by'
@@ -347,6 +352,11 @@ export function createProviderIssueHandoffService(
     issue_state: trackedIssue.state,
     issue_state_type: trackedIssue.state_type,
     issue_updated_at: trackedIssue.updated_at,
+    issue_viewer_id: trackedIssue.viewer_id,
+    issue_viewer_auth_fingerprint:
+      typeof trackedIssue.viewer_id === 'string' && trackedIssue.viewer_id.length > 0
+        ? resolveProviderViewerAuthFingerprint()
+        : null,
     issue_assignee_id: trackedIssue.assignee_id,
     issue_assignee_name: trackedIssue.assignee_name,
     ...(trackedIssue.blocked_by === undefined ? {} : { issue_blocked_by: trackedIssue.blocked_by })
@@ -519,6 +529,7 @@ export function createProviderIssueHandoffService(
       | 'state'
       | 'state_type'
       | 'updated_at'
+      | 'viewer_id'
       | 'assignee_id'
       | 'assignee_name'
       | 'blocked_by'
@@ -548,6 +559,14 @@ export function createProviderIssueHandoffService(
       issue_state: input.trackedIssue?.state ?? input.claim.issue_state,
       issue_state_type: input.trackedIssue?.state_type ?? input.claim.issue_state_type,
       issue_updated_at: input.trackedIssue?.updated_at ?? input.claim.issue_updated_at,
+      issue_viewer_id:
+        input.trackedIssue != null
+          ? trackedIssueFields?.issue_viewer_id ?? null
+          : (input.claim.issue_viewer_id ?? null),
+      issue_viewer_auth_fingerprint:
+        input.trackedIssue != null
+          ? trackedIssueFields?.issue_viewer_auth_fingerprint ?? null
+          : (input.claim.issue_viewer_auth_fingerprint ?? null),
       issue_assignee_id:
         input.trackedIssue != null ? input.trackedIssue.assignee_id : (input.claim.issue_assignee_id ?? null),
       issue_assignee_name:
@@ -1132,7 +1151,10 @@ export function createProviderIssueHandoffService(
     }
 
     if (!options.resolveTrackedIssue) {
-      const trackedIssue = buildTrackedIssueSnapshotFromClaim(claim);
+      const trackedIssue = buildTrackedIssueSnapshotFromClaim(
+        claim,
+        resolveProviderViewerAuthFingerprint()
+      );
       const authority = assessProviderTrackedIssueEligibility(trackedIssue, {
         hasExistingClaim: true
       });
@@ -1380,6 +1402,18 @@ export function createProviderIssueHandoffService(
                 : preserveReleasedIssueMetadata
                   ? existing.issue_updated_at
                   : claimBase.issue_updated_at,
+            issue_viewer_id:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_viewer_id
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_viewer_id ?? null
+                  : claimBase.issue_viewer_id,
+            issue_viewer_auth_fingerprint:
+              newerWebhookBlockedByDrain
+                ? claimBase.issue_viewer_auth_fingerprint
+                : preserveReleasedIssueMetadata
+                  ? existing.issue_viewer_auth_fingerprint ?? null
+                  : claimBase.issue_viewer_auth_fingerprint,
             issue_assignee_id:
               newerWebhookBlockedByDrain
                 ? claimBase.issue_assignee_id
@@ -2761,6 +2795,8 @@ function hasProviderClaimTransitioned(
     | 'issue_state'
     | 'issue_state_type'
     | 'issue_updated_at'
+    | 'issue_viewer_id'
+    | 'issue_viewer_auth_fingerprint'
     | 'issue_assignee_id'
     | 'issue_assignee_name'
     | 'issue_blocked_by'
@@ -2794,6 +2830,8 @@ function hasProviderClaimTransitioned(
           | 'issue_state'
           | 'issue_state_type'
           | 'issue_updated_at'
+          | 'issue_viewer_id'
+          | 'issue_viewer_auth_fingerprint'
           | 'issue_assignee_id'
           | 'issue_assignee_name'
           | 'issue_blocked_by'
@@ -2821,6 +2859,14 @@ function hasProviderClaimTransitioned(
     (
       next.issue_updated_at !== undefined &&
       claim.issue_updated_at !== next.issue_updated_at
+    ) ||
+    (
+      next.issue_viewer_id !== undefined &&
+      (claim.issue_viewer_id ?? null) !== (next.issue_viewer_id ?? null)
+    ) ||
+    (
+      next.issue_viewer_auth_fingerprint !== undefined &&
+      (claim.issue_viewer_auth_fingerprint ?? null) !== (next.issue_viewer_auth_fingerprint ?? null)
     ) ||
     (
       next.issue_assignee_id !== undefined &&
@@ -3112,11 +3158,20 @@ function buildTrackedIssueSnapshotFromClaim(
     | 'issue_state'
     | 'issue_state_type'
     | 'issue_updated_at'
+    | 'issue_viewer_id'
+    | 'issue_viewer_auth_fingerprint'
     | 'issue_assignee_id'
     | 'issue_assignee_name'
     | 'issue_blocked_by'
-  >
+  >,
+  currentViewerAuthFingerprint: string | null
 ): LiveLinearTrackedIssue {
+  const canTrustPersistedViewerIdentity =
+    typeof claim.issue_viewer_id === 'string' &&
+    claim.issue_viewer_id.length > 0 &&
+    typeof claim.issue_viewer_auth_fingerprint === 'string' &&
+    claim.issue_viewer_auth_fingerprint.length > 0 &&
+    currentViewerAuthFingerprint === claim.issue_viewer_auth_fingerprint;
   return {
     provider: 'linear',
     id: claim.issue_id,
@@ -3125,7 +3180,7 @@ function buildTrackedIssueSnapshotFromClaim(
     url: null,
     state: claim.issue_state,
     state_type: claim.issue_state_type,
-    viewer_id: null,
+    viewer_id: canTrustPersistedViewerIdentity ? claim.issue_viewer_id ?? null : null,
     assignee_id: claim.issue_assignee_id ?? null,
     assignee_name: claim.issue_assignee_name ?? null,
     workspace_id: null,
@@ -3138,6 +3193,10 @@ function buildTrackedIssueSnapshotFromClaim(
     blocked_by: claim.issue_blocked_by ?? [],
     recent_activity: []
   };
+}
+
+function resolveProviderViewerAuthFingerprint(): string | null {
+  return resolveLinearApiTokenFingerprint(process.env);
 }
 
 function stripProviderIssueReleasedPrefix(reason: string): string {

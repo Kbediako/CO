@@ -33,6 +33,8 @@ export interface ProviderIntakeClaimRecord {
   issue_state: string | null;
   issue_state_type: string | null;
   issue_updated_at: string | null;
+  issue_viewer_id?: string | null;
+  issue_viewer_auth_fingerprint?: string | null;
   issue_assignee_id?: string | null;
   issue_assignee_name?: string | null;
   issue_blocked_by?: LiveLinearTrackedIssue['blocked_by'] | null;
@@ -74,6 +76,7 @@ export interface ProviderIntakeSummaryPayload {
   issue_state: string | null;
   issue_state_type: string | null;
   issue_updated_at: string | null;
+  issue_viewer_id?: string | null;
   issue_assignee_id?: string | null;
   issue_assignee_name?: string | null;
   task_id: string;
@@ -207,6 +210,14 @@ export function upsertProviderIntakeClaim(
     issue_state: input.issue_state ?? null,
     issue_state_type: input.issue_state_type ?? null,
     issue_updated_at: input.issue_updated_at ?? null,
+    issue_viewer_id:
+      input.issue_viewer_id === undefined
+        ? existing?.issue_viewer_id ?? null
+        : input.issue_viewer_id ?? null,
+    issue_viewer_auth_fingerprint:
+      input.issue_viewer_auth_fingerprint === undefined
+        ? existing?.issue_viewer_auth_fingerprint ?? null
+        : input.issue_viewer_auth_fingerprint ?? null,
     issue_assignee_id: input.issue_assignee_id ?? null,
     issue_assignee_name: input.issue_assignee_name ?? null,
     issue_blocked_by:
@@ -326,6 +337,7 @@ export function buildProviderIntakeSummary(
     issue_state: claim.issue_state,
     issue_state_type: claim.issue_state_type,
     issue_updated_at: claim.issue_updated_at,
+    issue_viewer_id: claim.issue_viewer_id ?? null,
     issue_assignee_id: claim.issue_assignee_id ?? null,
     issue_assignee_name: claim.issue_assignee_name ?? null,
     task_id: claim.task_id,
@@ -380,6 +392,12 @@ function normalizeProviderIntakeClaim(
     issue_state: typeof input.issue_state === 'string' ? input.issue_state : null,
     issue_state_type: typeof input.issue_state_type === 'string' ? input.issue_state_type : null,
     issue_updated_at: typeof input.issue_updated_at === 'string' ? input.issue_updated_at : null,
+    issue_viewer_id:
+      typeof input.issue_viewer_id === 'string' ? input.issue_viewer_id : null,
+    issue_viewer_auth_fingerprint:
+      typeof input.issue_viewer_auth_fingerprint === 'string'
+        ? input.issue_viewer_auth_fingerprint
+        : null,
     issue_assignee_id:
       typeof input.issue_assignee_id === 'string' ? input.issue_assignee_id : null,
     issue_assignee_name:

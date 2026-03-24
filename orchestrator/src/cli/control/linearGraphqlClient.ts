@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 const DEFAULT_LINEAR_REQUEST_TIMEOUT_MS = 30_000;
 
@@ -110,6 +112,11 @@ export function resolveLinearApiToken(env: NodeJS.ProcessEnv): string | null {
     normalizeEnvValue(env.CO_LINEAR_API_KEY) ??
     normalizeEnvValue(env.LINEAR_API_KEY)
   );
+}
+
+export function resolveLinearApiTokenFingerprint(env: NodeJS.ProcessEnv): string | null {
+  const token = resolveLinearApiToken(env);
+  return token ? createHash('sha256').update(token).digest('hex') : null;
 }
 
 export function resolveLinearRequestTimeoutMs(env: NodeJS.ProcessEnv): number {

@@ -1,7 +1,49 @@
 {
   "version": 1,
-  "generated_at": "2026-03-23",
+  "generated_at": "2026-03-24",
   "entries": [
+    {
+      "path": ".agent/task/1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-24",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-24",
+      "cadence_days": 30
+    },
     {
       "path": ".agent/task/linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
       "owner": "Codex (top-level agent), Review agent",
