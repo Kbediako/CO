@@ -503,6 +503,7 @@ function shouldRewriteRetryFailureAsScopeGate(
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   return (
+    hasExplicitScopeFlagRejectionSignal(lines, scopeFlagToken) ||
     lines.some(
       (line) =>
         line.includes(scopeFlagToken) &&
@@ -510,6 +511,16 @@ function shouldRewriteRetryFailureAsScopeGate(
     ) ||
     hasPromptScopeIncompatibilitySignal(combined, scopeFlagToken)
   );
+}
+
+function hasExplicitScopeFlagRejectionSignal(lines: string[], scopeFlagToken: string): boolean {
+  const escapedScopeFlagToken = escapeForRegExp(scopeFlagToken);
+  const directScopeRejectionPatterns = [
+    new RegExp(`(?:unknown option|unknown flag|unrecognized option)\\s+${escapedScopeFlagToken}`),
+    new RegExp(`^(?:option\\s+)?${escapedScopeFlagToken}\\s+(?:cannot be used with|cannot be combined|is incompatible with)`),
+    new RegExp(`^(?:flag\\s+)?${escapedScopeFlagToken}\\s+(?:cannot be used with|cannot be combined|is incompatible with)`)
+  ];
+  return lines.some((line) => directScopeRejectionPatterns.some((pattern) => pattern.test(line)));
 }
 
 function hasPromptScopeFlagRejectionSignal(line: string): boolean {
@@ -570,4 +581,8 @@ function buildRetryWithoutScopeFlagsGateError(
       terminationBoundary: originalError?.terminationBoundary ?? null
     }
   );
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
