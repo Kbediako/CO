@@ -22,6 +22,7 @@ type Deferred<T> = {
 beforeEach(async () => {
   workspaceRoot = await mkdtemp(join(tmpdir(), 'provider-workflow-store-'));
   revisionTick = 0;
+  delete process.env[REPO_CONFIG_PATH_ENV_KEY];
 });
 
 afterEach(async () => {
@@ -238,6 +239,29 @@ describe('providerWorkflowConfigStore', () => {
       snapshot_path: snapshotPath
     });
     expect(store.snapshot().last_error).toBeTruthy();
+  });
+
+  it('rewrites a corrupted snapshot before short-circuiting an unchanged revision', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    const snapshotPath = await store.getLaunchConfigPath();
+    const initialSnapshot = await readFile(snapshotPath, 'utf8');
+
+    await writeFile(snapshotPath, '{ invalid json', 'utf8');
+
+    const refreshed = await store.refresh();
+    const healedSnapshot = await readFile(snapshotPath, 'utf8');
+
+    expect(refreshed.status).toBe('ready');
+    expect(refreshed.last_error).toBeNull();
+    expect(healedSnapshot).toBe(initialSnapshot);
+    expect(await store.getLaunchConfigPath()).toBe(snapshotPath);
   });
 
   it('preserves the last known good snapshot when rewriting it fails', async () => {

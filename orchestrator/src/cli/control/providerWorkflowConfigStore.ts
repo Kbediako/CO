@@ -52,12 +52,17 @@ export function createProviderWorkflowConfigStore(
     last_error: null
   };
 
-  async function snapshotExists(path: string | null): Promise<boolean> {
+  async function snapshotIsUsable(path: string | null): Promise<boolean> {
     if (!path) {
       return false;
     }
     try {
-      return (await stat(path)).isFile();
+      if (!(await stat(path)).isFile()) {
+        return false;
+      }
+      const raw = await readFile(path, 'utf8');
+      const config = parseUserConfigRaw(raw, 'repo');
+      return Boolean(config && findPipeline(config, createOptions.pipelineId));
     } catch {
       return false;
     }
@@ -112,13 +117,13 @@ export function createProviderWorkflowConfigStore(
   async function getLaunchConfigPath(): Promise<string> {
     return await runWithReloadLock(async () => {
       let nextState = await refreshUnlocked();
-      if (!(await snapshotExists(nextState.snapshot_path))) {
+      if (!(await snapshotIsUsable(nextState.snapshot_path))) {
         nextState = await attemptReload({
           startup: false,
           forceSnapshotRewrite: true
         });
       }
-      if (!nextState.snapshot_path || !(await snapshotExists(nextState.snapshot_path))) {
+      if (!nextState.snapshot_path || !(await snapshotIsUsable(nextState.snapshot_path))) {
         throw new Error(
           nextState.last_error
             ? `Provider workflow config snapshot is unavailable: ${nextState.last_error}`
@@ -146,7 +151,7 @@ export function createProviderWorkflowConfigStore(
         !reloadOptions.forceSnapshotRewrite &&
         revision === lastObservedRevision &&
         state.status === 'ready' &&
-        (await snapshotExists(state.snapshot_path))
+        (await snapshotIsUsable(state.snapshot_path))
       ) {
         return state;
       }
