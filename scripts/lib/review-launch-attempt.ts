@@ -178,6 +178,9 @@ export async function runReviewLaunchAttemptShell(
     disableDelegationMcp
   });
   const resolvedScoped = resolveCommand(scopedReviewArgs, options.runtimeContext);
+  const launchedWithExplicitScope = scopedReviewArgs.some(
+    (arg) => arg === '--base' || arg === '--commit' || arg === '--uncommitted'
+  );
   console.log(`Review prompt saved to: ${path.relative(options.repoRoot, options.artifactPaths.promptPath)}`);
   console.log(`Review output log: ${path.relative(options.repoRoot, options.artifactPaths.outputLogPath)}`);
   console.log(
@@ -257,8 +260,7 @@ export async function runReviewLaunchAttemptShell(
     return;
   } catch (error) {
     if (shouldRetryWithoutScopeFlags(error)) {
-      const hasExplicitScope = resolveScopeFlag(options.cliOptions) !== null;
-      if (hasExplicitScope) {
+      if (launchedWithExplicitScope) {
         if (
           options.retryWithoutScopeFlagsGateError &&
           shouldRewriteRetryFailureAsScopeGate(error, options.cliOptions)
