@@ -30,7 +30,8 @@ import {
 } from '../config/repoConfigPolicy.js';
 import {
   loadPackageConfig,
-  loadUserConfig
+  loadUserConfig,
+  resolveRepoConfigPath
 } from '../config/userConfig.js';
 
 export interface RunOrchestratorResumePreparationShellParams {
@@ -44,6 +45,7 @@ export interface RunOrchestratorResumePreparationShellParams {
   isRepoConfigRequiredImpl?: typeof isRepoConfigRequired;
   loadUserConfigImpl?: typeof loadUserConfig;
   loadPackageConfigImpl?: typeof loadPackageConfig;
+  resolveRepoConfigPathImpl?: typeof resolveRepoConfigPath;
   formatRepoConfigRequiredErrorImpl?: typeof formatRepoConfigRequiredError;
   resolvePipelineForResumeImpl?: typeof resolvePipelineForResume;
   recordResumeEventImpl?: typeof recordResumeEvent;
@@ -72,6 +74,7 @@ export async function runOrchestratorResumePreparationShell(
   const isRepoConfigRequiredImpl = params.isRepoConfigRequiredImpl ?? isRepoConfigRequired;
   const loadUserConfigImpl = params.loadUserConfigImpl ?? loadUserConfig;
   const loadPackageConfigImpl = params.loadPackageConfigImpl ?? loadPackageConfig;
+  const resolveRepoConfigPathImpl = params.resolveRepoConfigPathImpl ?? resolveRepoConfigPath;
   const formatRepoConfigRequiredErrorImpl =
     params.formatRepoConfigRequiredErrorImpl ?? formatRepoConfigRequiredError;
   const resolvePipelineForResumeImpl =
@@ -93,7 +96,7 @@ export async function runOrchestratorResumePreparationShell(
   const repoConfigRequired = isRepoConfigRequiredImpl(process.env);
   const userConfig = await loadUserConfigImpl(actualEnv, { allowPackageFallback: !repoConfigRequired });
   if (repoConfigRequired && userConfig?.source !== 'repo') {
-    throw new Error(formatRepoConfigRequiredErrorImpl(actualEnv.repoRoot));
+    throw new Error(formatRepoConfigRequiredErrorImpl(resolveRepoConfigPathImpl(actualEnv, process.env)));
   }
   const fallbackConfig =
     !repoConfigRequired && manifest.pipeline_id === 'rlm' && userConfig?.source === 'repo'

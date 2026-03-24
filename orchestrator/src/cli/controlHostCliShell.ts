@@ -31,6 +31,12 @@ import {
 } from './run/workspacePath.js';
 import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from './providerLinearWorkerRunner.js';
 import {
+  REPO_CONFIG_PATH_ENV_KEY,
+} from './config/userConfig.js';
+import {
+  REPO_CONFIG_REQUIRED_ENV_KEY
+} from './config/repoConfigPolicy.js';
+import {
   closeControlServerPublicLifecycle,
   runProviderIssueHandoffRefresh,
   runProviderIssueHandoffRehydrate,
@@ -45,6 +51,10 @@ import {
   createProviderIssueHandoffService,
   type ProviderIssueHandoffService
 } from './control/providerIssueHandoff.js';
+import {
+  createProviderWorkflowConfigStore,
+  type ProviderWorkflowConfigStore
+} from './control/providerWorkflowConfigStore.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -102,6 +112,12 @@ export async function runControlHostCliShell(
   const env = { ...baseEnv, taskId };
   const paths = resolveRunPaths(env, runId);
   await mkdir(paths.runDir, { recursive: true });
+  const providerWorkflowConfigStore = createProviderWorkflowConfigStore({
+    env,
+    runDir: paths.runDir,
+    pipelineId: startPipelineId
+  });
+  await providerWorkflowConfigStore.bootstrap();
 
   const configFiles = await loadDelegationConfigFiles({ repoRoot: env.repoRoot });
   const layers = [
@@ -123,6 +139,7 @@ export async function runControlHostCliShell(
     paths,
     config,
     runId,
+    providerWorkflowConfigStore,
     createProviderIssueHandoff: ({
       providerIntakeState,
       persistProviderIntake,
@@ -172,7 +189,11 @@ export async function runControlHostCliShell(
         },
         launcher: {
           start: async (input) => {
-            const launchSpec = await resolveProviderStartLaunchSpec(env, input.taskId);
+            const launchSpec = await resolveProviderStartLaunchSpec(
+              env,
+              input.taskId,
+              providerWorkflowConfigStore
+            );
             return await spawnBackgroundCliAndWaitForManifest(
               launchSpec.cwd,
               cliEntrypoint,
@@ -210,7 +231,11 @@ export async function runControlHostCliShell(
             );
           },
           resume: async (input) => {
-            const launchSpec = await resolveProviderResumeLaunchSpec(env, input.runId);
+            const launchSpec = await resolveProviderResumeLaunchSpec(
+              env,
+              input.runId,
+              providerWorkflowConfigStore
+            );
             await spawnBackgroundCli(launchSpec.cwd, cliEntrypoint, [
               'resume',
               '--run',
@@ -404,15 +429,18 @@ async function findSpawnManifest(params: {
 
 async function resolveProviderStartLaunchSpec(
   env: EnvironmentPaths,
-  taskId: string
+  taskId: string,
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore
 ): Promise<ProviderLaunchSpec> {
   const workspacePath = await ensureProviderWorkspace(env.repoRoot, taskId);
-  return buildProviderLaunchSpec(env, workspacePath);
+  const configPath = await resolveProviderLaunchConfigPath(env, providerWorkflowConfigStore);
+  return buildProviderLaunchSpec(env, workspacePath, configPath);
 }
 
 async function resolveProviderResumeLaunchSpec(
   env: EnvironmentPaths,
-  runId: string
+  runId: string,
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore
 ): Promise<ProviderLaunchSpec> {
   const { manifest, paths } = await loadManifest(env, runId);
   const resumeTaskId = await resolveProviderResumeTaskId(
@@ -428,7 +456,8 @@ async function resolveProviderResumeLaunchSpec(
     resumeTaskId,
     manifest as unknown as Record<string, unknown>
   );
-  const launchSpec = buildProviderLaunchSpec(env, workspacePath);
+  const configPath = await resolveProviderLaunchConfigPath(env, providerWorkflowConfigStore);
+  const launchSpec = buildProviderLaunchSpec(env, workspacePath, configPath);
   return {
     ...launchSpec,
     envOverrides: {
@@ -436,6 +465,16 @@ async function resolveProviderResumeLaunchSpec(
       ...(await resolveProviderResumeLinearSourceEnvOverrides(paths.runDir))
     }
   };
+}
+
+async function resolveProviderLaunchConfigPath(
+  env: EnvironmentPaths,
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore
+): Promise<string> {
+  if (providerWorkflowConfigStore) {
+    return await providerWorkflowConfigStore.getLaunchConfigPath();
+  }
+  return join(env.repoRoot, 'codex.orchestrator.json');
 }
 
 function buildProviderLinearSourceEnvOverrides(input: ProviderLinearSourceScope): Record<string, string> {
@@ -451,14 +490,17 @@ function buildProviderLinearSourceEnvOverrides(input: ProviderLinearSourceScope)
 
 function buildProviderLaunchSpec(
   env: EnvironmentPaths,
-  workspacePath: string
+  workspacePath: string,
+  repoConfigPath: string
 ): ProviderLaunchSpec {
   return {
     cwd: workspacePath,
     envOverrides: {
       CODEX_ORCHESTRATOR_ROOT: workspacePath,
       CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
-      CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot
+      CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+      [REPO_CONFIG_PATH_ENV_KEY]: repoConfigPath,
+      [REPO_CONFIG_REQUIRED_ENV_KEY]: '1'
     }
   };
 }
@@ -511,6 +553,7 @@ function parseProviderLinearSourceScopeFromProof(input: unknown): ProviderLinear
 
 export const __test__ = {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
+  buildProviderLaunchSpec,
   buildProviderLinearSourceEnvOverrides,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,

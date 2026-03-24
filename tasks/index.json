@@ -17,6 +17,38 @@
       }
     },
     {
+      "id": "20260324-1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback",
+      "title": "Coordinator Live Linear Snapshot-Only Retry Assignee-Identity Fallback",
+      "relates_to": "tasks/tasks-1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-24",
+      "paths": {
+        "spec": "tasks/specs/1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+        "task": "tasks/tasks-1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+        "agent_task": ".agent/task/1322-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md",
+        "docs": "docs/TECH_SPEC-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md"
+      }
+    },
+    {
+      "id": "20260324-linear-41f54a87-705b-467d-9e88-f49c6315f0dc",
+      "title": "Workflow Reload with Last Known Good Fallback",
+      "relates_to": "tasks/tasks-linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-24",
+      "paths": {
+        "spec": "tasks/specs/linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
+        "task": "tasks/tasks-linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
+        "agent_task": ".agent/task/linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
+        "docs": "docs/TECH_SPEC-linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md"
+      }
+    },
+    {
       "id": "20260323-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery",
       "title": "Coordinator Live Linear Unassigned Active-Claim Alignment and Recovery",
       "relates_to": "tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md",
