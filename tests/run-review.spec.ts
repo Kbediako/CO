@@ -2247,12 +2247,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    const argsLogPath = join(sandbox, 'review-args.log');
     for (const file of files) {
       await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
     }
 
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
       CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
       CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
     });
@@ -2263,6 +2265,10 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain(
       'large uncommitted review scope requires explicit scoping or override'
     );
+    const reviewInvocations = parseArgsLogInvocations(
+      await readFile(argsLogPath, 'utf8').catch(() => '')
+    ).filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(0);
   });
 
   it('allows large uncommitted review scope only with an auditable override', async () => {
@@ -2270,12 +2276,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    const argsLogPath = join(sandbox, 'review-args.log');
     for (const file of files) {
       await writeFile(join(sandbox, file), `updated-${file}\n`, 'utf8');
     }
 
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
       CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
       CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2',
       CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON: 'operator requested full working-tree review'
@@ -2291,6 +2299,10 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain('Scope advisory: large uncommitted diff detected');
     expect(prompt).toContain('Large-scope override recorded: operator requested full working-tree review');
     expect(prompt).toContain('Prioritize highest-risk findings first');
+    const reviewInvocations = parseArgsLogInvocations(
+      await readFile(argsLogPath, 'utf8').catch(() => '')
+    ).filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations.length).toBeGreaterThanOrEqual(1);
   });
 
   it('uses path-only uncommitted scope notes in prompts', async () => {
@@ -2417,7 +2429,11 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('retrying without them would remove explicit review scope');
     expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
     const argsLog = await readFile(argsLogPath, 'utf8');
-    expect(argsLog).toContain(`argv=review --base ${baseRef}`);
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2494,7 +2510,11 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('retrying without them would remove explicit review scope');
     expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
     const argsLog = await readFile(argsLogPath, 'utf8');
-    expect(argsLog).toContain(`argv=review --base ${baseRef}`);
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2527,7 +2547,11 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('retrying without them would remove explicit review scope');
     expect(result.stderr).toContain('explicit `--uncommitted` review scope must remain auditable');
     const argsLog = await readFile(argsLogPath, 'utf8');
-    expect(argsLog).toContain('argv=review --uncommitted');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('argv=review --uncommitted');
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2560,7 +2584,11 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('retrying without them would remove explicit review scope');
     expect(result.stderr).toContain('explicit `--uncommitted` review scope must remain auditable');
     const argsLog = await readFile(argsLogPath, 'utf8');
-    expect(argsLog).toContain('argv=review --uncommitted');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('argv=review --uncommitted');
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2595,7 +2623,11 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('retrying without them would remove explicit review scope');
     expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
     const argsLog = await readFile(argsLogPath, 'utf8');
-    expect(argsLog).toContain(`argv=review --base ${baseRef}`);
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
