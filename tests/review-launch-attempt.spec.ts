@@ -381,11 +381,9 @@ Usage: codex review [options]
       })
     ).rejects.toThrow('unknown option --title');
 
-    expect(launchArgs).toHaveLength(2);
+    expect(launchArgs).toHaveLength(1);
     expect(launchArgs[0]).toContain('--base');
     expect(launchArgs[0]).toContain('--title');
-    expect(launchArgs[1]).not.toContain('--base');
-    expect(launchArgs[1]).toContain('--title');
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
       failureState,
@@ -443,11 +441,9 @@ Usage: codex review [options]
       })
     ).rejects.toThrow('unknown option --title');
 
-    expect(launchArgs).toHaveLength(2);
+    expect(launchArgs).toHaveLength(1);
     expect(launchArgs[0]).toContain('--base');
     expect(launchArgs[0]).toContain('--title');
-    expect(launchArgs[1]).not.toContain('--base');
-    expect(launchArgs[1]).toContain('--title');
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
       failureState,

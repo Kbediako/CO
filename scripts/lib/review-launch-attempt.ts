@@ -257,6 +257,23 @@ export async function runReviewLaunchAttemptShell(
     return;
   } catch (error) {
     if (shouldRetryWithoutScopeFlags(error)) {
+      const hasExplicitScope = resolveScopeFlag(options.cliOptions) !== null;
+      if (hasExplicitScope) {
+        if (
+          options.retryWithoutScopeFlagsGateError &&
+          shouldRewriteRetryFailureAsScopeGate(error, options.cliOptions)
+        ) {
+          const retryGateError = buildRetryWithoutScopeFlagsGateError(
+            error,
+            options.repoRoot,
+            options.retryWithoutScopeFlagsGateError
+          );
+          await reportFailure(retryGateError);
+          throw retryGateError;
+        }
+        await reportFailure(error);
+        throw error;
+      }
       if (
         options.retryWithoutScopeFlagsGateError &&
         shouldRewriteRetryFailureAsScopeGate(error, options.cliOptions)

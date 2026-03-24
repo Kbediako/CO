@@ -145,6 +145,16 @@ if [[ -n "\${RUN_REVIEW_ARGS_LOG:-}" ]]; then
     echo "argv=$*"
   } >> "\${RUN_REVIEW_ARGS_LOG}"
 fi
+has_arg() {
+  local needle="$1"
+  shift
+  for arg in "$@"; do
+    if [[ "$arg" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
 if [[ "\${1:-}" == "--help" ]]; then
   if [[ "\${RUN_REVIEW_MODE:-ok}" == "delete-after-help" ]]; then
     rm -f "$0"
@@ -159,15 +169,15 @@ fi
       while true; do sleep 1; done
     fi
     if [[ "$mode" == "reject-scoped-prompt" ]]; then
-      if [[ "$*" == *"--base"* ]]; then
+      if has_arg "--base" "$@"; then
         echo "custom prompt cannot be combined with --base" >&2
         exit 1
       fi
-      if [[ "$*" == *"--commit"* ]]; then
+      if has_arg "--commit" "$@"; then
         echo "custom prompt cannot be combined with --commit" >&2
         exit 1
       fi
-      if [[ "$*" == *"--uncommitted"* ]]; then
+      if has_arg "--uncommitted" "$@"; then
         echo "custom prompt cannot be combined with --uncommitted" >&2
         exit 1
       fi
@@ -176,7 +186,7 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-scoped-prompt-generic-diff-scoping" ]]; then
-      if [[ "$*" == *"--base"* || "$*" == *"--commit"* || "$*" == *"--uncommitted"* ]]; then
+      if has_arg "--base" "$@" || has_arg "--commit" "$@" || has_arg "--uncommitted" "$@"; then
         echo "custom prompt cannot be combined with diff scoping" >&2
         exit 1
       fi
@@ -185,14 +195,14 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-scoped-prompt-usage-footer" ]]; then
-      if [[ "$*" == *"--base"* ]]; then
+      if has_arg "--base" "$@"; then
         echo "custom prompt cannot be combined with diff scoping" >&2
         echo "Usage: codex review [options]" >&2
         echo "  --base <ref>" >&2
         echo "  --commit <sha>" >&2
         exit 1
       fi
-      if [[ "$*" == *"--commit"* ]]; then
+      if has_arg "--commit" "$@"; then
         echo "custom prompt cannot be combined with diff scoping" >&2
         echo "Usage: codex review [options]" >&2
         echo "  --base <ref>" >&2
@@ -204,7 +214,7 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-title" ]]; then
-      if [[ "$*" == *"--title"* ]]; then
+      if has_arg "--title" "$@"; then
         echo "unknown option --title" >&2
         exit 1
       fi
@@ -213,7 +223,7 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-title-usage-footer" ]]; then
-      if [[ "$*" == *"--title"* ]]; then
+      if has_arg "--title" "$@"; then
         echo "unknown option --title" >&2
         echo "Usage: codex review [options]" >&2
         echo "  --base <ref>" >&2
@@ -225,7 +235,7 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-title-base-incompatibility" ]]; then
-      if [[ "$*" == *"--title"* ]]; then
+      if has_arg "--title" "$@"; then
         echo "--title cannot be used with --base" >&2
         exit 1
       fi
@@ -234,7 +244,7 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-title-base-incompatibility-double-quoted" ]]; then
-      if [[ "$*" == *"--title"* ]]; then
+      if has_arg "--title" "$@"; then
         echo '--title cannot be used with "--base"' >&2
         exit 1
       fi
@@ -243,7 +253,7 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-base-unknown-option" ]]; then
-      if [[ "$*" == *"--base"* ]]; then
+      if has_arg "--base" "$@"; then
         echo "unknown option --base" >&2
         exit 1
       fi
@@ -252,7 +262,7 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-base-quoted-unknown-option" ]]; then
-      if [[ "$*" == *"--base"* ]]; then
+      if has_arg "--base" "$@"; then
         echo "unknown option '--base'" >&2
         exit 1
       fi
@@ -2671,12 +2681,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const invocations = parseArgsLogInvocations(argsLog);
     expect(invocations.length).toBeGreaterThan(0);
     const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
-    expect(
-      reviewInvocations.some(
-        (entry) =>
-          entry.includes('--title Sample review') && entry.includes(`--base ${baseRef}`)
-      )
-    ).toBe(true);
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2721,12 +2728,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const invocations = parseArgsLogInvocations(argsLog);
     expect(invocations.length).toBeGreaterThan(0);
     const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
-    expect(
-      reviewInvocations.some(
-        (entry) =>
-          entry.includes('--title Sample review') && entry.includes(`--base ${baseRef}`)
-      )
-    ).toBe(true);
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2861,6 +2865,26 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toBeTruthy();
     expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+  });
+
+  it('does not treat scope flag text inside title values as an explicit scope flag', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-base-unknown-option'
+      },
+      ['--title', 'docs mention --base handling']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('stdout-ok');
+    expect(result.stderr).toContain('stderr-ok');
   });
 
   it('renders uncommitted rename scope notes as paired paths', async () => {
