@@ -147,6 +147,8 @@ describe('prepareControlServerStartupInputs', () => {
           issue_state: 'In Progress',
           issue_state_type: 'started',
           issue_updated_at: '2026-03-12T00:04:00.000Z',
+          issue_viewer_id: null,
+          issue_viewer_auth_fingerprint: null,
           issue_assignee_id: null,
           issue_assignee_name: null,
           issue_blocked_by: null,
