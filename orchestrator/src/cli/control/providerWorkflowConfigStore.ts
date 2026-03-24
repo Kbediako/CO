@@ -57,8 +57,7 @@ export function createProviderWorkflowConfigStore(
       return false;
     }
     try {
-      await stat(path);
-      return true;
+      return (await stat(path)).isFile();
     } catch {
       return false;
     }

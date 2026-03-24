@@ -209,6 +209,30 @@ describe('providerWorkflowConfigStore', () => {
     expect(store.snapshot().status).toBe('ready');
   });
 
+  it('fails closed when the cached snapshot path stops being a file', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    const snapshotPath = await store.getLaunchConfigPath();
+
+    await rm(snapshotPath, { force: true });
+    await mkdir(snapshotPath, { recursive: true });
+
+    await expect(store.getLaunchConfigPath()).rejects.toThrow(
+      /Provider workflow config snapshot is unavailable:/
+    );
+    expect(store.snapshot()).toMatchObject({
+      status: 'reload_failed',
+      snapshot_path: snapshotPath
+    });
+    expect(store.snapshot().last_error).toBeTruthy();
+  });
+
   it('preserves the last known good snapshot when rewriting it fails', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const runDir = join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host');
