@@ -223,6 +223,13 @@ describe('providerWorkflowConfigStore', () => {
     await rm(snapshotPath, { force: true });
     await mkdir(snapshotPath, { recursive: true });
 
+    const degraded = await store.refresh();
+
+    expect(degraded).toMatchObject({
+      status: 'reload_failed',
+      snapshot_path: snapshotPath
+    });
+    expect(degraded.last_error).toBeTruthy();
     await expect(store.getLaunchConfigPath()).rejects.toThrow(
       /Provider workflow config snapshot is unavailable:/
     );

@@ -145,7 +145,8 @@ export function createProviderWorkflowConfigStore(
         !reloadOptions.startup &&
         !reloadOptions.forceSnapshotRewrite &&
         revision === lastObservedRevision &&
-        state.status === 'ready'
+        state.status === 'ready' &&
+        (await snapshotExists(state.snapshot_path))
       ) {
         return state;
       }
