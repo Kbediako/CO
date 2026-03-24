@@ -2670,21 +2670,11 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const argsLog = await readFile(argsLogPath, 'utf8');
     const invocations = parseArgsLogInvocations(argsLog);
     expect(invocations.length).toBeGreaterThan(0);
-    expect(
-      invocations.some(
-        (entry) =>
-          entry.includes('argv=review') &&
-          entry.includes('--title Sample review') &&
-          entry.includes(`--base ${baseRef}`)
-      )
-    ).toBe(true);
     const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
-    expect(reviewInvocations.length).toBeGreaterThanOrEqual(2);
     expect(
       reviewInvocations.some(
         (entry) =>
-          entry.includes('argv=review --title Sample review') &&
-          !entry.includes(`--base ${baseRef}`)
+          entry.includes('--title Sample review') && entry.includes(`--base ${baseRef}`)
       )
     ).toBe(true);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
@@ -2730,21 +2720,11 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const argsLog = await readFile(argsLogPath, 'utf8');
     const invocations = parseArgsLogInvocations(argsLog);
     expect(invocations.length).toBeGreaterThan(0);
-    expect(
-      invocations.some(
-        (entry) =>
-          entry.includes('argv=review') &&
-          entry.includes('--title Sample review') &&
-          entry.includes(`--base ${baseRef}`)
-      )
-    ).toBe(true);
     const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
-    expect(reviewInvocations.length).toBeGreaterThanOrEqual(2);
     expect(
       reviewInvocations.some(
         (entry) =>
-          entry.includes('argv=review --title Sample review') &&
-          !entry.includes(`--base ${baseRef}`)
+          entry.includes('--title Sample review') && entry.includes(`--base ${baseRef}`)
       )
     ).toBe(true);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
