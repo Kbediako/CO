@@ -411,6 +411,39 @@ fi
       sleep 0.15
       exit 0
     fi
+    if [[ "$mode" == "relevant-reinspection-dwell-meta-surface-term-success" ]]; then
+      on_term() {
+        for _ in $(seq 1 6); do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/memories/MEMORY.md' in /Users/kbediako/Code/CO"
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc 'sed -n 1,120p /Users/kbediako/.codex/skills/delegation-usage/SKILL.md' in /Users/kbediako/Code/CO"
+          sleep 0.06
+        done
+        exit 0
+      }
+      trap on_term TERM
+      commands=(
+        "sed -n 1,20p file-1.py"
+        "sed -n 21,40p file-1.py"
+        "head -n 5 file-1.py"
+        "tail -n 5 file-1.py"
+        "grep -n updated file-1.py"
+        "grep -n baseline file-1.py"
+        "cat file-1.py"
+        "wc -l file-1.py"
+      )
+      while true; do
+        for command in "\${commands[@]}"; do
+          echo "thinking"
+          echo "exec"
+          echo "/bin/zsh -lc '\${command}' in /Users/kbediako/Code/CO"
+          sleep 0.01
+        done
+      done
+    fi
     if [[ "$mode" == "relevant-reinspection-concrete-output" ]]; then
       commands=(
         "sed -n 1,20p file-1.py"
@@ -3286,6 +3319,51 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         kind: 'relevant-reinspection-dwell',
         provenance: 'post-startup-anchor'
       })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('fails when meta-surface expansion appears during bounded-success shutdown', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    await initGitRepoWithTouchedPath(sandbox, 'file-1.py');
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'relevant-reinspection-dwell-meta-surface-term-success',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '0.05',
+      CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS: '0.2',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('meta-surface expansion detected');
+    expect(result.stderr).toContain('termination boundary: meta-surface-expansion');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+      summary: {
+        metaSurfaceSignals: number;
+        metaSurfaceKinds: string[];
+      };
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'meta-surface-expansion',
+        provenance: 'meta-surface-kinds'
+      })
+    );
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceKinds).toEqual(
+      expect.arrayContaining(['codex-memories', 'codex-skills'])
     );
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 

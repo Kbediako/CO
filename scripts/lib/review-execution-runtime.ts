@@ -681,6 +681,22 @@ async function waitForChildExit(
           );
           return;
         }
+        const metaSurfaceReason = options.getMetaSurfaceExpansionReason();
+        if (metaSurfaceReason) {
+          reject(
+            new CodexReviewError(
+              `${metaSurfaceReason} (set ${REVIEW_META_SURFACE_TIMEOUT_ENV_KEY}=0 to disable).`,
+              {
+                exitCode: typeof code === 'number' && code > 0 ? code : 1,
+                signal,
+                timedOut: false,
+                outputPreview: '',
+                terminationBoundary: options.getTerminationBoundaryRecord('meta-surface-expansion')
+              }
+            )
+          );
+          return;
+        }
         const blockedCommand = options.getBlockedHeavyCommand();
         if (options.blockHeavyCommands && blockedCommand) {
           reject(
