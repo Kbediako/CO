@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { logger } from '../../logger.js';
@@ -59,6 +59,17 @@ export function createProviderWorkflowConfigStore(
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async function replaceSnapshotAtomically(raw: string): Promise<void> {
+    const tempSnapshotPath = `${snapshotPath}.tmp`;
+    try {
+      await writeFile(tempSnapshotPath, raw, 'utf8');
+      await rename(tempSnapshotPath, snapshotPath);
+    } catch (error) {
+      await rm(tempSnapshotPath, { force: true }).catch(() => undefined);
+      throw error;
     }
   }
 
@@ -126,7 +137,7 @@ export function createProviderWorkflowConfigStore(
       }
 
       await mkdir(dirname(snapshotPath), { recursive: true });
-      await writeFile(snapshotPath, raw, 'utf8');
+      await replaceSnapshotAtomically(raw);
       lastObservedRevision = revision;
       const previousStatus = state.status;
       state = {

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -199,6 +199,43 @@ describe('providerWorkflowConfigStore', () => {
     expect(regeneratedSnapshotPath).toBe(snapshotPath);
     expect(regeneratedSnapshot).toBe(initialSnapshot);
     expect(store.snapshot().status).toBe('ready');
+  });
+
+  it('preserves the last known good snapshot when rewriting it fails', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const runDir = join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host');
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir,
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    const snapshotPath = await store.getLaunchConfigPath();
+    const initialSnapshot = await readFile(snapshotPath, 'utf8');
+
+    await writeRepoConfig(buildValidProviderConfig('v2'));
+    await chmod(runDir, 0o500);
+
+    try {
+      const degraded = await store.refresh();
+
+      expect(degraded.status).toBe('reload_failed');
+      expect(degraded.snapshot_path).toBe(snapshotPath);
+      expect(degraded.last_error).toBeTruthy();
+      expect(await readFile(snapshotPath, 'utf8')).toBe(initialSnapshot);
+    } finally {
+      await chmod(runDir, 0o700);
+    }
+
+    const recovered = await store.refresh();
+    const recoveredSnapshot = JSON.parse(await readFile(snapshotPath, 'utf8')) as {
+      pipelines: Array<{ title: string }>;
+    };
+
+    expect(recovered.status).toBe('ready');
+    expect(recovered.last_error).toBeNull();
+    expect(recoveredSnapshot.pipelines[0]?.title).toBe('Provider worker v2');
   });
 
   it('watches the resolved repo-config override path when one is provided', async () => {
