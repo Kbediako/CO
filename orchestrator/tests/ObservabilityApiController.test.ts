@@ -316,6 +316,87 @@ describe('ObservabilityApiController', () => {
     });
   });
 
+  it('surfaces a healthy provider workflow snapshot on the state endpoint', async () => {
+    const { res, state } = createResponseRecorder();
+    const handled = await handleObservabilityApiRequest({
+      req: {
+        method: 'GET',
+        url: '/api/v1/state'
+      } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res,
+      presenterContext: {
+        controlStore: {
+          snapshot: () => CONTROL_STATE
+        },
+        paths: {
+          manifestPath: '/repo/.runs/task-1038/cli/run-1/manifest.json',
+          runDir: '/repo/.runs/task-1038/cli/run-1',
+          logPath: '/repo/.runs/task-1038/cli/run-1/log.txt'
+        },
+        readCompatibilityProjection: async () => ({
+          running: [],
+          retrying: [],
+          codexTotals: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0,
+            seconds_running: 0
+          },
+          rateLimits: null,
+          selected: null,
+          dispatchPilot: null,
+          tracked: null,
+          providerIntake: null,
+          providerWorkflow: {
+            status: 'ready',
+            pipeline_id: 'provider-linear-worker',
+            source_path: '/repo/codex.orchestrator.json',
+            snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+            last_reload_attempt_at: '2026-03-24T00:00:00.000Z',
+            last_success_at: '2026-03-24T00:00:00.000Z',
+            last_error_at: null,
+            last_error: null
+          }
+        })
+      },
+      readRequestBody: async () => ({}),
+      requestRefresh: async () => ({
+        queued: true,
+        coalesced: false,
+        requested_at: '2026-03-21T15:02:00.000Z',
+        operations: ['reconcile']
+      }),
+      readDispatchEvaluation: async () => ({
+        issueIdentifier: null,
+        evaluation: {
+          summary: {
+            status: 'disabled',
+            reason: 'pilot_disabled_default_off',
+            source_status: 'disabled',
+            advisory_only: true,
+            source_setup: null
+          },
+          recommendation: null,
+          failure: null
+        }
+      })
+    });
+
+    expect(handled).toBe(true);
+    expect(state.statusCode).toBe(200);
+    expect(state.body).toMatchObject({
+      provider_workflow: {
+        status: 'ready',
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_success_at: '2026-03-24T00:00:00.000Z',
+        last_error_at: null,
+        last_error: null
+      }
+    });
+  });
+
   it('keeps running counters null without proof and surfaces authoritative retry metadata when present', () => {
     const runningSource = buildCompatibilitySource('task-1311-running', {
       compatibilityState: 'In Progress',

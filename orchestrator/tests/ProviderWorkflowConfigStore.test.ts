@@ -100,6 +100,44 @@ describe('providerWorkflowConfigStore', () => {
     expect(recoveredSnapshot.pipelines[0]?.title).toBe('Provider worker v2');
   });
 
+  it('returns defensive copies from its public state accessors', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    const bootstrapped = await store.bootstrap();
+    bootstrapped.status = 'reload_failed';
+    bootstrapped.last_error = 'mutated bootstrap state';
+
+    expect(store.snapshot()).toMatchObject({
+      status: 'ready',
+      pipeline_id: 'provider-linear-worker',
+      last_error: null
+    });
+
+    const snapshotted = store.snapshot();
+    snapshotted.pipeline_id = 'mutated-pipeline-id';
+
+    expect(store.snapshot()).toMatchObject({
+      status: 'ready',
+      pipeline_id: 'provider-linear-worker'
+    });
+
+    await writeRepoConfig('{ invalid json');
+    const degraded = await store.refresh();
+    degraded.status = 'ready';
+    degraded.last_error = 'mutated degraded state';
+
+    expect(store.snapshot()).toMatchObject({
+      status: 'reload_failed'
+    });
+    expect(store.snapshot().last_error).toBeTruthy();
+    expect(store.snapshot().last_error).not.toBe('mutated degraded state');
+  });
+
   it('retries a failed revision when the config is repaired without metadata change', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const store = createProviderWorkflowConfigStore({

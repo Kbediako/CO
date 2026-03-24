@@ -29,6 +29,9 @@ const PROVIDER_WORKFLOW_SNAPSHOT_FILE = 'provider-workflow.last-known-good.json'
 export function createProviderWorkflowConfigStore(
   createOptions: CreateProviderWorkflowConfigStoreOptions
 ): ProviderWorkflowConfigStore {
+  const cloneState = (
+    value: ControlProviderWorkflowPayload
+  ): ControlProviderWorkflowPayload => ({ ...value });
   const sourcePath = resolveRepoConfigPath(createOptions.env);
   const snapshotPath = join(createOptions.runDir, PROVIDER_WORKFLOW_SNAPSHOT_FILE);
   // This store assumes serialized access from the single-threaded control-host
@@ -62,14 +65,14 @@ export function createProviderWorkflowConfigStore(
   async function bootstrap(): Promise<ControlProviderWorkflowPayload> {
     const nextState = await attemptReload({ startup: true });
     bootstrapped = true;
-    return nextState;
+    return cloneState(nextState);
   }
 
   async function refresh(): Promise<ControlProviderWorkflowPayload> {
     if (!bootstrapped) {
       return await bootstrap();
     }
-    return await attemptReload({ startup: false });
+    return cloneState(await attemptReload({ startup: false }));
   }
 
   async function getLaunchConfigPath(): Promise<string> {
@@ -165,7 +168,7 @@ export function createProviderWorkflowConfigStore(
   return {
     bootstrap,
     refresh,
-    snapshot: () => state,
+    snapshot: () => cloneState(state),
     getLaunchConfigPath
   };
 }

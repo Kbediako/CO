@@ -85,6 +85,5 @@ last_review: 2026-03-24
 - Date: 2026-03-24
 
 ## Manifest Evidence
-- Docs-review override: `out/linear-41f54a87-705b-467d-9e88-f49c6315f0dc/manual/20260324T000629Z-docs-first/05-docs-review-override.md`
-- Deterministic docs gates: `out/linear-41f54a87-705b-467d-9e88-f49c6315f0dc/manual/20260324T000629Z-docs-first/01-delegation-guard.log`, `out/linear-41f54a87-705b-467d-9e88-f49c6315f0dc/manual/20260324T000629Z-docs-first/02-spec-guard.log`, `out/linear-41f54a87-705b-467d-9e88-f49c6315f0dc/manual/20260324T000629Z-docs-first/03-docs-check.log`, `out/linear-41f54a87-705b-467d-9e88-f49c6315f0dc/manual/20260324T000629Z-docs-first/04-docs-freshness.log`, and `out/linear-41f54a87-705b-467d-9e88-f49c6315f0dc/manual/20260324T000629Z-docs-first/05-docs-review.log`
-- Validation summary: pending fresh-branch replay of the implementation and required repo validation.
+- Evidence index: `out/linear-41f54a87-705b-467d-9e88-f49c6315f0dc/manual/20260324T000629Z-docs-first/00-summary.md`
+- Validation summary: fresh-branch replay completed on this rework branch; repo validation, review prompt generation, and downstream pack smoke all passed before PR handoff.
