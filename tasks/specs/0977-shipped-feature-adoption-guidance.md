@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0977-shipped-feature-adoption-guidance.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-02-21
+last_review: 2026-03-24
 ---
 
 ## Summary
