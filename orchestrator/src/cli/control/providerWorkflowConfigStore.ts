@@ -35,10 +35,12 @@ export function createProviderWorkflowConfigStore(
   const sourcePath = resolveRepoConfigPath(createOptions.env);
   const snapshotPath = join(createOptions.runDir, PROVIDER_WORKFLOW_SNAPSHOT_FILE);
   // This store assumes serialized access from the single-threaded control-host
-  // runtime loop. `attemptReload`, `bootstrapped`, `lastObservedRevision`, and
-  // `state` are not concurrency-safe without an explicit lock.
+  // runtime loop. Public reload helpers still take an explicit lock because
+  // observability reads and provider launches can overlap through async call
+  // paths even on a single Node event loop.
   let bootstrapped = false;
   let lastObservedRevision: string | null = null;
+  let reloadQueue: Promise<void> = Promise.resolve();
   let state: ControlProviderWorkflowPayload = {
     status: 'reload_failed',
     pipeline_id: createOptions.pipelineId,
@@ -73,35 +75,59 @@ export function createProviderWorkflowConfigStore(
     }
   }
 
-  async function bootstrap(): Promise<ControlProviderWorkflowPayload> {
+  async function runWithReloadLock<T>(action: () => Promise<T>): Promise<T> {
+    const previous = reloadQueue;
+    let release!: () => void;
+    reloadQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous.catch(() => undefined);
+    try {
+      return await action();
+    } finally {
+      release();
+    }
+  }
+
+  async function bootstrapUnlocked(): Promise<ControlProviderWorkflowPayload> {
     const nextState = await attemptReload({ startup: true });
     bootstrapped = true;
-    return cloneState(nextState);
+    return nextState;
+  }
+
+  async function refreshUnlocked(): Promise<ControlProviderWorkflowPayload> {
+    if (!bootstrapped) {
+      return await bootstrapUnlocked();
+    }
+    return await attemptReload({ startup: false });
+  }
+
+  async function bootstrap(): Promise<ControlProviderWorkflowPayload> {
+    return cloneState(await runWithReloadLock(() => bootstrapUnlocked()));
   }
 
   async function refresh(): Promise<ControlProviderWorkflowPayload> {
-    if (!bootstrapped) {
-      return await bootstrap();
-    }
-    return cloneState(await attemptReload({ startup: false }));
+    return cloneState(await runWithReloadLock(() => refreshUnlocked()));
   }
 
   async function getLaunchConfigPath(): Promise<string> {
-    let nextState = await refresh();
-    if (!(await snapshotExists(nextState.snapshot_path))) {
-      nextState = await attemptReload({
-        startup: false,
-        forceSnapshotRewrite: true
-      });
-    }
-    if (!nextState.snapshot_path || !(await snapshotExists(nextState.snapshot_path))) {
-      throw new Error(
-        nextState.last_error
-          ? `Provider workflow config snapshot is unavailable: ${nextState.last_error}`
-          : 'Provider workflow config snapshot is unavailable.'
-      );
-    }
-    return nextState.snapshot_path;
+    return await runWithReloadLock(async () => {
+      let nextState = await refreshUnlocked();
+      if (!(await snapshotExists(nextState.snapshot_path))) {
+        nextState = await attemptReload({
+          startup: false,
+          forceSnapshotRewrite: true
+        });
+      }
+      if (!nextState.snapshot_path || !(await snapshotExists(nextState.snapshot_path))) {
+        throw new Error(
+          nextState.last_error
+            ? `Provider workflow config snapshot is unavailable: ${nextState.last_error}`
+            : 'Provider workflow config snapshot is unavailable.'
+        );
+      }
+      return nextState.snapshot_path;
+    });
   }
 
   async function attemptReload(reloadOptions: {

@@ -13,6 +13,12 @@ let workspaceRoot: string;
 let revisionTick = 0;
 const initialRepoConfigPathEnv = process.env[REPO_CONFIG_PATH_ENV_KEY];
 
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+};
+
 beforeEach(async () => {
   workspaceRoot = await mkdtemp(join(tmpdir(), 'provider-workflow-store-'));
   revisionTick = 0;
@@ -24,6 +30,8 @@ afterEach(async () => {
   } else {
     process.env[REPO_CONFIG_PATH_ENV_KEY] = initialRepoConfigPathEnv;
   }
+  vi.doUnmock('node:fs/promises');
+  vi.resetModules();
   vi.restoreAllMocks();
   await rm(workspaceRoot, { recursive: true, force: true });
 });
@@ -238,6 +246,81 @@ describe('providerWorkflowConfigStore', () => {
     expect(recoveredSnapshot.pipelines[0]?.title).toBe('Provider worker v2');
   });
 
+  it('serializes concurrent refresh and launch-path reads while rewriting the snapshot', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const runDir = join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host');
+    const snapshotPath = join(runDir, 'provider-workflow.last-known-good.json');
+    const tempSnapshotPath = `${snapshotPath}.tmp`;
+    const firstSnapshotWriteEntered = createDeferred<void>();
+    const releaseFirstSnapshotWrite = createDeferred<void>();
+    let observeSnapshotWrites = false;
+    let observedSnapshotTempWriteCalls = 0;
+    let activeSnapshotTempWrites = 0;
+    let maxConcurrentSnapshotTempWrites = 0;
+
+    vi.resetModules();
+    const actualFsPromises = await vi.importActual<typeof import('node:fs/promises')>(
+      'node:fs/promises'
+    );
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFsPromises,
+      writeFile: vi.fn(
+        async (...args: Parameters<typeof actualFsPromises.writeFile>) => {
+          const [path] = args;
+          if (path === tempSnapshotPath && observeSnapshotWrites) {
+            observedSnapshotTempWriteCalls += 1;
+            activeSnapshotTempWrites += 1;
+            maxConcurrentSnapshotTempWrites = Math.max(
+              maxConcurrentSnapshotTempWrites,
+              activeSnapshotTempWrites
+            );
+            try {
+              if (observedSnapshotTempWriteCalls === 1) {
+                firstSnapshotWriteEntered.resolve();
+                await releaseFirstSnapshotWrite.promise;
+              }
+              return await actualFsPromises.writeFile(...args);
+            } finally {
+              activeSnapshotTempWrites -= 1;
+            }
+          }
+          return await actualFsPromises.writeFile(...args);
+        }
+      )
+    }));
+    const { createProviderWorkflowConfigStore: createIsolatedProviderWorkflowConfigStore } =
+      await import('../src/cli/control/providerWorkflowConfigStore.js');
+    const store = createIsolatedProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir,
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    await store.getLaunchConfigPath();
+    observeSnapshotWrites = true;
+    await writeRepoConfig(buildValidProviderConfig('v2'));
+    const refreshPromise = store.refresh();
+    await firstSnapshotWriteEntered.promise;
+
+    const launchPathPromise = store.getLaunchConfigPath();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(maxConcurrentSnapshotTempWrites).toBe(1);
+
+    releaseFirstSnapshotWrite.resolve();
+    const [refreshed, launchPath] = await Promise.all([refreshPromise, launchPathPromise]);
+    const recoveredSnapshot = JSON.parse(await readFile(snapshotPath, 'utf8')) as {
+      pipelines: Array<{ title: string }>;
+    };
+
+    expect(refreshed.status).toBe('ready');
+    expect(launchPath).toBe(snapshotPath);
+    expect(observedSnapshotTempWriteCalls).toBe(1);
+    expect(maxConcurrentSnapshotTempWrites).toBe(1);
+    expect(recoveredSnapshot.pipelines[0]?.title).toBe('Provider worker v2');
+  });
+
   it('watches the resolved repo-config override path when one is provided', async () => {
     const overridePath = join(workspaceRoot, 'config', 'provider.json');
     process.env[REPO_CONFIG_PATH_ENV_KEY] = overridePath;
@@ -267,6 +350,16 @@ function buildEnv(repoRoot: string): EnvironmentPaths {
     outRoot: join(repoRoot, 'out'),
     taskId: 'local-mcp'
   };
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 }
 
 async function writeRepoConfig(config: Record<string, unknown> | string): Promise<void> {
