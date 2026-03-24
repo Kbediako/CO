@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import process from 'node:process';
 
 export const REPO_CONFIG_REQUIRED_ENV_KEY = 'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED';
@@ -16,10 +15,10 @@ export function isRepoConfigRequired(env: NodeJS.ProcessEnv = process.env): bool
   return REPO_CONFIG_REQUIRED_TRUE_VALUES.has(normalized);
 }
 
-export function formatRepoConfigRequiredError(repoRoot: string): string {
+export function formatRepoConfigRequiredError(repoConfigPath: string): string {
   return [
     `Repo-local codex.orchestrator.json is required when ${REPO_CONFIG_REQUIRED_ENV_KEY}=1.`,
-    `Expected: ${join(repoRoot, 'codex.orchestrator.json')}.`,
+    `Expected: ${repoConfigPath}.`,
     'Run `codex-orchestrator init codex` to scaffold repo-local config.'
   ].join(' ');
 }

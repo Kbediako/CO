@@ -55,6 +55,17 @@ export interface ControlDispatchPilotPayload {
   reason?: string | null;
 }
 
+export interface ControlProviderWorkflowPayload {
+  status: 'ready' | 'reload_failed';
+  pipeline_id: string;
+  source_path: string;
+  snapshot_path: string | null;
+  last_reload_attempt_at: string | null;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  last_error: string | null;
+}
+
 interface SharedSelectedProjectionFields {
   issueIdentifier: string;
   issueId: string | null;
@@ -190,6 +201,7 @@ export interface ControlStatePayload {
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload;
   provider_intake?: ProviderIntakeSummaryPayload;
+  provider_workflow?: ControlProviderWorkflowPayload;
 }
 
 export interface ControlSelectedRunRuntimeSnapshot {
@@ -197,6 +209,7 @@ export interface ControlSelectedRunRuntimeSnapshot {
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
+  providerWorkflow?: ControlProviderWorkflowPayload | null;
 }
 
 export interface ControlCompatibilitySourceContext extends SharedSelectedProjectionFields {}
@@ -210,6 +223,7 @@ export interface ControlCompatibilityRuntimeSnapshot {
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
+  providerWorkflow?: ControlProviderWorkflowPayload | null;
 }
 
 export interface CompatibilityProjectionIssueRecord {
@@ -228,6 +242,7 @@ export interface ControlCompatibilityProjectionSnapshot {
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
+  providerWorkflow?: ControlProviderWorkflowPayload | null;
 }
 
 export interface ControlIssuePayload {
@@ -363,8 +378,9 @@ export function buildSelectedRunRuntimeFingerprintInput(
   const dispatchPilot = snapshot.dispatchPilot ?? null;
   const trackedLinear = selected?.tracked?.linear ?? snapshot.tracked?.linear ?? null;
   const providerIntake = snapshot.providerIntake ?? null;
+  const providerWorkflow = snapshot.providerWorkflow ?? null;
   const questionSummary = selected?.questionSummary ?? null;
-  if (!selected && !trackedLinear && !dispatchPilot && !questionSummary && !providerIntake) {
+  if (!selected && !trackedLinear && !dispatchPilot && !questionSummary && !providerIntake && !providerWorkflow) {
     return null;
   }
   return {
@@ -418,6 +434,18 @@ export function buildSelectedRunRuntimeFingerprintInput(
           state: providerIntake.state,
           reason: providerIntake.reason,
           run_id: providerIntake.run_id
+        }
+      : null,
+    provider_workflow: providerWorkflow
+      ? {
+          status: providerWorkflow.status,
+          pipeline_id: providerWorkflow.pipeline_id,
+          source_path: providerWorkflow.source_path,
+          snapshot_path: providerWorkflow.snapshot_path,
+          last_reload_attempt_at: providerWorkflow.last_reload_attempt_at,
+          last_success_at: providerWorkflow.last_success_at,
+          last_error_at: providerWorkflow.last_error_at,
+          last_error: providerWorkflow.last_error
         }
       : null
   };

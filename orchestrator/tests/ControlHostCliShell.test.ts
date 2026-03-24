@@ -8,11 +8,14 @@ import type { ProviderIssueHandoffService } from '../src/cli/control/providerIss
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 
 import { __test__ as controlHostCliShellTest } from '../src/cli/controlHostCliShell.js';
+import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../src/cli/config/repoConfigPolicy.js';
+import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
 const {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
+  buildProviderLaunchSpec,
   buildProviderLinearSourceEnvOverrides,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
@@ -91,6 +94,29 @@ describe('controlHostCliShell manifest discovery', () => {
       CO_LINEAR_WORKSPACE_ID: 'workspace-1',
       CO_LINEAR_TEAM_ID: '',
       CO_LINEAR_PROJECT_ID: ''
+    });
+  });
+
+  it('pins provider child launches to the cached last-known-good repo config snapshot', () => {
+    const env: EnvironmentPaths = {
+      repoRoot: '/repo',
+      runsRoot: '/repo/.runs',
+      outRoot: '/repo/out',
+      taskId: 'local-mcp'
+    };
+
+    expect(
+      buildProviderLaunchSpec(env, '/repo/.workspaces/provider-task', '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json')
+    ).toEqual({
+      cwd: '/repo/.workspaces/provider-task',
+      envOverrides: {
+        CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task',
+        CODEX_ORCHESTRATOR_RUNS_DIR: '/repo/.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: '/repo/out',
+        [REPO_CONFIG_PATH_ENV_KEY]:
+          '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1'
+      }
     });
   });
 
@@ -276,6 +302,8 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
@@ -330,6 +358,8 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         CO_LINEAR_WORKSPACE_ID: 'workspace-1',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: 'project-1'
@@ -371,6 +401,8 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
@@ -405,6 +437,8 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
@@ -447,6 +481,8 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''

@@ -7,6 +7,7 @@ import type { ControlState } from './controlState.js';
 import type { ControlRequestSharedContext } from './controlRequestContext.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import type { ProviderIntakeState } from './providerIntakeState.js';
+import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import { readControlServerSeeds } from './controlServerSeedLoading.js';
 import { createControlServerSeededRuntimeAssembly } from './controlServerSeededRuntimeAssembly.js';
 
@@ -16,6 +17,7 @@ interface PrepareControlServerStartupInputsOptions {
   eventStream?: Pick<RunEventStream, 'append'>;
   runId: string;
   sessionTtlMs: number;
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
   createProviderIssueHandoff?: ((input: {
     providerIntakeState: ProviderIntakeState;
     persistProviderIntake: () => Promise<void>;
@@ -56,6 +58,7 @@ export async function prepareControlServerStartupInputs(
     delegationSeed,
     linearAdvisorySeed,
     providerIntakeSeed,
+    providerWorkflowConfigStore: options.providerWorkflowConfigStore,
     createProviderIssueHandoff: options.createProviderIssueHandoff
   });
 

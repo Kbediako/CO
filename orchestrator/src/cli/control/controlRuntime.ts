@@ -1,6 +1,7 @@
 import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
   buildProviderIntakeSummary,
   type ProviderIntakeClaimRecord,
@@ -47,6 +48,7 @@ interface ControlRuntimeContext {
     tracked_issue: LiveLinearTrackedIssue | null;
   };
   providerIntakeState?: ProviderIntakeState;
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -145,11 +147,15 @@ function createControlRuntimeSnapshot(
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
+      const providerWorkflow = context.providerWorkflowConfigStore
+        ? await context.providerWorkflowConfigStore.refresh()
+        : null;
       return {
         selected,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked,
-        providerIntake
+        providerIntake,
+        providerWorkflow
       };
     })();
     return selectedRunSnapshotPromise;
@@ -175,6 +181,9 @@ function createControlRuntimeSnapshot(
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
+      const providerWorkflow = context.providerWorkflowConfigStore
+        ? await context.providerWorkflowConfigStore.refresh()
+        : null;
       const running = [
         ...(selected?.rawStatus === 'in_progress' ? [selected] : []),
         ...discoveredSources.filter((source) => source.rawStatus === 'in_progress')
@@ -201,7 +210,8 @@ function createControlRuntimeSnapshot(
         rateLimits,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked,
-        providerIntake
+        providerIntake,
+        providerWorkflow
       };
     })();
     return compatibilityRuntimeSnapshotPromise;
