@@ -625,19 +625,13 @@ Usage: codex review [options]
     expect(logTerminationBoundaryFallback).toHaveBeenCalledTimes(1);
   });
 
-  it('captures failure state and partial-output hint when the retry also fails on a timeout boundary', async () => {
+  it('does not retry into a timeout boundary after explicit uncommitted scope is rejected', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
     const writeTelemetry = vi.fn().mockResolvedValue(null);
     const captureReviewFailureIssueLogFn = vi.fn().mockResolvedValue(null);
     const logTerminationBoundaryFallback = vi.fn();
-    const timeoutBoundary = {
-      kind: 'timeout',
-      provenance: 'review-timeout',
-      reason: 'review timed out',
-      sample: null
-    } as const;
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -659,21 +653,11 @@ Usage: codex review [options]
         captureReviewFailureIssueLogFn,
         runReview: async () => {
           attemptCount += 1;
-          if (attemptCount === 1) {
-            throw new CodexReviewError('custom prompt cannot be combined with --uncommitted', {
-              exitCode: 1,
-              signal: null,
-              timedOut: false,
-              outputPreview: 'custom prompt cannot be combined with --uncommitted'
-            });
-          }
-          throw new CodexReviewError('review timed out', {
+          throw new CodexReviewError('custom prompt cannot be combined with --uncommitted', {
             exitCode: 1,
             signal: null,
-            timedOut: true,
-            outputPreview: 'review timed out',
-            reviewState: makeState(sandbox),
-            terminationBoundary: timeoutBoundary
+            timedOut: false,
+            outputPreview: 'custom prompt cannot be combined with --uncommitted'
           });
         },
         writeTelemetry,
@@ -684,17 +668,12 @@ Usage: codex review [options]
       })
     ).rejects.toBeInstanceOf(CodexReviewError);
 
+    expect(attemptCount).toBe(1);
     expect(captureReviewFailureIssueLogFn).toHaveBeenCalledTimes(1);
-    expect(writeTelemetry).toHaveBeenCalledTimes(1);
-    expect(writeTelemetry).toHaveBeenCalledWith(
-      expect.any(ReviewExecutionState),
-      'failed',
-      'review timed out',
-      timeoutBoundary
-    );
-    expect(logTerminationBoundaryFallback).toHaveBeenCalledWith(timeoutBoundary);
-    expect(errorSpy).toHaveBeenCalledWith(
-      `Review output log (partial): ${join('.runs', 'sample-task', 'cli', 'sample-run', 'review', 'output.log')}`
+    expect(writeTelemetry).not.toHaveBeenCalled();
+    expect(logTerminationBoundaryFallback).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('Review output log (partial):')
     );
   });
 });
