@@ -2707,7 +2707,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.error).not.toContain('remove explicit review scope');
   });
 
-  it('preserves non-prompt scope incompatibility failures instead of rewriting them as scope-gate errors', async () => {
+  it('fails when a title/base incompatibility would drop explicit base scope', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
@@ -2731,20 +2731,13 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain('--title cannot be used with --base');
-    expect(result.stderr).not.toContain('retrying without them would remove explicit review scope');
+    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
     const argsLog = await readFile(argsLogPath, 'utf8');
     const invocations = parseArgsLogInvocations(argsLog);
     const reviewInvocations = invocations.filter((entry) => entry.includes('argv=review'));
-    expect(reviewInvocations.length).toBeGreaterThanOrEqual(2);
+    expect(reviewInvocations).toHaveLength(1);
     expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
     expect(reviewInvocations[0]).toContain('--title Sample review');
-    expect(
-      reviewInvocations.some(
-        (entry) =>
-          entry.includes('argv=review --title Sample review') &&
-          !entry.includes(`--base ${baseRef}`)
-      )
-    ).toBe(true);
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
@@ -2753,7 +2746,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toBeTruthy();
-    expect(telemetry.error).not.toContain('remove explicit review scope');
+    expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
   });
 
   it('renders uncommitted rename scope notes as paired paths', async () => {
