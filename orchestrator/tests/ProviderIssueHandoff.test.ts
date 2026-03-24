@@ -5175,6 +5175,7 @@ describe('createProviderIssueHandoffService', () => {
       state: 'released',
       reason: 'provider_issue_released:assignee_changed',
       issue_viewer_id: null,
+      issue_viewer_auth_fingerprint: null,
       issue_assignee_id: 'viewer-1',
       issue_assignee_name: 'Codex'
     });

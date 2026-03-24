@@ -22,7 +22,7 @@ review_notes:
 
 ## Context
 
-The live-resolver retry path already has the right ownership inputs because it evaluates the current tracked issue with both `viewer_id` and `assignee_id`. The remaining gap is isolated to snapshot-only queued retries. When live resolution is unavailable, `providerIssueHandoff.ts` rebuilds a tracked-issue snapshot from the persisted claim, but that reconstruction hardcodes `viewer_id: null`. For self-assigned issues this produces a false `assignee_changed` release even though the persisted snapshot still belongs to the same worker.
+The live-resolver retry path already has the right ownership inputs because it evaluates the current tracked issue with both `viewer_id` and `assignee_id`. The remaining gap is isolated to snapshot-only queued retries. When live resolution is unavailable, `providerIssueHandoff.ts` rebuilds a tracked-issue snapshot from the persisted claim, but that reconstruction hardcodes `viewer_id: null`. For self-assigned issues, this produces a false `assignee_changed` release even though the persisted snapshot still belongs to the same worker.
 
 ## Requirements
 
@@ -41,7 +41,7 @@ The live-resolver retry path already has the right ownership inputs because it e
 - That fallback preserves `assignee_id` but hardcodes `viewer_id: null`.
 - Because self-assigned ownership requires `viewer_id === assignee_id`, the fallback misclassifies same-worker queued retries as `provider_issue_released:assignee_changed`.
 - The correct fix is to preserve viewer identity separately; deriving it from assignee identity would incorrectly mark persisted foreign assignees as owned.
-- The persisted viewer identity also needs an auth-context guard so stale viewer state is not trusted after a Linear token change.
+- The persisted viewer identity also needs an auth-context guard, so stale viewer state is not trusted after a Linear token change.
 
 ## Validation Plan
 

@@ -560,10 +560,12 @@ export function createProviderIssueHandoffService(
       issue_state_type: input.trackedIssue?.state_type ?? input.claim.issue_state_type,
       issue_updated_at: input.trackedIssue?.updated_at ?? input.claim.issue_updated_at,
       issue_viewer_id:
-        input.trackedIssue != null ? input.trackedIssue.viewer_id : (input.claim.issue_viewer_id ?? null),
+        input.trackedIssue != null
+          ? trackedIssueFields?.issue_viewer_id ?? null
+          : (input.claim.issue_viewer_id ?? null),
       issue_viewer_auth_fingerprint:
         input.trackedIssue != null
-          ? resolveProviderViewerAuthFingerprint()
+          ? trackedIssueFields?.issue_viewer_auth_fingerprint ?? null
           : (input.claim.issue_viewer_auth_fingerprint ?? null),
       issue_assignee_id:
         input.trackedIssue != null ? input.trackedIssue.assignee_id : (input.claim.issue_assignee_id ?? null),

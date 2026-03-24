@@ -66,6 +66,55 @@ describe('upsertProviderIntakeClaim', () => {
     expect(claim.issue_viewer_auth_fingerprint).toBe('viewer-auth-1');
   });
 
+  it('clears persisted viewer identity when a later update explicitly nulls it', () => {
+    const state = createProviderIntakeState();
+
+    upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      issue_viewer_id: 'viewer-1',
+      issue_viewer_auth_fingerprint: 'viewer-auth-1',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: 'run-1',
+      run_manifest_path: '/tmp/run-1/manifest.json'
+    });
+
+    const claim = upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:01.000Z',
+      issue_viewer_id: null,
+      issue_viewer_auth_fingerprint: null,
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-1',
+      run_manifest_path: '/tmp/run-1/manifest.json'
+    });
+
+    expect(claim.issue_viewer_id).toBeNull();
+    expect(claim.issue_viewer_auth_fingerprint).toBeNull();
+  });
+
   it('preserves blocker metadata when a later update omits it', () => {
     const state = createProviderIntakeState();
 
