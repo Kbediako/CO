@@ -2573,9 +2573,6 @@ async function discoverProviderIssueRuns(
       if (!manifest) {
         continue;
       }
-      const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
-        join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
-      );
       const issueProvider = readStringValue(manifest, 'issue_provider');
       const issueId = readStringValue(manifest, 'issue_id');
       if (issueProvider !== 'linear' || !issueId) {
@@ -2584,6 +2581,9 @@ async function discoverProviderIssueRuns(
       if (input && (issueProvider !== input.provider || issueId !== input.issueId)) {
         continue;
       }
+      const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
+        join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
+      );
       discovered.push({
         provider: issueProvider,
         issueId,

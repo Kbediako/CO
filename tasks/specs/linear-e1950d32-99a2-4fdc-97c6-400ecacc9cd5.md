@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md
 review_notes:
   - 2026-03-25: Opened from Linear issue `CO-18` after confirming the live CO workflow states via `linear issue-context`, observing the issue in `Ready`, and transitioning it to `In Progress`.
+  - 2026-03-25: docs-review approval mirrored from the checklist: self-approved by `provider-worker` at 2026-03-24T23:32:36Z after `/Users/kbediako/Code/CO/.runs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5/cli/2026-03-24T23-27-44-639Z-c2876226/manifest.json` succeeded with no blocking comments.
   - 2026-03-25: The required failed baseline was re-audited from the canonical main-checkout artifacts because the cited `.runs` payloads are not stored under the current worktree path.
   - 2026-03-25: The failed `CO-16` artifact pair proves a terminal worker failure (`manifest.status = failed`, `proof.owner_status = failed`, `proof.end_reason = codex_exit_1`) after successful Linear writes had already occurred.
   - 2026-03-25: Current local control-host intake state has since been manually recovered, so this lane targets the missing automatic reconciliation path rather than replaying the already-fixed live stale snapshot.

@@ -12,7 +12,7 @@
 - [x] `tasks/index.json` registers the `CO-18` TECH_SPEC entry. Evidence: `tasks/index.json`.
 - [x] `docs/TASKS.md` updated with the `CO-18` snapshot. Evidence: `docs/TASKS.md`.
 - [x] Checklist mirrored to `.agent/task/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md`. Evidence: `.agent/task/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md`.
-- [x] docs-review approved the `CO-18` packet for implementation. Evidence: self-approved by `provider-worker` on 2026-03-24T23:32:36Z after `docs-review` succeeded at `/Users/kbediako/Code/CO/.runs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5/cli/2026-03-24T23-27-44-639Z-c2876226/manifest.json`; no blocking review comments remained before implementation.
+- [x] docs-review approved the `CO-18` packet for implementation. Evidence: self-approved by `provider-worker` on 2026-03-24T23:32:36Z after `docs-review` succeeded at `/Users/kbediako/Code/CO/.runs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5/cli/2026-03-24T23-27-44-639Z-c2876226/manifest.json`; no blocking review comments remained before implementation. Mirror: `tasks/specs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md` `review_notes`.
 
 ## Investigation
 - [x] Live Linear workflow states and current issue state were rechecked before transition, and the issue was moved from `Ready` to `In Progress`. Evidence: `node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear issue-context --issue-id e1950d32-99a2-4fdc-97c6-400ecacc9cd5`, `node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear transition --issue-id e1950d32-99a2-4fdc-97c6-400ecacc9cd5 --state "In Progress"`.
@@ -31,7 +31,7 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed locally on 2026-03-25.
 - [x] `npm run build`. Evidence: passed locally on 2026-03-25.
 - [x] `npm run lint`. Evidence: passed locally on 2026-03-25.
-- [ ] `npm run test`. Evidence: awaiting terminal GitHub `Core Lane` result for PR #295 on head `ae9516a5094f9248cb5ddba6082b776b186fd935` because the full suite was not rerun locally after the latest follow-up patch.
+- [ ] `npm run test`. Evidence: the env-scrubbed local rerun on 2026-03-25 completed without visible failures, but the provider-worker shell hit the known quiet-tail after completion and the required GitHub `Core Lane` run for PR `#296` on head `af5affcc2c98623639bfd53e96c75366dabd8878` is still pending, so terminal green is not recorded yet.
 - [x] `npm run docs:check`. Evidence: passed locally on 2026-03-25.
 - [x] `npm run docs:freshness`. Evidence: passed locally on 2026-03-25.
 - [x] `DIFF_BUDGET_OVERRIDE_REASON="Docs-first packet plus bounded provider failure reconciliation and regressions for CO-18 exceed the review budget by 18 lines; splitting would separate required spec evidence from the implementation it governs." node scripts/diff-budget.mjs`. Evidence: passed locally on 2026-03-25.
@@ -39,6 +39,6 @@
 - [x] `env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" npm run pack:smoke`. Evidence: passed locally on 2026-03-25.
 
 ## Delivery
-- [ ] Open PR for `CO-18`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.
-- [ ] Verify unresolved actionable review threads = `0` or record a waiver with evidence before moving to `In Review`.
-- [ ] Merge the latest `origin/main` into the branch before review handoff, refresh the workpad to match current status and risks, and stop coding once the issue reaches `In Review`.
+- [x] Replacement PR `#296` is open and attached to Linear after the required `Rework` reset. Evidence: `https://github.com/Kbediako/CO/pull/296`, `node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear attach-pr --issue-id e1950d32-99a2-4fdc-97c6-400ecacc9cd5 --url https://github.com/Kbediako/CO/pull/296 --title "fix: reconcile failed provider-worker intake state"`.
+- [ ] Handle actionable PR feedback and wait for required checks to reach terminal green before moving to `In Review`. Evidence: CodeRabbit requested changes on 2026-03-25T04:44:33Z, and GitHub `Core Lane` run `23525089460` for PR `#296` is still pending.
+- [ ] Verify unresolved actionable review threads = `0`, merge the latest `origin/main` into the branch just before handoff, refresh the workpad to match current status and risks, and stop coding once the issue reaches `In Review`.

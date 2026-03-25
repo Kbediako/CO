@@ -74,7 +74,7 @@
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`
-  - `npm run review`
+  - manifest-backed review evidence via `TASK=linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5 NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <manifest-path>` (repo alias: `npm run review -- --manifest <manifest-path>`)
   - `npm run pack:smoke` only if downstream-facing CLI/package/skill surfaces change
   - `docs/implementation-docs-archive-policy.json` archive path recorded through the automation workflow or `npm run docs:archive-implementation` fallback when the archive window is reached, including the resulting archive PR URL, commit hash, or fallback evidence in the closeout packet
 - Rollout verification:

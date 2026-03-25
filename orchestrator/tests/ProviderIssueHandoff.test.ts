@@ -113,6 +113,21 @@ function createLinearTokenFingerprint(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+function cloneProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {
+  return normalizeProviderIntakeState(JSON.parse(JSON.stringify(state)) as ProviderIntakeState);
+}
+
+function createPersistSnapshotSpy(state: ProviderIntakeState) {
+  let persistedState = cloneProviderIntakeState(state);
+  const persist = vi.fn(async () => {
+    persistedState = cloneProviderIntakeState(state);
+  });
+  return {
+    persist,
+    getPersistedState: () => persistedState
+  };
+}
+
 async function flushAsyncWork(turns = 8): Promise<void> {
   for (let index = 0; index < turns; index += 1) {
     await Promise.resolve();
@@ -4466,14 +4481,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_error: null
     });
 
-    let persistedState = normalizeProviderIntakeState(
-      JSON.parse(JSON.stringify(state)) as ProviderIntakeState
-    );
-    const persist = vi.fn(async () => {
-      persistedState = normalizeProviderIntakeState(
-        JSON.parse(JSON.stringify(state)) as ProviderIntakeState
-      );
-    });
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
 
     const liveService = createProviderIssueHandoffService({
       paths,
@@ -4505,7 +4513,7 @@ describe('createProviderIssueHandoffService', () => {
     await liveService.refresh();
 
     expect(persist).toHaveBeenCalled();
-    expect(persistedState.claims[0]?.issue_blocked_by).toEqual([
+    expect(getPersistedState().claims[0]?.issue_blocked_by).toEqual([
       {
         id: 'lin-blocker-1',
         identifier: 'CO-9',
@@ -4523,7 +4531,7 @@ describe('createProviderIssueHandoffService', () => {
     };
     createProviderIssueHandoffService({
       paths,
-      state: persistedState,
+      state: getPersistedState(),
       persist: vi.fn(async () => undefined),
       launcher: restartedLauncher,
       startPipelineId: 'diagnostics'
@@ -4533,8 +4541,8 @@ describe('createProviderIssueHandoffService', () => {
     await flushAsyncWork();
     await waitForCondition(
       () =>
-        persistedState.claims[0]?.state === 'released' &&
-        persistedState.claims[0]?.reason === 'provider_issue_released:todo_blocked_by_non_terminal'
+        getPersistedState().claims[0]?.state === 'released' &&
+        getPersistedState().claims[0]?.reason === 'provider_issue_released:todo_blocked_by_non_terminal'
     );
 
     expect(restartedLauncher.start).not.toHaveBeenCalled();
@@ -10667,7 +10675,7 @@ describe('createProviderIssueHandoffService', () => {
       launch_token: null
     });
 
-    const persist = vi.fn(async () => undefined);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -10694,7 +10702,7 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
-    expect(state.claims[0]).toMatchObject({
+    const expectedClaim = {
       state: 'resumable',
       reason: 'provider_issue_rehydrated_resumable_run',
       issue_state: 'In Progress',
@@ -10707,7 +10715,10 @@ describe('createProviderIssueHandoffService', () => {
       retry_attempt: 1,
       retry_due_at: '2026-03-19T04:30:10.000Z',
       retry_error: null
-    });
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
   it('reclassifies a stale running claim from terminal failed proof evidence before the run manifest flips terminal', async () => {
@@ -10777,7 +10788,7 @@ describe('createProviderIssueHandoffService', () => {
       launch_token: null
     });
 
-    const persist = vi.fn(async () => undefined);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -10804,7 +10815,7 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
-    expect(state.claims[0]).toMatchObject({
+    const expectedClaim = {
       state: 'resumable',
       reason: 'provider_issue_rehydrated_resumable_run',
       issue_state: 'In Progress',
@@ -10817,7 +10828,10 @@ describe('createProviderIssueHandoffService', () => {
       retry_attempt: 1,
       retry_due_at: '2026-03-19T04:30:10.000Z',
       retry_error: 'codex_exit_1'
-    });
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
   it('keeps an active running claim when a terminal failed proof sidecar is older than the manifest', async () => {
@@ -10887,7 +10901,7 @@ describe('createProviderIssueHandoffService', () => {
       launch_token: null
     });
 
-    const persist = vi.fn(async () => undefined);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -10914,7 +10928,7 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
-    expect(state.claims[0]).toMatchObject({
+    const expectedClaim = {
       state: 'running',
       reason: 'provider_issue_rehydrated_active_run',
       task_id: 'task-1303-failed',
@@ -10922,7 +10936,10 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: childPaths.manifestPath,
       retry_queued: null,
       retry_error: null
-    });
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
   it('does not leak a stale failed proof summary onto a manifest-backed failed run', async () => {
@@ -10991,7 +11008,7 @@ describe('createProviderIssueHandoffService', () => {
       launch_token: null
     });
 
-    const persist = vi.fn(async () => undefined);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -11018,7 +11035,7 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
-    expect(state.claims[0]).toMatchObject({
+    const expectedClaim = {
       state: 'resumable',
       reason: 'provider_issue_rehydrated_resumable_run',
       task_id: 'task-1303-failed',
@@ -11028,7 +11045,10 @@ describe('createProviderIssueHandoffService', () => {
       retry_attempt: 1,
       retry_due_at: '2026-03-19T04:30:10.000Z',
       retry_error: null
-    });
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
   it('ignores malformed provider worker proof sidecars and still rehydrates from manifest evidence', async () => {
@@ -11086,7 +11106,7 @@ describe('createProviderIssueHandoffService', () => {
       launch_token: null
     });
 
-    const persist = vi.fn(async () => undefined);
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
       start: vi.fn(async () => null),
       resume: vi.fn(async () => undefined)
@@ -11113,7 +11133,7 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
-    expect(state.claims[0]).toMatchObject({
+    const expectedClaim = {
       state: 'resumable',
       reason: 'provider_issue_rehydrated_resumable_run',
       issue_state: 'In Progress',
@@ -11125,7 +11145,10 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: true,
       retry_attempt: 1,
       retry_due_at: '2026-03-19T04:30:10.000Z'
-    });
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
   it('queues a second failed-run retry at double the first backoff delay', async () => {
