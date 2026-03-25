@@ -157,6 +157,67 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('treats string boolean literals as enabled for blocked-by-source', async () => {
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'create-follow-up',
+          action: 'created',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up',
+            description: 'Investigate',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: null,
+            team: null,
+            project: null
+          },
+          relations: {
+            related: true,
+            blocked_by_source: true
+          },
+          source_setup: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate',
+          'acceptance-criteria': '- [ ] Captured',
+          'blocked-by-source': 'true'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        log: vi.fn()
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up',
+      description: 'Investigate',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
+      sourceSetup: null,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      }
+    });
+  });
+
   it('preserves raw inline workpad body text instead of trimming surrounding newlines', async () => {
     const upsertProviderLinearWorkpadCommentMock =
       vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>()
@@ -790,7 +851,7 @@ describe('runLinearCliShell', () => {
     expect(setExitCode).toHaveBeenCalledWith(1);
   });
 
-  it('emits machine-readable json when a local runtime error escapes argument validation', async () => {
+  it('treats unreadable file-backed required text inputs as usage errors', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();
 
@@ -817,9 +878,9 @@ describe('runLinearCliShell', () => {
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
       ok: false,
       error: {
-        code: 'linear_cli_error',
-        message: 'ENOENT: missing workpad file',
-        status: 500
+        code: 'linear_body_file_unreadable',
+        message: '--body-file must reference a readable file.',
+        status: 422
       }
     });
     expect(setExitCode).toHaveBeenCalledWith(1);

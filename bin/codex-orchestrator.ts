@@ -184,6 +184,7 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
   const booleanFlagKeys = new Set([
     'apply',
     'auto-issue-log',
+    'blocked-by-source',
     'cloud',
     'cloud-preflight',
     'codex-cli',

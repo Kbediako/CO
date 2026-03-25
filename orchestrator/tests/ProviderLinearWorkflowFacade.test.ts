@@ -804,7 +804,9 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
         variables?: Record<string, unknown>;
       };
-      if (body.query?.includes('ProviderLinearIssueContext')) {
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        expect(body.query).not.toContain('comments(');
+        expect(body.query).not.toContain('attachments(');
         return jsonResponse(buildIssueContextBody());
       }
       if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
@@ -1038,7 +1040,7 @@ describe('providerLinearWorkflowFacade', () => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
       };
-      if (body.query?.includes('ProviderLinearIssueContext')) {
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
         return jsonResponse(buildIssueContextBody());
       }
       if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
@@ -1137,7 +1139,7 @@ describe('providerLinearWorkflowFacade', () => {
           };
         };
       };
-      if (body.query?.includes('ProviderLinearIssueContext')) {
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
         return jsonResponse(buildIssueContextBody());
       }
       if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {

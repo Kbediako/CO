@@ -219,7 +219,7 @@ export async function runLinearCliShell(
             'acceptance-criteria',
             'acceptance-criteria-file'
           ),
-          blockedBySource: params.flags['blocked-by-source'] === true,
+          blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
           sourceSetup: readSourceSetup(params.flags),
           env
         });
@@ -283,6 +283,18 @@ function readStringFlag(flags: ArgMap, key: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readBooleanFlag(flags: ArgMap, key: string): boolean {
+  const value = flags[key];
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(normalized);
+}
+
 function readSourceSetup(flags: ArgMap): DispatchPilotSourceSetup | null {
   const workspaceId = readStringFlag(flags, 'workspace-id') ?? null;
   const teamId = readStringFlag(flags, 'team-id') ?? null;
@@ -324,7 +336,15 @@ async function resolveRequiredText(
     return inlineValue;
   }
   if (fileValue) {
-    const fileText = await readTextFile(fileValue);
+    let fileText: string;
+    try {
+      fileText = await readTextFile(fileValue);
+    } catch {
+      throw usageError(
+        `linear_${fileFlag.replace(/-/gu, '_')}_unreadable`,
+        `--${fileFlag} must reference a readable file.`
+      );
+    }
     if (fileText.trim().length === 0) {
       throw usageError(
         `linear_${inlineFlag.replace(/-/gu, '_')}_missing`,
