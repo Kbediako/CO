@@ -83,5 +83,6 @@
 - Whether the smallest correct implementation is a direct child-to-control-host refresh callback, richer proof-aware run discovery, or both.
 
 ## Approvals
-- Reviewer: pending docs-review for `linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5`
-- Date: 2026-03-25
+- Reviewer: `provider-worker` self-approved after `docs-review` for `linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5`
+- Date: 2026-03-24T23:32:36Z
+- Evidence: `/Users/kbediako/Code/CO/.runs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5/cli/2026-03-24T23-27-44-639Z-c2876226/manifest.json`

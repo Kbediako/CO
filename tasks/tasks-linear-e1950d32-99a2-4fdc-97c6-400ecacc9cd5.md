@@ -12,7 +12,7 @@
 - [x] `tasks/index.json` registers the `CO-18` TECH_SPEC entry. Evidence: `tasks/index.json`.
 - [x] `docs/TASKS.md` updated with the `CO-18` snapshot. Evidence: `docs/TASKS.md`.
 - [x] Checklist mirrored to `.agent/task/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md`. Evidence: `.agent/task/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md`.
-- [ ] docs-review approved the `CO-18` packet for implementation. Evidence: pending.
+- [x] docs-review approved the `CO-18` packet for implementation. Evidence: self-approved by `provider-worker` on 2026-03-24T23:32:36Z after `docs-review` succeeded at `/Users/kbediako/Code/CO/.runs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5/cli/2026-03-24T23-27-44-639Z-c2876226/manifest.json`; no blocking review comments remained before implementation.
 
 ## Investigation
 - [x] Live Linear workflow states and current issue state were rechecked before transition, and the issue was moved from `Ready` to `In Progress`. Evidence: `node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear issue-context --issue-id e1950d32-99a2-4fdc-97c6-400ecacc9cd5`, `node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear transition --issue-id e1950d32-99a2-4fdc-97c6-400ecacc9cd5 --state "In Progress"`.

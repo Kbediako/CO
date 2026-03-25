@@ -8,7 +8,7 @@
 - MCP Task ID: `linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5`
 
 ## Goal
-- Reconcile terminal provider-worker failures truthfully across run manifests, worker proof, provider-intake persistence, and Linear/workpad surfaces so recovery is deterministic and operator-visible.
+- Reconcile terminal provider-worker failures truthfully across run manifests, worker proof, provider-intake persistence, and Linear/workpad surfaces, so recovery is deterministic and operator-visible.
 
 ## Plan
 1. Register the docs-first packet for `linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5`, update `tasks/index.json`, `docs/TASKS.md`, the freshness registry, and the single active Linear workpad.
