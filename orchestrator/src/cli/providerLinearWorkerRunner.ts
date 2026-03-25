@@ -1,11 +1,24 @@
 import { spawn, type StdioOptions } from 'node:child_process';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
+import {
+  computeEffectiveDelegationConfig,
+  loadDelegationConfigFiles,
+  parseDelegationConfigOverride,
+  splitDelegationConfigOverrides,
+  type DelegationConfigLayer
+} from './config/delegationConfig.js';
+import {
+  PROVIDER_CONTROL_HOST_RUN_ID_ENV,
+  PROVIDER_CONTROL_HOST_TASK_ID_ENV,
+  readProviderControlHostLocatorFromEnv,
+  readProviderControlHostLocatorFromManifest
+} from '../../../scripts/lib/provider-run-contract.js';
 import {
   hasLinearSourceBinding,
   resolveLinearSourceSetup,
@@ -21,6 +34,10 @@ import {
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
+import {
+  PROVIDER_WORKSPACE_ROOT_DIRNAME,
+  resolveProviderWorkspacePath
+} from './run/workspacePath.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import {
   createRuntimeCodexCommandContext,
@@ -29,17 +46,24 @@ import {
   resolveRuntimeCodexCommand,
   type RuntimeCodexCommandContext
 } from './runtime/index.js';
+import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
+import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
+const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
+const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
+const CSRF_HEADER = 'x-csrf-token';
+const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
 };
 
 export interface ProviderLinearWorkerContext {
+  manifest: Record<string, unknown>;
   manifestPath: string;
   runDir: string;
   repoRoot: string;
@@ -101,6 +125,17 @@ export interface ProviderLinearWorkerExecResult {
   exitCode: number | null;
   stdout: string;
   stderr: string;
+}
+
+interface ProviderWorkerRunLocation {
+  canonicalRunsRoot: string;
+  taskId: string;
+  runId: string;
+}
+
+interface ProviderControlHostManifestTarget {
+  currentRun: ProviderWorkerRunLocation;
+  manifestPath: string;
 }
 
 export interface ProviderLinearWorkerDependencies {
@@ -324,6 +359,7 @@ export async function loadProviderLinearWorkerContext(
     normalizeOptionalString(manifest.run_id) ??
     `provider-linear-worker-${Date.now()}`;
   return {
+    manifest,
     manifestPath,
     runDir: dirname(manifestPath),
     repoRoot,
@@ -752,6 +788,349 @@ function buildProofPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
 }
 
+async function resolveProviderWorkerRunLocation(
+  currentManifestPath: string,
+): Promise<ProviderWorkerRunLocation | null> {
+  try {
+    const canonicalManifestPath = await realpath(currentManifestPath);
+    if (basename(canonicalManifestPath) !== 'manifest.json') {
+      return null;
+    }
+    const canonicalRunDir = dirname(canonicalManifestPath);
+    const cliDir = dirname(canonicalRunDir);
+    if (basename(cliDir) !== 'cli') {
+      return null;
+    }
+    const taskDir = dirname(cliDir);
+    const canonicalRunsRoot = dirname(taskDir);
+    if (dirname(canonicalRunsRoot) === canonicalRunsRoot) {
+      return null;
+    }
+    return {
+      canonicalRunsRoot,
+      taskId: sanitizeTaskId(basename(taskDir)),
+      runId: sanitizeRunId(basename(canonicalRunDir))
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveProviderControlHostManifestPath(
+  currentManifestPath: string,
+  env: NodeJS.ProcessEnv,
+  manifest: Record<string, unknown>
+): Promise<ProviderControlHostManifestTarget | null> {
+  const locator =
+    readProviderControlHostLocatorFromManifest(manifest) ??
+    readProviderControlHostLocatorFromEnv({
+      [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: env[PROVIDER_CONTROL_HOST_TASK_ID_ENV],
+      [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: env[PROVIDER_CONTROL_HOST_RUN_ID_ENV],
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE
+    });
+  if (!locator) {
+    return null;
+  }
+  const currentRun = await resolveProviderWorkerRunLocation(currentManifestPath);
+  if (!currentRun) {
+    return null;
+  }
+  return {
+    currentRun,
+    manifestPath: resolve(
+      currentRun.canonicalRunsRoot,
+      sanitizeTaskId(locator.taskId),
+      'cli',
+      sanitizeRunId(locator.runId),
+      'manifest.json'
+    )
+  };
+}
+
+function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
+  const relativePath = relative(rootPath, targetPath);
+  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
+}
+
+function resolveProviderWorkerTaskId(
+  currentRun: ProviderWorkerRunLocation,
+  manifest: Record<string, unknown>
+): string | null {
+  const manifestTaskId =
+    normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId);
+  if (manifestTaskId) {
+    const sanitizedTaskId = sanitizeTaskId(manifestTaskId);
+    return sanitizedTaskId.length > 0 ? sanitizedTaskId : null;
+  }
+  return currentRun.taskId.length > 0 ? currentRun.taskId : null;
+}
+
+async function readControlEndpointToken(tokenPath: string): Promise<string> {
+  const raw = await readFile(tokenPath, 'utf8');
+  const trimmed = raw.trim();
+  const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+  try {
+    const parsed = JSON.parse(raw);
+    if (isRecord(parsed) && typeof parsed.token === 'string' && parsed.token.trim().length > 0) {
+      return parsed.token.trim();
+    }
+    throw new Error('control auth token invalid');
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
+    if (looksLikeJson) {
+      throw new Error('control auth token invalid');
+    }
+    // Fall back to plain-text token contents.
+  }
+  const token = trimmed;
+  if (!token) {
+    throw new Error('control auth token missing');
+  }
+  return token;
+}
+
+function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv): DelegationConfigLayer[] {
+  const layers: DelegationConfigLayer[] = [];
+  for (const key of CONFIG_OVERRIDE_ENV_KEYS) {
+    const raw = env[key];
+    if (!raw) {
+      continue;
+    }
+    const values = splitDelegationConfigOverrides(raw);
+    for (const value of values) {
+      try {
+        const layer = parseDelegationConfigOverride(value, 'env');
+        if (layer) {
+          layers.push(layer);
+        }
+      } catch (error) {
+        logger.warn(
+          `Invalid delegation config override (env): ${(error as Error)?.message ?? String(error)}`
+        );
+      }
+    }
+  }
+  return layers;
+}
+
+async function resolveAllowedControlHostBindHosts(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv
+): Promise<string[] | null> {
+  const configFiles = await loadDelegationConfigFiles({ repoRoot, env });
+  const layers = [configFiles.global, configFiles.repo, ...collectDelegationEnvOverrides(env)]
+    .filter(Boolean) as DelegationConfigLayer[];
+  const effective = computeEffectiveDelegationConfig({
+    repoRoot,
+    layers
+  }).ui.allowedBindHosts;
+  const hasExplicitAllowedBindHosts = Array.isArray(configFiles.repo?.ui?.allowedBindHosts);
+  return hasExplicitAllowedBindHosts ? effective : null;
+}
+
+function normalizeControlHostName(host: string): string {
+  const trimmed = host.trim().toLowerCase();
+  const normalized =
+    trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1) : trimmed;
+  if (normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1') {
+    return 'loopback';
+  }
+  return normalized;
+}
+
+function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[] | null): URL {
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    throw new Error('control base_url missing');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('control base_url not permitted');
+  }
+  const normalizedAllowedHosts = new Set(
+    (allowedHosts ?? ['127.0.0.1', 'localhost', '::1']).map((entry) =>
+      normalizeControlHostName(entry)
+    )
+  );
+  if (!normalizedAllowedHosts.has(normalizeControlHostName(parsed.hostname))) {
+    throw new Error('control base_url not permitted');
+  }
+  return parsed;
+}
+
+function isCompatibleControlHostRepoRoot(
+  candidateRepoRoot: string,
+  workerWorkspacePath: string,
+  taskId: string
+): boolean {
+  const canonicalCandidateRepoRoot = resolve(candidateRepoRoot);
+  const canonicalWorkerWorkspacePath = resolve(workerWorkspacePath);
+  if (
+    canonicalWorkerWorkspacePath === canonicalCandidateRepoRoot &&
+    !(
+      basename(canonicalWorkerWorkspacePath) === taskId &&
+      basename(dirname(canonicalWorkerWorkspacePath)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+    )
+  ) {
+    return true;
+  }
+  try {
+    return canonicalWorkerWorkspacePath === resolveProviderWorkspacePath(canonicalCandidateRepoRoot, taskId);
+  } catch {
+    return false;
+  }
+}
+
+async function resolveProviderControlHostRepoRoot(input: {
+  manifestPath: string;
+  workerWorkspacePath: string;
+  taskId: string;
+}): Promise<string | null> {
+  const canonicalWorkerWorkspacePath = await realpath(input.workerWorkspacePath).catch(() =>
+    resolve(input.workerWorkspacePath)
+  );
+  const runDerivedRepoRoot = await realpath(
+    resolve(dirname(input.manifestPath), '..', '..', '..', '..')
+  ).catch(() => null);
+  if (
+    runDerivedRepoRoot &&
+    isCompatibleControlHostRepoRoot(runDerivedRepoRoot, canonicalWorkerWorkspacePath, input.taskId)
+  ) {
+    return runDerivedRepoRoot;
+  }
+  try {
+    const raw = JSON.parse(await readFile(input.manifestPath, 'utf8')) as Record<string, unknown>;
+    const manifestWorkspacePath =
+      normalizeOptionalString(raw.workspace_path) ??
+      normalizeOptionalString(raw.workspacePath);
+    if (!manifestWorkspacePath) {
+      return null;
+    }
+    const canonicalManifestWorkspacePath = await realpath(manifestWorkspacePath);
+    return isCompatibleControlHostRepoRoot(
+      canonicalManifestWorkspacePath,
+      canonicalWorkerWorkspacePath,
+      input.taskId
+    )
+      ? canonicalManifestWorkspacePath
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function requestProviderControlHostRefresh(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+  proof: ProviderLinearWorkerProof;
+  repoRoot: string;
+  log: Pick<typeof logger, 'warn'>;
+}): Promise<void> {
+  if (input.proof.owner_phase !== 'ended' || input.proof.owner_status !== 'failed') {
+    return;
+  }
+  try {
+    const manifestTarget = await resolveProviderControlHostManifestPath(
+      input.currentManifestPath,
+      input.env,
+      input.manifest
+    );
+    if (!manifestTarget) {
+      return;
+    }
+    const canonicalManifestPath = await realpath(manifestTarget.manifestPath);
+    const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
+    if (!isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)) {
+      throw new Error('control-host manifest path invalid');
+    }
+    const canonicalRunDir = dirname(canonicalManifestPath);
+    const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
+    if (!workerTaskId) {
+      throw new Error('provider task id unavailable');
+    }
+    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
+      manifestPath: canonicalManifestPath,
+      workerWorkspacePath: input.repoRoot,
+      taskId: workerTaskId
+    });
+    if (!controlHostRepoRoot) {
+      throw new Error('control-host repo root unavailable');
+    }
+    const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
+    const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
+    const canonicalEndpointPath = await realpath(endpointPath);
+    if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
+      throw new Error('control endpoint path invalid');
+    }
+    const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
+    const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
+    const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
+    const resolvedTokenPath =
+      typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
+        ? resolve(canonicalRunDir, endpoint.token_path)
+        : resolve(canonicalRunDir, 'control_auth.json');
+    if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
+      throw new Error('control auth path invalid');
+    }
+    const canonicalTokenPath = await realpath(resolvedTokenPath);
+    if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
+      throw new Error('control auth path invalid');
+    }
+    const token = await readControlEndpointToken(canonicalTokenPath);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
+    try {
+      const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
+        method: 'POST',
+        redirect: 'error',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          [CSRF_HEADER]: token
+        },
+        body: JSON.stringify({
+          action: 'refresh',
+          source: 'provider-linear-worker',
+          issue_id: input.proof.issue_id,
+          issue_identifier: input.proof.issue_identifier,
+          owner_status: input.proof.owner_status,
+          end_reason: input.proof.end_reason
+        }),
+        signal: controller.signal
+      });
+      const responseBody = await response.text();
+      if (response.status !== 202) {
+        const responseDetail = responseBody.trim();
+        throw new Error(
+          responseDetail
+            ? `refresh request failed with status ${response.status}: ${responseDetail}`
+            : `refresh request failed with status ${response.status}`
+        );
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (error) {
+    const message = (error as Error)?.name === 'AbortError'
+      ? 'refresh request timeout'
+      : (error as Error)?.message ?? String(error);
+    input.log.warn(
+      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}`
+    );
+  }
+}
+
 async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,
   runDir: string,
@@ -822,7 +1201,20 @@ export async function runProviderLinearWorker(
     updated_at: deps.now()
   };
 
-  finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+  const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
+    const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof);
+    await requestProviderControlHostRefresh({
+      currentManifestPath: context.manifestPath,
+      env,
+      manifest: context.manifest,
+      proof: hydratedProof,
+      repoRoot: context.repoRoot,
+      log: deps.log
+    });
+    return hydratedProof;
+  };
+
+  finalProof = await persistProof(finalProof);
   const readTrackedIssueWithFailClosedProof = async (): Promise<LiveLinearTrackedIssue> => {
     try {
       return await deps.readTrackedIssue({
@@ -838,7 +1230,7 @@ export async function runProviderLinearWorker(
         end_reason: 'tracked_issue_read_failed',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
   };
@@ -856,7 +1248,7 @@ export async function runProviderLinearWorker(
       end_reason: lifecycle.terminalReason,
       updated_at: deps.now()
     };
-    finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+    finalProof = await persistProof(finalProof);
     return finalProof;
   }
 
@@ -884,7 +1276,7 @@ export async function runProviderLinearWorker(
         end_reason: 'exec_runner_failed',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
     const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
@@ -913,7 +1305,7 @@ export async function runProviderLinearWorker(
       end_reason: null,
       updated_at: deps.now()
     };
-    finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+    finalProof = await persistProof(finalProof);
 
     if (execResult.exitCode !== 0) {
       finalProof = {
@@ -923,7 +1315,7 @@ export async function runProviderLinearWorker(
         end_reason: `codex_exit_${execResult.exitCode ?? 'unknown'}`,
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw new Error(
         `provider-linear-worker turn ${turnNumber} failed with exit code ${execResult.exitCode ?? 'unknown'}`
       );
@@ -937,7 +1329,7 @@ export async function runProviderLinearWorker(
         end_reason: 'thread_id_missing',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw new Error('provider-linear-worker could not determine thread_id from Codex JSONL output.');
     }
 
@@ -951,7 +1343,7 @@ export async function runProviderLinearWorker(
         end_reason: lifecycle.terminalReason,
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       return finalProof;
     }
 
@@ -963,7 +1355,7 @@ export async function runProviderLinearWorker(
         end_reason: 'max_turns_reached_issue_still_active',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       return finalProof;
     }
   }
@@ -975,7 +1367,7 @@ export async function runProviderLinearWorker(
     end_reason: 'worker_completed',
     updated_at: deps.now()
   };
-  finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+  finalProof = await persistProof(finalProof);
   return finalProof;
 }
 
