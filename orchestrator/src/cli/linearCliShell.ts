@@ -8,9 +8,11 @@ import {
 } from './control/linearDispatchSource.js';
 import {
   attachProviderLinearIssuePr,
+  createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
   getProviderLinearIssueContext,
   type ProviderLinearAttachPrResult,
+  type ProviderLinearCreateFollowUpResult,
   type ProviderLinearDeleteWorkpadResult,
   type ProviderLinearIssueContextResult,
   type ProviderLinearTransitionResult,
@@ -39,6 +41,7 @@ interface LinearCliShellDependencies {
   deleteProviderLinearWorkpadComment: typeof deleteProviderLinearWorkpadComment;
   transitionProviderLinearIssueState: typeof transitionProviderLinearIssueState;
   attachProviderLinearIssuePr: typeof attachProviderLinearIssuePr;
+  createProviderLinearFollowUpIssue: typeof createProviderLinearFollowUpIssue;
   appendAuditEntry: typeof appendProviderLinearAuditEntry;
   readTextFile: (path: string) => Promise<string>;
   getEnv: () => NodeJS.ProcessEnv;
@@ -67,6 +70,7 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   deleteProviderLinearWorkpadComment,
   transitionProviderLinearIssueState,
   attachProviderLinearIssuePr,
+  createProviderLinearFollowUpIssue,
   appendAuditEntry: appendProviderLinearAuditEntry,
   readTextFile: async (path: string) => await readFile(path, 'utf8'),
   getEnv: () => process.env,
@@ -186,6 +190,43 @@ export async function runLinearCliShell(
         emitJsonResult(result, dependencies);
         return;
       }
+      case 'create-follow-up': {
+        assertAllowedFlags(params.flags, [
+          'format',
+          'issue-id',
+          'workspace-id',
+          'team-id',
+          'project-id',
+          'title',
+          'description',
+          'description-file',
+          'acceptance-criteria',
+          'acceptance-criteria-file',
+          'blocked-by-source'
+        ]);
+        const result = await dependencies.createProviderLinearFollowUpIssue({
+          issueId: requireFlag(params.flags, 'issue-id'),
+          title: requireFlag(params.flags, 'title'),
+          description: await resolveRequiredText(
+            params.flags,
+            dependencies.readTextFile,
+            'description',
+            'description-file'
+          ),
+          acceptanceCriteria: await resolveRequiredText(
+            params.flags,
+            dependencies.readTextFile,
+            'acceptance-criteria',
+            'acceptance-criteria-file'
+          ),
+          blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
+          sourceSetup: readSourceSetup(params.flags),
+          env
+        });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
       default:
         throw usageError('linear_unknown_subcommand', `Unknown linear subcommand: ${subcommand}`);
     }
@@ -242,6 +283,18 @@ function readStringFlag(flags: ArgMap, key: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readBooleanFlag(flags: ArgMap, key: string): boolean {
+  const value = flags[key];
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(normalized);
+}
+
 function readSourceSetup(flags: ArgMap): DispatchPilotSourceSetup | null {
   const workspaceId = readStringFlag(flags, 'workspace-id') ?? null;
   const teamId = readStringFlag(flags, 'team-id') ?? null;
@@ -261,19 +314,49 @@ async function resolveBody(
   flags: ArgMap,
   readTextFile: (path: string) => Promise<string>
 ): Promise<string> {
-  const inlineBody = readRawStringFlag(flags, 'body');
-  const bodyFile = readStringFlag(flags, 'body-file');
-  const hasInlineBody = typeof inlineBody === 'string' && inlineBody.trim().length > 0;
-  if (hasInlineBody && bodyFile) {
-    throw usageError('linear_body_conflict', 'Use either --body or --body-file, not both.');
+  return await resolveRequiredText(flags, readTextFile, 'body', 'body-file');
+}
+
+async function resolveRequiredText(
+  flags: ArgMap,
+  readTextFile: (path: string) => Promise<string>,
+  inlineFlag: string,
+  fileFlag: string
+): Promise<string> {
+  const inlineValue = readRawStringFlag(flags, inlineFlag);
+  const fileValue = readStringFlag(flags, fileFlag);
+  const hasInlineValue = typeof inlineValue === 'string' && inlineValue.trim().length > 0;
+  if (hasInlineValue && fileValue) {
+    throw usageError(
+      `linear_${inlineFlag.replace(/-/gu, '_')}_conflict`,
+      `Use either --${inlineFlag} or --${fileFlag}, not both.`
+    );
   }
-  if (hasInlineBody) {
-    return inlineBody;
+  if (hasInlineValue) {
+    return inlineValue;
   }
-  if (bodyFile) {
-    return await readTextFile(bodyFile);
+  if (fileValue) {
+    let fileText: string;
+    try {
+      fileText = await readTextFile(fileValue);
+    } catch {
+      throw usageError(
+        `linear_${fileFlag.replace(/-/gu, '_')}_unreadable`,
+        `--${fileFlag} must reference a readable file.`
+      );
+    }
+    if (fileText.trim().length === 0) {
+      throw usageError(
+        `linear_${inlineFlag.replace(/-/gu, '_')}_missing`,
+        `--${inlineFlag} or --${fileFlag} is required.`
+      );
+    }
+    return fileText;
   }
-  throw usageError('linear_body_missing', '--body or --body-file is required.');
+  throw usageError(
+    `linear_${inlineFlag.replace(/-/gu, '_')}_missing`,
+    `--${inlineFlag} or --${fileFlag} is required.`
+  );
 }
 
 function usageError(code: string, message: string): LinearCliUsageError {
@@ -311,7 +394,8 @@ type LinearCliResult =
   | ProviderLinearUpsertWorkpadResult
   | ProviderLinearDeleteWorkpadResult
   | ProviderLinearTransitionResult
-  | ProviderLinearAttachPrResult;
+  | ProviderLinearAttachPrResult
+  | ProviderLinearCreateFollowUpResult;
 
 async function recordAuditResult(
   result: LinearCliResult,
@@ -339,6 +423,7 @@ function buildAuditEntry(
 ): ProviderLinearAuditEntry {
   const requestedIssueId = readStringFlag(flags, 'issue-id') ?? null;
   const sourceSetup = resolveAuditSourceSetup(flags, env);
+  const followUpAuditFields = resolveFollowUpAuditFields(result);
   if (!result.ok) {
     return {
       recorded_at: recordedAt,
@@ -350,6 +435,7 @@ function buildAuditEntry(
       action: null,
       via: null,
       state: null,
+      ...followUpAuditFields,
       comment_id: null,
       attachment_id: null,
       error_code: result.error.code,
@@ -369,6 +455,7 @@ function buildAuditEntry(
         action: null,
         via: null,
         state: result.issue.state?.name ?? null,
+        ...followUpAuditFields,
         comment_id: result.issue.workpad_comment?.id ?? null,
         attachment_id: null,
         error_code: null,
@@ -385,6 +472,7 @@ function buildAuditEntry(
         action: result.action,
         via: null,
         state: null,
+        ...followUpAuditFields,
         comment_id: result.comment.id,
         attachment_id: null,
         error_code: null,
@@ -401,6 +489,7 @@ function buildAuditEntry(
         action: result.action,
         via: null,
         state: null,
+        ...followUpAuditFields,
         comment_id: result.comment_id,
         attachment_id: null,
         error_code: null,
@@ -417,6 +506,7 @@ function buildAuditEntry(
         action: result.action,
         via: null,
         state: result.issue.state?.name ?? result.target_state.name,
+        ...followUpAuditFields,
         comment_id: null,
         attachment_id: null,
         error_code: null,
@@ -433,12 +523,84 @@ function buildAuditEntry(
         action: result.action,
         via: result.via,
         state: null,
+        ...followUpAuditFields,
         comment_id: null,
         attachment_id: result.attachment.id,
         error_code: null,
         error_message: null
       };
+    case 'create-follow-up':
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: true,
+        issue_id: result.issue.id,
+        issue_identifier: result.issue.identifier,
+        source_setup: result.source_setup,
+        action: result.action,
+        via: result.relations.blocked_by_source ? 'related+blocks' : 'related',
+        state: result.follow_up_issue.state?.name ?? null,
+        ...followUpAuditFields,
+        comment_id: null,
+        attachment_id: null,
+        error_code: null,
+        error_message: null
+      };
   }
+}
+
+function resolveFollowUpAuditFields(
+  result: LinearCliResult
+): Pick<
+  ProviderLinearAuditEntry,
+  'follow_up_issue_id' | 'follow_up_issue_identifier' | 'failed_relation_type'
+> {
+  if (result.ok) {
+    if (result.operation !== 'create-follow-up') {
+      return {
+        follow_up_issue_id: null,
+        follow_up_issue_identifier: null,
+        failed_relation_type: null
+      };
+    }
+    return {
+      follow_up_issue_id: result.follow_up_issue.id,
+      follow_up_issue_identifier: result.follow_up_issue.identifier,
+      failed_relation_type: null
+    };
+  }
+  if (result.operation !== 'create-follow-up') {
+    return {
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null
+    };
+  }
+  const details = result.error.details;
+  const createdIssue =
+    details && typeof details === 'object' && details.created_issue && typeof details.created_issue === 'object'
+      ? (details.created_issue as Record<string, unknown>)
+      : null;
+  return {
+    follow_up_issue_id: readRecordString(createdIssue, 'id'),
+    follow_up_issue_identifier: readRecordString(createdIssue, 'identifier'),
+    failed_relation_type: readUnknownString(details?.failed_relation_type)
+  };
+}
+
+function readRecordString(record: Record<string, unknown> | null, key: string): string | null {
+  if (!record) {
+    return null;
+  }
+  return readUnknownString(record[key]);
+}
+
+function readUnknownString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): DispatchPilotSourceSetup | null {
