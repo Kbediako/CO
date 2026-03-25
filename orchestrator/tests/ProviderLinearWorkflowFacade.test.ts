@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   attachProviderLinearIssuePr,
+  createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
   getProviderLinearIssueContext,
   transitionProviderLinearIssueState,
@@ -48,6 +49,11 @@ function buildIssueContextBody(overrides: Record<string, unknown> = {}): unknown
           name: 'Codex Orchestrator',
           states: {
             nodes: [
+              {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              },
               {
                 id: 'state-in-progress',
                 name: 'In Progress',
@@ -126,6 +132,7 @@ describe('providerLinearWorkflowFacade', () => {
         team: {
           key: 'CO',
           states: [
+            { id: 'state-backlog', name: 'Backlog', type: 'unstarted' },
             { id: 'state-in-progress', name: 'In Progress', type: 'started' },
             { id: 'state-human-review', name: 'Human Review', type: 'started' },
             { id: 'state-done', name: 'Done', type: 'completed' }
@@ -788,6 +795,448 @@ describe('providerLinearWorkflowFacade', () => {
         type: 'started'
       },
       source_setup: null
+    });
+  });
+
+  it('creates a same-project Backlog follow-up issue with related and blocker linkage', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        expect(body.query).not.toContain('comments(');
+        expect(body.query).not.toContain('attachments(');
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        expect(body.variables).toEqual({
+          input: {
+            teamId: 'lin-team-1',
+            projectId: 'lin-project-1',
+            stateId: 'state-backlog',
+            title: 'Follow-up issue',
+            description: [
+              'Investigate the remaining improvement.',
+              '',
+              '## Acceptance Criteria',
+              '- [ ] Captured'
+            ].join('\n')
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        if ((body.variables?.input as Record<string, unknown> | undefined)?.type === 'related') {
+          expect(body.variables).toEqual({
+            input: {
+              type: 'related',
+              issueId: 'lin-issue-1',
+              relatedIssueId: 'lin-issue-2'
+            }
+          });
+          return jsonResponse({
+            data: {
+              issueRelationCreate: {
+                success: true,
+                issueRelation: {
+                  id: 'relation-related',
+                  type: 'related'
+                }
+              }
+            }
+          });
+        }
+        expect(body.variables).toEqual({
+          input: {
+            type: 'blocks',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-issue-2'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-blocks',
+                type: 'blocks'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      follow_up_issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-2',
+        title: 'Follow-up issue',
+        description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+        url: 'https://linear.app/example/issue/CO-2',
+        state: {
+          id: 'state-backlog',
+          name: 'Backlog',
+          type: 'unstarted'
+        },
+        team: {
+          id: 'lin-team-1',
+          key: 'CO',
+          name: 'Codex Orchestrator'
+        },
+        project: {
+          id: 'lin-project-1',
+          name: 'CO'
+        }
+      },
+      relations: {
+        related: true,
+        blocked_by_source: true
+      },
+      source_setup: null
+    });
+  });
+
+  it('fails closed when the source issue is not assigned to a project', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse(
+        buildIssueContextBody({
+          project: null
+        })
+      )
+    );
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_project_missing',
+        message: 'Linear issue CO-1 is missing a project assignment; same-project follow-up creation requires one.',
+        status: 422
+      }
+    });
+  });
+
+  it('fails closed when the live team does not expose Backlog for follow-up creation', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse(
+        buildIssueContextBody({
+          team: {
+            id: 'lin-team-1',
+            key: 'CO',
+            name: 'Codex Orchestrator',
+            states: {
+              nodes: [
+                {
+                  id: 'state-ready',
+                  name: 'Ready',
+                  type: 'unstarted'
+                },
+                {
+                  id: 'state-in-progress',
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                {
+                  id: 'state-human-review',
+                  name: 'Human Review',
+                  type: 'started'
+                },
+                {
+                  id: 'state-done',
+                  name: 'Done',
+                  type: 'completed'
+                }
+              ]
+            }
+          }
+        })
+      )
+    );
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_backlog_state_missing',
+        message: 'Linear team state "Backlog" was not found for issue CO-1.',
+        status: 422
+      }
+    });
+  });
+
+  it('surfaces the created follow-up issue when relation creation fails after issue creation', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        return jsonResponse({
+          errors: [{ message: 'relation failed' }]
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 409,
+        retryable: false,
+        details: {
+          errors: ['relation failed'],
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          failed_relation_type: 'related'
+        }
+      }
+    });
+  });
+
+  it('surfaces the created follow-up issue when blocker relation creation fails after related succeeds', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: {
+          input?: {
+            type?: string;
+          };
+        };
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        if (body.variables?.input?.type === 'related') {
+          return jsonResponse({
+            data: {
+              issueRelationCreate: {
+                success: true
+              }
+            }
+          });
+        }
+        if (body.variables?.input?.type === 'blocks') {
+          return jsonResponse({
+            errors: [{ message: 'block relation failed' }]
+          });
+        }
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 409,
+        retryable: false,
+        details: {
+          errors: ['block relation failed'],
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          failed_relation_type: 'blocks'
+        }
+      }
     });
   });
 

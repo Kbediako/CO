@@ -49,6 +49,22 @@
       }
     },
     {
+      "id": "20260325-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d",
+      "title": "CO Add Symphony-Style Follow-Up Issue Automation",
+      "relates_to": "tasks/tasks-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "task": "tasks/tasks-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "agent_task": ".agent/task/linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "docs": "docs/TECH_SPEC-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md"
+      }
+    },
+    {
       "id": "20260324-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514",
       "title": "CO Reduce Review Long Tails and Make Review Evidence Accounting Truthful",
       "relates_to": "tasks/tasks-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
