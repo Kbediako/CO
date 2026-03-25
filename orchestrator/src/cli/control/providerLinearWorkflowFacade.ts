@@ -29,6 +29,7 @@ export interface ProviderLinearWorkflowError {
   code: string;
   message: string;
   status: number;
+  retryable?: boolean;
   details?: Record<string, unknown>;
 }
 
@@ -1015,12 +1016,13 @@ export async function createProviderLinearFollowUpIssue(input: {
       'create-follow-up',
       mapped.code,
       mapped.message,
-      mapped.status,
+      409,
       {
         ...(mapped.details ?? {}),
         created_issue: createdIssue,
         failed_relation_type: 'related'
-      }
+      },
+      false
     );
   }
   if (relatedRelationResult.payload.data?.issueRelationCreate?.success !== true) {
@@ -1028,11 +1030,12 @@ export async function createProviderLinearFollowUpIssue(input: {
       'create-follow-up',
       'linear_follow_up_relation_failed',
       'Linear follow-up issue relation creation did not succeed.',
-      503,
+      409,
       {
         created_issue: createdIssue,
         failed_relation_type: 'related'
-      }
+      },
+      false
     );
   }
 
@@ -1057,12 +1060,13 @@ export async function createProviderLinearFollowUpIssue(input: {
         'create-follow-up',
         mapped.code,
         mapped.message,
-        mapped.status,
+        409,
         {
           ...(mapped.details ?? {}),
           created_issue: createdIssue,
           failed_relation_type: 'blocks'
-        }
+        },
+        false
       );
     }
     if (blockingRelationResult.payload.data?.issueRelationCreate?.success !== true) {
@@ -1070,11 +1074,12 @@ export async function createProviderLinearFollowUpIssue(input: {
         'create-follow-up',
         'linear_follow_up_relation_failed',
         'Linear follow-up issue relation creation did not succeed.',
-        503,
+        409,
         {
           created_issue: createdIssue,
           failed_relation_type: 'blocks'
-        }
+        },
+        false
       );
     }
   }
@@ -1800,7 +1805,8 @@ function failure<T extends ProviderLinearOperation>(
   code: string,
   message: string,
   status: number,
-  details?: Record<string, unknown>
+  details?: Record<string, unknown>,
+  retryable?: boolean
 ): ProviderLinearOperationFailure<T> {
   return {
     ok: false,
@@ -1809,6 +1815,7 @@ function failure<T extends ProviderLinearOperation>(
       code,
       message,
       status,
+      ...(typeof retryable === 'boolean' ? { retryable } : {}),
       ...(details ? { details } : {})
     }
   };

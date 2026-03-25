@@ -324,7 +324,14 @@ async function resolveRequiredText(
     return inlineValue;
   }
   if (fileValue) {
-    return await readTextFile(fileValue);
+    const fileText = await readTextFile(fileValue);
+    if (fileText.trim().length === 0) {
+      throw usageError(
+        `linear_${inlineFlag.replace(/-/gu, '_')}_missing`,
+        `--${inlineFlag} or --${fileFlag} is required.`
+      );
+    }
+    return fileText;
   }
   throw usageError(
     `linear_${inlineFlag.replace(/-/gu, '_')}_missing`,

@@ -688,6 +688,44 @@ describe('runLinearCliShell', () => {
     expect(setExitCode).not.toHaveBeenCalled();
   });
 
+  it('rejects whitespace-only file-backed required text inputs', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    const upsertProviderLinearWorkpadCommentMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>();
+
+    await expect(
+      runLinearCliShell(
+        {
+          positionals: ['upsert-workpad'],
+          flags: {
+            format: 'json',
+            'issue-id': 'lin-issue-1',
+            'body-file': '/tmp/workpad.md'
+          },
+          printHelp: vi.fn()
+        },
+        {
+          readTextFile: vi.fn(async () => '   \n'),
+          upsertProviderLinearWorkpadComment: upsertProviderLinearWorkpadCommentMock,
+          log,
+          setExitCode
+        }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(upsertProviderLinearWorkpadCommentMock).not.toHaveBeenCalled();
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'linear_body_missing',
+        message: '--body or --body-file is required.',
+        status: 422
+      }
+    });
+    expect(setExitCode).toHaveBeenCalledWith(1);
+  });
+
   it.each([
     {
       name: 'unknown subcommands',

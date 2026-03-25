@@ -1096,7 +1096,8 @@ describe('providerLinearWorkflowFacade', () => {
       error: {
         code: 'linear_graphql_error',
         message: 'Linear GraphQL returned operation errors.',
-        status: 502,
+        status: 409,
+        retryable: false,
         details: {
           errors: ['relation failed'],
           created_issue: {
@@ -1130,7 +1131,11 @@ describe('providerLinearWorkflowFacade', () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
-        variables?: Record<string, string>;
+        variables?: {
+          input?: {
+            type?: string;
+          };
+        };
       };
       if (body.query?.includes('ProviderLinearIssueContext')) {
         return jsonResponse(buildIssueContextBody());
@@ -1202,7 +1207,8 @@ describe('providerLinearWorkflowFacade', () => {
       error: {
         code: 'linear_graphql_error',
         message: 'Linear GraphQL returned operation errors.',
-        status: 502,
+        status: 409,
+        retryable: false,
         details: {
           errors: ['block relation failed'],
           created_issue: {
