@@ -34,6 +34,7 @@ import {
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
+import { resolveProviderWorkspacePath } from './run/workspacePath.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import {
   createRuntimeCodexCommandContext,
@@ -897,8 +898,59 @@ function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[]): URL {
   return parsed;
 }
 
-async function resolveProviderControlHostRepoRoot(manifestPath: string): Promise<string> {
-  return await realpath(resolve(dirname(manifestPath), '..', '..', '..', '..'));
+function isCompatibleControlHostRepoRoot(
+  candidateRepoRoot: string,
+  workerWorkspacePath: string,
+  taskId: string
+): boolean {
+  const canonicalCandidateRepoRoot = resolve(candidateRepoRoot);
+  const canonicalWorkerWorkspacePath = resolve(workerWorkspacePath);
+  if (canonicalWorkerWorkspacePath === canonicalCandidateRepoRoot) {
+    return true;
+  }
+  try {
+    return canonicalWorkerWorkspacePath === resolveProviderWorkspacePath(canonicalCandidateRepoRoot, taskId);
+  } catch {
+    return false;
+  }
+}
+
+async function resolveProviderControlHostRepoRoot(input: {
+  manifestPath: string;
+  workerWorkspacePath: string;
+  taskId: string;
+}): Promise<string | null> {
+  const canonicalWorkerWorkspacePath = await realpath(input.workerWorkspacePath).catch(() =>
+    resolve(input.workerWorkspacePath)
+  );
+  const runDerivedRepoRoot = await realpath(
+    resolve(dirname(input.manifestPath), '..', '..', '..', '..')
+  ).catch(() => null);
+  if (
+    runDerivedRepoRoot &&
+    isCompatibleControlHostRepoRoot(runDerivedRepoRoot, canonicalWorkerWorkspacePath, input.taskId)
+  ) {
+    return runDerivedRepoRoot;
+  }
+  try {
+    const raw = JSON.parse(await readFile(input.manifestPath, 'utf8')) as Record<string, unknown>;
+    const manifestWorkspacePath =
+      normalizeOptionalString(raw.workspace_path) ??
+      normalizeOptionalString(raw.workspacePath);
+    if (!manifestWorkspacePath) {
+      return null;
+    }
+    const canonicalManifestWorkspacePath = await realpath(manifestWorkspacePath);
+    return isCompatibleControlHostRepoRoot(
+      canonicalManifestWorkspacePath,
+      canonicalWorkerWorkspacePath,
+      input.taskId
+    )
+      ? canonicalManifestWorkspacePath
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 async function requestProviderControlHostRefresh(input: {
@@ -927,7 +979,20 @@ async function requestProviderControlHostRefresh(input: {
       throw new Error('control-host manifest path invalid');
     }
     const canonicalRunDir = dirname(canonicalManifestPath);
-    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot(canonicalManifestPath);
+    const workerTaskId =
+      normalizeOptionalString(input.manifest.task_id) ??
+      normalizeOptionalString(input.manifest.taskId);
+    if (!workerTaskId) {
+      throw new Error('provider task id unavailable');
+    }
+    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
+      manifestPath: canonicalManifestPath,
+      workerWorkspacePath: input.repoRoot,
+      taskId: workerTaskId
+    });
+    if (!controlHostRepoRoot) {
+      throw new Error('control-host repo root unavailable');
+    }
     const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
     const endpointRaw = await readFile(resolve(canonicalRunDir, 'control_endpoint.json'), 'utf8');
     const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };

@@ -35,6 +35,7 @@
   - trigger prompt failure reconciliation from the provider worker back into the control-host refresh/rehydrate path when terminal failure is known, reusing existing control-host communication seams if possible
   - update rehydrate/refresh claim transitions to carry refreshed issue metadata instead of preserving stale pre-failure values
   - add a bounded failure-side Linear workpad refresh path using the existing worker helper surface so operators see the blocker without raw artifact spelunking
+  - preserve control-host bind-host policy validation when `CODEX_ORCHESTRATOR_RUNS_DIR` points outside the repo root by accepting manifest workspace metadata only when it matches the active provider workspace topology
 - Data model changes / migrations:
   - no schema migration
   - persisted intake claims may transition from stale `running` to `resumable`, `handoff_failed`, `released`, or other truthful non-running states after terminal failure reconciliation
@@ -63,6 +64,7 @@
   - focused `ProviderLinearWorkerRunner` regressions for:
     - terminal failure proof plus control-host/workpad reconciliation callback behavior
     - failure-side Linear update truthfulness
+    - external `CODEX_ORCHESTRATOR_RUNS_DIR` layouts still resolving the owning control-host repo policy without trusting unrelated manifest workspace paths
   - focused `ControlRuntime` regressions for operator-visible provider-intake state after reconciliation
   - `DELEGATION_GUARD_OVERRIDE_REASON="Provider worker run could not delegate because spawn_agent is unavailable without explicit user authorization in this session." node scripts/delegation-guard.mjs`
   - `node scripts/spec-guard.mjs --dry-run`
