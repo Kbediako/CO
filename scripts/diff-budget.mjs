@@ -181,6 +181,42 @@ function parseNumstatLine(line) {
   };
 }
 
+function parsePathList(raw) {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function parseNumstatMap(raw) {
+  return new Map(
+    raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map(parseNumstatLine)
+      .filter(Boolean)
+      .map((entry) => [entry.filePath, entry])
+  );
+}
+
+function numstatTotalLines(entry) {
+  return entry.added + entry.deleted;
+}
+
+function mergeNumstatMaps(...maps) {
+  const merged = new Map();
+  for (const map of maps) {
+    for (const [filePath, entry] of map.entries()) {
+      const existing = merged.get(filePath);
+      if (!existing || numstatTotalLines(entry) > numstatTotalLines(existing)) {
+        merged.set(filePath, entry);
+      }
+    }
+  }
+  return merged;
+}
+
 async function collectCommitDiff(commit) {
   if (!(await verifyGitRef(commit))) {
     throw new Error(`Invalid commit ref: ${commit}`);
@@ -211,18 +247,15 @@ async function collectCommitDiff(commit) {
 }
 
 async function collectWorkingTreeDiff() {
-  const [nameOnly, numstatRaw, untracked] = await Promise.all([
+  const [nameOnly, cachedNameOnly, numstatRaw, cachedNumstatRaw, untracked] = await Promise.all([
     runGit(['diff', '--name-only', '--no-renames', 'HEAD']),
+    runGit(['diff', '--cached', '--name-only', '--no-renames', 'HEAD']),
     runGit(['diff', '--numstat', '--no-renames', 'HEAD']),
+    runGit(['diff', '--cached', '--numstat', '--no-renames', 'HEAD']),
     listUntrackedFiles()
   ]);
 
-  const changedFiles = new Set(
-    nameOnly
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-  );
+  const changedFiles = new Set([...parsePathList(nameOnly), ...parsePathList(cachedNameOnly)]);
 
   for (const filePath of untracked) {
     changedFiles.add(filePath);
@@ -230,15 +263,7 @@ async function collectWorkingTreeDiff() {
 
   return {
     changedFiles,
-    numstatByPath: new Map(
-      numstatRaw
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map(parseNumstatLine)
-        .filter(Boolean)
-        .map((entry) => [entry.filePath, entry])
-    ),
+    numstatByPath: mergeNumstatMaps(parseNumstatMap(numstatRaw), parseNumstatMap(cachedNumstatRaw)),
     untrackedRaw: untracked
   };
 }

@@ -112,16 +112,17 @@ export async function assessReviewScope(
 
   const status = await tryGit(['status', '--porcelain=v1', '-z', '--untracked-files=all'], repoRoot);
   const diff = await tryGit(['diff', '--numstat', '--no-renames', 'HEAD'], repoRoot);
+  const cachedDiff = await tryGit(['diff', '--cached', '--numstat', '--no-renames', 'HEAD'], repoRoot);
   const untracked = await tryGit(['ls-files', '--others', '--exclude-standard', '-z'], repoRoot);
   const untrackedPaths = untracked ? parseNullDelimitedPaths(untracked) : [];
   const untrackedLines = untrackedPaths.length > 0 ? await countWorkingTreeLines(untrackedPaths, repoRoot) : null;
 
   const changedFiles = status ? parseStatusZPaths(status).length : null;
   let changedLines: number | null = null;
-  if (diff || untrackedLines !== null) {
+  if (diff || cachedDiff || untrackedLines !== null) {
     changedLines = 0;
-    if (diff) {
-      changedLines += parseNumstatLineDelta(diff);
+    if (diff || cachedDiff) {
+      changedLines += parseMergedNumstatLineDelta(diff, cachedDiff);
     }
     if (untrackedLines !== null) {
       changedLines += untrackedLines;
@@ -252,18 +253,38 @@ function resolveLargeScopeLineThreshold(env: NodeJS.ProcessEnv): number {
   return parsed;
 }
 
-function parseNumstatLineDelta(numstatOutput: string): number {
-  let total = 0;
-  for (const rawLine of numstatOutput.split(/\r?\n/u)) {
-    const line = rawLine.trim();
-    if (!line) {
+function parseMergedNumstatLineDelta(
+  numstatOutput: string | null,
+  cachedNumstatOutput: string | null
+): number {
+  const totalsByPath = new Map<string, number>();
+  for (const output of [numstatOutput, cachedNumstatOutput]) {
+    if (!output) {
       continue;
     }
-    const [added, deleted] = line.split(/\s+/u);
-    const addCount = Number(added);
-    const delCount = Number(deleted);
-    total += Number.isFinite(addCount) ? addCount : 0;
-    total += Number.isFinite(delCount) ? delCount : 0;
+    for (const rawLine of output.split(/\r?\n/u)) {
+      const line = rawLine.trim();
+      if (!line) {
+        continue;
+      }
+      const [added, deleted, ...rest] = line.split(/\s+/u);
+      const filePath = rest.join(' ').trim();
+      if (!filePath) {
+        continue;
+      }
+      const addCount = Number(added);
+      const delCount = Number(deleted);
+      const total =
+        (Number.isFinite(addCount) ? addCount : 0) + (Number.isFinite(delCount) ? delCount : 0);
+      const existing = totalsByPath.get(filePath) ?? 0;
+      if (total > existing) {
+        totalsByPath.set(filePath, total);
+      }
+    }
+  }
+  let total = 0;
+  for (const value of totalsByPath.values()) {
+    total += value;
   }
   return total;
 }

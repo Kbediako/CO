@@ -185,6 +185,20 @@ describe('review-scope-advisory', () => {
     expect(scope.largeScope).toBe(false);
   });
 
+  it('counts staged-only churn when unstaged edits restore the working tree content', async () => {
+    const repo = await initRepository();
+
+    await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
+    await execFileAsync('git', ['add', 'notes.txt'], { cwd: repo });
+    await writeFile(join(repo, 'notes.txt'), 'one\n', 'utf8');
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(1);
+    expect(scope.changedLines).toBe(2);
+    expect(scope.largeScope).toBe(false);
+  });
+
   it('counts rename-only churn the same way as diff-budget', async () => {
     const repo = await initRepository();
 
