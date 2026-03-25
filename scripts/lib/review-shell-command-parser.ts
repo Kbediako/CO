@@ -39,6 +39,7 @@ export function normalizeShellCommandPathSeparators(command: string): string {
 
   for (let index = 0; index < command.length; index += 1) {
     const char = command[index] ?? '';
+    const next = command[index + 1] ?? '';
     if (escaped) {
       currentToken += char;
       escaped = false;
@@ -68,6 +69,34 @@ export function normalizeShellCommandPathSeparators(command: string): string {
     if (/\s/u.test(char)) {
       flushToken();
       normalized += char;
+      continue;
+    }
+
+    if (char === ';' || char === '\n') {
+      flushToken();
+      normalized += char;
+      continue;
+    }
+
+    if (char === '&') {
+      flushToken();
+      if (next === '&') {
+        normalized += '&&';
+        index += 1;
+      } else {
+        normalized += '&';
+      }
+      continue;
+    }
+
+    if (char === '|') {
+      flushToken();
+      if (next === '|') {
+        normalized += '||';
+        index += 1;
+      } else {
+        normalized += '|';
+      }
       continue;
     }
 
@@ -104,6 +133,10 @@ function looksLikeRelativeWindowsLauncherToken(token: string): boolean {
   }
 
   if (/^(?:\.\.?\\)+(?:[^\\/\s"'`]+\\)+[^\\/\s"'`]+$/u.test(token)) {
+    return true;
+  }
+
+  if (/^(?!-)(?:[^\\/\s"'`=]+\\)+[^\\/\s"'`.=]+$/u.test(token)) {
     return true;
   }
 

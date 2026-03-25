@@ -90,6 +90,26 @@ describe('review shell command parser', () => {
         String.raw`node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
       )
     ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`echo prep&&.\bin\tool`
+      )
+    ).toBe(String.raw`echo prep&&./bin/tool`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`echo prep&&node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`bin\tool review --manifest x`
+      )
+    ).toBe(String.raw`bin/tool review --manifest x`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`venv\Scripts\pytest tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`);
     expect(normalizeShellCommandPathSeparators(String.raw`".\bin\tool.cmd"`)).toBe(
       String.raw`"./bin/tool.cmd"`
     );

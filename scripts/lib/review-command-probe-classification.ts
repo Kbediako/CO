@@ -23,7 +23,7 @@ export const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
 const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
 const REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES = new Set(['test', 't', 'tst']);
 const REVIEW_SHELL_PROBE_ENV_VARS = new Set(['MANIFEST', 'RUNNER_LOG', 'RUN_LOG']);
-const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest']);
+const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest', 'pytest']);
 const REVIEW_LIKELY_COMMANDS = new Set([
   'npm',
   'pnpm',
@@ -151,10 +151,6 @@ function hasHeavyCommandTokens(tokens: string[]): boolean {
 
   const launcherTarget = resolveValidationLauncherTarget(command, args);
   if (launcherTarget !== null && REVIEW_DIRECT_VALIDATION_RUNNERS.has(launcherTarget)) {
-    return true;
-  }
-
-  if (command === 'pytest') {
     return true;
   }
 
@@ -417,14 +413,17 @@ export function isLikelyReviewCommandLine(line: string): boolean {
   if (detectHeavyReviewCommand(normalized)) {
     return true;
   }
-  const shellTokens = stripLeadingEnvAssignments(tokenizeShellSegment(normalized));
-  if (extractShellCommandPayload(shellTokens)) {
-    return true;
-  }
-  const unwrappedTokens = unwrapEnvCommandTokens(shellTokens);
-  const command = normalizeCommandToken(unwrappedTokens[0] ?? shellTokens[0] ?? '');
-  if (REVIEW_LIKELY_COMMANDS.has(command)) {
-    return true;
+  const segments = splitShellControlSegments(normalized);
+  for (const segment of segments) {
+    const shellTokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
+    if (extractShellCommandPayload(shellTokens)) {
+      return true;
+    }
+    const unwrappedTokens = unwrapEnvCommandTokens(shellTokens);
+    const command = normalizeCommandToken(unwrappedTokens[0] ?? shellTokens[0] ?? '');
+    if (REVIEW_LIKELY_COMMANDS.has(command)) {
+      return true;
+    }
   }
   if (normalized.includes(' in ') && /\s-\w+\s+/u.test(normalized)) {
     return true;

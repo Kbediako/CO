@@ -113,6 +113,16 @@ describe('review command intent classification', () => {
 
     expect(
       classifyCommandIntentCommandLine(
+        String.raw`bin\codex-orchestrator review --manifest x`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`bin/codex-orchestrator review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
         String.raw`node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts`,
         { allowValidationCommandIntents: false }
       )
@@ -189,6 +199,76 @@ describe('review command intent classification', () => {
     ).toEqual({
       kind: 'validation-runner',
       sample: String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`cmd /C "bin\codex-orchestrator review --manifest x"`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`bin/codex-orchestrator review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`echo prep&&.\bin\codex-orchestrator review --manifest x`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`./bin/codex-orchestrator review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`cmd /C "echo prep&&.\bin\codex-orchestrator review --manifest x"`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`./bin/codex-orchestrator review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`venv\Scripts\pytest tests/review-execution-state.spec.ts`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`cmd /C "echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts"`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`cmd /C "venv\Scripts\pytest tests/review-execution-state.spec.ts"`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`
     });
   });
 });

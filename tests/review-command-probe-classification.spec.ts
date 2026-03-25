@@ -96,8 +96,18 @@ describe('review command probe classification', () => {
       )
     ).toBe(String.raw`./bin/python.exe -m pytest tests/review-execution-state.spec.ts`);
     expect(
+      detectHeavyReviewCommand(
+        String.raw`venv\Scripts\pytest tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`);
+    expect(
       isLikelyReviewCommandLine(
         String.raw`.\bin\codex-orchestrator.cmd review --manifest x`
+      )
+    ).toBe(true);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`bin\codex-orchestrator review --manifest x`
       )
     ).toBe(true);
 
@@ -137,8 +147,38 @@ describe('review command probe classification', () => {
       )
     ).toBe(String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`);
     expect(
+      detectHeavyReviewCommand(
+        String.raw`cmd /C "venv\Scripts\pytest tests/review-execution-state.spec.ts"`
+      )
+    ).toBe(String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`);
+    expect(
       isLikelyReviewCommandLine(
         String.raw`cmd /C ".\bin\codex-orchestrator.cmd review --manifest x"`
+      )
+    ).toBe(true);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`cmd /C "bin\codex-orchestrator review --manifest x"`
+      )
+    ).toBe(true);
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`cmd /C "echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts"`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`echo prep&&.\bin\codex-orchestrator review --manifest x`
+      )
+    ).toBe(true);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`cmd /C "echo prep&&.\bin\codex-orchestrator review --manifest x"`
       )
     ).toBe(true);
   });

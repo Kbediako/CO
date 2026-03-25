@@ -20,7 +20,7 @@ const REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS = new Set(
 );
 const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|pause|cancel)\(/iu;
-const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest']);
+const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest', 'pytest']);
 
 export type ReviewCommandIntentViolationKind =
   | 'validation-suite'
