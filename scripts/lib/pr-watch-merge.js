@@ -51,6 +51,12 @@ function isReviewDecisionBlocked(reviewDecision, readinessMode) {
   return resolveBlockedReviewDecisions(readinessMode).has(reviewDecision);
 }
 
+function doesMergeStateBlockReady(mergeStateStatus, readinessMode) {
+  return readinessMode === 'review'
+    ? ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)
+    : !MERGEABLE_STATES.has(mergeStateStatus);
+}
+
 class PrWatchMergeExitError extends Error {
   constructor(message, exitCode = 1) {
     super(message);
@@ -693,6 +699,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   const botRereviewFetchError = botRereview?.fetchError === true;
   const botRereviewPending = Array.isArray(botRereview?.pendingBots) ? botRereview.pendingBots : [];
   const botRereviewInProgress = Array.isArray(botRereview?.inProgressBots) ? botRereview.inProgressBots : [];
+  const requiredChecksQueryFailed = options.requiredChecksQueryFailed === true;
   const coderabbitReviewMeta =
     botRereview?.coderabbit && typeof botRereview.coderabbit === 'object'
       ? botRereview.coderabbit
@@ -725,10 +732,10 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   if (gateChecksSource === 'required' && gateChecks.failed.length > 0) {
     gateReasons.push(`required_checks_failed=${gateChecks.failed.length}`);
   }
-  const mergeStateBlocksReady =
-    readinessMode === 'review'
-      ? ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)
-      : !MERGEABLE_STATES.has(mergeStateStatus);
+  if (requiredChecksQueryFailed) {
+    gateReasons.push('required_checks_query_failed');
+  }
+  const mergeStateBlocksReady = doesMergeStateBlockReady(mergeStateStatus, readinessMode);
   if (mergeStateBlocksReady) {
     gateReasons.push(`merge_state=${mergeStateStatus || 'UNKNOWN'}`);
   }
@@ -769,6 +776,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     coderabbitReviewMeta,
     checks,
     requiredChecks: requiredCheckSummary,
+    requiredChecksQueryFailed,
     gateChecksSource,
     gateReasons,
     readinessMode,
@@ -785,6 +793,7 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
   const reasons = [];
   const reviewDecision = normalizeEnum(snapshot.reviewDecision);
   const mergeStateStatus = normalizeEnum(snapshot.mergeStateStatus);
+  const mergeStateBlocksReady = doesMergeStateBlockReady(mergeStateStatus, readinessMode);
   if (Boolean(snapshot.isDraft)) {
     reasons.push('draft');
   }
@@ -794,7 +803,7 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
   if (isReviewDecisionBlocked(reviewDecision, readinessMode)) {
     reasons.push(`review=${reviewDecision}`);
   }
-  if (ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)) {
+  if (mergeStateBlocksReady) {
     reasons.push(`merge_state=${mergeStateStatus}`);
   }
   if (typeof snapshot.unresolvedThreadCount === 'number' && snapshot.unresolvedThreadCount > 0) {
@@ -808,13 +817,22 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
   }
   const requiredChecks =
     snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object' ? snapshot.requiredChecks : null;
+  if (snapshot.requiredChecksQueryFailed === true) {
+    reasons.push('required_checks_query_failed');
+  }
   const requiredFailedCount = Array.isArray(requiredChecks?.failed) ? requiredChecks.failed.length : 0;
   if (requiredFailedCount > 0 && snapshot.readyToMerge === false) {
     reasons.push(`required_checks_failed=${requiredFailedCount}`);
   } else {
     const rollupFailedCount = Array.isArray(snapshot.checks?.failed) ? snapshot.checks.failed.length : 0;
     const rollupPendingCount = Array.isArray(snapshot.checks?.pending) ? snapshot.checks.pending.length : 0;
-    if (!requiredChecks && !MERGEABLE_STATES.has(mergeStateStatus) && rollupPendingCount === 0 && rollupFailedCount > 0) {
+    if (
+      !requiredChecks
+      && snapshot.requiredChecksQueryFailed !== true
+      && mergeStateBlocksReady
+      && rollupPendingCount === 0
+      && rollupFailedCount > 0
+    ) {
       reasons.push(`checks_failed=${rollupFailedCount}`);
     }
   }
@@ -1307,7 +1325,10 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache 
         ...inlineBotFeedback,
         rereview: botRereviewSignals
       },
-      options
+      {
+        ...options,
+        requiredChecksQueryFailed: requiredChecksResult.fetchError
+      }
     ),
     requiredChecksForNextPoll: requiredChecks
       ? {

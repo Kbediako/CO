@@ -227,6 +227,33 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.readyToMerge).toBe(true);
     expect(snapshot.gateReasons).toEqual([]);
   });
+
+  it('fails closed when required-check verification errors in ready-review mode', () => {
+    const response = makeResponse([], {
+      reviewDecision: 'REVIEW_REQUIRED',
+      mergeStateStatus: 'BLOCKED'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(
+      response,
+      requiredChecks,
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review',
+        requiredChecksQueryFailed: true
+      }
+    );
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.requiredChecksQueryFailed).toBe(true);
+    expect(snapshot.gateReasons).toContain('required_checks_query_failed');
+  });
 });
 
 describe('resolveActionRequiredReasons', () => {
@@ -320,6 +347,31 @@ describe('resolveActionRequiredReasons', () => {
     );
 
     expect(resolveActionRequiredReasons(snapshot, { readinessMode: 'review' })).toEqual([]);
+  });
+
+  it('classifies required-check query failures as action-required in ready-review mode', () => {
+    const response = makeResponse([], {
+      reviewDecision: 'REVIEW_REQUIRED',
+      mergeStateStatus: 'BLOCKED'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(
+      response,
+      requiredChecks,
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review',
+        requiredChecksQueryFailed: true
+      }
+    );
+
+    expect(resolveActionRequiredReasons(snapshot, { readinessMode: 'review' }))
+      .toContain('required_checks_query_failed');
   });
 
   it('classifies behind merge state as action-required', () => {
@@ -422,7 +474,36 @@ describe('resolveActionRequiredReasons', () => {
     expect(resolveActionRequiredReasons(snapshot)).toContain('checks_failed=1');
   });
 
-  it('does not classify rollup failures as action-required while rollup checks are pending', () => {
+  it('does not classify rollup failures as action-required in ready-review mode when BLOCKED only reflects review gating', () => {
+    const response = makeResponse([
+      {
+        __typename: 'CheckRun',
+        name: 'optional-check',
+        status: 'COMPLETED',
+        conclusion: 'FAILURE',
+        detailsUrl: 'https://example.com/optional-check'
+      }
+    ], {
+      mergeStateStatus: 'BLOCKED',
+      reviewDecision: 'REVIEW_REQUIRED'
+    });
+    const snapshot = buildStatusSnapshot(
+      response,
+      null,
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review'
+      }
+    );
+
+    expect(snapshot.readyToMerge).toBe(true);
+    expect(resolveActionRequiredReasons(snapshot, { readinessMode: 'review' })).toEqual([]);
+  });
+
+  it('does not classify rollup failures as action-required while rollup checks are pending in merge mode', () => {
     const response = makeResponse([
       {
         __typename: 'CheckRun',
@@ -447,7 +528,7 @@ describe('resolveActionRequiredReasons', () => {
     });
 
     expect(snapshot.requiredChecks).toBeNull();
-    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+    expect(resolveActionRequiredReasons(snapshot)).toEqual(['merge_state=BLOCKED']);
   });
 });
 
@@ -634,6 +715,30 @@ describe('shouldSucceedAfterTimeout', () => {
     expect(resolveActionRequiredReasons(failedRequiredChecksSnapshot, { readinessMode: 'review' }))
       .toContain('required_checks_failed=1');
     expect(shouldSucceedAfterTimeout(failedRequiredChecksSnapshot, { readinessMode: 'review' })).toBe(false);
+  });
+
+  it('keeps ready-review snapshots with required-check query failures non-successful at timeout', () => {
+    const staleRequiredChecksSnapshot = buildStatusSnapshot(
+      makeResponse([], {
+        reviewDecision: 'REVIEW_REQUIRED',
+        mergeStateStatus: 'BLOCKED'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review',
+        requiredChecksQueryFailed: true
+      }
+    );
+
+    expect(staleRequiredChecksSnapshot.readyToMerge).toBe(false);
+    expect(staleRequiredChecksSnapshot.gateReasons).toContain('required_checks_query_failed');
+    expect(shouldSucceedAfterTimeout(staleRequiredChecksSnapshot, { readinessMode: 'review' })).toBe(false);
   });
 });
 

@@ -51,6 +51,7 @@ export interface PrWatchMergeSnapshot {
   coderabbitReviewMeta: PrWatchMergeCoderabbitReviewMeta;
   checks: PrWatchMergeCheckSummary;
   requiredChecks: PrWatchMergeCheckSummary | null;
+  requiredChecksQueryFailed: boolean;
   gateChecksSource: 'required' | 'rollup';
   gateReasons: string[];
   readinessMode: 'merge' | 'review';
@@ -108,7 +109,9 @@ export function buildStatusSnapshot(
     unacknowledgedCount: number;
     rereview?: PrWatchMergeBotRereviewSignals | null;
   } | null,
-  options?: Pick<PrWatchMergeOptions, 'readinessMode'>
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'> & {
+    requiredChecksQueryFailed?: boolean;
+  }
 ): PrWatchMergeSnapshot;
 
 export function resolveActionRequiredReasons(
