@@ -1,5 +1,5 @@
 import { spawn, type StdioOptions } from 'node:child_process';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -34,7 +34,10 @@ import {
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
-import { resolveProviderWorkspacePath } from './run/workspacePath.js';
+import {
+  PROVIDER_WORKSPACE_ROOT_DIRNAME,
+  resolveProviderWorkspacePath
+} from './run/workspacePath.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import {
   createRuntimeCodexCommandContext,
@@ -912,7 +915,13 @@ function isCompatibleControlHostRepoRoot(
 ): boolean {
   const canonicalCandidateRepoRoot = resolve(candidateRepoRoot);
   const canonicalWorkerWorkspacePath = resolve(workerWorkspacePath);
-  if (canonicalWorkerWorkspacePath === canonicalCandidateRepoRoot) {
+  if (
+    canonicalWorkerWorkspacePath === canonicalCandidateRepoRoot &&
+    !(
+      basename(canonicalWorkerWorkspacePath) === taskId &&
+      basename(dirname(canonicalWorkerWorkspacePath)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+    )
+  ) {
     return true;
   }
   try {
