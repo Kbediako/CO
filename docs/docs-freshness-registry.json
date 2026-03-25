@@ -3,6 +3,13 @@
   "generated_at": "2026-03-25",
   "entries": [
     {
+      "path": "docs/TASKS-archive-2026.md",
+      "owner": "",
+      "status": "archived",
+      "last_review": "2026-03-25",
+      "cadence_days": 365
+    },
+    {
       "path": ".agent/task/linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -39,6 +46,49 @@
     },
     {
       "path": "tasks/tasks-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+      "path": "tasks/tasks-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-25",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-03-25",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-03-25",
