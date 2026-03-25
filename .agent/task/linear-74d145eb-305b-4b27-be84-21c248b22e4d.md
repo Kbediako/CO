@@ -19,8 +19,8 @@
 - [x] Baseline audit captured the current diff-budget codepath and the focused-versus-broad stacked artifact evidence required by the issue. Evidence: `out/linear-74d145eb-305b-4b27-be84-21c248b22e4d/manual/20260325T070238Z-baseline-audit.md`.
 - [x] Required diff-budget, review-wrapper, CI workflow, and standalone-review docs seams were audited before implementation. Evidence: `scripts/diff-budget.mjs`, `scripts/run-review.ts`, `codex.orchestrator.json`, `.github/workflows/core-lane.yml`, `docs/standalone-review-guide.md`, `tests/diff-budget.spec.ts`.
 - [x] Delegation override was explicitly recorded for this worker run because subagent spawning is unavailable in-session. Evidence: `tasks/specs/linear-74d145eb-305b-4b27-be84-21c248b22e4d.md`.
-- [x] Rework audit identified the remaining actionable PR `#300` gap: unborn-repository staged line accounting in `scripts/lib/review-scope-advisory.ts` still used `git diff --cached ... HEAD`, which suppresses `changedLines` before the first commit exists. Evidence: PR `#300` unresolved thread `https://github.com/Kbediako/CO/pull/300#discussion_r2988403927`, local repro on 2026-03-26.
-- [x] Rework docs-review also surfaced the sibling hard-gate bug: `scripts/diff-budget.mjs` still failed outright on unborn repositories because its cached staged diff paths also appended `HEAD`. Evidence: `.runs/linear-74d145eb-305b-4b27-be84-21c248b22e4d/cli/2026-03-25T13-58-54-207Z-15726b24/review/output.log`, local repro on 2026-03-26.
+- [x] Rework audit identified the remaining actionable PR `#300` gap: unborn-repository staged line accounting in `scripts/lib/review-scope-advisory.ts` still used `git diff --cached ... HEAD`, which suppresses `changedLines` before the first commit exists. Evidence: PR `#300` unresolved thread `https://github.com/Kbediako/CO/pull/300#discussion_r2988403927`, local repro on 2026-03-25.
+- [x] Rework docs-review also surfaced the sibling hard-gate bug: `scripts/diff-budget.mjs` still failed outright on unborn repositories because its cached staged diff paths also appended `HEAD`. Evidence: `.runs/linear-74d145eb-305b-4b27-be84-21c248b22e4d/cli/2026-03-25T13-58-54-207Z-15726b24/review/output.log`, local repro on 2026-03-25.
 
 ## Implementation
 - [x] Recalibrate local auto diff-budget scope so stacked local runs hard-gate current-head scope while still surfacing broad aggregate scope as advisory evidence. Evidence: `scripts/diff-budget.mjs`, `tests/diff-budget.spec.ts`.
@@ -30,16 +30,16 @@
 
 ## Validation
 - [x] `DELEGATION_GUARD_OVERRIDE_REASON="Provider worker run could not delegate because spawn_agent is unavailable without explicit user authorization in this session." node dist/bin/codex-orchestrator.js start docs-review --format json --no-interactive --task linear-74d145eb-305b-4b27-be84-21c248b22e4d`. Evidence: `.runs/linear-74d145eb-305b-4b27-be84-21c248b22e4d/cli/2026-03-25T14-04-17-097Z-09437beb/manifest.json`.
-- [x] `DELEGATION_GUARD_OVERRIDE_REASON="Provider worker run could not delegate because spawn_agent is unavailable without explicit user authorization in this session." node scripts/delegation-guard.mjs`. Evidence: local command pass on 2026-03-26 with recorded override.
-- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: local command pass on 2026-03-26.
-- [x] `npm run build`. Evidence: local command pass on 2026-03-26.
-- [x] `npm run lint`. Evidence: local command pass on 2026-03-26.
-- [x] `npm run test`. Evidence: sanitized local pass on 2026-03-26 via `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$TMPDIR" CI=1 npm run test` (`295` files / `2367` tests).
-- [x] `npm run docs:check`. Evidence: local command pass on 2026-03-26.
-- [x] `npm run docs:freshness`. Evidence: local command pass on 2026-03-26, artifact `out/linear-74d145eb-305b-4b27-be84-21c248b22e4d/docs-freshness.json`.
-- [x] `node scripts/diff-budget.mjs`. Evidence: local command pass on 2026-03-26 with `✅ Diff budget: OK (scope=working-tree, files=5/25, lines=58/1200, +54/-4)`.
-- [x] `npm run review`. Evidence: local command pass on 2026-03-26, artifact `.runs/linear-74d145eb-305b-4b27-be84-21c248b22e4d/cli/2026-03-25T13-55-12-979Z-51fda3cf/review/output.log`.
-- [x] `npm run pack:smoke`. Evidence: local command pass on 2026-03-26.
+- [x] `DELEGATION_GUARD_OVERRIDE_REASON="Provider worker run could not delegate because spawn_agent is unavailable without explicit user authorization in this session." node scripts/delegation-guard.mjs`. Evidence: local command pass on 2026-03-25 with recorded override.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: local command pass on 2026-03-25.
+- [x] `npm run build`. Evidence: local command pass on 2026-03-25.
+- [x] `npm run lint`. Evidence: local command pass on 2026-03-25.
+- [x] `npm run test`. Evidence: sanitized local pass on 2026-03-25 via `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$TMPDIR" CI=1 npm run test` (`295` files / `2367` tests).
+- [x] `npm run docs:check`. Evidence: local command pass on 2026-03-25.
+- [x] `npm run docs:freshness`. Evidence: local command pass on 2026-03-25, artifact `out/linear-74d145eb-305b-4b27-be84-21c248b22e4d/docs-freshness.json`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: local command pass on 2026-03-25 with `✅ Diff budget: OK (scope=working-tree, files=5/25, lines=58/1200, +54/-4)`.
+- [x] `npm run review`. Evidence: local command pass on 2026-03-25, artifact `.runs/linear-74d145eb-305b-4b27-be84-21c248b22e4d/cli/2026-03-25T13-55-12-979Z-51fda3cf/review/output.log`.
+- [x] `npm run pack:smoke`. Evidence: local command pass on 2026-03-25.
 
 ## Delivery
 - [ ] Open PR for `CO-15`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.
