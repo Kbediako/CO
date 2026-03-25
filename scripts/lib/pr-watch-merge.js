@@ -57,6 +57,10 @@ function doesMergeStateBlockReady(mergeStateStatus, readinessMode) {
     : !MERGEABLE_STATES.has(mergeStateStatus);
 }
 
+function doesMergeStateRequireAuthorAction(mergeStateStatus) {
+  return ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus);
+}
+
 class PrWatchMergeExitError extends Error {
   constructor(message, exitCode = 1) {
     super(message);
@@ -800,7 +804,7 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
   const reasons = [];
   const reviewDecision = normalizeEnum(snapshot.reviewDecision);
   const mergeStateStatus = normalizeEnum(snapshot.mergeStateStatus);
-  const mergeStateBlocksReady = doesMergeStateBlockReady(mergeStateStatus, readinessMode);
+  const mergeStateRequiresAuthorAction = doesMergeStateRequireAuthorAction(mergeStateStatus);
   if (Boolean(snapshot.isDraft)) {
     reasons.push('draft');
   }
@@ -810,7 +814,7 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
   if (isReviewDecisionBlocked(reviewDecision, readinessMode)) {
     reasons.push(`review=${reviewDecision}`);
   }
-  if (mergeStateBlocksReady) {
+  if (mergeStateRequiresAuthorAction) {
     reasons.push(`merge_state=${mergeStateStatus}`);
   }
   if (typeof snapshot.unresolvedThreadCount === 'number' && snapshot.unresolvedThreadCount > 0) {
@@ -836,7 +840,9 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
     if (
       !requiredChecks
       && snapshot.requiredChecksQueryFailed !== true
-      && mergeStateBlocksReady
+      && readinessMode !== 'review'
+      && !mergeStateRequiresAuthorAction
+      && !MERGEABLE_STATES.has(mergeStateStatus)
       && rollupPendingCount === 0
       && rollupFailedCount > 0
     ) {
@@ -1406,7 +1412,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
 
   if (isReviewMode) {
     const unsupportedFlags = [];
-    if (typeof args['merge-method'] === 'string') {
+    if (Object.prototype.hasOwnProperty.call(args, 'merge-method')) {
       unsupportedFlags.push('--merge-method');
     }
     if (hasFlag(args, 'auto-merge') || hasFlag(args, 'no-auto-merge')) {

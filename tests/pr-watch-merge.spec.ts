@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildPrNumberViewArgs,
@@ -12,6 +12,7 @@ import {
   resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
   resolveRequiredChecksSummary,
+  runPrWatchMerge,
   shouldSucceedAfterTimeout,
   summarizeRequiredChecks
 } from '../scripts/lib/pr-watch-merge.js';
@@ -529,7 +530,7 @@ describe('resolveActionRequiredReasons', () => {
     });
 
     expect(snapshot.requiredChecks).toBeNull();
-    expect(resolveActionRequiredReasons(snapshot)).toEqual(['merge_state=BLOCKED']);
+    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
   });
 });
 
@@ -753,6 +754,18 @@ describe('shouldSucceedAfterTimeout', () => {
     expect(staleRequiredChecksSnapshot.readyToMerge).toBe(false);
     expect(staleRequiredChecksSnapshot.gateReasons).toContain('required_checks_query_failed');
     expect(shouldSucceedAfterTimeout(staleRequiredChecksSnapshot, { readinessMode: 'review' })).toBe(false);
+  });
+});
+
+describe('runPrWatchMerge review-mode flag validation', () => {
+  it('rejects valueless merge-method flags in ready-review mode', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(runPrWatchMerge(['--merge-method'], { readinessMode: 'review' })).resolves.toBe(1);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      'ready-review does not support merge flags: --merge-method'
+    );
   });
 });
 
