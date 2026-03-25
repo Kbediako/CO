@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp c6685211c9127a5b6f73350ea3776e51dc67f86595fbaf1611bd2dc2582bb903 -->
+<!-- codex:instruction-stamp 423c073bb5fcc174ea1c31ae9ceb9059fdd925d15aca42f10544d15d67c01c0d -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -75,6 +75,7 @@
 - Prefer `npm run review` for ad-hoc reviews in this repo so task-scoped evidence is captured and delegation MCP remains enabled by default.
 - Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed.
 - In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `codex-orchestrator review`/`npm run review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
+- Non-interactive lane policy: direct/manual wrapper runs stay handoff-only unless `FORCE_CODEX_REVIEW=1`; `docs-review` and `implementation-gate` explicitly force review execution; `docs-relevance-advisory` explicitly clears `FORCE_CODEX_REVIEW` and remains prompt-only/advisory; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1`, so its pre-handoff standalone review executes before `Human Review` / `In Review`.
 - Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <path>` (repo alias: `npm run review -- --manifest <path>`).

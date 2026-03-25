@@ -4,6 +4,7 @@ import {
   extractShellCommandPayload,
   inferStaticShellTruthiness,
   normalizeCommandToken,
+  normalizeShellCommandPathSeparators,
   segmentRunsInParentShell,
   separatorCarriesParentShellStateForward,
   splitShellControlSegmentsDetailed,
@@ -64,6 +65,21 @@ describe('review shell command parser', () => {
     expect(inferStaticShellTruthiness('FOO=1 env -u MANIFEST false')).toBe(false);
     expect(inferStaticShellTruthiness('export MANIFEST=/tmp/manifest.json')).toBe(true);
     expect(inferStaticShellTruthiness('printf "%s" "$MANIFEST"')).toBeNull();
+  });
+
+  it('normalizes Windows path tokens without mutating unrelated shell escapes', () => {
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`C:\Users\me\AppData\Roaming\npm\npx.cmd vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(
+      String.raw`C:/Users/me/AppData/Roaming/npm/npx.cmd vitest run tests/review-execution-state.spec.ts`
+    );
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`/bin/zsh -lc 'printf "%s\n" "$MANIFEST"'`
+      )
+    ).toBe(String.raw`/bin/zsh -lc 'printf "%s\n" "$MANIFEST"'`);
   });
 });
 

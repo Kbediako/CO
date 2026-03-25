@@ -85,16 +85,17 @@
       {
         "kind": "command",
         "id": "docs-relevance-review",
-        "title": "npm run review (docs relevance advisory)",
+        "title": "npm run review (docs relevance advisory prompt-only)",
         "command": "npm run review",
         "env": {
           "SKIP_DIFF_BUDGET": "1",
           "CODEX_REVIEW_NON_INTERACTIVE": "1",
+          "FORCE_CODEX_REVIEW": "",
           "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned docs relevance advisory review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
           "NOTES": "Goal: docs relevance advisory | Summary: semantic docs relevance review lane with manifest context | Risks: advisory-only lane; false positives/negatives possible"
         },
         "allowFailure": true,
-        "summaryHint": "Agent-first docs relevance advisory review"
+        "summaryHint": "Agent-first docs relevance advisory handoff (prompt-only unless manually forced)"
       }
     ],
     "design-artifacts": [
@@ -164,7 +165,7 @@
     {
       "id": "implementation-gate",
       "title": "Implementation Complete Gate",
-      "description": "Runs the required implementation validations (spec-guard, build, lint, test, docs:check, docs:freshness, diff-budget) and launches the Codex review handoff, writing a single manifest for evidence.",
+      "description": "Runs the required implementation validations (spec-guard, build, lint, test, docs:check, docs:freshness, diff-budget) and forces standalone review execution, writing a single manifest for evidence.",
       "tags": [
         "implementation-gate"
       ],
@@ -194,7 +195,7 @@
         {
           "kind": "command",
           "id": "review",
-          "title": "npm run review",
+          "title": "npm run review (forced)",
           "command": "npm run review",
           "env": {
             "DIFF_BUDGET_STAGE": "1",
@@ -202,7 +203,7 @@
             "FORCE_CODEX_REVIEW": "1",
             "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned implementation gate review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
             "CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY": "1",
-            "NOTES": "Goal: implementation gate review handoff | Summary: automated prompt with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
+            "NOTES": "Goal: implementation gate forced standalone review | Summary: automated forced review execution with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
           }
         }
       ]
@@ -210,7 +211,7 @@
     {
       "id": "docs-review",
       "title": "Docs Review Gate",
-      "description": "Pre-implementation docs review: spec-guard, docs:check, docs:freshness, and review (diff budget skipped).",
+      "description": "Pre-implementation docs review: spec-guard, docs:check, docs:freshness, and forced standalone review execution (diff budget skipped).",
       "tags": [
         "docs-review"
       ],
@@ -230,7 +231,7 @@
         {
           "kind": "command",
           "id": "review",
-          "title": "npm run review",
+          "title": "npm run review (forced)",
           "command": "npm run review",
           "env": {
             "SKIP_DIFF_BUDGET": "1",
@@ -238,7 +239,7 @@
             "FORCE_CODEX_REVIEW": "1",
             "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned docs review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
             "CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY": "1",
-            "NOTES": "Goal: docs review gate review handoff | Summary: automated prompt with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
+            "NOTES": "Goal: docs review forced standalone review | Summary: automated forced review execution with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
           }
         }
       ]
@@ -246,7 +247,7 @@
     {
       "id": "docs-relevance-advisory",
       "title": "Docs Relevance Advisory",
-      "description": "Runs a non-blocking docs relevance signal lane (warn-mode freshness + advisory review).",
+      "description": "Runs a non-blocking docs relevance signal lane (warn-mode freshness + advisory prompt-only review).",
       "tags": [
         "docs",
         "advisory"
@@ -262,7 +263,7 @@
     {
       "id": "provider-linear-worker",
       "title": "Provider Linear Worker",
-      "description": "Runs the provider-owned same-session Linear worker loop inside one child run.",
+      "description": "Runs the provider-owned same-session Linear worker loop inside one child run and exports forced standalone-review env for the pre-handoff review step.",
       "tags": [
         "provider-worker",
         "linear"
@@ -273,7 +274,11 @@
           "id": "provider-linear-worker",
           "title": "Run provider linear worker",
           "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js\"",
-          "summaryHint": "Provider linear worker completed"
+          "env": {
+            "CODEX_REVIEW_NON_INTERACTIVE": "1",
+            "FORCE_CODEX_REVIEW": "1"
+          },
+          "summaryHint": "Provider linear worker completed with forced standalone review enabled for handoff"
         }
       ]
     },

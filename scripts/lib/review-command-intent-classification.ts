@@ -1,6 +1,7 @@
 import {
   extractShellCommandPayload,
   normalizeCommandToken,
+  normalizeShellCommandPathSeparators,
   splitShellControlSegments,
   stripLeadingEnvAssignments,
   tokenizeShellSegment,
@@ -62,7 +63,7 @@ export function classifyCommandIntentCommandLine(
   commandLine: string,
   options: { allowValidationCommandIntents: boolean }
 ): ReviewCommandIntentViolation | null {
-  const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
+  const normalized = normalizeShellCommandPathSeparators(normalizeReviewCommandLine(commandLine));
   const segments = splitShellControlSegments(normalized);
   for (const segment of segments) {
     const violation = classifyCommandIntentSegment(segment, options, 0);

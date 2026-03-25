@@ -17,6 +17,93 @@ export type ShellControlSegment = {
   separatorAfter: ShellControlSeparator;
 };
 
+function isWindowsPathSegmentStart(char: string): boolean {
+  return /^[A-Za-z0-9._-]$/u.test(char);
+}
+
+export function normalizeShellCommandPathSeparators(command: string): string {
+  let normalized = '';
+  let currentToken = '';
+  let quote: '"' | "'" | '`' | null = null;
+  let escaped = false;
+
+  const flushToken = () => {
+    if (!currentToken) {
+      return;
+    }
+    normalized += looksLikeWindowsPathToken(currentToken)
+      ? normalizeWindowsPathToken(currentToken)
+      : currentToken;
+    currentToken = '';
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index] ?? '';
+    if (escaped) {
+      currentToken += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && quote !== "'") {
+      currentToken += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      }
+      currentToken += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      currentToken += char;
+      continue;
+    }
+
+    if (/\s/u.test(char)) {
+      flushToken();
+      normalized += char;
+      continue;
+    }
+
+    currentToken += char;
+  }
+  flushToken();
+  return normalized;
+}
+
+function looksLikeWindowsPathToken(token: string): boolean {
+  const unquoted = stripMatchingQuotes(token);
+  return /^[A-Za-z]:\\/u.test(unquoted) || /^\\\\[^\\/\s"'`]+[\\/]/u.test(unquoted);
+}
+
+function stripMatchingQuotes(token: string): string {
+  if (token.length < 2) {
+    return token;
+  }
+  const first = token[0] ?? '';
+  const last = token[token.length - 1] ?? '';
+  if ((first === '"' || first === "'" || first === '`') && last === first) {
+    return token.slice(1, -1);
+  }
+  return token;
+}
+
+function normalizeWindowsPathToken(token: string): string {
+  const first = token[0] ?? '';
+  const last = token[token.length - 1] ?? '';
+  const hasMatchingQuotes =
+    token.length >= 2 && (first === '"' || first === "'" || first === '`') && last === first;
+  const raw = hasMatchingQuotes ? token.slice(1, -1) : token;
+  const normalized = raw.replace(/\\\\(?=[^\\\s])/gu, '//').replace(/\\(?=[^\\\s])/gu, '/');
+  return hasMatchingQuotes ? `${first}${normalized}${last}` : normalized;
+}
+
 export function splitShellControlSegmentsDetailed(command: string): ShellControlSegment[] {
   if (!command.trim()) {
     return [];

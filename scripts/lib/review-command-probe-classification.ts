@@ -2,6 +2,7 @@ import {
   REVIEW_SHELL_COMMANDS,
   extractShellCommandPayload,
   normalizeCommandToken,
+  normalizeShellCommandPathSeparators,
   splitShellControlSegments,
   splitShellControlSegmentsDetailed,
   stripLeadingEnvAssignments,
@@ -22,6 +23,37 @@ export const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
 const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
 const REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES = new Set(['test', 't', 'tst']);
 const REVIEW_SHELL_PROBE_ENV_VARS = new Set(['MANIFEST', 'RUNNER_LOG', 'RUN_LOG']);
+const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest']);
+const REVIEW_LIKELY_COMMANDS = new Set([
+  'npm',
+  'pnpm',
+  'yarn',
+  'bun',
+  'npx',
+  'bunx',
+  'git',
+  'bash',
+  'sh',
+  'zsh',
+  'ksh',
+  'fish',
+  'python',
+  'python3',
+  'py',
+  'pytest',
+  'go',
+  'cargo',
+  'mvn',
+  'mvnw',
+  'gradle',
+  'gradlew',
+  'node',
+  'codex',
+  'codex-orchestrator',
+  'cmd',
+  'powershell',
+  'pwsh'
+]);
 
 function normalizeReviewCommandLine(line: string): string {
   const trimmed = line.trim();
@@ -113,6 +145,11 @@ function hasHeavyCommandTokens(tokens: string[]): boolean {
     return scriptTarget !== null && REVIEW_HEAVY_SCRIPT_TARGETS.has(scriptTarget);
   }
 
+  const launcherTarget = resolveValidationLauncherTarget(command, args);
+  if (launcherTarget !== null && REVIEW_DIRECT_VALIDATION_RUNNERS.has(launcherTarget)) {
+    return true;
+  }
+
   if (command === 'pytest') {
     return true;
   }
@@ -145,6 +182,66 @@ function hasHeavyCommandTokens(tokens: string[]): boolean {
   return false;
 }
 
+function resolveValidationLauncherTarget(command: string, args: string[]): string | null {
+  if (command === 'npx' || command === 'bunx') {
+    return resolveFirstBinaryLauncherTarget(args);
+  }
+
+  const firstArg = normalizeCommandToken(args[0] ?? '');
+  if (command === 'npm' && firstArg === 'exec') {
+    return resolveFirstBinaryLauncherTarget(args.slice(1), { skipDlx: false });
+  }
+  if (command === 'pnpm' && (firstArg === 'dlx' || firstArg === 'exec')) {
+    return resolveFirstBinaryLauncherTarget(args.slice(1), { skipDlx: false });
+  }
+  if (command === 'yarn' && (firstArg === 'dlx' || firstArg === 'exec')) {
+    return resolveFirstBinaryLauncherTarget(args.slice(1), { skipDlx: false });
+  }
+  if (command === 'bun' && firstArg === 'x') {
+    return resolveFirstBinaryLauncherTarget(args.slice(1), { skipDlx: false });
+  }
+  return null;
+}
+
+function resolveFirstBinaryLauncherTarget(
+  args: string[],
+  options: { skipDlx?: boolean } = {}
+): string | null {
+  let index = 0;
+  while (index < args.length) {
+    const token = args[index] ?? '';
+    const normalized = token.toLowerCase();
+    if (normalized === '--') {
+      const target = args[index + 1];
+      return target ? normalizeCommandToken(target) : null;
+    }
+    if (options.skipDlx !== false && (normalized === 'dlx' || normalized === 'exec')) {
+      index += 1;
+      continue;
+    }
+    if (token.startsWith('-')) {
+      index += binaryLauncherOptionConsumesValue(token) && !token.includes('=') ? 2 : 1;
+      continue;
+    }
+    return normalizeCommandToken(token);
+  }
+  return null;
+}
+
+function binaryLauncherOptionConsumesValue(option: string): boolean {
+  const normalized = option.toLowerCase();
+  return (
+    normalized === '-p' ||
+    normalized === '--package' ||
+    normalized.startsWith('--package=') ||
+    normalized === '-c' ||
+    normalized === '--call' ||
+    normalized.startsWith('--call=') ||
+    normalized === '--node-options' ||
+    normalized.startsWith('--node-options=')
+  );
+}
+
 function detectHeavyReviewCommandFromSegment(segment: string, depth = 0): string | null {
   const tokens = stripLeadingEnvAssignments(tokenizeShellSegment(segment));
   if (tokens.length === 0) {
@@ -168,7 +265,7 @@ function detectHeavyReviewCommandFromSegment(segment: string, depth = 0): string
 }
 
 export function detectHeavyReviewCommand(commandLine: string): string | null {
-  const normalized = normalizeReviewCommandLine(commandLine);
+  const normalized = normalizeShellCommandPathSeparators(normalizeReviewCommandLine(commandLine));
   const segments = splitShellControlSegments(normalized);
   for (const segment of segments) {
     const heavyCommand = detectHeavyReviewCommandFromSegment(segment);
@@ -292,7 +389,7 @@ function payloadContainsShellProbe(payload: string, depth = 0): boolean {
 }
 
 export function classifyShellProbeCommandLine(commandLine: string): string | null {
-  const normalized = normalizeReviewCommandLine(commandLine);
+  const normalized = normalizeShellCommandPathSeparators(normalizeReviewCommandLine(commandLine));
   if (detectHeavyReviewCommand(normalized)) {
     return null;
   }
@@ -305,7 +402,7 @@ export function classifyShellProbeCommandLine(commandLine: string): string | nul
 }
 
 export function isLikelyReviewCommandLine(line: string): boolean {
-  const normalized = normalizeReviewCommandLine(line);
+  const normalized = normalizeShellCommandPathSeparators(normalizeReviewCommandLine(line));
   if (!normalized) {
     return false;
   }
@@ -316,11 +413,9 @@ export function isLikelyReviewCommandLine(line: string): boolean {
   if (extractShellCommandPayload(shellTokens)) {
     return true;
   }
-  if (
-    /^(?:npm|pnpm|yarn|bun|node|npx|git|bash|sh|zsh|python|pytest|go|cargo|mvn|gradle(?:w)?)\b/i.test(
-      normalized
-    )
-  ) {
+  const unwrappedTokens = unwrapEnvCommandTokens(shellTokens);
+  const command = normalizeCommandToken(unwrappedTokens[0] ?? shellTokens[0] ?? '');
+  if (REVIEW_LIKELY_COMMANDS.has(command)) {
     return true;
   }
   if (normalized.includes(' in ') && /\s-\w+\s+/u.test(normalized)) {

@@ -1714,11 +1714,15 @@ describe('codex-orchestrator command surface', () => {
     };
 
     await expect(
-      runCli(['mcp', 'enable', '--servers', 'delegation', '--servers', 'playwright', '--yes'], env)
+      runCli(
+        ['mcp', 'enable', '--servers', 'delegation', '--servers', 'playwright', '--yes'],
+        env,
+        CLI_BOOT_TIMEOUT
+      )
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('--servers specified multiple times.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects duplicate --yes flags for mcp enable', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-duplicate-yes-'));
@@ -1728,10 +1732,10 @@ describe('codex-orchestrator command surface', () => {
       CODEX_CLI_BIN: fakeCodex
     };
 
-    await expect(runCli(['mcp', 'enable', '--yes', 'false', '--yes'], env)).rejects.toMatchObject({
+    await expect(runCli(['mcp', 'enable', '--yes', 'false', '--yes'], env, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('--yes specified multiple times.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('returns non-zero when mcp enable --yes has failed actions', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-fail-'));

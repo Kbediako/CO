@@ -58,4 +58,35 @@ describe('review command intent classification', () => {
       })?.kind
     ).toBe('review-orchestration');
   });
+
+  it('does not treat quoted rg regex alternation as nested review orchestration', () => {
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`/bin/zsh -lc "rg -n \"execRunner\\(|run review|npm run review|codex-orchestrator review|FORCE_CODEX_REVIEW\" orchestrator/src/cli/providerLinearWorkerRunner.ts | sed -n '1,200p' && echo '---' && sed -n '840,980p' orchestrator/src/cli/providerLinearWorkerRunner.ts"`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toBeNull();
+  });
+
+  it('keeps Windows launcher paths classifiable for review and validation boundaries', () => {
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`C:\Users\me\AppData\Roaming\npm\codex-orchestrator.cmd review --manifest x`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`C:/Users/me/AppData/Roaming/npm/codex-orchestrator.cmd review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`C:\Users\me\AppData\Roaming\npm\npx.cmd vitest run tests/review-execution-state.spec.ts`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`C:/Users/me/AppData/Roaming/npm/npx.cmd vitest run tests/review-execution-state.spec.ts`
+    });
+  });
 });

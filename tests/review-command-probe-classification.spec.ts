@@ -52,4 +52,24 @@ describe('review command probe classification', () => {
     expect(isLikelyReviewCommandLine(`/bin/zsh -lc 'npm run docs:check'`)).toBe(true);
     expect(isLikelyReviewCommandLine('not actually a command')).toBe(false);
   });
+
+  it('keeps absolute Windows launcher paths recognizable in probe detection', () => {
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`C:\Users\me\AppData\Roaming\npm\npx.cmd vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(
+      String.raw`C:/Users/me/AppData/Roaming/npm/npx.cmd vitest run tests/review-execution-state.spec.ts`
+    );
+    expect(
+      classifyShellProbeCommandLine(
+        String.raw`C:\Windows\System32\cmd.exe /C printenv MANIFEST`
+      )
+    ).toBe(String.raw`C:/Windows/System32/cmd.exe /C printenv MANIFEST`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`C:\Users\me\AppData\Roaming\npm\codex-orchestrator.cmd review --manifest x`
+      )
+    ).toBe(true);
+  });
 });

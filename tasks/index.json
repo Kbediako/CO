@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260325-linear-cc7d12e3-eabf-4168-827e-b3a023583e22",
+      "title": "CO Align Non-Interactive Standalone Review Policy Across Gate Advisory and Provider-Worker Lanes",
+      "relates_to": "tasks/tasks-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "task": "tasks/tasks-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "agent_task": ".agent/task/linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "docs": "docs/TECH_SPEC-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md"
+      }
+    },
+    {
       "id": "20260324-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514",
       "title": "CO Reduce Review Long Tails and Make Review Evidence Accounting Truthful",
       "relates_to": "tasks/tasks-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
