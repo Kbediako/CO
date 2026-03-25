@@ -2613,7 +2613,7 @@ function resolveProviderIssueRunStatus(
   if (manifestStatus && manifestStatus !== 'in_progress') {
     return manifestStatus;
   }
-  return isProviderLinearWorkerTerminalFailure(proof) ? 'failed' : manifestStatus;
+  return shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof) ? 'failed' : manifestStatus;
 }
 
 function resolveProviderIssueRunSummary(
@@ -2622,7 +2622,11 @@ function resolveProviderIssueRunSummary(
 ): string | null {
   const manifestSummary = readStringValue(manifest, 'summary');
   const proofFailureReason = resolveProviderLinearWorkerFailureReason(proof);
-  if (proofFailureReason && readStringValue(manifest, 'status') !== 'failed') {
+  if (
+    proofFailureReason &&
+    readStringValue(manifest, 'status') !== 'failed' &&
+    shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof)
+  ) {
     return proofFailureReason;
   }
   return manifestSummary ?? proofFailureReason;
@@ -2654,6 +2658,32 @@ function isProviderLinearWorkerTerminalFailure(
     readStringValue(proofRecord, 'owner_phase') === 'ended' &&
     readStringValue(proofRecord, 'owner_status') === 'failed'
   );
+}
+
+function shouldUseProviderLinearWorkerTerminalFailureProof(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): boolean {
+  if (!isProviderLinearWorkerTerminalFailure(proof)) {
+    return false;
+  }
+  const proofUpdatedAt = readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at');
+  if (!proofUpdatedAt) {
+    return false;
+  }
+  const manifestUpdatedAt = readStringValue(manifest, 'updated_at', 'started_at');
+  if (!manifestUpdatedAt) {
+    return true;
+  }
+  const proofTimestamp = Date.parse(proofUpdatedAt);
+  const manifestTimestamp = Date.parse(manifestUpdatedAt);
+  if (Number.isNaN(proofTimestamp)) {
+    return false;
+  }
+  if (Number.isNaN(manifestTimestamp)) {
+    return true;
+  }
+  return proofTimestamp >= manifestTimestamp;
 }
 
 function resolveProviderLinearWorkerFailureReason(

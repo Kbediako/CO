@@ -857,7 +857,7 @@ async function resolveAllowedControlHostBindHosts(
     repoRoot,
     layers
   }).ui.allowedBindHosts;
-  const hasExplicitAllowedBindHosts = layers.some((layer) => Array.isArray(layer.ui?.allowedBindHosts));
+  const hasExplicitAllowedBindHosts = Array.isArray(configFiles.repo?.ui?.allowedBindHosts);
   return hasExplicitAllowedBindHosts ? effective : [];
 }
 
