@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { execFile } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  assessReviewScope,
   buildLargeScopeAdvisoryPromptLines,
   buildScopeNotes,
   formatScopeMetrics,
@@ -9,6 +16,33 @@ import {
   REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY,
   resolveLargeScopeOverrideReason
 } from '../scripts/lib/review-scope-advisory.js';
+
+const execFileAsync = promisify(execFile);
+const createdDirs: string[] = [];
+
+async function initRepository(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'review-scope-advisory-'));
+  createdDirs.push(dir);
+
+  await execFileAsync('git', ['init'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.email', 'review-scope@example.com'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.name', 'Review Scope'], { cwd: dir });
+
+  await writeFile(join(dir, 'notes.txt'), 'one\n', 'utf8');
+  await execFileAsync('git', ['add', '.'], { cwd: dir });
+  await execFileAsync('git', ['commit', '-m', 'initial commit'], { cwd: dir });
+
+  return dir;
+}
+
+afterEach(async () => {
+  while (createdDirs.length > 0) {
+    const dir = createdDirs.pop();
+    if (dir) {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
 
 describe('review-scope-advisory', () => {
   it('renders path-only uncommitted scope notes', () => {
@@ -135,5 +169,19 @@ describe('review-scope-advisory', () => {
         [REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY]: 'operator accepted the full working tree'
       })
     ).toBe('operator accepted the full working tree');
+  });
+
+  it('measures the final working tree once when staged and unstaged edits overlap on the same file', async () => {
+    const repo = await initRepository();
+
+    await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
+    await execFileAsync('git', ['add', 'notes.txt'], { cwd: repo });
+    await writeFile(join(repo, 'notes.txt'), 'three\n', 'utf8');
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(1);
+    expect(scope.changedLines).toBe(2);
+    expect(scope.largeScope).toBe(false);
   });
 });

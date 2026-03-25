@@ -111,21 +111,17 @@ export async function assessReviewScope(
   }
 
   const status = await tryGit(['status', '--porcelain=v1', '-z', '--untracked-files=all'], repoRoot);
-  const diff = await tryGit(['diff', '--numstat'], repoRoot);
-  const cachedDiff = await tryGit(['diff', '--cached', '--numstat'], repoRoot);
+  const diff = await tryGit(['diff', 'HEAD', '--numstat'], repoRoot);
   const untracked = await tryGit(['ls-files', '--others', '--exclude-standard', '-z'], repoRoot);
   const untrackedPaths = untracked ? parseNullDelimitedPaths(untracked) : [];
   const untrackedLines = untrackedPaths.length > 0 ? await countWorkingTreeLines(untrackedPaths, repoRoot) : null;
 
   const changedFiles = status ? parseStatusZPaths(status).length : null;
   let changedLines: number | null = null;
-  if (diff || cachedDiff || untrackedLines !== null) {
+  if (diff || untrackedLines !== null) {
     changedLines = 0;
     if (diff) {
       changedLines += parseNumstatLineDelta(diff);
-    }
-    if (cachedDiff) {
-      changedLines += parseNumstatLineDelta(cachedDiff);
     }
     if (untrackedLines !== null) {
       changedLines += untrackedLines;

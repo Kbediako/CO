@@ -1156,6 +1156,23 @@ exit 2
   return binPath;
 }
 
+async function makeFakeDiffBudgetScript(sandbox: string): Promise<void> {
+  await mkdir(join(sandbox, 'scripts'), { recursive: true });
+  await writeFile(
+    join(sandbox, 'scripts', 'diff-budget.mjs'),
+    [
+      '#!/usr/bin/env node',
+      'const hasExplicitScope = process.argv.includes("--base") || process.argv.includes("--commit");',
+      'if (!hasExplicitScope && (process.env.BASE_SHA || process.env.DIFF_BUDGET_BASE)) {',
+      '  console.error("unexpected inherited base env");',
+      '  process.exit(1);',
+      '}',
+      'console.log("fake diff-budget ok");'
+    ].join('\n'),
+    'utf8'
+  );
+}
+
 function parseArgsLogInvocations(argsLog: string): string[] {
   return argsLog
     .split(/^---$/m)
@@ -1285,6 +1302,24 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('skipping diff budget (already executed by pipeline).');
+  });
+
+  it('sanitizes inherited base env for default diff-budget preflight scope', async () => {
+    const sandbox = await makeSandbox();
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await makeFakeDiffBudgetScript(sandbox);
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      BASE_SHA: 'stale-base-ref',
+      DIFF_BUDGET_BASE: 'stale-fallback-ref'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('fake diff-budget ok');
+    expect(result.stderr).not.toContain('unexpected inherited base env');
   });
 
   it('does not require codex availability for non-interactive handoff mode', async () => {
