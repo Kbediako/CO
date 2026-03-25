@@ -59,6 +59,7 @@ const toml = require('@iarna/toml') as {
 };
 
 export interface ProviderLinearWorkerContext {
+  manifest: Record<string, unknown>;
   manifestPath: string;
   runDir: string;
   repoRoot: string;
@@ -343,6 +344,7 @@ export async function loadProviderLinearWorkerContext(
     normalizeOptionalString(manifest.run_id) ??
     `provider-linear-worker-${Date.now()}`;
   return {
+    manifest,
     manifestPath,
     runDir: dirname(manifestPath),
     repoRoot,
@@ -1012,7 +1014,6 @@ export async function runProviderLinearWorker(
   const context = await loadProviderLinearWorkerContext(env, deps.readManifest);
   const runtimeContext = await deps.resolveRuntimeContext(env, context.repoRoot, context.runId);
   deps.log.info(`[provider-linear-worker-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
-  const childManifest = await deps.readManifest(context.manifestPath);
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
     ...env,
@@ -1054,7 +1055,7 @@ export async function runProviderLinearWorker(
     await requestProviderControlHostRefresh({
       currentManifestPath: context.manifestPath,
       env,
-      manifest: childManifest,
+      manifest: context.manifest,
       proof: hydratedProof,
       repoRoot: context.repoRoot,
       log: deps.log
