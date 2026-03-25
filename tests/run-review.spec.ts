@@ -1163,10 +1163,12 @@ async function makeFakeDiffBudgetScript(sandbox: string): Promise<void> {
     [
       '#!/usr/bin/env node',
       'const hasExplicitScope = process.argv.includes("--base") || process.argv.includes("--commit");',
-      'if (!hasExplicitScope && (process.env.BASE_SHA || process.env.DIFF_BUDGET_BASE)) {',
+      'const inheritedBaseEnvPresent = Boolean(process.env.BASE_SHA || process.env.DIFF_BUDGET_BASE);',
+      'if (inheritedBaseEnvPresent) {',
       '  console.error("unexpected inherited base env");',
       '  process.exit(1);',
       '}',
+      'console.log(`fake inherited base env present=${inheritedBaseEnvPresent}`);',
       'const baseIndex = process.argv.indexOf("--base");',
       'if (baseIndex !== -1) {',
       '  console.log(`fake diff-budget base=${process.argv[baseIndex + 1] ?? ""}`);',
@@ -1326,6 +1328,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     });
 
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('fake inherited base env present=false');
     expect(result.stdout).toContain('fake diff-budget ok');
     expect(result.stderr).not.toContain('unexpected inherited base env');
   });
@@ -1348,6 +1351,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
 
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('fake inherited base env present=false');
     expect(result.stdout).toContain('fake diff-budget base=HEAD');
     expect(result.stdout).toContain('fake diff-budget ok');
     expect(result.stderr).not.toContain('unexpected inherited base env');
