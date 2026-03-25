@@ -80,6 +80,14 @@ describe('review shell command parser', () => {
         String.raw`/bin/zsh -lc 'printf "%s\n" "$MANIFEST"'`
       )
     ).toBe(String.raw`/bin/zsh -lc 'printf "%s\n" "$MANIFEST"'`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`);
+    expect(normalizeShellCommandPathSeparators(String.raw`'.\bin\tool.cmd'`)).toBe(
+      String.raw`'.\bin\tool.cmd'`
+    );
   });
 });
 

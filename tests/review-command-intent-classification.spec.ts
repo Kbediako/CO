@@ -89,4 +89,26 @@ describe('review command intent classification', () => {
       sample: String.raw`C:/Users/me/AppData/Roaming/npm/npx.cmd vitest run tests/review-execution-state.spec.ts`
     });
   });
+
+  it('keeps relative Windows launcher paths classifiable for review and validation boundaries', () => {
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`.\bin\codex-orchestrator.cmd review --manifest x`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`./bin/codex-orchestrator.cmd review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`
+    });
+  });
 });

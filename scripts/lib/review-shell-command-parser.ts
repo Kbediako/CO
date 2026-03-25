@@ -79,7 +79,33 @@ export function normalizeShellCommandPathSeparators(command: string): string {
 
 function looksLikeWindowsPathToken(token: string): boolean {
   const unquoted = stripMatchingQuotes(token);
-  return /^[A-Za-z]:\\/u.test(unquoted) || /^\\\\[^\\/\s"'`]+[\\/]/u.test(unquoted);
+  const candidate = stripTrailingShellControlSuffix(unquoted);
+  if (/^[A-Za-z]:\\/u.test(candidate) || /^\\\\[^\\/\s"'`]+[\\/]/u.test(candidate)) {
+    return true;
+  }
+
+  // Keep quoted relative tokens untouched so regex/search literals do not regress again.
+  if (unquoted !== token) {
+    return false;
+  }
+
+  return looksLikeRelativeWindowsLauncherToken(candidate);
+}
+
+function stripTrailingShellControlSuffix(token: string): string {
+  return token.replace(/(?:&&|\|\||[;&|])+$/u, '');
+}
+
+function looksLikeRelativeWindowsLauncherToken(token: string): boolean {
+  if (!token.includes('\\')) {
+    return false;
+  }
+
+  if (/\\[^\\/\s"'`]+\.(?:cmd|exe|bat|com|ps1)$/iu.test(token)) {
+    return true;
+  }
+
+  return /^node_modules\\\.bin\\[^\\/\s"'`]+$/iu.test(token);
 }
 
 function stripMatchingQuotes(token: string): string {
