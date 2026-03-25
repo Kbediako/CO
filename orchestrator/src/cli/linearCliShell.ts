@@ -396,6 +396,7 @@ function buildAuditEntry(
 ): ProviderLinearAuditEntry {
   const requestedIssueId = readStringFlag(flags, 'issue-id') ?? null;
   const sourceSetup = resolveAuditSourceSetup(flags, env);
+  const followUpAuditFields = resolveFollowUpAuditFields(result);
   if (!result.ok) {
     return {
       recorded_at: recordedAt,
@@ -407,6 +408,7 @@ function buildAuditEntry(
       action: null,
       via: null,
       state: null,
+      ...followUpAuditFields,
       comment_id: null,
       attachment_id: null,
       error_code: result.error.code,
@@ -426,6 +428,7 @@ function buildAuditEntry(
         action: null,
         via: null,
         state: result.issue.state?.name ?? null,
+        ...followUpAuditFields,
         comment_id: result.issue.workpad_comment?.id ?? null,
         attachment_id: null,
         error_code: null,
@@ -442,6 +445,7 @@ function buildAuditEntry(
         action: result.action,
         via: null,
         state: null,
+        ...followUpAuditFields,
         comment_id: result.comment.id,
         attachment_id: null,
         error_code: null,
@@ -458,6 +462,7 @@ function buildAuditEntry(
         action: result.action,
         via: null,
         state: null,
+        ...followUpAuditFields,
         comment_id: result.comment_id,
         attachment_id: null,
         error_code: null,
@@ -474,6 +479,7 @@ function buildAuditEntry(
         action: result.action,
         via: null,
         state: result.issue.state?.name ?? result.target_state.name,
+        ...followUpAuditFields,
         comment_id: null,
         attachment_id: null,
         error_code: null,
@@ -490,6 +496,7 @@ function buildAuditEntry(
         action: result.action,
         via: result.via,
         state: null,
+        ...followUpAuditFields,
         comment_id: null,
         attachment_id: result.attachment.id,
         error_code: null,
@@ -506,12 +513,67 @@ function buildAuditEntry(
         action: result.action,
         via: result.relations.blocked_by_source ? 'related+blocks' : 'related',
         state: result.follow_up_issue.state?.name ?? null,
+        ...followUpAuditFields,
         comment_id: null,
         attachment_id: null,
         error_code: null,
         error_message: null
       };
   }
+}
+
+function resolveFollowUpAuditFields(
+  result: LinearCliResult
+): Pick<
+  ProviderLinearAuditEntry,
+  'follow_up_issue_id' | 'follow_up_issue_identifier' | 'failed_relation_type'
+> {
+  if (result.ok) {
+    if (result.operation !== 'create-follow-up') {
+      return {
+        follow_up_issue_id: null,
+        follow_up_issue_identifier: null,
+        failed_relation_type: null
+      };
+    }
+    return {
+      follow_up_issue_id: result.follow_up_issue.id,
+      follow_up_issue_identifier: result.follow_up_issue.identifier,
+      failed_relation_type: null
+    };
+  }
+  if (result.operation !== 'create-follow-up') {
+    return {
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null
+    };
+  }
+  const details = result.error.details;
+  const createdIssue =
+    details && typeof details === 'object' && details.created_issue && typeof details.created_issue === 'object'
+      ? (details.created_issue as Record<string, unknown>)
+      : null;
+  return {
+    follow_up_issue_id: readRecordString(createdIssue, 'id'),
+    follow_up_issue_identifier: readRecordString(createdIssue, 'identifier'),
+    failed_relation_type: readUnknownString(details?.failed_relation_type)
+  };
+}
+
+function readRecordString(record: Record<string, unknown> | null, key: string): string | null {
+  if (!record) {
+    return null;
+  }
+  return readUnknownString(record[key]);
+}
+
+function readUnknownString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): DispatchPilotSourceSetup | null {

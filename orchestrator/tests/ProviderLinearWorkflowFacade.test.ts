@@ -1126,6 +1126,112 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('surfaces the created follow-up issue when blocker relation creation fails after related succeeds', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        if (body.variables?.input?.type === 'related') {
+          return jsonResponse({
+            data: {
+              issueRelationCreate: {
+                success: true
+              }
+            }
+          });
+        }
+        if (body.variables?.input?.type === 'blocks') {
+          return jsonResponse({
+            errors: [{ message: 'block relation failed' }]
+          });
+        }
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 502,
+        details: {
+          errors: ['block relation failed'],
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          failed_relation_type: 'blocks'
+        }
+      }
+    });
+  });
+
   it('falls back to a plain URL attachment when the GitHub-specific mutation errors', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {

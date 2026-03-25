@@ -23,6 +23,9 @@ export interface ProviderLinearAuditEntry {
   action: string | null;
   via: string | null;
   state: string | null;
+  follow_up_issue_id: string | null;
+  follow_up_issue_identifier: string | null;
+  failed_relation_type: string | null;
   comment_id: string | null;
   attachment_id: string | null;
   error_code: string | null;
@@ -134,6 +137,9 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
     action: normalizeOptionalString(entry.action),
     via: normalizeOptionalString(entry.via),
     state: normalizeOptionalString(entry.state),
+    follow_up_issue_id: normalizeOptionalString(entry.follow_up_issue_id),
+    follow_up_issue_identifier: normalizeOptionalString(entry.follow_up_issue_identifier),
+    failed_relation_type: normalizeOptionalString(entry.failed_relation_type),
     comment_id: normalizeOptionalString(entry.comment_id),
     attachment_id: normalizeOptionalString(entry.attachment_id),
     error_code: normalizeOptionalString(entry.error_code),

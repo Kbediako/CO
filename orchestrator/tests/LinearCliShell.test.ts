@@ -98,6 +98,9 @@ describe('runLinearCliShell', () => {
       action: null,
       via: null,
       state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
       comment_id: null,
       attachment_id: null,
       error_code: null,
@@ -321,6 +324,9 @@ describe('runLinearCliShell', () => {
       action: null,
       via: null,
       state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
       comment_id: null,
       attachment_id: null,
       error_code: 'linear_graphql_error',
@@ -443,10 +449,100 @@ describe('runLinearCliShell', () => {
       action: 'created',
       via: 'related+blocks',
       state: 'Backlog',
+      follow_up_issue_id: 'lin-issue-2',
+      follow_up_issue_identifier: 'CO-2',
+      failed_relation_type: null,
       comment_id: null,
       attachment_id: null,
       error_code: null,
       error_message: null
+    });
+  });
+
+  it('records follow-up recovery metadata when create-follow-up fails after issue creation', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'create-follow-up',
+          error: {
+            code: 'linear_graphql_error',
+            message: 'Linear GraphQL returned operation errors.',
+            status: 502,
+            details: {
+              errors: ['relation failed'],
+              created_issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2'
+              },
+              failed_relation_type: 'blocks'
+            }
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-03-22T12:00:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 502,
+        details: {
+          errors: ['relation failed'],
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2'
+          },
+          failed_relation_type: 'blocks'
+        }
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-03-22T12:00:00.000Z',
+      operation: 'create-follow-up',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: null,
+      via: null,
+      state: null,
+      follow_up_issue_id: 'lin-issue-2',
+      follow_up_issue_identifier: 'CO-2',
+      failed_relation_type: 'blocks',
+      comment_id: null,
+      attachment_id: null,
+      error_code: 'linear_graphql_error',
+      error_message: 'Linear GraphQL returned operation errors.'
     });
   });
 
@@ -516,6 +612,9 @@ describe('runLinearCliShell', () => {
       action: null,
       via: null,
       state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
       comment_id: null,
       attachment_id: null,
       error_code: 'linear_graphql_error',
