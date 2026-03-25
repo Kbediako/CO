@@ -241,6 +241,16 @@ describe('review command intent classification', () => {
 
     expect(
       classifyCommandIntentCommandLine(
+        String.raw`cmd /C "node scripts\run-review.{js,ts} --manifest x"`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`node scripts/run-review.{js,ts} --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
         String.raw`echo prep&&.\bin\codex-orchestrator review --manifest x`,
         { allowValidationCommandIntents: false }
       )

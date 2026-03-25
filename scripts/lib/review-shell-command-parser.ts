@@ -116,6 +116,10 @@ function looksLikeWindowsPathToken(token: string): boolean {
     return false;
   }
 
+  if (quote === '"' && !looksLikeExplicitDoubleQuotedWindowsPathToken(candidate)) {
+    return false;
+  }
+
   return looksLikeRelativeWindowsLauncherToken(candidate);
 }
 
@@ -137,7 +141,7 @@ function looksLikeRelativeWindowsLauncherToken(token: string): boolean {
   }
 
   if (
-    /^(?!-)(?:[^\\/\s"'`=;&|<>]+\\)+[^\\/\s"'`=;&|<>]+\.(?:js|ts|mjs|cjs|mts|cts)$/iu.test(
+    /^(?!-)(?:[^\\/\s"'`=;&|<>]+\\)+[^\\/\s"'`=;&|<>]+\.(?:js|ts|mjs|cjs|mts|cts|\{js,ts\})$/iu.test(
       token
     )
   ) {
@@ -153,6 +157,16 @@ function looksLikeRelativeWindowsLauncherToken(token: string): boolean {
   }
 
   return false;
+}
+
+function looksLikeExplicitDoubleQuotedWindowsPathToken(token: string): boolean {
+  if (/^(?:\.\.?\\)+/u.test(token) || /^node_modules\\\.bin\\/iu.test(token)) {
+    return true;
+  }
+
+  return /^(?!-)(?:[^\\/\s"'`=;&|<>]+\\)+[^\\/\s"'`]+\.(?:cmd|exe|bat|com|ps1)$/iu.test(
+    token
+  );
 }
 
 function getMatchingQuote(token: string): '"' | "'" | '`' | null {

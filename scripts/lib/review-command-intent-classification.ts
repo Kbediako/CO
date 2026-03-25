@@ -153,13 +153,13 @@ export function isReviewOrchestrationCommand(command: string, args: string[]): b
     return firstArg === 'review';
   }
   if (command === 'node') {
-    return args.some(
-      (arg) =>
-        normalizeCommandToken(arg) === 'run-review.ts' ||
-        normalizeCommandToken(arg) === 'run-review.js'
-    );
+    return args.some((arg) => isReviewRunnerScriptToken(normalizeCommandToken(arg)));
   }
   return false;
+}
+
+function isReviewRunnerScriptToken(token: string): boolean {
+  return /^(?:.*\/)?run-review\.(?:js|ts|mjs|cjs|mts|cts|\{js,ts\})$/iu.test(token);
 }
 
 function isDirectValidationRunnerCommand(command: string, args: string[]): boolean {

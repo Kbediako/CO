@@ -117,6 +117,11 @@ describe('review shell command parser', () => {
         String.raw`rg run\|pytest file.txt`
       )
     ).toBe(String.raw`rg run\|pytest file.txt`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`rg "foo\w+" file.txt`
+      )
+    ).toBe(String.raw`rg "foo\w+" file.txt`);
     expect(normalizeShellCommandPathSeparators(String.raw`".\bin\tool.cmd"`)).toBe(
       String.raw`"./bin/tool.cmd"`
     );
