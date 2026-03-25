@@ -722,6 +722,9 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
         : `checks_pending=${gateChecks.pending.length}`
     );
   }
+  if (gateChecksSource === 'required' && gateChecks.failed.length > 0) {
+    gateReasons.push(`required_checks_failed=${gateChecks.failed.length}`);
+  }
   const mergeStateBlocksReady =
     readinessMode === 'review'
       ? ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)

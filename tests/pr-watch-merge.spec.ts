@@ -367,7 +367,7 @@ describe('resolveActionRequiredReasons', () => {
     expect(resolveActionRequiredReasons(snapshot)).toContain('required_checks_failed=1');
   });
 
-  it('ignores required-check failures when snapshot is ready to merge', () => {
+  it('blocks ready snapshots when required checks fail even if merge state still looks clean', () => {
     const response = makeResponse([]);
     const requiredChecks = summarizeRequiredChecks([
       { name: 'corelane', state: 'FAILURE', bucket: 'fail', link: 'https://example.com/corelane' }
@@ -377,8 +377,9 @@ describe('resolveActionRequiredReasons', () => {
       unacknowledgedCount: 0
     });
 
-    expect(snapshot.readyToMerge).toBe(true);
-    expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.gateReasons).toContain('required_checks_failed=1');
+    expect(resolveActionRequiredReasons(snapshot)).toContain('required_checks_failed=1');
   });
 
   it('does not classify rollup-only failing checks as action-required', () => {
@@ -608,6 +609,31 @@ describe('shouldSucceedAfterTimeout', () => {
 
     expect(shouldSucceedAfterTimeout(mergeSnapshot)).toBe(false);
     expect(shouldSucceedAfterTimeout(blockedReviewSnapshot, { readinessMode: 'review' })).toBe(false);
+  });
+
+  it('keeps ready-review snapshots with failed required checks non-successful at timeout', () => {
+    const failedRequiredChecksSnapshot = buildStatusSnapshot(
+      makeResponse([], {
+        reviewDecision: 'REVIEW_REQUIRED',
+        mergeStateStatus: 'BLOCKED'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'FAILURE', bucket: 'fail', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review'
+      }
+    );
+
+    expect(failedRequiredChecksSnapshot.readyToMerge).toBe(false);
+    expect(failedRequiredChecksSnapshot.gateReasons).toContain('required_checks_failed=1');
+    expect(resolveActionRequiredReasons(failedRequiredChecksSnapshot, { readinessMode: 'review' }))
+      .toContain('required_checks_failed=1');
+    expect(shouldSucceedAfterTimeout(failedRequiredChecksSnapshot, { readinessMode: 'review' })).toBe(false);
   });
 });
 
