@@ -216,6 +216,7 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['pr', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('resolve-merge');
+    expect(stdout).toContain('ready-review');
     expect(stdout).toContain('docs/guides/review-artifacts.md');
   }, TEST_TIMEOUT);
 
@@ -223,6 +224,7 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['pr']);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('watch-merge');
+    expect(stdout).toContain('ready-review');
   }, TEST_TIMEOUT);
 
   it('prints pr watch-merge help', async () => {
@@ -235,6 +237,13 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator pr resolve-merge');
     expect(stdout).toContain('--exit-on-action-required');
   }, TEST_TIMEOUT);
+
+  it('prints pr ready-review help', async () => {
+    const { stdout } = await runCli(['pr', 'ready-review', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator pr ready-review');
+    expect(stdout).toContain('review handoff is safe after a bounded automated-feedback drain');
+    expect(stdout).not.toContain('--auto-merge');
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects unknown pr subcommands through the binary shell', async () => {
     await expect(runCli(['pr', 'ship-it'])).rejects.toMatchObject({

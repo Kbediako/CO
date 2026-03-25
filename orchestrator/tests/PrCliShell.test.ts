@@ -19,7 +19,7 @@ describe('runPrCliShell', () => {
           runPrWatchMerge: runPrWatchMergeMock
         }
       )
-    ).rejects.toThrow('pr requires a subcommand (watch-merge|resolve-merge).');
+    ).rejects.toThrow('pr requires a subcommand (watch-merge|resolve-merge|ready-review).');
 
     expect(runPrWatchMergeMock).not.toHaveBeenCalled();
   });
@@ -40,7 +40,8 @@ describe('runPrCliShell', () => {
     );
 
     expect(runPrWatchMergeMock).toHaveBeenCalledWith(['--pr', '211', '--dry-run'], {
-      usage: 'codex-orchestrator pr watch-merge'
+      usage: 'codex-orchestrator pr watch-merge',
+      readinessMode: 'merge'
     });
     expect(setExitCode).not.toHaveBeenCalled();
   });
@@ -60,7 +61,28 @@ describe('runPrCliShell', () => {
 
     expect(runPrWatchMergeMock).toHaveBeenCalledWith(['--pr', '211'], {
       usage: 'codex-orchestrator pr resolve-merge',
-      defaultExitOnActionRequired: true
+      defaultExitOnActionRequired: true,
+      readinessMode: 'merge'
+    });
+  });
+
+  it('maps ready-review into the downstream runner with review-handoff defaults', async () => {
+    const runPrWatchMergeMock = vi.fn<typeof import('../../scripts/lib/pr-watch-merge.js').runPrWatchMerge>()
+      .mockResolvedValue(0);
+
+    await runPrCliShell(
+      {
+        rawArgs: ['ready-review', '--pr', '211', '--quiet-minutes', '15']
+      },
+      {
+        runPrWatchMerge: runPrWatchMergeMock
+      }
+    );
+
+    expect(runPrWatchMergeMock).toHaveBeenCalledWith(['--pr', '211', '--quiet-minutes', '15'], {
+      usage: 'codex-orchestrator pr ready-review',
+      defaultExitOnActionRequired: true,
+      readinessMode: 'review'
     });
   });
 
