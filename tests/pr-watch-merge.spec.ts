@@ -205,7 +205,8 @@ describe('pr watch-merge required-check gating', () => {
 
   it('treats REVIEW_REQUIRED as informational in ready-review mode when other gates are clean', () => {
     const response = makeResponse([], {
-      reviewDecision: 'REVIEW_REQUIRED'
+      reviewDecision: 'REVIEW_REQUIRED',
+      mergeStateStatus: 'BLOCKED'
     });
     const requiredChecks = summarizeRequiredChecks([
       { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
@@ -532,7 +533,8 @@ describe('shouldSucceedAfterTimeout', () => {
   it('allows clean ready-review snapshots to exit successfully at the bounded timeout', () => {
     const snapshot = buildStatusSnapshot(
       makeResponse([], {
-        reviewDecision: 'REVIEW_REQUIRED'
+        reviewDecision: 'REVIEW_REQUIRED',
+        mergeStateStatus: 'BLOCKED'
       }),
       summarizeRequiredChecks([
         { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
@@ -547,6 +549,27 @@ describe('shouldSucceedAfterTimeout', () => {
     );
 
     expect(shouldSucceedAfterTimeout(snapshot, { readinessMode: 'review' })).toBe(true);
+  });
+
+  it('fails closed after bounded polling errors even when the last clean review snapshot looked ready', () => {
+    const snapshot = buildStatusSnapshot(
+      makeResponse([], {
+        reviewDecision: 'REVIEW_REQUIRED',
+        mergeStateStatus: 'BLOCKED'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review'
+      }
+    );
+
+    expect(shouldSucceedAfterTimeout(snapshot, { readinessMode: 'review', pollingHealthy: false })).toBe(false);
   });
 
   it('keeps merge mode and blocked review-handoff snapshots non-successful at timeout', () => {

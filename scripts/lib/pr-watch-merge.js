@@ -722,7 +722,11 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
         : `checks_pending=${gateChecks.pending.length}`
     );
   }
-  if (!MERGEABLE_STATES.has(mergeStateStatus)) {
+  const mergeStateBlocksReady =
+    readinessMode === 'review'
+      ? ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)
+      : !MERGEABLE_STATES.has(mergeStateStatus);
+  if (mergeStateBlocksReady) {
     gateReasons.push(`merge_state=${mergeStateStatus || 'UNKNOWN'}`);
   }
   if (isReviewDecisionBlocked(reviewDecision, readinessMode)) {
@@ -816,6 +820,9 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
 
 export function shouldSucceedAfterTimeout(snapshot, options = {}) {
   if (!snapshot || typeof snapshot !== 'object') {
+    return false;
+  }
+  if (options.pollingHealthy === false) {
     return false;
   }
   const readinessMode = normalizeReadinessMode(options.readinessMode ?? snapshot.readinessMode);
@@ -1461,6 +1468,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
   let lastMergeAttemptHeadOid = null;
   let requiredChecksForNextPollCache = null;
   let latestSnapshot = null;
+  let pollingHealthySinceLatestSnapshot = false;
 
   while (Date.now() <= deadline) {
     let snapshot;
@@ -1471,11 +1479,13 @@ async function runPrWatchMergeOrThrow(argv, options) {
       snapshot = fetched.snapshot;
       requiredChecksForNextPollCache = fetched.requiredChecksForNextPoll;
     } catch (error) {
+      pollingHealthySinceLatestSnapshot = false;
       log(`Polling error: ${error instanceof Error ? error.message : String(error)} (retrying).`);
       await sleep(intervalMs);
       continue;
     }
     latestSnapshot = snapshot;
+    pollingHealthySinceLatestSnapshot = true;
 
     if (snapshot.state === 'MERGED' || snapshot.mergedAt) {
       log(`PR #${prNumber} is merged.`);
@@ -1571,7 +1581,7 @@ async function runPrWatchMergeOrThrow(argv, options) {
     await sleep(Math.min(intervalMs, remainingTimeMs));
   }
 
-  if (shouldSucceedAfterTimeout(latestSnapshot, { readinessMode })) {
+  if (shouldSucceedAfterTimeout(latestSnapshot, { readinessMode, pollingHealthy: pollingHealthySinceLatestSnapshot })) {
     log('Bounded wait expired cleanly with no remaining automated-feedback blockers.');
     if (latestSnapshot?.url) {
       log(`Ready for review: ${latestSnapshot.url}`);

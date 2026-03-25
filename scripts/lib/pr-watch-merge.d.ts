@@ -118,7 +118,9 @@ export function resolveActionRequiredReasons(
 
 export function shouldSucceedAfterTimeout(
   snapshot: PrWatchMergeSnapshot | null | undefined,
-  options?: Pick<PrWatchMergeOptions, 'readinessMode'>
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'> & {
+    pollingHealthy?: boolean;
+  }
 ): boolean;
 
 export function resolveLatestBotRereviewRequests(
