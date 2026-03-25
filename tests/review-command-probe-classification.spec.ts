@@ -76,6 +76,22 @@ describe('review command probe classification', () => {
   it('keeps relative Windows launcher paths recognizable in probe detection', () => {
     expect(
       detectHeavyReviewCommand(
+        String.raw`node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`.\bin\codex-orchestrator review --manifest x`
+      )
+    ).toBe(true);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`cmd /C ".\bin\codex-orchestrator review --manifest x"`
+      )
+    ).toBe(true);
+
+    expect(
+      detectHeavyReviewCommand(
         String.raw`.\bin\python.exe -m pytest tests/review-execution-state.spec.ts`
       )
     ).toBe(String.raw`./bin/python.exe -m pytest tests/review-execution-state.spec.ts`);

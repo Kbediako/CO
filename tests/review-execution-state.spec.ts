@@ -85,8 +85,16 @@ describe('review shell command parser', () => {
         String.raw`node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts`
       )
     ).toBe(String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
     expect(normalizeShellCommandPathSeparators(String.raw`".\bin\tool.cmd"`)).toBe(
       String.raw`"./bin/tool.cmd"`
+    );
+    expect(normalizeShellCommandPathSeparators(String.raw`".\bin\tool"`)).toBe(
+      String.raw`"./bin/tool"`
     );
     expect(normalizeShellCommandPathSeparators(String.raw`'.\bin\tool.cmd'`)).toBe(
       String.raw`'.\bin\tool.cmd'`

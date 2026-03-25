@@ -103,11 +103,19 @@ function looksLikeRelativeWindowsLauncherToken(token: string): boolean {
     return false;
   }
 
+  if (/^(?:\.\.?\\)+(?:[^\\/\s"'`]+\\)+[^\\/\s"'`]+$/u.test(token)) {
+    return true;
+  }
+
+  if (/^node_modules\\\.bin\\[^\\/\s"'`]+$/iu.test(token)) {
+    return true;
+  }
+
   if (/\\[^\\/\s"'`]+\.(?:cmd|exe|bat|com|ps1)$/iu.test(token)) {
     return true;
   }
 
-  return /^node_modules\\\.bin\\[^\\/\s"'`]+$/iu.test(token);
+  return false;
 }
 
 function getMatchingQuote(token: string): '"' | "'" | '`' | null {

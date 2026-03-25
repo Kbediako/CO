@@ -93,6 +93,16 @@ describe('review command intent classification', () => {
   it('keeps relative Windows launcher paths classifiable for review and validation boundaries', () => {
     expect(
       classifyCommandIntentCommandLine(
+        String.raw`.\bin\codex-orchestrator review --manifest x`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`./bin/codex-orchestrator review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
         String.raw`.\bin\codex-orchestrator.cmd review --manifest x`,
         { allowValidationCommandIntents: false }
       )
@@ -159,6 +169,16 @@ describe('review command intent classification', () => {
     ).toEqual({
       kind: 'review-orchestration',
       sample: String.raw`./bin/codex-orchestrator.cmd review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`cmd /C ".\bin\codex-orchestrator review --manifest x"`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`./bin/codex-orchestrator review --manifest x`
     });
 
     expect(
