@@ -398,7 +398,7 @@ describe('provider linear worker runner', () => {
   });
 
   it('continues on the same thread across turns and writes a proof sidecar', async () => {
-    const { manifestPath, runDir } = await createManifestRoot();
+    const { manifestPath } = await createManifestRoot();
     const readTrackedIssue = vi
       .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
       .mockResolvedValueOnce(createTrackedIssue())
@@ -625,7 +625,7 @@ describe('provider linear worker runner', () => {
   });
 
   it('passes env-backed Linear scope bindings into tracked issue refreshes', async () => {
-    const { manifestPath, runDir } = await createManifestRoot();
+    const { manifestPath } = await createManifestRoot();
     const readTrackedIssue = vi
       .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
       .mockResolvedValueOnce(createTrackedIssue())
@@ -1580,7 +1580,7 @@ describe('provider linear worker runner', () => {
   });
 
   it('rejects symlinked control-host run directories that escape the runs root', async () => {
-    const { manifestPath, runDir } = await createManifestRoot();
+    const { manifestPath } = await createManifestRoot();
     const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const runsRoot = join(tempRoot ?? '', '.runs');
     const externalRoot = join(tempRoot ?? '', 'external-control-host');
