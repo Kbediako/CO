@@ -37,6 +37,14 @@ describe('review command intent classification', () => {
   it('does not classify typecheck and check scripts as validation-suite intents', () => {
     expect(classifyCommandIntentCommandLine(`npm run typecheck`, { allowValidationCommandIntents: false })).toBeNull();
     expect(classifyCommandIntentCommandLine(`pnpm run check`, { allowValidationCommandIntents: false })).toBeNull();
+    expect(
+      classifyCommandIntentCommandLine(`python -m pytest tests/review-execution-state.spec.ts`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: `python -m pytest tests/review-execution-state.spec.ts`
+    });
   });
 
   it('resolves launcher variants and nested review-orchestration commands', () => {
@@ -253,6 +261,16 @@ describe('review command intent classification', () => {
 
     expect(
       classifyCommandIntentCommandLine(
+        String.raw`venv\Scripts\python -m pytest tests/review-execution-state.spec.ts`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`venv/Scripts/python -m pytest tests/review-execution-state.spec.ts`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
         String.raw`cmd /C "echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts"`,
         { allowValidationCommandIntents: false }
       )
@@ -269,6 +287,16 @@ describe('review command intent classification', () => {
     ).toEqual({
       kind: 'validation-runner',
       sample: String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`cmd /C "venv\Scripts\python -m pytest tests/review-execution-state.spec.ts"`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`venv/Scripts/python -m pytest tests/review-execution-state.spec.ts`
     });
   });
 });

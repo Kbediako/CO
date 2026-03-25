@@ -167,6 +167,17 @@ function isDirectValidationRunnerCommand(command: string, args: string[]): boole
     return true;
   }
 
+  if (command === 'python' || command === 'python3' || command === 'py') {
+    for (let index = 0; index < args.length - 1; index += 1) {
+      if ((args[index] ?? '').toLowerCase() !== '-m') {
+        continue;
+      }
+      if (normalizeCommandToken(args[index + 1] ?? '') === 'pytest') {
+        return true;
+      }
+    }
+  }
+
   const launcherTarget = resolveValidationLauncherTarget(command, args);
   return launcherTarget !== null && REVIEW_DIRECT_VALIDATION_RUNNERS.has(launcherTarget);
 }
