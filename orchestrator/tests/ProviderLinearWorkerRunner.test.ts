@@ -1,5 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import http from 'node:http';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,6 +27,7 @@ import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 let tempRoot: string | null = null;
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   if (tempRoot) {
     await rm(tempRoot, { recursive: true, force: true });
     tempRoot = null;
@@ -49,6 +51,37 @@ async function createManifestRoot() {
     'utf8'
   );
   return { runDir, manifestPath };
+}
+
+async function createControlEndpointServer(bindHost = '127.0.0.1'): Promise<{
+  baseUrl: string;
+  requests: Array<{ url: string; body: Record<string, unknown> }>;
+  close(): Promise<void>;
+}> {
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const server = http.createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on('end', () => {
+      requests.push({
+        url: req.url ?? '/',
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
+      });
+      res.writeHead(202, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ queued: true, coalesced: false }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, bindHost, () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Failed to bind control endpoint test server.');
+  }
+  const host = address.family === 'IPv6' ? `[${address.address}]` : address.address;
+  return {
+    baseUrl: `http://${host}:${address.port}`,
+    requests,
+    close: () => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+  };
 }
 
 async function writeCodexConfig(maxTurns: number): Promise<string> {
@@ -627,6 +660,349 @@ describe('provider linear worker runner', () => {
 
   it('fails closed when a codex turn exits non-zero and writes a failed proof sidecar', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    const controlServer = await createControlEndpointServer();
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: controlServer.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    try {
+      await expect(
+        runProviderLinearWorker(
+          {
+            CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+            CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+            CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+            CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+          },
+          {
+            readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+            resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+            execRunner: vi.fn(async () => ({
+              exitCode: 2,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'boom'
+            })),
+            now: vi
+              .fn()
+              .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+              .mockReturnValue('2026-03-21T09:00:01.000Z'),
+            log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+          }
+        )
+      ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
+      const written = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(written).toMatchObject({
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        owner_status: 'failed',
+        end_reason: 'codex_exit_2'
+      });
+      expect(controlServer.requests).toEqual([
+        {
+          url: '/api/v1/refresh',
+          body: {
+            action: 'refresh',
+            source: 'provider-linear-worker',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-2',
+            owner_status: 'failed',
+            end_reason: 'codex_exit_2'
+          }
+        }
+      ]);
+    } finally {
+      await controlServer.close();
+    }
+  });
+
+  it('falls back to the provider control-host env locator when older manifests omit the host fields', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    const controlServer = await createControlEndpointServer();
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: controlServer.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+
+    try {
+      await expect(
+        runProviderLinearWorker(
+          {
+            CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+            CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+            CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+            CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3',
+            CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+            CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+            CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
+          },
+          {
+            readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+            resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+            execRunner: vi.fn(async () => ({
+              exitCode: 2,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'boom'
+            })),
+            now: vi
+              .fn()
+              .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+              .mockReturnValue('2026-03-21T09:00:01.000Z'),
+            log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+          }
+        )
+      ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
+      expect(controlServer.requests).toHaveLength(1);
+      expect(controlServer.requests[0]).toMatchObject({
+        url: '/api/v1/refresh',
+        body: {
+          action: 'refresh',
+          source: 'provider-linear-worker',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          owner_status: 'failed',
+          end_reason: 'codex_exit_2'
+        }
+      });
+    } finally {
+      await controlServer.close();
+    }
+  });
+
+  it('allows configured control-host bind hosts for terminal failure refresh requests', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexConfigDir = join(tempRoot ?? '', '.codex');
+    await mkdir(codexConfigDir, { recursive: true });
+    await writeFile(
+      join(codexConfigDir, 'orchestrator.toml'),
+      '[ui]\nallowed_bind_hosts = ["localhost"]\n',
+      'utf8'
+    );
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    const controlServer = await createControlEndpointServer();
+    const localhostBaseUrl = controlServer.baseUrl.replace('127.0.0.1', 'localhost');
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: localhostBaseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    try {
+      await expect(
+        runProviderLinearWorker(
+          {
+            CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+            CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+            CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+            CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+          },
+          {
+            readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+            resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+            execRunner: vi.fn(async () => ({
+              exitCode: 2,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'boom'
+            })),
+            now: vi
+              .fn()
+              .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+              .mockReturnValue('2026-03-21T09:00:01.000Z'),
+            log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+          }
+        )
+      ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
+      expect(controlServer.requests).toHaveLength(1);
+      expect(controlServer.requests[0]).toMatchObject({
+        url: '/api/v1/refresh',
+        body: {
+          action: 'refresh',
+          source: 'provider-linear-worker',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          owner_status: 'failed',
+          end_reason: 'codex_exit_2'
+        }
+      });
+    } finally {
+      await controlServer.close();
+    }
+  });
+
+  it('uses the owning control-host repo bind-host policy instead of the worker workspace config', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const workerWorkspacePath = join(tempRoot ?? '', 'packages', 'worker');
+    await mkdir(workerWorkspacePath, { recursive: true });
+    const codexConfigDir = join(tempRoot ?? '', '.codex');
+    await mkdir(codexConfigDir, { recursive: true });
+    await writeFile(
+      join(codexConfigDir, 'orchestrator.toml'),
+      '[ui]\nallowed_bind_hosts = ["localhost"]\n',
+      'utf8'
+    );
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    const controlServer = await createControlEndpointServer();
+    const localhostBaseUrl = controlServer.baseUrl.replace('127.0.0.1', 'localhost');
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: localhostBaseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      join(controlHostRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: workerWorkspacePath,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    try {
+      await expect(
+        runProviderLinearWorker(
+          {
+            CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+            CODEX_ORCHESTRATOR_ROOT: workerWorkspacePath,
+            CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+            CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+          },
+          {
+            readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+            resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+            execRunner: vi.fn(async () => ({
+              exitCode: 2,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'boom'
+            })),
+            now: vi
+              .fn()
+              .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+              .mockReturnValue('2026-03-21T09:00:01.000Z'),
+            log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+          }
+        )
+      ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
+      expect(controlServer.requests).toHaveLength(1);
+      expect(controlServer.requests[0]?.url).toBe('/api/v1/refresh');
+    } finally {
+      await controlServer.close();
+    }
+  });
+
+  it('allows IPv6 loopback control-host refresh endpoints', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: 'http://[::1]:43123',
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
 
     await expect(
       runProviderLinearWorker(
@@ -656,16 +1032,111 @@ describe('provider linear worker runner', () => {
       )
     ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
 
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toBe('http://[::1]:43123/api/v1/refresh');
+  });
+
+  it('does not parse delegation config on healthy runs that never need terminal failure refresh', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexConfigDir = join(tempRoot ?? '', '.codex');
+    await mkdir(codexConfigDir, { recursive: true });
+    await writeFile(join(codexConfigDir, 'orchestrator.toml'), 'not = [valid', 'utf8');
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+      },
+      {
+        readTrackedIssue: vi
+          .fn()
+          .mockResolvedValueOnce(createTrackedIssue())
+          .mockResolvedValueOnce(
+            createTrackedIssue({
+              state: 'Done',
+              state_type: 'completed'
+            })
+          ),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner: vi.fn(async () => ({
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+          ].join('\n'),
+          stderr: ''
+        })),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive'
+    });
+  });
+
+  it('fails closed without crashing when the persisted control-host locator is malformed', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: '../outside-task',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async () => ({
+            exitCode: 2,
+            stdout: [
+              '{"type":"thread.started","thread_id":"thread-1"}',
+              '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+            ].join('\n'),
+            stderr: 'boom'
+          })),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log
+        }
+      )
+    ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
     const written = JSON.parse(
       await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
     ) as Record<string, unknown>;
     expect(written).toMatchObject({
-      thread_id: 'thread-1',
-      latest_turn_id: 'turn-1',
-      latest_session_id: 'thread-1-turn-1',
       owner_status: 'failed',
       end_reason: 'codex_exit_2'
     });
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.stringContaining('provider-linear-worker could not request control-host refresh for CO-2')
+    );
   });
 
   it('fails closed when execRunner rejects and writes a failed proof sidecar', async () => {
