@@ -17,10 +17,6 @@ export type ShellControlSegment = {
   separatorAfter: ShellControlSeparator;
 };
 
-function isWindowsPathSegmentStart(char: string): boolean {
-  return /^[A-Za-z0-9._-]$/u.test(char);
-}
-
 export function normalizeShellCommandPathSeparators(command: string): string {
   let normalized = '';
   let currentToken = '';
@@ -169,7 +165,7 @@ function normalizeWindowsPathToken(token: string): string {
   const hasMatchingQuotes =
     token.length >= 2 && (first === '"' || first === "'" || first === '`') && last === first;
   const raw = hasMatchingQuotes ? token.slice(1, -1) : token;
-  const normalized = raw.replace(/\\\\(?=[^\\\s])/gu, '//').replace(/\\(?=[^\\\s])/gu, '/');
+  const normalized = raw.replace(/\\\\(?=$|[^\\\s])/gu, '//').replace(/\\(?=$|[^\\\s])/gu, '/');
   return hasMatchingQuotes ? `${first}${normalized}${last}` : normalized;
 }
 

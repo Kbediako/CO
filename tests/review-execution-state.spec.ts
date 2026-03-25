@@ -75,6 +75,8 @@ describe('review shell command parser', () => {
     ).toBe(
       String.raw`C:/Users/me/AppData/Roaming/npm/npx.cmd vitest run tests/review-execution-state.spec.ts`
     );
+    expect(normalizeShellCommandPathSeparators('C:\\Users\\me\\')).toBe('C:/Users/me/');
+    expect(normalizeShellCommandPathSeparators('\\\\server\\share\\')).toBe('//server/share/');
     expect(
       normalizeShellCommandPathSeparators(
         String.raw`/bin/zsh -lc 'printf "%s\n" "$MANIFEST"'`
