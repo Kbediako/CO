@@ -10705,7 +10705,8 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: childPaths.manifestPath,
       retry_queued: true,
       retry_attempt: 1,
-      retry_due_at: '2026-03-19T04:30:10.000Z'
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: null
     });
   });
 
