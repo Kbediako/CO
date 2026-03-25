@@ -19,6 +19,7 @@ const REVIEW_LARGE_SCOPE_FILE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_FILE
 const REVIEW_LARGE_SCOPE_LINE_THRESHOLD_ENV_KEY = 'CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD';
 export const REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY =
   'CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON';
+const IGNORED_REVIEW_SCOPE_PREFIXES = ['.agent/task/', 'tasks/tasks-'];
 
 export interface ReviewScopeCliOptions {
   base?: string;
@@ -114,10 +115,14 @@ export async function assessReviewScope(
   const diff = await tryGit(['diff', '--numstat', '--no-renames', 'HEAD'], repoRoot);
   const cachedDiff = await tryGit(['diff', '--cached', '--numstat', '--no-renames', 'HEAD'], repoRoot);
   const untracked = await tryGit(['ls-files', '--others', '--exclude-standard', '-z'], repoRoot);
-  const untrackedPaths = untracked ? parseNullDelimitedPaths(untracked) : [];
+  const untrackedPaths = untracked
+    ? parseNullDelimitedPaths(untracked).filter((filePath) => !isIgnoredReviewScopePath(filePath))
+    : [];
   const untrackedLines = untrackedPaths.length > 0 ? await countWorkingTreeLines(untrackedPaths, repoRoot) : null;
 
-  const changedFiles = status ? parseStatusZPaths(status).length : null;
+  const changedFiles = status
+    ? parseStatusZPaths(status).filter((filePath) => !isIgnoredReviewScopePath(filePath)).length
+    : null;
   let changedLines: number | null = null;
   if (diff || cachedDiff || untrackedLines !== null) {
     changedLines = 0;
@@ -269,7 +274,7 @@ function parseMergedNumstatLineDelta(
       }
       const [added, deleted, ...rest] = line.split(/\s+/u);
       const filePath = rest.join(' ').trim();
-      if (!filePath) {
+      if (!filePath || isIgnoredReviewScopePath(filePath)) {
         continue;
       }
       const addCount = Number(added);
@@ -291,6 +296,10 @@ function parseMergedNumstatLineDelta(
 
 function parseNullDelimitedPaths(raw: string): string[] {
   return raw.split('\u0000').filter((entry) => entry.length > 0);
+}
+
+function isIgnoredReviewScopePath(filePath: string): boolean {
+  return IGNORED_REVIEW_SCOPE_PREFIXES.some((prefix) => filePath.startsWith(prefix));
 }
 
 async function countWorkingTreeFileLines(relativePath: string, repoRoot: string): Promise<number> {

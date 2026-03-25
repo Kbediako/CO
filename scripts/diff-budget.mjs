@@ -16,12 +16,14 @@ const DEFAULT_STACKED_ADVISORY_REF = 'origin/main';
 
 const IGNORED_EXACT_PATHS = new Set(['package-lock.json']);
 const IGNORED_PREFIXES = [
+  '.agent/task/',
   '.runs/',
   'archives/',
   'dist/',
   'node_modules/',
   'out/'
 ];
+const IGNORED_TASK_CHECKLIST_PREFIX = 'tasks/tasks-';
 
 function showUsage() {
   console.log(`Usage: node scripts/diff-budget.mjs [--dry-run] [--commit <sha>] [--base <ref>] [--max-files <n>] [--max-lines <n>]
@@ -144,6 +146,9 @@ function isIgnoredPath(filePath) {
     if (filePath.startsWith(prefix)) {
       return true;
     }
+  }
+  if (filePath.startsWith(IGNORED_TASK_CHECKLIST_PREFIX)) {
+    return true;
   }
   return false;
 }

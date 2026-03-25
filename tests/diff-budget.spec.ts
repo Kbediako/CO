@@ -259,9 +259,13 @@ describe('diff-budget script', () => {
   it('ignores exact and prefix ignored paths', async () => {
     const repo = await initRepository();
 
+    await mkdir(join(repo, '.agent', 'task'), { recursive: true });
     await mkdir(join(repo, '.runs'), { recursive: true });
+    await mkdir(join(repo, 'tasks'), { recursive: true });
+    await writeFile(join(repo, '.agent', 'task', 'ignored.md'), 'z\n'.repeat(2000), 'utf8');
     await writeFile(join(repo, '.runs', 'ignored.txt'), 'x\n'.repeat(2000), 'utf8');
     await writeFile(join(repo, 'package-lock.json'), 'y\n'.repeat(2000), 'utf8');
+    await writeFile(join(repo, 'tasks', 'tasks-ignored.md'), 'q\n'.repeat(2000), 'utf8');
 
     const result = await runDiffBudget(repo, ['--base', 'HEAD', '--max-files', '0', '--max-lines', '0']);
     expect(result.exitCode).toBe(0);

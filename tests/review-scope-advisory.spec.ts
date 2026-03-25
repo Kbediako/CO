@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -191,6 +191,22 @@ describe('review-scope-advisory', () => {
     await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
     await execFileAsync('git', ['add', 'notes.txt'], { cwd: repo });
     await writeFile(join(repo, 'notes.txt'), 'one\n', 'utf8');
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(1);
+    expect(scope.changedLines).toBe(2);
+    expect(scope.largeScope).toBe(false);
+  });
+
+  it('ignores .agent task mirrors in uncommitted scope metrics', async () => {
+    const repo = await initRepository();
+
+    await mkdir(join(repo, '.agent', 'task'), { recursive: true });
+    await mkdir(join(repo, 'tasks'), { recursive: true });
+    await writeFile(join(repo, '.agent', 'task', 'ignored.md'), 'ignore\n'.repeat(50), 'utf8');
+    await writeFile(join(repo, 'tasks', 'tasks-ignored.md'), 'checklist\n'.repeat(50), 'utf8');
+    await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
 
     const scope = await assessReviewScope({}, repo);
     expect(scope.mode).toBe('uncommitted');

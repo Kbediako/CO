@@ -68,7 +68,7 @@ last_review: 2026-03-25
 - Rollout verification:
   - compare the new behavior against the recent focused versus broad stacked artifact evidence captured in the baseline audit
   - confirm that explicit base/commit runs still fail hard when they exceed the budget
-  - confirm that stacked local auto runs surface advisory aggregate scope rather than forcing routine overrides
+  - confirm that stacked local auto-runs surface aggregate scope as advisory context rather than forcing routine overrides
 - Monitoring / alerts:
   - use the Linear workpad for operator-facing progress
   - use diff-budget logs and validation manifests as the primary closeout evidence
