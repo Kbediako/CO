@@ -2621,11 +2621,14 @@ function resolveProviderIssueRunSummary(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
   const manifestSummary = readStringValue(manifest, 'summary');
-  const proofFailureReason = resolveProviderLinearWorkerFailureReason(proof);
+  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof);
+  const proofFailureReason = proofIsAuthoritative
+    ? resolveProviderLinearWorkerFailureReason(proof)
+    : null;
   if (
     proofFailureReason &&
     readStringValue(manifest, 'status') !== 'failed' &&
-    shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof)
+    proofIsAuthoritative
   ) {
     return proofFailureReason;
   }
@@ -2637,14 +2640,26 @@ function resolveProviderIssueRunUpdatedAt(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
   const manifestUpdatedAt = readStringValue(manifest, 'updated_at', 'started_at');
-  const proofUpdatedAt = readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at');
-  if (!proofUpdatedAt || !isProviderLinearWorkerTerminalFailure(proof)) {
+  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof)
+    && isProviderLinearWorkerTerminalFailure(proof);
+  const proofUpdatedAt = proofIsAuthoritative
+    ? readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at')
+    : null;
+  if (!proofUpdatedAt) {
+    return manifestUpdatedAt;
+  }
+  const proofTimestamp = Date.parse(proofUpdatedAt);
+  if (!Number.isFinite(proofTimestamp)) {
     return manifestUpdatedAt;
   }
   if (!manifestUpdatedAt) {
     return proofUpdatedAt;
   }
-  return Date.parse(proofUpdatedAt) > Date.parse(manifestUpdatedAt) ? proofUpdatedAt : manifestUpdatedAt;
+  const manifestTimestamp = Date.parse(manifestUpdatedAt);
+  if (!Number.isFinite(manifestTimestamp)) {
+    return proofUpdatedAt;
+  }
+  return proofTimestamp > manifestTimestamp ? proofUpdatedAt : manifestUpdatedAt;
 }
 
 function isProviderLinearWorkerTerminalFailure(

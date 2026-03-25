@@ -1,5 +1,5 @@
 import { spawn, type StdioOptions } from 'node:child_process';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -798,21 +798,22 @@ function resolveProviderControlHostManifestPath(
 }
 
 function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
-  const relativePath = targetPath.slice(rootPath.length);
-  return targetPath === rootPath || (
-    targetPath.startsWith(rootPath) &&
-    (relativePath.startsWith('/') || relativePath.startsWith('\\'))
-  );
+  const relativePath = relative(rootPath, targetPath);
+  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
 }
 
 async function readControlEndpointToken(tokenPath: string): Promise<string> {
   const raw = await readFile(tokenPath, 'utf8');
   try {
-    const parsed = JSON.parse(raw) as { token?: unknown };
-    if (typeof parsed?.token === 'string' && parsed.token.trim().length > 0) {
+    const parsed = JSON.parse(raw);
+    if (isRecord(parsed) && typeof parsed.token === 'string' && parsed.token.trim().length > 0) {
       return parsed.token.trim();
     }
-  } catch {
+    throw new Error('control auth token invalid');
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
     // Fall back to plain-text token contents.
   }
   const token = raw.trim();
@@ -966,8 +967,14 @@ async function requestProviderControlHostRefresh(input: {
         }),
         signal: controller.signal
       });
-      if (!response.ok) {
-        throw new Error(`refresh request failed with status ${response.status}`);
+      const responseBody = await response.text();
+      if (response.status !== 202) {
+        const responseDetail = responseBody.trim();
+        throw new Error(
+          responseDetail
+            ? `refresh request failed with status ${response.status}: ${responseDetail}`
+            : `refresh request failed with status ${response.status}`
+        );
       }
     } finally {
       clearTimeout(timer);
