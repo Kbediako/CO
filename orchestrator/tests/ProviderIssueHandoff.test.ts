@@ -10931,6 +10931,9 @@ describe('createProviderIssueHandoffService', () => {
     const expectedClaim = {
       state: 'running',
       reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:10:00.000Z',
       task_id: 'task-1303-failed',
       run_id: 'run-failed',
       run_manifest_path: childPaths.manifestPath,

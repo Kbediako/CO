@@ -1001,7 +1001,12 @@ async function requestProviderControlHostRefresh(input: {
       throw new Error('control-host repo root unavailable');
     }
     const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
-    const endpointRaw = await readFile(resolve(canonicalRunDir, 'control_endpoint.json'), 'utf8');
+    const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
+    const canonicalEndpointPath = await realpath(endpointPath);
+    if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
+      throw new Error('control endpoint path invalid');
+    }
+    const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
     const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
     const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
     const resolvedTokenPath =
