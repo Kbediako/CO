@@ -184,6 +184,7 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
   const booleanFlagKeys = new Set([
     'apply',
     'auto-issue-log',
+    'blocked-by-source',
     'cloud',
     'cloud-preflight',
     'codex-cli',
@@ -1506,6 +1507,19 @@ Subcommands:
     --team-id <id>        Optional team scope check.
     --project-id <id>     Optional project scope check.
     --format json         Emit machine-readable output.
+
+  create-follow-up
+    --issue-id <id>                   Source Linear issue id/key.
+    --title <title>                   Follow-up issue title.
+    --description <text>              Follow-up issue description.
+    --description-file <path>         Read follow-up issue description from a file.
+    --acceptance-criteria <text>      Follow-up acceptance criteria.
+    --acceptance-criteria-file <path> Read follow-up acceptance criteria from a file.
+    --blocked-by-source               Add blocker linkage when the follow-up depends on the source issue.
+    --workspace-id <id>               Optional workspace scope check.
+    --team-id <id>                    Optional team scope check.
+    --project-id <id>                 Optional project scope check.
+    --format json                     Emit machine-readable output.
 `);
 }
 

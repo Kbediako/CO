@@ -84,10 +84,26 @@ codex-orchestrator pr ready-review \
 
 `ready-review` waits for green gating signals plus a bounded quiet window, treats `REVIEW_REQUIRED` as informational for review handoff, and exits non-zero when the author still needs to address actionable blockers.
 
+## Follow-Up Issues
+
+When you discover a meaningful out-of-scope improvement, create a separate same-project follow-up issue in `Backlog` instead of expanding the current issue.
+The helper always adds a `related` relation to the source issue and can also add blocker linkage when the follow-up depends on the source issue landing first.
+
+```bash
+codex-orchestrator linear create-follow-up \
+  --issue-id "$ISSUE_ID" \
+  --title "Follow-up title" \
+  --description-file /tmp/follow-up-description.md \
+  --acceptance-criteria-file /tmp/follow-up-acceptance.md \
+  --blocked-by-source \
+  --format json
+```
+
 ## Workflow Notes
 
 - Move `Todo` or the live team's equivalent queued state (for CO, `Ready`) to the actual started state before active coding when the issue is unblocked.
 - Use the Linear issue id, not the human identifier, for helper commands.
+- When you discover a meaningful out-of-scope improvement, use `create-follow-up` so the new issue stays in the same project, starts in `Backlog`, and returns the created follow-up identifier/URL for workpad references.
 - Keep exactly one active `## Codex Workpad` comment current. Refresh it before new work, before review handoff, after rework, and after merge completion. Do not create duplicate progress comments.
 - Always read `issue-context` before any transition so you use the team's actual workflow state names.
 - Attach the PR before handing off to `Human Review` or the live-team alias `In Review`.
