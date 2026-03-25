@@ -74,7 +74,7 @@ last_review: 2026-03-25
   - use diff-budget logs and validation manifests as the primary closeout evidence
 
 ## Open Questions
-- Whether the implementation should expose a new user-facing `--scope` flag, rely on an environment variable for explicit CI hard-base mode, or keep the smallest possible auto detection plus explicit CI env. Choose the smallest truthful contract.
+- Whether the implementation should expose a new user-facing `--scope` flag, rely on an environment variable for explicit CI hard-base mode, or keep the smallest possible auto-detection plus explicit CI env. Choose the smallest truthful contract.
 
 ## Approvals
 - Reviewer: Pending docs-review

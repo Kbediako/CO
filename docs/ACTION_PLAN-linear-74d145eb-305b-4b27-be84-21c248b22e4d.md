@@ -7,7 +7,7 @@
 - Linear URL: https://linear.app/asabeko/issue/CO-15/co-recalibrate-diff-budget-for-stacked-lanes-while-keeping-hard-pr
 
 ## Summary
-- Goal: finish Linear issue `CO-15` by recalibrating diff-budget so local stacked lanes get a truthful hard signal while CI PR scope stays hard-gated.
+- Goal: finish Linear issue `CO-15` by recalibrating diff-budget, so local stacked lanes get a truthful hard signal while CI PR scope stays hard-gated.
 - Scope: docs-first packet, one persistent Linear workpad, pre-implementation docs-review, bounded diff-budget/workflow/docs changes, focused tests, full validation, PR prep, and review handoff.
 - Assumptions:
   - the live team review handoff state is `In Review`
