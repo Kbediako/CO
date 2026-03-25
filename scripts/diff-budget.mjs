@@ -258,9 +258,9 @@ async function collectCommitDiff(commit) {
 async function collectWorkingTreeDiff() {
   const [nameOnly, cachedNameOnly, numstatRaw, cachedNumstatRaw, untracked] = await Promise.all([
     runGit(['diff', '--name-only', '--no-renames']),
-    runGit(['diff', '--cached', '--name-only', '--no-renames', 'HEAD']),
+    runGit(['diff', '--cached', '--name-only', '--no-renames']),
     runGit(['diff', '--numstat', '--no-renames']),
-    runGit(['diff', '--cached', '--numstat', '--no-renames', 'HEAD']),
+    runGit(['diff', '--cached', '--numstat', '--no-renames']),
     listUntrackedFiles()
   ]);
 
