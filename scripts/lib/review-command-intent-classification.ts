@@ -92,7 +92,9 @@ function classifyCommandIntentSegment(
   if (depth < 3) {
     const payload = extractShellCommandPayload(tokens);
     if (payload) {
-      const nestedSegments = splitShellControlSegments(payload);
+      const nestedSegments = splitShellControlSegments(
+        normalizeShellCommandPathSeparators(payload)
+      );
       for (const nestedSegment of nestedSegments) {
         const nestedViolation = classifyCommandIntentSegment(nestedSegment, options, depth + 1);
         if (nestedViolation) {

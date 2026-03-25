@@ -78,14 +78,16 @@ export function normalizeShellCommandPathSeparators(command: string): string {
 }
 
 function looksLikeWindowsPathToken(token: string): boolean {
-  const unquoted = stripMatchingQuotes(token);
+  const quote = getMatchingQuote(token);
+  const unquoted = quote ? token.slice(1, -1) : token;
   const candidate = stripTrailingShellControlSuffix(unquoted);
   if (/^[A-Za-z]:\\/u.test(candidate) || /^\\\\[^\\/\s"'`]+[\\/]/u.test(candidate)) {
     return true;
   }
 
-  // Keep quoted relative tokens untouched so regex/search literals do not regress again.
-  if (unquoted !== token) {
+  // Single-quoted relative tokens already preserve backslashes during tokenization.
+  // Leave them untouched so quoted regex/search literals do not regress again.
+  if (quote === "'") {
     return false;
   }
 
@@ -108,16 +110,16 @@ function looksLikeRelativeWindowsLauncherToken(token: string): boolean {
   return /^node_modules\\\.bin\\[^\\/\s"'`]+$/iu.test(token);
 }
 
-function stripMatchingQuotes(token: string): string {
+function getMatchingQuote(token: string): '"' | "'" | '`' | null {
   if (token.length < 2) {
-    return token;
+    return null;
   }
   const first = token[0] ?? '';
   const last = token[token.length - 1] ?? '';
   if ((first === '"' || first === "'" || first === '`') && last === first) {
-    return token.slice(1, -1);
+    return first;
   }
-  return token;
+  return null;
 }
 
 function normalizeWindowsPathToken(token: string): string {

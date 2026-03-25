@@ -251,7 +251,9 @@ function detectHeavyReviewCommandFromSegment(segment: string, depth = 0): string
   if (depth < 3) {
     const payload = extractShellCommandPayload(tokens);
     if (payload) {
-      const nestedSegments = splitShellControlSegments(payload);
+      const nestedSegments = splitShellControlSegments(
+        normalizeShellCommandPathSeparators(payload)
+      );
       for (const nestedSegment of nestedSegments) {
         const nestedHeavyCommand = detectHeavyReviewCommandFromSegment(nestedSegment, depth + 1);
         if (nestedHeavyCommand) {
@@ -379,7 +381,9 @@ function segmentLooksLikeShellProbe(rawTokens: string[], depth = 0): boolean {
 }
 
 function payloadContainsShellProbe(payload: string, depth = 0): boolean {
-  const segments = splitShellControlSegmentsDetailed(payload);
+  const segments = splitShellControlSegmentsDetailed(
+    normalizeShellCommandPathSeparators(payload)
+  );
   for (const { segment } of segments) {
     if (segmentLooksLikeShellProbe(tokenizeShellSegment(segment), depth)) {
       return true;

@@ -84,5 +84,35 @@ describe('review command probe classification', () => {
         String.raw`.\bin\codex-orchestrator.cmd review --manifest x`
       )
     ).toBe(true);
+
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`".\bin\python.exe" -m pytest tests/review-execution-state.spec.ts`
+      )
+    ).toBe(
+      String.raw`"./bin/python.exe" -m pytest tests/review-execution-state.spec.ts`
+    );
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`".\bin\codex-orchestrator.cmd" review --manifest x`
+      )
+    ).toBe(true);
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`/bin/zsh -lc '".\bin\python.exe" -m pytest tests/review-execution-state.spec.ts'`
+      )
+    ).toBe(
+      String.raw`"./bin/python.exe" -m pytest tests/review-execution-state.spec.ts`
+    );
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`/bin/zsh -lc '".\bin\codex-orchestrator.cmd" review --manifest x'`
+      )
+    ).toBe(true);
+    expect(
+      classifyShellProbeCommandLine(
+        String.raw`/bin/zsh -lc '".\bin\cmd.exe" /C printenv MANIFEST'`
+      )
+    ).toBe(String.raw`/bin/zsh -lc '".\bin\cmd.exe" /C printenv MANIFEST'`);
   });
 });

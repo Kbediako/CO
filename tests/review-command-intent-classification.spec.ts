@@ -110,5 +110,45 @@ describe('review command intent classification', () => {
       kind: 'validation-runner',
       sample: String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`
     });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`".\bin\codex-orchestrator.cmd" review --manifest x`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`"./bin/codex-orchestrator.cmd" review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`"node_modules\.bin\vitest.cmd" run tests/review-execution-state.spec.ts`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`"node_modules/.bin/vitest.cmd" run tests/review-execution-state.spec.ts`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`/bin/zsh -lc '".\bin\codex-orchestrator.cmd" review --manifest x'`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: String.raw`"./bin/codex-orchestrator.cmd" review --manifest x`
+    });
+
+    expect(
+      classifyCommandIntentCommandLine(
+        String.raw`/bin/zsh -lc '"node_modules\.bin\vitest.cmd" run tests/review-execution-state.spec.ts'`,
+        { allowValidationCommandIntents: false }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: String.raw`"node_modules/.bin/vitest.cmd" run tests/review-execution-state.spec.ts`
+    });
   });
 });
