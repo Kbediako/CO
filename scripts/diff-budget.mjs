@@ -205,18 +205,22 @@ function parseNumstatMap(raw) {
   );
 }
 
-function numstatTotalLines(entry) {
-  return entry.added + entry.deleted;
-}
-
 function mergeNumstatMaps(...maps) {
   const merged = new Map();
   for (const map of maps) {
     for (const [filePath, entry] of map.entries()) {
       const existing = merged.get(filePath);
-      if (!existing || numstatTotalLines(entry) > numstatTotalLines(existing)) {
-        merged.set(filePath, entry);
-      }
+      merged.set(
+        filePath,
+        existing
+          ? {
+              filePath,
+              added: existing.added + entry.added,
+              deleted: existing.deleted + entry.deleted,
+              binary: existing.binary || entry.binary
+            }
+          : { ...entry }
+      );
     }
   }
   return merged;
@@ -253,9 +257,9 @@ async function collectCommitDiff(commit) {
 
 async function collectWorkingTreeDiff() {
   const [nameOnly, cachedNameOnly, numstatRaw, cachedNumstatRaw, untracked] = await Promise.all([
-    runGit(['diff', '--name-only', '--no-renames', 'HEAD']),
+    runGit(['diff', '--name-only', '--no-renames']),
     runGit(['diff', '--cached', '--name-only', '--no-renames', 'HEAD']),
-    runGit(['diff', '--numstat', '--no-renames', 'HEAD']),
+    runGit(['diff', '--numstat', '--no-renames']),
     runGit(['diff', '--cached', '--numstat', '--no-renames', 'HEAD']),
     listUntrackedFiles()
   ]);

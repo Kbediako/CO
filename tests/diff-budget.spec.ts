@@ -202,31 +202,31 @@ describe('diff-budget script', () => {
     expect(result.stdout).toContain('lines=1/1');
   });
 
-  it('measures the final working tree scope once when a file has both staged and unstaged edits', async () => {
+  it('counts staged and unstaged churn when a file has both pending deltas', async () => {
     const repo = await initRepository();
 
     await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
     await execFileAsync('git', ['add', 'notes.txt'], { cwd: repo });
     await writeFile(join(repo, 'notes.txt'), 'three\n', 'utf8');
 
-    const result = await runDiffBudget(repo, ['--max-lines', '2']);
+    const result = await runDiffBudget(repo, ['--max-lines', '4']);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('✅ Diff budget: OK (scope=working-tree');
-    expect(result.stdout).toContain('lines=2/2');
+    expect(result.stdout).toContain('lines=4/4');
   });
 
-  it('counts staged-only churn when unstaged edits restore the working tree content', async () => {
+  it('counts both staged and unstaged churn when worktree edits restore HEAD content', async () => {
     const repo = await initRepository();
 
     await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
     await execFileAsync('git', ['add', 'notes.txt'], { cwd: repo });
     await writeFile(join(repo, 'notes.txt'), 'one\n', 'utf8');
 
-    const result = await runDiffBudget(repo, ['--max-lines', '1']);
+    const result = await runDiffBudget(repo, ['--max-lines', '3']);
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toContain('❌ Diff budget exceeded (scope=working-tree)');
-    expect(result.stdout).toContain('total lines changed 2 > 1');
-    expect(result.stdout).toContain('notes.txt: 2');
+    expect(result.stdout).toContain('total lines changed 4 > 3');
+    expect(result.stdout).toContain('notes.txt: 4');
   });
 
   it('--commit mode ignores working tree state', async () => {

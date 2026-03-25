@@ -171,7 +171,7 @@ describe('review-scope-advisory', () => {
     ).toBe('operator accepted the full working tree');
   });
 
-  it('measures the final working tree once when staged and unstaged edits overlap on the same file', async () => {
+  it('counts staged and unstaged churn when a file has both pending deltas', async () => {
     const repo = await initRepository();
 
     await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
@@ -181,11 +181,11 @@ describe('review-scope-advisory', () => {
     const scope = await assessReviewScope({}, repo);
     expect(scope.mode).toBe('uncommitted');
     expect(scope.changedFiles).toBe(1);
-    expect(scope.changedLines).toBe(2);
+    expect(scope.changedLines).toBe(4);
     expect(scope.largeScope).toBe(false);
   });
 
-  it('counts staged-only churn when unstaged edits restore the working tree content', async () => {
+  it('counts both staged and unstaged churn when worktree edits restore HEAD content', async () => {
     const repo = await initRepository();
 
     await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
@@ -195,7 +195,7 @@ describe('review-scope-advisory', () => {
     const scope = await assessReviewScope({}, repo);
     expect(scope.mode).toBe('uncommitted');
     expect(scope.changedFiles).toBe(1);
-    expect(scope.changedLines).toBe(2);
+    expect(scope.changedLines).toBe(4);
     expect(scope.largeScope).toBe(false);
   });
 
