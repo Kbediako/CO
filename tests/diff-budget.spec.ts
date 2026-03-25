@@ -25,6 +25,17 @@ async function initRepository(): Promise<string> {
   return dir;
 }
 
+async function initUnbornRepository(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'diff-budget-unborn-'));
+  createdDirs.push(dir);
+
+  await execFileAsync('git', ['init'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.email', 'diff-budget@example.com'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.name', 'Diff Budget'], { cwd: dir });
+
+  return dir;
+}
+
 async function git(repo: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('git', args, { cwd: repo });
   return String(stdout ?? '').trim();
@@ -286,5 +297,17 @@ describe('diff-budget script', () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('⚠️ Diff budget exceeded (override applied)');
     expect(result.stdout).toContain('Override accepted via DIFF_BUDGET_OVERRIDE_REASON: tests: override accepted');
+  });
+
+  it('counts staged files before the first commit exists', async () => {
+    const repo = await initUnbornRepository();
+
+    await writeFile(join(repo, 'draft.txt'), 'hello\nworld\n', 'utf8');
+    await execFileAsync('git', ['add', 'draft.txt'], { cwd: repo });
+
+    const result = await runDiffBudget(repo, ['--max-lines', '2']);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('✅ Diff budget: OK (scope=working-tree');
+    expect(result.stdout).toContain('lines=2/2');
   });
 });

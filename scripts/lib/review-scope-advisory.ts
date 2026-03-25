@@ -113,7 +113,7 @@ export async function assessReviewScope(
 
   const status = await tryGit(['status', '--porcelain=v1', '-z', '--untracked-files=all'], repoRoot);
   const diff = await tryGit(['diff', '--numstat', '--no-renames'], repoRoot);
-  const cachedDiff = await tryGit(['diff', '--cached', '--numstat', '--no-renames', 'HEAD'], repoRoot);
+  const cachedDiff = await tryGit(['diff', '--cached', '--numstat', '--no-renames'], repoRoot);
   const untracked = await tryGit(['ls-files', '--others', '--exclude-standard', '-z'], repoRoot);
   const untrackedPaths = untracked
     ? parseNullDelimitedPaths(untracked).filter((filePath) => !isIgnoredReviewScopePath(filePath))

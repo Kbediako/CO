@@ -35,6 +35,17 @@ async function initRepository(): Promise<string> {
   return dir;
 }
 
+async function initUnbornRepository(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'review-scope-advisory-unborn-'));
+  createdDirs.push(dir);
+
+  await execFileAsync('git', ['init'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.email', 'review-scope@example.com'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.name', 'Review Scope'], { cwd: dir });
+
+  return dir;
+}
+
 afterEach(async () => {
   while (createdDirs.length > 0) {
     const dir = createdDirs.pop();
@@ -223,6 +234,19 @@ describe('review-scope-advisory', () => {
     const scope = await assessReviewScope({}, repo);
     expect(scope.mode).toBe('uncommitted');
     expect(scope.changedFiles).toBe(2);
+    expect(scope.changedLines).toBe(2);
+    expect(scope.largeScope).toBe(false);
+  });
+
+  it('counts staged lines before the first commit exists', async () => {
+    const repo = await initUnbornRepository();
+
+    await writeFile(join(repo, 'draft.txt'), 'hello\nworld\n', 'utf8');
+    await execFileAsync('git', ['add', 'draft.txt'], { cwd: repo });
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(1);
     expect(scope.changedLines).toBe(2);
     expect(scope.largeScope).toBe(false);
   });
