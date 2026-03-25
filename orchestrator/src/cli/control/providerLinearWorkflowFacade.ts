@@ -17,7 +17,8 @@ type ProviderLinearOperation =
   | 'upsert-workpad'
   | 'delete-workpad'
   | 'transition'
-  | 'attach-pr';
+  | 'attach-pr'
+  | 'create-follow-up';
 type ProviderLinearOperationFailure<T extends ProviderLinearOperation> = {
   ok: false;
   operation: T;
@@ -156,6 +157,43 @@ export type ProviderLinearAttachPrResult =
       error: ProviderLinearWorkflowError;
     };
 
+export interface ProviderLinearCreatedIssue {
+  id: string;
+  identifier: string;
+  title: string;
+  description: string | null;
+  url: string | null;
+  state: ProviderLinearWorkflowState | null;
+  team: {
+    id: string | null;
+    key: string | null;
+    name: string | null;
+  } | null;
+  project: {
+    id: string | null;
+    name: string | null;
+  } | null;
+}
+
+export type ProviderLinearCreateFollowUpResult =
+  | {
+      ok: true;
+      operation: 'create-follow-up';
+      action: 'created';
+      issue: Pick<ProviderLinearIssueContext, 'id' | 'identifier'>;
+      follow_up_issue: ProviderLinearCreatedIssue;
+      relations: {
+        related: true;
+        blocked_by_source: boolean;
+      };
+      source_setup: DispatchPilotSourceSetup | null;
+    }
+  | {
+      ok: false;
+      operation: 'create-follow-up';
+      error: ProviderLinearWorkflowError;
+    };
+
 interface LinearIssueContextQueryResponse {
   viewer?: {
     organization?: {
@@ -291,6 +329,43 @@ interface AttachmentMutationResponse {
       title?: string | null;
       url?: string | null;
       sourceType?: string | null;
+    } | null;
+  } | null;
+}
+
+interface IssueCreateMutationResponse {
+  issueCreate?: {
+    success?: boolean | null;
+    issue?: {
+      id?: string | null;
+      identifier?: string | null;
+      title?: string | null;
+      description?: string | null;
+      url?: string | null;
+      state?: {
+        id?: string | null;
+        name?: string | null;
+        type?: string | null;
+      } | null;
+      team?: {
+        id?: string | null;
+        key?: string | null;
+        name?: string | null;
+      } | null;
+      project?: {
+        id?: string | null;
+        name?: string | null;
+      } | null;
+    } | null;
+  } | null;
+}
+
+interface IssueRelationMutationResponse {
+  issueRelationCreate?: {
+    success?: boolean | null;
+    issueRelation?: {
+      id?: string | null;
+      type?: string | null;
     } | null;
   } | null;
 }
@@ -803,6 +878,224 @@ export async function attachProviderLinearIssuePr(input: {
   };
 }
 
+export async function createProviderLinearFollowUpIssue(input: {
+  issueId: string;
+  title: string;
+  description: string;
+  acceptanceCriteria: string;
+  blockedBySource?: boolean;
+  sourceSetup?: DispatchPilotSourceSetup | null;
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+}): Promise<ProviderLinearCreateFollowUpResult> {
+  const issueId = normalizeRequiredString(input.issueId);
+  if (!issueId) {
+    return failure('create-follow-up', 'linear_issue_id_missing', 'Linear issue id is required.', 422);
+  }
+  const title = normalizeRequiredString(input.title);
+  if (!title) {
+    return failure('create-follow-up', 'linear_follow_up_title_missing', 'Follow-up issue title is required.', 422);
+  }
+  const description = normalizeRequiredString(input.description);
+  if (!description) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_description_missing',
+      'Follow-up issue description is required.',
+      422
+    );
+  }
+  const acceptanceCriteria = normalizeRequiredString(input.acceptanceCriteria);
+  if (!acceptanceCriteria) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_acceptance_criteria_missing',
+      'Follow-up issue acceptance criteria are required.',
+      422
+    );
+  }
+
+  const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
+  if (!session.ok) {
+    return failure(
+      'create-follow-up',
+      session.error.code,
+      session.error.message,
+      session.error.status,
+      session.error.details
+    );
+  }
+
+  const context = await readIssueContext(session.session, issueId);
+  if (!context.ok) {
+    return failure(
+      'create-follow-up',
+      context.error.code,
+      context.error.message,
+      context.error.status,
+      context.error.details
+    );
+  }
+
+  const teamId = normalizeOptionalString(context.issue.team?.id);
+  if (!teamId) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_team_missing',
+      `Linear issue ${context.issue.identifier} is missing a team assignment.`,
+      422
+    );
+  }
+
+  const projectId = normalizeOptionalString(context.issue.project?.id);
+  if (!projectId) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_project_missing',
+      `Linear issue ${context.issue.identifier} is missing a project assignment; same-project follow-up creation requires one.`,
+      422
+    );
+  }
+
+  const backlogState = resolveWorkflowStateByName(context.issue.team?.states ?? [], 'Backlog');
+  if (!backlogState) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_backlog_state_missing',
+      `Linear team state "Backlog" was not found for issue ${context.issue.identifier}.`,
+      422
+    );
+  }
+
+  const createdIssueResult = await executeLinearGraphql<IssueCreateMutationResponse>({
+    token: session.session.token,
+    timeoutMs: session.session.timeoutMs,
+    fetchImpl: session.session.fetchImpl,
+    query: buildCreateFollowUpIssueMutation(),
+    variables: {
+      input: {
+        teamId,
+        projectId,
+        stateId: backlogState.id,
+        title,
+        description: buildFollowUpIssueDescription(description, acceptanceCriteria)
+      }
+    }
+  });
+  if (!createdIssueResult.ok) {
+    return failureFromGraphql('create-follow-up', createdIssueResult.failure);
+  }
+
+  const createdIssue = parseCreatedIssue(createdIssueResult.payload.data?.issueCreate?.issue ?? null);
+  if (createdIssueResult.payload.data?.issueCreate?.success !== true || !createdIssue) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_create_failed',
+      'Linear follow-up issue creation did not succeed.',
+      503
+    );
+  }
+
+  const relatedRelationResult = await executeLinearGraphql<IssueRelationMutationResponse>({
+    token: session.session.token,
+    timeoutMs: session.session.timeoutMs,
+    fetchImpl: session.session.fetchImpl,
+    query: buildCreateIssueRelationMutation(),
+    variables: {
+      input: {
+        type: 'related',
+        issueId: context.issue.id,
+        relatedIssueId: createdIssue.id
+      }
+    }
+  });
+  if (!relatedRelationResult.ok) {
+    const mapped = mapGraphqlFailure(relatedRelationResult.failure);
+    return failure(
+      'create-follow-up',
+      mapped.code,
+      mapped.message,
+      mapped.status,
+      {
+        ...(mapped.details ?? {}),
+        created_issue: createdIssue,
+        failed_relation_type: 'related'
+      }
+    );
+  }
+  if (relatedRelationResult.payload.data?.issueRelationCreate?.success !== true) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_relation_failed',
+      'Linear follow-up issue relation creation did not succeed.',
+      503,
+      {
+        created_issue: createdIssue,
+        failed_relation_type: 'related'
+      }
+    );
+  }
+
+  const blockedBySource = input.blockedBySource === true;
+  if (blockedBySource) {
+    const blockingRelationResult = await executeLinearGraphql<IssueRelationMutationResponse>({
+      token: session.session.token,
+      timeoutMs: session.session.timeoutMs,
+      fetchImpl: session.session.fetchImpl,
+      query: buildCreateIssueRelationMutation(),
+      variables: {
+        input: {
+          type: 'blocks',
+          issueId: context.issue.id,
+          relatedIssueId: createdIssue.id
+        }
+      }
+    });
+    if (!blockingRelationResult.ok) {
+      const mapped = mapGraphqlFailure(blockingRelationResult.failure);
+      return failure(
+        'create-follow-up',
+        mapped.code,
+        mapped.message,
+        mapped.status,
+        {
+          ...(mapped.details ?? {}),
+          created_issue: createdIssue,
+          failed_relation_type: 'blocks'
+        }
+      );
+    }
+    if (blockingRelationResult.payload.data?.issueRelationCreate?.success !== true) {
+      return failure(
+        'create-follow-up',
+        'linear_follow_up_relation_failed',
+        'Linear follow-up issue relation creation did not succeed.',
+        503,
+        {
+          created_issue: createdIssue,
+          failed_relation_type: 'blocks'
+        }
+      );
+    }
+  }
+
+  return {
+    ok: true,
+    operation: 'create-follow-up',
+    action: 'created',
+    issue: {
+      id: context.issue.id,
+      identifier: context.issue.identifier
+    },
+    follow_up_issue: createdIssue,
+    relations: {
+      related: true,
+      blocked_by_source: blockedBySource
+    },
+    source_setup: session.session.sourceSetup
+  };
+}
+
 function resolveLinearWorkflowSession(
   env: NodeJS.ProcessEnv | undefined,
   fetchImpl: typeof fetch | undefined,
@@ -1237,6 +1530,47 @@ function buildAttachUrlMutation(): string {
   }`;
 }
 
+function buildCreateFollowUpIssueMutation(): string {
+  return `mutation ProviderLinearCreateFollowUpIssue($input: IssueCreateInput!) {
+    issueCreate(input: $input) {
+      success
+      issue {
+        id
+        identifier
+        title
+        description
+        url
+        state {
+          id
+          name
+          type
+        }
+        team {
+          id
+          key
+          name
+        }
+        project {
+          id
+          name
+        }
+      }
+    }
+  }`;
+}
+
+function buildCreateIssueRelationMutation(): string {
+  return `mutation ProviderLinearCreateIssueRelation($input: IssueRelationCreateInput!) {
+    issueRelationCreate(input: $input) {
+      success
+      issueRelation {
+        id
+        type
+      }
+    }
+  }`;
+}
+
 function resolveWorkflowSourceSetup(
   sourceSetup: DispatchPilotSourceSetup | null | undefined,
   env: NodeJS.ProcessEnv
@@ -1352,6 +1686,61 @@ function parseAttachment(
     title: normalizeOptionalString(value?.title),
     url: normalizeOptionalString(value?.url),
     source_type: normalizeOptionalString(value?.sourceType)
+  };
+}
+
+function parseCreatedIssue(
+  value:
+    | {
+        id?: string | null;
+        identifier?: string | null;
+        title?: string | null;
+        description?: string | null;
+        url?: string | null;
+        state?: {
+          id?: string | null;
+          name?: string | null;
+          type?: string | null;
+        } | null;
+        team?: {
+          id?: string | null;
+          key?: string | null;
+          name?: string | null;
+        } | null;
+        project?: {
+          id?: string | null;
+          name?: string | null;
+        } | null;
+      }
+    | null
+): ProviderLinearCreatedIssue | null {
+  const id = normalizeRequiredString(value?.id);
+  const identifier = normalizeRequiredString(value?.identifier);
+  const title = normalizeRequiredString(value?.title);
+  if (!id || !identifier || !title) {
+    return null;
+  }
+
+  return {
+    id,
+    identifier,
+    title,
+    description: normalizeOptionalString(value?.description),
+    url: normalizeOptionalString(value?.url),
+    state: parseWorkflowState(value?.state ?? null),
+    team: value?.team
+      ? {
+          id: normalizeOptionalString(value.team.id),
+          key: normalizeOptionalString(value.team.key),
+          name: normalizeOptionalString(value.team.name)
+        }
+      : null,
+    project: value?.project
+      ? {
+          id: normalizeOptionalString(value.project.id),
+          name: normalizeOptionalString(value.project.name)
+        }
+      : null
   };
 }
 
@@ -1575,6 +1964,16 @@ function normalizeRequiredString(value: string | null | undefined): string | nul
 
 function normalizeOptionalString(value: string | null | undefined): string | null {
   return normalizeRequiredString(value);
+}
+
+function buildFollowUpIssueDescription(description: string, acceptanceCriteria: string): string {
+  const normalizedDescription = description.trim();
+  const normalizedAcceptanceCriteria = acceptanceCriteria.trim();
+  const acceptanceSection =
+    /^#{1,6}\s+Acceptance Criteria\b/imu.test(normalizedAcceptanceCriteria)
+      ? normalizedAcceptanceCriteria
+      : `## Acceptance Criteria\n${normalizedAcceptanceCriteria}`;
+  return `${normalizedDescription}\n\n${acceptanceSection}`;
 }
 
 function normalizeIso(value: string | null | undefined): string | null {

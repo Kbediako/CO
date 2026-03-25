@@ -199,6 +199,7 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('exactly one active `## Codex Workpad` comment');
     expect(firstPrompt).toContain(`Use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
     expect(firstPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
+    expect(firstPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(firstPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(firstPrompt).toContain('Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`)');
@@ -218,6 +219,7 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('Keep exactly one active `## Codex Workpad` comment current');
     expect(continuationPrompt).toContain(`use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
     expect(continuationPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
+    expect(continuationPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(continuationPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');

@@ -328,6 +328,128 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('routes create-follow-up into the facade and records audit metadata', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'create-follow-up',
+          action: 'created',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up',
+            description: 'Do the thing',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          relations: {
+            related: true,
+            blocked_by_source: true
+          },
+          source_setup: {
+            provider: 'linear',
+            workspace_id: 'lin-workspace-1',
+            team_id: 'lin-team-1',
+            project_id: 'lin-project-1'
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'acceptance-criteria-file': '/tmp/acceptance.md',
+          'blocked-by-source': true,
+          'workspace-id': 'lin-workspace-1',
+          'team-id': 'lin-team-1',
+          'project-id': 'lin-project-1'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        readTextFile: vi.fn(async () => '- [ ] Captured'),
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-03-22T12:00:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up',
+      description: 'Investigate the remaining improvement',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token',
+        CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+      }
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      follow_up_issue: {
+        identifier: 'CO-2',
+        url: 'https://linear.app/example/issue/CO-2'
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-03-22T12:00:00.000Z',
+      operation: 'create-follow-up',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-1',
+      source_setup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      action: 'created',
+      via: 'related+blocks',
+      state: 'Backlog',
+      comment_id: null,
+      attachment_id: null,
+      error_code: null,
+      error_message: null
+    });
+  });
+
   it('records only the explicitly requested scope for failed audit entries', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();
