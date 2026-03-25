@@ -17,6 +17,7 @@
 4. Patch the smallest reconciliation path that makes terminal failure authoritative, refreshes stale issue metadata, and leaves a truthful failure-side workpad/update trail.
 5. Add focused tests across provider handoff, worker runner, and control runtime seams.
 6. Run the required validation floor, refresh the workpad, and hand off through the normal review workflow once the branch is ready.
+7. After merge, archive the implementation-doc packet per `docs/implementation-docs-archive-policy.json` through the automation path (sync payloads to `doc-archives` and open the stub PR) or the fallback `npm run docs:archive-implementation`, then record the resulting archive evidence when the archive window is reached.
 
 ## Checkpoints
 - Docs-first registration complete and mirrored.
@@ -24,6 +25,7 @@
 - docs-review manifest recorded.
 - Runtime patch and focused regressions complete.
 - Validation floor green and review/elegance passes complete.
+- Implementation docs archive path/evidence recorded per `docs/implementation-docs-archive-policy.json` when the archive window is reached.
 
 ## Notes
 - Delegation override required for this session:

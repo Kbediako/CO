@@ -74,10 +74,12 @@
   - `node scripts/diff-budget.mjs`
   - `npm run review`
   - `npm run pack:smoke` only if downstream-facing CLI/package/skill surfaces change
+  - `docs/implementation-docs-archive-policy.json` archive path recorded through the automation workflow or `npm run docs:archive-implementation` fallback when the archive window is reached, including the resulting archive PR URL, commit hash, or fallback evidence in the closeout packet
 - Rollout verification:
   - reproduce the failed-artifact interpretation in tests using the captured `CO-16` evidence shape
   - prove the control-host rehydrate/refresh paths no longer preserve stale `running` or stale `Ready` after terminal failure
   - refresh the active Linear workpad to match the current blocker and implementation status before review handoff
+  - record implementation-doc archive completion evidence once the archive window is reached so the packet can be archived without manual reconstruction
 
 ## Open Questions
 - Whether the smallest correct implementation is a direct child-to-control-host refresh callback, richer proof-aware run discovery, or both.

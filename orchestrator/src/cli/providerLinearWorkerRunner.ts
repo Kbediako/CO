@@ -897,17 +897,8 @@ function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[]): URL {
   return parsed;
 }
 
-async function resolveProviderControlHostRepoRoot(manifestPath: string): Promise<string | null> {
-  try {
-    const raw = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
-    return (
-      normalizeOptionalString(raw.workspace_path) ??
-      normalizeOptionalString(raw.workspacePath) ??
-      resolve(dirname(manifestPath), '..', '..', '..', '..')
-    );
-  } catch {
-    return null;
-  }
+async function resolveProviderControlHostRepoRoot(manifestPath: string): Promise<string> {
+  return await realpath(resolve(dirname(manifestPath), '..', '..', '..', '..'));
 }
 
 async function requestProviderControlHostRefresh(input: {
@@ -937,9 +928,6 @@ async function requestProviderControlHostRefresh(input: {
     }
     const canonicalRunDir = dirname(canonicalManifestPath);
     const controlHostRepoRoot = await resolveProviderControlHostRepoRoot(canonicalManifestPath);
-    if (!controlHostRepoRoot) {
-      throw new Error('control-host repo root unavailable');
-    }
     const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
     const endpointRaw = await readFile(resolve(canonicalRunDir, 'control_endpoint.json'), 'utf8');
     const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
