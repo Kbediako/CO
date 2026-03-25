@@ -7,6 +7,19 @@ import { readFile } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
+  computeEffectiveDelegationConfig,
+  loadDelegationConfigFiles,
+  parseDelegationConfigOverride,
+  splitDelegationConfigOverrides,
+  type DelegationConfigLayer
+} from './config/delegationConfig.js';
+import {
+  PROVIDER_CONTROL_HOST_RUN_ID_ENV,
+  PROVIDER_CONTROL_HOST_TASK_ID_ENV,
+  readProviderControlHostLocatorFromEnv,
+  readProviderControlHostLocatorFromManifest
+} from '../../../scripts/lib/provider-run-contract.js';
+import {
   hasLinearSourceBinding,
   resolveLinearSourceSetup,
   resolveLiveLinearTrackedIssueById,
@@ -29,11 +42,17 @@ import {
   resolveRuntimeCodexCommand,
   type RuntimeCodexCommandContext
 } from './runtime/index.js';
+import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
+import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
+const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
+const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
+const CSRF_HEADER = 'x-csrf-token';
+const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
@@ -750,6 +769,217 @@ function buildProofPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
 }
 
+function resolveProviderControlHostManifestPath(
+  currentManifestPath: string,
+  env: NodeJS.ProcessEnv,
+  manifest: Record<string, unknown>
+): string | null {
+  const locator =
+    readProviderControlHostLocatorFromManifest(manifest) ??
+    readProviderControlHostLocatorFromEnv({
+      [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: env[PROVIDER_CONTROL_HOST_TASK_ID_ENV],
+      [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: env[PROVIDER_CONTROL_HOST_RUN_ID_ENV],
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE
+    });
+  if (!locator) {
+    return null;
+  }
+  const currentRunDir = dirname(currentManifestPath);
+  const runsRoot = resolve(currentRunDir, '..', '..', '..');
+  return resolve(
+    runsRoot,
+    sanitizeTaskId(locator.taskId),
+    'cli',
+    sanitizeRunId(locator.runId),
+    'manifest.json'
+  );
+}
+
+function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
+  const relativePath = targetPath.slice(rootPath.length);
+  return targetPath === rootPath || (
+    targetPath.startsWith(rootPath) &&
+    (relativePath.startsWith('/') || relativePath.startsWith('\\'))
+  );
+}
+
+async function readControlEndpointToken(tokenPath: string): Promise<string> {
+  const raw = await readFile(tokenPath, 'utf8');
+  try {
+    const parsed = JSON.parse(raw) as { token?: unknown };
+    if (typeof parsed?.token === 'string' && parsed.token.trim().length > 0) {
+      return parsed.token.trim();
+    }
+  } catch {
+    // Fall back to plain-text token contents.
+  }
+  const token = raw.trim();
+  if (!token) {
+    throw new Error('control auth token missing');
+  }
+  return token;
+}
+
+function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv): DelegationConfigLayer[] {
+  const layers: DelegationConfigLayer[] = [];
+  for (const key of CONFIG_OVERRIDE_ENV_KEYS) {
+    const raw = env[key];
+    if (!raw) {
+      continue;
+    }
+    const values = splitDelegationConfigOverrides(raw);
+    for (const value of values) {
+      try {
+        const layer = parseDelegationConfigOverride(value, 'env');
+        if (layer) {
+          layers.push(layer);
+        }
+      } catch (error) {
+        logger.warn(
+          `Invalid delegation config override (env): ${(error as Error)?.message ?? String(error)}`
+        );
+      }
+    }
+  }
+  return layers;
+}
+
+async function resolveAllowedControlHostBindHosts(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv
+): Promise<string[]> {
+  const configFiles = await loadDelegationConfigFiles({ repoRoot, env });
+  const layers = [configFiles.global, configFiles.repo, ...collectDelegationEnvOverrides(env)]
+    .filter(Boolean) as DelegationConfigLayer[];
+  const effective = computeEffectiveDelegationConfig({
+    repoRoot,
+    layers
+  }).ui.allowedBindHosts;
+  const hasExplicitAllowedBindHosts = layers.some((layer) => Array.isArray(layer.ui?.allowedBindHosts));
+  return hasExplicitAllowedBindHosts ? effective : [];
+}
+
+function normalizeControlHostName(host: string): string {
+  const trimmed = host.trim().toLowerCase();
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[]): URL {
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    throw new Error('control base_url missing');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('control base_url not permitted');
+  }
+  const normalizedAllowedHosts = new Set(
+    (allowedHosts.length > 0 ? allowedHosts : ['127.0.0.1', 'localhost', '::1']).map((entry) =>
+      normalizeControlHostName(entry)
+    )
+  );
+  if (!normalizedAllowedHosts.has(normalizeControlHostName(parsed.hostname))) {
+    throw new Error('control base_url not permitted');
+  }
+  return parsed;
+}
+
+async function resolveProviderControlHostRepoRoot(
+  manifestPath: string,
+  fallbackRepoRoot: string
+): Promise<string> {
+  try {
+    const raw = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    return (
+      normalizeOptionalString(raw.workspace_path) ??
+      normalizeOptionalString(raw.workspacePath) ??
+      resolve(dirname(manifestPath), '..', '..', '..', '..')
+    );
+  } catch {
+    return fallbackRepoRoot;
+  }
+}
+
+async function requestProviderControlHostRefresh(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+  proof: ProviderLinearWorkerProof;
+  repoRoot: string;
+  log: Pick<typeof logger, 'warn'>;
+}): Promise<void> {
+  if (input.proof.owner_phase !== 'ended' || input.proof.owner_status !== 'failed') {
+    return;
+  }
+  try {
+    const manifestPath = resolveProviderControlHostManifestPath(
+      input.currentManifestPath,
+      input.env,
+      input.manifest
+    );
+    if (!manifestPath) {
+      return;
+    }
+    const runDir = dirname(manifestPath);
+    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot(manifestPath, input.repoRoot);
+    const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
+    const endpointRaw = await readFile(resolve(runDir, 'control_endpoint.json'), 'utf8');
+    const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
+    const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
+    const resolvedTokenPath =
+      typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
+        ? resolve(runDir, endpoint.token_path)
+        : resolve(runDir, 'control_auth.json');
+    if (!isPathWithinRoot(resolvedTokenPath, runDir)) {
+      throw new Error('control auth path invalid');
+    }
+    const token = await readControlEndpointToken(resolvedTokenPath);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
+    try {
+      const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          [CSRF_HEADER]: token
+        },
+        body: JSON.stringify({
+          action: 'refresh',
+          source: 'provider-linear-worker',
+          issue_id: input.proof.issue_id,
+          issue_identifier: input.proof.issue_identifier,
+          owner_status: input.proof.owner_status,
+          end_reason: input.proof.end_reason
+        }),
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        throw new Error(`refresh request failed with status ${response.status}`);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (error) {
+    const message = (error as Error)?.name === 'AbortError'
+      ? 'refresh request timeout'
+      : (error as Error)?.message ?? String(error);
+    input.log.warn(
+      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}`
+    );
+  }
+}
+
 async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,
   runDir: string,
@@ -782,6 +1012,7 @@ export async function runProviderLinearWorker(
   const context = await loadProviderLinearWorkerContext(env, deps.readManifest);
   const runtimeContext = await deps.resolveRuntimeContext(env, context.repoRoot, context.runId);
   deps.log.info(`[provider-linear-worker-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
+  const childManifest = await deps.readManifest(context.manifestPath);
   const childEnv: NodeJS.ProcessEnv = {
     ...process.env,
     ...env,
@@ -818,7 +1049,20 @@ export async function runProviderLinearWorker(
     updated_at: deps.now()
   };
 
-  finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+  const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
+    const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof);
+    await requestProviderControlHostRefresh({
+      currentManifestPath: context.manifestPath,
+      env,
+      manifest: childManifest,
+      proof: hydratedProof,
+      repoRoot: context.repoRoot,
+      log: deps.log
+    });
+    return hydratedProof;
+  };
+
+  finalProof = await persistProof(finalProof);
   const readTrackedIssueWithFailClosedProof = async (): Promise<LiveLinearTrackedIssue> => {
     try {
       return await deps.readTrackedIssue({
@@ -834,7 +1078,7 @@ export async function runProviderLinearWorker(
         end_reason: 'tracked_issue_read_failed',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
   };
@@ -852,7 +1096,7 @@ export async function runProviderLinearWorker(
       end_reason: lifecycle.terminalReason,
       updated_at: deps.now()
     };
-    finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+    finalProof = await persistProof(finalProof);
     return finalProof;
   }
 
@@ -880,7 +1124,7 @@ export async function runProviderLinearWorker(
         end_reason: 'exec_runner_failed',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
     const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
@@ -909,7 +1153,7 @@ export async function runProviderLinearWorker(
       end_reason: null,
       updated_at: deps.now()
     };
-    finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+    finalProof = await persistProof(finalProof);
 
     if (execResult.exitCode !== 0) {
       finalProof = {
@@ -919,7 +1163,7 @@ export async function runProviderLinearWorker(
         end_reason: `codex_exit_${execResult.exitCode ?? 'unknown'}`,
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw new Error(
         `provider-linear-worker turn ${turnNumber} failed with exit code ${execResult.exitCode ?? 'unknown'}`
       );
@@ -933,7 +1177,7 @@ export async function runProviderLinearWorker(
         end_reason: 'thread_id_missing',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw new Error('provider-linear-worker could not determine thread_id from Codex JSONL output.');
     }
 
@@ -947,7 +1191,7 @@ export async function runProviderLinearWorker(
         end_reason: lifecycle.terminalReason,
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       return finalProof;
     }
 
@@ -959,7 +1203,7 @@ export async function runProviderLinearWorker(
         end_reason: 'max_turns_reached_issue_still_active',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       return finalProof;
     }
   }
@@ -971,7 +1215,7 @@ export async function runProviderLinearWorker(
     end_reason: 'worker_completed',
     updated_at: deps.now()
   };
-  finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+  finalProof = await persistProof(finalProof);
   return finalProof;
 }
 
