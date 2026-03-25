@@ -1162,7 +1162,6 @@ async function makeFakeDiffBudgetScript(sandbox: string): Promise<void> {
     join(sandbox, 'scripts', 'diff-budget.mjs'),
     [
       '#!/usr/bin/env node',
-      'const hasExplicitScope = process.argv.includes("--base") || process.argv.includes("--commit");',
       'const inheritedBaseEnvPresent = Boolean(process.env.BASE_SHA || process.env.DIFF_BUDGET_BASE);',
       'if (inheritedBaseEnvPresent) {',
       '  console.error("unexpected inherited base env");',
