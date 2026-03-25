@@ -127,6 +127,17 @@ export interface ProviderLinearWorkerExecResult {
   stderr: string;
 }
 
+interface ProviderWorkerRunLocation {
+  canonicalRunsRoot: string;
+  taskId: string;
+  runId: string;
+}
+
+interface ProviderControlHostManifestTarget {
+  currentRun: ProviderWorkerRunLocation;
+  manifestPath: string;
+}
+
 export interface ProviderLinearWorkerDependencies {
   now: () => string;
   readManifest: (path: string) => Promise<Record<string, unknown>>;
@@ -775,11 +786,39 @@ function buildProofPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
 }
 
-function resolveProviderControlHostManifestPath(
+async function resolveProviderWorkerRunLocation(
+  currentManifestPath: string,
+): Promise<ProviderWorkerRunLocation | null> {
+  try {
+    const canonicalManifestPath = await realpath(currentManifestPath);
+    if (basename(canonicalManifestPath) !== 'manifest.json') {
+      return null;
+    }
+    const canonicalRunDir = dirname(canonicalManifestPath);
+    const cliDir = dirname(canonicalRunDir);
+    if (basename(cliDir) !== 'cli') {
+      return null;
+    }
+    const taskDir = dirname(cliDir);
+    const canonicalRunsRoot = dirname(taskDir);
+    if (dirname(canonicalRunsRoot) === canonicalRunsRoot) {
+      return null;
+    }
+    return {
+      canonicalRunsRoot,
+      taskId: sanitizeTaskId(basename(taskDir)),
+      runId: sanitizeRunId(basename(canonicalRunDir))
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveProviderControlHostManifestPath(
   currentManifestPath: string,
   env: NodeJS.ProcessEnv,
   manifest: Record<string, unknown>
-): string | null {
+): Promise<ProviderControlHostManifestTarget | null> {
   const locator =
     readProviderControlHostLocatorFromManifest(manifest) ??
     readProviderControlHostLocatorFromEnv({
@@ -790,15 +829,20 @@ function resolveProviderControlHostManifestPath(
   if (!locator) {
     return null;
   }
-  const currentRunDir = dirname(currentManifestPath);
-  const runsRoot = resolve(currentRunDir, '..', '..', '..');
-  return resolve(
-    runsRoot,
-    sanitizeTaskId(locator.taskId),
-    'cli',
-    sanitizeRunId(locator.runId),
-    'manifest.json'
-  );
+  const currentRun = await resolveProviderWorkerRunLocation(currentManifestPath);
+  if (!currentRun) {
+    return null;
+  }
+  return {
+    currentRun,
+    manifestPath: resolve(
+      currentRun.canonicalRunsRoot,
+      sanitizeTaskId(locator.taskId),
+      'cli',
+      sanitizeRunId(locator.runId),
+      'manifest.json'
+    )
+  };
 }
 
 function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
@@ -807,7 +851,7 @@ function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
 }
 
 function resolveProviderWorkerTaskId(
-  currentManifestPath: string,
+  currentRun: ProviderWorkerRunLocation,
   manifest: Record<string, unknown>
 ): string | null {
   const manifestTaskId =
@@ -817,9 +861,7 @@ function resolveProviderWorkerTaskId(
     const sanitizedTaskId = sanitizeTaskId(manifestTaskId);
     return sanitizedTaskId.length > 0 ? sanitizedTaskId : null;
   }
-  const currentRunDir = dirname(currentManifestPath);
-  const pathTaskId = sanitizeTaskId(basename(resolve(currentRunDir, '..', '..')));
-  return pathTaskId.length > 0 ? pathTaskId : null;
+  return currentRun.taskId.length > 0 ? currentRun.taskId : null;
 }
 
 async function readControlEndpointToken(tokenPath: string): Promise<string> {
@@ -997,21 +1039,21 @@ async function requestProviderControlHostRefresh(input: {
     return;
   }
   try {
-    const manifestPath = resolveProviderControlHostManifestPath(
+    const manifestTarget = await resolveProviderControlHostManifestPath(
       input.currentManifestPath,
       input.env,
       input.manifest
     );
-    if (!manifestPath) {
+    if (!manifestTarget) {
       return;
     }
-    const canonicalRunsRoot = await realpath(resolve(dirname(input.currentManifestPath), '..', '..', '..'));
-    const canonicalManifestPath = await realpath(manifestPath);
+    const canonicalManifestPath = await realpath(manifestTarget.manifestPath);
+    const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
     if (!isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)) {
       throw new Error('control-host manifest path invalid');
     }
     const canonicalRunDir = dirname(canonicalManifestPath);
-    const workerTaskId = resolveProviderWorkerTaskId(input.currentManifestPath, input.manifest);
+    const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
     if (!workerTaskId) {
       throw new Error('provider task id unavailable');
     }
