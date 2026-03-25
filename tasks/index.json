@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260325-linear-4848ec97-cfab-45d9-9023-79107b496526",
+      "title": "CO Add Autonomous Pre-Review-Handoff Standalone and Elegance Review Gate",
+      "relates_to": "tasks/tasks-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "task": "tasks/tasks-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "agent_task": ".agent/task/linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "docs": "docs/TECH_SPEC-linear-4848ec97-cfab-45d9-9023-79107b496526.md"
+      }
+    },
+    {
       "id": "20260325-linear-cc7d12e3-eabf-4168-827e-b3a023583e22",
       "title": "CO Align Non-Interactive Standalone Review Policy Across Gate Advisory and Provider-Worker Lanes",
       "relates_to": "tasks/tasks-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
@@ -30,6 +46,22 @@
         "task": "tasks/tasks-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
         "agent_task": ".agent/task/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
         "docs": "docs/TECH_SPEC-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md"
+      }
+    },
+    {
+      "id": "20260325-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d",
+      "title": "CO Add Symphony-Style Follow-Up Issue Automation",
+      "relates_to": "tasks/tasks-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "task": "tasks/tasks-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "agent_task": ".agent/task/linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "docs": "docs/TECH_SPEC-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md"
       }
     },
     {

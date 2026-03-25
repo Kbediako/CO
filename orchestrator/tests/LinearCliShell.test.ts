@@ -98,6 +98,9 @@ describe('runLinearCliShell', () => {
       action: null,
       via: null,
       state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
       comment_id: null,
       attachment_id: null,
       error_code: null,
@@ -147,6 +150,67 @@ describe('runLinearCliShell', () => {
       issueId: 'lin-issue-1',
       body: '## Codex Workpad\n\nPlan',
       commentId: null,
+      sourceSetup: null,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      }
+    });
+  });
+
+  it('treats string boolean literals as enabled for blocked-by-source', async () => {
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'create-follow-up',
+          action: 'created',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up',
+            description: 'Investigate',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: null,
+            team: null,
+            project: null
+          },
+          relations: {
+            related: true,
+            blocked_by_source: true
+          },
+          source_setup: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate',
+          'acceptance-criteria': '- [ ] Captured',
+          'blocked-by-source': 'true'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        log: vi.fn()
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up',
+      description: 'Investigate',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
       sourceSetup: null,
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
@@ -321,6 +385,221 @@ describe('runLinearCliShell', () => {
       action: null,
       via: null,
       state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: 'linear_graphql_error',
+      error_message: 'Linear GraphQL returned operation errors.'
+    });
+  });
+
+  it('routes create-follow-up into the facade and records audit metadata', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'create-follow-up',
+          action: 'created',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up',
+            description: 'Do the thing',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          relations: {
+            related: true,
+            blocked_by_source: true
+          },
+          source_setup: {
+            provider: 'linear',
+            workspace_id: 'lin-workspace-1',
+            team_id: 'lin-team-1',
+            project_id: 'lin-project-1'
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'acceptance-criteria-file': '/tmp/acceptance.md',
+          'blocked-by-source': true,
+          'workspace-id': 'lin-workspace-1',
+          'team-id': 'lin-team-1',
+          'project-id': 'lin-project-1'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        readTextFile: vi.fn(async () => '- [ ] Captured'),
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-03-22T12:00:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up',
+      description: 'Investigate the remaining improvement',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token',
+        CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+      }
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      follow_up_issue: {
+        identifier: 'CO-2',
+        url: 'https://linear.app/example/issue/CO-2'
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-03-22T12:00:00.000Z',
+      operation: 'create-follow-up',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-1',
+      source_setup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      action: 'created',
+      via: 'related+blocks',
+      state: 'Backlog',
+      follow_up_issue_id: 'lin-issue-2',
+      follow_up_issue_identifier: 'CO-2',
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: null,
+      error_message: null
+    });
+  });
+
+  it('records follow-up recovery metadata when create-follow-up fails after issue creation', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'create-follow-up',
+          error: {
+            code: 'linear_graphql_error',
+            message: 'Linear GraphQL returned operation errors.',
+            status: 502,
+            details: {
+              errors: ['relation failed'],
+              created_issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2'
+              },
+              failed_relation_type: 'blocks'
+            }
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-03-22T12:00:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 502,
+        details: {
+          errors: ['relation failed'],
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2'
+          },
+          failed_relation_type: 'blocks'
+        }
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-03-22T12:00:00.000Z',
+      operation: 'create-follow-up',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: null,
+      via: null,
+      state: null,
+      follow_up_issue_id: 'lin-issue-2',
+      follow_up_issue_identifier: 'CO-2',
+      failed_relation_type: 'blocks',
       comment_id: null,
       attachment_id: null,
       error_code: 'linear_graphql_error',
@@ -394,6 +673,9 @@ describe('runLinearCliShell', () => {
       action: null,
       via: null,
       state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
       comment_id: null,
       attachment_id: null,
       error_code: 'linear_graphql_error',
@@ -467,6 +749,44 @@ describe('runLinearCliShell', () => {
     expect(setExitCode).not.toHaveBeenCalled();
   });
 
+  it('rejects whitespace-only file-backed required text inputs', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    const upsertProviderLinearWorkpadCommentMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>();
+
+    await expect(
+      runLinearCliShell(
+        {
+          positionals: ['upsert-workpad'],
+          flags: {
+            format: 'json',
+            'issue-id': 'lin-issue-1',
+            'body-file': '/tmp/workpad.md'
+          },
+          printHelp: vi.fn()
+        },
+        {
+          readTextFile: vi.fn(async () => '   \n'),
+          upsertProviderLinearWorkpadComment: upsertProviderLinearWorkpadCommentMock,
+          log,
+          setExitCode
+        }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(upsertProviderLinearWorkpadCommentMock).not.toHaveBeenCalled();
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'linear_body_missing',
+        message: '--body or --body-file is required.',
+        status: 422
+      }
+    });
+    expect(setExitCode).toHaveBeenCalledWith(1);
+  });
+
   it.each([
     {
       name: 'unknown subcommands',
@@ -531,7 +851,7 @@ describe('runLinearCliShell', () => {
     expect(setExitCode).toHaveBeenCalledWith(1);
   });
 
-  it('emits machine-readable json when a local runtime error escapes argument validation', async () => {
+  it('treats unreadable file-backed required text inputs as usage errors', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();
 
@@ -558,9 +878,9 @@ describe('runLinearCliShell', () => {
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
       ok: false,
       error: {
-        code: 'linear_cli_error',
-        message: 'ENOENT: missing workpad file',
-        status: 500
+        code: 'linear_body_file_unreadable',
+        message: '--body-file must reference a readable file.',
+        status: 422
       }
     });
     expect(setExitCode).toHaveBeenCalledWith(1);

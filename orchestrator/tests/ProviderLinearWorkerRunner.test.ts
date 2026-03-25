@@ -266,11 +266,18 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('exactly one active `## Codex Workpad` comment');
     expect(firstPrompt).toContain(`Use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
     expect(firstPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
+    expect(firstPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(firstPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(firstPrompt).toContain('Standalone-review policy for this provider-worker lane');
     expect(firstPrompt).toContain('`codex-orchestrator review` / `npm run review`');
     expect(firstPrompt).toContain('`FORCE_CODEX_REVIEW=1`');
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
+    expect(firstPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
+    expect(firstPrompt).toContain('about 2+ changed files or about 40+ changed lines');
+    expect(firstPrompt).toContain('use the wrapper-led review path by default');
+    expect(firstPrompt).toContain('manual correctness/regressions/missing-tests review');
+    expect(firstPrompt).toContain('manual elegance checklist');
+    expect(firstPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(firstPrompt).toContain('Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`)');
     expect(firstPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(firstPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work');
@@ -288,11 +295,18 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('Keep exactly one active `## Codex Workpad` comment current');
     expect(continuationPrompt).toContain(`use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
     expect(continuationPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
+    expect(continuationPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(continuationPrompt).toContain('Standalone-review policy for this provider-worker lane');
     expect(continuationPrompt).toContain('`codex-orchestrator review` / `npm run review`');
     expect(continuationPrompt).toContain('`FORCE_CODEX_REVIEW=1`');
+    expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
+    expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
+    expect(continuationPrompt).toContain('use the wrapper-led review path by default');
+    expect(continuationPrompt).toContain('manual correctness/regressions/missing-tests review');
+    expect(continuationPrompt).toContain('manual elegance checklist');
+    expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(continuationPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(continuationPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work');
     expect(continuationPrompt).toContain('If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.');
@@ -438,6 +452,9 @@ describe('provider linear worker runner', () => {
           action: null,
           via: null,
           state: 'In Progress',
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
           comment_id: null,
           attachment_id: null,
           error_code: null,
@@ -453,6 +470,9 @@ describe('provider linear worker runner', () => {
           action: 'created',
           via: null,
           state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
           comment_id: 'comment-1',
           attachment_id: null,
           error_code: null,
@@ -483,6 +503,9 @@ describe('provider linear worker runner', () => {
           action: null,
           via: null,
           state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
           comment_id: null,
           attachment_id: null,
           error_code: 'linear_graphql_error',
@@ -498,6 +521,9 @@ describe('provider linear worker runner', () => {
           action: 'updated',
           via: null,
           state: 'In Review',
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
           comment_id: null,
           attachment_id: null,
           error_code: null,
@@ -549,6 +575,16 @@ describe('provider linear worker runner', () => {
       'thread-1',
       expect.stringContaining('Continuation guidance')
     ]);
+    const firstTurnPrompt = String(execRunner.mock.calls[0]?.[0].args[2] ?? '');
+    const continuationPrompt = String(execRunner.mock.calls[1]?.[0].args[4] ?? '');
+    expect(firstTurnPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
+    expect(firstTurnPrompt).toContain('about 2+ changed files or about 40+ changed lines');
+    expect(firstTurnPrompt).toContain('manual elegance checklist');
+    expect(firstTurnPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
+    expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
+    expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
+    expect(continuationPrompt).toContain('manual elegance checklist');
+    expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(proof).toMatchObject({
       thread_id: 'thread-1',
       latest_turn_id: 'turn-2',

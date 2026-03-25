@@ -72,10 +72,26 @@ codex-orchestrator linear attach-pr \
   --format json
 ```
 
+## Follow-Up Issues
+
+When you discover a meaningful out-of-scope improvement, create a separate same-project follow-up issue in `Backlog` instead of expanding the current issue.
+The helper always adds a `related` relation to the source issue and can also add blocker linkage when the follow-up depends on the source issue landing first.
+
+```bash
+codex-orchestrator linear create-follow-up \
+  --issue-id "$ISSUE_ID" \
+  --title "Follow-up title" \
+  --description-file /tmp/follow-up-description.md \
+  --acceptance-criteria-file /tmp/follow-up-acceptance.md \
+  --blocked-by-source \
+  --format json
+```
+
 ## Workflow Notes
 
 - Move `Todo` or the live team's equivalent queued state (for CO, `Ready`) to the actual started state before active coding when the issue is unblocked.
 - Use the Linear issue id, not the human identifier, for helper commands.
+- When you discover a meaningful out-of-scope improvement, use `create-follow-up` so the new issue stays in the same project, starts in `Backlog`, and returns the created follow-up identifier/URL for workpad references.
 - Keep exactly one active `## Codex Workpad` comment current. Refresh it before new work, before review handoff, after rework, and after merge completion. Do not create duplicate progress comments.
 - Always read `issue-context` before any transition so you use the team's actual workflow state names.
 - Attach the PR before handing off to `Human Review` or the live-team alias `In Review`.
@@ -84,12 +100,17 @@ codex-orchestrator linear attach-pr \
   - check inline review comments and unresolved review threads
   - check review summaries / decisions
   - resolve each actionable item or post explicit, justified pushback
+- Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff before opening a new PR for review handoff, before updating an already attached PR for handoff, and before transitioning the issue to `Human Review` or `In Review`.
+- Use the repo heuristic for non-trivial work: about 2+ changed files or about 40+ changed lines, unless you record an explicit skip justification in the workpad.
+- Run the standalone review first. When manifest-backed evidence matters, use the wrapper-led review path by default; if review tooling is unavailable or stalls without a concrete verdict, do a manual correctness/regressions/missing-tests review plus a manual elegance checklist and record that fallback instead of stalling.
+- After standalone-review findings are addressed, run an explicit elegance/minimality pass before handoff and record any kept complexity or fallback.
 - Before handing off to `Human Review` or `In Review`, the completion bar is:
   - required validation is green
   - actionable PR feedback is handled or explicitly pushed back
   - the latest `origin/main` is merged into the branch
   - PR checks are green
   - the workpad is refreshed to match the current implementation and remaining risks
+  - the workpad records the review goal, findings or fallback, and final clean or justified status for the standalone/elegance gate
 - `Human Review` and `In Review` are review handoff states. Do not keep coding there; refresh the workpad if needed, record the handoff clearly, and end the turn instead of polling inside the same run.
 - `Rework` means a full reset on the same issue. Close the previous PR, delete the old workpad, create a fresh branch from `origin/main`, create a new bootstrap workpad, then execute end to end again before handing the issue back to `Human Review` or `In Review`.
 - `Merging` means the issue is still active. Follow `skills/land/SKILL.md` to shepherd the PR through checks, conflicts, approvals, and merge completion.
