@@ -52,7 +52,17 @@ const REVIEW_LIKELY_COMMANDS = new Set([
   'codex-orchestrator',
   'cmd',
   'powershell',
-  'pwsh'
+  'pwsh',
+  'sed',
+  'rg',
+  'grep',
+  'cat',
+  'head',
+  'tail',
+  'nl',
+  'awk',
+  'find',
+  'ls'
 ]);
 
 function normalizeReviewCommandLine(line: string): string {

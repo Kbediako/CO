@@ -53,6 +53,12 @@ describe('review command probe classification', () => {
     expect(isLikelyReviewCommandLine('not actually a command')).toBe(false);
   });
 
+  it('keeps direct inspection primitives review-likely without promoting escaped search patterns', () => {
+    expect(isLikelyReviewCommandLine('sed -n 1,120p scripts/run-review.ts')).toBe(true);
+    expect(isLikelyReviewCommandLine('rg -n foo scripts/run-review.ts')).toBe(true);
+    expect(detectHeavyReviewCommand(String.raw`rg run\|pytest file.txt`)).toBeNull();
+  });
+
   it('keeps absolute Windows launcher paths recognizable in probe detection', () => {
     expect(
       detectHeavyReviewCommand(

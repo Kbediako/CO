@@ -132,7 +132,7 @@ function looksLikeRelativeWindowsLauncherToken(token: string): boolean {
     return true;
   }
 
-  if (/^(?!-)(?:[^\\/\s"'`=]+\\)+[^\\/\s"'`.=]+$/u.test(token)) {
+  if (/^(?!-)(?:[^\\/\s"'`=;&|<>]+\\)+[^\\/\s"'`.=;&|<>]+$/u.test(token)) {
     return true;
   }
 
