@@ -230,7 +230,7 @@ function resolveFirstBinaryLauncherTarget(
       continue;
     }
     if (token.startsWith('-')) {
-      index += binaryLauncherOptionConsumesValue(token) && !token.includes('=') ? 2 : 1;
+      index += binaryLauncherOptionExpectsValue(token) && !token.includes('=') ? 2 : 1;
       continue;
     }
     return normalizeCommandToken(token);
@@ -238,17 +238,14 @@ function resolveFirstBinaryLauncherTarget(
   return null;
 }
 
-function binaryLauncherOptionConsumesValue(option: string): boolean {
+function binaryLauncherOptionExpectsValue(option: string): boolean {
   const normalized = option.toLowerCase();
   return (
     normalized === '-p' ||
     normalized === '--package' ||
-    normalized.startsWith('--package=') ||
     normalized === '-c' ||
     normalized === '--call' ||
-    normalized.startsWith('--call=') ||
-    normalized === '--node-options' ||
-    normalized.startsWith('--node-options=')
+    normalized === '--node-options'
   );
 }
 
