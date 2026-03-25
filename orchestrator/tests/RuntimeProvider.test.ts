@@ -6,6 +6,7 @@ import { resolveRuntimeSelection } from '../src/cli/runtime/provider.js';
 describe('runtime mode resolution', () => {
   it('resolves precedence as flag > env > config > manifest > default', () => {
     const env = { CODEX_ORCHESTRATOR_RUNTIME_MODE: 'appserver' } as NodeJS.ProcessEnv;
+    const blankEnv = { CODEX_ORCHESTRATOR_RUNTIME_MODE: '' } as NodeJS.ProcessEnv;
 
     expect(
       resolveRuntimeMode({
@@ -28,7 +29,7 @@ describe('runtime mode resolution', () => {
 
     expect(
       resolveRuntimeMode({
-        env: {},
+        env: blankEnv,
         configDefault: 'appserver',
         manifestMode: 'cli',
         preferManifest: true
@@ -37,14 +38,21 @@ describe('runtime mode resolution', () => {
 
     expect(
       resolveRuntimeMode({
-        env: {},
+        env: blankEnv,
         configDefault: null,
         manifestMode: 'appserver',
         preferManifest: true
       })
     ).toEqual({ mode: 'appserver', source: 'manifest' });
 
-    expect(resolveRuntimeMode({ env: {}, configDefault: null, manifestMode: null, preferManifest: true })).toEqual({
+    expect(
+      resolveRuntimeMode({
+        env: blankEnv,
+        configDefault: null,
+        manifestMode: null,
+        preferManifest: true
+      })
+    ).toEqual({
       mode: 'appserver',
       source: 'default'
     });

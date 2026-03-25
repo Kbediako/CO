@@ -1,9 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getCliExecRunner } from '../src/cli/services/execRuntime.js';
+beforeEach(() => {
+  vi.restoreAllMocks();
+  vi.doUnmock('node:child_process');
+  vi.resetModules();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.doUnmock('node:child_process');
+  vi.resetModules();
+});
 
 describe('CLI exec runtime', () => {
   it('forwards args to spawned commands', async () => {
+    const { getCliExecRunner } = await import('../src/cli/services/execRuntime.js');
     const runner = getCliExecRunner();
     const result = await runner.run({
       command: process.execPath,

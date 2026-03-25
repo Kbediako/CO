@@ -1,6 +1,7 @@
 import {
   extractShellCommandPayload,
   normalizeCommandToken,
+  normalizeShellCommandPathSeparators,
   splitShellControlSegments,
   stripLeadingEnvAssignments,
   tokenizeShellSegment,
@@ -19,7 +20,7 @@ const REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS = new Set(
 );
 const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|pause|cancel)\(/iu;
-const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest']);
+const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest', 'pytest']);
 
 export type ReviewCommandIntentViolationKind =
   | 'validation-suite'
@@ -62,7 +63,7 @@ export function classifyCommandIntentCommandLine(
   commandLine: string,
   options: { allowValidationCommandIntents: boolean }
 ): ReviewCommandIntentViolation | null {
-  const normalized = normalizeReviewCommandLine(commandLine).replace(/\\/gu, '/');
+  const normalized = normalizeShellCommandPathSeparators(normalizeReviewCommandLine(commandLine));
   const segments = splitShellControlSegments(normalized);
   for (const segment of segments) {
     const violation = classifyCommandIntentSegment(segment, options, 0);
@@ -91,7 +92,9 @@ function classifyCommandIntentSegment(
   if (depth < 3) {
     const payload = extractShellCommandPayload(tokens);
     if (payload) {
-      const nestedSegments = splitShellControlSegments(payload);
+      const nestedSegments = splitShellControlSegments(
+        normalizeShellCommandPathSeparators(payload)
+      );
       for (const nestedSegment of nestedSegments) {
         const nestedViolation = classifyCommandIntentSegment(nestedSegment, options, depth + 1);
         if (nestedViolation) {
@@ -162,6 +165,17 @@ export function isReviewOrchestrationCommand(command: string, args: string[]): b
 function isDirectValidationRunnerCommand(command: string, args: string[]): boolean {
   if (REVIEW_DIRECT_VALIDATION_RUNNERS.has(command)) {
     return true;
+  }
+
+  if (command === 'python' || command === 'python3' || command === 'py') {
+    for (let index = 0; index < args.length - 1; index += 1) {
+      if ((args[index] ?? '').toLowerCase() !== '-m') {
+        continue;
+      }
+      if (normalizeCommandToken(args[index + 1] ?? '') === 'pytest') {
+        return true;
+      }
+    }
   }
 
   const launcherTarget = resolveValidationLauncherTarget(command, args);
