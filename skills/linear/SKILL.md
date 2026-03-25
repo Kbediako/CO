@@ -72,6 +72,18 @@ codex-orchestrator linear attach-pr \
   --format json
 ```
 
+## Pre-Review Drain
+
+After opening or updating a PR, run the shipped bounded automated-feedback drain before moving the issue to `Human Review` or `In Review`.
+
+```bash
+codex-orchestrator pr ready-review \
+  --pr "$PR_NUMBER" \
+  --quiet-minutes 15
+```
+
+`ready-review` waits for green gating signals plus a bounded quiet window, treats `REVIEW_REQUIRED` as informational for review handoff, and exits non-zero when the author still needs to address actionable blockers.
+
 ## Workflow Notes
 
 - Move `Todo` or the live team's equivalent queued state (for CO, `Ready`) to the actual started state before active coding when the issue is unblocked.
@@ -84,11 +96,13 @@ codex-orchestrator linear attach-pr \
   - check inline review comments and unresolved review threads
   - check review summaries / decisions
   - resolve each actionable item or post explicit, justified pushback
+- After opening or updating a PR, run `codex-orchestrator pr ready-review --pr "$PR_NUMBER" --quiet-minutes <window>` and keep the issue out of review until that bounded automated-feedback drain exits cleanly or reveals a blocker you handle explicitly.
 - Before handing off to `Human Review` or `In Review`, the completion bar is:
   - required validation is green
   - actionable PR feedback is handled or explicitly pushed back
   - the latest `origin/main` is merged into the branch
   - PR checks are green
+  - the `pr ready-review` drain is clean
   - the workpad is refreshed to match the current implementation and remaining risks
 - `Human Review` and `In Review` are review handoff states. Do not keep coding there; refresh the workpad if needed, record the handoff clearly, and end the turn instead of polling inside the same run.
 - `Rework` means a full reset on the same issue. Close the previous PR, delete the old workpad, create a fresh branch from `origin/main`, create a new bootstrap workpad, then execute end to end again before handing the issue back to `Human Review` or `In Review`.

@@ -11,6 +11,7 @@ import {
   resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
   resolveRequiredChecksSummary,
+  shouldSucceedAfterTimeout,
   summarizeRequiredChecks
 } from '../scripts/lib/pr-watch-merge.js';
 
@@ -201,6 +202,30 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.coderabbitReviewMeta.outsideDiffCount).toBe(1);
     expect(snapshot.coderabbitReviewMeta.nitpickCount).toBe(3);
   });
+
+  it('treats REVIEW_REQUIRED as informational in ready-review mode when other gates are clean', () => {
+    const response = makeResponse([], {
+      reviewDecision: 'REVIEW_REQUIRED'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(
+      response,
+      requiredChecks,
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review'
+      }
+    );
+
+    expect(snapshot.readyToMerge).toBe(true);
+    expect(snapshot.gateReasons).toEqual([]);
+  });
 });
 
 describe('resolveActionRequiredReasons', () => {
@@ -272,6 +297,28 @@ describe('resolveActionRequiredReasons', () => {
     });
 
     expect(resolveActionRequiredReasons(snapshot)).toEqual([]);
+  });
+
+  it('does not classify REVIEW_REQUIRED as action-required in ready-review mode', () => {
+    const response = makeResponse([], {
+      reviewDecision: 'REVIEW_REQUIRED'
+    });
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(
+      response,
+      requiredChecks,
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review'
+      }
+    );
+
+    expect(resolveActionRequiredReasons(snapshot, { readinessMode: 'review' })).toEqual([]);
   });
 
   it('classifies behind merge state as action-required', () => {
@@ -478,6 +525,66 @@ describe('resolveCachedRequiredChecksSummary', () => {
       'def456'
     );
     expect(resolved).toBeNull();
+  });
+});
+
+describe('shouldSucceedAfterTimeout', () => {
+  it('allows clean ready-review snapshots to exit successfully at the bounded timeout', () => {
+    const snapshot = buildStatusSnapshot(
+      makeResponse([], {
+        reviewDecision: 'REVIEW_REQUIRED'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review'
+      }
+    );
+
+    expect(shouldSucceedAfterTimeout(snapshot, { readinessMode: 'review' })).toBe(true);
+  });
+
+  it('keeps merge mode and blocked review-handoff snapshots non-successful at timeout', () => {
+    const mergeSnapshot = buildStatusSnapshot(
+      makeResponse([]),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      }
+    );
+    const blockedReviewSnapshot = buildStatusSnapshot(
+      makeResponse([], {
+        reviewThreads: {
+          nodes: [
+            {
+              isResolved: false,
+              isOutdated: false
+            }
+          ]
+        }
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      },
+      {
+        readinessMode: 'review'
+      }
+    );
+
+    expect(shouldSucceedAfterTimeout(mergeSnapshot)).toBe(false);
+    expect(shouldSucceedAfterTimeout(blockedReviewSnapshot, { readinessMode: 'review' })).toBe(false);
   });
 });
 

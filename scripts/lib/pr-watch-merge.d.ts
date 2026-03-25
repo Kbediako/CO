@@ -2,6 +2,7 @@ export interface PrWatchMergeOptions {
   usage?: string;
   defaultAutoMerge?: boolean;
   defaultExitOnActionRequired?: boolean;
+  readinessMode?: 'merge' | 'review';
 }
 
 export interface PrWatchMergeCheckFailure {
@@ -52,6 +53,7 @@ export interface PrWatchMergeSnapshot {
   requiredChecks: PrWatchMergeCheckSummary | null;
   gateChecksSource: 'required' | 'rollup';
   gateReasons: string[];
+  readinessMode: 'merge' | 'review';
   readyToMerge: boolean;
   headOid: string | null;
 }
@@ -105,10 +107,19 @@ export function buildStatusSnapshot(
     fetchError: boolean;
     unacknowledgedCount: number;
     rereview?: PrWatchMergeBotRereviewSignals | null;
-  } | null
+  } | null,
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'>
 ): PrWatchMergeSnapshot;
 
-export function resolveActionRequiredReasons(snapshot: PrWatchMergeSnapshot): string[];
+export function resolveActionRequiredReasons(
+  snapshot: PrWatchMergeSnapshot,
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'>
+): string[];
+
+export function shouldSucceedAfterTimeout(
+  snapshot: PrWatchMergeSnapshot | null | undefined,
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'>
+): boolean;
 
 export function resolveLatestBotRereviewRequests(
   comments: Array<{
