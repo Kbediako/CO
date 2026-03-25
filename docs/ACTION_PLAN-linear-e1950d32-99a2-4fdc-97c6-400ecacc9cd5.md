@@ -11,7 +11,7 @@
 - Reconcile terminal provider-worker failures truthfully across run manifests, worker proof, provider-intake persistence, and Linear/workpad surfaces, so recovery is deterministic and operator-visible.
 
 ## Plan
-1. Register the docs-first packet for `linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5`, update `tasks/index.json`, `docs/TASKS.md`, the freshness registry, and the single active Linear workpad.
+1. Register canonical task ID `20260325-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5` in `tasks/index.json` (`items[]`), update `docs/TASKS.md`, keep `docs/docs-freshness-registry.json` on the real on-disk file paths, and sync the single active Linear workpad.
 2. Capture the failed `CO-16` baseline in a manual audit note covering the manifest/proof pair, the current intake snapshot, the relevant provider/control runtime seams, and the Symphony baseline.
 3. Run `docs-review` for the new packet before implementation.
 4. Patch the smallest reconciliation path that makes terminal failure authoritative, refreshes stale issue metadata, and leaves a truthful failure-side workpad/update trail.

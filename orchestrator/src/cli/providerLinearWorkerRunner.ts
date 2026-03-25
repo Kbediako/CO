@@ -930,23 +930,27 @@ async function requestProviderControlHostRefresh(input: {
     if (!manifestPath) {
       return;
     }
-    const runDir = dirname(manifestPath);
-    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot(manifestPath);
+    const canonicalRunsRoot = await realpath(resolve(dirname(input.currentManifestPath), '..', '..', '..'));
+    const canonicalManifestPath = await realpath(manifestPath);
+    if (!isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)) {
+      throw new Error('control-host manifest path invalid');
+    }
+    const canonicalRunDir = dirname(canonicalManifestPath);
+    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot(canonicalManifestPath);
     if (!controlHostRepoRoot) {
       throw new Error('control-host repo root unavailable');
     }
     const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
-    const endpointRaw = await readFile(resolve(runDir, 'control_endpoint.json'), 'utf8');
+    const endpointRaw = await readFile(resolve(canonicalRunDir, 'control_endpoint.json'), 'utf8');
     const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
     const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
     const resolvedTokenPath =
       typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
-        ? resolve(runDir, endpoint.token_path)
-        : resolve(runDir, 'control_auth.json');
-    if (!isPathWithinRoot(resolvedTokenPath, runDir)) {
+        ? resolve(canonicalRunDir, endpoint.token_path)
+        : resolve(canonicalRunDir, 'control_auth.json');
+    if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
       throw new Error('control auth path invalid');
     }
-    const canonicalRunDir = await realpath(runDir);
     const canonicalTokenPath = await realpath(resolvedTokenPath);
     if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
       throw new Error('control auth path invalid');
