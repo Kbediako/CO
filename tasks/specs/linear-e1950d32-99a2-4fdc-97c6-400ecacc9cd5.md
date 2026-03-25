@@ -40,9 +40,9 @@ The original `CO-16` provider-worker lane ended in a real autonomous failure, bu
 ## Current Truth
 
 - `providerIssueHandoff.ts` already has rehydrate/refresh paths for active, resumable, completed, released, and retrying claims.
-- Those paths depend on control-host refresh/rehydrate running; the worker itself currently writes proof but does not explicitly force terminal failure reconciliation back into the control host.
-- `discoverProviderIssueRuns()` currently reads manifest state only; proof is written separately and may contain more authoritative terminal owner status.
-- `controlRuntime.ts` exposes provider intake directly from persisted claim state, so stale persisted claims stay visible until the handoff service reconciles them.
+- Before this lane, those paths depended on control-host refresh/rehydrate running while the worker only wrote proof and did not explicitly force terminal failure reconciliation back into the control host.
+- `discoverProviderIssueRuns()` now reads manifest state plus `PROVIDER_LINEAR_WORKER_PROOF_FILENAME`, and the handoff service resolves `status`, `summary`, and `updatedAt` through proof-aware helpers gated by proof authority.
+- `controlRuntime.ts` still exposes provider intake from persisted claim state, so truthful failure-side persisted metadata remains the operator-visible source of truth after reconciliation.
 - The local Symphony baseline still expects single-owner orchestration, deterministic retries, and truthful release/recovery behavior.
 
 ## Validation Plan

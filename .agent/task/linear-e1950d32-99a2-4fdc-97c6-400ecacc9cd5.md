@@ -21,22 +21,22 @@
 - [x] Delegation override was explicitly recorded for this worker run because subagent spawning is unavailable in-session. Evidence: `tasks/specs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md`.
 
 ## Implementation
-- [ ] Make terminal provider-worker failure authoritative for provider-intake reconciliation without leaving stale `running` ownership.
-- [ ] Refresh stale provider issue metadata during failure reconciliation and rehydrate/refresh reads.
-- [ ] Add a truthful failure-side Linear/workpad update path for terminal worker failures.
-- [ ] Add focused regressions across `ProviderIssueHandoff`, `ProviderLinearWorkerRunner`, and `ControlRuntime`.
+- [x] Make terminal provider-worker failure authoritative for provider-intake reconciliation without leaving stale `running` ownership. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/src/cli/control/controlRuntime.ts`.
+- [x] Refresh stale provider issue metadata during failure reconciliation and rehydrate/refresh reads. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts`.
+- [x] Add a truthful failure-side Linear/workpad update path for terminal worker failures. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`.
+- [x] Add focused regressions across `ProviderIssueHandoff`, `ProviderLinearWorkerRunner`, and `ControlRuntime`. Evidence: `orchestrator/tests/ProviderIssueHandoff.test.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, `orchestrator/tests/ControlRuntime.test.ts`.
 
 ## Validation
-- [ ] `DELEGATION_GUARD_OVERRIDE_REASON="Provider worker run could not delegate because spawn_agent is unavailable without explicit user authorization in this session." node scripts/delegation-guard.mjs`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`.
-- [ ] `npm run build`.
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run docs:check`.
-- [ ] `npm run docs:freshness`.
-- [ ] `node scripts/diff-budget.mjs`.
-- [ ] `npm run review`.
-- [ ] `npm run pack:smoke` if downstream-facing CLI/package/skill surfaces change.
+- [x] `DELEGATION_GUARD_OVERRIDE_REASON="Provider worker run could not delegate because spawn_agent is unavailable without explicit user authorization in this session." node scripts/delegation-guard.mjs`. Evidence: passed locally on 2026-03-25.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed locally on 2026-03-25.
+- [x] `npm run build`. Evidence: passed locally on 2026-03-25.
+- [x] `npm run lint`. Evidence: passed locally on 2026-03-25.
+- [ ] `npm run test`. Evidence: awaiting terminal GitHub `Core Lane` result for PR #295 on head `322ebd2a2f2dfbca3202247035e02c76ca6d0ac9`.
+- [x] `npm run docs:check`. Evidence: passed locally on 2026-03-25.
+- [x] `npm run docs:freshness`. Evidence: passed locally on 2026-03-25.
+- [x] `DIFF_BUDGET_OVERRIDE_REASON="Docs-first packet plus bounded provider failure reconciliation and regressions for CO-18 exceed the review budget by 18 lines; splitting would separate required spec evidence from the implementation it governs." node scripts/diff-budget.mjs`. Evidence: passed locally on 2026-03-25.
+- [x] `DIFF_BUDGET_OVERRIDE_REASON="Docs-first packet plus bounded provider failure reconciliation and regressions for CO-18 exceed the review budget by 18 lines; splitting would separate required spec evidence from the implementation it governs." npm run review -- --manifest /Users/kbediako/Code/CO/.runs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5/cli/2026-03-24T23-27-44-639Z-c2876226/manifest.json`. Evidence: non-interactive manifest-backed handoff prompt emitted on 2026-03-25.
+- [x] `env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" npm run pack:smoke`. Evidence: passed locally on 2026-03-25.
 
 ## Delivery
 - [ ] Open PR for `CO-18`, attach it to Linear, handle feedback, and wait for required checks to reach terminal green.
