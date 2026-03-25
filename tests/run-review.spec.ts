@@ -1167,6 +1167,14 @@ async function makeFakeDiffBudgetScript(sandbox: string): Promise<void> {
       '  console.error("unexpected inherited base env");',
       '  process.exit(1);',
       '}',
+      'const baseIndex = process.argv.indexOf("--base");',
+      'if (baseIndex !== -1) {',
+      '  console.log(`fake diff-budget base=${process.argv[baseIndex + 1] ?? ""}`);',
+      '}',
+      'const commitIndex = process.argv.indexOf("--commit");',
+      'if (commitIndex !== -1) {',
+      '  console.log(`fake diff-budget commit=${process.argv[commitIndex + 1] ?? ""}`);',
+      '}',
       'console.log("fake diff-budget ok");'
     ].join('\n'),
     'utf8'
@@ -1318,6 +1326,29 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     });
 
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('fake diff-budget ok');
+    expect(result.stderr).not.toContain('unexpected inherited base env');
+  });
+
+  it('preserves explicit base scope for diff-budget preflight', async () => {
+    const sandbox = await makeSandbox();
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await makeFakeDiffBudgetScript(sandbox);
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        BASE_SHA: 'stale-base-ref',
+        DIFF_BUDGET_BASE: 'stale-fallback-ref'
+      },
+      ['--base', 'HEAD']
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('fake diff-budget base=HEAD');
     expect(result.stdout).toContain('fake diff-budget ok');
     expect(result.stderr).not.toContain('unexpected inherited base env');
   });

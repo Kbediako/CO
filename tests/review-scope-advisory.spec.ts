@@ -184,4 +184,16 @@ describe('review-scope-advisory', () => {
     expect(scope.changedLines).toBe(2);
     expect(scope.largeScope).toBe(false);
   });
+
+  it('counts rename-only churn the same way as diff-budget', async () => {
+    const repo = await initRepository();
+
+    await execFileAsync('git', ['mv', 'notes.txt', 'renamed-notes.txt'], { cwd: repo });
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(2);
+    expect(scope.changedLines).toBe(2);
+    expect(scope.largeScope).toBe(false);
+  });
 });

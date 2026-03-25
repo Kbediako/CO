@@ -111,7 +111,7 @@ export async function assessReviewScope(
   }
 
   const status = await tryGit(['status', '--porcelain=v1', '-z', '--untracked-files=all'], repoRoot);
-  const diff = await tryGit(['diff', 'HEAD', '--numstat'], repoRoot);
+  const diff = await tryGit(['diff', '--numstat', '--no-renames', 'HEAD'], repoRoot);
   const untracked = await tryGit(['ls-files', '--others', '--exclude-standard', '-z'], repoRoot);
   const untrackedPaths = untracked ? parseNullDelimitedPaths(untracked) : [];
   const untrackedLines = untrackedPaths.length > 0 ? await countWorkingTreeLines(untrackedPaths, repoRoot) : null;
