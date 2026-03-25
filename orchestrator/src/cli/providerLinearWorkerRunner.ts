@@ -805,6 +805,8 @@ function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
 
 async function readControlEndpointToken(tokenPath: string): Promise<string> {
   const raw = await readFile(tokenPath, 'utf8');
+  const trimmed = raw.trim();
+  const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('[');
   try {
     const parsed = JSON.parse(raw);
     if (isRecord(parsed) && typeof parsed.token === 'string' && parsed.token.trim().length > 0) {
@@ -815,9 +817,12 @@ async function readControlEndpointToken(tokenPath: string): Promise<string> {
     if (!(error instanceof SyntaxError)) {
       throw error;
     }
+    if (looksLikeJson) {
+      throw new Error('control auth token invalid');
+    }
     // Fall back to plain-text token contents.
   }
-  const token = raw.trim();
+  const token = trimmed;
   if (!token) {
     throw new Error('control auth token missing');
   }
@@ -865,10 +870,12 @@ async function resolveAllowedControlHostBindHosts(
 
 function normalizeControlHostName(host: string): string {
   const trimmed = host.trim().toLowerCase();
-  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-    return trimmed.slice(1, -1);
+  const normalized =
+    trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1) : trimmed;
+  if (normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1') {
+    return 'loopback';
   }
-  return trimmed;
+  return normalized;
 }
 
 function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[]): URL {
