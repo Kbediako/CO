@@ -856,7 +856,7 @@ function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv): DelegationConfig
 async function resolveAllowedControlHostBindHosts(
   repoRoot: string,
   env: NodeJS.ProcessEnv
-): Promise<string[]> {
+): Promise<string[] | null> {
   const configFiles = await loadDelegationConfigFiles({ repoRoot, env });
   const layers = [configFiles.global, configFiles.repo, ...collectDelegationEnvOverrides(env)]
     .filter(Boolean) as DelegationConfigLayer[];
@@ -865,7 +865,7 @@ async function resolveAllowedControlHostBindHosts(
     layers
   }).ui.allowedBindHosts;
   const hasExplicitAllowedBindHosts = Array.isArray(configFiles.repo?.ui?.allowedBindHosts);
-  return hasExplicitAllowedBindHosts ? effective : [];
+  return hasExplicitAllowedBindHosts ? effective : null;
 }
 
 function normalizeControlHostName(host: string): string {
@@ -878,7 +878,7 @@ function normalizeControlHostName(host: string): string {
   return normalized;
 }
 
-function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[]): URL {
+function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[] | null): URL {
   if (typeof raw !== 'string' || raw.trim().length === 0) {
     throw new Error('control base_url missing');
   }
@@ -895,7 +895,7 @@ function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[]): URL {
     throw new Error('control base_url not permitted');
   }
   const normalizedAllowedHosts = new Set(
-    (allowedHosts.length > 0 ? allowedHosts : ['127.0.0.1', 'localhost', '::1']).map((entry) =>
+    (allowedHosts ?? ['127.0.0.1', 'localhost', '::1']).map((entry) =>
       normalizeControlHostName(entry)
     )
   );

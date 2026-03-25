@@ -1410,6 +1410,94 @@ describe('provider linear worker runner', () => {
     }
   });
 
+  it('treats an explicit empty allowed_bind_hosts list as deny-all for control-host refreshes', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const workerWorkspacePath = join(tempRoot ?? '', '.workspaces', 'linear-lin-issue-1');
+    const repoCodexConfigDir = join(tempRoot ?? '', '.codex');
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(workerWorkspacePath, { recursive: true });
+    await mkdir(repoCodexConfigDir, { recursive: true });
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeFile(join(repoCodexConfigDir, 'orchestrator.toml'), '[ui]\nallowed_bind_hosts = []\n', 'utf8');
+    const controlServer = await createControlEndpointServer();
+    try {
+      await writeFile(
+        join(controlHostRunDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: controlServer.baseUrl,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+      await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+      await writeFile(
+        join(controlHostRunDir, 'manifest.json'),
+        JSON.stringify({
+          run_id: 'control-host',
+          task_id: 'local-mcp',
+          workspace_path: tempRoot
+        }),
+        'utf8'
+      );
+      await writeFile(
+        manifestPath,
+        JSON.stringify({
+          run_id: 'run-child',
+          task_id: 'linear-lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          workspace_path: workerWorkspacePath,
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host'
+        }),
+        'utf8'
+      );
+
+      await expect(
+        runProviderLinearWorker(
+          {
+            CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+            CODEX_ORCHESTRATOR_ROOT: workerWorkspacePath,
+            CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+            CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+          },
+          {
+            readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+            resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+            execRunner: vi.fn(async () => ({
+              exitCode: 2,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: 'boom'
+            })),
+            now: vi
+              .fn()
+              .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+              .mockReturnValue('2026-03-21T09:00:01.000Z'),
+            log
+          }
+        )
+      ).rejects.toThrow('provider-linear-worker turn 1 failed with exit code 2');
+
+      const written = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(written).toMatchObject({
+        owner_status: 'failed',
+        end_reason: 'codex_exit_2'
+      });
+      expect(controlServer.requests).toHaveLength(0);
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.stringContaining('control base_url not permitted')
+      );
+    } finally {
+      await controlServer.close();
+    }
+  });
+
   it('rejects backslash-based control auth path escapes outside the control-host run root', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
