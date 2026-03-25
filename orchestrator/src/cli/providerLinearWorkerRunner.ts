@@ -3,7 +3,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
@@ -946,7 +946,12 @@ async function requestProviderControlHostRefresh(input: {
     if (!isPathWithinRoot(resolvedTokenPath, runDir)) {
       throw new Error('control auth path invalid');
     }
-    const token = await readControlEndpointToken(resolvedTokenPath);
+    const canonicalRunDir = await realpath(runDir);
+    const canonicalTokenPath = await realpath(resolvedTokenPath);
+    if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
+      throw new Error('control auth path invalid');
+    }
+    const token = await readControlEndpointToken(canonicalTokenPath);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
     try {
