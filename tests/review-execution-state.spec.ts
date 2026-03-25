@@ -92,6 +92,27 @@ describe('review shell command parser', () => {
       String.raw`'.\bin\tool.cmd'`
     );
   });
+
+  it('preserves quoted cmd shell payload backslashes for recursive boundary parsing', () => {
+    const reviewTokens = tokenizeShellSegment(
+      String.raw`cmd /C ".\bin\codex-orchestrator.cmd review --manifest x"`
+    );
+    expect(reviewTokens).toEqual([
+      'cmd',
+      '/C',
+      String.raw`.\bin\codex-orchestrator.cmd review --manifest x`
+    ]);
+    expect(extractShellCommandPayload(reviewTokens)).toBe(
+      String.raw`.\bin\codex-orchestrator.cmd review --manifest x`
+    );
+
+    const validationTokens = tokenizeShellSegment(
+      String.raw`cmd /C "node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts"`
+    );
+    expect(extractShellCommandPayload(validationTokens)).toBe(
+      String.raw`node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts`
+    );
+  });
 });
 
 describe('ReviewExecutionState', () => {

@@ -140,6 +140,10 @@ function hasHeavyCommandTokens(tokens: string[]): boolean {
   const command = normalizeCommandToken(unwrappedTokens[0] ?? '');
   const args = unwrappedTokens.slice(1);
 
+  if (REVIEW_DIRECT_VALIDATION_RUNNERS.has(command)) {
+    return true;
+  }
+
   if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
     const scriptTarget = resolvePackageScriptTarget(args);
     return scriptTarget !== null && REVIEW_HEAVY_SCRIPT_TARGETS.has(scriptTarget);

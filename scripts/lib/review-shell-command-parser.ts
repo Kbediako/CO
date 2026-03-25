@@ -260,6 +260,19 @@ export function segmentRunsInParentShell(
   return false;
 }
 
+function shellBackslashActsAsEscape(
+  quote: '"' | "'" | '`' | null,
+  nextChar: string
+): boolean {
+  if (quote === "'") {
+    return false;
+  }
+  if (quote === '"') {
+    return nextChar === '"' || nextChar === '$' || nextChar === '`' || nextChar === '\\' || nextChar === '\n';
+  }
+  return true;
+}
+
 export function tokenizeShellSegment(segment: string): string[] {
   const tokens: string[] = [];
   let current = '';
@@ -275,6 +288,7 @@ export function tokenizeShellSegment(segment: string): string[] {
 
   for (let index = 0; index < segment.length; index += 1) {
     const char = segment[index] ?? '';
+    const next = segment[index + 1] ?? '';
 
     if (escaped) {
       current += char;
@@ -282,8 +296,13 @@ export function tokenizeShellSegment(segment: string): string[] {
       continue;
     }
 
-    if (char === '\\' && quote !== "'") {
+    if (char === '\\' && shellBackslashActsAsEscape(quote, next)) {
       escaped = true;
+      continue;
+    }
+
+    if (char === '\\') {
+      current += char;
       continue;
     }
 

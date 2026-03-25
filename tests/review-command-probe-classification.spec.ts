@@ -114,5 +114,16 @@ describe('review command probe classification', () => {
         String.raw`/bin/zsh -lc '".\bin\cmd.exe" /C printenv MANIFEST'`
       )
     ).toBe(String.raw`/bin/zsh -lc '".\bin\cmd.exe" /C printenv MANIFEST'`);
+
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`cmd /C "node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts"`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`cmd /C ".\bin\codex-orchestrator.cmd review --manifest x"`
+      )
+    ).toBe(true);
   });
 });
