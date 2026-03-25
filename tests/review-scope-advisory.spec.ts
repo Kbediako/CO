@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { execFile } from 'node:child_process';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  assessReviewScope,
   buildLargeScopeAdvisoryPromptLines,
   buildScopeNotes,
   formatScopeMetrics,
@@ -9,6 +16,33 @@ import {
   REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY,
   resolveLargeScopeOverrideReason
 } from '../scripts/lib/review-scope-advisory.js';
+
+const execFileAsync = promisify(execFile);
+const createdDirs: string[] = [];
+
+async function initRepository(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'review-scope-advisory-'));
+  createdDirs.push(dir);
+
+  await execFileAsync('git', ['init'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.email', 'review-scope@example.com'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.name', 'Review Scope'], { cwd: dir });
+
+  await writeFile(join(dir, 'notes.txt'), 'one\n', 'utf8');
+  await execFileAsync('git', ['add', '.'], { cwd: dir });
+  await execFileAsync('git', ['commit', '-m', 'initial commit'], { cwd: dir });
+
+  return dir;
+}
+
+afterEach(async () => {
+  while (createdDirs.length > 0) {
+    const dir = createdDirs.pop();
+    if (dir) {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+});
 
 describe('review-scope-advisory', () => {
   it('renders path-only uncommitted scope notes', () => {
@@ -135,5 +169,61 @@ describe('review-scope-advisory', () => {
         [REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY]: 'operator accepted the full working tree'
       })
     ).toBe('operator accepted the full working tree');
+  });
+
+  it('counts staged and unstaged churn when a file has both pending deltas', async () => {
+    const repo = await initRepository();
+
+    await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
+    await execFileAsync('git', ['add', 'notes.txt'], { cwd: repo });
+    await writeFile(join(repo, 'notes.txt'), 'three\n', 'utf8');
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(1);
+    expect(scope.changedLines).toBe(4);
+    expect(scope.largeScope).toBe(false);
+  });
+
+  it('counts both staged and unstaged churn when worktree edits restore HEAD content', async () => {
+    const repo = await initRepository();
+
+    await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
+    await execFileAsync('git', ['add', 'notes.txt'], { cwd: repo });
+    await writeFile(join(repo, 'notes.txt'), 'one\n', 'utf8');
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(1);
+    expect(scope.changedLines).toBe(4);
+    expect(scope.largeScope).toBe(false);
+  });
+
+  it('ignores .agent task mirrors in uncommitted scope metrics', async () => {
+    const repo = await initRepository();
+
+    await mkdir(join(repo, '.agent', 'task'), { recursive: true });
+    await mkdir(join(repo, 'tasks'), { recursive: true });
+    await writeFile(join(repo, '.agent', 'task', 'ignored.md'), 'ignore\n'.repeat(50), 'utf8');
+    await writeFile(join(repo, 'tasks', 'tasks-ignored.md'), 'checklist\n'.repeat(50), 'utf8');
+    await writeFile(join(repo, 'notes.txt'), 'two\n', 'utf8');
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(1);
+    expect(scope.changedLines).toBe(2);
+    expect(scope.largeScope).toBe(false);
+  });
+
+  it('counts rename-only churn the same way as diff-budget', async () => {
+    const repo = await initRepository();
+
+    await execFileAsync('git', ['mv', 'notes.txt', 'renamed-notes.txt'], { cwd: repo });
+
+    const scope = await assessReviewScope({}, repo);
+    expect(scope.mode).toBe('uncommitted');
+    expect(scope.changedFiles).toBe(2);
+    expect(scope.changedLines).toBe(2);
+    expect(scope.largeScope).toBe(false);
   });
 });
