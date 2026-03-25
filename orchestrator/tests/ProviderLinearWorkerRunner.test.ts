@@ -842,6 +842,16 @@ describe('provider linear worker runner', () => {
     const { manifestPath } = await createManifestRoot();
     const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
     await mkdir(controlHostRunDir, { recursive: true });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
     const controlServer = await createControlEndpointServer();
     await writeFile(
       join(controlHostRunDir, 'control_endpoint.json'),
@@ -990,6 +1000,7 @@ describe('provider linear worker runner', () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(String(fetchSpy.mock.calls[0]?.[0])).toBe('http://control.example:43123/api/v1/refresh');
+    expect(fetchSpy.mock.calls[0]?.[1]?.redirect).toBe('error');
     expectRefreshAuthHeaders(fetchSpy.mock.calls[0]?.[1]?.headers as Headers | undefined);
   });
 

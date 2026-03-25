@@ -806,6 +806,22 @@ function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
   return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
 }
 
+function resolveProviderWorkerTaskId(
+  currentManifestPath: string,
+  manifest: Record<string, unknown>
+): string | null {
+  const manifestTaskId =
+    normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId);
+  if (manifestTaskId) {
+    const sanitizedTaskId = sanitizeTaskId(manifestTaskId);
+    return sanitizedTaskId.length > 0 ? sanitizedTaskId : null;
+  }
+  const currentRunDir = dirname(currentManifestPath);
+  const pathTaskId = sanitizeTaskId(basename(resolve(currentRunDir, '..', '..')));
+  return pathTaskId.length > 0 ? pathTaskId : null;
+}
+
 async function readControlEndpointToken(tokenPath: string): Promise<string> {
   const raw = await readFile(tokenPath, 'utf8');
   const trimmed = raw.trim();
@@ -995,9 +1011,7 @@ async function requestProviderControlHostRefresh(input: {
       throw new Error('control-host manifest path invalid');
     }
     const canonicalRunDir = dirname(canonicalManifestPath);
-    const workerTaskId =
-      normalizeOptionalString(input.manifest.task_id) ??
-      normalizeOptionalString(input.manifest.taskId);
+    const workerTaskId = resolveProviderWorkerTaskId(input.currentManifestPath, input.manifest);
     if (!workerTaskId) {
       throw new Error('provider task id unavailable');
     }
@@ -1035,6 +1049,7 @@ async function requestProviderControlHostRefresh(input: {
     try {
       const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
         method: 'POST',
+        redirect: 'error',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
