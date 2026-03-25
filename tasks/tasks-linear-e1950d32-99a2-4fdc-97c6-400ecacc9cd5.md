@@ -31,7 +31,7 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: passed locally on 2026-03-25.
 - [x] `npm run build`. Evidence: passed locally on 2026-03-25.
 - [x] `npm run lint`. Evidence: passed locally on 2026-03-25.
-- [ ] `npm run test`. Evidence: awaiting terminal GitHub `Core Lane` result for PR #295 on head `322ebd2a2f2dfbca3202247035e02c76ca6d0ac9`.
+- [ ] `npm run test`. Evidence: awaiting terminal GitHub `Core Lane` result for PR #295 on head `ae9516a5094f9248cb5ddba6082b776b186fd935` because the full suite was not rerun locally after the latest follow-up patch.
 - [x] `npm run docs:check`. Evidence: passed locally on 2026-03-25.
 - [x] `npm run docs:freshness`. Evidence: passed locally on 2026-03-25.
 - [x] `DIFF_BUDGET_OVERRIDE_REASON="Docs-first packet plus bounded provider failure reconciliation and regressions for CO-18 exceed the review budget by 18 lines; splitting would separate required spec evidence from the implementation it governs." node scripts/diff-budget.mjs`. Evidence: passed locally on 2026-03-25.

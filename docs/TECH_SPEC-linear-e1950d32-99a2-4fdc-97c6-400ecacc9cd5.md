@@ -12,7 +12,7 @@
 
 ## Technical Requirements
 - Functional requirements:
-  - register `linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5` across PRD, TECH_SPEC, ACTION_PLAN, checklist, `.agent` mirror, task registry, task snapshot, and docs freshness registry before code edits
+  - register canonical task ID `20260325-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5` under `tasks/index.json` `items[]`, while keeping the existing on-disk doc/checklist filenames and docs freshness registry paths under `linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5`
   - audit the failed `CO-16` manifest/proof pair and compare the current control-host/provider runtime against the local Symphony baseline
   - reconcile terminal failed provider-worker runs from authoritative run evidence so persisted intake no longer remains `running`
   - refresh or overwrite stale tracked-issue metadata during failure reconciliation so later reads do not keep stale `Ready` or equivalent outdated state
