@@ -97,6 +97,10 @@ codex-orchestrator pr ready-review \
   - check review summaries / decisions
   - resolve each actionable item or post explicit, justified pushback
 - After opening or updating a PR, run `codex-orchestrator pr ready-review --pr "$PR_NUMBER" --quiet-minutes <window>` and keep the issue out of review until that bounded automated-feedback drain exits cleanly or reveals a blocker you handle explicitly.
+- Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff before opening a new PR for review handoff, before updating an already attached PR for handoff, and before transitioning the issue to `Human Review` or `In Review`.
+- Use the repo heuristic for non-trivial work: about 2+ changed files or about 40+ changed lines, unless you record an explicit skip justification in the workpad.
+- Run the standalone review first. When manifest-backed evidence matters, use the wrapper-led review path by default; if review tooling is unavailable or stalls without a concrete verdict, do a manual correctness/regressions/missing-tests review plus a manual elegance checklist and record that fallback instead of stalling.
+- After standalone-review findings are addressed, run an explicit elegance/minimality pass before handoff and record any kept complexity or fallback.
 - Before handing off to `Human Review` or `In Review`, the completion bar is:
   - required validation is green
   - actionable PR feedback is handled or explicitly pushed back
@@ -104,6 +108,7 @@ codex-orchestrator pr ready-review \
   - PR checks are green
   - the `pr ready-review` drain is clean
   - the workpad is refreshed to match the current implementation and remaining risks
+  - the workpad records the review goal, findings or fallback, and final clean or justified status for the standalone/elegance gate
 - `Human Review` and `In Review` are review handoff states. Do not keep coding there; refresh the workpad if needed, record the handoff clearly, and end the turn instead of polling inside the same run.
 - `Rework` means a full reset on the same issue. Close the previous PR, delete the old workpad, create a fresh branch from `origin/main`, create a new bootstrap workpad, then execute end to end again before handing the issue back to `Human Review` or `In Review`.
 - `Merging` means the issue is still active. Follow `skills/land/SKILL.md` to shepherd the PR through checks, conflicts, approvals, and merge completion.

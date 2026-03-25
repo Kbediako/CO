@@ -24,6 +24,22 @@
       }
     },
     {
+      "id": "20260325-linear-4848ec97-cfab-45d9-9023-79107b496526",
+      "title": "CO Add Autonomous Pre-Review-Handoff Standalone and Elegance Review Gate",
+      "relates_to": "tasks/tasks-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "task": "tasks/tasks-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "agent_task": ".agent/task/linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "docs": "docs/TECH_SPEC-linear-4848ec97-cfab-45d9-9023-79107b496526.md"
+      }
+    },
+    {
       "id": "20260325-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5",
       "title": "CO Reconcile Terminal Provider-Worker Failures and Stale Intake Workpad State",
       "relates_to": "tasks/tasks-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",

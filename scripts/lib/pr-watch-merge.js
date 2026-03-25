@@ -184,6 +184,13 @@ function parseTimestampMs(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+export function isNoRequiredChecksReportedErrorMessage(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return false;
+  }
+  return /no required checks reported\b/iu.test(value);
+}
+
 function maxTimestamp(values) {
   let max = null;
   for (const value of values) {
@@ -908,7 +915,14 @@ async function fetchRequiredChecks(owner, repo, prNumber) {
       summary: summary.total > 0 ? summary : null,
       fetchError: false
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (isNoRequiredChecksReportedErrorMessage(message)) {
+      return {
+        summary: null,
+        fetchError: false
+      };
+    }
     return {
       summary: null,
       fetchError: true

@@ -4,6 +4,7 @@ import {
   buildPrNumberViewArgs,
   buildPrMergeArgs,
   buildStatusSnapshot,
+  isNoRequiredChecksReportedErrorMessage,
   isHumanReviewActor,
   parseGitHubRepoFromRemoteUrl,
   resolveActionRequiredReasons,
@@ -578,6 +579,19 @@ describe('resolveRequiredChecksSummary', () => {
 
     const resolved = resolveRequiredChecksSummary(null, previous, false);
     expect(resolved).toBeNull();
+  });
+});
+
+describe('isNoRequiredChecksReportedErrorMessage', () => {
+  it('recognizes the gh no-required-checks response as a clean fallback case', () => {
+    expect(
+      isNoRequiredChecksReportedErrorMessage(
+        "gh pr checks 297 --required failed: no required checks reported on the 'co-10-pre-review-feedback-drain' branch"
+      )
+    ).toBe(true);
+    expect(
+      isNoRequiredChecksReportedErrorMessage('gh pr checks 297 --required failed: transport timeout')
+    ).toBe(false);
   });
 });
 
