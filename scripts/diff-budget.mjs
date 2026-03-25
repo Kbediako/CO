@@ -10,17 +10,20 @@ import { parseArgs, hasFlag } from './lib/cli-args.js';
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_MAX_FILES = 25;
-const DEFAULT_MAX_LINES = 800;
+const DEFAULT_MAX_LINES = 1200;
 const MAX_UNTRACKED_BYTES_FOR_LINE_COUNT = 1024 * 1024;
+const DEFAULT_STACKED_ADVISORY_REF = 'origin/main';
 
 const IGNORED_EXACT_PATHS = new Set(['package-lock.json']);
 const IGNORED_PREFIXES = [
+  '.agent/task/',
   '.runs/',
   'archives/',
   'dist/',
   'node_modules/',
   'out/'
 ];
+const IGNORED_TASK_CHECKLIST_PREFIX = 'tasks/tasks-';
 
 function showUsage() {
   console.log(`Usage: node scripts/diff-budget.mjs [--dry-run] [--commit <sha>] [--base <ref>] [--max-files <n>] [--max-lines <n>]
@@ -36,11 +39,11 @@ Escape hatch:
 
 Base selection order:
   For --commit: uses the commit's own diff (ignores working tree state).
-  For working-tree diffs:
+  For explicit base diffs:
   1) --base <ref>
   2) BASE_SHA env var (CI)
-  3) origin/main (when available)
-  4) initial commit
+  3) DIFF_BUDGET_BASE env var
+  Local auto mode (no explicit base/env): hard-gates current working tree scope and, when ${DEFAULT_STACKED_ADVISORY_REF} exists, prints the broader aggregate branch delta as advisory context.
 
 Options:
   --dry-run     Report failures without exiting non-zero
@@ -74,32 +77,54 @@ async function verifyGitRef(ref) {
   }
 }
 
-async function resolveBaseRef(baseArg) {
-  if (baseArg && (await verifyGitRef(baseArg))) {
-    return baseArg;
+async function resolveConfiguredBaseRef(baseArg) {
+  const candidates = [
+    { source: '--base', ref: baseArg?.trim() },
+    { source: 'BASE_SHA', ref: process.env.BASE_SHA?.trim() },
+    { source: 'DIFF_BUDGET_BASE', ref: process.env.DIFF_BUDGET_BASE?.trim() }
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate.ref) {
+      continue;
+    }
+    if (await verifyGitRef(candidate.ref)) {
+      return {
+        baseRef: candidate.ref,
+        explicitRequested: true,
+        invalidRefs: []
+      };
+    }
+
+    return {
+      baseRef: null,
+      explicitRequested: true,
+      invalidRefs: [`${candidate.source}=${candidate.ref}`]
+    };
   }
 
-  const envBase = process.env.BASE_SHA ?? process.env.DIFF_BUDGET_BASE;
-  if (envBase && (await verifyGitRef(envBase))) {
-    return envBase;
+  return {
+    baseRef: null,
+    explicitRequested: false,
+    invalidRefs: []
+  };
+}
+
+async function resolveStackedAdvisoryRef() {
+  if (await verifyGitRef(DEFAULT_STACKED_ADVISORY_REF)) {
+    return DEFAULT_STACKED_ADVISORY_REF;
   }
 
-  const defaultRef = 'origin/main';
-  if (await verifyGitRef(defaultRef)) {
-    return defaultRef;
-  }
+  return null;
+}
 
-  const { stdout } = await execFileAsync('git', ['rev-list', '--max-parents=0', 'HEAD'], {
-    maxBuffer: 1024 * 1024
-  });
-  const commits = String(stdout ?? '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (commits.length === 0) {
-    throw new Error('Unable to locate repository history for diff budget.');
+async function resolveMergeBaseRef(ref) {
+  const mergeBase = await runGit(['merge-base', ref, 'HEAD']).catch(() => '');
+  const trimmedMergeBase = mergeBase.trim();
+  if (trimmedMergeBase && (await verifyGitRef(trimmedMergeBase))) {
+    return trimmedMergeBase;
   }
-  return commits[commits.length - 1] || 'HEAD';
+  return ref;
 }
 
 async function runGit(args, options = {}) {
@@ -121,6 +146,9 @@ function isIgnoredPath(filePath) {
     if (filePath.startsWith(prefix)) {
       return true;
     }
+  }
+  if (filePath.startsWith(IGNORED_TASK_CHECKLIST_PREFIX)) {
+    return true;
   }
   return false;
 }
@@ -158,6 +186,46 @@ function parseNumstatLine(line) {
   };
 }
 
+function parsePathList(raw) {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function parseNumstatMap(raw) {
+  return new Map(
+    raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map(parseNumstatLine)
+      .filter(Boolean)
+      .map((entry) => [entry.filePath, entry])
+  );
+}
+
+function mergeNumstatMaps(...maps) {
+  const merged = new Map();
+  for (const map of maps) {
+    for (const [filePath, entry] of map.entries()) {
+      const existing = merged.get(filePath);
+      merged.set(
+        filePath,
+        existing
+          ? {
+              filePath,
+              added: existing.added + entry.added,
+              deleted: existing.deleted + entry.deleted,
+              binary: existing.binary || entry.binary
+            }
+          : { ...entry }
+      );
+    }
+  }
+  return merged;
+}
+
 async function collectCommitDiff(commit) {
   if (!(await verifyGitRef(commit))) {
     throw new Error(`Invalid commit ref: ${commit}`);
@@ -187,6 +255,61 @@ async function collectCommitDiff(commit) {
   return { changedFiles, numstatByPath };
 }
 
+async function collectWorkingTreeDiff() {
+  const [nameOnly, cachedNameOnly, numstatRaw, cachedNumstatRaw, untracked] = await Promise.all([
+    runGit(['diff', '--name-only', '--no-renames']),
+    runGit(['diff', '--cached', '--name-only', '--no-renames', 'HEAD']),
+    runGit(['diff', '--numstat', '--no-renames']),
+    runGit(['diff', '--cached', '--numstat', '--no-renames', 'HEAD']),
+    listUntrackedFiles()
+  ]);
+
+  const changedFiles = new Set([...parsePathList(nameOnly), ...parsePathList(cachedNameOnly)]);
+
+  for (const filePath of untracked) {
+    changedFiles.add(filePath);
+  }
+
+  return {
+    changedFiles,
+    numstatByPath: mergeNumstatMaps(parseNumstatMap(numstatRaw), parseNumstatMap(cachedNumstatRaw)),
+    untrackedRaw: untracked
+  };
+}
+
+async function collectBaseDiff(baseRef) {
+  const [nameOnly, numstatRaw, untracked] = await Promise.all([
+    runGit(['diff', '--name-only', '--no-renames', baseRef]),
+    runGit(['diff', '--numstat', '--no-renames', baseRef]),
+    listUntrackedFiles()
+  ]);
+
+  const changedFiles = new Set(
+    nameOnly
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+  );
+
+  for (const filePath of untracked) {
+    changedFiles.add(filePath);
+  }
+
+  return {
+    changedFiles,
+    numstatByPath: new Map(
+      numstatRaw
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map(parseNumstatLine)
+        .filter(Boolean)
+        .map((entry) => [entry.filePath, entry])
+    ),
+    untrackedRaw: untracked
+  };
+}
+
 async function countUntrackedLines(filePath) {
   const abs = path.resolve(process.cwd(), filePath);
   try {
@@ -198,78 +321,22 @@ async function countUntrackedLines(filePath) {
     if (!content) {
       return { kind: 'lines', lines: 0 };
     }
-    return { kind: 'lines', lines: content.split(/\r?\n/).length };
+    const trailingNewlineAdjustedCount =
+      content.split(/\r?\n/).length - (content.endsWith('\n') ? 1 : 0);
+    return { kind: 'lines', lines: Math.max(0, trailingNewlineAdjustedCount) };
   } catch {
     return { kind: 'unreadable' };
   }
 }
 
-async function main() {
-  const { args, positionals } = parseArgs(process.argv.slice(2));
-  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
-    showUsage();
-    return;
-  }
-  const knownFlags = new Set(['dry-run', 'commit', 'base', 'max-files', 'max-lines', 'h', 'help']);
-  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
-  if (unknown.length > 0 || positionals.length > 0) {
-    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
-    console.error(`Unknown option: ${label}`);
-    showUsage();
-    process.exitCode = 2;
-    return;
-  }
+function summarizeDiff(diff, commitRef) {
+  const { changedFiles, numstatByPath, untrackedRaw } = diff;
 
-  const cliOptions = {
-    dryRun: hasFlag(args, 'dry-run'),
-    commit: typeof args.commit === 'string' ? args.commit : undefined,
-    base: typeof args.base === 'string' ? args.base : undefined,
-    maxFiles: typeof args['max-files'] === 'string' ? args['max-files'] : undefined,
-    maxLines: typeof args['max-lines'] === 'string' ? args['max-lines'] : undefined
-  };
-  const maxFiles = parseNumber(cliOptions.maxFiles ?? process.env.DIFF_BUDGET_MAX_FILES, DEFAULT_MAX_FILES);
-  const maxLines = parseNumber(cliOptions.maxLines ?? process.env.DIFF_BUDGET_MAX_LINES, DEFAULT_MAX_LINES);
+  return { changedFiles, numstatByPath, untrackedRaw, commitRef };
+}
 
-  const overrideReason = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
-
-  const commitRef = cliOptions.commit?.trim();
-  const modeLabel = commitRef ? `commit=${commitRef}` : 'working-tree';
-
-  let changedFiles = new Set();
-  let numstatByPath = new Map();
-  let untrackedRaw = [];
-  let baseRef = null;
-
-  if (commitRef) {
-    ({ changedFiles, numstatByPath } = await collectCommitDiff(commitRef));
-  } else {
-    baseRef = await resolveBaseRef(cliOptions.base);
-    const [nameOnly, numstatRaw, untracked] = await Promise.all([
-      runGit(['diff', '--name-only', '--no-renames', baseRef]),
-      runGit(['diff', '--numstat', '--no-renames', baseRef]),
-      listUntrackedFiles()
-    ]);
-
-    changedFiles = new Set(
-      nameOnly
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-    );
-
-    for (const filePath of untracked) {
-      changedFiles.add(filePath);
-    }
-
-    const numstatEntries = numstatRaw
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map(parseNumstatLine)
-      .filter(Boolean);
-    numstatByPath = new Map(numstatEntries.map((entry) => [entry.filePath, entry]));
-    untrackedRaw = untracked;
-  }
+async function measureDiff(diff) {
+  const { changedFiles, numstatByPath, untrackedRaw, commitRef } = diff;
 
   let consideredFiles = 0;
   let totalAdded = 0;
@@ -307,37 +374,160 @@ async function main() {
     perFileLines.push({ filePath, lines: 0, binary: false });
   }
 
-  const totalLines = totalAdded + totalDeleted;
+  return {
+    consideredFiles,
+    totalAdded,
+    totalDeleted,
+    totalLines: totalAdded + totalDeleted,
+    perFileLines,
+    untrackedIssues
+  };
+}
+
+function buildFailures(summary, maxFiles, maxLines) {
   const failures = [];
+  if (summary.consideredFiles > maxFiles) {
+    failures.push(`changed files ${summary.consideredFiles} > ${maxFiles}`);
+  }
+  if (summary.totalLines > maxLines) {
+    failures.push(`total lines changed ${summary.totalLines} > ${maxLines}`);
+  }
+  if (summary.untrackedIssues.length > 0) {
+    failures.push(`untracked files could not be measured: ${summary.untrackedIssues.length}`);
+  }
+  return failures;
+}
 
-  if (consideredFiles > maxFiles) {
-    failures.push(`changed files ${consideredFiles} > ${maxFiles}`);
-  }
-  if (totalLines > maxLines) {
-    failures.push(`total lines changed ${totalLines} > ${maxLines}`);
-  }
-  if (untrackedIssues.length > 0) {
-    failures.push(`untracked files could not be measured: ${untrackedIssues.length}`);
-  }
-
-  if (failures.length === 0) {
-    const baseLabel = baseRef ? `base=${baseRef}` : modeLabel;
-    console.log(
-      `✅ Diff budget: OK (${baseLabel}, files=${consideredFiles}/${maxFiles}, lines=${totalLines}/${maxLines}, +${totalAdded}/-${totalDeleted})`
-    );
-    return;
-  }
-
-  const topFiles = [...perFileLines]
+function buildTopFiles(summary) {
+  return [...summary.perFileLines]
     .sort((a, b) => b.lines - a.lines)
     .slice(0, 10)
     .map((entry) => `  - ${entry.filePath}: ${entry.lines}${entry.binary ? ' (binary/unknown)' : ''}`);
+}
 
-  const baseLabel = baseRef ? `base=${baseRef}` : modeLabel;
+function printUntrackedIssues(summary) {
+  if (summary.untrackedIssues.length === 0) {
+    return;
+  }
+
+  console.log('Untracked measurement issues:');
+  for (const issue of summary.untrackedIssues) {
+    if (issue.kind === 'too-large') {
+      console.log(`  - ${issue.filePath}: too large to measure (${issue.sizeBytes} bytes)`);
+    } else if (issue.kind === 'unreadable') {
+      console.log(`  - ${issue.filePath}: unreadable`);
+    } else {
+      console.log(`  - ${issue.filePath}: unknown`);
+    }
+  }
+}
+
+function formatBudgetTotals(summary, maxFiles, maxLines) {
+  return `files=${summary.consideredFiles}/${maxFiles}, lines=${summary.totalLines}/${maxLines}, +${summary.totalAdded}/-${summary.totalDeleted}`;
+}
+
+function shouldPrintStackedAdvisory(hardSummary, advisorySummary) {
+  return (
+    advisorySummary.consideredFiles > hardSummary.consideredFiles ||
+    advisorySummary.totalLines > hardSummary.totalLines
+  );
+}
+
+function printStackedAdvisory(advisoryRef, summary, maxFiles, maxLines) {
+  console.log('');
+  console.log(
+    `Advisory stacked aggregate vs ${advisoryRef}: ${formatBudgetTotals(summary, maxFiles, maxLines)}`
+  );
+  console.log(
+    'The broader stacked branch delta is reported for context only; the hard local gate above uses the current working tree scope.'
+  );
+}
+
+async function main() {
+  const { args, positionals } = parseArgs(process.argv.slice(2));
+  if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
+    showUsage();
+    return;
+  }
+  const knownFlags = new Set(['dry-run', 'commit', 'base', 'max-files', 'max-lines', 'h', 'help']);
+  const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
+  if (unknown.length > 0 || positionals.length > 0) {
+    const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
+    console.error(`Unknown option: ${label}`);
+    showUsage();
+    process.exitCode = 2;
+    return;
+  }
+
+  const cliOptions = {
+    dryRun: hasFlag(args, 'dry-run'),
+    commit: typeof args.commit === 'string' ? args.commit : undefined,
+    base: typeof args.base === 'string' ? args.base : undefined,
+    maxFiles: typeof args['max-files'] === 'string' ? args['max-files'] : undefined,
+    maxLines: typeof args['max-lines'] === 'string' ? args['max-lines'] : undefined
+  };
+  const maxFiles = parseNumber(cliOptions.maxFiles ?? process.env.DIFF_BUDGET_MAX_FILES, DEFAULT_MAX_FILES);
+  const maxLines = parseNumber(cliOptions.maxLines ?? process.env.DIFF_BUDGET_MAX_LINES, DEFAULT_MAX_LINES);
+
+  const overrideReason = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
+
+  const commitRef = cliOptions.commit?.trim();
+  const baseConfig = commitRef
+    ? { baseRef: null, explicitRequested: false, invalidRefs: [] }
+    : await resolveConfiguredBaseRef(cliOptions.base);
+  const { baseRef, explicitRequested: explicitBaseRequested, invalidRefs } = baseConfig;
+
+  if (!commitRef && explicitBaseRequested && !baseRef) {
+    throw new Error(
+      `Explicit diff base requested but no valid ref was found (${invalidRefs.join(', ')}).`
+    );
+  }
+
+  const localAutoMode = !commitRef && !explicitBaseRequested && !baseRef;
+  const hardScopeLabel = commitRef
+    ? `commit=${commitRef}`
+    : baseRef
+      ? `base=${baseRef}`
+      : 'scope=working-tree';
+
+  let hardDiff;
+  if (commitRef) {
+    const commitDiff = await collectCommitDiff(commitRef);
+    hardDiff = summarizeDiff({ ...commitDiff, untrackedRaw: [] }, commitRef);
+  } else if (baseRef) {
+    hardDiff = summarizeDiff(await collectBaseDiff(baseRef), null);
+  } else {
+    hardDiff = summarizeDiff(await collectWorkingTreeDiff(), null);
+  }
+
+  const hardSummary = await measureDiff(hardDiff);
+  const failures = buildFailures(hardSummary, maxFiles, maxLines);
+  const topFiles = buildTopFiles(hardSummary);
+
+  let stackedAdvisory = null;
+  if (localAutoMode) {
+    const advisoryRef = await resolveStackedAdvisoryRef();
+    if (advisoryRef) {
+      const advisoryBaseRef = await resolveMergeBaseRef(advisoryRef);
+      const advisorySummary = await measureDiff(summarizeDiff(await collectBaseDiff(advisoryBaseRef), null));
+      if (shouldPrintStackedAdvisory(hardSummary, advisorySummary)) {
+        stackedAdvisory = { ref: advisoryRef, summary: advisorySummary };
+      }
+    }
+  }
+
+  if (failures.length === 0) {
+    console.log(`✅ Diff budget: OK (${hardScopeLabel}, ${formatBudgetTotals(hardSummary, maxFiles, maxLines)})`);
+    if (stackedAdvisory) {
+      printStackedAdvisory(stackedAdvisory.ref, stackedAdvisory.summary, maxFiles, maxLines);
+    }
+    return;
+  }
+
   const exceededLabel = overrideReason
     ? '⚠️ Diff budget exceeded (override applied)'
     : '❌ Diff budget exceeded';
-  console.log(`${exceededLabel} (${baseLabel})`);
+  console.log(`${exceededLabel} (${hardScopeLabel})`);
   for (const failure of failures) {
     console.log(` - ${failure}`);
   }
@@ -348,17 +538,10 @@ async function main() {
     }
   }
 
-  if (untrackedIssues.length > 0) {
-    console.log('Untracked measurement issues:');
-    for (const issue of untrackedIssues) {
-      if (issue.kind === 'too-large') {
-        console.log(`  - ${issue.filePath}: too large to measure (${issue.sizeBytes} bytes)`);
-      } else if (issue.kind === 'unreadable') {
-        console.log(`  - ${issue.filePath}: unreadable`);
-      } else {
-        console.log(`  - ${issue.filePath}: unknown`);
-      }
-    }
+  printUntrackedIssues(hardSummary);
+
+  if (stackedAdvisory) {
+    printStackedAdvisory(stackedAdvisory.ref, stackedAdvisory.summary, maxFiles, maxLines);
   }
 
   if (overrideReason) {

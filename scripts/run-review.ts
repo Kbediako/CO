@@ -590,8 +590,14 @@ async function runDiffBudget(options: CliOptions): Promise<void> {
     args.push('--base', options.base);
   }
 
+  const diffBudgetEnv = { ...process.env };
+  // The review wrapper's scope is driven by explicit CLI flags; inherited base env vars
+  // would silently change the default uncommitted review surface.
+  delete diffBudgetEnv.BASE_SHA;
+  delete diffBudgetEnv.DIFF_BUDGET_BASE;
+
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('node', args, { stdio: 'inherit', env: process.env, cwd: repoRoot });
+    const child = spawn('node', args, { stdio: 'inherit', env: diffBudgetEnv, cwd: repoRoot });
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
     child.once('exit', (code) => {
       if (code === 0) {

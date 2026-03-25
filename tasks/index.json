@@ -56,6 +56,22 @@
       }
     },
     {
+      "id": "20260325-linear-74d145eb-305b-4b27-be84-21c248b22e4d",
+      "title": "CO Recalibrate Diff Budget for Stacked Lanes While Keeping Hard PR Scope Guard",
+      "relates_to": "tasks/tasks-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+        "task": "tasks/tasks-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+        "agent_task": ".agent/task/linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+        "docs": "docs/TECH_SPEC-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md"
+      }
+    },
+    {
       "id": "20260325-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5",
       "title": "CO Reconcile Terminal Provider-Worker Failures and Stale Intake Workpad State",
       "relates_to": "tasks/tasks-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",

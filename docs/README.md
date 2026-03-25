@@ -218,7 +218,7 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | `npm run ci:cloud-canary` | Runs the cloud canary harness (`scripts/cloud-canary-ci.mjs`) to verify cloud lifecycle manifest + run-summary evidence; credential-gated by `CODEX_CLOUD_ENV_ID` and optional auth secrets (`CODEX_CLOUD_BRANCH` defaults to `main`). Feature flags can be passed through with `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` (comma- or space-delimited, e.g. `sqlite,memories`). |
 | `node scripts/delegation-guard.mjs` | Enforces subagent delegation evidence before review (repo-only). |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review (repo-only). |
-| `node scripts/diff-budget.mjs` | Guards against oversized diffs before review (repo-only; defaults: 25 files / 800 lines; supports explicit overrides). |
+| `node scripts/diff-budget.mjs` | Guards against oversized diffs before review (repo-only; defaults: 25 files / 1200 lines; supports explicit overrides). |
 | `npm run pack:smoke` | Downstream simulation gate for npm consumers (tarball install in temp mock repo, `review` wrapper artifacts, delegate-server JSONL, and `skills install --only long-poll-wait`). Spot-check gate; pair with `npm run pack:audit` when you need full tarball inventory coverage. Core lane runs it automatically when downstream-facing paths change, and `.github/workflows/pack-smoke-backstop.yml` runs a weekly `main` backstop. |
 | `codex-orchestrator review` | Runs the standalone review wrapper with task-scoped manifest evidence; delegation MCP is enabled by default (explicit disable available via `CODEX_REVIEW_DISABLE_DELEGATION_MCP=1` / `--disable-delegation-mcp`), runtime guards are opt-in via `CODEX_REVIEW_*` env vars, and patience-first checkpoints log by default (`CODEX_REVIEW_MONITOR_INTERVAL_SECONDS` tunes/disables). Large uncommitted scopes get an automatic prompt advisory (`CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD` / `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD`). Optional auto failure issue logging via `CODEX_REVIEW_AUTO_ISSUE_LOG=1` or `--auto-issue-log`. |
 | `npm run review` | Runs `codex review` with task-scoped manifest evidence; delegation MCP is enabled by default (explicit disable available via `CODEX_REVIEW_DISABLE_DELEGATION_MCP=1` / `--disable-delegation-mcp`), runtime guards are opt-in via `CODEX_REVIEW_*` env vars, and patience-first checkpoints log by default (`CODEX_REVIEW_MONITOR_INTERVAL_SECONDS` tunes/disables). Large uncommitted scopes get an automatic prompt advisory (`CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD` / `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD`). Optional auto failure issue logging via `CODEX_REVIEW_AUTO_ISSUE_LOG=1` or `--auto-issue-log`. |
@@ -229,13 +229,14 @@ Run `npm run build` to compile TypeScript before packaging or invoking the CLI d
 
 This repo enforces a small “diff budget” via `node scripts/diff-budget.mjs` to keep PRs reviewable and avoid accidental scope creep (repo-only).
 
-- Defaults: 25 changed files / 800 total lines changed (additions + deletions), excluding ignored paths.
-- CI: `.github/workflows/core-lane.yml` runs the diff budget on pull requests and sets `BASE_SHA` to the PR base commit.
-- Local: run `node scripts/diff-budget.mjs` before `npm run review` (the review wrapper runs it automatically).
+- Defaults: 25 changed files / 1200 total lines changed (additions + deletions), excluding ignored paths.
+- CI: `.github/workflows/core-lane.yml` runs the diff budget on pull requests and sets `BASE_SHA` to the PR base commit, so PR/base scope remains hard-gated.
+- Local: run `node scripts/diff-budget.mjs` before `npm run review` (the review wrapper runs it automatically). Without an explicit base, the hard local gate uses the current working tree relative to `HEAD`; when `origin/main` exists and the broader stacked aggregate is larger, the script prints that aggregate as advisory context.
+- If `--base`, `BASE_SHA`, or `DIFF_BUDGET_BASE` is provided but cannot be resolved, the script fails instead of downgrading to local auto mode or silently falling through to a lower-priority base source.
 
 ### Local usage
-- Working tree diff against the default base (uses `BASE_SHA`/`origin/main`/initial commit as available): `node scripts/diff-budget.mjs`
-- Explicit base: `node scripts/diff-budget.mjs --base <ref>`
+- Current working tree hard gate relative to `HEAD` (default local mode): `node scripts/diff-budget.mjs`
+- Explicit PR/base scope: `node scripts/diff-budget.mjs --base <ref>`
 - Commit-scoped mode (ignores working tree state): `node scripts/diff-budget.mjs --commit <sha>`
 
 ### Overrides (exceptional)
