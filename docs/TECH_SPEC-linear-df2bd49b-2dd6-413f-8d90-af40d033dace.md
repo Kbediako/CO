@@ -36,7 +36,7 @@ last_review: 2026-03-26
 - Functional requirements:
   - `upsert-workpad` must reject workpad bodies that omit any core section or only provide the marker
   - the core sections must exist in a stable order: environment/workspace stamp, plan, acceptance criteria, validation, and notes
-  - plan, acceptance-criteria, and validation sections must provide checklist-shaped progress content rather than empty prose-only shells
+  - plan, acceptance-criteria, and validation sections must provide non-empty, truthful progress content; checklist formatting is allowed but not required
   - when the ticket description includes `Validation`, `Test Plan`, or `Testing` sections, those requirements must be mirrored into the workpad acceptance/validation surface in a detectable way
   - provider-worker prompt text and repo-local `skills/linear/SKILL.md` guidance must require refreshes after meaningful milestones and immediately before review or merge handoff
   - final or handoff closeout must stay in the same workpad comment instead of separate completion comments

@@ -12039,7 +12039,7 @@
       "path": "docs/TASKS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-22",
+      "last_review": "2026-03-26",
       "cadence_days": 90
     },
     {
@@ -15105,7 +15105,7 @@
       "path": "tasks/index.json",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-21",
+      "last_review": "2026-03-26",
       "cadence_days": 90
     },
     {

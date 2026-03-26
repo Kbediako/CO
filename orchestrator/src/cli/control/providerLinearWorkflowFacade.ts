@@ -39,6 +39,28 @@ const LINEAR_ISSUE_PLAIN_SECTION_TITLES = new Set([
   'implementation',
   'investigation'
 ]);
+const LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'as',
+  'at',
+  'by',
+  'for',
+  'from',
+  'in',
+  'into',
+  'of',
+  'on',
+  'or',
+  'per',
+  'the',
+  'to',
+  'via',
+  'vs',
+  'with',
+  'without'
+]);
 const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
@@ -2026,7 +2048,17 @@ function findUnresolvedWorkpadComments(
 }
 
 function hasWorkpadMarker(body: string): boolean {
-  return /(^|\n)##\s+Codex Workpad\b/u.test(body);
+  let insideCodeFence = false;
+  for (const line of body.split(/\r?\n/u)) {
+    if (isCodeFenceLine(line)) {
+      insideCodeFence = !insideCodeFence;
+      continue;
+    }
+    if (!insideCodeFence && /^##\s+Codex Workpad\b/u.test(line)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function validateWorkpadBodyContract(
@@ -2129,16 +2161,16 @@ function parseWorkpadSections(body: string): ProviderLinearWorkpadSection[] {
   };
 
   for (const line of body.split(/\r?\n/u)) {
-    if (!markerSeen) {
-      if (/^##\s+Codex Workpad\b/u.test(line)) {
-        markerSeen = true;
+    if (isCodeFenceLine(line)) {
+      if (markerSeen && currentTitle) {
+        currentLines.push(line);
       }
+      insideCodeFence = !insideCodeFence;
       continue;
     }
-    if (isCodeFenceLine(line)) {
-      insideCodeFence = !insideCodeFence;
-      if (currentTitle) {
-        currentLines.push(line);
+    if (!markerSeen) {
+      if (!insideCodeFence && /^##\s+Codex Workpad\b/u.test(line)) {
+        markerSeen = true;
       }
       continue;
     }
@@ -2174,8 +2206,16 @@ function extractIssueValidationRequirements(
   const requirements: ProviderLinearIssueValidationRequirement[] = [];
   let activeSection: string | null = null;
   let previousNonEmptyLine: string | null = null;
+  let insideCodeFence = false;
   const lines = description.split(/\r?\n/u);
   for (const [index, line] of lines.entries()) {
+    if (isCodeFenceLine(line)) {
+      insideCodeFence = !insideCodeFence;
+      continue;
+    }
+    if (insideCodeFence) {
+      continue;
+    }
     const heading = parseIssueDescriptionSectionHeading(
       line,
       previousNonEmptyLine,
@@ -2191,6 +2231,12 @@ function extractIssueValidationRequirements(
       continue;
     }
     if (!activeSection) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    if (isListIntroductionLine(line, lines[index + 1] ?? null)) {
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
@@ -2235,7 +2281,12 @@ function parseIssueDescriptionSectionHeading(
   nextLine: string | null = null
 ): string | null {
   const trimmed = line.trim();
-  if (!trimmed || /^[-*+]\s/u.test(trimmed) || /^\d+\.\s/u.test(trimmed)) {
+  if (
+    !trimmed ||
+    /^[-*+]\s/u.test(trimmed) ||
+    /^\d+\.\s/u.test(trimmed) ||
+    isSetextUnderlineLine(trimmed)
+  ) {
     return null;
   }
 
@@ -2249,7 +2300,7 @@ function parseIssueDescriptionSectionHeading(
   candidate = candidate.replace(/^\*\*(.+)\*\*:?\s*$/u, '$1');
   candidate = candidate.replace(/^__(.+)__:?\s*$/u, '$1');
   candidate = candidate.replace(/:\s*$/u, '').trim();
-  if (!/^[A-Za-z][A-Za-z0-9 /&()'-]{0,79}$/u.test(candidate)) {
+  if (!candidate) {
     return null;
   }
 
@@ -2257,14 +2308,37 @@ function parseIssueDescriptionSectionHeading(
   if (LINEAR_ISSUE_PLAIN_SECTION_TITLES.has(normalizedCandidate)) {
     return candidate;
   }
-  if (isMarkdownHeading) {
+  if (isMarkdownHeading || isSetextUnderlineLine(nextLine ?? '')) {
     return candidate;
+  }
+  if (!looksLikePlainSectionHeadingCandidate(candidate)) {
+    return null;
   }
 
   const nextTrimmed = nextLine?.trim() ?? '';
   return isListLikeLine(previousNonEmptyLine) || isListLikeLine(nextTrimmed)
     ? candidate
     : null;
+}
+
+function looksLikePlainSectionHeadingCandidate(candidate: string): boolean {
+  if (!/^[A-Za-z][A-Za-z0-9 /&()'-]{0,79}$/u.test(candidate)) {
+    return false;
+  }
+  const words = candidate.split(/\s+/u).filter(Boolean);
+  if (words.length === 0 || words.length > 8) {
+    return false;
+  }
+  return words.every((word, index) => {
+    const bareWord = word.replace(/^[("'(]+|[)"')]+$/gu, '');
+    if (!bareWord) {
+      return true;
+    }
+    if (/^[A-Z0-9][A-Za-z0-9/&'-]*$/u.test(bareWord)) {
+      return true;
+    }
+    return index > 0 && LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS.has(bareWord.toLowerCase());
+  });
 }
 
 function stripRequirementPrefix(line: string): string | null {
@@ -2300,6 +2374,11 @@ function isCodeFenceLine(line: string): boolean {
 function isListLikeLine(line: string | null): boolean {
   const trimmed = line?.trim() ?? '';
   return /^[-*+]\s/u.test(trimmed) || /^\d+\.\s/u.test(trimmed) || /^\[[ xX]\]\s/u.test(trimmed);
+}
+
+function isListIntroductionLine(line: string, nextLine: string | null): boolean {
+  const trimmed = line.trim();
+  return Boolean(trimmed) && /:\s*$/u.test(trimmed) && isListLikeLine(nextLine);
 }
 
 function isSetextUnderlineLine(line: string): boolean {
