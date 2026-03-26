@@ -84,6 +84,12 @@ const LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS = new Set([
   'with',
   'without'
 ]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_LEADING_VERBS = new Set([
+  'run',
+  'rerun',
+  'execute',
+  'install'
+]);
 const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
@@ -2294,6 +2300,11 @@ function extractIssueValidationRequirements(
     const nextLine = lines[index + 1] ?? null;
     const previousLine = lines[index - 1] ?? null;
     const nextVisibleLines = getNextVisibleIssueLines(lines, index + 1, 2);
+    const headingContentLines = getNextVisibleIssueLines(
+      lines,
+      isSetextUnderlineLine(nextLine ?? '') ? index + 2 : index + 1,
+      2
+    );
     const heading = parseIssueDescriptionSectionHeading(
       line,
       previousNonEmptyLine,
@@ -2302,11 +2313,6 @@ function extractIssueValidationRequirements(
       nextVisibleLines[0] ?? null
     );
     if (heading) {
-      const headingContentLines = getNextVisibleIssueLines(
-        lines,
-        isSetextUnderlineLine(nextLine ?? '') ? index + 2 : index + 1,
-        2
-      );
       if (matchesIssueValidationSectionTitle(heading)) {
         activeSection = heading;
       } else if (
@@ -2512,11 +2518,32 @@ function looksLikeLowercaseSetextSectionHeadingCandidate(candidate: string): boo
   if (!coreCandidate) {
     return false;
   }
-  if (!/^[\p{L}][\p{L}\p{M}\p{N} /&()'’\-–—]{0,79}$/u.test(coreCandidate)) {
+  if (!/^[\p{Ll}][\p{L}\p{M}\p{N} /&()'’\-–—]{0,79}$/u.test(coreCandidate)) {
     return false;
   }
+  const normalizedCoreCandidate = normalizeComparableValue(coreCandidate);
+  if (
+    LINEAR_ISSUE_PLAIN_SECTION_TITLES.has(normalizedCoreCandidate) ||
+    LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(normalizedCoreCandidate)
+  ) {
+    return true;
+  }
   const words = coreCandidate.split(/\s+/u).filter(Boolean);
-  if (words.length === 0 || words.length > 8) {
+  if (words.length === 0 || words.length > 5) {
+    return false;
+  }
+  const significantWords = words
+    .map((word) => word.replace(/^[("'(]+|[)"')]+$/gu, ''))
+    .filter(
+      (word) =>
+        word.length > 0 &&
+        !/^[&/\-–—]$/u.test(word) &&
+        !LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS.has(word.toLowerCase())
+    );
+  if (significantWords.length === 0) {
+    return false;
+  }
+  if (LINEAR_ISSUE_LOWERCASE_SETEXT_LEADING_VERBS.has(significantWords[0].toLowerCase())) {
     return false;
   }
   return words.every((word) => {
