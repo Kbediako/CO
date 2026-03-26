@@ -2275,7 +2275,8 @@ function extractIssueValidationRequirements(
       line,
       previousNonEmptyLine,
       nextLine,
-      previousLine
+      previousLine,
+      nextVisibleLines[0] ?? null
     );
     if (heading) {
       const headingContentLines = getNextVisibleIssueLines(
@@ -2309,7 +2310,10 @@ function extractIssueValidationRequirements(
       }
       continue;
     }
-    if (isListIntroductionLine(line, nextVisibleLines[0] ?? null)) {
+    if (
+      isListIntroductionLine(line, nextVisibleLines[0] ?? null) ||
+      isStyledListIntroductionLine(line, nextVisibleLines[0] ?? null)
+    ) {
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
@@ -2352,7 +2356,8 @@ function parseIssueDescriptionSectionHeading(
   line: string,
   previousNonEmptyLine: string | null = null,
   nextLine: string | null = null,
-  previousLine: string | null = null
+  previousLine: string | null = null,
+  nextVisibleLine: string | null = null
 ): string | null {
   const trimmed = line.trim();
   if (
@@ -2396,6 +2401,9 @@ function parseIssueDescriptionSectionHeading(
   const previousTrimmed = previousLine?.trim() ?? '';
   const nextTrimmed = nextLine?.trim() ?? '';
   if (hadStyledWrapper) {
+    if (isStyledListIntroductionLine(line, nextVisibleLine ?? nextLine, candidate)) {
+      return null;
+    }
     return isListLikeLine(previousNonEmptyLine) ||
       isListLikeLine(nextTrimmed) ||
       (!previousTrimmed && Boolean(nextTrimmed))
@@ -2513,6 +2521,32 @@ function isListLikeLine(line: string | null): boolean {
 function isListIntroductionLine(line: string, nextLine: string | null): boolean {
   const trimmed = line.trim();
   return Boolean(trimmed) && /:\s*$/u.test(trimmed) && isListLikeLine(nextLine);
+}
+
+function isStyledListIntroductionLine(
+  line: string,
+  nextLine: string | null,
+  parsedCandidate: string | null = null
+): boolean {
+  if (!isListLikeLine(nextLine)) {
+    return false;
+  }
+  const trimmed = line.trim();
+  const styledMatch = trimmed.match(/^\*\*(.+)\*\*\s*$/u) ?? trimmed.match(/^__(.+)__\s*$/u);
+  if (!styledMatch) {
+    return false;
+  }
+  const wrappedContent = styledMatch[1].trim();
+  if (!/:\s*$/u.test(wrappedContent)) {
+    return false;
+  }
+  const candidate = (parsedCandidate ?? wrappedContent.replace(/:\s*$/u, '').trim()).trim();
+  return (
+    Boolean(candidate) &&
+    !matchesIssueValidationSectionTitle(candidate) &&
+    !looksLikePlainSectionHeadingCandidate(candidate) &&
+    !looksLikeSetextSectionHeadingCandidate(candidate)
+  );
 }
 
 function getNextVisibleIssueLines(lines: string[], startIndex: number, count: number): string[] {
