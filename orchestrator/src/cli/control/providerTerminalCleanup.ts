@@ -287,7 +287,13 @@ export async function runProviderTerminalCleanup(
     processedAttachedPrCount += 1;
     const prView = await runCommand({
       command: 'gh',
-      args: ['pr', 'view', attachedPrUrl, '--json', 'state,headRefName,headRefOid,url'],
+      args: [
+        'pr',
+        'view',
+        attachedPrUrl,
+        '--json',
+        'state,headRefName,headRefOid,url,headRepository,headRepositoryOwner,isCrossRepository'
+      ],
       cwd: input.workspacePath
     });
     if (!prView.ok) {
@@ -301,6 +307,8 @@ export async function runProviderTerminalCleanup(
       continue;
     }
 
+    const sameBaseRepository = prDetails.repoKey === workspaceRepoKey;
+    const sameHeadRepository = prDetails.headRepoKey === workspaceRepoKey;
     const matchesBranch =
       branch !== null &&
       prDetails.headRefName === branch &&
@@ -310,7 +318,12 @@ export async function runProviderTerminalCleanup(
       workspaceHeadOid !== null &&
       prDetails.headRefOid !== null &&
       prDetails.headRefOid === workspaceHeadOid;
-    if (prDetails.state !== 'OPEN' || (!matchesBranch && !matchesHead)) {
+    if (
+      prDetails.state !== 'OPEN' ||
+      !sameBaseRepository ||
+      !sameHeadRepository ||
+      (!matchesBranch && !matchesHead)
+    ) {
       continue;
     }
 
@@ -479,10 +492,23 @@ function parsePrViewResponse(value: string): {
   headRefOid: string | null;
   url: string | null;
   repoKey: string | null;
+  headRepoKey: string | null;
 } | null {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     const parsedUrl = parseGitHubPullRequestUrl(typeof parsed.url === 'string' ? parsed.url : null);
+    const headRepository = asRecord(parsed.headRepository);
+    const headRepositoryOwner = asRecord(parsed.headRepositoryOwner);
+    const headRepositoryName = normalizeOptionalString(headRepository?.name);
+    const headRepositoryOwnerLogin = normalizeOptionalString(headRepositoryOwner?.login);
+    const isCrossRepository =
+      typeof parsed.isCrossRepository === 'boolean' ? parsed.isCrossRepository : null;
+    const headRepoKey =
+      headRepositoryName && headRepositoryOwnerLogin
+        ? `${headRepositoryOwnerLogin.toLowerCase()}/${headRepositoryName.toLowerCase()}`
+        : isCrossRepository === false
+          ? parsedUrl?.repoKey ?? null
+          : null;
     return {
       state:
         normalizeOptionalString(typeof parsed.state === 'string' ? parsed.state : null)?.toUpperCase() ?? null,
@@ -493,7 +519,8 @@ function parsePrViewResponse(value: string): {
         typeof parsed.headRefOid === 'string' ? parsed.headRefOid : null
       ),
       url: parsedUrl?.canonicalUrl ?? null,
-      repoKey: parsedUrl?.repoKey ?? null
+      repoKey: parsedUrl?.repoKey ?? null,
+      headRepoKey
     };
   } catch {
     return null;

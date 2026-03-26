@@ -190,7 +190,13 @@ describe('providerTerminalCleanup', () => {
         };
       }
       expect(command).toBe('gh');
-      expect(args).toEqual(['pr', 'view', attachedPrUrl, '--json', 'state,headRefName,headRefOid,url']);
+      expect(args).toEqual([
+        'pr',
+        'view',
+        attachedPrUrl,
+        '--json',
+        'state,headRefName,headRefOid,url,headRepository,headRepositoryOwner,isCrossRepository'
+      ]);
       return {
         ok: true,
         exitCode: 0,
@@ -198,7 +204,10 @@ describe('providerTerminalCleanup', () => {
           state: 'CLOSED',
           headRefName: 'feature/co-5',
           headRefOid: workspaceHeadOid,
-          url: attachedPrUrl
+          url: attachedPrUrl,
+          headRepository: { name: 'co' },
+          headRepositoryOwner: { login: 'example' },
+          isCrossRepository: false
         }),
         stderr: ''
       };
@@ -272,7 +281,10 @@ describe('providerTerminalCleanup', () => {
             state: 'OPEN',
             headRefName: 'feature/co-5',
             headRefOid: workspaceHeadOid,
-            url: attachedPrUrl
+            url: attachedPrUrl,
+            headRepository: { name: 'co' },
+            headRepositoryOwner: { login: 'example' },
+            isCrossRepository: false
           }),
           stderr: ''
         };
@@ -364,7 +376,10 @@ describe('providerTerminalCleanup', () => {
             state: 'OPEN',
             headRefName: 'feature/co-5',
             headRefOid: workspaceHeadOid,
-            url: attachedPrUrl
+            url: attachedPrUrl,
+            headRepository: { name: 'co' },
+            headRepositoryOwner: { login: 'example' },
+            isCrossRepository: false
           }),
           stderr: ''
         };
@@ -446,7 +461,10 @@ describe('providerTerminalCleanup', () => {
             state: 'OPEN',
             headRefName: 'feature/co-5',
             headRefOid: workspaceHeadOid,
-            url: attachedPrUrl
+            url: attachedPrUrl,
+            headRepository: { name: 'co' },
+            headRepositoryOwner: { login: 'example' },
+            isCrossRepository: false
           }),
           stderr: ''
         };
@@ -523,7 +541,13 @@ describe('providerTerminalCleanup', () => {
           stderr: ''
         };
       }
-      expect(args).toEqual(['pr', 'view', attachedPrUrl, '--json', 'state,headRefName,headRefOid,url']);
+      expect(args).toEqual([
+        'pr',
+        'view',
+        attachedPrUrl,
+        '--json',
+        'state,headRefName,headRefOid,url,headRepository,headRepositoryOwner,isCrossRepository'
+      ]);
       return {
         ok: true,
         exitCode: 0,
@@ -531,7 +555,10 @@ describe('providerTerminalCleanup', () => {
           state: 'OPEN',
           headRefName: 'feature/co-5',
           headRefOid: 'ffffffffff56abc123def456abc123def456abcd',
-          url: attachedPrUrl
+          url: attachedPrUrl,
+          headRepository: { name: 'co' },
+          headRepositoryOwner: { login: 'example' },
+          isCrossRepository: false
         }),
         stderr: ''
       };
@@ -598,7 +625,13 @@ describe('providerTerminalCleanup', () => {
           stderr: ''
         };
       }
-      expect(args).toEqual(['pr', 'view', attachedPrUrl, '--json', 'state,headRefName,headRefOid,url']);
+      expect(args).toEqual([
+        'pr',
+        'view',
+        attachedPrUrl,
+        '--json',
+        'state,headRefName,headRefOid,url,headRepository,headRepositoryOwner,isCrossRepository'
+      ]);
       return {
         ok: true,
         exitCode: 0,
@@ -606,7 +639,10 @@ describe('providerTerminalCleanup', () => {
           state: 'OPEN',
           headRefName: 'feature/co-5',
           headRefOid: workspaceHeadOid,
-          url: attachedPrUrl
+          url: attachedPrUrl,
+          headRepository: { name: 'co-fork' },
+          headRepositoryOwner: { login: 'other' },
+          isCrossRepository: true
         }),
         stderr: ''
       };
@@ -635,6 +671,90 @@ describe('providerTerminalCleanup', () => {
       closedPrUrls: []
     });
     expect(runCommand).toHaveBeenCalledTimes(3);
+  });
+
+  it('ignores a fork-based PR when the base repo matches but the head repository does not', async () => {
+    const workspacePath = await createWorkspacePath();
+    const attachedPrUrl = 'https://github.com/example/co/pull/123';
+    const workspaceHeadOid = 'abc123def456abc123def456abc123def456abcd';
+    const readIssueContext = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'issue-context' as const,
+      issue: {
+        attachments: [{ id: 'att-1', title: 'PR 123', url: attachedPrUrl, source_type: 'github' }]
+      }
+    }));
+    const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command, args }) => {
+      if (command === 'git') {
+        if (args.at(-2) === 'branch' && args.at(-1) === '--show-current') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'feature/co-5\n',
+            stderr: ''
+          };
+        }
+        if (args.at(-3) === 'remote' && args.at(-2) === 'get-url' && args.at(-1) === 'origin') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'https://github.com/example/co.git\n',
+            stderr: ''
+          };
+        }
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: `${workspaceHeadOid}\n`,
+          stderr: ''
+        };
+      }
+      expect(args).toEqual([
+        'pr',
+        'view',
+        attachedPrUrl,
+        '--json',
+        'state,headRefName,headRefOid,url,headRepository,headRepositoryOwner,isCrossRepository'
+      ]);
+      return {
+        ok: true,
+        exitCode: 0,
+        stdout: JSON.stringify({
+          state: 'OPEN',
+          headRefName: 'feature/co-5',
+          headRefOid: workspaceHeadOid,
+          url: attachedPrUrl,
+          headRepository: { name: 'co' },
+          headRepositoryOwner: { login: 'other' },
+          isCrossRepository: true
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderTerminalCleanup(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-5',
+        workspacePath,
+        config: buildEnabledCleanupConfig()
+      },
+      {
+        readIssueContext,
+        runCommand,
+        now: () => '2026-03-27T00:00:00.000Z'
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'noop',
+      summary: 'No attached open PR matched branch feature/co-5.',
+      branch: 'feature/co-5',
+      attachedPrUrls: [attachedPrUrl],
+      matchingOpenPrUrls: [],
+      closedPrUrls: []
+    });
+    expect(runCommand).toHaveBeenCalledTimes(4);
   });
 
   it('caps attached PR cleanup work and reports the skipped remainder as a non-fatal failure', async () => {
@@ -686,7 +806,10 @@ describe('providerTerminalCleanup', () => {
             state: 'OPEN',
             headRefName: 'feature/co-5',
             headRefOid: workspaceHeadOid,
-            url: args[2]
+            url: args[2],
+            headRepository: { name: 'co' },
+            headRepositoryOwner: { login: 'example' },
+            isCrossRepository: false
           }),
           stderr: ''
         };
@@ -773,7 +896,13 @@ describe('providerTerminalCleanup', () => {
         };
       }
       if (args[1] === 'view') {
-        expect(args).toEqual(['pr', 'view', matchingPrUrl, '--json', 'state,headRefName,headRefOid,url']);
+        expect(args).toEqual([
+          'pr',
+          'view',
+          matchingPrUrl,
+          '--json',
+          'state,headRefName,headRefOid,url,headRepository,headRepositoryOwner,isCrossRepository'
+        ]);
         return {
           ok: true,
           exitCode: 0,
@@ -781,7 +910,10 @@ describe('providerTerminalCleanup', () => {
             state: 'OPEN',
             headRefName: 'feature/co-5',
             headRefOid: workspaceHeadOid,
-            url: matchingPrUrl
+            url: matchingPrUrl,
+            headRepository: { name: 'co' },
+            headRepositoryOwner: { login: 'example' },
+            isCrossRepository: false
           }),
           stderr: ''
         };
@@ -865,7 +997,13 @@ describe('providerTerminalCleanup', () => {
         };
       }
       if (args[1] === 'view') {
-        expect(args).toEqual(['pr', 'view', attachedPrUrl, '--json', 'state,headRefName,headRefOid,url']);
+        expect(args).toEqual([
+          'pr',
+          'view',
+          attachedPrUrl,
+          '--json',
+          'state,headRefName,headRefOid,url,headRepository,headRepositoryOwner,isCrossRepository'
+        ]);
         return {
           ok: true,
           exitCode: 0,
@@ -873,7 +1011,10 @@ describe('providerTerminalCleanup', () => {
             state: 'OPEN',
             headRefName: 'feature/co-5',
             headRefOid: workspaceHeadOid,
-            url: attachedPrUrl
+            url: attachedPrUrl,
+            headRepository: { name: 'co' },
+            headRepositoryOwner: { login: 'example' },
+            isCrossRepository: false
           }),
           stderr: ''
         };
