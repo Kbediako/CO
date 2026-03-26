@@ -2274,6 +2274,8 @@ function stripRequirementPrefix(line: string): string | null {
   }
 
   const withoutPrefix = trimmed
+    .replace(/^[-*+]\s+\[[ xX]\]\s+/u, '')
+    .replace(/^\d+\.\s+\[[ xX]\]\s+/u, '')
     .replace(/^\[[ xX]\]\s+/u, '')
     .replace(/^[-*+]\s+/u, '')
     .replace(/^\d+\.\s+/u, '')
