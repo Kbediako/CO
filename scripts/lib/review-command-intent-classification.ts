@@ -21,6 +21,17 @@ const REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS = new Set(
 const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|pause|cancel)\(/iu;
 const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest', 'pytest']);
+const NODE_OPTION_VALUE_FLAGS = new Set([
+  '-r',
+  '--require',
+  '--import',
+  '--loader',
+  '--experimental-loader',
+  '--input-type',
+  '--env-file',
+  '--env-file-if-exists'
+]);
+const NODE_NON_SCRIPT_EXECUTION_FLAGS = new Set(['-e', '--eval', '-p', '--print', '-c', '--check']);
 
 export type ReviewCommandIntentViolationKind =
   | 'validation-suite'
@@ -153,13 +164,42 @@ export function isReviewOrchestrationCommand(command: string, args: string[]): b
     return firstArg === 'review';
   }
   if (command === 'node') {
-    return args.some((arg) => isReviewRunnerScriptToken(normalizeCommandToken(arg)));
+    const entryScript = resolveNodeEntryScriptToken(args);
+    return entryScript !== null && isReviewRunnerScriptToken(entryScript);
   }
   return false;
 }
 
 function isReviewRunnerScriptToken(token: string): boolean {
   return /^(?:.*\/)?run-review\.(?:js|ts|mjs|cjs|mts|cts|\{js,ts\})$/iu.test(token);
+}
+
+function resolveNodeEntryScriptToken(args: string[]): string | null {
+  let skipNextValue = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    const normalized = token.toLowerCase();
+    if (skipNextValue) {
+      skipNextValue = false;
+      continue;
+    }
+    if (normalized === '--') {
+      const explicitScript = args[index + 1] ?? '';
+      return explicitScript ? normalizeCommandToken(explicitScript) : null;
+    }
+    if (NODE_NON_SCRIPT_EXECUTION_FLAGS.has(normalized)) {
+      return null;
+    }
+    if (NODE_OPTION_VALUE_FLAGS.has(normalized)) {
+      skipNextValue = !token.includes('=');
+      continue;
+    }
+    if (token.startsWith('-')) {
+      continue;
+    }
+    return normalizeCommandToken(token);
+  }
+  return null;
 }
 
 function isDirectValidationRunnerCommand(command: string, args: string[]): boolean {

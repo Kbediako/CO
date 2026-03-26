@@ -329,4 +329,21 @@ describe('review command intent classification', () => {
       sample: String.raw`venv/Scripts/python -m pytest tests/review-execution-state.spec.ts`
     });
   });
+
+  it('only treats the Node entry script as the review runner target', () => {
+    expect(
+      classifyCommandIntentCommandLine(`node scripts/tool.js run-review.{js,ts}`, {
+        allowValidationCommandIntents: false
+      })
+    ).toBeNull();
+
+    expect(
+      classifyCommandIntentCommandLine(`node --require tsx scripts/run-review.ts --manifest x`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: `node --require tsx scripts/run-review.ts --manifest x`
+    });
+  });
 });
