@@ -8,6 +8,7 @@ import { resolveLinearSourceSetup } from './linearDispatchSource.js';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 
 const LINEAR_WORKPAD_MARKER = '## Codex Workpad';
+const LINEAR_WORKPAD_MARKER_TITLE = 'Codex Workpad';
 const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
   'Environment / Workspace Stamp',
   'Plan',
@@ -2095,6 +2096,18 @@ function validateWorkpadBodyContract(
       ok: false;
       error: ProviderLinearWorkflowError;
     } {
+  const firstVisibleLine = body.split(/\r?\n/u).find((line) => normalizeRequiredString(line) !== null) ?? '';
+  if (!isCanonicalWorkpadMarkerLine(firstVisibleLine)) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_structure_invalid',
+        message: `Workpad body must start with "${LINEAR_WORKPAD_MARKER}".`,
+        status: 422
+      }
+    };
+  }
+
   const { sections, hasLeadingContentBeforeFirstSection } = parseWorkpadSections(body);
   if (hasLeadingContentBeforeFirstSection) {
     return {
@@ -2178,6 +2191,15 @@ function validateWorkpadBodyContract(
   }
 
   return { ok: true };
+}
+
+function isCanonicalWorkpadMarkerLine(line: string): boolean {
+  const headingMatch = line.match(/^\s*##\s+(.+?)\s*$/u);
+  if (!headingMatch) {
+    return false;
+  }
+  const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
+  return normalizeComparableValue(headingTitle) === normalizeComparableValue(LINEAR_WORKPAD_MARKER_TITLE);
 }
 
 function parseWorkpadSections(body: string): {
@@ -2394,7 +2416,8 @@ function parseIssueDescriptionSectionHeading(
     return candidate;
   }
   if (isSetextUnderlineLine(nextLine ?? '')) {
-    return matchesIssueValidationSectionTitle(candidate) || looksLikeSetextSectionHeadingCandidate(candidate)
+    return matchesIssueValidationSectionTitle(candidate) ||
+      looksLikeActualSetextSectionHeadingCandidate(candidate)
       ? candidate
       : null;
   }
@@ -2462,6 +2485,50 @@ function looksLikeSetextSectionHeadingCandidate(candidate: string): boolean {
     return false;
   }
   return looksLikePlainSectionHeadingCandidate(symbolTrimmedCandidate);
+}
+
+function looksLikeActualSetextSectionHeadingCandidate(candidate: string): boolean {
+  if (looksLikeSetextSectionHeadingCandidate(candidate)) {
+    return true;
+  }
+  if (/[.:;!?]\s*$/u.test(candidate)) {
+    return false;
+  }
+  if (looksLikeLowercaseSetextSectionHeadingCandidate(candidate)) {
+    return true;
+  }
+  const symbolTrimmedCandidate = candidate
+    .replace(/[^\p{L}\p{N}\s/&()'-]+/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!symbolTrimmedCandidate || symbolTrimmedCandidate === candidate) {
+    return false;
+  }
+  return looksLikeLowercaseSetextSectionHeadingCandidate(symbolTrimmedCandidate);
+}
+
+function looksLikeLowercaseSetextSectionHeadingCandidate(candidate: string): boolean {
+  const coreCandidate = trimBoundarySymbolDecorationTokens(candidate);
+  if (!coreCandidate) {
+    return false;
+  }
+  if (!/^[\p{L}][\p{L}\p{M}\p{N} /&()'’\-–—]{0,79}$/u.test(coreCandidate)) {
+    return false;
+  }
+  const words = coreCandidate.split(/\s+/u).filter(Boolean);
+  if (words.length === 0 || words.length > 8) {
+    return false;
+  }
+  return words.every((word) => {
+    const bareWord = word.replace(/^[("'(]+|[)"')]+$/gu, '');
+    if (!bareWord) {
+      return true;
+    }
+    if (/^[&/\-–—]$/u.test(bareWord)) {
+      return true;
+    }
+    return /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}/&'’\-–—]*$/u.test(bareWord);
+  });
 }
 
 function matchesIssueValidationSectionTitle(title: string): boolean {
