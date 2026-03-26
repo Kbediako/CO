@@ -16,6 +16,28 @@ const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
   'Notes'
 ] as const;
 const LINEAR_ISSUE_VALIDATION_SECTION_TITLES = new Set(['validation', 'test plan', 'testing']);
+const LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES = new Set([
+  'automated',
+  'manual',
+  'smoke',
+  'sanity',
+  'regression',
+  'integration',
+  'unit',
+  'e2e',
+  'end to end',
+  'qa',
+  'verification',
+  'checks',
+  'checklist',
+  'accessibility',
+  'performance',
+  'security',
+  'setup',
+  'cleanup',
+  'preflight',
+  'postflight'
+]);
 const LINEAR_ISSUE_PLAIN_SECTION_TITLES = new Set([
   'context',
   'observed nuance',
@@ -2441,15 +2463,22 @@ function shouldPreserveValidationSectionAcrossNestedHeading(
   followingLine: string | null,
   thirdLine: string | null
 ): boolean {
+  const headingTitle = normalizeComparableValue(line.replace(/^\s*#{1,6}\s+/u, '').trim());
   const firstCandidate = normalizeRequiredString(nextLine);
   const secondCandidate = normalizeRequiredString(followingLine);
   const nextContentLine = firstCandidate ?? secondCandidate;
   const contentFollower =
     firstCandidate === null ? thirdLine : followingLine;
+  const allowsProseRequirements = LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(headingTitle);
   return (
     isMarkdownHeadingLine(line) &&
     (isListLikeLine(nextContentLine) ||
-      (nextContentLine !== null && isListIntroductionLine(nextContentLine, contentFollower)))
+      (nextContentLine !== null && isListIntroductionLine(nextContentLine, contentFollower)) ||
+      (allowsProseRequirements &&
+        nextContentLine !== null &&
+        !isCodeFenceLine(nextContentLine) &&
+        !isMarkdownHeadingLine(nextContentLine) &&
+        !isSetextUnderlineLine(nextContentLine)))
   );
 }
 

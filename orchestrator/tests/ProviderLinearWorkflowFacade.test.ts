@@ -967,6 +967,50 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('keeps mirroring prose requirements under common nested validation markdown subheadings', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Nested validation buckets with prose requirements should still contribute mirrored checks.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '### Automated', 'Run npm test.', '### Manual', 'Capture screenshots.'].join(
+              '\n'
+            )
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Capture screenshots.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
   it('ignores fenced code headings when validating the canonical workpad section structure', async () => {
     const createdWorkpadBody = buildStructuredWorkpadBody({
       notesLines: ['```md', '### Sample Heading', '- This is example markdown, not a real section.', '```']
