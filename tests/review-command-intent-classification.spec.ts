@@ -45,6 +45,30 @@ describe('review command intent classification', () => {
       kind: 'validation-runner',
       sample: `python -m pytest tests/review-execution-state.spec.ts`
     });
+    expect(
+      classifyCommandIntentCommandLine(`python -W ignore -m pytest tests/review-execution-state.spec.ts`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: `python -W ignore -m pytest tests/review-execution-state.spec.ts`
+    });
+    expect(
+      classifyCommandIntentCommandLine(
+        `python --check-hash-based-pycs=default -m pytest tests/review-execution-state.spec.ts`,
+        {
+          allowValidationCommandIntents: false
+        }
+      )
+    ).toEqual({
+      kind: 'validation-runner',
+      sample: `python --check-hash-based-pycs=default -m pytest tests/review-execution-state.spec.ts`
+    });
+    expect(
+      classifyCommandIntentCommandLine(`python tool.py -m pytest`, {
+        allowValidationCommandIntents: false
+      })
+    ).toBeNull();
   });
 
   it('resolves launcher variants and nested review-orchestration commands', () => {
@@ -344,6 +368,46 @@ describe('review command intent classification', () => {
     ).toEqual({
       kind: 'review-orchestration',
       sample: `node --require tsx scripts/run-review.ts --manifest x`
+    });
+    expect(
+      classifyCommandIntentCommandLine(`node -C development scripts/run-review.ts --manifest x`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: `node -C development scripts/run-review.ts --manifest x`
+    });
+    expect(
+      classifyCommandIntentCommandLine(`node --inspect-port 9229 scripts/run-review.ts --manifest x`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: `node --inspect-port 9229 scripts/run-review.ts --manifest x`
+    });
+    expect(
+      classifyCommandIntentCommandLine(`node --watch scripts/run-review.ts --manifest x`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: `node --watch scripts/run-review.ts --manifest x`
+    });
+    expect(
+      classifyCommandIntentCommandLine(`node --run review`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: `node --run review`
+    });
+    expect(
+      classifyCommandIntentCommandLine(`node --run=review`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'review-orchestration',
+      sample: `node --run=review`
     });
   });
 });

@@ -22,16 +22,25 @@ const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|pause|cancel)\(/iu;
 const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest', 'pytest']);
 const NODE_OPTION_VALUE_FLAGS = new Set([
+  '-C',
   '-r',
+  '--conditions',
+  '--debug-port',
+  '--inspect-port',
   '--require',
   '--import',
   '--loader',
   '--experimental-loader',
   '--input-type',
   '--env-file',
-  '--env-file-if-exists'
+  '--env-file-if-exists',
+  '--title',
+  '--watch-kill-signal',
+  '--watch-path'
 ]);
 const NODE_NON_SCRIPT_EXECUTION_FLAGS = new Set(['-e', '--eval', '-p', '--print', '-c', '--check']);
+const NODE_RUNTIME_SCRIPT_FLAGS = new Set(['--run']);
+const PYTHON_OPTION_VALUE_FLAGS = new Set(['-W', '-X', '--check-hash-based-pycs']);
 
 export type ReviewCommandIntentViolationKind =
   | 'validation-suite'
@@ -164,6 +173,10 @@ export function isReviewOrchestrationCommand(command: string, args: string[]): b
     return firstArg === 'review';
   }
   if (command === 'node') {
+    const runtimeScriptTarget = resolveNodeRuntimeScriptTarget(args);
+    if (runtimeScriptTarget === 'review') {
+      return true;
+    }
     const entryScript = resolveNodeEntryScriptToken(args);
     return entryScript !== null && isReviewRunnerScriptToken(entryScript);
   }
@@ -175,31 +188,110 @@ function isReviewRunnerScriptToken(token: string): boolean {
 }
 
 function resolveNodeEntryScriptToken(args: string[]): string | null {
-  let skipNextValue = false;
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index] ?? '';
-    const normalized = token.toLowerCase();
-    if (skipNextValue) {
-      skipNextValue = false;
-      continue;
-    }
-    if (normalized === '--') {
+    const optionName = normalizeCliOptionName(token);
+    if (optionName === '--') {
       const explicitScript = args[index + 1] ?? '';
       return explicitScript ? normalizeCommandToken(explicitScript) : null;
     }
-    if (NODE_NON_SCRIPT_EXECUTION_FLAGS.has(normalized)) {
+    if (
+      NODE_NON_SCRIPT_EXECUTION_FLAGS.has(optionName) ||
+      NODE_RUNTIME_SCRIPT_FLAGS.has(optionName)
+    ) {
       return null;
     }
-    if (NODE_OPTION_VALUE_FLAGS.has(normalized)) {
-      skipNextValue = !token.includes('=');
-      continue;
-    }
     if (token.startsWith('-')) {
+      index += advancePastNodeOption(args, index) - 1;
       continue;
     }
     return normalizeCommandToken(token);
   }
   return null;
+}
+
+function resolveNodeRuntimeScriptTarget(args: string[]): string | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    const optionName = normalizeCliOptionName(token);
+    if (optionName === '--') {
+      return null;
+    }
+    if (NODE_NON_SCRIPT_EXECUTION_FLAGS.has(optionName)) {
+      return null;
+    }
+    if (NODE_RUNTIME_SCRIPT_FLAGS.has(optionName)) {
+      if (hasInlineOptionValue(token)) {
+        return normalizeCommandToken(extractInlineOptionValue(token));
+      }
+      const scriptTarget = args[index + 1] ?? '';
+      return scriptTarget ? normalizeCommandToken(scriptTarget) : null;
+    }
+    if (token.startsWith('-')) {
+      index += advancePastNodeOption(args, index) - 1;
+      continue;
+    }
+    return null;
+  }
+  return null;
+}
+
+function advancePastNodeOption(args: string[], index: number): number {
+  const token = args[index] ?? '';
+  if (hasInlineOptionValue(token)) {
+    return 1;
+  }
+  const optionName = normalizeCliOptionName(token);
+  if (NODE_OPTION_VALUE_FLAGS.has(optionName)) {
+    return args[index + 1] ? 2 : 1;
+  }
+
+  const nextToken = args[index + 1] ?? '';
+  if (
+    nextToken &&
+    !nextToken.startsWith('-') &&
+    hasLaterNodeReviewRunnerCandidate(args, index + 2)
+  ) {
+    return 2;
+  }
+  return 1;
+}
+
+function hasLaterNodeReviewRunnerCandidate(args: string[], startIndex: number): boolean {
+  for (let index = startIndex; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    const optionName = normalizeCliOptionName(token);
+    if (optionName === '--') {
+      const explicitScript = args[index + 1] ?? '';
+      return explicitScript ? isReviewRunnerScriptToken(normalizeCommandToken(explicitScript)) : false;
+    }
+    if (token.startsWith('-')) {
+      if (hasInlineOptionValue(token)) {
+        continue;
+      }
+      if (NODE_OPTION_VALUE_FLAGS.has(optionName)) {
+        index += args[index + 1] ? 1 : 0;
+      }
+      continue;
+    }
+    return isReviewRunnerScriptToken(normalizeCommandToken(token));
+  }
+  return false;
+}
+
+function normalizeCliOptionName(token: string): string {
+  const equalsIndex = token.indexOf('=');
+  const optionName = equalsIndex >= 0 ? token.slice(0, equalsIndex) : token;
+  return optionName.startsWith('--') ? optionName.toLowerCase() : optionName;
+}
+
+function hasInlineOptionValue(token: string): boolean {
+  return token.includes('=');
+}
+
+function extractInlineOptionValue(token: string): string {
+  const equalsIndex = token.indexOf('=');
+  return equalsIndex >= 0 ? token.slice(equalsIndex + 1) : '';
 }
 
 function isDirectValidationRunnerCommand(command: string, args: string[]): boolean {
@@ -209,11 +301,20 @@ function isDirectValidationRunnerCommand(command: string, args: string[]): boole
 
   if (command === 'python' || command === 'python3' || command === 'py') {
     for (let index = 0; index < args.length - 1; index += 1) {
-      if ((args[index] ?? '').toLowerCase() !== '-m') {
-        continue;
+      const token = args[index] ?? '';
+      const optionName = normalizeCliOptionName(token);
+      if (optionName === '--' || optionName === '-c' || token === '-') {
+        break;
       }
-      if (normalizeCommandToken(args[index + 1] ?? '') === 'pytest') {
-        return true;
+      if (optionName === '-m') {
+        return normalizeCommandToken(args[index + 1] ?? '') === 'pytest';
+      }
+      if (!token.startsWith('-')) {
+        break;
+      }
+      if (pythonOptionConsumesValue(token)) {
+        index += hasInlineOptionValue(token) ? 0 : 1;
+        continue;
       }
     }
   }
@@ -228,6 +329,10 @@ function isPackageManagerValidationSuiteCommand(command: string, args: string[])
   }
   const scriptTarget = resolvePackageScriptTarget(args);
   return scriptTarget !== null && REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS.has(scriptTarget);
+}
+
+function pythonOptionConsumesValue(token: string): boolean {
+  return hasInlineOptionValue(token) || PYTHON_OPTION_VALUE_FLAGS.has(normalizeCliOptionName(token));
 }
 
 function resolveValidationLauncherTarget(command: string, args: string[]): string | null {
