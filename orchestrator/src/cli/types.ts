@@ -14,6 +14,7 @@ export interface PipelineDefinition {
   description?: string;
   stages: PipelineStage[];
   tags?: string[];
+  metadata?: Record<string, unknown>;
   guardrailsRequired?: boolean;
 }
 
