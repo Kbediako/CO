@@ -47,7 +47,8 @@ export function resolveRuntimeMode(options: ResolveRuntimeModeOptions = {}): Run
   }
 
   const envKey = options.envKey ?? DEFAULT_RUNTIME_MODE_ENV_KEY;
-  const envValue = options.env?.[envKey] ?? process.env[envKey];
+  const env = options.env ?? process.env;
+  const envValue = env[envKey];
   if (typeof envValue === 'string' && envValue.trim().length > 0) {
     return {
       mode: parseRuntimeModeFromSource(envValue, `env ${envKey}`),

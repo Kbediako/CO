@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260326-linear-df2bd49b-2dd6-413f-8d90-af40d033dace",
+      "title": "CO Tighten Symphony-style Linear Workpad Structure and Milestone Refresh Contract",
+      "relates_to": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-26",
+      "paths": {
+        "spec": "tasks/specs/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
+        "task": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
+        "agent_task": ".agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
+        "docs": "docs/TECH_SPEC-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md"
+      }
+    },
+    {
       "id": "20260325-linear-9d962236-4c38-4b28-b144-007c6f3a1395",
       "title": "CO Add Bounded Pre-Review Automated-Feedback Drain Before In Review",
       "relates_to": "tasks/tasks-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",

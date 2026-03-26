@@ -40,6 +40,20 @@ codex-orchestrator linear upsert-workpad \
 
 The body must contain the `## Codex Workpad` marker.
 
+Keep the workpad body in this exact top-level order, with every section non-empty:
+
+```md
+## Codex Workpad
+
+### Environment / Workspace Stamp
+### Plan
+### Acceptance Criteria
+### Validation
+### Notes
+```
+
+If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.
+
 Delete the current unresolved workpad comment when a Symphony-style `Rework` reset requires a fresh attempt:
 
 ```bash
@@ -104,7 +118,7 @@ codex-orchestrator linear create-follow-up \
 - Move `Todo` or the live team's equivalent queued state (for CO, `Ready`) to the actual started state before active coding when the issue is unblocked.
 - Use the Linear issue id, not the human identifier, for helper commands.
 - When you discover a meaningful out-of-scope improvement, use `create-follow-up` so the new issue stays in the same project, starts in `Backlog`, and returns the created follow-up identifier/URL for workpad references.
-- Keep exactly one active `## Codex Workpad` comment current. Refresh it before new work, before review handoff, after rework, and after merge completion. Do not create duplicate progress comments.
+- Keep exactly one active `## Codex Workpad` comment current. Refresh it after each meaningful milestone, immediately before review or merge handoffs, after rework, and after merge completion. Final closeout stays in the same workpad comment. Do not create duplicate progress or terminal summary comments.
 - Always read `issue-context` before any transition so you use the team's actual workflow state names.
 - Attach the PR before handing off to `Human Review` or the live-team alias `In Review`.
 - If a PR is already attached, run a full PR feedback sweep before any new implementation work:

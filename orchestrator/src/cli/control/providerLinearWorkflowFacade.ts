@@ -8,6 +8,37 @@ import { resolveLinearSourceSetup } from './linearDispatchSource.js';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 
 const LINEAR_WORKPAD_MARKER = '## Codex Workpad';
+const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
+  'Environment / Workspace Stamp',
+  'Plan',
+  'Acceptance Criteria',
+  'Validation',
+  'Notes'
+] as const;
+const LINEAR_ISSUE_VALIDATION_SECTION_TITLES = new Set(['validation', 'test plan', 'testing']);
+const LINEAR_ISSUE_PLAIN_SECTION_TITLES = new Set([
+  'context',
+  'observed nuance',
+  'required reference baseline',
+  'problem to solve',
+  'scope',
+  'out of scope',
+  'acceptance criteria',
+  'validation',
+  'test plan',
+  'testing',
+  'recent activity',
+  'known blockers',
+  'dependencies',
+  'risks',
+  'constraints',
+  'constraints / non-goals',
+  'non-goals',
+  'notes',
+  'open questions',
+  'implementation',
+  'investigation'
+]);
 const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
@@ -53,6 +84,17 @@ export interface ProviderLinearWorkflowAttachment {
   title: string | null;
   url: string | null;
   source_type: string | null;
+}
+
+interface ProviderLinearWorkpadSection {
+  title: string;
+  body: string;
+}
+
+interface ProviderLinearIssueValidationRequirement {
+  raw: string;
+  normalized: string;
+  source_section: string;
 }
 
 export interface ProviderLinearIssueContext {
@@ -479,6 +521,16 @@ export async function upsertProviderLinearWorkpadComment(input: {
   const context = await readIssueContext(session.session, issueId);
   if (!context.ok) {
     return failure('upsert-workpad', context.error.code, context.error.message, context.error.status, context.error.details);
+  }
+  const workpadValidation = validateWorkpadBodyContract(body, context.issue.description);
+  if (!workpadValidation.ok) {
+    return failure(
+      'upsert-workpad',
+      workpadValidation.error.code,
+      workpadValidation.error.message,
+      workpadValidation.error.status,
+      workpadValidation.error.details
+    );
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
@@ -1977,6 +2029,281 @@ function hasWorkpadMarker(body: string): boolean {
   return /(^|\n)##\s+Codex Workpad\b/u.test(body);
 }
 
+function validateWorkpadBodyContract(
+  body: string,
+  issueDescription: string | null
+):
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      error: ProviderLinearWorkflowError;
+    } {
+  const sections = parseWorkpadSections(body);
+  const requiredSections = sections.slice(0, LINEAR_WORKPAD_REQUIRED_SECTIONS.length);
+  const canonicalPrefixMatches =
+    requiredSections.length === LINEAR_WORKPAD_REQUIRED_SECTIONS.length &&
+    requiredSections.every(
+      (section, index) =>
+        normalizeComparableValue(section.title) ===
+        normalizeComparableValue(LINEAR_WORKPAD_REQUIRED_SECTIONS[index])
+    );
+  if (!canonicalPrefixMatches) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_structure_invalid',
+        message: `Workpad body must contain these H3 sections in order after "${LINEAR_WORKPAD_MARKER}": ${LINEAR_WORKPAD_REQUIRED_SECTIONS.join(', ')}.`,
+        status: 422,
+        details: {
+          required_sections: [...LINEAR_WORKPAD_REQUIRED_SECTIONS],
+          actual_sections: sections.map((section) => section.title)
+        }
+      }
+    };
+  }
+
+  const emptySections = requiredSections
+    .filter((section) => normalizeRequiredString(section.body) === null)
+    .map((section) => section.title);
+  if (emptySections.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_section_empty',
+        message: 'Workpad core sections must be non-empty.',
+        status: 422,
+        details: {
+          empty_sections: emptySections
+        }
+      }
+    };
+  }
+
+  const ticketValidationRequirements = extractIssueValidationRequirements(issueDescription);
+  if (ticketValidationRequirements.length === 0) {
+    return { ok: true };
+  }
+
+  const mirroredValidationText = normalizeRequirementValue(
+    `${requiredSections[2]?.body ?? ''}\n${requiredSections[3]?.body ?? ''}`
+  );
+  const missingRequirements = ticketValidationRequirements.filter(
+    (requirement) => !mirroredValidationText.includes(requirement.normalized)
+  );
+  if (missingRequirements.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: missingRequirements.map((requirement) => requirement.raw),
+          source_sections: [...new Set(missingRequirements.map((requirement) => requirement.source_section))]
+        }
+      }
+    };
+  }
+
+  return { ok: true };
+}
+
+function parseWorkpadSections(body: string): ProviderLinearWorkpadSection[] {
+  const sections: ProviderLinearWorkpadSection[] = [];
+  let markerSeen = false;
+  let insideCodeFence = false;
+  let currentTitle: string | null = null;
+  let currentLines: string[] = [];
+
+  const flushCurrent = () => {
+    if (!currentTitle) {
+      return;
+    }
+    sections.push({
+      title: currentTitle,
+      body: currentLines.join('\n').trim()
+    });
+  };
+
+  for (const line of body.split(/\r?\n/u)) {
+    if (!markerSeen) {
+      if (/^##\s+Codex Workpad\b/u.test(line)) {
+        markerSeen = true;
+      }
+      continue;
+    }
+    if (isCodeFenceLine(line)) {
+      insideCodeFence = !insideCodeFence;
+      if (currentTitle) {
+        currentLines.push(line);
+      }
+      continue;
+    }
+    if (insideCodeFence) {
+      if (currentTitle) {
+        currentLines.push(line);
+      }
+      continue;
+    }
+    const headingMatch = line.match(/^\s*###\s+(.+?)\s*$/u);
+    if (headingMatch) {
+      flushCurrent();
+      currentTitle = normalizeRequiredString(headingMatch[1]) ?? headingMatch[1].trim();
+      currentLines = [];
+      continue;
+    }
+    if (currentTitle) {
+      currentLines.push(line);
+    }
+  }
+  flushCurrent();
+
+  return sections;
+}
+
+function extractIssueValidationRequirements(
+  description: string | null
+): ProviderLinearIssueValidationRequirement[] {
+  if (!description) {
+    return [];
+  }
+
+  const requirements: ProviderLinearIssueValidationRequirement[] = [];
+  let activeSection: string | null = null;
+  let previousNonEmptyLine: string | null = null;
+  const lines = description.split(/\r?\n/u);
+  for (const [index, line] of lines.entries()) {
+    const heading = parseIssueDescriptionSectionHeading(
+      line,
+      previousNonEmptyLine,
+      lines[index + 1] ?? null
+    );
+    if (heading) {
+      activeSection = LINEAR_ISSUE_VALIDATION_SECTION_TITLES.has(normalizeComparableValue(heading))
+        ? heading
+        : null;
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    if (!activeSection) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    const rawRequirement = stripRequirementPrefix(line);
+    if (!rawRequirement) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    const normalizedRequirement = normalizeRequirementValue(rawRequirement);
+    if (!normalizedRequirement) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    if (requirements.some((entry) => entry.normalized === normalizedRequirement)) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    requirements.push({
+      raw: rawRequirement,
+      normalized: normalizedRequirement,
+      source_section: activeSection
+    });
+    if (line.trim().length > 0) {
+      previousNonEmptyLine = line;
+    }
+  }
+
+  return requirements;
+}
+
+function parseIssueDescriptionSectionHeading(
+  line: string,
+  previousNonEmptyLine: string | null = null,
+  nextLine: string | null = null
+): string | null {
+  const trimmed = line.trim();
+  if (!trimmed || /^[-*+]\s/u.test(trimmed) || /^\d+\.\s/u.test(trimmed)) {
+    return null;
+  }
+
+  let candidate = trimmed;
+  let isMarkdownHeading = false;
+  const markdownHeadingMatch = candidate.match(/^#{1,6}\s+(.+?)\s*$/u);
+  if (markdownHeadingMatch) {
+    candidate = markdownHeadingMatch[1];
+    isMarkdownHeading = true;
+  }
+  candidate = candidate.replace(/^\*\*(.+)\*\*:?\s*$/u, '$1');
+  candidate = candidate.replace(/^__(.+)__:?\s*$/u, '$1');
+  candidate = candidate.replace(/:\s*$/u, '').trim();
+  if (!/^[A-Za-z][A-Za-z0-9 /&()'-]{0,79}$/u.test(candidate)) {
+    return null;
+  }
+
+  const normalizedCandidate = normalizeComparableValue(candidate);
+  if (LINEAR_ISSUE_PLAIN_SECTION_TITLES.has(normalizedCandidate)) {
+    return candidate;
+  }
+  if (isMarkdownHeading) {
+    return candidate;
+  }
+
+  const nextTrimmed = nextLine?.trim() ?? '';
+  return isListLikeLine(previousNonEmptyLine) || isListLikeLine(nextTrimmed)
+    ? candidate
+    : null;
+}
+
+function stripRequirementPrefix(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed || isCodeFenceLine(trimmed) || isSetextUnderlineLine(trimmed)) {
+    return null;
+  }
+
+  const withoutPrefix = trimmed
+    .replace(/^\[[ xX]\]\s+/u, '')
+    .replace(/^[-*+]\s+/u, '')
+    .replace(/^\d+\.\s+/u, '')
+    .trim();
+  return withoutPrefix.length > 0 ? withoutPrefix : null;
+}
+
+function normalizeRequirementValue(value: string): string {
+  return value
+    .replace(/\[([^\]]+)\]\([^)]+\)/gu, '$1')
+    .replace(/[`*_>#]/gu, ' ')
+    .replace(/[.,:;!?]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function isCodeFenceLine(line: string): boolean {
+  return /^(?:```|~~~)/u.test(line.trim());
+}
+
+function isListLikeLine(line: string | null): boolean {
+  const trimmed = line?.trim() ?? '';
+  return /^[-*+]\s/u.test(trimmed) || /^\d+\.\s/u.test(trimmed) || /^\[[ xX]\]\s/u.test(trimmed);
+}
+
+function isSetextUnderlineLine(line: string): boolean {
+  return /^[-=]{3,}\s*$/u.test(line.trim());
+}
+
 function resolveWorkflowStateByName(
   states: readonly ProviderLinearWorkflowState[],
   stateName: string
@@ -2197,7 +2524,7 @@ function normalizeIso(value: string | null | undefined): string | null {
 }
 
 function normalizeComparableValue(value: string): string {
-  return value.trim().toLowerCase();
+  return value.trim().replace(/\s+/gu, ' ').toLowerCase();
 }
 
 function normalizeGraphqlFailureStatus(status: number | null | undefined): number {

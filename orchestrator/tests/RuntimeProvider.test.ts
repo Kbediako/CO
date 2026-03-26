@@ -57,6 +57,28 @@ describe('runtime mode resolution', () => {
       source: 'default'
     });
   });
+
+  it('ignores ambient process env when an explicit env object is provided', () => {
+    const previousRuntimeMode = process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE;
+    process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE = 'appserver';
+
+    try {
+      expect(
+        resolveRuntimeMode({
+          env: {},
+          configDefault: 'cli',
+          manifestMode: 'appserver',
+          preferManifest: true
+        })
+      ).toEqual({ mode: 'cli', source: 'config' });
+    } finally {
+      if (previousRuntimeMode === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE = previousRuntimeMode;
+      }
+    }
+  });
 });
 
 describe('runtime provider selection', () => {
