@@ -2219,10 +2219,25 @@ function extractIssueValidationRequirements(
     const heading = parseIssueDescriptionSectionHeading(
       line,
       previousNonEmptyLine,
-      lines[index + 1] ?? null
+      lines[index + 1] ?? null,
+      lines[index - 1] ?? null
     );
     if (heading) {
-      activeSection = matchesIssueValidationSectionTitle(heading) ? heading : null;
+      if (matchesIssueValidationSectionTitle(heading)) {
+        activeSection = heading;
+      } else if (
+        activeSection &&
+        shouldPreserveValidationSectionAcrossNestedHeading(
+          line,
+          lines[index + 1] ?? null,
+          lines[index + 2] ?? null
+        )
+      ) {
+        // Preserve the surrounding validation section for nested markdown buckets like
+        // "### Automated" when they still introduce validation lists.
+      } else {
+        activeSection = null;
+      }
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
@@ -2276,7 +2291,8 @@ function extractIssueValidationRequirements(
 function parseIssueDescriptionSectionHeading(
   line: string,
   previousNonEmptyLine: string | null = null,
-  nextLine: string | null = null
+  nextLine: string | null = null,
+  previousLine: string | null = null
 ): string | null {
   const trimmed = line.trim();
   if (
@@ -2313,8 +2329,11 @@ function parseIssueDescriptionSectionHeading(
     return null;
   }
 
+  const previousTrimmed = previousLine?.trim() ?? '';
   const nextTrimmed = nextLine?.trim() ?? '';
-  return isListLikeLine(previousNonEmptyLine) || isListLikeLine(nextTrimmed)
+  return isListLikeLine(previousNonEmptyLine) ||
+    isListLikeLine(nextTrimmed) ||
+    (!previousTrimmed && Boolean(nextTrimmed))
     ? candidate
     : null;
 }
@@ -2388,6 +2407,10 @@ function isCodeFenceLine(line: string): boolean {
   return /^(?:```|~~~)/u.test(line.trim());
 }
 
+function isMarkdownHeadingLine(line: string): boolean {
+  return /^\s*#{1,6}\s+\S/u.test(line);
+}
+
 function isListLikeLine(line: string | null): boolean {
   const trimmed = line?.trim() ?? '';
   return /^[-*+]\s/u.test(trimmed) || /^\d+[.)]\s/u.test(trimmed) || /^\[[ xX]\]\s/u.test(trimmed);
@@ -2396,6 +2419,18 @@ function isListLikeLine(line: string | null): boolean {
 function isListIntroductionLine(line: string, nextLine: string | null): boolean {
   const trimmed = line.trim();
   return Boolean(trimmed) && /:\s*$/u.test(trimmed) && isListLikeLine(nextLine);
+}
+
+function shouldPreserveValidationSectionAcrossNestedHeading(
+  line: string,
+  nextLine: string | null,
+  followingLine: string | null
+): boolean {
+  return (
+    isMarkdownHeadingLine(line) &&
+    (isListLikeLine(nextLine) ||
+      (nextLine !== null && isListIntroductionLine(nextLine, followingLine)))
+  );
 }
 
 function isSetextUnderlineLine(line: string): boolean {
