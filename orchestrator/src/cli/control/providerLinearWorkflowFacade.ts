@@ -2366,10 +2366,10 @@ function stripRequirementPrefix(line: string): string | null {
 
   const withoutPrefix = trimmed
     .replace(/^[-*+]\s+\[[ xX]\]\s+/u, '')
-    .replace(/^\d+\.\s+\[[ xX]\]\s+/u, '')
+    .replace(/^\d+[.)]\s+\[[ xX]\]\s+/u, '')
     .replace(/^\[[ xX]\]\s+/u, '')
     .replace(/^[-*+]\s+/u, '')
-    .replace(/^\d+\.\s+/u, '')
+    .replace(/^\d+[.)]\s+/u, '')
     .trim();
   return withoutPrefix.length > 0 ? withoutPrefix : null;
 }
@@ -2390,7 +2390,7 @@ function isCodeFenceLine(line: string): boolean {
 
 function isListLikeLine(line: string | null): boolean {
   const trimmed = line?.trim() ?? '';
-  return /^[-*+]\s/u.test(trimmed) || /^\d+\.\s/u.test(trimmed) || /^\[[ xX]\]\s/u.test(trimmed);
+  return /^[-*+]\s/u.test(trimmed) || /^\d+[.)]\s/u.test(trimmed) || /^\[[ xX]\]\s/u.test(trimmed);
 }
 
 function isListIntroductionLine(line: string, nextLine: string | null): boolean {

@@ -579,6 +579,84 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('normalizes CommonMark ordered-list validation requirements before mirroring', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.', '- Run npm run lint.'],
+      notesLines: ['- Ordered-list ticket requirements using `1)` were normalized before validation mirroring.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Context',
+              'Tighten validation parsing.',
+              '',
+              'Validation',
+              'Run these commands:',
+              '1) Run npm test.',
+              '2) Run npm run lint.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-ordered-list-validation',
+                url: 'https://linear.app/comment/workpad-created-ordered-list-validation',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-ordered-list-validation',
+        url: 'https://linear.app/comment/workpad-created-ordered-list-validation',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
   it('stops mirroring validation requirements when a custom plain heading starts a prose section', async () => {
     const createdWorkpadBody = buildStructuredWorkpadBody({
       validationLines: ['- Run npm test.'],
