@@ -24,6 +24,29 @@
       }
     },
     {
+      "id": "20260327-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8",
+      "title": "Terminal Workspace Cleanup Hook and Attached-PR Auto-Close",
+      "relates_to": "tasks/tasks-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-27",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-26",
+          "manifest": ".runs/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8/cli/2026-03-26T14-48-08-884Z-c36eacd1/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
+        "task": "tasks/tasks-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
+        "agent_task": ".agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
+        "docs": "docs/TECH_SPEC-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md"
+      }
+    },
+    {
       "id": "20260326-linear-df2bd49b-2dd6-413f-8d90-af40d033dace",
       "title": "CO Tighten Symphony-style Linear Workpad Structure and Milestone Refresh Contract",
       "relates_to": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",

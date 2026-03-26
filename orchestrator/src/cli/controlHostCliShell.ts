@@ -153,6 +153,7 @@ export async function runControlHostCliShell(
         startPipelineId,
         publishRuntime,
         readFeatureToggles,
+        providerWorkflowConfigStore,
         resolveTrackedIssue: async ({ issueId }) => {
           const runtimeEnv = process.env;
           const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), runtimeEnv);

@@ -7,15 +7,24 @@ import {
   parseUserConfigRaw,
   resolveRepoConfigPath
 } from '../config/userConfig.js';
+import type { PipelineDefinition } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
 import { isoTimestamp } from '../utils/time.js';
-import type { ControlProviderWorkflowPayload } from './observabilityReadModel.js';
+import {
+  resolveProviderTerminalCleanupConfig,
+  type ProviderTerminalCleanupResult
+} from './providerTerminalCleanup.js';
+import type {
+  ControlProviderTerminalCleanupLastResultPayload,
+  ControlProviderWorkflowPayload
+} from './observabilityReadModel.js';
 
 export interface ProviderWorkflowConfigStore {
   bootstrap(): Promise<ControlProviderWorkflowPayload>;
   refresh(): Promise<ControlProviderWorkflowPayload>;
   snapshot(): ControlProviderWorkflowPayload;
   getLaunchConfigPath(): Promise<string>;
+  recordTerminalCleanupResult(result: ProviderTerminalCleanupResult): void;
 }
 
 interface CreateProviderWorkflowConfigStoreOptions {
@@ -31,7 +40,8 @@ export function createProviderWorkflowConfigStore(
 ): ProviderWorkflowConfigStore {
   const cloneState = (
     value: ControlProviderWorkflowPayload
-  ): ControlProviderWorkflowPayload => ({ ...value });
+  ): ControlProviderWorkflowPayload =>
+    JSON.parse(JSON.stringify(value)) as ControlProviderWorkflowPayload;
   const sourcePath = resolveRepoConfigPath(createOptions.env);
   const snapshotPath = join(createOptions.runDir, PROVIDER_WORKFLOW_SNAPSHOT_FILE);
   // This store assumes serialized access from the single-threaded control-host
@@ -49,7 +59,8 @@ export function createProviderWorkflowConfigStore(
     last_reload_attempt_at: null,
     last_success_at: null,
     last_error_at: null,
-    last_error: null
+    last_error: null,
+    terminal_cleanup: buildDefaultTerminalCleanupPayload()
   };
 
   async function snapshotIsUsable(path: string | null): Promise<boolean> {
@@ -157,15 +168,7 @@ export function createProviderWorkflowConfigStore(
       }
 
       const raw = await readFile(sourcePath, 'utf8');
-      const config = parseUserConfigRaw(raw, 'repo');
-      if (!config) {
-        throw new Error(`Missing codex.orchestrator.json at ${sourcePath}`);
-      }
-      if (!findPipeline(config, createOptions.pipelineId)) {
-        throw new Error(
-          `Repo-local codex.orchestrator.json is missing required pipeline "${createOptions.pipelineId}".`
-        );
-      }
+      const pipeline = parseRequiredPipelineFromRaw(raw, sourcePath, createOptions.pipelineId);
 
       await mkdir(dirname(snapshotPath), { recursive: true });
       await replaceSnapshotAtomically(raw);
@@ -179,7 +182,11 @@ export function createProviderWorkflowConfigStore(
         last_reload_attempt_at: attemptedAt,
         last_success_at: attemptedAt,
         last_error_at: null,
-        last_error: null
+        last_error: null,
+        terminal_cleanup: buildTerminalCleanupPayload(
+          pipeline.metadata,
+          state.terminal_cleanup?.last_result ?? null
+        )
       };
       if (!reloadOptions.startup && previousStatus === 'reload_failed') {
         logger.info(
@@ -190,12 +197,37 @@ export function createProviderWorkflowConfigStore(
     } catch (error) {
       const reason = (error as Error).message;
       lastObservedRevision = revision ?? 'missing';
-      if (reloadOptions.startup || !state.snapshot_path) {
+      const fallbackSnapshotPath = await resolveUsableSnapshotPath(state.snapshot_path, snapshotPath);
+      if (fallbackSnapshotPath) {
+        logger.error(
+          `[provider-workflow] Failed to reload config path=${sourcePath} reason=${reason}; keeping last known good configuration`
+        );
+        const snapshotRaw = await readFile(fallbackSnapshotPath, 'utf8');
+        const pipeline = parseRequiredPipelineFromRaw(
+          snapshotRaw,
+          fallbackSnapshotPath,
+          createOptions.pipelineId
+        );
+        state = {
+          ...state,
+          status: 'reload_failed',
+          pipeline_id: createOptions.pipelineId,
+          source_path: sourcePath,
+          snapshot_path: fallbackSnapshotPath,
+          last_reload_attempt_at: attemptedAt,
+          last_success_at: state.last_success_at ?? attemptedAt,
+          last_error_at: attemptedAt,
+          last_error: reason,
+          terminal_cleanup: buildTerminalCleanupPayload(
+            pipeline.metadata,
+            state.terminal_cleanup?.last_result ?? null
+          )
+        };
+        return state;
+      }
+      if (reloadOptions.startup) {
         throw new Error(`Failed to load provider workflow config path=${sourcePath}: ${reason}`);
       }
-      logger.error(
-        `[provider-workflow] Failed to reload config path=${sourcePath} reason=${reason}; keeping last known good configuration`
-      );
       state = {
         ...state,
         status: 'reload_failed',
@@ -207,10 +239,112 @@ export function createProviderWorkflowConfigStore(
     }
   }
 
+  async function resolveUsableSnapshotPath(
+    preferredPath: string | null,
+    defaultPath: string
+  ): Promise<string | null> {
+    if (await snapshotIsUsable(preferredPath)) {
+      return preferredPath;
+    }
+    return (await snapshotIsUsable(defaultPath)) ? defaultPath : null;
+  }
+
   return {
     bootstrap,
     refresh,
     snapshot: () => cloneState(state),
-    getLaunchConfigPath
+    getLaunchConfigPath,
+    recordTerminalCleanupResult: (result) => {
+      state = {
+        ...state,
+        terminal_cleanup: {
+          ...(state.terminal_cleanup ?? buildDefaultTerminalCleanupPayload()),
+          last_result: mapTerminalCleanupResult(result)
+        }
+      };
+    }
+  };
+}
+
+function buildDefaultTerminalCleanupPayload(): NonNullable<
+  ControlProviderWorkflowPayload['terminal_cleanup']
+> {
+  return {
+    enabled: false,
+    close_attached_pr: {
+      enabled: false,
+      comment_template:
+        resolveProviderTerminalCleanupConfig(null).closeAttachedPr.commentTemplate
+    },
+    last_result: null
+  };
+}
+
+function parseRequiredPipelineFromRaw(
+  raw: string,
+  path: string,
+  pipelineId: string
+): PipelineDefinition {
+  const config = parseUserConfigRaw(raw, 'repo');
+  if (!config) {
+    throw new Error(`Missing codex.orchestrator.json at ${path}`);
+  }
+  const pipeline = findPipeline(config, pipelineId);
+  if (!pipeline) {
+    throw new Error(
+      `Repo-local codex.orchestrator.json is missing required pipeline "${pipelineId}".`
+    );
+  }
+  return pipeline;
+}
+
+function buildTerminalCleanupPayload(
+  metadata: unknown,
+  lastResult: ControlProviderTerminalCleanupLastResultPayload | null
+): NonNullable<ControlProviderWorkflowPayload['terminal_cleanup']> {
+  const config = resolveProviderTerminalCleanupConfig(metadata);
+  return {
+    enabled: config.enabled,
+    close_attached_pr: {
+      enabled: config.closeAttachedPr.enabled,
+      comment_template: config.closeAttachedPr.commentTemplate
+    },
+    last_result: lastResult ? cloneTerminalCleanupLastResult(lastResult) : null
+  };
+}
+
+function mapTerminalCleanupResult(
+  result: ProviderTerminalCleanupResult
+): ControlProviderTerminalCleanupLastResultPayload {
+  return {
+    attempted_at: result.attemptedAt,
+    status: result.status,
+    summary: result.summary,
+    error: result.error,
+    issue_id: result.issueId,
+    issue_identifier: result.issueIdentifier,
+    workspace_path: result.workspacePath,
+    branch: result.branch,
+    attached_pr_urls: [...result.attachedPrUrls],
+    matching_open_pr_urls: [...result.matchingOpenPrUrls],
+    closed_pr_urls: [...result.closedPrUrls]
+  };
+}
+
+function cloneTerminalCleanupLastResult(
+  result: ControlProviderTerminalCleanupLastResultPayload
+): ControlProviderTerminalCleanupLastResultPayload {
+  return {
+    attempted_at: result.attempted_at,
+    status: result.status,
+    summary: result.summary,
+    error: result.error,
+    issue_id: result.issue_id,
+    issue_identifier: result.issue_identifier,
+    workspace_path: result.workspace_path,
+    branch: result.branch,
+    attached_pr_urls: [...result.attached_pr_urls],
+    matching_open_pr_urls: [...result.matching_open_pr_urls],
+    closed_pr_urls: [...result.closed_pr_urls]
   };
 }
