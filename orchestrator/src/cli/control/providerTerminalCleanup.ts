@@ -265,10 +265,16 @@ export async function runProviderTerminalCleanup(
   const errors: string[] = [];
   let resolvedBranch = branch;
   const cleanupDeadlineMs = nowMs() + PROVIDER_TERMINAL_CLEANUP_TOTAL_BUDGET_MS;
-  const attachedPrUrlsToProcess = attachedPrUrls.slice(0, PROVIDER_TERMINAL_CLEANUP_MAX_ATTACHED_PRS);
-  if (attachedPrUrls.length > attachedPrUrlsToProcess.length) {
+  const sameRepoAttachedPrUrls = attachedPrUrls.filter(
+    (attachedPrUrl) => parseGitHubPullRequestUrl(attachedPrUrl)?.repoKey === workspaceRepoKey
+  );
+  const attachedPrUrlsToProcess = sameRepoAttachedPrUrls.slice(
+    0,
+    PROVIDER_TERMINAL_CLEANUP_MAX_ATTACHED_PRS
+  );
+  if (sameRepoAttachedPrUrls.length > attachedPrUrlsToProcess.length) {
     errors.push(
-      `skipped ${attachedPrUrls.length - attachedPrUrlsToProcess.length} attached PR(s) beyond cleanup cap of ${PROVIDER_TERMINAL_CLEANUP_MAX_ATTACHED_PRS}`
+      `skipped ${sameRepoAttachedPrUrls.length - attachedPrUrlsToProcess.length} attached PR(s) beyond cleanup cap of ${PROVIDER_TERMINAL_CLEANUP_MAX_ATTACHED_PRS}`
     );
   }
   let processedAttachedPrCount = 0;
@@ -292,9 +298,6 @@ export async function runProviderTerminalCleanup(
     const prDetails = parsePrViewResponse(prView.stdout);
     if (!prDetails) {
       errors.push(`gh pr view ${attachedPrUrl}: invalid JSON response`);
-      continue;
-    }
-    if (prDetails.repoKey !== workspaceRepoKey) {
       continue;
     }
 

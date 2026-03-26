@@ -549,7 +549,7 @@ describe('providerTerminalCleanup', () => {
       matchingOpenPrUrls: [],
       closedPrUrls: []
     });
-    expect(runCommand).toHaveBeenCalledTimes(4);
+    expect(runCommand).toHaveBeenCalledTimes(3);
   });
 
   it('caps attached PR cleanup work and reports the skipped remainder as a non-fatal failure', async () => {
@@ -640,6 +640,107 @@ describe('providerTerminalCleanup', () => {
     expect(result.attachedPrUrls).toEqual(attachedPrUrls);
     expect(result.error).toContain('skipped 1 attached PR(s) beyond cleanup cap of 20');
     expect(runCommand).toHaveBeenCalledTimes(43);
+  });
+
+  it('filters foreign-repo attachments before applying the cleanup cap', async () => {
+    const workspacePath = await createWorkspacePath();
+    const workspaceHeadOid = 'abc123def456abc123def456abc123def456abcd';
+    const foreignRepoUrls = Array.from(
+      { length: 25 },
+      (_, index) => `https://github.com/other/co-fork/pull/${index + 1}`
+    );
+    const matchingPrUrl = 'https://github.com/example/co/pull/999';
+    const readIssueContext = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'issue-context' as const,
+      issue: {
+        attachments: [...foreignRepoUrls, matchingPrUrl].map((url, index) => ({
+          id: `att-${index + 1}`,
+          title: `PR ${index + 1}`,
+          url,
+          source_type: 'github'
+        }))
+      }
+    }));
+    const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command, args }) => {
+      if (command === 'git') {
+        if (args.at(-2) === 'branch' && args.at(-1) === '--show-current') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'feature/co-5\n',
+            stderr: ''
+          };
+        }
+        if (args.at(-3) === 'remote' && args.at(-2) === 'get-url' && args.at(-1) === 'origin') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'https://github.com/example/co.git\n',
+            stderr: ''
+          };
+        }
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: `${workspaceHeadOid}\n`,
+          stderr: ''
+        };
+      }
+      if (args[1] === 'view') {
+        expect(args).toEqual(['pr', 'view', matchingPrUrl, '--json', 'state,headRefName,headRefOid,url']);
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: JSON.stringify({
+            state: 'OPEN',
+            headRefName: 'feature/co-5',
+            headRefOid: workspaceHeadOid,
+            url: matchingPrUrl
+          }),
+          stderr: ''
+        };
+      }
+      expect(args).toEqual([
+        'pr',
+        'close',
+        matchingPrUrl,
+        '--comment',
+        'Closing because the Linear issue for branch feature/co-5 entered a terminal state without merge.'
+      ]);
+      return {
+        ok: true,
+        exitCode: 0,
+        stdout: 'Closed pull request\n',
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderTerminalCleanup(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-5',
+        workspacePath,
+        config: buildEnabledCleanupConfig()
+      },
+      {
+        readIssueContext,
+        runCommand,
+        now: () => '2026-03-27T00:00:00.000Z',
+        nowMs: () => 0
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'succeeded',
+      summary: 'Closed 1 attached PR(s) for branch feature/co-5.',
+      branch: 'feature/co-5',
+      attachedPrUrls: [...foreignRepoUrls, matchingPrUrl],
+      matchingOpenPrUrls: [matchingPrUrl],
+      closedPrUrls: [matchingPrUrl]
+    });
+    expect(result.error).toBeNull();
+    expect(runCommand).toHaveBeenCalledTimes(5);
   });
 
   it('closes an attached PR from a detached workspace when the PR head commit matches HEAD', async () => {
