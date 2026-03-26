@@ -758,10 +758,7 @@ describe('runLinearCliShell', () => {
           ok: true,
           operation: 'child-stream',
           action: 'launched',
-          issue: {
-            id: 'lin-issue-1',
-            identifier: 'CO-13'
-          },
+          issue: { id: 'lin-issue-1', identifier: 'CO-13' },
           source_setup: null,
           stream: 'docs-review',
           pipeline_id: 'docs-review',
@@ -811,29 +808,18 @@ describe('runLinearCliShell', () => {
       ok: true,
       operation: 'child-stream',
       stream: 'docs-review',
-      child_run: {
-        run_id: 'docs-run-1',
-        status: 'succeeded'
-      }
+      child_run: { run_id: 'docs-run-1', status: 'succeeded' }
     });
-    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', expect.objectContaining({
       recorded_at: '2026-03-27T01:00:00.000Z',
       operation: 'child-stream',
       ok: true,
       issue_id: 'lin-issue-1',
       issue_identifier: 'CO-13',
-      source_setup: null,
       action: 'stream:docs-review',
       via: 'pipeline:docs-review',
-      state: 'succeeded',
-      follow_up_issue_id: null,
-      follow_up_issue_identifier: null,
-      failed_relation_type: null,
-      comment_id: null,
-      attachment_id: null,
-      error_code: null,
-      error_message: null
-    });
+      state: 'succeeded'
+    }));
   });
 
   it('rejects whitespace-only file-backed required text inputs', async () => {

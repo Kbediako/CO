@@ -9,6 +9,13 @@
         "Codex"
       ],
       "last_review": "2026-03-27",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-26",
+          "manifest": ".runs/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29-docs-review/cli/2026-03-26T17-01-25-241Z-fdf9c459/manifest.json"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
         "task": "tasks/tasks-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",

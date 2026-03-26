@@ -199,6 +199,7 @@ describe('provider linear worker runner', () => {
     expect(context).toMatchObject({
       manifestPath,
       repoRoot: tempRoot,
+      taskId: 'linear-lin-issue-1',
       issueId: 'lin-issue-1',
       issueIdentifier: 'CO-2',
       maxTurns: 7
@@ -249,6 +250,24 @@ describe('provider linear worker runner', () => {
     expect(context.maxTurns).toBe(20);
   });
 
+  it('uses manifest.taskId when the snake_case task id is absent', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      taskId: 'linear-camel-task',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
+    });
+
+    expect(context.taskId).toBe('linear-camel-task');
+  });
+
   it('builds a full first-turn prompt and a continuation prompt', () => {
     const issue = createTrackedIssue();
 
@@ -282,6 +301,7 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('`FORCE_CODEX_REVIEW=1`');
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(firstPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
+    expect(firstPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
     expect(firstPrompt).toContain('`codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>`');
     expect(firstPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(firstPrompt).toContain('about 2+ changed files or about 40+ changed lines');
@@ -317,6 +337,7 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(continuationPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
+    expect(continuationPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(continuationPrompt).toContain('Standalone-review policy for this provider-worker lane');
     expect(continuationPrompt).toContain('`codex-orchestrator review` / `npm run review`');
@@ -450,6 +471,22 @@ describe('provider linear worker runner', () => {
           state_type: 'completed'
         })
       );
+    const childStreamRecord = {
+      stream: 'docs-review',
+      pipeline_id: 'docs-review',
+      task_id: 'linear-lin-issue-1-docs-review',
+      run_id: 'docs-run-1',
+      status: 'succeeded',
+      manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1', 'manifest.json'),
+      artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1',
+      log_path: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/run.log',
+      summary: 'docs-review passed',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-21T09:00:00.050Z'
+    };
     const execRunner = vi
       .fn<
         (request: {
@@ -463,22 +500,7 @@ describe('provider linear worker runner', () => {
       .mockImplementationOnce(async (request) => {
         const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
         expect(auditPath).toBe(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME));
-        await appendProviderLinearWorkerChildStreamRecord(runDir, {
-          stream: 'docs-review',
-          pipeline_id: 'docs-review',
-          task_id: 'linear-lin-issue-1-docs-review',
-          run_id: 'docs-run-1',
-          status: 'succeeded',
-          manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1', 'manifest.json'),
-          artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1',
-          log_path: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/run.log',
-          summary: 'docs-review passed',
-          issue_id: 'lin-issue-1',
-          issue_identifier: 'CO-2',
-          workspace_path: tempRoot,
-          source_setup: null,
-          launched_at: '2026-03-21T09:00:00.050Z'
-        });
+        await appendProviderLinearWorkerChildStreamRecord(runDir, childStreamRecord);
         await appendProviderLinearAuditEntry(String(auditPath), {
           recorded_at: '2026-03-21T09:00:00.100Z',
           operation: 'issue-context',
@@ -649,15 +671,7 @@ describe('provider linear worker runner', () => {
         failure_count: 1,
         latest_recorded_at: '2026-03-21T09:00:01.200Z'
       },
-      child_streams: [
-        {
-          stream: 'docs-review',
-          pipeline_id: 'docs-review',
-          task_id: 'linear-lin-issue-1-docs-review',
-          run_id: 'docs-run-1',
-          status: 'succeeded'
-        }
-      ],
+      child_streams: [expect.objectContaining({ stream: 'docs-review', run_id: 'docs-run-1', status: 'succeeded' })],
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -708,16 +722,12 @@ describe('provider linear worker runner', () => {
           }
         }
       },
-      child_streams: [
-        {
-          stream: 'docs-review',
-          pipeline_id: 'docs-review',
-          task_id: 'linear-lin-issue-1-docs-review',
-          run_id: 'docs-run-1',
-          status: 'succeeded',
-          artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1'
-        }
-      ],
+      child_streams: [expect.objectContaining({
+        stream: 'docs-review',
+        run_id: 'docs-run-1',
+        status: 'succeeded',
+        artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1'
+      })],
       end_reason: 'issue_inactive'
     });
   });

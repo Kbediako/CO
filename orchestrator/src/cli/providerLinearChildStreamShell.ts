@@ -19,11 +19,7 @@ import {
 } from './providerLinearWorkerRunner.js';
 import { slugify } from './utils/strings.js';
 
-const ALLOWED_PROVIDER_CHILD_PIPELINES = [
-  'docs-review',
-  'implementation-gate',
-  'docs-relevance-advisory'
-] as const;
+const ALLOWED_PROVIDER_CHILD_PIPELINES = ['docs-review', 'implementation-gate', 'docs-relevance-advisory'] as const;
 const PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE = [
   'MCP_RUNNER_TASK_ID',
   'CODEX_ORCHESTRATOR_TASK_ID',
@@ -62,10 +58,7 @@ export interface ProviderLinearChildStreamSuccessResult {
   ok: true;
   operation: 'child-stream';
   action: 'launched';
-  issue: {
-    id: string;
-    identifier: string;
-  };
+  issue: { id: string; identifier: string };
   source_setup: DispatchPilotSourceSetup | null;
   stream: string;
   pipeline_id: ProviderLinearChildStreamPipelineId;
@@ -81,16 +74,10 @@ export interface ProviderLinearChildStreamFailureResult {
   stream: string | null;
   pipeline_id: string | null;
   child_run: ProviderLinearChildRunResult | null;
-  error: {
-    code: string;
-    message: string;
-    status: number;
-  };
+  error: { code: string; message: string; status: number };
 }
 
-export type ProviderLinearChildStreamResult =
-  | ProviderLinearChildStreamSuccessResult
-  | ProviderLinearChildStreamFailureResult;
+export type ProviderLinearChildStreamResult = ProviderLinearChildStreamSuccessResult | ProviderLinearChildStreamFailureResult;
 
 export interface RunProviderLinearChildStreamShellParams {
   pipelineId: string;
@@ -100,17 +87,13 @@ export interface RunProviderLinearChildStreamShellParams {
 
 interface ProviderLinearChildStreamShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
-  appendChildStreamRecord: (
-    runDir: string,
-    record: ProviderLinearWorkerChildStreamRecord
-  ) => Promise<ProviderLinearWorkerChildStreamRecord[]>;
+  appendChildStreamRecord: (runDir: string, record: ProviderLinearWorkerChildStreamRecord) => Promise<ProviderLinearWorkerChildStreamRecord[]>;
   now: () => string;
 }
 
 const DEFAULT_DEPENDENCIES: ProviderLinearChildStreamShellDependencies = {
   execRunner: defaultExecRunner,
-  appendChildStreamRecord: async (runDir, record) =>
-    await appendProviderLinearWorkerChildStreamRecord(runDir, record),
+  appendChildStreamRecord: async (runDir, record) => await appendProviderLinearWorkerChildStreamRecord(runDir, record),
   now: () => new Date().toISOString()
 };
 
@@ -250,7 +233,7 @@ export async function runProviderLinearChildStreamShell(
       command: invocation.command,
       args,
       cwd: context.repoRoot,
-      env: buildProviderLinearChildStartEnv(env, context.repoRoot),
+      env: buildProviderLinearChildStartEnv(env, context.repoRoot, pipelineId),
       mirrorOutput: false
     });
   } catch (error) {
@@ -283,22 +266,36 @@ export async function runProviderLinearChildStreamShell(
     });
   }
 
-  await deps.appendChildStreamRecord(context.runDir, {
-    stream,
-    pipeline_id: pipelineId,
-    task_id: childTaskId,
-    run_id: childRun.run_id,
-    status: childRun.status,
-    manifest_path: childRun.manifest_path,
-    artifact_root: childRun.artifact_root,
-    log_path: childRun.log_path,
-    summary: childRun.summary,
-    issue_id: context.issueId,
-    issue_identifier: context.issueIdentifier,
-    workspace_path: context.workspacePath,
-    source_setup: sourceSetup,
-    launched_at: deps.now()
-  });
+  try {
+    await deps.appendChildStreamRecord(context.runDir, {
+      stream,
+      pipeline_id: pipelineId,
+      task_id: childTaskId,
+      run_id: childRun.run_id,
+      status: childRun.status,
+      manifest_path: childRun.manifest_path,
+      artifact_root: childRun.artifact_root,
+      log_path: childRun.log_path,
+      summary: childRun.summary,
+      issue_id: context.issueId,
+      issue_identifier: context.issueIdentifier,
+      workspace_path: context.workspacePath,
+      source_setup: sourceSetup,
+      launched_at: deps.now()
+    });
+  } catch (error) {
+    return failureResult({
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      pipelineId,
+      childRun,
+      code: 'provider_worker_child_stream_record_failed',
+      message: `Failed to record child stream lineage: ${error instanceof Error ? error.message : String(error)}`,
+      status: 502
+    });
+  }
 
   if (execResult.exitCode !== 0 || childRun.status !== 'succeeded') {
     return failureResult({
@@ -351,11 +348,15 @@ function normalizeRuntimeMode(value: string | undefined): 'cli' | 'appserver' | 
 
 function buildProviderLinearChildStartEnv(
   env: NodeJS.ProcessEnv,
-  repoRoot: string
+  repoRoot: string,
+  pipelineId: ProviderLinearChildStreamPipelineId
 ): NodeJS.ProcessEnv {
   const sanitized: NodeJS.ProcessEnv = { ...process.env, ...env };
   for (const key of PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE) {
     delete sanitized[key];
+  }
+  if (pipelineId === 'docs-relevance-advisory') {
+    delete sanitized.FORCE_CODEX_REVIEW;
   }
   sanitized.CODEX_ORCHESTRATOR_ROOT = repoRoot;
   return sanitized;

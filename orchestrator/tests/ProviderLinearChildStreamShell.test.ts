@@ -4,10 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  readProviderLinearWorkerChildStreams,
-  PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME
-} from '../src/cli/providerLinearWorkerRunner.js';
+import { readProviderLinearWorkerChildStreams, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { runProviderLinearChildStreamShell } from '../src/cli/providerLinearChildStreamShell.js';
 
 let tempRoot: string | null = null;
@@ -15,6 +12,7 @@ const RUN_ID = 'run-child';
 const TASK_ID = 'linear-lin-issue-1';
 const CONTROL_HOST_TASK_ID = 'local-mcp';
 const CONTROL_HOST_RUN_ID = 'control-host';
+const ISSUE = { issue_id: 'lin-issue-1', issue_identifier: 'CO-13' };
 
 afterEach(async () => {
   if (tempRoot) {
@@ -23,21 +21,18 @@ afterEach(async () => {
   }
 });
 
-async function createProviderWorkerManifest(overrides: {
-  pipelineId?: string;
-} = {}) {
+async function createProviderWorkerManifest(pipelineId = 'provider-linear-worker') {
   tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-stream-'));
   const runDir = join(tempRoot, '.runs', TASK_ID, 'cli', RUN_ID);
-  await mkdir(runDir, { recursive: true });
   const manifestPath = join(runDir, 'manifest.json');
+  await mkdir(runDir, { recursive: true });
   await writeFile(
     manifestPath,
     JSON.stringify({
       run_id: RUN_ID,
       task_id: TASK_ID,
-      pipeline_id: overrides.pipelineId ?? 'provider-linear-worker',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-13',
+      pipeline_id: pipelineId,
+      ...ISSUE,
       issue_updated_at: '2026-03-26T14:32:20.815Z',
       provider_control_host_task_id: CONTROL_HOST_TASK_ID,
       provider_control_host_run_id: CONTROL_HOST_RUN_ID,
@@ -48,10 +43,7 @@ async function createProviderWorkerManifest(overrides: {
   return { manifestPath, runDir };
 }
 
-function buildProviderWorkerEnv(
-  manifestPath: string,
-  overrides: NodeJS.ProcessEnv = {}
-): NodeJS.ProcessEnv {
+function buildProviderWorkerEnv(manifestPath: string, overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
     CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
@@ -64,22 +56,26 @@ function buildProviderWorkerEnv(
   };
 }
 
+function createExecResult(pipelineId: 'docs-review' | 'docs-relevance-advisory', runId: string, summary: string) {
+  const taskId = `${TASK_ID}-${pipelineId}`;
+  return {
+    exitCode: 0,
+    stdout: JSON.stringify({
+      run_id: runId,
+      status: 'succeeded',
+      artifact_root: `.runs/${taskId}/cli/${runId}`,
+      manifest: `.runs/${taskId}/cli/${runId}/manifest.json`,
+      log_path: `.runs/${taskId}/cli/${runId}/run.log`,
+      summary
+    }),
+    stderr: ''
+  };
+}
+
 describe('runProviderLinearChildStreamShell', () => {
   it('launches an allowlisted provider child stream and records parent lineage', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
-    const execRunner = vi.fn(async () => ({
-      exitCode: 0,
-      stdout: JSON.stringify({
-        run_id: 'docs-run-1',
-        status: 'succeeded',
-        artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1',
-        manifest: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/manifest.json',
-        log_path: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/run.log',
-        summary: 'docs-review passed'
-      }),
-      stderr: ''
-    }));
-
+    const execRunner = vi.fn(async () => createExecResult('docs-review', 'docs-run-1', 'docs-review passed'));
     const result = await runProviderLinearChildStreamShell(
       {
         pipelineId: 'docs-review',
@@ -92,14 +88,11 @@ describe('runProviderLinearChildStreamShell', () => {
           CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(runDir, 'provider-linear-worker-linear-audit.jsonl'),
           CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
           CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN: 'provider-launch-token',
-          MCP_RUNNER_TASK_ID: TASK_ID,
-          CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/co-package-root'
+          CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/co-package-root',
+          MCP_RUNNER_TASK_ID: TASK_ID
         })
       },
-      {
-        execRunner,
-        now: () => '2026-03-27T01:00:00.000Z'
-      }
+      { execRunner, now: () => '2026-03-27T01:00:00.000Z' }
     );
 
     expect(result).toMatchObject({
@@ -148,10 +141,7 @@ describe('runProviderLinearChildStreamShell', () => {
       'CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE',
       'CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN',
       'MCP_RUNNER_TASK_ID'
-    ]) {
-      expect(request?.env[key]).toBeUndefined();
-    }
-
+    ]) expect(request?.env[key]).toBeUndefined();
     expect(await readProviderLinearWorkerChildStreams(runDir)).toEqual([
       expect.objectContaining({
         stream: 'docs-review',
@@ -165,65 +155,54 @@ describe('runProviderLinearChildStreamShell', () => {
     expect(PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME).toBe('provider-linear-worker-child-streams.json');
   });
 
-  it('rejects unsupported child pipelines before launching anything', async () => {
+  it.each([
+    ['rejects unsupported child pipelines before launching anything', 'diagnostics', {}, 'provider_worker_child_stream_pipeline_unsupported', 422],
+    ['fails closed when provider control-host provenance is missing', 'docs-review', { CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'unexpected-host' }, 'provider_worker_child_stream_provenance_invalid', 412]
+  ] as const)('%s', async (_label, pipelineId, overrides, code, status) => {
     const { manifestPath } = await createProviderWorkerManifest();
     const execRunner = vi.fn();
-
     const result = await runProviderLinearChildStreamShell(
-      {
-        pipelineId: 'diagnostics',
-        env: buildProviderWorkerEnv(manifestPath)
-      },
+      { pipelineId, env: buildProviderWorkerEnv(manifestPath, overrides) },
       { execRunner: execRunner as never }
     );
 
-    expect(result).toEqual({
-      ok: false,
-      operation: 'child-stream',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-13',
-      source_setup: null,
-      stream: null,
-      pipeline_id: 'diagnostics',
-      child_run: null,
-      error: {
-        code: 'provider_worker_child_stream_pipeline_unsupported',
-        message: 'Unsupported child stream pipeline: diagnostics. Allowed pipelines: docs-review, implementation-gate, docs-relevance-advisory.',
-        status: 422
-      }
-    });
+    expect(result).toMatchObject({ ok: false, operation: 'child-stream', ...ISSUE, pipeline_id: pipelineId, child_run: null, error: { code, status } });
     expect(execRunner).not.toHaveBeenCalled();
   });
 
-  it('fails closed when provider control-host provenance is missing', async () => {
+  it('clears FORCE_CODEX_REVIEW for advisory children and returns child-run details when sidecar writes fail', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
-    const execRunner = vi.fn();
-
+    const execRunner = vi.fn(async () =>
+      createExecResult('docs-relevance-advisory', 'advisory-run-1', 'docs relevance advisory finished')
+    );
     const result = await runProviderLinearChildStreamShell(
       {
-        pipelineId: 'docs-review',
-        env: buildProviderWorkerEnv(manifestPath, {
-          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'unexpected-host'
-        })
+        pipelineId: 'docs-relevance-advisory',
+        env: buildProviderWorkerEnv(manifestPath, { FORCE_CODEX_REVIEW: '1' })
       },
-      { execRunner: execRunner as never }
+      {
+        execRunner,
+        appendChildStreamRecord: vi.fn(async () => {
+          throw new Error('disk full');
+        })
+      }
     );
 
-    expect(result).toEqual({
+    expect(execRunner.mock.calls[0]?.[0]?.env.FORCE_CODEX_REVIEW).toBeUndefined();
+    expect(result).toMatchObject({
       ok: false,
       operation: 'child-stream',
-      issue_id: 'lin-issue-1',
-      issue_identifier: 'CO-13',
-      source_setup: null,
-      stream: null,
-      pipeline_id: 'docs-review',
-      child_run: null,
+      stream: 'docs-relevance-advisory',
+      pipeline_id: 'docs-relevance-advisory',
+      child_run: {
+        run_id: 'advisory-run-1',
+        task_id: 'linear-lin-issue-1-docs-relevance-advisory'
+      },
       error: {
-        code: 'provider_worker_child_stream_provenance_invalid',
-        message: 'linear child-stream requires provider control-host provenance recorded on the parent provider-worker manifest and matching active environment.',
-        status: 412
+        code: 'provider_worker_child_stream_record_failed',
+        message: 'Failed to record child stream lineage: disk full',
+        status: 502
       }
     });
-    expect(execRunner).not.toHaveBeenCalled();
   });
 });

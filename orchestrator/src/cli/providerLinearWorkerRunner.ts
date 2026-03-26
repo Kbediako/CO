@@ -387,7 +387,11 @@ export async function loadProviderLinearWorkerContext(
   const taskId =
     normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID) ??
     normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId) ??
     contextTaskIdFromManifestPath(manifestPath);
+  if (!taskId) {
+    throw new Error('Provider worker task id unavailable.');
+  }
   const manifestProviderControlHostTaskId =
     normalizeOptionalString(manifest.provider_control_host_task_id) ??
     normalizeOptionalString(manifest.providerControlHostTaskId);
@@ -434,13 +438,9 @@ export async function loadProviderLinearWorkerContext(
   };
 }
 
-function contextTaskIdFromManifestPath(manifestPath: string): string {
-  const segments = manifestPath.split(/[\\/]+/u);
-  const cliIndex = segments.lastIndexOf('cli');
-  if (cliIndex > 0) {
-    return segments[cliIndex - 1] ?? 'provider-linear-worker';
-  }
-  return 'provider-linear-worker';
+function contextTaskIdFromManifestPath(manifestPath: string): string | null {
+  const taskId = sanitizeTaskId(basename(resolve(dirname(manifestPath), '..', '..')));
+  return taskId.length > 0 ? taskId : null;
 }
 
 function buildIssueDescriptionSection(issue: LiveLinearTrackedIssue): string[] {
