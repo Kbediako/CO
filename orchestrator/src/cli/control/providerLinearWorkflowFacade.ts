@@ -2469,12 +2469,14 @@ function shouldPreserveValidationSectionAcrossNestedHeading(
   const nextContentLine = firstCandidate ?? secondCandidate;
   const contentFollower =
     firstCandidate === null ? thirdLine : followingLine;
-  const allowsProseRequirements = LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(headingTitle);
+  const preservesValidationContext =
+    LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(headingTitle) || matchesIssueValidationSectionTitle(headingTitle);
   return (
     isMarkdownHeadingLine(line) &&
+    preservesValidationContext &&
     (isListLikeLine(nextContentLine) ||
       (nextContentLine !== null && isListIntroductionLine(nextContentLine, contentFollower)) ||
-      (allowsProseRequirements &&
+      (preservesValidationContext &&
         nextContentLine !== null &&
         !isCodeFenceLine(nextContentLine) &&
         !isMarkdownHeadingLine(nextContentLine) &&
