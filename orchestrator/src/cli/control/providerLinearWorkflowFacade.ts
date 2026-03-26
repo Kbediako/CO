@@ -2229,7 +2229,8 @@ function parseWorkpadSections(body: string): {
     const headingMatch = line.match(/^\s*###\s+(.+?)\s*$/u);
     if (headingMatch) {
       flushCurrent();
-      currentTitle = normalizeRequiredString(headingMatch[1]) ?? headingMatch[1].trim();
+      const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
+      currentTitle = normalizeRequiredString(headingTitle) ?? headingTitle;
       currentLines = [];
       continue;
     }
@@ -2388,6 +2389,9 @@ function parseIssueDescriptionSectionHeading(
 
   const normalizedCandidate = normalizeComparableValue(candidate);
   if (LINEAR_ISSUE_PLAIN_SECTION_TITLES.has(normalizedCandidate)) {
+    return candidate;
+  }
+  if (matchesSymbolDecoratedSectionTitle(candidate, LINEAR_ISSUE_VALIDATION_SECTION_TITLES)) {
     return candidate;
   }
   if (isMarkdownHeading) {
@@ -2611,6 +2615,21 @@ function matchesDecoratedSectionTitle(title: string, allowedTitles: Set<string>)
     }
     const suffix = normalizedTitle.slice(allowedTitle.length).trimStart();
     if (!suffix || !/^[\p{L}\p{N}]/u.test(suffix)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function matchesSymbolDecoratedSectionTitle(title: string, allowedTitles: Set<string>): boolean {
+  const normalizedTitle = normalizeComparableValue(title);
+  for (const allowedTitle of allowedTitles) {
+    if (!normalizedTitle.startsWith(allowedTitle)) {
+      continue;
+    }
+    const suffix = normalizedTitle.slice(allowedTitle.length).trimStart();
+    if (suffix && /^(?:[^\p{L}\p{N}\s]+(?:\s+[^\p{L}\p{N}\s]+)*)$/u.test(suffix)) {
       return true;
     }
   }
