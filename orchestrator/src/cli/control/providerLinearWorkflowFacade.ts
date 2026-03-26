@@ -90,6 +90,79 @@ const LINEAR_ISSUE_LOWERCASE_SETEXT_LEADING_VERBS = new Set([
   'execute',
   'install'
 ]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_ENTRYPOINTS = new Set([
+  'bun',
+  'cargo',
+  'composer',
+  'docker',
+  'git',
+  'helm',
+  'kubectl',
+  'mvn',
+  'node',
+  'npm',
+  'npx',
+  'pip',
+  'pip3',
+  'pnpm',
+  'poetry',
+  'pytest',
+  'python',
+  'python3',
+  'terraform',
+  'uv',
+  'yarn'
+]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_ENTRYPOINTS = new Set([
+  'go',
+  'just',
+  'make'
+]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS = new Set([
+  'add',
+  'bench',
+  'branch',
+  'build',
+  'check',
+  'checkout',
+  'ci',
+  'clean',
+  'clone',
+  'commit',
+  'coverage',
+  'deploy',
+  'dev',
+  'diff',
+  'exec',
+  'fetch',
+  'fmt',
+  'format',
+  'install',
+  'init',
+  'lint',
+  'log',
+  'merge',
+  'mod',
+  'plan',
+  'pull',
+  'push',
+  'rebase',
+  'release',
+  'reset',
+  'restore',
+  'run',
+  'serve',
+  'show',
+  'start',
+  'status',
+  'stash',
+  'switch',
+  'sync',
+  'tag',
+  'test',
+  'verify',
+  'vet'
+]);
 const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
@@ -2543,7 +2616,20 @@ function looksLikeLowercaseSetextSectionHeadingCandidate(candidate: string): boo
   if (significantWords.length === 0) {
     return false;
   }
-  if (LINEAR_ISSUE_LOWERCASE_SETEXT_LEADING_VERBS.has(significantWords[0].toLowerCase())) {
+  const firstSignificantWord = significantWords[0].toLowerCase();
+  const secondSignificantWord = significantWords[1]?.toLowerCase() ?? null;
+  if (LINEAR_ISSUE_LOWERCASE_SETEXT_LEADING_VERBS.has(firstSignificantWord)) {
+    return false;
+  }
+  const secondWordLooksCommandLike =
+    secondSignificantWord !== null &&
+    (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS.has(secondSignificantWord) ||
+      /[/\\]/u.test(significantWords[1]));
+  if (
+    secondWordLooksCommandLike &&
+    (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_ENTRYPOINTS.has(firstSignificantWord) ||
+      LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_ENTRYPOINTS.has(firstSignificantWord))
+  ) {
     return false;
   }
   return words.every((word) => {
