@@ -2351,7 +2351,7 @@ function parseIssueDescriptionSectionHeading(
     return candidate;
   }
   if (isSetextUnderlineLine(nextLine ?? '')) {
-    return matchesIssueValidationSectionTitle(candidate) || looksLikePlainSectionHeadingCandidate(candidate)
+    return matchesIssueValidationSectionTitle(candidate) || looksLikeSetextSectionHeadingCandidate(candidate)
       ? candidate
       : null;
   }
@@ -2392,6 +2392,23 @@ function looksLikePlainSectionHeadingCandidate(candidate: string): boolean {
     }
     return index > 0 && LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS.has(bareWord.toLowerCase());
   });
+}
+
+function looksLikeSetextSectionHeadingCandidate(candidate: string): boolean {
+  if (looksLikePlainSectionHeadingCandidate(candidate)) {
+    return true;
+  }
+  if (/[.:;!?]\s*$/u.test(candidate)) {
+    return false;
+  }
+  const symbolTrimmedCandidate = candidate
+    .replace(/[^\p{L}\p{N}\s/&()'-]+/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!symbolTrimmedCandidate || symbolTrimmedCandidate === candidate) {
+    return false;
+  }
+  return looksLikePlainSectionHeadingCandidate(symbolTrimmedCandidate);
 }
 
 function matchesIssueValidationSectionTitle(title: string): boolean {
