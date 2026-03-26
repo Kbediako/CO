@@ -1570,6 +1570,56 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('keeps nested validation buckets active when fenced examples appear before the real checklist', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Fenced examples inside nested validation buckets should not clear mirrored requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '### Automated',
+              '```sh',
+              'npm test',
+              '```',
+              '- Run npm test.',
+              '- Run npm run lint.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
   it('treats non-ASCII markdown headings as section boundaries when parsing validation requirements', async () => {
     const createdWorkpadBody = buildStructuredWorkpadBody({
       validationLines: ['- Run npm test.'],
@@ -2015,6 +2065,74 @@ describe('providerLinearWorkflowFacade', () => {
             'Notes',
             'Extra'
           ]
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the workpad body includes content before the first canonical section', async () => {
+    const invalidWorkpadBody = [
+      '## Codex Workpad',
+      '',
+      'This stray prose should not be accepted.',
+      '',
+      '### Environment / Workspace Stamp',
+      '- Branch: `co-21-tighten-linear-workpad-contract`.',
+      '',
+      '### Plan',
+      '- Keep the workpad strict.',
+      '',
+      '### Acceptance Criteria',
+      '- Preserve the canonical five sections only.',
+      '',
+      '### Validation',
+      '- Run npm test.',
+      '',
+      '### Notes',
+      '- No extra preamble should be accepted.'
+    ].join('\n');
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_structure_invalid',
+        message:
+          'Workpad body must contain these H3 sections in order after "## Codex Workpad": Environment / Workspace Stamp, Plan, Acceptance Criteria, Validation, Notes.',
+        status: 422,
+        details: {
+          required_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes'
+          ],
+          actual_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes'
+          ],
+          leading_content_before_first_section: true
         }
       }
     });

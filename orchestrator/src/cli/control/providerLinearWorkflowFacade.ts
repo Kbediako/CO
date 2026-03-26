@@ -2094,7 +2094,22 @@ function validateWorkpadBodyContract(
       ok: false;
       error: ProviderLinearWorkflowError;
     } {
-  const sections = parseWorkpadSections(body);
+  const { sections, hasLeadingContentBeforeFirstSection } = parseWorkpadSections(body);
+  if (hasLeadingContentBeforeFirstSection) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_structure_invalid',
+        message: `Workpad body must contain these H3 sections in order after "${LINEAR_WORKPAD_MARKER}": ${LINEAR_WORKPAD_REQUIRED_SECTIONS.join(', ')}.`,
+        status: 422,
+        details: {
+          required_sections: [...LINEAR_WORKPAD_REQUIRED_SECTIONS],
+          actual_sections: sections.map((section) => section.title),
+          leading_content_before_first_section: true
+        }
+      }
+    };
+  }
   const canonicalStructureMatches =
     sections.length === LINEAR_WORKPAD_REQUIRED_SECTIONS.length &&
     sections.every(
@@ -2164,12 +2179,16 @@ function validateWorkpadBodyContract(
   return { ok: true };
 }
 
-function parseWorkpadSections(body: string): ProviderLinearWorkpadSection[] {
+function parseWorkpadSections(body: string): {
+  sections: ProviderLinearWorkpadSection[];
+  hasLeadingContentBeforeFirstSection: boolean;
+} {
   const sections: ProviderLinearWorkpadSection[] = [];
   let markerSeen = false;
   let insideCodeFence = false;
   let currentTitle: string | null = null;
   let currentLines: string[] = [];
+  let hasLeadingContentBeforeFirstSection = false;
 
   const flushCurrent = () => {
     if (!currentTitle) {
@@ -2183,7 +2202,9 @@ function parseWorkpadSections(body: string): ProviderLinearWorkpadSection[] {
 
   for (const line of body.split(/\r?\n/u)) {
     if (isCodeFenceLine(line)) {
-      if (markerSeen && currentTitle) {
+      if (markerSeen && !currentTitle) {
+        hasLeadingContentBeforeFirstSection = true;
+      } else if (markerSeen && currentTitle) {
         currentLines.push(line);
       }
       insideCodeFence = !insideCodeFence;
@@ -2196,7 +2217,9 @@ function parseWorkpadSections(body: string): ProviderLinearWorkpadSection[] {
       continue;
     }
     if (insideCodeFence) {
-      if (currentTitle) {
+      if (!currentTitle && normalizeRequiredString(line) !== null) {
+        hasLeadingContentBeforeFirstSection = true;
+      } else if (currentTitle) {
         currentLines.push(line);
       }
       continue;
@@ -2208,13 +2231,18 @@ function parseWorkpadSections(body: string): ProviderLinearWorkpadSection[] {
       currentLines = [];
       continue;
     }
-    if (currentTitle) {
+    if (!currentTitle && normalizeRequiredString(line) !== null) {
+      hasLeadingContentBeforeFirstSection = true;
+    } else if (currentTitle) {
       currentLines.push(line);
     }
   }
   flushCurrent();
 
-  return sections;
+  return {
+    sections,
+    hasLeadingContentBeforeFirstSection
+  };
 }
 
 function extractIssueValidationRequirements(
@@ -2244,15 +2272,15 @@ function extractIssueValidationRequirements(
       lines[index - 1] ?? null
     );
     if (heading) {
+      const nextVisibleLines = getNextVisibleIssueLines(lines, index + 1, 2);
       if (matchesIssueValidationSectionTitle(heading)) {
         activeSection = heading;
-    } else if (
+      } else if (
         activeSection &&
         shouldPreserveValidationSectionAcrossNestedHeading(
           line,
-          lines[index + 1] ?? null,
-          lines[index + 2] ?? null,
-          lines[index + 3] ?? null
+          nextVisibleLines[0] ?? null,
+          nextVisibleLines[1] ?? null
         )
       ) {
         // Preserve the surrounding validation section for nested markdown buckets like
@@ -2474,30 +2502,50 @@ function isListIntroductionLine(line: string, nextLine: string | null): boolean 
   return Boolean(trimmed) && /:\s*$/u.test(trimmed) && isListLikeLine(nextLine);
 }
 
+function getNextVisibleIssueLines(lines: string[], startIndex: number, count: number): string[] {
+  if (count <= 0) {
+    return [];
+  }
+  const visibleLines: string[] = [];
+  let insideCodeFence = false;
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (isCodeFenceLine(line)) {
+      insideCodeFence = !insideCodeFence;
+      continue;
+    }
+    if (insideCodeFence) {
+      continue;
+    }
+    if (normalizeRequiredString(line) === null) {
+      continue;
+    }
+    visibleLines.push(line);
+    if (visibleLines.length >= count) {
+      break;
+    }
+  }
+  return visibleLines;
+}
+
 function shouldPreserveValidationSectionAcrossNestedHeading(
   line: string,
   nextLine: string | null,
-  followingLine: string | null,
-  thirdLine: string | null
+  followingLine: string | null
 ): boolean {
   const headingTitle = normalizeNestedValidationBucketTitle(line);
-  const firstCandidate = normalizeRequiredString(nextLine);
-  const secondCandidate = normalizeRequiredString(followingLine);
-  const nextContentLine = firstCandidate ?? secondCandidate;
-  const contentFollower =
-    firstCandidate === null ? thirdLine : followingLine;
   const preservesValidationContext =
     headingTitle !== null &&
     (LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(headingTitle) || matchesIssueValidationSectionTitle(headingTitle));
   return (
     preservesValidationContext &&
-    (isListLikeLine(nextContentLine) ||
-      (nextContentLine !== null && isListIntroductionLine(nextContentLine, contentFollower)) ||
+    (isListLikeLine(nextLine) ||
+      (nextLine !== null && isListIntroductionLine(nextLine, followingLine)) ||
       (preservesValidationContext &&
-        nextContentLine !== null &&
-        !isCodeFenceLine(nextContentLine) &&
-        !isMarkdownHeadingLine(nextContentLine) &&
-        !isSetextUnderlineLine(nextContentLine)))
+        nextLine !== null &&
+        !isCodeFenceLine(nextLine) &&
+        !isMarkdownHeadingLine(nextLine) &&
+        !isSetextUnderlineLine(nextLine)))
   );
 }
 
