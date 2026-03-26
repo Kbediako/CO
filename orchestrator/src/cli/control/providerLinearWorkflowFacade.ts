@@ -2070,13 +2070,14 @@ function findUnresolvedWorkpadComments(
 }
 
 function hasWorkpadMarker(body: string): boolean {
-  let insideCodeFence = false;
+  let activeCodeFenceDelimiter: string | null = null;
   for (const line of body.split(/\r?\n/u)) {
-    if (isCodeFenceLine(line)) {
-      insideCodeFence = !insideCodeFence;
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
       continue;
     }
-    if (!insideCodeFence && /^##\s+Codex Workpad\b/u.test(line)) {
+    if (!activeCodeFenceDelimiter && /^##\s+Codex Workpad\b/u.test(line)) {
       return true;
     }
   }
@@ -2185,7 +2186,7 @@ function parseWorkpadSections(body: string): {
 } {
   const sections: ProviderLinearWorkpadSection[] = [];
   let markerSeen = false;
-  let insideCodeFence = false;
+  let activeCodeFenceDelimiter: string | null = null;
   let currentTitle: string | null = null;
   let currentLines: string[] = [];
   let hasLeadingContentBeforeFirstSection = false;
@@ -2201,22 +2202,23 @@ function parseWorkpadSections(body: string): {
   };
 
   for (const line of body.split(/\r?\n/u)) {
-    if (isCodeFenceLine(line)) {
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    if (codeFenceTransition.isBoundary) {
       if (markerSeen && !currentTitle) {
         hasLeadingContentBeforeFirstSection = true;
       } else if (markerSeen && currentTitle) {
         currentLines.push(line);
       }
-      insideCodeFence = !insideCodeFence;
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
       continue;
     }
     if (!markerSeen) {
-      if (!insideCodeFence && /^##\s+Codex Workpad\b/u.test(line)) {
+      if (!activeCodeFenceDelimiter && /^##\s+Codex Workpad\b/u.test(line)) {
         markerSeen = true;
       }
       continue;
     }
-    if (insideCodeFence) {
+    if (activeCodeFenceDelimiter) {
       if (!currentTitle && normalizeRequiredString(line) !== null) {
         hasLeadingContentBeforeFirstSection = true;
       } else if (currentTitle) {
@@ -2255,32 +2257,40 @@ function extractIssueValidationRequirements(
   const requirements: ProviderLinearIssueValidationRequirement[] = [];
   let activeSection: string | null = null;
   let previousNonEmptyLine: string | null = null;
-  let insideCodeFence = false;
+  let activeCodeFenceDelimiter: string | null = null;
   const lines = description.split(/\r?\n/u);
   for (const [index, line] of lines.entries()) {
-    if (isCodeFenceLine(line)) {
-      insideCodeFence = !insideCodeFence;
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
       continue;
     }
-    if (insideCodeFence) {
+    if (activeCodeFenceDelimiter) {
       continue;
     }
+    const nextLine = lines[index + 1] ?? null;
+    const previousLine = lines[index - 1] ?? null;
+    const nextVisibleLines = getNextVisibleIssueLines(lines, index + 1, 2);
     const heading = parseIssueDescriptionSectionHeading(
       line,
       previousNonEmptyLine,
-      lines[index + 1] ?? null,
-      lines[index - 1] ?? null
+      nextLine,
+      previousLine
     );
     if (heading) {
-      const nextVisibleLines = getNextVisibleIssueLines(lines, index + 1, 2);
+      const headingContentLines = getNextVisibleIssueLines(
+        lines,
+        isSetextUnderlineLine(nextLine ?? '') ? index + 2 : index + 1,
+        2
+      );
       if (matchesIssueValidationSectionTitle(heading)) {
         activeSection = heading;
       } else if (
         activeSection &&
         shouldPreserveValidationSectionAcrossNestedHeading(
           line,
-          nextVisibleLines[0] ?? null,
-          nextVisibleLines[1] ?? null
+          headingContentLines[0] ?? null,
+          headingContentLines[1] ?? null
         )
       ) {
         // Preserve the surrounding validation section for nested markdown buckets like
@@ -2299,7 +2309,7 @@ function extractIssueValidationRequirements(
       }
       continue;
     }
-    if (isListIntroductionLine(line, lines[index + 1] ?? null)) {
+    if (isListIntroductionLine(line, nextVisibleLines[0] ?? null)) {
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
@@ -2403,7 +2413,7 @@ function parseIssueDescriptionSectionHeading(
 }
 
 function looksLikePlainSectionHeadingCandidate(candidate: string): boolean {
-  if (!/^[A-Za-z][A-Za-z0-9 /&()'-]{0,79}$/u.test(candidate)) {
+  if (!/^[\p{L}][\p{L}\p{M}\p{N} /&()'’\-–—]{0,79}$/u.test(candidate)) {
     return false;
   }
   const words = candidate.split(/\s+/u).filter(Boolean);
@@ -2415,7 +2425,10 @@ function looksLikePlainSectionHeadingCandidate(candidate: string): boolean {
     if (!bareWord) {
       return true;
     }
-    if (/^[A-Z0-9][A-Za-z0-9/&'-]*$/u.test(bareWord)) {
+    if (/^[&/\-–—]$/u.test(bareWord)) {
+      return true;
+    }
+    if (/^[\p{Lu}\p{Lt}\p{Lo}\p{Lm}\p{Nl}\p{Nd}][\p{L}\p{M}\p{N}/&'’\-–—]*$/u.test(bareWord)) {
       return true;
     }
     return index > 0 && LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS.has(bareWord.toLowerCase());
@@ -2485,7 +2498,7 @@ function normalizeRequirementValue(value: string): string {
 }
 
 function isCodeFenceLine(line: string): boolean {
-  return /^(?:```|~~~)/u.test(line.trim());
+  return parseCodeFenceLine(line) !== null;
 }
 
 function isMarkdownHeadingLine(line: string): boolean {
@@ -2507,14 +2520,15 @@ function getNextVisibleIssueLines(lines: string[], startIndex: number, count: nu
     return [];
   }
   const visibleLines: string[] = [];
-  let insideCodeFence = false;
+  let activeCodeFenceDelimiter: string | null = null;
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index];
-    if (isCodeFenceLine(line)) {
-      insideCodeFence = !insideCodeFence;
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
       continue;
     }
-    if (insideCodeFence) {
+    if (activeCodeFenceDelimiter) {
       continue;
     }
     if (normalizeRequiredString(line) === null) {
@@ -2563,6 +2577,67 @@ function normalizeNestedValidationBucketTitle(line: string): string | null {
   candidate = candidate.replace(/\s+#+\s*$/u, '');
   candidate = candidate.replace(/:\s*$/u, '').trim();
   return candidate ? normalizeComparableValue(candidate) : null;
+}
+
+function parseCodeFenceLine(line: string): {
+  delimiter: string;
+  trailingText: string;
+} | null {
+  const trimmedLine = line.trimStart();
+  const match = trimmedLine.match(/^(`{3,}|~{3,})(.*)$/u);
+  if (!match) {
+    return null;
+  }
+  return {
+    delimiter: match[1],
+    trailingText: match[2] ?? ''
+  };
+}
+
+function isClosingCodeFenceLine(
+  activeDelimiter: string,
+  codeFenceLine: {
+    delimiter: string;
+    trailingText: string;
+  }
+): boolean {
+  return (
+    codeFenceLine.delimiter[0] === activeDelimiter[0] &&
+    codeFenceLine.delimiter.length >= activeDelimiter.length &&
+    codeFenceLine.trailingText.trim().length === 0
+  );
+}
+
+function getCodeFenceTransition(
+  activeDelimiter: string | null,
+  line: string
+): {
+  isBoundary: boolean;
+  nextDelimiter: string | null;
+} {
+  const codeFenceLine = parseCodeFenceLine(line);
+  if (!codeFenceLine) {
+    return {
+      isBoundary: false,
+      nextDelimiter: activeDelimiter
+    };
+  }
+  if (activeDelimiter === null) {
+    return {
+      isBoundary: true,
+      nextDelimiter: codeFenceLine.delimiter
+    };
+  }
+  if (isClosingCodeFenceLine(activeDelimiter, codeFenceLine)) {
+    return {
+      isBoundary: true,
+      nextDelimiter: null
+    };
+  }
+  return {
+    isBoundary: false,
+    nextDelimiter: activeDelimiter
+  };
 }
 
 function containsNormalizedRequirement(haystack: string, needle: string): boolean {
