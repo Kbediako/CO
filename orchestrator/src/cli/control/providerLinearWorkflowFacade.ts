@@ -120,6 +120,7 @@ const LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_ENTRYPOINTS = new Set([
 ]);
 const LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS = new Set([
   'add',
+  'apply',
   'bench',
   'branch',
   'build',
@@ -129,26 +130,45 @@ const LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS = new Set([
   'clean',
   'clone',
   'commit',
+  'compose',
+  'config',
   'coverage',
+  'create',
   'deploy',
+  'describe',
   'dev',
+  'destroy',
   'diff',
+  'down',
+  'env',
   'exec',
+  'generate',
   'fetch',
   'fmt',
   'format',
+  'get',
+  'import',
+  'inspect',
   'install',
   'init',
   'lint',
+  'list',
+  'login',
   'log',
+  'logout',
   'merge',
   'mod',
+  'new',
   'plan',
   'pull',
+  'publish',
   'push',
   'rebase',
   'release',
+  'remote',
+  'remove',
   'reset',
+  'rm',
   'restore',
   'run',
   'serve',
@@ -156,9 +176,37 @@ const LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS = new Set([
   'start',
   'status',
   'stash',
+  'stop',
   'switch',
   'sync',
   'tag',
+  'test',
+  'uninstall',
+  'update',
+  'upgrade',
+  'up',
+  'use',
+  'verify',
+  'vet',
+  'whoami'
+]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_SUBCOMMANDS = new Set([
+  'bench',
+  'build',
+  'check',
+  'clean',
+  'dev',
+  'fmt',
+  'format',
+  'generate',
+  'install',
+  'lint',
+  'mod',
+  'plan',
+  'run',
+  'serve',
+  'status',
+  'sync',
   'test',
   'verify',
   'vet'
@@ -2605,8 +2653,8 @@ function looksLikeLowercaseSetextSectionHeadingCandidate(candidate: string): boo
   if (words.length === 0 || words.length > 5) {
     return false;
   }
-  const significantWords = words
-    .map((word) => word.replace(/^[("'(]+|[)"')]+$/gu, ''))
+  const strippedWords = words.map((word) => word.replace(/^[("'(]+|[)"')]+$/gu, ''));
+  const significantWords = strippedWords
     .filter(
       (word) =>
         word.length > 0 &&
@@ -2617,20 +2665,42 @@ function looksLikeLowercaseSetextSectionHeadingCandidate(candidate: string): boo
     return false;
   }
   const firstSignificantWord = significantWords[0].toLowerCase();
+  const secondWord = strippedWords[1] ?? null;
   const secondSignificantWord = significantWords[1]?.toLowerCase() ?? null;
   if (LINEAR_ISSUE_LOWERCASE_SETEXT_LEADING_VERBS.has(firstSignificantWord)) {
     return false;
   }
-  const secondWordLooksCommandLike =
+  const secondSignificantWordLooksCommandLike =
     secondSignificantWord !== null &&
     (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS.has(secondSignificantWord) ||
       /[/\\]/u.test(significantWords[1]));
   if (
-    secondWordLooksCommandLike &&
-    (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_ENTRYPOINTS.has(firstSignificantWord) ||
-      LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_ENTRYPOINTS.has(firstSignificantWord))
+    secondSignificantWordLooksCommandLike &&
+    LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_ENTRYPOINTS.has(firstSignificantWord)
   ) {
     return false;
+  }
+  const secondWordLooksCommandLike =
+    secondWord !== null &&
+    (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS.has(secondWord.toLowerCase()) ||
+      /[/\\]/u.test(secondWord));
+  const thirdWord = strippedWords[2] ?? null;
+  const thirdWordLooksCommandArgument =
+    thirdWord !== null &&
+    (/^[.~-]/u.test(thirdWord) || /[/\\=:]/u.test(thirdWord) || /\.\w/u.test(thirdWord));
+  if (
+    secondWord !== null &&
+    LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_ENTRYPOINTS.has(firstSignificantWord)
+  ) {
+    const normalizedSecondWord = secondWord.toLowerCase();
+    if (
+      LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_SUBCOMMANDS.has(normalizedSecondWord) ||
+      (/[/\\]/u.test(secondWord) && secondWordLooksCommandLike) ||
+      (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS.has(normalizedSecondWord) &&
+        thirdWordLooksCommandArgument)
+    ) {
+      return false;
+    }
   }
   return words.every((word) => {
     const bareWord = word.replace(/^[("'(]+|[)"')]+$/gu, '');
