@@ -2463,16 +2463,16 @@ function shouldPreserveValidationSectionAcrossNestedHeading(
   followingLine: string | null,
   thirdLine: string | null
 ): boolean {
-  const headingTitle = normalizeComparableValue(line.replace(/^\s*#{1,6}\s+/u, '').trim());
+  const headingTitle = normalizeNestedValidationBucketTitle(line);
   const firstCandidate = normalizeRequiredString(nextLine);
   const secondCandidate = normalizeRequiredString(followingLine);
   const nextContentLine = firstCandidate ?? secondCandidate;
   const contentFollower =
     firstCandidate === null ? thirdLine : followingLine;
   const preservesValidationContext =
-    LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(headingTitle) || matchesIssueValidationSectionTitle(headingTitle);
+    headingTitle !== null &&
+    (LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(headingTitle) || matchesIssueValidationSectionTitle(headingTitle));
   return (
-    isMarkdownHeadingLine(line) &&
     preservesValidationContext &&
     (isListLikeLine(nextContentLine) ||
       (nextContentLine !== null && isListIntroductionLine(nextContentLine, contentFollower)) ||
@@ -2482,6 +2482,21 @@ function shouldPreserveValidationSectionAcrossNestedHeading(
         !isMarkdownHeadingLine(nextContentLine) &&
         !isSetextUnderlineLine(nextContentLine)))
   );
+}
+
+function normalizeNestedValidationBucketTitle(line: string): string | null {
+  let candidate = line.trim();
+  if (!candidate) {
+    return null;
+  }
+  const markdownHeadingMatch = candidate.match(/^#{1,6}\s+(.+?)\s*$/u);
+  if (markdownHeadingMatch) {
+    candidate = markdownHeadingMatch[1];
+  }
+  candidate = candidate.replace(/^\*\*(.+)\*\*:?\s*$/u, '$1');
+  candidate = candidate.replace(/^__(.+)__:?\s*$/u, '$1');
+  candidate = candidate.replace(/:\s*$/u, '').trim();
+  return candidate ? normalizeComparableValue(candidate) : null;
 }
 
 function isSetextUnderlineLine(line: string): boolean {
