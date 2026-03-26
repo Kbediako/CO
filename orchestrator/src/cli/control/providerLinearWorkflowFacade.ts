@@ -2461,22 +2461,7 @@ function looksLikeSetextSectionHeadingCandidate(candidate: string): boolean {
 }
 
 function matchesIssueValidationSectionTitle(title: string): boolean {
-  const normalizedTitle = normalizeComparableValue(title);
-  if (LINEAR_ISSUE_VALIDATION_SECTION_TITLES.has(normalizedTitle)) {
-    return true;
-  }
-
-  for (const validationTitle of LINEAR_ISSUE_VALIDATION_SECTION_TITLES) {
-    if (!normalizedTitle.startsWith(validationTitle)) {
-      continue;
-    }
-    const suffix = normalizedTitle.slice(validationTitle.length).trimStart();
-    if (!suffix || !/^[a-z0-9]/u.test(suffix)) {
-      return true;
-    }
-  }
-
-  return false;
+  return matchesDecoratedSectionTitle(title, LINEAR_ISSUE_VALIDATION_SECTION_TITLES);
 }
 
 function stripRequirementPrefix(line: string): string | null {
@@ -2584,7 +2569,8 @@ function shouldPreserveValidationSectionAcrossNestedHeading(
   const headingTitle = normalizeNestedValidationBucketTitle(line);
   const preservesValidationContext =
     headingTitle !== null &&
-    (LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(headingTitle) || matchesIssueValidationSectionTitle(headingTitle));
+    (matchesDecoratedSectionTitle(headingTitle, LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES) ||
+      matchesIssueValidationSectionTitle(headingTitle));
   return (
     preservesValidationContext &&
     (isListLikeLine(nextLine) ||
@@ -2611,6 +2597,25 @@ function normalizeNestedValidationBucketTitle(line: string): string | null {
   candidate = candidate.replace(/\s+#+\s*$/u, '');
   candidate = candidate.replace(/:\s*$/u, '').trim();
   return candidate ? normalizeComparableValue(candidate) : null;
+}
+
+function matchesDecoratedSectionTitle(title: string, allowedTitles: Set<string>): boolean {
+  const normalizedTitle = normalizeComparableValue(title);
+  if (allowedTitles.has(normalizedTitle)) {
+    return true;
+  }
+
+  for (const allowedTitle of allowedTitles) {
+    if (!normalizedTitle.startsWith(allowedTitle)) {
+      continue;
+    }
+    const suffix = normalizedTitle.slice(allowedTitle.length).trimStart();
+    if (!suffix || !/^[\p{L}\p{N}]/u.test(suffix)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function parseCodeFenceLine(line: string): {
