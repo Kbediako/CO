@@ -2222,9 +2222,7 @@ function extractIssueValidationRequirements(
       lines[index + 1] ?? null
     );
     if (heading) {
-      activeSection = LINEAR_ISSUE_VALIDATION_SECTION_TITLES.has(normalizeComparableValue(heading))
-        ? heading
-        : null;
+      activeSection = matchesIssueValidationSectionTitle(heading) ? heading : null;
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
@@ -2339,6 +2337,25 @@ function looksLikePlainSectionHeadingCandidate(candidate: string): boolean {
     }
     return index > 0 && LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS.has(bareWord.toLowerCase());
   });
+}
+
+function matchesIssueValidationSectionTitle(title: string): boolean {
+  const normalizedTitle = normalizeComparableValue(title);
+  if (LINEAR_ISSUE_VALIDATION_SECTION_TITLES.has(normalizedTitle)) {
+    return true;
+  }
+
+  for (const validationTitle of LINEAR_ISSUE_VALIDATION_SECTION_TITLES) {
+    if (!normalizedTitle.startsWith(validationTitle)) {
+      continue;
+    }
+    const suffix = normalizedTitle.slice(validationTitle.length).trimStart();
+    if (!suffix || !/^[a-z0-9]/u.test(suffix)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function stripRequirementPrefix(line: string): string | null {
