@@ -55,6 +55,29 @@ export interface ControlDispatchPilotPayload {
   reason?: string | null;
 }
 
+export interface ControlProviderTerminalCleanupLastResultPayload {
+  attempted_at: string;
+  status: 'disabled' | 'noop' | 'succeeded' | 'failed';
+  summary: string;
+  error: string | null;
+  issue_id: string;
+  issue_identifier: string | null;
+  workspace_path: string;
+  branch: string | null;
+  attached_pr_urls: string[];
+  matching_open_pr_urls: string[];
+  closed_pr_urls: string[];
+}
+
+export interface ControlProviderTerminalCleanupPayload {
+  enabled: boolean;
+  close_attached_pr: {
+    enabled: boolean;
+    comment_template: string;
+  };
+  last_result: ControlProviderTerminalCleanupLastResultPayload | null;
+}
+
 export interface ControlProviderWorkflowPayload {
   status: 'ready' | 'reload_failed';
   pipeline_id: string;
@@ -64,6 +87,7 @@ export interface ControlProviderWorkflowPayload {
   last_success_at: string | null;
   last_error_at: string | null;
   last_error: string | null;
+  terminal_cleanup?: ControlProviderTerminalCleanupPayload | null;
 }
 
 interface SharedSelectedProjectionFields {
@@ -445,7 +469,37 @@ export function buildSelectedRunRuntimeFingerprintInput(
           last_reload_attempt_at: providerWorkflow.last_reload_attempt_at,
           last_success_at: providerWorkflow.last_success_at,
           last_error_at: providerWorkflow.last_error_at,
-          last_error: providerWorkflow.last_error
+          last_error: providerWorkflow.last_error,
+          terminal_cleanup: providerWorkflow.terminal_cleanup
+            ? {
+                enabled: providerWorkflow.terminal_cleanup.enabled,
+                close_attached_pr: {
+                  enabled: providerWorkflow.terminal_cleanup.close_attached_pr.enabled,
+                  comment_template: providerWorkflow.terminal_cleanup.close_attached_pr.comment_template
+                },
+                last_result: providerWorkflow.terminal_cleanup.last_result
+                  ? {
+                      attempted_at: providerWorkflow.terminal_cleanup.last_result.attempted_at,
+                      status: providerWorkflow.terminal_cleanup.last_result.status,
+                      summary: providerWorkflow.terminal_cleanup.last_result.summary,
+                      error: providerWorkflow.terminal_cleanup.last_result.error,
+                      issue_id: providerWorkflow.terminal_cleanup.last_result.issue_id,
+                      issue_identifier: providerWorkflow.terminal_cleanup.last_result.issue_identifier,
+                      workspace_path: providerWorkflow.terminal_cleanup.last_result.workspace_path,
+                      branch: providerWorkflow.terminal_cleanup.last_result.branch,
+                      attached_pr_urls: [
+                        ...providerWorkflow.terminal_cleanup.last_result.attached_pr_urls
+                      ],
+                      matching_open_pr_urls: [
+                        ...providerWorkflow.terminal_cleanup.last_result.matching_open_pr_urls
+                      ],
+                      closed_pr_urls: [
+                        ...providerWorkflow.terminal_cleanup.last_result.closed_pr_urls
+                      ]
+                    }
+                  : null
+              }
+            : null
         }
       : null
   };

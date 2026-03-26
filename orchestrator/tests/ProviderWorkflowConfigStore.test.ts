@@ -50,6 +50,50 @@ describe('providerWorkflowConfigStore', () => {
     );
   });
 
+  it('boots from the last known good snapshot when startup reload fails', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const runDir = join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host');
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const initialStore = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir,
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await initialStore.bootstrap();
+    const snapshotPath = await initialStore.getLaunchConfigPath();
+    const initialSnapshot = await readFile(snapshotPath, 'utf8');
+
+    await writeRepoConfig('{ invalid json');
+    const restartedStore = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir,
+      pipelineId: 'provider-linear-worker'
+    });
+
+    const bootstrapped = await restartedStore.bootstrap();
+
+    expect(bootstrapped).toMatchObject({
+      status: 'reload_failed',
+      pipeline_id: 'provider-linear-worker',
+      snapshot_path: snapshotPath
+    });
+    expect(bootstrapped.last_error).toBeTruthy();
+    expect(bootstrapped.terminal_cleanup).toMatchObject({
+      enabled: true,
+      close_attached_pr: {
+        enabled: true,
+        comment_template:
+          'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.'
+      }
+    });
+    expect(await restartedStore.getLaunchConfigPath()).toBe(snapshotPath);
+    expect(await readFile(snapshotPath, 'utf8')).toBe(initialSnapshot);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('keeping last known good configuration')
+    );
+  });
+
   it('keeps the last known good snapshot when a later reload becomes invalid', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
@@ -145,6 +189,54 @@ describe('providerWorkflowConfigStore', () => {
     });
     expect(store.snapshot().last_error).toBeTruthy();
     expect(store.snapshot().last_error).not.toBe('mutated degraded state');
+  });
+
+  it('loads terminal cleanup metadata and records the latest cleanup result', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    const bootstrapped = await store.bootstrap();
+
+    expect(bootstrapped.terminal_cleanup).toMatchObject({
+      enabled: true,
+      close_attached_pr: {
+        enabled: true,
+        comment_template:
+          'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.'
+      },
+      last_result: null
+    });
+
+    store.recordTerminalCleanupResult({
+      attemptedAt: '2026-03-27T00:00:00.000Z',
+      status: 'failed',
+      summary: 'Terminal cleanup could not close the attached PR.',
+      error: 'gh pr close exited 1 stderr="close failed"',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-5',
+      workspacePath: '/repo/.workspaces/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8',
+      branch: 'feature/co-5',
+      attachedPrUrls: ['https://github.com/example/co/pull/123'],
+      matchingOpenPrUrls: ['https://github.com/example/co/pull/123'],
+      closedPrUrls: []
+    });
+
+    expect(store.snapshot().terminal_cleanup?.last_result).toMatchObject({
+      status: 'failed',
+      issue_identifier: 'CO-5',
+      branch: 'feature/co-5',
+      attached_pr_urls: ['https://github.com/example/co/pull/123']
+    });
+
+    if (bootstrapped.terminal_cleanup?.last_result) {
+      bootstrapped.terminal_cleanup.last_result.status = 'succeeded';
+    }
+
+    expect(store.snapshot().terminal_cleanup?.last_result?.status).toBe('failed');
   });
 
   it('retries a failed revision when the config is repaired without metadata change', async () => {
@@ -438,6 +530,16 @@ function buildValidProviderConfig(version: string): Record<string, unknown> {
         id: 'provider-linear-worker',
         title: `Provider worker ${version}`,
         guardrailsRequired: false,
+        metadata: {
+          terminal_cleanup: {
+            enabled: true,
+            close_attached_pr: {
+              enabled: true,
+              comment_template:
+                'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.'
+            }
+          }
+        },
         stages: [
           {
             kind: 'command',

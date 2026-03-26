@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import process from 'node:process';
 
 import { logger } from '../../logger.js';
 import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../providerLinearWorkerRunner.js';
@@ -37,6 +38,11 @@ import {
   upsertProviderIntakeClaim
 } from './providerIntakeState.js';
 import { createProviderIssueRetryQueue } from './providerIssueRetryQueue.js';
+import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
+import {
+  runProviderTerminalCleanup,
+  type ProviderTerminalCleanupConfig
+} from './providerTerminalCleanup.js';
 
 export interface ProviderIssueLauncher {
   start(input: {
@@ -130,6 +136,8 @@ export interface CreateProviderIssueHandoffServiceOptions {
     }
   ) => Promise<ProviderTrackedIssueRefreshResolution>) | null;
   resolveTrackedIssues?: (() => Promise<ProviderTrackedIssuePollResolution>) | null;
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore | null;
+  runTerminalCleanup?: typeof runProviderTerminalCleanup;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
@@ -200,6 +208,7 @@ export function createProviderIssueHandoffService(
   const startPipelineId = options.startPipelineId ?? 'diagnostics';
   const allowedRunRoots = [resolve(options.paths.runDir, '..', '..', '..')];
   const repoRoot = resolve(options.paths.repoRoot);
+  const runTerminalCleanup = options.runTerminalCleanup ?? runProviderTerminalCleanup;
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -591,7 +600,15 @@ export function createProviderIssueHandoffService(
       updated_at: now
     });
     if (input.cleanupWorkspace && canCleanupReleasedProviderWorkspace(input.releaseRun)) {
-      await cleanupReleasedProviderWorkspace(repoRoot, nextTaskId, nextManifestPath);
+      await cleanupReleasedProviderWorkspace({
+        repoRoot,
+        taskId: nextTaskId,
+        manifestPath: nextManifestPath,
+        issueId: input.claim.issue_id,
+        issueIdentifier: input.claim.issue_identifier,
+        providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
+        runTerminalCleanup
+      });
     }
     if (transitioned) {
       options.publishRuntime?.('provider-intake.refresh');
@@ -709,11 +726,15 @@ export function createProviderIssueHandoffService(
           shouldCleanupReleasedProviderWorkspace(claim) &&
           canCleanupReleasedProviderWorkspace(releasedRun)
         ) {
-          await cleanupReleasedProviderWorkspace(
+          await cleanupReleasedProviderWorkspace({
             repoRoot,
-            releasedRun?.taskId ?? claim.task_id,
-            releasedRun?.manifestPath ?? claim.run_manifest_path
-          );
+            taskId: releasedRun?.taskId ?? claim.task_id,
+            manifestPath: releasedRun?.manifestPath ?? claim.run_manifest_path,
+            issueId: claim.issue_id,
+            issueIdentifier: claim.issue_identifier,
+            providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
+            runTerminalCleanup
+          });
         }
         continue;
       }
@@ -2513,13 +2534,93 @@ function readRecordValue(
   return null;
 }
 
-async function cleanupReleasedProviderWorkspace(
-  repoRoot: string,
-  taskId: string,
-  manifestPath: string | null
-): Promise<void> {
-  const workspacePath = await resolveProviderCleanupWorkspacePath(repoRoot, taskId, manifestPath);
-  await cleanupProviderWorkspace(repoRoot, workspacePath);
+async function cleanupReleasedProviderWorkspace(input: {
+  repoRoot: string;
+  taskId: string;
+  manifestPath: string | null;
+  issueId: string;
+  issueIdentifier: string | null;
+  providerWorkflowConfigStore: ProviderWorkflowConfigStore | null;
+  runTerminalCleanup: typeof runProviderTerminalCleanup;
+}): Promise<void> {
+  const workspacePath = await resolveProviderCleanupWorkspacePath(
+    input.repoRoot,
+    input.taskId,
+    input.manifestPath
+  );
+  await maybeRunReleasedProviderTerminalCleanup({
+    issueId: input.issueId,
+    issueIdentifier: input.issueIdentifier,
+    workspacePath,
+    providerWorkflowConfigStore: input.providerWorkflowConfigStore,
+    runTerminalCleanup: input.runTerminalCleanup
+  });
+  await cleanupProviderWorkspace(input.repoRoot, workspacePath);
+}
+
+async function maybeRunReleasedProviderTerminalCleanup(input: {
+  issueId: string;
+  issueIdentifier: string | null;
+  workspacePath: string;
+  providerWorkflowConfigStore: ProviderWorkflowConfigStore | null;
+  runTerminalCleanup: typeof runProviderTerminalCleanup;
+}): Promise<void> {
+  try {
+    const providerWorkflow = input.providerWorkflowConfigStore
+      ? await input.providerWorkflowConfigStore.refresh()
+      : null;
+    const cleanupConfig = resolveProviderTerminalCleanupConfigFromPayload(providerWorkflow);
+    if (!cleanupConfig) {
+      return;
+    }
+    const cleanupResult = await input.runTerminalCleanup({
+      issueId: input.issueId,
+      issueIdentifier: input.issueIdentifier,
+      workspacePath: input.workspacePath,
+      config: cleanupConfig,
+      env: process.env
+    });
+    input.providerWorkflowConfigStore?.recordTerminalCleanupResult(cleanupResult);
+    if (cleanupResult.status === 'failed') {
+      logger.error(
+        `[provider-terminal-cleanup] issue=${input.issueIdentifier ?? input.issueId} summary=${cleanupResult.summary} error=${cleanupResult.error ?? 'unknown'}`
+      );
+      return;
+    }
+    if (cleanupResult.status === 'succeeded') {
+      logger.info(
+        `[provider-terminal-cleanup] issue=${input.issueIdentifier ?? input.issueId} summary=${cleanupResult.summary}`
+      );
+    }
+  } catch (error) {
+    logger.error(
+      `[provider-terminal-cleanup] issue=${input.issueIdentifier ?? input.issueId} failed before workspace removal: ${(error as Error).message}`
+    );
+  }
+}
+
+function resolveProviderTerminalCleanupConfigFromPayload(
+  providerWorkflow: {
+    terminal_cleanup?: {
+      enabled: boolean;
+      close_attached_pr: {
+        enabled: boolean;
+        comment_template: string;
+      };
+    } | null;
+  } | null
+): ProviderTerminalCleanupConfig | null {
+  const terminalCleanup = providerWorkflow?.terminal_cleanup ?? null;
+  if (!terminalCleanup) {
+    return null;
+  }
+  return {
+    enabled: terminalCleanup.enabled,
+    closeAttachedPr: {
+      enabled: terminalCleanup.close_attached_pr.enabled,
+      commentTemplate: terminalCleanup.close_attached_pr.comment_template
+    }
+  };
 }
 
 async function resolveProviderCleanupWorkspacePath(

@@ -8260,6 +8260,171 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('keeps terminal workspace cleanup non-fatal when the attached-pr close hook fails', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-completed',
+        task_id: 'task-1303-completed',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        workspace_path: join(root, '.workspaces', 'task-1303-completed'),
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    const workspacePath = resolveProviderWorkspacePath(root, 'task-1303-completed');
+    await mkdir(workspacePath, { recursive: true });
+    await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const cleanupResult = {
+      attemptedAt: '2026-03-27T00:00:00.000Z',
+      status: 'failed' as const,
+      summary: 'Terminal cleanup closed 0 of 1 matching attached PR(s) for branch feature/co-5.',
+      error: 'gh pr close exited 1 stderr="close failed"',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      workspacePath,
+      branch: 'feature/co-5',
+      attachedPrUrls: ['https://github.com/example/co/pull/123'],
+      matchingOpenPrUrls: ['https://github.com/example/co/pull/123'],
+      closedPrUrls: []
+    };
+    const recordTerminalCleanupResult = vi.fn();
+    const runTerminalCleanup = vi.fn(async () => cleanupResult);
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-03-27T00:00:00.000Z',
+        last_success_at: '2026-03-27T00:00:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: {
+          enabled: true,
+          close_attached_pr: {
+            enabled: true,
+            comment_template:
+              'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.'
+          },
+          last_result: null
+        }
+      })),
+      refresh: vi.fn(async () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-03-27T00:00:00.000Z',
+        last_success_at: '2026-03-27T00:00:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: {
+          enabled: true,
+          close_attached_pr: {
+            enabled: true,
+            comment_template:
+              'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.'
+          },
+          last_result: null
+        }
+      })),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-03-27T00:00:00.000Z',
+        last_success_at: '2026-03-27T00:00:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: {
+          enabled: true,
+          close_attached_pr: {
+            enabled: true,
+            comment_template:
+              'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.'
+          },
+          last_result: null
+        }
+      }),
+      getLaunchConfigPath: vi.fn(async () => '/repo/.runs/local-mcp/cli/control-host/provider-workflow.json'),
+      recordTerminalCleanupResult
+    };
+
+    const persist = vi.fn(async () => undefined);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      providerWorkflowConfigStore,
+      runTerminalCleanup,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    await expect(access(workspacePath)).rejects.toThrow();
+    expect(runTerminalCleanup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-2',
+        workspacePath
+      })
+    );
+    expect(recordTerminalCleanupResult).toHaveBeenCalledWith(cleanupResult);
+  });
+
   it('cleans terminal released provider workspaces during refresh startup replay even when the assignee changed', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
