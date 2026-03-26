@@ -2325,8 +2325,13 @@ function parseIssueDescriptionSectionHeading(
   if (LINEAR_ISSUE_PLAIN_SECTION_TITLES.has(normalizedCandidate)) {
     return candidate;
   }
-  if (isMarkdownHeading || isSetextUnderlineLine(nextLine ?? '')) {
+  if (isMarkdownHeading) {
     return candidate;
+  }
+  if (isSetextUnderlineLine(nextLine ?? '')) {
+    return matchesIssueValidationSectionTitle(candidate) || looksLikePlainSectionHeadingCandidate(candidate)
+      ? candidate
+      : null;
   }
   const previousTrimmed = previousLine?.trim() ?? '';
   const nextTrimmed = nextLine?.trim() ?? '';
