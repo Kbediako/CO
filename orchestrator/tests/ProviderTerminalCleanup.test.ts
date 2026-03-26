@@ -317,6 +317,91 @@ describe('providerTerminalCleanup', () => {
     expect(runCommand).toHaveBeenCalledTimes(5);
   });
 
+  it.each([
+    ['https://x-access-token:secret@github.com/example/co.git\n'],
+    ['https://www.github.com/example/co.git\n']
+  ])('accepts %s as the workspace origin remote', async (originUrl) => {
+    const workspacePath = await createWorkspacePath();
+    const attachedPrUrl = 'https://github.com/example/co/pull/123';
+    const workspaceHeadOid = 'abc123def456abc123def456abc123def456abcd';
+    const readIssueContext = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'issue-context' as const,
+      issue: {
+        attachments: [{ id: 'att-1', title: 'PR 123', url: attachedPrUrl, source_type: 'github' }]
+      }
+    }));
+    const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command, args }) => {
+      if (command === 'git') {
+        if (args.at(-2) === 'branch' && args.at(-1) === '--show-current') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'feature/co-5\n',
+            stderr: ''
+          };
+        }
+        if (args.at(-3) === 'remote' && args.at(-2) === 'get-url' && args.at(-1) === 'origin') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: originUrl,
+            stderr: ''
+          };
+        }
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: `${workspaceHeadOid}\n`,
+          stderr: ''
+        };
+      }
+      if (args[1] === 'view') {
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: JSON.stringify({
+            state: 'OPEN',
+            headRefName: 'feature/co-5',
+            headRefOid: workspaceHeadOid,
+            url: attachedPrUrl
+          }),
+          stderr: ''
+        };
+      }
+      return {
+        ok: true,
+        exitCode: 0,
+        stdout: 'Closed pull request\n',
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderTerminalCleanup(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-5',
+        workspacePath,
+        config: buildEnabledCleanupConfig()
+      },
+      {
+        readIssueContext,
+        runCommand,
+        now: () => '2026-03-27T00:00:00.000Z'
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'succeeded',
+      summary: 'Closed 1 attached PR(s) for branch feature/co-5.',
+      branch: 'feature/co-5',
+      attachedPrUrls: [attachedPrUrl],
+      matchingOpenPrUrls: [attachedPrUrl],
+      closedPrUrls: [attachedPrUrl]
+    });
+    expect(runCommand).toHaveBeenCalledTimes(5);
+  });
+
   it('surfaces a failed close attempt without throwing', async () => {
     const workspacePath = await createWorkspacePath();
     const attachedPrUrl = 'https://github.com/example/co/pull/123';

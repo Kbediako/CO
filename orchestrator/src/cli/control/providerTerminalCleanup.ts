@@ -582,17 +582,28 @@ function parseGitHubRepositoryUrl(value: string | null | undefined): string | nu
     return null;
   }
 
-  const urlMatch = normalized.match(
-    /^(?:https:\/\/|ssh:\/\/git@)github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/
-  );
-  if (urlMatch) {
-    return `${urlMatch[1]!.toLowerCase()}/${urlMatch[2]!.toLowerCase()}`;
-  }
   const scpMatch = normalized.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
   if (scpMatch) {
     return `${scpMatch[1]!.toLowerCase()}/${scpMatch[2]!.toLowerCase()}`;
   }
-  return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    return null;
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  if (hostname !== 'github.com' && hostname !== 'www.github.com') {
+    return null;
+  }
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  const owner = normalizeOptionalString(segments[0] ?? null);
+  const repo = normalizeOptionalString((segments[1] ?? '').replace(/\.git$/iu, ''));
+  if (!owner || !repo || segments.length !== 2) {
+    return null;
+  }
+  return `${owner.toLowerCase()}/${repo.toLowerCase()}`;
 }
 
 function normalizePullRequestNumber(value: string | null | undefined): string | null {
