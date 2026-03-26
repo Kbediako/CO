@@ -779,6 +779,50 @@ describe('runDoctor', () => {
     }
   });
 
+  it('prefers explicit cwd over ambient CODEX_ORCHESTRATOR_ROOT during doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-explicit-cwd-'));
+    const previousRoot = process.env.CODEX_ORCHESTRATOR_ROOT;
+    const runCloudPreflightSpy = vi
+      .spyOn(cloudPreflight, 'runCloudPreflight')
+      .mockImplementation(async (request) => ({
+        ok: true,
+        issues: [],
+        details: {
+          codexBin: request.codexBin,
+          environmentId: request.environmentId,
+          branch: null
+        }
+      }));
+
+    process.env.CODEX_ORCHESTRATOR_ROOT = process.cwd();
+
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        environmentId: 'env_explicit',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: '/tmp/fake-codex',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+
+      expect(runCloudPreflightSpy).toHaveBeenCalledOnce();
+      const [request] = runCloudPreflightSpy.mock.calls[0] ?? [];
+      expect(request?.repoRoot).toBe(tempDir);
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_explicit');
+    } finally {
+      runCloudPreflightSpy.mockRestore();
+      if (previousRoot === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousRoot;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('resolves cloud env id from stageSets references in doctor cloud preflight', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-stage-set-'));
     await writeFile(
