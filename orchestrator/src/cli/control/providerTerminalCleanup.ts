@@ -150,27 +150,29 @@ export async function runProviderTerminalCleanup(
   }
 
   const branch = normalizeOptionalString(branchResult.stdout);
-  let workspaceHeadOid: string | null = null;
-  if (!branch) {
-    const headResult = await runCommand({
-      command: 'git',
-      args: ['-C', input.workspacePath, 'rev-parse', 'HEAD'],
-      cwd: input.workspacePath
+  const headResult = await runCommand({
+    command: 'git',
+    args: ['-C', input.workspacePath, 'rev-parse', 'HEAD'],
+    cwd: input.workspacePath
+  });
+  if (!headResult.ok) {
+    return buildResult({
+      attemptedAt,
+      issueId: input.issueId,
+      issueIdentifier,
+      workspacePath: input.workspacePath,
+      status: 'failed',
+      summary:
+        branch === null
+          ? 'Terminal cleanup could not determine the detached workspace HEAD.'
+          : 'Terminal cleanup could not determine the workspace HEAD.',
+      error: formatCommandFailure('git', headResult),
+      branch
     });
-    if (!headResult.ok) {
-      return buildResult({
-        attemptedAt,
-        issueId: input.issueId,
-        issueIdentifier,
-        workspacePath: input.workspacePath,
-        status: 'failed',
-        summary: 'Terminal cleanup could not determine the detached workspace HEAD.',
-        error: formatCommandFailure('git', headResult),
-        branch: null
-      });
-    }
-    workspaceHeadOid = normalizeOptionalString(headResult.stdout);
-    if (!workspaceHeadOid) {
+  }
+  const workspaceHeadOid = normalizeOptionalString(headResult.stdout);
+  if (!workspaceHeadOid) {
+    if (!branch) {
       return buildResult({
         attemptedAt,
         issueId: input.issueId,
@@ -181,6 +183,15 @@ export async function runProviderTerminalCleanup(
         branch: null
       });
     }
+    return buildResult({
+      attemptedAt,
+      issueId: input.issueId,
+      issueIdentifier,
+      workspacePath: input.workspacePath,
+      status: 'failed',
+      summary: 'Terminal cleanup could not determine the workspace HEAD.',
+      branch
+    });
   }
 
   const issueContext = await readIssueContext({
@@ -236,7 +247,10 @@ export async function runProviderTerminalCleanup(
       continue;
     }
 
-    const matchesBranch = branch !== null && prDetails.headRefName === branch;
+    const matchesBranch =
+      branch !== null &&
+      prDetails.headRefName === branch &&
+      prDetails.headRefOid === workspaceHeadOid;
     const matchesHead =
       branch === null &&
       workspaceHeadOid !== null &&

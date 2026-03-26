@@ -21,6 +21,7 @@ afterEach(async () => {
 describe('providerTerminalCleanup', () => {
   it('returns a noop when the issue has no attached GitHub PRs', async () => {
     const workspacePath = await createWorkspacePath();
+    const workspaceHeadOid = 'abc123def456abc123def456abc123def456abcd';
     const readIssueContext = vi.fn(async () => ({
       ok: true as const,
       operation: 'issue-context' as const,
@@ -28,12 +29,20 @@ describe('providerTerminalCleanup', () => {
         attachments: []
       }
     }));
-    const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command }) => {
+    const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command, args }) => {
       expect(command).toBe('git');
+      if (args.at(-2) === 'branch' && args.at(-1) === '--show-current') {
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: 'feature/co-5\n',
+          stderr: ''
+        };
+      }
       return {
         ok: true,
         exitCode: 0,
-        stdout: 'feature/co-5\n',
+        stdout: `${workspaceHeadOid}\n`,
         stderr: ''
       };
     });
@@ -65,13 +74,14 @@ describe('providerTerminalCleanup', () => {
       matchingOpenPrUrls: [],
       closedPrUrls: []
     });
-    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(runCommand).toHaveBeenCalledTimes(2);
     expect(readIssueContext).toHaveBeenCalledTimes(1);
   });
 
   it('returns a noop when the attached PR is already closed', async () => {
     const workspacePath = await createWorkspacePath();
     const attachedPrUrl = 'https://github.com/example/co/pull/123';
+    const workspaceHeadOid = 'abc123def456abc123def456abc123def456abcd';
     const readIssueContext = vi.fn(async () => ({
       ok: true as const,
       operation: 'issue-context' as const,
@@ -81,10 +91,18 @@ describe('providerTerminalCleanup', () => {
     }));
     const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command, args }) => {
       if (command === 'git') {
+        if (args.at(-2) === 'branch' && args.at(-1) === '--show-current') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'feature/co-5\n',
+            stderr: ''
+          };
+        }
         return {
           ok: true,
           exitCode: 0,
-          stdout: 'feature/co-5\n',
+          stdout: `${workspaceHeadOid}\n`,
           stderr: ''
         };
       }
@@ -96,7 +114,7 @@ describe('providerTerminalCleanup', () => {
         stdout: JSON.stringify({
           state: 'CLOSED',
           headRefName: 'feature/co-5',
-          headRefOid: 'abc123',
+          headRefOid: workspaceHeadOid,
           url: attachedPrUrl
         }),
         stderr: ''
@@ -124,12 +142,13 @@ describe('providerTerminalCleanup', () => {
       matchingOpenPrUrls: [],
       closedPrUrls: []
     });
-    expect(runCommand).toHaveBeenCalledTimes(2);
+    expect(runCommand).toHaveBeenCalledTimes(3);
   });
 
   it('closes the attached open PR when its head branch matches the workspace branch', async () => {
     const workspacePath = await createWorkspacePath();
     const attachedPrUrl = 'https://github.com/example/co/pull/123';
+    const workspaceHeadOid = 'abc123def456abc123def456abc123def456abcd';
     const readIssueContext = vi.fn(async () => ({
       ok: true as const,
       operation: 'issue-context' as const,
@@ -139,10 +158,18 @@ describe('providerTerminalCleanup', () => {
     }));
     const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command, args }) => {
       if (command === 'git') {
+        if (args.at(-2) === 'branch' && args.at(-1) === '--show-current') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'feature/co-5\n',
+            stderr: ''
+          };
+        }
         return {
           ok: true,
           exitCode: 0,
-          stdout: 'feature/co-5\n',
+          stdout: `${workspaceHeadOid}\n`,
           stderr: ''
         };
       }
@@ -153,7 +180,7 @@ describe('providerTerminalCleanup', () => {
           stdout: JSON.stringify({
             state: 'OPEN',
             headRefName: 'feature/co-5',
-            headRefOid: 'abc123',
+            headRefOid: workspaceHeadOid,
             url: attachedPrUrl
           }),
           stderr: ''
@@ -196,12 +223,13 @@ describe('providerTerminalCleanup', () => {
       matchingOpenPrUrls: [attachedPrUrl],
       closedPrUrls: [attachedPrUrl]
     });
-    expect(runCommand).toHaveBeenCalledTimes(3);
+    expect(runCommand).toHaveBeenCalledTimes(4);
   });
 
   it('surfaces a failed close attempt without throwing', async () => {
     const workspacePath = await createWorkspacePath();
     const attachedPrUrl = 'https://github.com/example/co/pull/123';
+    const workspaceHeadOid = 'abc123def456abc123def456abc123def456abcd';
     const readIssueContext = vi.fn(async () => ({
       ok: true as const,
       operation: 'issue-context' as const,
@@ -211,10 +239,18 @@ describe('providerTerminalCleanup', () => {
     }));
     const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command, args }) => {
       if (command === 'git') {
+        if (args.at(-2) === 'branch' && args.at(-1) === '--show-current') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'feature/co-5\n',
+            stderr: ''
+          };
+        }
         return {
           ok: true,
           exitCode: 0,
-          stdout: 'feature/co-5\n',
+          stdout: `${workspaceHeadOid}\n`,
           stderr: ''
         };
       }
@@ -225,7 +261,7 @@ describe('providerTerminalCleanup', () => {
           stdout: JSON.stringify({
             state: 'OPEN',
             headRefName: 'feature/co-5',
-            headRefOid: 'abc123',
+            headRefOid: workspaceHeadOid,
             url: attachedPrUrl
           }),
           stderr: ''
@@ -263,6 +299,73 @@ describe('providerTerminalCleanup', () => {
     });
     expect(result.error).toContain('gh pr close');
     expect(result.error).toContain('close failed');
+  });
+
+  it('ignores an attached PR when the branch matches but the head commit does not', async () => {
+    const workspacePath = await createWorkspacePath();
+    const attachedPrUrl = 'https://github.com/example/co/pull/123';
+    const workspaceHeadOid = 'abc123def456abc123def456abc123def456abcd';
+    const readIssueContext = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'issue-context' as const,
+      issue: {
+        attachments: [{ id: 'att-1', title: 'PR 123', url: attachedPrUrl, source_type: 'github' }]
+      }
+    }));
+    const runCommand = vi.fn<ProviderTerminalCleanupCommandRunner>(async ({ command, args }) => {
+      if (command === 'git') {
+        if (args.at(-2) === 'branch' && args.at(-1) === '--show-current') {
+          return {
+            ok: true,
+            exitCode: 0,
+            stdout: 'feature/co-5\n',
+            stderr: ''
+          };
+        }
+        return {
+          ok: true,
+          exitCode: 0,
+          stdout: `${workspaceHeadOid}\n`,
+          stderr: ''
+        };
+      }
+      expect(args).toEqual(['pr', 'view', attachedPrUrl, '--json', 'state,headRefName,headRefOid,url']);
+      return {
+        ok: true,
+        exitCode: 0,
+        stdout: JSON.stringify({
+          state: 'OPEN',
+          headRefName: 'feature/co-5',
+          headRefOid: 'ffffffffff56abc123def456abc123def456abcd',
+          url: attachedPrUrl
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderTerminalCleanup(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-5',
+        workspacePath,
+        config: buildEnabledCleanupConfig()
+      },
+      {
+        readIssueContext,
+        runCommand,
+        now: () => '2026-03-27T00:00:00.000Z'
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'noop',
+      summary: 'No attached open PR matched branch feature/co-5.',
+      branch: 'feature/co-5',
+      attachedPrUrls: [attachedPrUrl],
+      matchingOpenPrUrls: [],
+      closedPrUrls: []
+    });
+    expect(runCommand).toHaveBeenCalledTimes(3);
   });
 
   it('closes an attached PR from a detached workspace when the PR head commit matches HEAD', async () => {
