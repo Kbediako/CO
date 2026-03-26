@@ -2073,15 +2073,14 @@ function validateWorkpadBodyContract(
       error: ProviderLinearWorkflowError;
     } {
   const sections = parseWorkpadSections(body);
-  const requiredSections = sections.slice(0, LINEAR_WORKPAD_REQUIRED_SECTIONS.length);
-  const canonicalPrefixMatches =
-    requiredSections.length === LINEAR_WORKPAD_REQUIRED_SECTIONS.length &&
-    requiredSections.every(
+  const canonicalStructureMatches =
+    sections.length === LINEAR_WORKPAD_REQUIRED_SECTIONS.length &&
+    sections.every(
       (section, index) =>
         normalizeComparableValue(section.title) ===
         normalizeComparableValue(LINEAR_WORKPAD_REQUIRED_SECTIONS[index])
     );
-  if (!canonicalPrefixMatches) {
+  if (!canonicalStructureMatches) {
     return {
       ok: false,
       error: {
@@ -2096,7 +2095,7 @@ function validateWorkpadBodyContract(
     };
   }
 
-  const emptySections = requiredSections
+  const emptySections = sections
     .filter((section) => normalizeRequiredString(section.body) === null)
     .map((section) => section.title);
   if (emptySections.length > 0) {
@@ -2119,7 +2118,7 @@ function validateWorkpadBodyContract(
   }
 
   const mirroredValidationText = normalizeRequirementValue(
-    `${requiredSections[2]?.body ?? ''}\n${requiredSections[3]?.body ?? ''}`
+    `${sections[2]?.body ?? ''}\n${sections[3]?.body ?? ''}`
   );
   const missingRequirements = ticketValidationRequirements.filter(
     (requirement) => !mirroredValidationText.includes(requirement.normalized)

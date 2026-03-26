@@ -1603,6 +1603,57 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('fails closed when the workpad body appends extra sections after the canonical five', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      extraSections: [{ title: 'Extra', lines: ['- This section should not be accepted.'] }]
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_structure_invalid',
+        message:
+          'Workpad body must contain these H3 sections in order after "## Codex Workpad": Environment / Workspace Stamp, Plan, Acceptance Criteria, Validation, Notes.',
+        status: 422,
+        details: {
+          required_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes'
+          ],
+          actual_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes',
+            'Extra'
+          ]
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('fails closed when ticket validation requirements are not mirrored into the workpad', async () => {
     const incompleteWorkpadBody = buildStructuredWorkpadBody({
       validationLines: ['- Run npm test.'],
