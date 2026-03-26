@@ -402,13 +402,14 @@ export async function loadProviderLinearWorkerContext(
     normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID);
   const envProviderControlHostRunId =
     normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID);
-  const providerControlHostMatchesManifest =
-    (!envProviderControlHostTaskId ||
-      !manifestProviderControlHostTaskId ||
-      envProviderControlHostTaskId === manifestProviderControlHostTaskId) &&
-    (!envProviderControlHostRunId ||
-      !manifestProviderControlHostRunId ||
-      envProviderControlHostRunId === manifestProviderControlHostRunId);
+  const providerControlHostMatchesManifest = Boolean(
+    envProviderControlHostTaskId &&
+      envProviderControlHostRunId &&
+      manifestProviderControlHostTaskId &&
+      manifestProviderControlHostRunId &&
+      envProviderControlHostTaskId === manifestProviderControlHostTaskId &&
+      envProviderControlHostRunId === manifestProviderControlHostRunId
+  );
   return {
     manifest,
     manifestPath,
@@ -418,7 +419,8 @@ export async function loadProviderLinearWorkerContext(
     taskId,
     pipelineId:
       normalizeOptionalString(env.CODEX_ORCHESTRATOR_PIPELINE_ID) ??
-      normalizeOptionalString(manifest.pipeline_id),
+      normalizeOptionalString(manifest.pipeline_id) ??
+      normalizeOptionalString(manifest.pipelineId),
     providerControlHostTaskId:
       envProviderControlHostTaskId ?? manifestProviderControlHostTaskId,
     providerControlHostRunId:
@@ -918,7 +920,9 @@ export async function appendProviderLinearWorkerChildStreamRecord(
   writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
 ): Promise<ProviderLinearWorkerChildStreamRecord[]> {
   const existing = await readProviderLinearWorkerChildStreams(runDir);
-  const next = existing.filter((entry) => entry.run_id !== record.run_id);
+  const next = existing.filter(
+    (entry) => !(entry.task_id === record.task_id && entry.run_id === record.run_id)
+  );
   next.push(record);
   await writeJson(buildChildStreamsPath(runDir), next);
   return next;

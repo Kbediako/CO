@@ -268,6 +268,18 @@ describe('provider linear worker runner', () => {
     expect(context.taskId).toBe('linear-camel-task');
   });
 
+  it('requires matching live control-host env values and accepts manifest.pipelineId', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');
+    expect(await loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined })).toMatchObject({ pipelineId: 'provider-linear-worker', providerControlHostMatchesManifest: false });
+    expect((await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
+    })).providerControlHostMatchesManifest).toBe(true);
+  });
+
   it('builds a full first-turn prompt and a continuation prompt', () => {
     const issue = createTrackedIssue();
 
@@ -487,6 +499,7 @@ describe('provider linear worker runner', () => {
       source_setup: null,
       launched_at: '2026-03-21T09:00:00.050Z'
     };
+    const secondChildStreamRecord = { ...childStreamRecord, task_id: 'linear-lin-issue-1-docs-review-alt', manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review-alt', 'cli', 'docs-run-1', 'manifest.json'), artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' };
     const execRunner = vi
       .fn<
         (request: {
@@ -501,6 +514,7 @@ describe('provider linear worker runner', () => {
         const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
         expect(auditPath).toBe(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME));
         await appendProviderLinearWorkerChildStreamRecord(runDir, childStreamRecord);
+        await appendProviderLinearWorkerChildStreamRecord(runDir, secondChildStreamRecord);
         await appendProviderLinearAuditEntry(String(auditPath), {
           recorded_at: '2026-03-21T09:00:00.100Z',
           operation: 'issue-context',
@@ -671,7 +685,7 @@ describe('provider linear worker runner', () => {
         failure_count: 1,
         latest_recorded_at: '2026-03-21T09:00:01.200Z'
       },
-      child_streams: [expect.objectContaining({ stream: 'docs-review', run_id: 'docs-run-1', status: 'succeeded' })],
+      child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded' })]),
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -722,12 +736,7 @@ describe('provider linear worker runner', () => {
           }
         }
       },
-      child_streams: [expect.objectContaining({
-        stream: 'docs-review',
-        run_id: 'docs-run-1',
-        status: 'succeeded',
-        artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1'
-      })],
+      child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' })]),
       end_reason: 'issue_inactive'
     });
   });
