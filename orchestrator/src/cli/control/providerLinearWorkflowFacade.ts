@@ -2798,8 +2798,26 @@ function isStyledListIntroductionLine(
   return (
     Boolean(candidate) &&
     !matchesIssueValidationSectionTitle(candidate) &&
-    !looksLikePlainSectionHeadingCandidate(candidate) &&
-    !looksLikeSetextSectionHeadingCandidate(candidate)
+    (looksLikeStyledListIntroductionLabel(candidate) ||
+      (!looksLikePlainSectionHeadingCandidate(candidate) && !looksLikeSetextSectionHeadingCandidate(candidate)))
+  );
+}
+
+function looksLikeStyledListIntroductionLabel(candidate: string): boolean {
+  const normalizedCandidate = normalizeComparableValue(candidate);
+  if (!normalizedCandidate) {
+    return false;
+  }
+  const words = normalizedCandidate.split(/\s+/u).filter(Boolean);
+  if (words.length < 2 || words.length > 5) {
+    return false;
+  }
+  const firstWord = words[0];
+  const lastWord = words[words.length - 1];
+  return (
+    ['run', 'follow', 'perform', 'verify', 'check', 'use', 'execute', 'capture', 'complete'].includes(
+      firstWord
+    ) && ['commands', 'checks', 'steps', 'tasks', 'items'].includes(lastWord)
   );
 }
 
