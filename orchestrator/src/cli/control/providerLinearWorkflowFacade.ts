@@ -2838,7 +2838,7 @@ function shouldPreserveValidationSectionAcrossNestedHeading(
   const headingTitle = normalizeNestedValidationBucketTitle(line);
   const preservesValidationContext =
     headingTitle !== null &&
-    (matchesDecoratedSectionTitle(headingTitle, LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES) ||
+    (matchesCompoundValidationNestedSectionTitle(headingTitle) ||
       matchesIssueValidationSectionTitle(headingTitle));
   return (
     preservesValidationContext &&
@@ -2850,6 +2850,64 @@ function shouldPreserveValidationSectionAcrossNestedHeading(
         !isMarkdownHeadingLine(nextLine) &&
         !isSetextUnderlineLine(nextLine)))
   );
+}
+
+function matchesCompoundValidationNestedSectionTitle(normalizedTitle: string): boolean {
+  const tokens = normalizedTitle.split(/\s+/u).filter(Boolean);
+  if (tokens.length === 0) {
+    return false;
+  }
+  let coreTokenCount = tokens.length;
+  while (
+    coreTokenCount > 0 &&
+    (isStandaloneSymbolDecorationToken(tokens[coreTokenCount - 1]) ||
+      isParentheticalSectionQualifierToken(tokens[coreTokenCount - 1]))
+  ) {
+    coreTokenCount -= 1;
+  }
+  let startTokenIndex = 0;
+  while (
+    startTokenIndex < coreTokenCount &&
+    (isStandaloneSymbolDecorationToken(tokens[startTokenIndex]) ||
+      isParentheticalSectionQualifierToken(tokens[startTokenIndex]))
+  ) {
+    startTokenIndex += 1;
+  }
+  const coreTokens = tokens.slice(startTokenIndex, coreTokenCount);
+  if (coreTokens.length === 0) {
+    return false;
+  }
+  const normalizedCoreTitle = coreTokens.join(' ');
+  if (LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(normalizedCoreTitle)) {
+    return true;
+  }
+  if (coreTokens.length <= 1) {
+    return false;
+  }
+  const titleWords = [...LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES]
+    .map((title) => title.split(/\s+/u))
+    .sort((left, right) => right.length - left.length);
+  const memo = new Map<number, boolean>();
+  const canMatchFrom = (index: number): boolean => {
+    if (index === coreTokens.length) {
+      return true;
+    }
+    if (memo.has(index)) {
+      return memo.get(index) ?? false;
+    }
+    const matched = titleWords.some((allowedWords) => {
+      if (allowedWords.length === 0 || index + allowedWords.length > coreTokens.length) {
+        return false;
+      }
+      return (
+        allowedWords.every((allowedWord, offset) => coreTokens[index + offset] === allowedWord) &&
+        canMatchFrom(index + allowedWords.length)
+      );
+    });
+    memo.set(index, matched);
+    return matched;
+  };
+  return canMatchFrom(0);
 }
 
 function normalizeNestedValidationBucketTitle(line: string): string | null {
