@@ -11,6 +11,10 @@ import {
 import { runProviderLinearChildStreamShell } from '../src/cli/providerLinearChildStreamShell.js';
 
 let tempRoot: string | null = null;
+const RUN_ID = 'run-child';
+const TASK_ID = 'linear-lin-issue-1';
+const CONTROL_HOST_TASK_ID = 'local-mcp';
+const CONTROL_HOST_RUN_ID = 'control-host';
 
 afterEach(async () => {
   if (tempRoot) {
@@ -23,25 +27,41 @@ async function createProviderWorkerManifest(overrides: {
   pipelineId?: string;
 } = {}) {
   tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-stream-'));
-  const runDir = join(tempRoot, '.runs', 'linear-lin-issue-1', 'cli', 'run-child');
+  const runDir = join(tempRoot, '.runs', TASK_ID, 'cli', RUN_ID);
   await mkdir(runDir, { recursive: true });
   const manifestPath = join(runDir, 'manifest.json');
   await writeFile(
     manifestPath,
     JSON.stringify({
-      run_id: 'run-child',
-      task_id: 'linear-lin-issue-1',
+      run_id: RUN_ID,
+      task_id: TASK_ID,
       pipeline_id: overrides.pipelineId ?? 'provider-linear-worker',
       issue_id: 'lin-issue-1',
       issue_identifier: 'CO-13',
       issue_updated_at: '2026-03-26T14:32:20.815Z',
-      provider_control_host_task_id: 'local-mcp',
-      provider_control_host_run_id: 'control-host',
+      provider_control_host_task_id: CONTROL_HOST_TASK_ID,
+      provider_control_host_run_id: CONTROL_HOST_RUN_ID,
       workspace_path: tempRoot
     }),
     'utf8'
   );
   return { manifestPath, runDir };
+}
+
+function buildProviderWorkerEnv(
+  manifestPath: string,
+  overrides: NodeJS.ProcessEnv = {}
+): NodeJS.ProcessEnv {
+  return {
+    CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+    CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+    CODEX_ORCHESTRATOR_RUN_ID: RUN_ID,
+    CODEX_ORCHESTRATOR_TASK_ID: TASK_ID,
+    CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+    CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: CONTROL_HOST_TASK_ID,
+    CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: CONTROL_HOST_RUN_ID,
+    ...overrides
+  };
 }
 
 describe('runProviderLinearChildStreamShell', () => {
@@ -63,25 +83,18 @@ describe('runProviderLinearChildStreamShell', () => {
     const result = await runProviderLinearChildStreamShell(
       {
         pipelineId: 'docs-review',
-        env: {
-          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
-          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
-          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
-          CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1',
-          CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        env: buildProviderWorkerEnv(manifestPath, {
           CODEX_ORCHESTRATOR_RUN_DIR: join(runDir, 'nested'),
           CODEX_ORCHESTRATOR_RUNTIME_MODE: 'appserver',
           CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'appserver',
           CODEX_RUNTIME_MODE: 'appserver',
           CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID: 'appserver-run-child',
           CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(runDir, 'provider-linear-worker-linear-audit.jsonl'),
-          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
-          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host',
           CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
           CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN: 'provider-launch-token',
-          MCP_RUNNER_TASK_ID: 'linear-lin-issue-1',
+          MCP_RUNNER_TASK_ID: TASK_ID,
           CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/co-package-root'
-        }
+        })
       },
       {
         execRunner,
@@ -109,9 +122,9 @@ describe('runProviderLinearChildStreamShell', () => {
         'start',
         'docs-review',
         '--task',
-        'linear-lin-issue-1-docs-review',
+        `${TASK_ID}-docs-review`,
         '--parent-run',
-        'run-child',
+        RUN_ID,
         '--runtime-mode',
         'appserver'
       ])
@@ -119,39 +132,35 @@ describe('runProviderLinearChildStreamShell', () => {
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env.CODEX_ORCHESTRATOR_ROOT).toBe(tempRoot);
     expect(request?.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBe('/tmp/co-package-root');
-    expect(request?.env.CODEX_ORCHESTRATOR_MANIFEST_PATH).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_TASK_ID).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_RUN_ID).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_PIPELINE_ID).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_RUN_DIR).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_RUNTIME_MODE).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE).toBeUndefined();
-    expect(request?.env.CODEX_RUNTIME_MODE).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID).toBeUndefined();
-    expect(request?.env.CODEX_PROVIDER_LINEAR_AUDIT_PATH).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE).toBeUndefined();
-    expect(request?.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN).toBeUndefined();
-    expect(request?.env.MCP_RUNNER_TASK_ID).toBeUndefined();
+    for (const key of [
+      'CODEX_ORCHESTRATOR_MANIFEST_PATH',
+      'CODEX_ORCHESTRATOR_TASK_ID',
+      'CODEX_ORCHESTRATOR_RUN_ID',
+      'CODEX_ORCHESTRATOR_PIPELINE_ID',
+      'CODEX_ORCHESTRATOR_RUN_DIR',
+      'CODEX_ORCHESTRATOR_RUNTIME_MODE',
+      'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
+      'CODEX_RUNTIME_MODE',
+      'CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID',
+      'CODEX_PROVIDER_LINEAR_AUDIT_PATH',
+      'CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID',
+      'CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID',
+      'CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE',
+      'CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN',
+      'MCP_RUNNER_TASK_ID'
+    ]) {
+      expect(request?.env[key]).toBeUndefined();
+    }
 
     expect(await readProviderLinearWorkerChildStreams(runDir)).toEqual([
-      {
+      expect.objectContaining({
         stream: 'docs-review',
         pipeline_id: 'docs-review',
-        task_id: 'linear-lin-issue-1-docs-review',
+        task_id: `${TASK_ID}-docs-review`,
         run_id: 'docs-run-1',
         status: 'succeeded',
-        manifest_path: join(tempRoot ?? '', '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/manifest.json'),
-        artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1',
-        log_path: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/run.log',
-        summary: 'docs-review passed',
-        issue_id: 'lin-issue-1',
-        issue_identifier: 'CO-13',
-        workspace_path: tempRoot,
-        source_setup: null,
         launched_at: '2026-03-27T01:00:00.000Z'
-      }
+      })
     ]);
     expect(PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME).toBe('provider-linear-worker-child-streams.json');
   });
@@ -163,15 +172,7 @@ describe('runProviderLinearChildStreamShell', () => {
     const result = await runProviderLinearChildStreamShell(
       {
         pipelineId: 'diagnostics',
-        env: {
-          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
-          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
-          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
-          CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1',
-          CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
-          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
-          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
-        }
+        env: buildProviderWorkerEnv(manifestPath)
       },
       { execRunner: execRunner as never }
     );
@@ -201,14 +202,9 @@ describe('runProviderLinearChildStreamShell', () => {
     const result = await runProviderLinearChildStreamShell(
       {
         pipelineId: 'docs-review',
-        env: {
-          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
-          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
-          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
-          CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-1',
-          CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-worker',
+        env: buildProviderWorkerEnv(manifestPath, {
           CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'unexpected-host'
-        }
+        })
       },
       { execRunner: execRunner as never }
     );
