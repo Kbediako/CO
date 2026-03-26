@@ -2225,12 +2225,13 @@ function extractIssueValidationRequirements(
     if (heading) {
       if (matchesIssueValidationSectionTitle(heading)) {
         activeSection = heading;
-      } else if (
+    } else if (
         activeSection &&
         shouldPreserveValidationSectionAcrossNestedHeading(
           line,
           lines[index + 1] ?? null,
-          lines[index + 2] ?? null
+          lines[index + 2] ?? null,
+          lines[index + 3] ?? null
         )
       ) {
         // Preserve the surrounding validation section for nested markdown buckets like
@@ -2306,6 +2307,9 @@ function parseIssueDescriptionSectionHeading(
 
   let candidate = trimmed;
   let isMarkdownHeading = false;
+  const boldWrappedMatch = candidate.match(/^\*\*(.+)\*\*:?\s*$/u);
+  const underlineWrappedMatch = candidate.match(/^__(.+)__:?\s*$/u);
+  const hadStyledWrapper = Boolean(boldWrappedMatch || underlineWrappedMatch);
   const markdownHeadingMatch = candidate.match(/^#{1,6}\s+(.+?)\s*$/u);
   if (markdownHeadingMatch) {
     candidate = markdownHeadingMatch[1];
@@ -2325,12 +2329,18 @@ function parseIssueDescriptionSectionHeading(
   if (isMarkdownHeading || isSetextUnderlineLine(nextLine ?? '')) {
     return candidate;
   }
+  const previousTrimmed = previousLine?.trim() ?? '';
+  const nextTrimmed = nextLine?.trim() ?? '';
+  if (hadStyledWrapper) {
+    return isListLikeLine(previousNonEmptyLine) ||
+      isListLikeLine(nextTrimmed) ||
+      (!previousTrimmed && Boolean(nextTrimmed))
+      ? candidate
+      : null;
+  }
   if (!looksLikePlainSectionHeadingCandidate(candidate)) {
     return null;
   }
-
-  const previousTrimmed = previousLine?.trim() ?? '';
-  const nextTrimmed = nextLine?.trim() ?? '';
   return isListLikeLine(previousNonEmptyLine) ||
     isListLikeLine(nextTrimmed) ||
     (!previousTrimmed && Boolean(nextTrimmed))
@@ -2424,12 +2434,18 @@ function isListIntroductionLine(line: string, nextLine: string | null): boolean 
 function shouldPreserveValidationSectionAcrossNestedHeading(
   line: string,
   nextLine: string | null,
-  followingLine: string | null
+  followingLine: string | null,
+  thirdLine: string | null
 ): boolean {
+  const firstCandidate = normalizeRequiredString(nextLine);
+  const secondCandidate = normalizeRequiredString(followingLine);
+  const nextContentLine = firstCandidate ?? secondCandidate;
+  const contentFollower =
+    firstCandidate === null ? thirdLine : followingLine;
   return (
     isMarkdownHeadingLine(line) &&
-    (isListLikeLine(nextLine) ||
-      (nextLine !== null && isListIntroductionLine(nextLine, followingLine)))
+    (isListLikeLine(nextContentLine) ||
+      (nextContentLine !== null && isListIntroductionLine(nextContentLine, contentFollower)))
   );
 }
 
