@@ -2387,11 +2387,7 @@ function parseIssueDescriptionSectionHeading(
     return null;
   }
 
-  const normalizedCandidate = normalizeComparableValue(candidate);
-  if (LINEAR_ISSUE_PLAIN_SECTION_TITLES.has(normalizedCandidate)) {
-    return candidate;
-  }
-  if (matchesSymbolDecoratedSectionTitle(candidate, LINEAR_ISSUE_VALIDATION_SECTION_TITLES)) {
+  if (matchesDecoratedSectionTitle(candidate, LINEAR_ISSUE_PLAIN_SECTION_TITLES)) {
     return candidate;
   }
   if (isMarkdownHeading) {
@@ -2425,10 +2421,14 @@ function parseIssueDescriptionSectionHeading(
 }
 
 function looksLikePlainSectionHeadingCandidate(candidate: string): boolean {
-  if (!/^[\p{L}][\p{L}\p{M}\p{N} /&()'’\-–—]{0,79}$/u.test(candidate)) {
+  const coreCandidate = trimBoundarySymbolDecorationTokens(candidate);
+  if (!coreCandidate) {
     return false;
   }
-  const words = candidate.split(/\s+/u).filter(Boolean);
+  if (!/^[\p{L}][\p{L}\p{M}\p{N} /&()'’\-–—]{0,79}$/u.test(coreCandidate)) {
+    return false;
+  }
+  const words = coreCandidate.split(/\s+/u).filter(Boolean);
   if (words.length === 0 || words.length > 8) {
     return false;
   }
@@ -2465,7 +2465,22 @@ function looksLikeSetextSectionHeadingCandidate(candidate: string): boolean {
 }
 
 function matchesIssueValidationSectionTitle(title: string): boolean {
-  return matchesDecoratedSectionTitle(title, LINEAR_ISSUE_VALIDATION_SECTION_TITLES);
+  if (matchesDecoratedSectionTitle(title, LINEAR_ISSUE_VALIDATION_SECTION_TITLES)) {
+    return true;
+  }
+
+  if (!looksLikePlainSectionHeadingCandidate(title) && !looksLikeSetextSectionHeadingCandidate(title)) {
+    return false;
+  }
+
+  const normalizedTitle = normalizeComparableValue(trimBoundarySymbolDecorationTokens(title));
+  return [...LINEAR_ISSUE_VALIDATION_SECTION_TITLES].some((allowedTitle) => {
+    if (!normalizedTitle.startsWith(allowedTitle)) {
+      return false;
+    }
+    const suffix = normalizedTitle.slice(allowedTitle.length).trimStart();
+    return Boolean(suffix) && !/^[\p{L}\p{N}]/u.test(suffix);
+  });
 }
 
 function stripRequirementPrefix(line: string): string | null {
@@ -2604,7 +2619,10 @@ function normalizeNestedValidationBucketTitle(line: string): string | null {
 }
 
 function matchesDecoratedSectionTitle(title: string, allowedTitles: Set<string>): boolean {
-  const normalizedTitle = normalizeComparableValue(title);
+  const normalizedTitle = normalizeComparableValue(trimBoundarySymbolDecorationTokens(title));
+  if (!normalizedTitle) {
+    return false;
+  }
   if (allowedTitles.has(normalizedTitle)) {
     return true;
   }
@@ -2614,7 +2632,7 @@ function matchesDecoratedSectionTitle(title: string, allowedTitles: Set<string>)
       continue;
     }
     const suffix = normalizedTitle.slice(allowedTitle.length).trimStart();
-    if (!suffix || !/^[\p{L}\p{N}]/u.test(suffix)) {
+    if (!suffix || matchesDecoratedSectionQualifierSuffix(suffix)) {
       return true;
     }
   }
@@ -2622,19 +2640,35 @@ function matchesDecoratedSectionTitle(title: string, allowedTitles: Set<string>)
   return false;
 }
 
-function matchesSymbolDecoratedSectionTitle(title: string, allowedTitles: Set<string>): boolean {
-  const normalizedTitle = normalizeComparableValue(title);
-  for (const allowedTitle of allowedTitles) {
-    if (!normalizedTitle.startsWith(allowedTitle)) {
-      continue;
-    }
-    const suffix = normalizedTitle.slice(allowedTitle.length).trimStart();
-    if (suffix && /^(?:[^\p{L}\p{N}\s]+(?:\s+[^\p{L}\p{N}\s]+)*)$/u.test(suffix)) {
-      return true;
-    }
+function trimBoundarySymbolDecorationTokens(candidate: string): string {
+  const tokens = candidate.trim().split(/\s+/u).filter(Boolean);
+  while (tokens.length > 0 && isStandaloneSymbolDecorationToken(tokens[0])) {
+    tokens.shift();
   }
+  while (tokens.length > 0 && isStandaloneSymbolDecorationToken(tokens[tokens.length - 1])) {
+    tokens.pop();
+  }
+  return tokens.join(' ');
+}
 
-  return false;
+function matchesDecoratedSectionQualifierSuffix(suffix: string): boolean {
+  const tokens = suffix.split(/\s+/u).filter(Boolean);
+  return (
+    tokens.length > 0 &&
+    tokens.every(
+      (token) => isStandaloneSymbolDecorationToken(token) || isParentheticalSectionQualifierToken(token)
+    )
+  );
+}
+
+function isStandaloneSymbolDecorationToken(token: string): boolean {
+  return !/[\p{L}\p{N}]/u.test(token);
+}
+
+function isParentheticalSectionQualifierToken(token: string): boolean {
+  return /^\((?:[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}'’/\-–—]*)(?: [\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}'’/\-–—]*){0,2}\)$/u.test(
+    token
+  );
 }
 
 function parseCodeFenceLine(line: string): {
