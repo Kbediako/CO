@@ -2143,7 +2143,7 @@ function validateWorkpadBodyContract(
     `${sections[2]?.body ?? ''}\n${sections[3]?.body ?? ''}`
   );
   const missingRequirements = ticketValidationRequirements.filter(
-    (requirement) => !mirroredValidationText.includes(requirement.normalized)
+    (requirement) => !containsNormalizedRequirement(mirroredValidationText, requirement.normalized)
   );
   if (missingRequirements.length > 0) {
     return {
@@ -2495,8 +2495,36 @@ function normalizeNestedValidationBucketTitle(line: string): string | null {
   }
   candidate = candidate.replace(/^\*\*(.+)\*\*:?\s*$/u, '$1');
   candidate = candidate.replace(/^__(.+)__:?\s*$/u, '$1');
+  candidate = candidate.replace(/\s+#+\s*$/u, '');
   candidate = candidate.replace(/:\s*$/u, '').trim();
   return candidate ? normalizeComparableValue(candidate) : null;
+}
+
+function containsNormalizedRequirement(haystack: string, needle: string): boolean {
+  if (!needle) {
+    return true;
+  }
+  const haystackTokens = haystack.split(/\s+/u).filter(Boolean);
+  const needleTokens = needle.split(/\s+/u).filter(Boolean);
+  if (needleTokens.length === 0) {
+    return true;
+  }
+  if (haystackTokens.length < needleTokens.length) {
+    return false;
+  }
+  for (let index = 0; index <= haystackTokens.length - needleTokens.length; index += 1) {
+    let matched = true;
+    for (let offset = 0; offset < needleTokens.length; offset += 1) {
+      if (haystackTokens[index + offset] !== needleTokens[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isSetextUnderlineLine(line: string): boolean {
