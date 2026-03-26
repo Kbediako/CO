@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260327-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29",
+      "title": "CO Add Audited Provider-Worker Child-Stream Support for Bounded Multi-Agent Work",
+      "relates_to": "tasks/tasks-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-27",
+      "paths": {
+        "spec": "tasks/specs/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
+        "task": "tasks/tasks-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
+        "agent_task": ".agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
+        "docs": "docs/TECH_SPEC-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md"
+      }
+    },
+    {
       "id": "20260324-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514",
       "title": "CO Reduce Review Long Tails and Make Review Evidence Accounting Truthful",
       "relates_to": "tasks/tasks-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",

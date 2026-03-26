@@ -10,7 +10,8 @@ export type ProviderLinearAuditOperation =
   | 'upsert-workpad'
   | 'delete-workpad'
   | 'transition'
-  | 'attach-pr';
+  | 'attach-pr'
+  | 'child-stream';
 
 export interface ProviderLinearAuditEntry {
   recorded_at: string;
@@ -115,6 +116,7 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
     && operation !== 'delete-workpad'
     && operation !== 'transition'
     && operation !== 'attach-pr'
+    && operation !== 'child-stream'
   ) {
     return null;
   }

@@ -1503,6 +1503,11 @@ Subcommands:
     --team-id <id>        Optional team scope check.
     --project-id <id>     Optional project scope check.
     --format json         Emit machine-readable output.
+
+  child-stream
+    --pipeline <id>       Allowlisted child pipeline: docs-review, implementation-gate, or docs-relevance-advisory.
+    --stream <name>       Optional task-id suffix for the child stream (defaults to the pipeline id).
+    --format json         Emit machine-readable output.
 `);
 }
 

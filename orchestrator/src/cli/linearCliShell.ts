@@ -23,6 +23,10 @@ import {
   resolveProviderLinearAuditPath,
   type ProviderLinearAuditEntry
 } from './control/providerLinearWorkflowAudit.js';
+import {
+  runProviderLinearChildStreamShell,
+  type ProviderLinearChildStreamResult
+} from './providerLinearChildStreamShell.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -39,6 +43,7 @@ interface LinearCliShellDependencies {
   deleteProviderLinearWorkpadComment: typeof deleteProviderLinearWorkpadComment;
   transitionProviderLinearIssueState: typeof transitionProviderLinearIssueState;
   attachProviderLinearIssuePr: typeof attachProviderLinearIssuePr;
+  runProviderLinearChildStreamShell: typeof runProviderLinearChildStreamShell;
   appendAuditEntry: typeof appendProviderLinearAuditEntry;
   readTextFile: (path: string) => Promise<string>;
   getEnv: () => NodeJS.ProcessEnv;
@@ -67,6 +72,7 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   deleteProviderLinearWorkpadComment,
   transitionProviderLinearIssueState,
   attachProviderLinearIssuePr,
+  runProviderLinearChildStreamShell,
   appendAuditEntry: appendProviderLinearAuditEntry,
   readTextFile: async (path: string) => await readFile(path, 'utf8'),
   getEnv: () => process.env,
@@ -180,6 +186,17 @@ export async function runLinearCliShell(
           url: requireFlag(params.flags, 'url'),
           title: readStringFlag(params.flags, 'title') ?? null,
           sourceSetup: readSourceSetup(params.flags),
+          env
+        });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'child-stream': {
+        assertAllowedFlags(params.flags, ['format', 'pipeline', 'stream']);
+        const result = await dependencies.runProviderLinearChildStreamShell({
+          pipelineId: requireFlag(params.flags, 'pipeline'),
+          streamName: readStringFlag(params.flags, 'stream') ?? null,
           env
         });
         await recordAuditResult(result, params.flags, env, dependencies);
@@ -311,7 +328,8 @@ type LinearCliResult =
   | ProviderLinearUpsertWorkpadResult
   | ProviderLinearDeleteWorkpadResult
   | ProviderLinearTransitionResult
-  | ProviderLinearAttachPrResult;
+  | ProviderLinearAttachPrResult
+  | ProviderLinearChildStreamResult;
 
 async function recordAuditResult(
   result: LinearCliResult,
@@ -340,6 +358,23 @@ function buildAuditEntry(
   const requestedIssueId = readStringFlag(flags, 'issue-id') ?? null;
   const sourceSetup = resolveAuditSourceSetup(flags, env);
   if (!result.ok) {
+    if (result.operation === 'child-stream') {
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: false,
+        issue_id: result.issue_id ?? requestedIssueId,
+        issue_identifier: result.issue_identifier,
+        source_setup: result.source_setup ?? sourceSetup,
+        action: result.stream ? `stream:${result.stream}` : null,
+        via: result.pipeline_id ? `pipeline:${result.pipeline_id}` : null,
+        state: result.child_run?.status ?? null,
+        comment_id: null,
+        attachment_id: null,
+        error_code: result.error.code,
+        error_message: result.error.message
+      };
+    }
     return {
       recorded_at: recordedAt,
       operation: result.operation,
@@ -435,6 +470,22 @@ function buildAuditEntry(
         state: null,
         comment_id: null,
         attachment_id: result.attachment.id,
+        error_code: null,
+        error_message: null
+      };
+    case 'child-stream':
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: true,
+        issue_id: result.issue.id,
+        issue_identifier: result.issue.identifier,
+        source_setup: result.source_setup,
+        action: `stream:${result.stream}`,
+        via: `pipeline:${result.pipeline_id}`,
+        state: result.child_run.status,
+        comment_id: null,
+        attachment_id: null,
         error_code: null,
         error_message: null
       };

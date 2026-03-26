@@ -467,6 +467,90 @@ describe('runLinearCliShell', () => {
     expect(setExitCode).not.toHaveBeenCalled();
   });
 
+  it('routes child-stream into the provider worker launcher and audits the result', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const runProviderLinearChildStreamShellMock =
+      vi.fn<typeof import('../src/cli/providerLinearChildStreamShell.js').runProviderLinearChildStreamShell>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'child-stream',
+          action: 'launched',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-13'
+          },
+          source_setup: null,
+          stream: 'docs-review',
+          pipeline_id: 'docs-review',
+          child_run: {
+            run_id: 'docs-run-1',
+            task_id: 'linear-lin-issue-1-docs-review',
+            pipeline_id: 'docs-review',
+            status: 'succeeded',
+            artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1',
+            manifest_path: '/tmp/repo/.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/manifest.json',
+            log_path: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/run.log',
+            summary: 'docs-review passed',
+            runtime_mode_requested: null,
+            runtime_mode: null,
+            runtime_provider: null
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['child-stream'],
+        flags: {
+          format: 'json',
+          pipeline: 'docs-review'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        runProviderLinearChildStreamShell: runProviderLinearChildStreamShellMock,
+        getEnv: () => ({
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-03-27T01:00:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(runProviderLinearChildStreamShellMock).toHaveBeenCalledWith({
+      pipelineId: 'docs-review',
+      streamName: null,
+      env: {
+        CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+      }
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'child-stream',
+      stream: 'docs-review',
+      child_run: {
+        run_id: 'docs-run-1',
+        status: 'succeeded'
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-03-27T01:00:00.000Z',
+      operation: 'child-stream',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-13',
+      source_setup: null,
+      action: 'stream:docs-review',
+      via: 'pipeline:docs-review',
+      state: 'succeeded',
+      comment_id: null,
+      attachment_id: null,
+      error_code: null,
+      error_message: null
+    });
+  });
+
   it.each([
     {
       name: 'unknown subcommands',

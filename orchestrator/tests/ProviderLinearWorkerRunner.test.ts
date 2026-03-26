@@ -8,6 +8,7 @@ import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  appendProviderLinearWorkerChildStreamRecord,
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
@@ -201,6 +202,7 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
     expect(firstPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
+    expect(firstPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
     expect(firstPrompt).toContain('Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`)');
     expect(firstPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(firstPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work');
@@ -219,6 +221,7 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain(`use \`${helperCommand} issue-context --issue-id lin-issue-1\` to inspect the team workflow states before any transition.`);
     expect(continuationPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
+    expect(continuationPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(continuationPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(continuationPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work');
@@ -355,6 +358,22 @@ describe('provider linear worker runner', () => {
       .mockImplementationOnce(async (request) => {
         const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
         expect(auditPath).toBe(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME));
+        await appendProviderLinearWorkerChildStreamRecord(runDir, {
+          stream: 'docs-review',
+          pipeline_id: 'docs-review',
+          task_id: 'linear-lin-issue-1-docs-review',
+          run_id: 'docs-run-1',
+          status: 'succeeded',
+          manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1', 'manifest.json'),
+          artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1',
+          log_path: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/run.log',
+          summary: 'docs-review passed',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          workspace_path: tempRoot,
+          source_setup: null,
+          launched_at: '2026-03-21T09:00:00.050Z'
+        });
         await appendProviderLinearAuditEntry(String(auditPath), {
           recorded_at: '2026-03-21T09:00:00.100Z',
           operation: 'issue-context',
@@ -503,6 +522,15 @@ describe('provider linear worker runner', () => {
         failure_count: 1,
         latest_recorded_at: '2026-03-21T09:00:01.200Z'
       },
+      child_streams: [
+        {
+          stream: 'docs-review',
+          pipeline_id: 'docs-review',
+          task_id: 'linear-lin-issue-1-docs-review',
+          run_id: 'docs-run-1',
+          status: 'succeeded'
+        }
+      ],
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -553,6 +581,16 @@ describe('provider linear worker runner', () => {
           }
         }
       },
+      child_streams: [
+        {
+          stream: 'docs-review',
+          pipeline_id: 'docs-review',
+          task_id: 'linear-lin-issue-1-docs-review',
+          run_id: 'docs-run-1',
+          status: 'succeeded',
+          artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1'
+        }
+      ],
       end_reason: 'issue_inactive'
     });
   });

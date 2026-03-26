@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  createProviderIssueHandoffService
+  createProviderIssueHandoffService,
+  discoverProviderIssueRuns
 } from '../src/cli/control/providerIssueHandoff.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import * as questionChildResolutionAdapter from '../src/cli/control/questionChildResolutionAdapter.js';
@@ -163,6 +164,42 @@ function getLatestScheduledTimeoutCallback(
 }
 
 describe('createProviderIssueHandoffService', () => {
+  it('ignores nested provider child manifests when discovering scheduler-owned issue runs', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerRunDir = join(root, '.runs', 'linear-lin-issue-1', 'cli', 'provider-run-1');
+    const providerChildDir = join(root, '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1');
+    await mkdir(providerRunDir, { recursive: true });
+    await mkdir(providerChildDir, { recursive: true });
+    await writeFile(join(providerRunDir, 'manifest.json'), JSON.stringify({
+      run_id: 'provider-run-1',
+      task_id: 'linear-lin-issue-1',
+      pipeline_id: 'provider-linear-worker',
+      parent_run_id: null,
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      updated_at: '2026-03-27T01:00:00.000Z'
+    }), 'utf8');
+    await writeFile(join(providerChildDir, 'manifest.json'), JSON.stringify({
+      run_id: 'docs-run-1',
+      task_id: 'linear-lin-issue-1-docs-review',
+      pipeline_id: 'docs-review',
+      parent_run_id: 'provider-run-1',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      updated_at: '2026-03-27T01:01:00.000Z'
+    }), 'utf8');
+
+    await expect(
+      discoverProviderIssueRuns(paths.runDir, { provider: 'linear', issueId: 'lin-issue-1' })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        runId: 'provider-run-1',
+        taskId: 'linear-lin-issue-1',
+        pipelineId: 'provider-linear-worker'
+      })
+    ]);
+  });
+
   it('persists a starting claim before launching a deterministic start for a started Linear issue', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
