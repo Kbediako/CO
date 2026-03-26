@@ -434,6 +434,7 @@ export function buildProviderWorkerPrompt(
       '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
       ...buildPreReviewHandoffGateSection(),
       '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
+      '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
       '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work.',
       '- `Human Review` and `In Review` are review handoff states for the worker. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
       '- `Merging` and `Rework` are optional active workflow states only when the team exposes them.',
@@ -460,6 +461,7 @@ export function buildProviderWorkerPrompt(
     '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
     ...buildPreReviewHandoffGateSection(),
     '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
+    '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
     '- Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`).',
     '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work.',
     '- `Human Review` and `In Review` are stop-coding handoff states. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
@@ -1185,9 +1187,11 @@ export async function runProviderLinearWorker(
   childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
   const helperCommand = resolveProviderLinearHelperCommand(childEnv);
   if (shouldForceNonInteractive(childEnv)) {
-    childEnv.CODEX_NON_INTERACTIVE = childEnv.CODEX_NON_INTERACTIVE ?? '1';
-    childEnv.CODEX_NO_INTERACTIVE = childEnv.CODEX_NO_INTERACTIVE ?? '1';
-    childEnv.CODEX_INTERACTIVE = childEnv.CODEX_INTERACTIVE ?? '0';
+    childEnv.CODEX_REVIEW_NON_INTERACTIVE = '1';
+    childEnv.FORCE_CODEX_REVIEW = '1';
+    childEnv.CODEX_NON_INTERACTIVE = '1';
+    childEnv.CODEX_NO_INTERACTIVE = '1';
+    childEnv.CODEX_INTERACTIVE = '0';
   }
 
   let finalProof: ProviderLinearWorkerProof = {

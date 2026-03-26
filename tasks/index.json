@@ -40,6 +40,29 @@
       }
     },
     {
+      "id": "20260325-linear-cc7d12e3-eabf-4168-827e-b3a023583e22",
+      "title": "CO Align Non-Interactive Standalone Review Policy Across Gate Advisory and Provider-Worker Lanes",
+      "relates_to": "tasks/tasks-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-25",
+          "manifest": ".runs/linear-cc7d12e3-eabf-4168-827e-b3a023583e22/cli/2026-03-25T07-21-52-956Z-12d6b412/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "task": "tasks/tasks-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "agent_task": ".agent/task/linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "docs": "docs/TECH_SPEC-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md"
+      }
+    },
+    {
       "id": "20260325-linear-74d145eb-305b-4b27-be84-21c248b22e4d",
       "title": "CO Recalibrate Diff Budget for Stacked Lanes While Keeping Hard PR Scope Guard",
       "relates_to": "tasks/tasks-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",

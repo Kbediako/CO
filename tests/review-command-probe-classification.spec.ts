@@ -52,4 +52,140 @@ describe('review command probe classification', () => {
     expect(isLikelyReviewCommandLine(`/bin/zsh -lc 'npm run docs:check'`)).toBe(true);
     expect(isLikelyReviewCommandLine('not actually a command')).toBe(false);
   });
+
+  it('keeps direct inspection primitives review-likely without promoting escaped search patterns', () => {
+    expect(isLikelyReviewCommandLine('sed -n 1,120p scripts/run-review.ts')).toBe(true);
+    expect(isLikelyReviewCommandLine('rg -n foo scripts/run-review.ts')).toBe(true);
+    expect(detectHeavyReviewCommand(String.raw`rg run\|pytest file.txt`)).toBeNull();
+  });
+
+  it('keeps absolute Windows launcher paths recognizable in probe detection', () => {
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`C:\Users\me\AppData\Roaming\npm\npx.cmd vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(
+      String.raw`C:/Users/me/AppData/Roaming/npm/npx.cmd vitest run tests/review-execution-state.spec.ts`
+    );
+    expect(
+      classifyShellProbeCommandLine(
+        String.raw`C:\Windows\System32\cmd.exe /C printenv MANIFEST`
+      )
+    ).toBe(String.raw`C:/Windows/System32/cmd.exe /C printenv MANIFEST`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`C:\Users\me\AppData\Roaming\npm\codex-orchestrator.cmd review --manifest x`
+      )
+    ).toBe(true);
+  });
+
+  it('keeps relative Windows launcher paths recognizable in probe detection', () => {
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`.\bin\codex-orchestrator review --manifest x`
+      )
+    ).toBe(true);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`cmd /C ".\bin\codex-orchestrator review --manifest x"`
+      )
+    ).toBe(true);
+
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`.\bin\python.exe -m pytest tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`./bin/python.exe -m pytest tests/review-execution-state.spec.ts`);
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`venv\Scripts\pytest tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`.\bin\codex-orchestrator.cmd review --manifest x`
+      )
+    ).toBe(true);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`bin\codex-orchestrator review --manifest x`
+      )
+    ).toBe(true);
+
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`".\bin\python.exe" -m pytest tests/review-execution-state.spec.ts`
+      )
+    ).toBe(
+      String.raw`"./bin/python.exe" -m pytest tests/review-execution-state.spec.ts`
+    );
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`".\bin\codex-orchestrator.cmd" review --manifest x`
+      )
+    ).toBe(true);
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`/bin/zsh -lc '".\bin\python.exe" -m pytest tests/review-execution-state.spec.ts'`
+      )
+    ).toBe(
+      String.raw`"./bin/python.exe" -m pytest tests/review-execution-state.spec.ts`
+    );
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`/bin/zsh -lc '".\bin\codex-orchestrator.cmd" review --manifest x'`
+      )
+    ).toBe(true);
+    expect(
+      classifyShellProbeCommandLine(
+        String.raw`/bin/zsh -lc '".\bin\cmd.exe" /C printenv MANIFEST'`
+      )
+    ).toBe(String.raw`/bin/zsh -lc '".\bin\cmd.exe" /C printenv MANIFEST'`);
+
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`cmd /C "node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts"`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`);
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`cmd /C "venv\Scripts\pytest tests/review-execution-state.spec.ts"`
+      )
+    ).toBe(String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`cmd /C ".\bin\codex-orchestrator.cmd review --manifest x"`
+      )
+    ).toBe(true);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`cmd /C "bin\codex-orchestrator review --manifest x"`
+      )
+    ).toBe(true);
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      detectHeavyReviewCommand(
+        String.raw`cmd /C "echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts"`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`echo prep&&.\bin\codex-orchestrator review --manifest x`
+      )
+    ).toBe(true);
+    expect(
+      isLikelyReviewCommandLine(
+        String.raw`cmd /C "echo prep&&.\bin\codex-orchestrator review --manifest x"`
+      )
+    ).toBe(true);
+  });
 });

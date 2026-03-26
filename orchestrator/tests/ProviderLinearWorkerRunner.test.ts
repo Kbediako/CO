@@ -268,6 +268,9 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
     expect(firstPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(firstPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
+    expect(firstPrompt).toContain('Standalone-review policy for this provider-worker lane');
+    expect(firstPrompt).toContain('`codex-orchestrator review` / `npm run review`');
+    expect(firstPrompt).toContain('`FORCE_CODEX_REVIEW=1`');
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(firstPrompt).toContain('`codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>`');
     expect(firstPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
@@ -296,6 +299,9 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
+    expect(continuationPrompt).toContain('Standalone-review policy for this provider-worker lane');
+    expect(continuationPrompt).toContain('`codex-orchestrator review` / `npm run review`');
+    expect(continuationPrompt).toContain('`FORCE_CODEX_REVIEW=1`');
     expect(continuationPrompt).toContain('`codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>`');
     expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
@@ -728,6 +734,56 @@ describe('provider linear worker runner', () => {
         project_id: 'project-1'
       }
     });
+  });
+
+  it('forces standalone review execution env inside non-interactive provider worker turns', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+        '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+      ].join('\n'),
+      stderr: ''
+    }));
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        FORCE_CODEX_REVIEW: '',
+        CODEX_INTERACTIVE: '1'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    expect(execRunner.mock.calls[0]?.[0].env.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
+    expect(execRunner.mock.calls[0]?.[0].env.FORCE_CODEX_REVIEW).toBe('1');
+    expect(execRunner.mock.calls[0]?.[0].env.CODEX_NON_INTERACTIVE).toBe('1');
+    expect(execRunner.mock.calls[0]?.[0].env.CODEX_NO_INTERACTIVE).toBe('1');
+    expect(execRunner.mock.calls[0]?.[0].env.CODEX_INTERACTIVE).toBe('0');
   });
 
   it('fails closed when a codex turn exits non-zero and writes a failed proof sidecar', async () => {

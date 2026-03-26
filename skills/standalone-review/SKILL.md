@@ -70,7 +70,8 @@ codex review "Focus on correctness, regressions, edge cases; list missing tests.
 - If you need manifest evidence, use the review wrapper command:
   `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." codex-orchestrator review --manifest <path>`
 - Repo alias (same behavior in this repo): `npm run review -- --manifest <path>`
-- In non-interactive environments, add `FORCE_CODEX_REVIEW=1` as needed.
+- In non-interactive environments, direct/manual wrapper runs stay handoff-only unless you add `FORCE_CODEX_REVIEW=1`.
+- `docs-review` and `implementation-gate` already set `FORCE_CODEX_REVIEW=1`; `docs-relevance-advisory` intentionally keeps it cleared; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1`, so its closeout review executes before `Human Review` / `In Review`.
 - In non-interactive environments, prefer the wrapper over raw `codex review`; it preserves evidence paths, delegation toggles, and optional runtime guardrails (`CODEX_REVIEW_TIMEOUT_SECONDS`, `CODEX_REVIEW_STALL_TIMEOUT_SECONDS`).
 
 ## Expected outputs

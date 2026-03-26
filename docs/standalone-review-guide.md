@@ -51,6 +51,11 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 ## Wrapper behavior notes
 - Set `TASK` or `MCP_RUNNER_TASK_ID` so the review prompt includes task context instead of `unknown-task`.
 - In CI or when `CODEX_REVIEW_NON_INTERACTIVE=1`/`CODEX_NON_INTERACTIVE=1` (or `CODEX_NO_INTERACTIVE=1`) is set, the wrapper prints a “review handoff” prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
+- Non-interactive lane matrix:
+  - Direct/manual wrapper runs stay handoff-only unless you set `FORCE_CODEX_REVIEW=1`.
+  - `docs-review` and `implementation-gate` set `FORCE_CODEX_REVIEW=1` and execute unattended standalone review.
+  - `docs-relevance-advisory` clears `FORCE_CODEX_REVIEW` and stays prompt-only/advisory.
+  - The `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1` for the worker session, so the pre-handoff standalone review executes before `Human Review` / `In Review`; use `codex-orchestrator review` / `npm run review`, not raw `codex review`, for that closeout review.
 - To force execution in those environments: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=<task-id> NOTES="..." MANIFEST=<path> codex-orchestrator review --manifest <path>`.
 - `codex-orchestrator review` keeps delegation MCP enabled by default; disable when needed with `CODEX_REVIEW_DISABLE_DELEGATION_MCP=1` or `--disable-delegation-mcp` (legacy control remains supported: `CODEX_REVIEW_ENABLE_DELEGATION_MCP=0` or `--enable-delegation-mcp=false`).
 - `codex-orchestrator review` does not enforce runtime limits by default (reviews can run as long as needed).
