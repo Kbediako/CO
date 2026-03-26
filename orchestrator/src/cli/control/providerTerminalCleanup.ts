@@ -13,6 +13,9 @@ const execFileAsync = promisify(execFile);
 
 export const DEFAULT_PROVIDER_TERMINAL_CLEANUP_COMMENT_TEMPLATE =
   'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.';
+const PROVIDER_TERMINAL_CLEANUP_COMMAND_TIMEOUT_MS = 5_000;
+const PROVIDER_TERMINAL_CLEANUP_TOTAL_BUDGET_MS = 15_000;
+const PROVIDER_TERMINAL_CLEANUP_MAX_ATTACHED_PRS = 20;
 
 export interface ProviderTerminalCleanupConfig {
   enabled: boolean;
@@ -57,6 +60,7 @@ interface ProviderTerminalCleanupDependencies {
   readIssueContext?: ProviderTerminalCleanupIssueContextReader;
   runCommand?: ProviderTerminalCleanupCommandRunner;
   now?: () => string;
+  nowMs?: () => number;
 }
 
 export function resolveProviderTerminalCleanupConfig(
@@ -94,6 +98,7 @@ export async function runProviderTerminalCleanup(
   const readIssueContext = deps.readIssueContext ?? getProviderLinearIssueContext;
   const runCommand = deps.runCommand ?? runProviderTerminalCleanupCommand;
   const issueIdentifier = normalizeOptionalString(input.issueIdentifier);
+  const nowMs = deps.nowMs ?? Date.now;
 
   if (!input.config.enabled) {
     return buildResult({
@@ -193,6 +198,37 @@ export async function runProviderTerminalCleanup(
       branch
     });
   }
+  const workspaceTargetLabel = formatWorkspaceTargetLabel(branch, workspaceHeadOid);
+  const originUrlResult = await runCommand({
+    command: 'git',
+    args: ['-C', input.workspacePath, 'remote', 'get-url', 'origin'],
+    cwd: input.workspacePath
+  });
+  if (!originUrlResult.ok) {
+    return buildResult({
+      attemptedAt,
+      issueId: input.issueId,
+      issueIdentifier,
+      workspacePath: input.workspacePath,
+      status: 'failed',
+      summary: 'Terminal cleanup could not determine the workspace origin remote.',
+      error: formatCommandFailure('git', originUrlResult),
+      branch
+    });
+  }
+  const workspaceRepoKey = parseGitHubRepositoryUrl(originUrlResult.stdout);
+  if (!workspaceRepoKey) {
+    return buildResult({
+      attemptedAt,
+      issueId: input.issueId,
+      issueIdentifier,
+      workspacePath: input.workspacePath,
+      status: 'failed',
+      summary: 'Terminal cleanup could not determine the workspace GitHub repository.',
+      error: JSON.stringify(originUrlResult.stdout.trim()),
+      branch
+    });
+  }
 
   const issueContext = await readIssueContext({
     issueId: input.issueId,
@@ -219,7 +255,7 @@ export async function runProviderTerminalCleanup(
       issueIdentifier,
       workspacePath: input.workspacePath,
       status: 'noop',
-      summary: `No attached GitHub PRs were present for branch ${branch}.`,
+      summary: `No attached GitHub PRs were present for ${workspaceTargetLabel}.`,
       branch
     });
   }
@@ -228,9 +264,21 @@ export async function runProviderTerminalCleanup(
   const closedPrUrls: string[] = [];
   const errors: string[] = [];
   let resolvedBranch = branch;
-  const workspaceTargetLabel = formatWorkspaceTargetLabel(branch, workspaceHeadOid);
+  const cleanupDeadlineMs = nowMs() + PROVIDER_TERMINAL_CLEANUP_TOTAL_BUDGET_MS;
+  const attachedPrUrlsToProcess = attachedPrUrls.slice(0, PROVIDER_TERMINAL_CLEANUP_MAX_ATTACHED_PRS);
+  if (attachedPrUrls.length > attachedPrUrlsToProcess.length) {
+    errors.push(
+      `skipped ${attachedPrUrls.length - attachedPrUrlsToProcess.length} attached PR(s) beyond cleanup cap of ${PROVIDER_TERMINAL_CLEANUP_MAX_ATTACHED_PRS}`
+    );
+  }
+  let processedAttachedPrCount = 0;
 
-  for (const attachedPrUrl of attachedPrUrls) {
+  for (const attachedPrUrl of attachedPrUrlsToProcess) {
+    if (nowMs() >= cleanupDeadlineMs) {
+      errors.push(`cleanup budget exceeded after processing ${processedAttachedPrCount} attached PR(s)`);
+      break;
+    }
+    processedAttachedPrCount += 1;
     const prView = await runCommand({
       command: 'gh',
       args: ['pr', 'view', attachedPrUrl, '--json', 'state,headRefName,headRefOid,url'],
@@ -244,6 +292,9 @@ export async function runProviderTerminalCleanup(
     const prDetails = parsePrViewResponse(prView.stdout);
     if (!prDetails) {
       errors.push(`gh pr view ${attachedPrUrl}: invalid JSON response`);
+      continue;
+    }
+    if (prDetails.repoKey !== workspaceRepoKey) {
       continue;
     }
 
@@ -267,6 +318,10 @@ export async function runProviderTerminalCleanup(
       `HEAD ${shortOid(workspaceHeadOid)}`;
     resolvedBranch ??= prDetails.headRefName;
     matchingOpenPrUrls.push(prDetails.url ?? attachedPrUrl);
+    if (nowMs() >= cleanupDeadlineMs) {
+      errors.push(`cleanup budget exceeded before closing ${attachedPrUrl}`);
+      break;
+    }
     const prClose = await runCommand({
       command: 'gh',
       args: [
@@ -295,7 +350,7 @@ export async function runProviderTerminalCleanup(
       summary:
         matchingOpenPrUrls.length === 0
           ? `Terminal cleanup encountered ${errors.length} attached PR error(s) for ${workspaceTargetLabel}.`
-          : `Terminal cleanup closed ${closedPrUrls.length} of ${matchingOpenPrUrls.length} matching attached PR(s) for ${formatWorkspaceTargetLabel(resolvedBranch, workspaceHeadOid)}.`,
+          : `Terminal cleanup closed ${closedPrUrls.length} of ${matchingOpenPrUrls.length} matching attached PR(s) for ${formatWorkspaceTargetLabel(resolvedBranch, workspaceHeadOid)} and encountered ${errors.length} error(s).`,
       error: errors.join(' | '),
       branch: resolvedBranch,
       attachedPrUrls,
@@ -338,7 +393,8 @@ async function runProviderTerminalCleanupCommand(input: {
 }): Promise<ProviderTerminalCleanupCommandResult> {
   try {
     const { stdout, stderr } = await execFileAsync(input.command, input.args, {
-      cwd: input.cwd
+      cwd: input.cwd,
+      timeout: PROVIDER_TERMINAL_CLEANUP_COMMAND_TIMEOUT_MS
     });
     return {
       ok: true,
@@ -351,7 +407,10 @@ async function runProviderTerminalCleanupCommand(input: {
       code?: string | number;
       stdout?: string;
       stderr?: string;
+      killed?: boolean;
+      signal?: string | null;
     };
+    const timedOut = execError.killed === true && execError.signal === 'SIGTERM';
     return {
       ok: false,
       exitCode:
@@ -362,6 +421,8 @@ async function runProviderTerminalCleanupCommand(input: {
       stderr:
         typeof execError.stderr === 'string' && execError.stderr.length > 0
           ? execError.stderr
+          : timedOut
+            ? `command timed out after ${PROVIDER_TERMINAL_CLEANUP_COMMAND_TIMEOUT_MS}ms`
           : (execError.message ?? ''),
     };
   }
@@ -414,9 +475,11 @@ function parsePrViewResponse(value: string): {
   headRefName: string | null;
   headRefOid: string | null;
   url: string | null;
+  repoKey: string | null;
 } | null {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
+    const parsedUrl = parseGitHubPullRequestUrl(typeof parsed.url === 'string' ? parsed.url : null);
     return {
       state:
         normalizeOptionalString(typeof parsed.state === 'string' ? parsed.state : null)?.toUpperCase() ?? null,
@@ -426,7 +489,8 @@ function parsePrViewResponse(value: string): {
       headRefOid: normalizeOptionalString(
         typeof parsed.headRefOid === 'string' ? parsed.headRefOid : null
       ),
-      url: parseGitHubPullRequestUrl(typeof parsed.url === 'string' ? parsed.url : null)?.canonicalUrl ?? null
+      url: parsedUrl?.canonicalUrl ?? null,
+      repoKey: parsedUrl?.repoKey ?? null
     };
   } catch {
     return null;
@@ -477,6 +541,7 @@ function parseGitHubPullRequestUrl(
   value: string | null | undefined
 ): {
   canonicalUrl: string;
+  repoKey: string;
 } | null {
   const normalized = normalizeOptionalString(value);
   if (!normalized) {
@@ -503,8 +568,28 @@ function parseGitHubPullRequestUrl(
   }
 
   return {
-    canonicalUrl: `https://github.com/${owner}/${repo}/pull/${pullNumber}`
+    canonicalUrl: `https://github.com/${owner}/${repo}/pull/${pullNumber}`,
+    repoKey: `${owner.toLowerCase()}/${repo.toLowerCase()}`
   };
+}
+
+function parseGitHubRepositoryUrl(value: string | null | undefined): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const urlMatch = normalized.match(
+    /^(?:https:\/\/|ssh:\/\/git@)github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/
+  );
+  if (urlMatch) {
+    return `${urlMatch[1]!.toLowerCase()}/${urlMatch[2]!.toLowerCase()}`;
+  }
+  const scpMatch = normalized.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (scpMatch) {
+    return `${scpMatch[1]!.toLowerCase()}/${scpMatch[2]!.toLowerCase()}`;
+  }
+  return null;
 }
 
 function normalizePullRequestNumber(value: string | null | undefined): string | null {
