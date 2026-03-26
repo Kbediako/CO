@@ -216,6 +216,7 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['pr', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('resolve-merge');
+    expect(stdout).toContain('ready-review');
     expect(stdout).toContain('docs/guides/review-artifacts.md');
   }, TEST_TIMEOUT);
 
@@ -223,6 +224,7 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['pr']);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('watch-merge');
+    expect(stdout).toContain('ready-review');
   }, TEST_TIMEOUT);
 
   it('prints pr watch-merge help', async () => {
@@ -235,6 +237,13 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator pr resolve-merge');
     expect(stdout).toContain('--exit-on-action-required');
   }, TEST_TIMEOUT);
+
+  it('prints pr ready-review help', async () => {
+    const { stdout } = await runCli(['pr', 'ready-review', '--help']);
+    expect(stdout).toContain('Usage: codex-orchestrator pr ready-review');
+    expect(stdout).toContain('review handoff is safe after a bounded automated-feedback drain');
+    expect(stdout).not.toContain('--auto-merge');
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects unknown pr subcommands through the binary shell', async () => {
     await expect(runCli(['pr', 'ship-it'])).rejects.toMatchObject({
@@ -342,6 +351,11 @@ describe('codex-orchestrator command surface', () => {
         ...process.env,
         NOTES: 'Goal: launch review via CLI shell | Summary: non-interactive handoff | Risks: arg forwarding',
         CODEX_REVIEW_MONITOR_INTERVAL_SECONDS: '0',
+        FORCE_CODEX_REVIEW: '0',
+        CODEX_REVIEW_NON_INTERACTIVE: '0',
+        CODEX_NON_INTERACTIVE: '0',
+        CODEX_NO_INTERACTIVE: '0',
+        CODEX_NONINTERACTIVE: '0',
         CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON:
           'cli command-surface review shell test intentionally exercises unscoped non-interactive handoff',
         DIFF_BUDGET_OVERRIDE_REASON:
@@ -1714,11 +1728,15 @@ describe('codex-orchestrator command surface', () => {
     };
 
     await expect(
-      runCli(['mcp', 'enable', '--servers', 'delegation', '--servers', 'playwright', '--yes'], env)
+      runCli(
+        ['mcp', 'enable', '--servers', 'delegation', '--servers', 'playwright', '--yes'],
+        env,
+        CLI_BOOT_TIMEOUT
+      )
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('--servers specified multiple times.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects duplicate --yes flags for mcp enable', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-duplicate-yes-'));
@@ -1728,10 +1746,10 @@ describe('codex-orchestrator command surface', () => {
       CODEX_CLI_BIN: fakeCodex
     };
 
-    await expect(runCli(['mcp', 'enable', '--yes', 'false', '--yes'], env)).rejects.toMatchObject({
+    await expect(runCli(['mcp', 'enable', '--yes', 'false', '--yes'], env, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('--yes specified multiple times.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('returns non-zero when mcp enable --yes has failed actions', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-mcp-enable-fail-'));

@@ -2,6 +2,7 @@ export interface PrWatchMergeOptions {
   usage?: string;
   defaultAutoMerge?: boolean;
   defaultExitOnActionRequired?: boolean;
+  readinessMode?: 'merge' | 'review';
 }
 
 export interface PrWatchMergeCheckFailure {
@@ -50,8 +51,10 @@ export interface PrWatchMergeSnapshot {
   coderabbitReviewMeta: PrWatchMergeCoderabbitReviewMeta;
   checks: PrWatchMergeCheckSummary;
   requiredChecks: PrWatchMergeCheckSummary | null;
+  requiredChecksQueryFailed: boolean;
   gateChecksSource: 'required' | 'rollup';
   gateReasons: string[];
+  readinessMode: 'merge' | 'review';
   readyToMerge: boolean;
   headOid: string | null;
 }
@@ -84,6 +87,7 @@ export function isHumanReviewActor(
 
 export function parseGitHubRepoFromRemoteUrl(rawUrl: string): { owner: string; repo: string } | null;
 export function buildPrNumberViewArgs(owner?: string, repo?: string): string[];
+export function isNoRequiredChecksReportedErrorMessage(value: string | null | undefined): boolean;
 
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;
 
@@ -105,10 +109,23 @@ export function buildStatusSnapshot(
     fetchError: boolean;
     unacknowledgedCount: number;
     rereview?: PrWatchMergeBotRereviewSignals | null;
-  } | null
+  } | null,
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'> & {
+    requiredChecksQueryFailed?: boolean;
+  }
 ): PrWatchMergeSnapshot;
 
-export function resolveActionRequiredReasons(snapshot: PrWatchMergeSnapshot): string[];
+export function resolveActionRequiredReasons(
+  snapshot: PrWatchMergeSnapshot,
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'>
+): string[];
+
+export function shouldSucceedAfterTimeout(
+  snapshot: PrWatchMergeSnapshot | null | undefined,
+  options?: Pick<PrWatchMergeOptions, 'readinessMode'> & {
+    pollingHealthy?: boolean;
+  }
+): boolean;
 
 export function resolveLatestBotRereviewRequests(
   comments: Array<{

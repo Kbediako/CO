@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   attachProviderLinearIssuePr,
+  createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
   getProviderLinearIssueContext,
   transitionProviderLinearIssueState,
@@ -48,6 +49,11 @@ function buildIssueContextBody(overrides: Record<string, unknown> = {}): unknown
           name: 'Codex Orchestrator',
           states: {
             nodes: [
+              {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              },
               {
                 id: 'state-in-progress',
                 name: 'In Progress',
@@ -99,6 +105,39 @@ function buildIssueContextBody(overrides: Record<string, unknown> = {}): unknown
   };
 }
 
+function buildStructuredWorkpadBody(overrides: {
+  environmentLines?: string[];
+  planLines?: string[];
+  acceptanceCriteriaLines?: string[];
+  validationLines?: string[];
+  notesLines?: string[];
+  extraSections?: Array<{ title: string; lines: string[] }>;
+} = {}): string {
+  const {
+    environmentLines = ['- Issue: `CO-1`.', '- Workspace: `linear-workspace`.'],
+    planLines = ['- Update the durable workpad contract.'],
+    acceptanceCriteriaLines = ['- Keep the canonical five-section workpad shape.'],
+    validationLines = ['- Run npm test.', '- Run npm run lint.'],
+    notesLines = ['- Preserve a single active workpad comment.'],
+    extraSections = []
+  } = overrides;
+
+  const renderSection = (title: string, lines: string[]) => [`### ${title}`, ...lines, ''];
+
+  return [
+    '## Codex Workpad',
+    '',
+    ...renderSection('Environment / Workspace Stamp', environmentLines),
+    ...renderSection('Plan', planLines),
+    ...renderSection('Acceptance Criteria', acceptanceCriteriaLines),
+    ...renderSection('Validation', validationLines),
+    ...renderSection('Notes', notesLines),
+    ...extraSections.flatMap((section) => renderSection(section.title, section.lines))
+  ]
+    .join('\n')
+    .trimEnd();
+}
+
 describe('providerLinearWorkflowFacade', () => {
   it('returns issue context with comments, team states, attachments, and resolved workpad comment', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -126,11 +165,64 @@ describe('providerLinearWorkflowFacade', () => {
         team: {
           key: 'CO',
           states: [
+            { id: 'state-backlog', name: 'Backlog', type: 'unstarted' },
             { id: 'state-in-progress', name: 'In Progress', type: 'started' },
             { id: 'state-human-review', name: 'Human Review', type: 'started' },
             { id: 'state-done', name: 'Done', type: 'completed' }
           ]
         },
+        workpad_comment: {
+          id: 'comment-workpad',
+          body: '## Codex Workpad\n\nOld plan'
+        }
+      }
+    });
+  });
+
+  it('ignores fenced marker examples when selecting the active workpad comment', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
+      expect(body.variables?.issueId).toBe('lin-issue-1');
+      return jsonResponse(
+        buildIssueContextBody({
+          comments: {
+            nodes: [
+              {
+                id: 'comment-example',
+                body: ['````md', '```md', '## Codex Workpad', '### Notes', '- Example only.', '```', '````'].join(
+                  '\n'
+                ),
+                url: 'https://linear.app/comment/example',
+                createdAt: '2026-03-22T10:00:00.000Z',
+                updatedAt: '2026-03-22T10:30:00.000Z',
+                resolvedAt: null
+              },
+              {
+                id: 'comment-workpad',
+                body: '## Codex Workpad\n\nOld plan',
+                url: 'https://linear.app/comment/workpad',
+                createdAt: '2026-03-22T09:00:00.000Z',
+                updatedAt: '2026-03-22T09:30:00.000Z',
+                resolvedAt: null
+              }
+            ]
+          }
+        })
+      );
+    });
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
         workpad_comment: {
           id: 'comment-workpad',
           body: '## Codex Workpad\n\nOld plan'
@@ -200,6 +292,10 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('updates an existing workpad comment instead of creating a duplicate', async () => {
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Updated plan.'],
+      notesLines: ['- Updated existing active workpad.']
+    });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -211,7 +307,7 @@ describe('providerLinearWorkflowFacade', () => {
       if (body.query?.includes('ProviderLinearUpdateComment')) {
         expect(body.variables).toEqual({
           id: 'comment-workpad',
-          body: '## Codex Workpad\n\nUpdated plan'
+          body: updatedWorkpadBody
         });
         return jsonResponse({
           data: {
@@ -220,7 +316,7 @@ describe('providerLinearWorkflowFacade', () => {
               comment: {
                 id: 'comment-workpad',
                 url: 'https://linear.app/comment/workpad',
-                body: '## Codex Workpad\n\nUpdated plan'
+                body: updatedWorkpadBody
               }
             }
           }
@@ -231,7 +327,7 @@ describe('providerLinearWorkflowFacade', () => {
 
     const result = await upsertProviderLinearWorkpadComment({
       issueId: 'lin-issue-1',
-      body: '## Codex Workpad\n\nUpdated plan',
+      body: updatedWorkpadBody,
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
       },
@@ -249,7 +345,7 @@ describe('providerLinearWorkflowFacade', () => {
       comment: {
         id: 'comment-workpad',
         url: 'https://linear.app/comment/workpad',
-        body: '## Codex Workpad\n\nUpdated plan',
+        body: updatedWorkpadBody,
         created_at: null,
         updated_at: null,
         resolved_at: null
@@ -258,7 +354,3645 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('creates a bootstrap workpad comment when no active workpad exists and the ticket test plan is mirrored', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Bootstrap the new workpad contract.'],
+      acceptanceCriteriaLines: ['- Mirror ticket test-plan requirements into the workpad.'],
+      validationLines: ['- Run npm test.', '- Run npm run lint.'],
+      notesLines: ['- Fresh bootstrap workpad for this issue.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Context', 'Bootstrap the issue.', '', 'Test Plan', '- Run npm test.', '- Run npm run lint.'].join(
+              '\n'
+            ),
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-note',
+                  body: 'Unrelated note',
+                  url: 'https://linear.app/comment/note',
+                  createdAt: '2026-03-22T08:00:00.000Z',
+                  updatedAt: '2026-03-22T08:30:00.000Z',
+                  resolvedAt: null
+                }
+              ]
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created',
+                url: 'https://linear.app/comment/workpad-created',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created',
+        url: 'https://linear.app/comment/workpad-created',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('mirrors plain-text validation requirements that are not bullet-prefixed', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['Run npm test', 'Run npm run lint'],
+      notesLines: ['- Plain-text validation requirements were preserved.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Context', 'Tighten validation parsing.', '', 'Validation', 'Run npm test', 'Run npm run lint'].join(
+              '\n'
+            ),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-plain-text',
+                url: 'https://linear.app/comment/workpad-created-plain-text',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-plain-text',
+        url: 'https://linear.app/comment/workpad-created-plain-text',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('normalizes checklist-prefixed validation requirements before mirroring', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.', '- Run npm run lint.'],
+      notesLines: ['- Checklist-prefixed ticket requirements were normalized before validation mirroring.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Context', 'Tighten validation parsing.', '', 'Validation', '- [ ] Run npm test.', '- [ ] Run npm run lint.'].join(
+              '\n'
+            ),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-checklist-validation',
+                url: 'https://linear.app/comment/workpad-created-checklist-validation',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-checklist-validation',
+        url: 'https://linear.app/comment/workpad-created-checklist-validation',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('normalizes CommonMark ordered-list validation requirements before mirroring', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.', '- Run npm run lint.'],
+      notesLines: ['- Ordered-list ticket requirements using `1)` were normalized before validation mirroring.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Context',
+              'Tighten validation parsing.',
+              '',
+              'Validation',
+              'Run these commands:',
+              '1) Run npm test.',
+              '2) Run npm run lint.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-ordered-list-validation',
+                url: 'https://linear.app/comment/workpad-created-ordered-list-validation',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-ordered-list-validation',
+        url: 'https://linear.app/comment/workpad-created-ordered-list-validation',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('stops mirroring validation requirements when a custom plain heading starts a prose section', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Validation mirroring should not absorb later rollout bullets.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '- Run npm test.', 'Rollout', 'Notify the team.'].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-custom-heading',
+                url: 'https://linear.app/comment/workpad-created-custom-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-custom-heading',
+        url: 'https://linear.app/comment/workpad-created-custom-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('stops mirroring validation requirements when a custom plain heading follows validation prose after a blank line', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Standalone prose headings should stop validation extraction after prose requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'Run npm test.', '', 'Rollout', 'This prose belongs to a different section.'].join(
+              '\n'
+            ),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-prose-heading',
+                url: 'https://linear.app/comment/workpad-created-prose-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-prose-heading',
+        url: 'https://linear.app/comment/workpad-created-prose-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('stops mirroring validation requirements when a custom markdown heading starts a prose section', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Validation mirroring should stop at markdown section boundaries.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '- Run npm test.', '### Rollout', 'Notify the team.'].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-markdown-heading',
+                url: 'https://linear.app/comment/workpad-created-markdown-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-markdown-heading',
+        url: 'https://linear.app/comment/workpad-created-markdown-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('stops mirroring validation requirements when a custom markdown heading starts a checklist section', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Checklist bullets under non-validation markdown headings should not be mirrored as validation requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '- Run npm test.', '### Rollout', '- Notify the team.'].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-markdown-heading-checklist',
+                url: 'https://linear.app/comment/workpad-created-markdown-heading-checklist',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-markdown-heading-checklist',
+        url: 'https://linear.app/comment/workpad-created-markdown-heading-checklist',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('fails closed when nested markdown validation subheadings contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Nested markdown validation subheadings should still contribute requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '### Automated',
+              '- Run npm test.',
+              '### Manual',
+              '- Capture screenshots.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Capture screenshots.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('fails closed when plain and bold nested validation buckets contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Plain and styled validation buckets should still contribute mirrored checklist requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'Automated', '- Run npm test.', '**Manual**', '- Capture screenshots.'].join(
+              '\n'
+            )
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Capture screenshots.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('fails closed when decorated nested validation headings contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Keep the existing mirrored checks list up to date.'],
+      notesLines: ['- Decorated nested validation headings should still contribute mirrored checklist requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '### Automated (required)',
+              '- Run npm test.',
+              '### Manual ✅',
+              '- Capture screenshots.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm test.', 'Capture screenshots.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('fails closed when nested validation markdown headings with closing hashes contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Trailing closing hashes on nested validation headings should not drop mirrored requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '### Automated ###',
+              '- Run npm test.',
+              '### Manual ###',
+              '- Capture screenshots.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Capture screenshots.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('requires exact normalized validation requirement matches instead of substring matches', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- latest'],
+      notesLines: ['- Substring overlaps should not satisfy mirrored validation requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '- Test.'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Test.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('fails closed when nested markdown validation subheadings followed by blank lines contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Blank lines after nested markdown validation subheadings should not drop requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '### Automated',
+              '',
+              '- Run npm test.',
+              '### Manual',
+              '',
+              '- Capture screenshots.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Capture screenshots.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('fails closed when common nested validation markdown subheadings contain unmet prose requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Nested validation buckets with prose requirements should still contribute mirrored checks.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '### Automated', 'Run npm test.', '### Manual', 'Capture screenshots.'].join(
+              '\n'
+            )
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Capture screenshots.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('fails closed when multi-word nested validation markdown subheadings contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Multi-word nested validation buckets like Regression Checks should still preserve validation mirroring.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '### Regression Checks', '- Run npm test.', '- Run npm run lint.'].join(
+              '\n'
+            )
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('fails closed when nested setext validation buckets contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Nested setext validation buckets should still contribute mirrored checklist requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              'Automated',
+              '---',
+              '- Run npm test.',
+              'Manual',
+              '---',
+              '- Capture screenshots.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Capture screenshots.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('ignores fenced code headings when validating the canonical workpad section structure', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      notesLines: [
+        '````md',
+        '```md',
+        '### Sample Heading',
+        '- This is example markdown, not a real section.',
+        '```',
+        '````'
+      ]
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-code-fence',
+                url: 'https://linear.app/comment/workpad-created-code-fence',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-code-fence',
+        url: 'https://linear.app/comment/workpad-created-code-fence',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('fails closed when the workpad marker only appears inside a fenced example', async () => {
+    const invalidWorkpadBody = [
+      '```md',
+      '## Codex Workpad',
+      '',
+      '### Environment / Workspace Stamp',
+      '- Example only.',
+      '',
+      '### Plan',
+      '- Example only.',
+      '',
+      '### Acceptance Criteria',
+      '- Example only.',
+      '',
+      '### Validation',
+      '- Example only.',
+      '',
+      '### Notes',
+      '- Example only.',
+      '```'
+    ].join('\n');
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_marker_missing',
+        message: 'Workpad body must contain "## Codex Workpad".',
+        status: 422
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(0);
+  });
+
+  it('ignores setext underline rows when mirroring validation requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Setext underline rows should not become mirrored requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '----------', '- Run npm test.'].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-setext',
+                url: 'https://linear.app/comment/workpad-created-setext',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-setext',
+        url: 'https://linear.app/comment/workpad-created-setext',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('fails closed when validation prose introduces a checklist with missing mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Prose introductions should not terminate validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              'Run these commands:',
+              '- Run npm test.',
+              '- Run npm run lint.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when validation introductions are separated from checklists by blank lines', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Blank lines between validation introductions and checklists should not drop mirrored requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              'Run these commands:',
+              '',
+              '- Run npm test.',
+              '- Run npm run lint.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when styled validation introductions keep mirrored checklist requirements active', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Styled list introductions should not clear validation mirroring before checklist items.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '**Run these commands:**',
+              '- Run npm test.',
+              '- Run npm run lint.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when title-cased styled validation introductions keep mirrored checklist requirements active', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Title-cased styled list introductions should not clear validation mirroring before checklist items.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '**Run Commands:**', '- Run npm test.', '- Run npm run lint.'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when horizontal rules appear between validation prose requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Horizontal rules inside validation prose should not terminate requirement mirroring.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'Run npm test.', '---', 'Run npm run lint.'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when lowercase validation prose appears before a setext underline', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Lowercase validation prose before a setext underline should not become a heading.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'run npm test', '---', 'Run npm run lint.'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when tool-led lowercase validation prose appears before a setext underline', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm run test.'],
+      notesLines: ['- Tool-led lowercase validation prose before a setext underline should not become a heading.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'npm run test', '---', 'npm run lint'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['npm run lint'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when git-led lowercase validation prose appears before a setext underline', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run git clone repo.'],
+      notesLines: ['- Git command prose before a setext underline should not become a heading.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'git clone repo', '---', 'git pull'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['git pull'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when common tool-led lowercase command prose appears before a setext underline', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run git config user.name.'],
+      notesLines: ['- Common tool commands should not become lowercase setext headings.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'git config user.name', '---', 'docker compose up'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['docker compose up'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when ambiguous command entrypoints use a command-like second word before a setext underline', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run go generate ./...'],
+      notesLines: ['- Ambiguous command entrypoints should still fail closed on real command phrases.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'go generate ./...', '---', 'go test ./...'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['go test ./...'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when ambiguous command entrypoints use a generic subcommand with a command-like argument before a setext underline', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run go get ./...'],
+      notesLines: ['- Ambiguous command entrypoints should still reject generic subcommands when the following argument is command-like.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', 'go get ./...', '---', 'go test ./...'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['go test ./...'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores fenced validation examples when mirroring ticket requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Fenced examples should not become required validation items.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '````md',
+              '```sh',
+              '- Run npm run lint.',
+              '```',
+              '````',
+              '- Run npm test.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-fenced-validation',
+                url: 'https://linear.app/comment/workpad-created-fenced-validation',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-fenced-validation',
+        url: 'https://linear.app/comment/workpad-created-fenced-validation',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('keeps nested validation buckets active when fenced examples appear before the real checklist', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Fenced examples inside nested validation buckets should not clear mirrored requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '### Automated',
+              '```sh',
+              'npm test',
+              '```',
+              '- Run npm test.',
+              '- Run npm run lint.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('treats non-ASCII markdown headings as section boundaries when parsing validation requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Markdown subheadings should stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              '### Rollout 🚀',
+              'This prose belongs to a different section.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-non-ascii-heading',
+                url: 'https://linear.app/comment/workpad-created-non-ascii-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-non-ascii-heading',
+        url: 'https://linear.app/comment/workpad-created-non-ascii-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats non-ASCII setext headings as section boundaries when parsing validation requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Setext subheadings with non-ASCII suffixes should stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'Rollout 🚀',
+              '---',
+              '- Notify the team.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-non-ascii-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-non-ascii-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-non-ascii-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-non-ascii-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats lowercase setext headings as section boundaries when parsing validation requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Lowercase setext headings should stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'notes',
+              '-----',
+              '- Notify the team.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-lowercase-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-lowercase-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-lowercase-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-lowercase-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats multi-word lowercase setext headings as section boundaries when parsing validation requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Multi-word lowercase setext headings should still stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'follow up',
+              '---------',
+              '- Notify the team.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-multiword-lowercase-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-multiword-lowercase-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-multiword-lowercase-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-multiword-lowercase-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats multi-word lowercase setext headings followed by prose as section boundaries', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Lowercase setext headings followed by prose should still stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'rollout details',
+              '---------------',
+              'Coordinate with QA before rollout.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-multiword-lowercase-setext-prose-heading',
+                url: 'https://linear.app/comment/workpad-created-multiword-lowercase-setext-prose-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-multiword-lowercase-setext-prose-heading',
+        url: 'https://linear.app/comment/workpad-created-multiword-lowercase-setext-prose-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats verb-led lowercase setext subsections as section boundaries when they are not command lines', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Verb-led lowercase setext subsections like verify manually should still stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'verify manually',
+              '---------------',
+              'Confirm UI renders before ship.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-verb-led-lowercase-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-verb-led-lowercase-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-verb-led-lowercase-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-verb-led-lowercase-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats ambiguous command words like go live as lowercase setext section boundaries when they read like prose', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Ambiguous words like go live should still parse as lowercase setext headings when they read like prose.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'go live',
+              '-------',
+              'Coordinate the release with support before rollout.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-ambiguous-command-word-lowercase-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-ambiguous-command-word-lowercase-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-ambiguous-command-word-lowercase-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-ambiguous-command-word-lowercase-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats ambiguous command phrases like go get started as lowercase setext headings when they read like prose', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Phrases like go get started should remain prose headings when they are not real command lines.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'go get started',
+              '--------------',
+              'Walk through the first-time setup carefully.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-go-get-started-lowercase-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-go-get-started-lowercase-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-go-get-started-lowercase-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-go-get-started-lowercase-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats ambiguous command entrypoints with connector-led prose like make a plan as lowercase setext headings', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Connector-led phrases like make a plan should remain prose headings, not command phrases.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'make a plan',
+              '-----------',
+              'Sequence the final rollout deliberately.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-connector-led-ambiguous-lowercase-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-connector-led-ambiguous-lowercase-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-connector-led-ambiguous-lowercase-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-connector-led-ambiguous-lowercase-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats lowercase prose headings that start with CLI names as section boundaries when they are not command phrases', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- CLI-name prose headings like git workflow should still parse as lowercase setext headings.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'git workflow',
+              '------------',
+              'Coordinate the branch strategy before rollout.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-cli-name-prose-lowercase-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-cli-name-prose-lowercase-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-cli-name-prose-lowercase-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-cli-name-prose-lowercase-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats fully non-Latin setext headings as section boundaries when parsing validation requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Fully non-Latin setext headings should stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'Релиз',
+              '---',
+              '- Notify the team.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-cyrillic-setext-heading',
+                url: 'https://linear.app/comment/workpad-created-cyrillic-setext-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-cyrillic-setext-heading',
+        url: 'https://linear.app/comment/workpad-created-cyrillic-setext-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats fully bold non-ASCII headings as section boundaries when parsing validation requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Bold non-ASCII headings should stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              'Run npm test.',
+              '',
+              '**Rollout 🚀**',
+              'This prose belongs to a different section.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-bold-non-ascii-heading',
+                url: 'https://linear.app/comment/workpad-created-bold-non-ascii-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-bold-non-ascii-heading',
+        url: 'https://linear.app/comment/workpad-created-bold-non-ascii-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats fully bold headings ending with a colon as section boundaries when they precede lists', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Styled custom headings with trailing colons should still stop validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '- Run npm test.', '', '**Rollout:**', '- Notify the team.'].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-bold-colon-heading',
+                url: 'https://linear.app/comment/workpad-created-bold-colon-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-bold-colon-heading',
+        url: 'https://linear.app/comment/workpad-created-bold-colon-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('treats title-cased plain headings as section boundaries when they precede lists', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Title-cased plain headings still terminate validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Validation',
+              '- Run npm test.',
+              'Implementation Notes',
+              '- This list is not part of validation.'
+            ].join('\n'),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-plain-heading',
+                url: 'https://linear.app/comment/workpad-created-plain-heading',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-plain-heading',
+        url: 'https://linear.app/comment/workpad-created-plain-heading',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('fails closed when Unicode plain validation headings contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Unicode plain validation headings should still keep mirroring active.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation — Regression', '- Run npm test.', '- Run npm run lint.'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation — Regression']
+        }
+      }
+    });
+  });
+
+  it('fails closed when decorated plain validation headings contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Decorated plain validation headings should still keep mirroring active.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation ✅', '- Run npm test.', '- Run npm run lint.'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation ✅']
+        }
+      }
+    });
+  });
+
+  it('fails closed when leading-symbol validation headings contain unmet mirrored requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Leading-symbol validation headings should still keep mirroring active.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['✅ Validation', '- Run npm test.', '- Run npm run lint.'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['✅ Validation']
+        }
+      }
+    });
+  });
+
+  it('fails closed when nested validation headings use leading symbol decoration', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Leading-symbol nested validation buckets should still keep mirroring active.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '### ✅ Manual', '- Run npm test.', '- Run npm run lint.'].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+  });
+
+  it('does not treat decorated validation prose as a plain section heading', async () => {
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      notesLines: ['- Ignore prose that happens to begin with a decorated validation token.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              'Context',
+              'Keep operators unblocked.',
+              '',
+              'Validation ✅ required for merge.',
+              'Coordinate with QA before rollout.'
+            ].join('\n')
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: updatedWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                url: 'https://linear.app/comment/workpad',
+                body: updatedWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-workpad',
+        url: 'https://linear.app/comment/workpad',
+        body: updatedWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('does not treat symbol-decorated plain headings as validation requirements inside an active validation section', async () => {
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Symbol-decorated non-validation headings should terminate validation extraction.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '- Run npm test.', 'Rollout 🚀', 'Coordinate with QA before rollout.'].join(
+              '\n'
+            )
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: updatedWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                url: 'https://linear.app/comment/workpad',
+                body: updatedWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-workpad',
+        url: 'https://linear.app/comment/workpad',
+        body: updatedWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('fails closed when decorated markdown validation headings contain unmet requirements', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Capture screenshots.'],
+      notesLines: ['- Decorated validation headings should still mirror ticket requirements.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: [
+              '### Validation ✅',
+              '- Run npm test.',
+              '',
+              '### Testing (required)',
+              '- Run npm run lint.'
+            ].join('\n')
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm test.', 'Run npm run lint.'],
+          source_sections: ['Validation ✅', 'Testing (required)']
+        }
+      }
+    });
+  });
+
+  it('accepts canonical workpad sections when their H3 headings use ATX closing hashes', async () => {
+    const createdWorkpadBody = [
+      '## Codex Workpad',
+      '',
+      '### Environment / Workspace Stamp ###',
+      '- Issue: `CO-1`.',
+      '- Workspace: `linear-workspace`.',
+      '',
+      '### Plan ###',
+      '- Update the durable workpad contract.',
+      '',
+      '### Acceptance Criteria ###',
+      '- Keep the canonical five-section workpad shape.',
+      '',
+      '### Validation ###',
+      '- Run npm test.',
+      '- Run npm run lint.',
+      '',
+      '### Notes ###',
+      '- Preserve a single active workpad comment.'
+    ].join('\n');
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-closing-hashes-workpad',
+                url: 'https://linear.app/comment/workpad-created-closing-hashes-workpad',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-closing-hashes-workpad',
+        url: 'https://linear.app/comment/workpad-created-closing-hashes-workpad',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
+  it('fails closed when the workpad body omits or reorders the canonical top-level sections', async () => {
+    const invalidWorkpadBody = [
+      '## Codex Workpad',
+      '',
+      '### Plan',
+      '- Updated plan.',
+      '',
+      '### Environment / Workspace Stamp',
+      '- Issue: `CO-1`.'
+    ].join('\n');
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_structure_invalid',
+        message:
+          'Workpad body must contain these H3 sections in order after "## Codex Workpad": Environment / Workspace Stamp, Plan, Acceptance Criteria, Validation, Notes.',
+        status: 422,
+        details: {
+          required_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes'
+          ],
+          actual_sections: ['Plan', 'Environment / Workspace Stamp']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the first visible line is not the canonical workpad marker', async () => {
+    const invalidWorkpadBody = [
+      'Draft wrapper text that should not be accepted.',
+      '',
+      buildStructuredWorkpadBody()
+    ].join('\n');
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_structure_invalid',
+        message: 'Workpad body must start with "## Codex Workpad".',
+        status: 422
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the top-level workpad marker is renamed', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody().replace(
+      '## Codex Workpad',
+      '## Codex Workpad (draft)'
+    );
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_structure_invalid',
+        message: 'Workpad body must start with "## Codex Workpad".',
+        status: 422
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the workpad body appends extra sections after the canonical five', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      extraSections: [{ title: 'Extra', lines: ['- This section should not be accepted.'] }]
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_structure_invalid',
+        message:
+          'Workpad body must contain these H3 sections in order after "## Codex Workpad": Environment / Workspace Stamp, Plan, Acceptance Criteria, Validation, Notes.',
+        status: 422,
+        details: {
+          required_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes'
+          ],
+          actual_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes',
+            'Extra'
+          ]
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the workpad body includes content before the first canonical section', async () => {
+    const invalidWorkpadBody = [
+      '## Codex Workpad',
+      '',
+      'This stray prose should not be accepted.',
+      '',
+      '### Environment / Workspace Stamp',
+      '- Branch: `co-21-tighten-linear-workpad-contract`.',
+      '',
+      '### Plan',
+      '- Keep the workpad strict.',
+      '',
+      '### Acceptance Criteria',
+      '- Preserve the canonical five sections only.',
+      '',
+      '### Validation',
+      '- Run npm test.',
+      '',
+      '### Notes',
+      '- No extra preamble should be accepted.'
+    ].join('\n');
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_structure_invalid',
+        message:
+          'Workpad body must contain these H3 sections in order after "## Codex Workpad": Environment / Workspace Stamp, Plan, Acceptance Criteria, Validation, Notes.',
+        status: 422,
+        details: {
+          required_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes'
+          ],
+          actual_sections: [
+            'Environment / Workspace Stamp',
+            'Plan',
+            'Acceptance Criteria',
+            'Validation',
+            'Notes'
+          ],
+          leading_content_before_first_section: true
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed with workpad_section_empty when a canonical core section is empty', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: []
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_section_empty',
+        message: 'Workpad core sections must be non-empty.',
+        status: 422,
+        details: {
+          empty_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when ticket validation requirements are not mirrored into the workpad', async () => {
+    const incompleteWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Missing one required ticket validation item.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Context', 'Tighten validation.', '', 'Validation', '- Run npm test.', '- Run npm run lint.'].join(
+              '\n'
+            )
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: incompleteWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: ['Run npm run lint.'],
+          source_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('fails closed when commentId points at an unresolved human comment', async () => {
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Updated plan.'],
+      notesLines: ['- Invalid comment id should fail closed.']
+    });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -272,7 +4006,7 @@ describe('providerLinearWorkflowFacade', () => {
 
     const result = await upsertProviderLinearWorkpadComment({
       issueId: 'lin-issue-1',
-      body: '## Codex Workpad\n\nUpdated plan',
+      body: updatedWorkpadBody,
       commentId: 'comment-note',
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
@@ -295,7 +4029,67 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('fails closed when commentId points at a comment whose marker only appears inside a fenced example', async () => {
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Updated targeted workpad.'],
+      notesLines: ['- Fenced examples are not valid workpad comments.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-example',
+                  body: ['```md', '## Codex Workpad', '### Notes', '- Example only.', '```'].join('\n'),
+                  url: 'https://linear.app/comment/example',
+                  createdAt: '2026-03-22T10:00:00.000Z',
+                  updatedAt: '2026-03-22T10:30:00.000Z',
+                  resolvedAt: null
+                }
+              ]
+            }
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      commentId: 'comment-example',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'linear_workpad_comment_id_invalid',
+        message: 'Comment id must reference an unresolved Codex workpad comment.',
+        status: 422,
+        details: {
+          comment_id: 'comment-example'
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('updates the caller-selected unresolved workpad comment when commentId is valid', async () => {
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Updated targeted workpad.'],
+      notesLines: ['- Explicit comment selection stayed within the active workpad set.']
+    });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -330,7 +4124,7 @@ describe('providerLinearWorkflowFacade', () => {
       if (body.query?.includes('ProviderLinearUpdateComment')) {
         expect(body.variables).toEqual({
           id: 'comment-workpad-target',
-          body: '## Codex Workpad\n\nUpdated plan'
+          body: updatedWorkpadBody
         });
         return jsonResponse({
           data: {
@@ -339,7 +4133,7 @@ describe('providerLinearWorkflowFacade', () => {
               comment: {
                 id: 'comment-workpad-target',
                 url: 'https://linear.app/comment/workpad-target',
-                body: '## Codex Workpad\n\nUpdated plan'
+                body: updatedWorkpadBody
               }
             }
           }
@@ -350,7 +4144,7 @@ describe('providerLinearWorkflowFacade', () => {
 
     const result = await upsertProviderLinearWorkpadComment({
       issueId: 'lin-issue-1',
-      body: '## Codex Workpad\n\nUpdated plan',
+      body: updatedWorkpadBody,
       commentId: 'comment-workpad-target',
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
@@ -369,7 +4163,7 @@ describe('providerLinearWorkflowFacade', () => {
       comment: {
         id: 'comment-workpad-target',
         url: 'https://linear.app/comment/workpad-target',
-        body: '## Codex Workpad\n\nUpdated plan',
+        body: updatedWorkpadBody,
         created_at: null,
         updated_at: null,
         resolved_at: null
@@ -431,6 +4225,10 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('paginates comments so an active workpad beyond the first page is updated instead of duplicated', async () => {
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Updated paginated workpad.'],
+      notesLines: ['- The update reused the active workpad from a later comments page.']
+    });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -483,7 +4281,7 @@ describe('providerLinearWorkflowFacade', () => {
       if (body.query?.includes('ProviderLinearUpdateComment')) {
         expect(body.variables).toEqual({
           id: 'comment-workpad-later',
-          body: '## Codex Workpad\n\nUpdated plan'
+          body: updatedWorkpadBody
         });
         return jsonResponse({
           data: {
@@ -492,7 +4290,7 @@ describe('providerLinearWorkflowFacade', () => {
               comment: {
                 id: 'comment-workpad-later',
                 url: 'https://linear.app/comment/workpad-later',
-                body: '## Codex Workpad\n\nUpdated plan'
+                body: updatedWorkpadBody
               }
             }
           }
@@ -503,7 +4301,7 @@ describe('providerLinearWorkflowFacade', () => {
 
     const result = await upsertProviderLinearWorkpadComment({
       issueId: 'lin-issue-1',
-      body: '## Codex Workpad\n\nUpdated plan',
+      body: updatedWorkpadBody,
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
       },
@@ -520,7 +4318,7 @@ describe('providerLinearWorkflowFacade', () => {
       },
       comment: {
         id: 'comment-workpad-later',
-        body: '## Codex Workpad\n\nUpdated plan'
+        body: updatedWorkpadBody
       }
     });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
@@ -788,6 +4586,448 @@ describe('providerLinearWorkflowFacade', () => {
         type: 'started'
       },
       source_setup: null
+    });
+  });
+
+  it('creates a same-project Backlog follow-up issue with related and blocker linkage', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        expect(body.query).not.toContain('comments(');
+        expect(body.query).not.toContain('attachments(');
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        expect(body.variables).toEqual({
+          input: {
+            teamId: 'lin-team-1',
+            projectId: 'lin-project-1',
+            stateId: 'state-backlog',
+            title: 'Follow-up issue',
+            description: [
+              'Investigate the remaining improvement.',
+              '',
+              '## Acceptance Criteria',
+              '- [ ] Captured'
+            ].join('\n')
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        if ((body.variables?.input as Record<string, unknown> | undefined)?.type === 'related') {
+          expect(body.variables).toEqual({
+            input: {
+              type: 'related',
+              issueId: 'lin-issue-1',
+              relatedIssueId: 'lin-issue-2'
+            }
+          });
+          return jsonResponse({
+            data: {
+              issueRelationCreate: {
+                success: true,
+                issueRelation: {
+                  id: 'relation-related',
+                  type: 'related'
+                }
+              }
+            }
+          });
+        }
+        expect(body.variables).toEqual({
+          input: {
+            type: 'blocks',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-issue-2'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-blocks',
+                type: 'blocks'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      follow_up_issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-2',
+        title: 'Follow-up issue',
+        description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+        url: 'https://linear.app/example/issue/CO-2',
+        state: {
+          id: 'state-backlog',
+          name: 'Backlog',
+          type: 'unstarted'
+        },
+        team: {
+          id: 'lin-team-1',
+          key: 'CO',
+          name: 'Codex Orchestrator'
+        },
+        project: {
+          id: 'lin-project-1',
+          name: 'CO'
+        }
+      },
+      relations: {
+        related: true,
+        blocked_by_source: true
+      },
+      source_setup: null
+    });
+  });
+
+  it('fails closed when the source issue is not assigned to a project', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse(
+        buildIssueContextBody({
+          project: null
+        })
+      )
+    );
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_project_missing',
+        message: 'Linear issue CO-1 is missing a project assignment; same-project follow-up creation requires one.',
+        status: 422
+      }
+    });
+  });
+
+  it('fails closed when the live team does not expose Backlog for follow-up creation', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse(
+        buildIssueContextBody({
+          team: {
+            id: 'lin-team-1',
+            key: 'CO',
+            name: 'Codex Orchestrator',
+            states: {
+              nodes: [
+                {
+                  id: 'state-ready',
+                  name: 'Ready',
+                  type: 'unstarted'
+                },
+                {
+                  id: 'state-in-progress',
+                  name: 'In Progress',
+                  type: 'started'
+                },
+                {
+                  id: 'state-human-review',
+                  name: 'Human Review',
+                  type: 'started'
+                },
+                {
+                  id: 'state-done',
+                  name: 'Done',
+                  type: 'completed'
+                }
+              ]
+            }
+          }
+        })
+      )
+    );
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_backlog_state_missing',
+        message: 'Linear team state "Backlog" was not found for issue CO-1.',
+        status: 422
+      }
+    });
+  });
+
+  it('surfaces the created follow-up issue when relation creation fails after issue creation', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        return jsonResponse({
+          errors: [{ message: 'relation failed' }]
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 409,
+        retryable: false,
+        details: {
+          errors: ['relation failed'],
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          failed_relation_type: 'related'
+        }
+      }
+    });
+  });
+
+  it('surfaces the created follow-up issue when blocker relation creation fails after related succeeds', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: {
+          input?: {
+            type?: string;
+          };
+        };
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        if (body.variables?.input?.type === 'related') {
+          return jsonResponse({
+            data: {
+              issueRelationCreate: {
+                success: true
+              }
+            }
+          });
+        }
+        if (body.variables?.input?.type === 'blocks') {
+          return jsonResponse({
+            errors: [{ message: 'block relation failed' }]
+          });
+        }
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      acceptanceCriteria: '- [ ] Captured',
+      blockedBySource: true,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 409,
+        retryable: false,
+        details: {
+          errors: ['block relation failed'],
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          failed_relation_type: 'blocks'
+        }
+      }
     });
   });
 

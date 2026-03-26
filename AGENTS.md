@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 2a1b05c4352b5322d52e954a26442e910cef7f75f44a7002090deb4523b5d6ba -->
+<!-- codex:instruction-stamp 9bba6da88ca87cbb90dd5d3807b38569d5bef17ab0952dcf7c9cc8ccd47e6a47 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -99,6 +99,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - For large uncommitted diffs, `codex-orchestrator review` emits scope advisories and prompt shaping; tune thresholds via `CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD` / `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD`.
 - Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed; if it hangs in delegation startup, switch to `codex-orchestrator review`.
 - In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `codex-orchestrator review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
+- Non-interactive lane policy: direct/manual wrapper runs stay handoff-only unless `FORCE_CODEX_REVIEW=1`; `docs-review` and `implementation-gate` explicitly force review execution; `docs-relevance-advisory` explicitly clears `FORCE_CODEX_REVIEW` and remains prompt-only/advisory; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1`, so its pre-handoff standalone review executes before `Human Review` / `In Review`.
 - Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
 - When you need manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." MANIFEST=<path> codex-orchestrator review --manifest <path>` (`npm run review -- --manifest <path>` is equivalent in this repo). `NOTES` is strongly recommended; the wrapper auto-generates fallback notes when omitted.
 - See `docs/standalone-review-guide.md` for the canonical workflow.
@@ -205,7 +206,7 @@ Implementation work is not “complete” until you run (in order):
 | `npm run docs:freshness` | Docs freshness gate | Validates registry coverage + review recency and emits `out/<task-id>/docs-freshness.json`. |
 | `node scripts/diff-budget.mjs` | Review scope guard | Fails when diffs exceed the configured budget unless `DIFF_BUDGET_OVERRIDE_REASON` is set. |
 | `npm run eval:test` | Evaluation harness smoke tests | Requires fixtures in `evaluation/fixtures/**`; optional, enable when evaluation scope exists. |
-| `codex-orchestrator review` (`npm run review` alias) | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; in non-interactive/CI runs (stdin not TTY or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `NOTES` is recommended (`<goal + summary + risks>` plus optional questions) and the wrapper auto-generates fallback notes when omitted. |
+| `codex-orchestrator review` (`npm run review` alias) | Reviewer hand-off | Runs `codex review` with task/PRD context (when available) and the latest run manifest path included as evidence; in non-interactive/CI runs (stdin not TTY or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `docs-review` / `implementation-gate` and the `provider-linear-worker` pipeline set the forcing env for executed unattended review, while `docs-relevance-advisory` keeps it cleared for prompt-only advisory behavior; `NOTES` is recommended (`<goal + summary + risks>` plus optional questions) and the wrapper auto-generates fallback notes when omitted. |
 | `npm run pack:smoke` | Downstream simulation gate | Packs + installs tarball in a temp mock repo, validates CLI behavior (`review` artifacts + delegate-server JSONL), and checks bundled skill install output. Core lane enforces it on downstream-facing diffs; `.github/workflows/pack-smoke-backstop.yml` runs a weekly main-branch backstop. |
 
 Update the table once you wire different build pipelines or tooling.

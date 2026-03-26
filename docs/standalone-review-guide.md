@@ -51,6 +51,11 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 ## Wrapper behavior notes
 - Set `TASK` or `MCP_RUNNER_TASK_ID` so the review prompt includes task context instead of `unknown-task`.
 - In CI or when `CODEX_REVIEW_NON_INTERACTIVE=1`/`CODEX_NON_INTERACTIVE=1` (or `CODEX_NO_INTERACTIVE=1`) is set, the wrapper prints a “review handoff” prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
+- Non-interactive lane matrix:
+  - Direct/manual wrapper runs stay handoff-only unless you set `FORCE_CODEX_REVIEW=1`.
+  - `docs-review` and `implementation-gate` set `FORCE_CODEX_REVIEW=1` and execute unattended standalone review.
+  - `docs-relevance-advisory` clears `FORCE_CODEX_REVIEW` and stays prompt-only/advisory.
+  - The `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1` for the worker session, so the pre-handoff standalone review executes before `Human Review` / `In Review`; use `codex-orchestrator review` / `npm run review`, not raw `codex review`, for that closeout review.
 - To force execution in those environments: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=<task-id> NOTES="..." MANIFEST=<path> codex-orchestrator review --manifest <path>`.
 - `codex-orchestrator review` keeps delegation MCP enabled by default; disable when needed with `CODEX_REVIEW_DISABLE_DELEGATION_MCP=1` or `--disable-delegation-mcp` (legacy control remains supported: `CODEX_REVIEW_ENABLE_DELEGATION_MCP=0` or `--enable-delegation-mcp=false`).
 - `codex-orchestrator review` does not enforce runtime limits by default (reviews can run as long as needed).
@@ -75,6 +80,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
   - Allow unrestricted heavy command execution (including explicit validation suites and direct validation-runner launches): `CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1`
   - Enforce bounded mode (hard-stop on remaining heavy command starts outside the default command-intent boundary): `CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1`
 - `codex-orchestrator review` emits patience-first runtime checkpoints every 60s by default (`elapsed` + `idle` visibility while waiting).
+- The review wrapper's diff-budget preflight now hard-gates the current working tree relative to `HEAD` by default for local runs; explicit `--base`, explicit `--commit`, and CI `BASE_SHA` / `DIFF_BUDGET_BASE` remain the hard PR/base surfaces, and broader `origin/main` stacked history is advisory-only in local auto mode. If an explicit base ref is requested but cannot be resolved, the wrapper fails instead of silently downgrading scope or falling through to a lower-priority base source.
 - Large uncommitted review scope is now explicit and auditable: when thresholds trip, rerun with `--base` / `--commit` or set `CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON="<reason>"`. Accepted overrides are logged and copied into the review prompt.
 - If the CLI rejects an explicitly requested scope flag (`--uncommitted`, `--base`, or `--commit`), the wrapper now fails instead of silently dropping that explicit scope; this keeps the review surface and audit trail truthful.
 - In the default bounded `diff` path, repeated post-startup-anchor relevant rereads now terminate as a successful bounded completion instead of drifting toward a late failure; the success-side `termination_boundary` is preserved in `review/telemetry.json`.

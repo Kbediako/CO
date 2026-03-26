@@ -8,6 +8,209 @@ import { resolveLinearSourceSetup } from './linearDispatchSource.js';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 
 const LINEAR_WORKPAD_MARKER = '## Codex Workpad';
+const LINEAR_WORKPAD_MARKER_TITLE = 'Codex Workpad';
+const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
+  'Environment / Workspace Stamp',
+  'Plan',
+  'Acceptance Criteria',
+  'Validation',
+  'Notes'
+] as const;
+const LINEAR_ISSUE_VALIDATION_SECTION_TITLES = new Set(['validation', 'test plan', 'testing']);
+const LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES = new Set([
+  'automated',
+  'manual',
+  'smoke',
+  'sanity',
+  'regression',
+  'integration',
+  'unit',
+  'e2e',
+  'end to end',
+  'qa',
+  'verification',
+  'checks',
+  'checklist',
+  'accessibility',
+  'performance',
+  'security',
+  'setup',
+  'cleanup',
+  'preflight',
+  'postflight'
+]);
+const LINEAR_ISSUE_PLAIN_SECTION_TITLES = new Set([
+  'context',
+  'observed nuance',
+  'required reference baseline',
+  'problem to solve',
+  'scope',
+  'out of scope',
+  'acceptance criteria',
+  'validation',
+  'test plan',
+  'testing',
+  'recent activity',
+  'known blockers',
+  'dependencies',
+  'risks',
+  'constraints',
+  'constraints / non-goals',
+  'non-goals',
+  'notes',
+  'open questions',
+  'implementation',
+  'investigation'
+]);
+const LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'as',
+  'at',
+  'by',
+  'for',
+  'from',
+  'in',
+  'into',
+  'of',
+  'on',
+  'or',
+  'per',
+  'the',
+  'to',
+  'via',
+  'vs',
+  'with',
+  'without'
+]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_LEADING_VERBS = new Set([
+  'run',
+  'rerun',
+  'execute',
+  'install'
+]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_ENTRYPOINTS = new Set([
+  'bun',
+  'cargo',
+  'composer',
+  'docker',
+  'git',
+  'helm',
+  'kubectl',
+  'mvn',
+  'node',
+  'npm',
+  'npx',
+  'pip',
+  'pip3',
+  'pnpm',
+  'poetry',
+  'pytest',
+  'python',
+  'python3',
+  'terraform',
+  'uv',
+  'yarn'
+]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_ENTRYPOINTS = new Set([
+  'go',
+  'just',
+  'make'
+]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS = new Set([
+  'add',
+  'apply',
+  'bench',
+  'branch',
+  'build',
+  'check',
+  'checkout',
+  'ci',
+  'clean',
+  'clone',
+  'commit',
+  'compose',
+  'config',
+  'coverage',
+  'create',
+  'deploy',
+  'describe',
+  'dev',
+  'destroy',
+  'diff',
+  'down',
+  'env',
+  'exec',
+  'generate',
+  'fetch',
+  'fmt',
+  'format',
+  'get',
+  'import',
+  'inspect',
+  'install',
+  'init',
+  'lint',
+  'list',
+  'login',
+  'log',
+  'logout',
+  'merge',
+  'mod',
+  'new',
+  'plan',
+  'pull',
+  'publish',
+  'push',
+  'rebase',
+  'release',
+  'remote',
+  'remove',
+  'reset',
+  'rm',
+  'restore',
+  'run',
+  'serve',
+  'show',
+  'start',
+  'status',
+  'stash',
+  'stop',
+  'switch',
+  'sync',
+  'tag',
+  'test',
+  'uninstall',
+  'update',
+  'upgrade',
+  'up',
+  'use',
+  'verify',
+  'vet',
+  'whoami'
+]);
+const LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_SUBCOMMANDS = new Set([
+  'bench',
+  'build',
+  'check',
+  'clean',
+  'dev',
+  'fmt',
+  'format',
+  'generate',
+  'install',
+  'lint',
+  'mod',
+  'plan',
+  'run',
+  'serve',
+  'status',
+  'sync',
+  'test',
+  'verify',
+  'vet'
+]);
 const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
@@ -17,7 +220,8 @@ type ProviderLinearOperation =
   | 'upsert-workpad'
   | 'delete-workpad'
   | 'transition'
-  | 'attach-pr';
+  | 'attach-pr'
+  | 'create-follow-up';
 type ProviderLinearOperationFailure<T extends ProviderLinearOperation> = {
   ok: false;
   operation: T;
@@ -28,6 +232,7 @@ export interface ProviderLinearWorkflowError {
   code: string;
   message: string;
   status: number;
+  retryable?: boolean;
   details?: Record<string, unknown>;
 }
 
@@ -53,6 +258,17 @@ export interface ProviderLinearWorkflowAttachment {
   source_type: string | null;
 }
 
+interface ProviderLinearWorkpadSection {
+  title: string;
+  body: string;
+}
+
+interface ProviderLinearIssueValidationRequirement {
+  raw: string;
+  normalized: string;
+  source_section: string;
+}
+
 export interface ProviderLinearIssueContext {
   id: string;
   identifier: string;
@@ -76,6 +292,11 @@ export interface ProviderLinearIssueContext {
   attachments: ProviderLinearWorkflowAttachment[];
   workpad_comment: ProviderLinearWorkflowComment | null;
 }
+
+type ProviderLinearIssueSummary = Pick<
+  ProviderLinearIssueContext,
+  'id' | 'identifier' | 'workspace_id' | 'state' | 'team' | 'project'
+>;
 
 export type ProviderLinearIssueContextResult =
   | {
@@ -156,6 +377,43 @@ export type ProviderLinearAttachPrResult =
       error: ProviderLinearWorkflowError;
     };
 
+export interface ProviderLinearCreatedIssue {
+  id: string;
+  identifier: string;
+  title: string;
+  description: string | null;
+  url: string | null;
+  state: ProviderLinearWorkflowState | null;
+  team: {
+    id: string | null;
+    key: string | null;
+    name: string | null;
+  } | null;
+  project: {
+    id: string | null;
+    name: string | null;
+  } | null;
+}
+
+export type ProviderLinearCreateFollowUpResult =
+  | {
+      ok: true;
+      operation: 'create-follow-up';
+      action: 'created';
+      issue: Pick<ProviderLinearIssueContext, 'id' | 'identifier'>;
+      follow_up_issue: ProviderLinearCreatedIssue;
+      relations: {
+        related: true;
+        blocked_by_source: boolean;
+      };
+      source_setup: DispatchPilotSourceSetup | null;
+    }
+  | {
+      ok: false;
+      operation: 'create-follow-up';
+      error: ProviderLinearWorkflowError;
+    };
+
 interface LinearIssueContextQueryResponse {
   viewer?: {
     organization?: {
@@ -228,6 +486,39 @@ interface LinearIssueAttachmentsQueryResponse {
   } | null;
 }
 
+interface LinearIssueSummaryQueryResponse {
+  viewer?: {
+    organization?: {
+      id?: string | null;
+    } | null;
+  } | null;
+  issue?: {
+    id?: string | null;
+    identifier?: string | null;
+    state?: {
+      id?: string | null;
+      name?: string | null;
+      type?: string | null;
+    } | null;
+    team?: {
+      id?: string | null;
+      key?: string | null;
+      name?: string | null;
+      states?: {
+        nodes?: Array<{
+          id?: string | null;
+          name?: string | null;
+          type?: string | null;
+        }> | null;
+      } | null;
+    } | null;
+    project?: {
+      id?: string | null;
+      name?: string | null;
+    } | null;
+  } | null;
+}
+
 interface LinearConnectionPageInfo {
   hasNextPage?: boolean | null;
   endCursor?: string | null;
@@ -291,6 +582,43 @@ interface AttachmentMutationResponse {
       title?: string | null;
       url?: string | null;
       sourceType?: string | null;
+    } | null;
+  } | null;
+}
+
+interface IssueCreateMutationResponse {
+  issueCreate?: {
+    success?: boolean | null;
+    issue?: {
+      id?: string | null;
+      identifier?: string | null;
+      title?: string | null;
+      description?: string | null;
+      url?: string | null;
+      state?: {
+        id?: string | null;
+        name?: string | null;
+        type?: string | null;
+      } | null;
+      team?: {
+        id?: string | null;
+        key?: string | null;
+        name?: string | null;
+      } | null;
+      project?: {
+        id?: string | null;
+        name?: string | null;
+      } | null;
+    } | null;
+  } | null;
+}
+
+interface IssueRelationMutationResponse {
+  issueRelationCreate?: {
+    success?: boolean | null;
+    issueRelation?: {
+      id?: string | null;
+      type?: string | null;
     } | null;
   } | null;
 }
@@ -365,6 +693,16 @@ export async function upsertProviderLinearWorkpadComment(input: {
   const context = await readIssueContext(session.session, issueId);
   if (!context.ok) {
     return failure('upsert-workpad', context.error.code, context.error.message, context.error.status, context.error.details);
+  }
+  const workpadValidation = validateWorkpadBodyContract(body, context.issue.description);
+  if (!workpadValidation.ok) {
+    return failure(
+      'upsert-workpad',
+      workpadValidation.error.code,
+      workpadValidation.error.message,
+      workpadValidation.error.status,
+      workpadValidation.error.details
+    );
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
@@ -803,6 +1141,228 @@ export async function attachProviderLinearIssuePr(input: {
   };
 }
 
+export async function createProviderLinearFollowUpIssue(input: {
+  issueId: string;
+  title: string;
+  description: string;
+  acceptanceCriteria: string;
+  blockedBySource?: boolean;
+  sourceSetup?: DispatchPilotSourceSetup | null;
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+}): Promise<ProviderLinearCreateFollowUpResult> {
+  const issueId = normalizeRequiredString(input.issueId);
+  if (!issueId) {
+    return failure('create-follow-up', 'linear_issue_id_missing', 'Linear issue id is required.', 422);
+  }
+  const title = normalizeRequiredString(input.title);
+  if (!title) {
+    return failure('create-follow-up', 'linear_follow_up_title_missing', 'Follow-up issue title is required.', 422);
+  }
+  const description = normalizeRequiredString(input.description);
+  if (!description) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_description_missing',
+      'Follow-up issue description is required.',
+      422
+    );
+  }
+  const acceptanceCriteria = normalizeRequiredString(input.acceptanceCriteria);
+  if (!acceptanceCriteria) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_acceptance_criteria_missing',
+      'Follow-up issue acceptance criteria are required.',
+      422
+    );
+  }
+
+  const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
+  if (!session.ok) {
+    return failure(
+      'create-follow-up',
+      session.error.code,
+      session.error.message,
+      session.error.status,
+      session.error.details
+    );
+  }
+
+  const issueSummary = await readIssueSummary(session.session, issueId);
+  if (!issueSummary.ok) {
+    return failure(
+      'create-follow-up',
+      issueSummary.error.code,
+      issueSummary.error.message,
+      issueSummary.error.status,
+      issueSummary.error.details
+    );
+  }
+
+  const teamId = normalizeOptionalString(issueSummary.issue.team?.id);
+  if (!teamId) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_team_missing',
+      `Linear issue ${issueSummary.issue.identifier} is missing a team assignment.`,
+      422
+    );
+  }
+
+  const projectId = normalizeOptionalString(issueSummary.issue.project?.id);
+  if (!projectId) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_project_missing',
+      `Linear issue ${issueSummary.issue.identifier} is missing a project assignment; same-project follow-up creation requires one.`,
+      422
+    );
+  }
+
+  const backlogState = resolveWorkflowStateByName(issueSummary.issue.team?.states ?? [], 'Backlog');
+  if (!backlogState) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_backlog_state_missing',
+      `Linear team state "Backlog" was not found for issue ${issueSummary.issue.identifier}.`,
+      422
+    );
+  }
+
+  const createdIssueResult = await executeLinearGraphql<IssueCreateMutationResponse>({
+    token: session.session.token,
+    timeoutMs: session.session.timeoutMs,
+    fetchImpl: session.session.fetchImpl,
+    query: buildCreateFollowUpIssueMutation(),
+    variables: {
+      input: {
+        teamId,
+        projectId,
+        stateId: backlogState.id,
+        title,
+        description: buildFollowUpIssueDescription(description, acceptanceCriteria)
+      }
+    }
+  });
+  if (!createdIssueResult.ok) {
+    return failureFromGraphql('create-follow-up', createdIssueResult.failure);
+  }
+
+  const createdIssue = parseCreatedIssue(createdIssueResult.payload.data?.issueCreate?.issue ?? null);
+  if (createdIssueResult.payload.data?.issueCreate?.success !== true || !createdIssue) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_create_failed',
+      'Linear follow-up issue creation did not succeed.',
+      503
+    );
+  }
+
+  const relatedRelationResult = await executeLinearGraphql<IssueRelationMutationResponse>({
+    token: session.session.token,
+    timeoutMs: session.session.timeoutMs,
+    fetchImpl: session.session.fetchImpl,
+    query: buildCreateIssueRelationMutation(),
+    variables: {
+      input: {
+        type: 'related',
+        issueId: issueSummary.issue.id,
+        relatedIssueId: createdIssue.id
+      }
+    }
+  });
+  if (!relatedRelationResult.ok) {
+    const mapped = mapGraphqlFailure(relatedRelationResult.failure);
+    return failure(
+      'create-follow-up',
+      mapped.code,
+      mapped.message,
+      409,
+      {
+        ...(mapped.details ?? {}),
+        created_issue: createdIssue,
+        failed_relation_type: 'related'
+      },
+      false
+    );
+  }
+  if (relatedRelationResult.payload.data?.issueRelationCreate?.success !== true) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_relation_failed',
+      'Linear follow-up issue relation creation did not succeed.',
+      409,
+      {
+        created_issue: createdIssue,
+        failed_relation_type: 'related'
+      },
+      false
+    );
+  }
+
+  const blockedBySource = input.blockedBySource === true;
+  if (blockedBySource) {
+    const blockingRelationResult = await executeLinearGraphql<IssueRelationMutationResponse>({
+      token: session.session.token,
+      timeoutMs: session.session.timeoutMs,
+      fetchImpl: session.session.fetchImpl,
+      query: buildCreateIssueRelationMutation(),
+      variables: {
+        input: {
+          type: 'blocks',
+          issueId: issueSummary.issue.id,
+          relatedIssueId: createdIssue.id
+        }
+      }
+    });
+    if (!blockingRelationResult.ok) {
+      const mapped = mapGraphqlFailure(blockingRelationResult.failure);
+      return failure(
+        'create-follow-up',
+        mapped.code,
+        mapped.message,
+        409,
+        {
+          ...(mapped.details ?? {}),
+          created_issue: createdIssue,
+          failed_relation_type: 'blocks'
+        },
+        false
+      );
+    }
+    if (blockingRelationResult.payload.data?.issueRelationCreate?.success !== true) {
+      return failure(
+        'create-follow-up',
+        'linear_follow_up_relation_failed',
+        'Linear follow-up issue relation creation did not succeed.',
+        409,
+        {
+          created_issue: createdIssue,
+          failed_relation_type: 'blocks'
+        },
+        false
+      );
+    }
+  }
+
+  return {
+    ok: true,
+    operation: 'create-follow-up',
+    action: 'created',
+    issue: {
+      id: issueSummary.issue.id,
+      identifier: issueSummary.issue.identifier
+    },
+    follow_up_issue: createdIssue,
+    relations: {
+      related: true,
+      blocked_by_source: blockedBySource
+    },
+    source_setup: session.session.sourceSetup
+  };
+}
+
 function resolveLinearWorkflowSession(
   env: NodeJS.ProcessEnv | undefined,
   fetchImpl: typeof fetch | undefined,
@@ -837,6 +1397,66 @@ function resolveLinearWorkflowSession(
       fetchImpl: fetchImpl ?? fetch,
       sourceSetup: resolveWorkflowSourceSetup(sourceSetup, resolvedEnv)
     }
+  };
+}
+
+async function readIssueSummary(
+  session: ResolvedLinearWorkflowSession,
+  issueId: string
+):
+  Promise<
+    | {
+        ok: true;
+        issue: ProviderLinearIssueSummary;
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      }
+  > {
+  const result = await executeLinearGraphql<LinearIssueSummaryQueryResponse>({
+    token: session.token,
+    timeoutMs: session.timeoutMs,
+    fetchImpl: session.fetchImpl,
+    query: buildIssueSummaryQuery(),
+    variables: {
+      issueId
+    }
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: mapGraphqlFailure(result.failure)
+    };
+  }
+
+  const issueNode = result.payload.data?.issue ?? null;
+  if (!issueNode) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_issue_not_found',
+        message: `Linear issue "${issueId}" was not found.`,
+        status: 404
+      }
+    };
+  }
+
+  const parsedIssue = parseIssueSummary(
+    issueNode,
+    result.payload.data?.viewer?.organization?.id ?? null,
+    session.sourceSetup
+  );
+  if (!parsedIssue.ok) {
+    return {
+      ok: false,
+      error: parsedIssue.error
+    };
+  }
+
+  return {
+    ok: true,
+    issue: parsedIssue.issue
   };
 }
 
@@ -974,6 +1594,74 @@ async function readIssueContext(
   return {
     ok: true,
     issue: parsedIssue.issue
+  };
+}
+
+function parseIssueSummary(
+  issueNode: NonNullable<LinearIssueSummaryQueryResponse['issue']>,
+  workspaceId: string | null | undefined,
+  sourceSetup: DispatchPilotSourceSetup | null
+):
+  | {
+      ok: true;
+      issue: ProviderLinearIssueSummary;
+    }
+  | {
+      ok: false;
+      error: ProviderLinearWorkflowError;
+    } {
+  const id = normalizeRequiredString(issueNode.id);
+  const identifier = normalizeRequiredString(issueNode.identifier);
+  if (!id || !identifier) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_response_invalid',
+        message: 'Linear issue response was missing required fields.',
+        status: 503
+      }
+    };
+  }
+
+  const teamId = normalizeOptionalString(issueNode.team?.id);
+  const projectId = normalizeOptionalString(issueNode.project?.id);
+  const normalizedWorkspaceId = normalizeOptionalString(workspaceId);
+  if (sourceSetup?.workspace_id && sourceSetup.workspace_id !== normalizedWorkspaceId) {
+    return scopeMismatchError('workspace', sourceSetup.workspace_id, normalizedWorkspaceId);
+  }
+  if (sourceSetup?.team_id && sourceSetup.team_id !== teamId) {
+    return scopeMismatchError('team', sourceSetup.team_id, teamId);
+  }
+  if (sourceSetup?.project_id && sourceSetup.project_id !== projectId) {
+    return scopeMismatchError('project', sourceSetup.project_id, projectId);
+  }
+
+  return {
+    ok: true,
+    issue: {
+      id,
+      identifier,
+      workspace_id: normalizedWorkspaceId,
+      state: parseWorkflowState(issueNode.state ?? null),
+      team: issueNode.team
+        ? {
+            id: teamId,
+            key: normalizeOptionalString(issueNode.team.key),
+            name: normalizeOptionalString(issueNode.team.name),
+            states: Array.isArray(issueNode.team.states?.nodes)
+              ? issueNode.team.states.nodes
+                  .map((entry) => parseWorkflowState(entry))
+                  .filter((entry): entry is ProviderLinearWorkflowState => entry !== null)
+              : []
+          }
+        : null,
+      project: issueNode.project
+        ? {
+            id: projectId,
+            name: normalizeOptionalString(issueNode.project.name)
+          }
+        : null
+    }
   };
 }
 
@@ -1137,6 +1825,41 @@ function buildIssueContextQuery(): string {
   }`;
 }
 
+function buildIssueSummaryQuery(): string {
+  return `query ProviderLinearIssueSummary($issueId: String!) {
+    viewer {
+      organization {
+        id
+      }
+    }
+    issue(id: $issueId) {
+      id
+      identifier
+      state {
+        id
+        name
+        type
+      }
+      team {
+        id
+        key
+        name
+        states(first: ${LINEAR_WORKFLOW_STATE_LIMIT}) {
+          nodes {
+            id
+            name
+            type
+          }
+        }
+      }
+      project {
+        id
+        name
+      }
+    }
+  }`;
+}
+
 function buildIssueAttachmentPageQuery(): string {
   return `query ProviderLinearIssueAttachments($issueId: String!, $attachmentsAfter: String!) {
     issue(id: $issueId) {
@@ -1232,6 +1955,47 @@ function buildAttachUrlMutation(): string {
         title
         url
         sourceType
+      }
+    }
+  }`;
+}
+
+function buildCreateFollowUpIssueMutation(): string {
+  return `mutation ProviderLinearCreateFollowUpIssue($input: IssueCreateInput!) {
+    issueCreate(input: $input) {
+      success
+      issue {
+        id
+        identifier
+        title
+        description
+        url
+        state {
+          id
+          name
+          type
+        }
+        team {
+          id
+          key
+          name
+        }
+        project {
+          id
+          name
+        }
+      }
+    }
+  }`;
+}
+
+function buildCreateIssueRelationMutation(): string {
+  return `mutation ProviderLinearCreateIssueRelation($input: IssueRelationCreateInput!) {
+    issueRelationCreate(input: $input) {
+      success
+      issueRelation {
+        id
+        type
       }
     }
   }`;
@@ -1355,6 +2119,61 @@ function parseAttachment(
   };
 }
 
+function parseCreatedIssue(
+  value:
+    | {
+        id?: string | null;
+        identifier?: string | null;
+        title?: string | null;
+        description?: string | null;
+        url?: string | null;
+        state?: {
+          id?: string | null;
+          name?: string | null;
+          type?: string | null;
+        } | null;
+        team?: {
+          id?: string | null;
+          key?: string | null;
+          name?: string | null;
+        } | null;
+        project?: {
+          id?: string | null;
+          name?: string | null;
+        } | null;
+      }
+    | null
+): ProviderLinearCreatedIssue | null {
+  const id = normalizeRequiredString(value?.id);
+  const identifier = normalizeRequiredString(value?.identifier);
+  const title = normalizeRequiredString(value?.title);
+  if (!id || !identifier || !title) {
+    return null;
+  }
+
+  return {
+    id,
+    identifier,
+    title,
+    description: normalizeOptionalString(value?.description),
+    url: normalizeOptionalString(value?.url),
+    state: parseWorkflowState(value?.state ?? null),
+    team: value?.team
+      ? {
+          id: normalizeOptionalString(value.team.id),
+          key: normalizeOptionalString(value.team.key),
+          name: normalizeOptionalString(value.team.name)
+        }
+      : null,
+    project: value?.project
+      ? {
+          id: normalizeOptionalString(value.project.id),
+          name: normalizeOptionalString(value.project.name)
+        }
+      : null
+  };
+}
+
 function findWorkpadComment(
   comments: readonly ProviderLinearWorkflowComment[]
 ): ProviderLinearWorkflowComment | null {
@@ -1379,7 +2198,895 @@ function findUnresolvedWorkpadComments(
 }
 
 function hasWorkpadMarker(body: string): boolean {
-  return /(^|\n)##\s+Codex Workpad\b/u.test(body);
+  let activeCodeFenceDelimiter: string | null = null;
+  for (const line of body.split(/\r?\n/u)) {
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      continue;
+    }
+    if (!activeCodeFenceDelimiter && /^##\s+Codex Workpad\b/u.test(line)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function validateWorkpadBodyContract(
+  body: string,
+  issueDescription: string | null
+):
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      error: ProviderLinearWorkflowError;
+    } {
+  const firstVisibleLine = body.split(/\r?\n/u).find((line) => normalizeRequiredString(line) !== null) ?? '';
+  if (!isCanonicalWorkpadMarkerLine(firstVisibleLine)) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_structure_invalid',
+        message: `Workpad body must start with "${LINEAR_WORKPAD_MARKER}".`,
+        status: 422
+      }
+    };
+  }
+
+  const { sections, hasLeadingContentBeforeFirstSection } = parseWorkpadSections(body);
+  if (hasLeadingContentBeforeFirstSection) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_structure_invalid',
+        message: `Workpad body must contain these H3 sections in order after "${LINEAR_WORKPAD_MARKER}": ${LINEAR_WORKPAD_REQUIRED_SECTIONS.join(', ')}.`,
+        status: 422,
+        details: {
+          required_sections: [...LINEAR_WORKPAD_REQUIRED_SECTIONS],
+          actual_sections: sections.map((section) => section.title),
+          leading_content_before_first_section: true
+        }
+      }
+    };
+  }
+  const canonicalStructureMatches =
+    sections.length === LINEAR_WORKPAD_REQUIRED_SECTIONS.length &&
+    sections.every(
+      (section, index) =>
+        normalizeComparableValue(section.title) ===
+        normalizeComparableValue(LINEAR_WORKPAD_REQUIRED_SECTIONS[index])
+    );
+  if (!canonicalStructureMatches) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_structure_invalid',
+        message: `Workpad body must contain these H3 sections in order after "${LINEAR_WORKPAD_MARKER}": ${LINEAR_WORKPAD_REQUIRED_SECTIONS.join(', ')}.`,
+        status: 422,
+        details: {
+          required_sections: [...LINEAR_WORKPAD_REQUIRED_SECTIONS],
+          actual_sections: sections.map((section) => section.title)
+        }
+      }
+    };
+  }
+
+  const emptySections = sections
+    .filter((section) => normalizeRequiredString(section.body) === null)
+    .map((section) => section.title);
+  if (emptySections.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_section_empty',
+        message: 'Workpad core sections must be non-empty.',
+        status: 422,
+        details: {
+          empty_sections: emptySections
+        }
+      }
+    };
+  }
+
+  const ticketValidationRequirements = extractIssueValidationRequirements(issueDescription);
+  if (ticketValidationRequirements.length === 0) {
+    return { ok: true };
+  }
+
+  const mirroredValidationText = normalizeRequirementValue(
+    `${sections[2]?.body ?? ''}\n${sections[3]?.body ?? ''}`
+  );
+  const missingRequirements = ticketValidationRequirements.filter(
+    (requirement) => !containsNormalizedRequirement(mirroredValidationText, requirement.normalized)
+  );
+  if (missingRequirements.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_validation_requirements_missing',
+        message:
+          'Workpad must mirror ticket-provided Validation, Test Plan, or Testing requirements in the Acceptance Criteria or Validation sections.',
+        status: 422,
+        details: {
+          missing_requirements: missingRequirements.map((requirement) => requirement.raw),
+          source_sections: [...new Set(missingRequirements.map((requirement) => requirement.source_section))]
+        }
+      }
+    };
+  }
+
+  return { ok: true };
+}
+
+function isCanonicalWorkpadMarkerLine(line: string): boolean {
+  const headingMatch = line.match(/^\s*##\s+(.+?)\s*$/u);
+  if (!headingMatch) {
+    return false;
+  }
+  const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
+  return normalizeComparableValue(headingTitle) === normalizeComparableValue(LINEAR_WORKPAD_MARKER_TITLE);
+}
+
+function parseWorkpadSections(body: string): {
+  sections: ProviderLinearWorkpadSection[];
+  hasLeadingContentBeforeFirstSection: boolean;
+} {
+  const sections: ProviderLinearWorkpadSection[] = [];
+  let markerSeen = false;
+  let activeCodeFenceDelimiter: string | null = null;
+  let currentTitle: string | null = null;
+  let currentLines: string[] = [];
+  let hasLeadingContentBeforeFirstSection = false;
+
+  const flushCurrent = () => {
+    if (!currentTitle) {
+      return;
+    }
+    sections.push({
+      title: currentTitle,
+      body: currentLines.join('\n').trim()
+    });
+  };
+
+  for (const line of body.split(/\r?\n/u)) {
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    if (codeFenceTransition.isBoundary) {
+      if (markerSeen && !currentTitle) {
+        hasLeadingContentBeforeFirstSection = true;
+      } else if (markerSeen && currentTitle) {
+        currentLines.push(line);
+      }
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      continue;
+    }
+    if (!markerSeen) {
+      if (!activeCodeFenceDelimiter && /^##\s+Codex Workpad\b/u.test(line)) {
+        markerSeen = true;
+      }
+      continue;
+    }
+    if (activeCodeFenceDelimiter) {
+      if (!currentTitle && normalizeRequiredString(line) !== null) {
+        hasLeadingContentBeforeFirstSection = true;
+      } else if (currentTitle) {
+        currentLines.push(line);
+      }
+      continue;
+    }
+    const headingMatch = line.match(/^\s*###\s+(.+?)\s*$/u);
+    if (headingMatch) {
+      flushCurrent();
+      const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
+      currentTitle = normalizeRequiredString(headingTitle) ?? headingTitle;
+      currentLines = [];
+      continue;
+    }
+    if (!currentTitle && normalizeRequiredString(line) !== null) {
+      hasLeadingContentBeforeFirstSection = true;
+    } else if (currentTitle) {
+      currentLines.push(line);
+    }
+  }
+  flushCurrent();
+
+  return {
+    sections,
+    hasLeadingContentBeforeFirstSection
+  };
+}
+
+function extractIssueValidationRequirements(
+  description: string | null
+): ProviderLinearIssueValidationRequirement[] {
+  if (!description) {
+    return [];
+  }
+
+  const requirements: ProviderLinearIssueValidationRequirement[] = [];
+  let activeSection: string | null = null;
+  let previousNonEmptyLine: string | null = null;
+  let activeCodeFenceDelimiter: string | null = null;
+  const lines = description.split(/\r?\n/u);
+  for (const [index, line] of lines.entries()) {
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      continue;
+    }
+    if (activeCodeFenceDelimiter) {
+      continue;
+    }
+    const nextLine = lines[index + 1] ?? null;
+    const previousLine = lines[index - 1] ?? null;
+    const nextVisibleLines = getNextVisibleIssueLines(lines, index + 1, 2);
+    const headingContentLines = getNextVisibleIssueLines(
+      lines,
+      isSetextUnderlineLine(nextLine ?? '') ? index + 2 : index + 1,
+      2
+    );
+    const heading = parseIssueDescriptionSectionHeading(
+      line,
+      previousNonEmptyLine,
+      nextLine,
+      previousLine,
+      nextVisibleLines[0] ?? null
+    );
+    if (heading) {
+      if (matchesIssueValidationSectionTitle(heading)) {
+        activeSection = heading;
+      } else if (
+        activeSection &&
+        shouldPreserveValidationSectionAcrossNestedHeading(
+          line,
+          headingContentLines[0] ?? null,
+          headingContentLines[1] ?? null
+        )
+      ) {
+        // Preserve the surrounding validation section for nested markdown buckets like
+        // "### Automated" when they still introduce validation lists.
+      } else {
+        activeSection = null;
+      }
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    if (!activeSection) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    if (
+      isListIntroductionLine(line, nextVisibleLines[0] ?? null) ||
+      isStyledListIntroductionLine(line, nextVisibleLines[0] ?? null)
+    ) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    const rawRequirement = stripRequirementPrefix(line);
+    if (!rawRequirement) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    const normalizedRequirement = normalizeRequirementValue(rawRequirement);
+    if (!normalizedRequirement) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    if (requirements.some((entry) => entry.normalized === normalizedRequirement)) {
+      if (line.trim().length > 0) {
+        previousNonEmptyLine = line;
+      }
+      continue;
+    }
+    requirements.push({
+      raw: rawRequirement,
+      normalized: normalizedRequirement,
+      source_section: activeSection
+    });
+    if (line.trim().length > 0) {
+      previousNonEmptyLine = line;
+    }
+  }
+
+  return requirements;
+}
+
+function parseIssueDescriptionSectionHeading(
+  line: string,
+  previousNonEmptyLine: string | null = null,
+  nextLine: string | null = null,
+  previousLine: string | null = null,
+  nextVisibleLine: string | null = null
+): string | null {
+  const trimmed = line.trim();
+  if (
+    !trimmed ||
+    /^[-*+]\s/u.test(trimmed) ||
+    /^\d+\.\s/u.test(trimmed) ||
+    isSetextUnderlineLine(trimmed)
+  ) {
+    return null;
+  }
+
+  let candidate = trimmed;
+  let isMarkdownHeading = false;
+  const boldWrappedMatch = candidate.match(/^\*\*(.+)\*\*:?\s*$/u);
+  const underlineWrappedMatch = candidate.match(/^__(.+)__:?\s*$/u);
+  const hadStyledWrapper = Boolean(boldWrappedMatch || underlineWrappedMatch);
+  const markdownHeadingMatch = candidate.match(/^#{1,6}\s+(.+?)\s*$/u);
+  if (markdownHeadingMatch) {
+    candidate = markdownHeadingMatch[1];
+    isMarkdownHeading = true;
+  }
+  candidate = candidate.replace(/^\*\*(.+)\*\*:?\s*$/u, '$1');
+  candidate = candidate.replace(/^__(.+)__:?\s*$/u, '$1');
+  candidate = candidate.replace(/:\s*$/u, '').trim();
+  if (!candidate) {
+    return null;
+  }
+
+  if (matchesDecoratedSectionTitle(candidate, LINEAR_ISSUE_PLAIN_SECTION_TITLES)) {
+    return candidate;
+  }
+  if (isMarkdownHeading) {
+    return candidate;
+  }
+  if (isSetextUnderlineLine(nextLine ?? '')) {
+    return matchesIssueValidationSectionTitle(candidate) ||
+      looksLikeActualSetextSectionHeadingCandidate(candidate)
+      ? candidate
+      : null;
+  }
+  const previousTrimmed = previousLine?.trim() ?? '';
+  const nextTrimmed = nextLine?.trim() ?? '';
+  if (hadStyledWrapper) {
+    if (isStyledListIntroductionLine(line, nextVisibleLine ?? nextLine, candidate)) {
+      return null;
+    }
+    return isListLikeLine(previousNonEmptyLine) ||
+      isListLikeLine(nextTrimmed) ||
+      (!previousTrimmed && Boolean(nextTrimmed))
+      ? candidate
+      : null;
+  }
+  if (!looksLikePlainSectionHeadingCandidate(candidate)) {
+    return null;
+  }
+  return isListLikeLine(previousNonEmptyLine) ||
+    isListLikeLine(nextTrimmed) ||
+    (!previousTrimmed && Boolean(nextTrimmed))
+    ? candidate
+    : null;
+}
+
+function looksLikePlainSectionHeadingCandidate(candidate: string): boolean {
+  const coreCandidate = trimBoundarySymbolDecorationTokens(candidate);
+  if (!coreCandidate) {
+    return false;
+  }
+  if (!/^[\p{L}][\p{L}\p{M}\p{N} /&()'’\-–—]{0,79}$/u.test(coreCandidate)) {
+    return false;
+  }
+  const words = coreCandidate.split(/\s+/u).filter(Boolean);
+  if (words.length === 0 || words.length > 8) {
+    return false;
+  }
+  return words.every((word, index) => {
+    const bareWord = word.replace(/^[("'(]+|[)"')]+$/gu, '');
+    if (!bareWord) {
+      return true;
+    }
+    if (/^[&/\-–—]$/u.test(bareWord)) {
+      return true;
+    }
+    if (/^[\p{Lu}\p{Lt}\p{Lo}\p{Lm}\p{Nl}\p{Nd}][\p{L}\p{M}\p{N}/&'’\-–—]*$/u.test(bareWord)) {
+      return true;
+    }
+    return index > 0 && LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS.has(bareWord.toLowerCase());
+  });
+}
+
+function looksLikeSetextSectionHeadingCandidate(candidate: string): boolean {
+  if (looksLikePlainSectionHeadingCandidate(candidate)) {
+    return true;
+  }
+  if (/[.:;!?]\s*$/u.test(candidate)) {
+    return false;
+  }
+  const symbolTrimmedCandidate = candidate
+    .replace(/[^\p{L}\p{N}\s/&()'-]+/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!symbolTrimmedCandidate || symbolTrimmedCandidate === candidate) {
+    return false;
+  }
+  return looksLikePlainSectionHeadingCandidate(symbolTrimmedCandidate);
+}
+
+function looksLikeActualSetextSectionHeadingCandidate(candidate: string): boolean {
+  if (looksLikeSetextSectionHeadingCandidate(candidate)) {
+    return true;
+  }
+  if (/[.:;!?]\s*$/u.test(candidate)) {
+    return false;
+  }
+  if (looksLikeLowercaseSetextSectionHeadingCandidate(candidate)) {
+    return true;
+  }
+  const symbolTrimmedCandidate = candidate
+    .replace(/[^\p{L}\p{N}\s/&()'-]+/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!symbolTrimmedCandidate || symbolTrimmedCandidate === candidate) {
+    return false;
+  }
+  return looksLikeLowercaseSetextSectionHeadingCandidate(symbolTrimmedCandidate);
+}
+
+function looksLikeLowercaseSetextSectionHeadingCandidate(candidate: string): boolean {
+  const coreCandidate = trimBoundarySymbolDecorationTokens(candidate);
+  if (!coreCandidate) {
+    return false;
+  }
+  if (!/^[\p{Ll}][\p{L}\p{M}\p{N} /&()'’\-–—]{0,79}$/u.test(coreCandidate)) {
+    return false;
+  }
+  const normalizedCoreCandidate = normalizeComparableValue(coreCandidate);
+  if (
+    LINEAR_ISSUE_PLAIN_SECTION_TITLES.has(normalizedCoreCandidate) ||
+    LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(normalizedCoreCandidate)
+  ) {
+    return true;
+  }
+  const words = coreCandidate.split(/\s+/u).filter(Boolean);
+  if (words.length === 0 || words.length > 5) {
+    return false;
+  }
+  const strippedWords = words.map((word) => word.replace(/^[("'(]+|[)"')]+$/gu, ''));
+  const significantWords = strippedWords
+    .filter(
+      (word) =>
+        word.length > 0 &&
+        !/^[&/\-–—]$/u.test(word) &&
+        !LINEAR_ISSUE_PLAIN_SECTION_CONNECTOR_WORDS.has(word.toLowerCase())
+    );
+  if (significantWords.length === 0) {
+    return false;
+  }
+  const firstSignificantWord = significantWords[0].toLowerCase();
+  const secondWord = strippedWords[1] ?? null;
+  const secondSignificantWord = significantWords[1]?.toLowerCase() ?? null;
+  if (LINEAR_ISSUE_LOWERCASE_SETEXT_LEADING_VERBS.has(firstSignificantWord)) {
+    return false;
+  }
+  const secondSignificantWordLooksCommandLike =
+    secondSignificantWord !== null &&
+    (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS.has(secondSignificantWord) ||
+      /[/\\]/u.test(significantWords[1]));
+  if (
+    secondSignificantWordLooksCommandLike &&
+    LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_ENTRYPOINTS.has(firstSignificantWord)
+  ) {
+    return false;
+  }
+  const secondWordLooksCommandLike =
+    secondWord !== null &&
+    (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS.has(secondWord.toLowerCase()) ||
+      /[/\\]/u.test(secondWord));
+  const thirdWord = strippedWords[2] ?? null;
+  const thirdWordLooksCommandArgument =
+    thirdWord !== null &&
+    (/^[.~-]/u.test(thirdWord) || /[/\\=:]/u.test(thirdWord) || /\.\w/u.test(thirdWord));
+  if (
+    secondWord !== null &&
+    LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_ENTRYPOINTS.has(firstSignificantWord)
+  ) {
+    const normalizedSecondWord = secondWord.toLowerCase();
+    if (
+      LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_SUBCOMMANDS.has(normalizedSecondWord) ||
+      (/[/\\]/u.test(secondWord) && secondWordLooksCommandLike) ||
+      (LINEAR_ISSUE_LOWERCASE_SETEXT_COMMAND_SUBCOMMANDS.has(normalizedSecondWord) &&
+        thirdWordLooksCommandArgument)
+    ) {
+      return false;
+    }
+  }
+  return words.every((word) => {
+    const bareWord = word.replace(/^[("'(]+|[)"')]+$/gu, '');
+    if (!bareWord) {
+      return true;
+    }
+    if (/^[&/\-–—]$/u.test(bareWord)) {
+      return true;
+    }
+    return /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}/&'’\-–—]*$/u.test(bareWord);
+  });
+}
+
+function matchesIssueValidationSectionTitle(title: string): boolean {
+  if (matchesDecoratedSectionTitle(title, LINEAR_ISSUE_VALIDATION_SECTION_TITLES)) {
+    return true;
+  }
+
+  if (!looksLikePlainSectionHeadingCandidate(title) && !looksLikeSetextSectionHeadingCandidate(title)) {
+    return false;
+  }
+
+  const normalizedTitle = normalizeComparableValue(trimBoundarySymbolDecorationTokens(title));
+  return [...LINEAR_ISSUE_VALIDATION_SECTION_TITLES].some((allowedTitle) => {
+    if (!normalizedTitle.startsWith(allowedTitle)) {
+      return false;
+    }
+    const suffix = normalizedTitle.slice(allowedTitle.length).trimStart();
+    return Boolean(suffix) && !/^[\p{L}\p{N}]/u.test(suffix);
+  });
+}
+
+function stripRequirementPrefix(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed || isCodeFenceLine(trimmed) || isSetextUnderlineLine(trimmed)) {
+    return null;
+  }
+
+  const withoutPrefix = trimmed
+    .replace(/^[-*+]\s+\[[ xX]\]\s+/u, '')
+    .replace(/^\d+[.)]\s+\[[ xX]\]\s+/u, '')
+    .replace(/^\[[ xX]\]\s+/u, '')
+    .replace(/^[-*+]\s+/u, '')
+    .replace(/^\d+[.)]\s+/u, '')
+    .trim();
+  return withoutPrefix.length > 0 ? withoutPrefix : null;
+}
+
+function normalizeRequirementValue(value: string): string {
+  return value
+    .replace(/\[([^\]]+)\]\([^)]+\)/gu, '$1')
+    .replace(/[`*_>#]/gu, ' ')
+    .replace(/[.,:;!?]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function isCodeFenceLine(line: string): boolean {
+  return parseCodeFenceLine(line) !== null;
+}
+
+function isMarkdownHeadingLine(line: string): boolean {
+  return /^\s*#{1,6}\s+\S/u.test(line);
+}
+
+function isListLikeLine(line: string | null): boolean {
+  const trimmed = line?.trim() ?? '';
+  return /^[-*+]\s/u.test(trimmed) || /^\d+[.)]\s/u.test(trimmed) || /^\[[ xX]\]\s/u.test(trimmed);
+}
+
+function isListIntroductionLine(line: string, nextLine: string | null): boolean {
+  const trimmed = line.trim();
+  return Boolean(trimmed) && /:\s*$/u.test(trimmed) && isListLikeLine(nextLine);
+}
+
+function isStyledListIntroductionLine(
+  line: string,
+  nextLine: string | null,
+  parsedCandidate: string | null = null
+): boolean {
+  if (!isListLikeLine(nextLine)) {
+    return false;
+  }
+  const trimmed = line.trim();
+  const styledMatch = trimmed.match(/^\*\*(.+)\*\*\s*$/u) ?? trimmed.match(/^__(.+)__\s*$/u);
+  if (!styledMatch) {
+    return false;
+  }
+  const wrappedContent = styledMatch[1].trim();
+  if (!/:\s*$/u.test(wrappedContent)) {
+    return false;
+  }
+  const candidate = (parsedCandidate ?? wrappedContent.replace(/:\s*$/u, '').trim()).trim();
+  return (
+    Boolean(candidate) &&
+    !matchesIssueValidationSectionTitle(candidate) &&
+    (looksLikeStyledListIntroductionLabel(candidate) ||
+      (!looksLikePlainSectionHeadingCandidate(candidate) && !looksLikeSetextSectionHeadingCandidate(candidate)))
+  );
+}
+
+function looksLikeStyledListIntroductionLabel(candidate: string): boolean {
+  const normalizedCandidate = normalizeComparableValue(candidate);
+  if (!normalizedCandidate) {
+    return false;
+  }
+  const words = normalizedCandidate.split(/\s+/u).filter(Boolean);
+  if (words.length < 2 || words.length > 5) {
+    return false;
+  }
+  const firstWord = words[0];
+  const lastWord = words[words.length - 1];
+  return (
+    ['run', 'follow', 'perform', 'verify', 'check', 'use', 'execute', 'capture', 'complete'].includes(
+      firstWord
+    ) && ['commands', 'checks', 'steps', 'tasks', 'items'].includes(lastWord)
+  );
+}
+
+function getNextVisibleIssueLines(lines: string[], startIndex: number, count: number): string[] {
+  if (count <= 0) {
+    return [];
+  }
+  const visibleLines: string[] = [];
+  let activeCodeFenceDelimiter: string | null = null;
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = lines[index];
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      continue;
+    }
+    if (activeCodeFenceDelimiter) {
+      continue;
+    }
+    if (normalizeRequiredString(line) === null) {
+      continue;
+    }
+    visibleLines.push(line);
+    if (visibleLines.length >= count) {
+      break;
+    }
+  }
+  return visibleLines;
+}
+
+function shouldPreserveValidationSectionAcrossNestedHeading(
+  line: string,
+  nextLine: string | null,
+  followingLine: string | null
+): boolean {
+  const headingTitle = normalizeNestedValidationBucketTitle(line);
+  const preservesValidationContext =
+    headingTitle !== null &&
+    (matchesCompoundValidationNestedSectionTitle(headingTitle) ||
+      matchesIssueValidationSectionTitle(headingTitle));
+  return (
+    preservesValidationContext &&
+    (isListLikeLine(nextLine) ||
+      (nextLine !== null && isListIntroductionLine(nextLine, followingLine)) ||
+      (preservesValidationContext &&
+        nextLine !== null &&
+        !isCodeFenceLine(nextLine) &&
+        !isMarkdownHeadingLine(nextLine) &&
+        !isSetextUnderlineLine(nextLine)))
+  );
+}
+
+function matchesCompoundValidationNestedSectionTitle(normalizedTitle: string): boolean {
+  const tokens = normalizedTitle.split(/\s+/u).filter(Boolean);
+  if (tokens.length === 0) {
+    return false;
+  }
+  let coreTokenCount = tokens.length;
+  while (
+    coreTokenCount > 0 &&
+    (isStandaloneSymbolDecorationToken(tokens[coreTokenCount - 1]) ||
+      isParentheticalSectionQualifierToken(tokens[coreTokenCount - 1]))
+  ) {
+    coreTokenCount -= 1;
+  }
+  let startTokenIndex = 0;
+  while (
+    startTokenIndex < coreTokenCount &&
+    (isStandaloneSymbolDecorationToken(tokens[startTokenIndex]) ||
+      isParentheticalSectionQualifierToken(tokens[startTokenIndex]))
+  ) {
+    startTokenIndex += 1;
+  }
+  const coreTokens = tokens.slice(startTokenIndex, coreTokenCount);
+  if (coreTokens.length === 0) {
+    return false;
+  }
+  const normalizedCoreTitle = coreTokens.join(' ');
+  if (LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES.has(normalizedCoreTitle)) {
+    return true;
+  }
+  if (coreTokens.length <= 1) {
+    return false;
+  }
+  const titleWords = [...LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES]
+    .map((title) => title.split(/\s+/u))
+    .sort((left, right) => right.length - left.length);
+  const memo = new Map<number, boolean>();
+  const canMatchFrom = (index: number): boolean => {
+    if (index === coreTokens.length) {
+      return true;
+    }
+    if (memo.has(index)) {
+      return memo.get(index) ?? false;
+    }
+    const matched = titleWords.some((allowedWords) => {
+      if (allowedWords.length === 0 || index + allowedWords.length > coreTokens.length) {
+        return false;
+      }
+      return (
+        allowedWords.every((allowedWord, offset) => coreTokens[index + offset] === allowedWord) &&
+        canMatchFrom(index + allowedWords.length)
+      );
+    });
+    memo.set(index, matched);
+    return matched;
+  };
+  return canMatchFrom(0);
+}
+
+function normalizeNestedValidationBucketTitle(line: string): string | null {
+  let candidate = line.trim();
+  if (!candidate) {
+    return null;
+  }
+  const markdownHeadingMatch = candidate.match(/^#{1,6}\s+(.+?)\s*$/u);
+  if (markdownHeadingMatch) {
+    candidate = markdownHeadingMatch[1];
+  }
+  candidate = candidate.replace(/^\*\*(.+)\*\*:?\s*$/u, '$1');
+  candidate = candidate.replace(/^__(.+)__:?\s*$/u, '$1');
+  candidate = candidate.replace(/\s+#+\s*$/u, '');
+  candidate = candidate.replace(/:\s*$/u, '').trim();
+  return candidate ? normalizeComparableValue(candidate) : null;
+}
+
+function matchesDecoratedSectionTitle(title: string, allowedTitles: Set<string>): boolean {
+  const normalizedTitle = normalizeComparableValue(trimBoundarySymbolDecorationTokens(title));
+  if (!normalizedTitle) {
+    return false;
+  }
+  if (allowedTitles.has(normalizedTitle)) {
+    return true;
+  }
+
+  for (const allowedTitle of allowedTitles) {
+    if (!normalizedTitle.startsWith(allowedTitle)) {
+      continue;
+    }
+    const suffix = normalizedTitle.slice(allowedTitle.length).trimStart();
+    if (!suffix || matchesDecoratedSectionQualifierSuffix(suffix)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function trimBoundarySymbolDecorationTokens(candidate: string): string {
+  const tokens = candidate.trim().split(/\s+/u).filter(Boolean);
+  while (tokens.length > 0 && isStandaloneSymbolDecorationToken(tokens[0])) {
+    tokens.shift();
+  }
+  while (tokens.length > 0 && isStandaloneSymbolDecorationToken(tokens[tokens.length - 1])) {
+    tokens.pop();
+  }
+  return tokens.join(' ');
+}
+
+function matchesDecoratedSectionQualifierSuffix(suffix: string): boolean {
+  const tokens = suffix.split(/\s+/u).filter(Boolean);
+  return (
+    tokens.length > 0 &&
+    tokens.every(
+      (token) => isStandaloneSymbolDecorationToken(token) || isParentheticalSectionQualifierToken(token)
+    )
+  );
+}
+
+function isStandaloneSymbolDecorationToken(token: string): boolean {
+  return !/[\p{L}\p{N}]/u.test(token);
+}
+
+function isParentheticalSectionQualifierToken(token: string): boolean {
+  return /^\((?:[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}'’/\-–—]*)(?: [\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}'’/\-–—]*){0,2}\)$/u.test(
+    token
+  );
+}
+
+function parseCodeFenceLine(line: string): {
+  delimiter: string;
+  trailingText: string;
+} | null {
+  const trimmedLine = line.trimStart();
+  const match = trimmedLine.match(/^(`{3,}|~{3,})(.*)$/u);
+  if (!match) {
+    return null;
+  }
+  return {
+    delimiter: match[1],
+    trailingText: match[2] ?? ''
+  };
+}
+
+function isClosingCodeFenceLine(
+  activeDelimiter: string,
+  codeFenceLine: {
+    delimiter: string;
+    trailingText: string;
+  }
+): boolean {
+  return (
+    codeFenceLine.delimiter[0] === activeDelimiter[0] &&
+    codeFenceLine.delimiter.length >= activeDelimiter.length &&
+    codeFenceLine.trailingText.trim().length === 0
+  );
+}
+
+function getCodeFenceTransition(
+  activeDelimiter: string | null,
+  line: string
+): {
+  isBoundary: boolean;
+  nextDelimiter: string | null;
+} {
+  const codeFenceLine = parseCodeFenceLine(line);
+  if (!codeFenceLine) {
+    return {
+      isBoundary: false,
+      nextDelimiter: activeDelimiter
+    };
+  }
+  if (activeDelimiter === null) {
+    return {
+      isBoundary: true,
+      nextDelimiter: codeFenceLine.delimiter
+    };
+  }
+  if (isClosingCodeFenceLine(activeDelimiter, codeFenceLine)) {
+    return {
+      isBoundary: true,
+      nextDelimiter: null
+    };
+  }
+  return {
+    isBoundary: false,
+    nextDelimiter: activeDelimiter
+  };
+}
+
+function containsNormalizedRequirement(haystack: string, needle: string): boolean {
+  if (!needle) {
+    return true;
+  }
+  const haystackTokens = haystack.split(/\s+/u).filter(Boolean);
+  const needleTokens = needle.split(/\s+/u).filter(Boolean);
+  if (needleTokens.length === 0) {
+    return true;
+  }
+  if (haystackTokens.length < needleTokens.length) {
+    return false;
+  }
+  for (let index = 0; index <= haystackTokens.length - needleTokens.length; index += 1) {
+    let matched = true;
+    for (let offset = 0; offset < needleTokens.length; offset += 1) {
+      if (haystackTokens[index + offset] !== needleTokens[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isSetextUnderlineLine(line: string): boolean {
+  return /^[-=]{3,}\s*$/u.test(line.trim());
 }
 
 function resolveWorkflowStateByName(
@@ -1411,7 +3118,8 @@ function failure<T extends ProviderLinearOperation>(
   code: string,
   message: string,
   status: number,
-  details?: Record<string, unknown>
+  details?: Record<string, unknown>,
+  retryable?: boolean
 ): ProviderLinearOperationFailure<T> {
   return {
     ok: false,
@@ -1420,6 +3128,7 @@ function failure<T extends ProviderLinearOperation>(
       code,
       message,
       status,
+      ...(typeof retryable === 'boolean' ? { retryable } : {}),
       ...(details ? { details } : {})
     }
   };
@@ -1577,6 +3286,16 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
   return normalizeRequiredString(value);
 }
 
+function buildFollowUpIssueDescription(description: string, acceptanceCriteria: string): string {
+  const normalizedDescription = description.trim();
+  const normalizedAcceptanceCriteria = acceptanceCriteria.trim();
+  const acceptanceSection =
+    /^#{1,6}\s+Acceptance Criteria\b/imu.test(normalizedAcceptanceCriteria)
+      ? normalizedAcceptanceCriteria
+      : `## Acceptance Criteria\n${normalizedAcceptanceCriteria}`;
+  return `${normalizedDescription}\n\n${acceptanceSection}`;
+}
+
 function normalizeIso(value: string | null | undefined): string | null {
   const normalized = normalizeOptionalString(value);
   if (!normalized) {
@@ -1590,7 +3309,7 @@ function normalizeIso(value: string | null | undefined): string | null {
 }
 
 function normalizeComparableValue(value: string): string {
-  return value.trim().toLowerCase();
+  return value.trim().replace(/\s+/gu, ' ').toLowerCase();
 }
 
 function normalizeGraphqlFailureStatus(status: number | null | undefined): number {

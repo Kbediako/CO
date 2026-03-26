@@ -1,11 +1,24 @@
 import { spawn, type StdioOptions } from 'node:child_process';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
+import {
+  computeEffectiveDelegationConfig,
+  loadDelegationConfigFiles,
+  parseDelegationConfigOverride,
+  splitDelegationConfigOverrides,
+  type DelegationConfigLayer
+} from './config/delegationConfig.js';
+import {
+  PROVIDER_CONTROL_HOST_RUN_ID_ENV,
+  PROVIDER_CONTROL_HOST_TASK_ID_ENV,
+  readProviderControlHostLocatorFromEnv,
+  readProviderControlHostLocatorFromManifest
+} from '../../../scripts/lib/provider-run-contract.js';
 import {
   hasLinearSourceBinding,
   resolveLinearSourceSetup,
@@ -21,6 +34,10 @@ import {
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
+import {
+  PROVIDER_WORKSPACE_ROOT_DIRNAME,
+  resolveProviderWorkspacePath
+} from './run/workspacePath.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import {
   createRuntimeCodexCommandContext,
@@ -29,18 +46,25 @@ import {
   resolveRuntimeCodexCommand,
   type RuntimeCodexCommandContext
 } from './runtime/index.js';
+import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
+import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-worker-child-streams.json';
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
+const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
+const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
+const CSRF_HEADER = 'x-csrf-token';
+const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
 };
 
 export interface ProviderLinearWorkerContext {
+  manifest: Record<string, unknown>;
   manifestPath: string;
   runDir: string;
   repoRoot: string;
@@ -127,6 +151,17 @@ export interface ProviderLinearWorkerExecResult {
   exitCode: number | null;
   stdout: string;
   stderr: string;
+}
+
+interface ProviderWorkerRunLocation {
+  canonicalRunsRoot: string;
+  taskId: string;
+  runId: string;
+}
+
+interface ProviderControlHostManifestTarget {
+  currentRun: ProviderWorkerRunLocation;
+  manifestPath: string;
 }
 
 export interface ProviderLinearWorkerDependencies {
@@ -371,6 +406,7 @@ export async function loadProviderLinearWorkerContext(
       !manifestProviderControlHostRunId ||
       envProviderControlHostRunId === manifestProviderControlHostRunId);
   return {
+    manifest,
     manifestPath,
     runDir: dirname(manifestPath),
     repoRoot,
@@ -437,6 +473,17 @@ function buildBlockersSection(issue: LiveLinearTrackedIssue): string[] {
   ];
 }
 
+function buildPreReviewHandoffGateSection(): string[] {
+  return [
+    '- Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff before opening a new PR for review handoff, before updating an already-attached PR for handoff, and before transitioning the issue to `Human Review` or `In Review`.',
+    '- Use the repo heuristic for non-trivial work: about 2+ changed files or about 40+ changed lines, unless you record an explicit skip justification in the workpad.',
+    '- Run the standalone review first. When manifest-backed evidence matters, use the wrapper-led review path by default; if review tooling is unavailable or stalls without a concrete verdict, do a manual correctness/regressions/missing-tests review plus a manual elegance checklist and record that fallback instead of stalling.',
+    '- After addressing standalone-review findings, run an explicit elegance/minimality pass before PR create/update intended for handoff and before the review-state transition.',
+    '- After opening or updating a PR, run the shipped `codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>` monitor (or the equivalent repo-local wrapper) and keep the issue out of review until that bounded automated-feedback drain exits cleanly or exposes a blocker that you resolve or explicitly push back on.',
+    '- Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.'
+  ];
+}
+
 export function buildProviderWorkerPrompt(
   issue: LiveLinearTrackedIssue,
   turnNumber: number,
@@ -452,16 +499,22 @@ export function buildProviderWorkerPrompt(
       '- The original task instructions and prior turn context are already present in this thread, so do not restate them before acting.',
       `- Keep the same workflow contract and continue using \`${helperCommand}\` for ticket updates with Linear issue id \`${issue.id}\` (not the human identifier \`${issue.identifier}\`).`,
       '- Follow the repo-local workflow skills: `skills/linear/SKILL.md` for workpad, review, and rework behavior, and `skills/land/SKILL.md` for the merge shepherding loop once the issue reaches `Merging`.',
-      `- Keep exactly one active \`## Codex Workpad\` comment current, refresh it before new work and before any review handoff, and use \`${helperCommand} issue-context --issue-id ${issue.id}\` to inspect the team workflow states before any transition.`,
+      `- Keep exactly one active \`## Codex Workpad\` comment current, use \`${helperCommand} issue-context --issue-id ${issue.id}\` to inspect the team workflow states before any transition, and refresh that same comment after each meaningful milestone and immediately before any review or merge handoff.`,
+      '- The workpad body must keep this exact top-level structure, in order, with every section non-empty: `## Codex Workpad`, `### Environment / Workspace Stamp`, `### Plan`, `### Acceptance Criteria`, `### Validation`, `### Notes`.',
+      '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
       '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
+      `- When you discover a meaningful out-of-scope improvement, use \`${helperCommand} create-follow-up --issue-id ${issue.id} ...\` to file a same-project follow-up issue in \`Backlog\` with a clear title, description, acceptance criteria, a \`related\` link, and optional blocker linkage instead of expanding scope.`,
       '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
       `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
+      ...buildPreReviewHandoffGateSection(),
       '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
-      '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work.',
+      '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
+      '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work.',
       '- `Human Review` and `In Review` are review handoff states for the worker. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
       '- `Merging` and `Rework` are optional active workflow states only when the team exposes them.',
       '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.',
       '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
+      '- Keep final closeout in that same workpad comment instead of creating a separate terminal summary comment.',
       '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.',
       '- Focus on the remaining ticket work and do not end the turn while the issue stays active unless you are truly blocked.'
     ].join('\n');
@@ -478,12 +531,18 @@ export function buildProviderWorkerPrompt(
     '- Follow the repo-local workflow skills: `skills/linear/SKILL.md` for workpad, review, and rework behavior, and `skills/land/SKILL.md` for the merge shepherding loop once the issue reaches `Merging`.',
     `- Use \`${helperCommand} issue-context --issue-id ${issue.id}\` to inspect the team workflow states before any transition.`,
     '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
+    `- When you discover a meaningful out-of-scope improvement, use \`${helperCommand} create-follow-up --issue-id ${issue.id} ...\` to file a same-project follow-up issue in \`Backlog\` with a clear title, description, acceptance criteria, a \`related\` link, and optional blocker linkage instead of expanding scope.`,
     '- Maintain exactly one active `## Codex Workpad` comment on the issue. Reuse and update it in place during a single attempt; on `Rework`, remove the old workpad before creating the fresh reset workpad. Do not create extra progress or summary comments.',
+    '- Keep the workpad body in this exact top-level order, with every section non-empty: `## Codex Workpad`, `### Environment / Workspace Stamp`, `### Plan`, `### Acceptance Criteria`, `### Validation`, `### Notes`.',
+    '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
+    '- Refresh the same workpad after each meaningful milestone and immediately before any review or merge handoff. Keep final closeout in that same workpad comment.',
     '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
     `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
+    ...buildPreReviewHandoffGateSection(),
     '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
+    '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
     '- Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`).',
-    '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, and the workpad is refreshed to match completed work.',
+    '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work.',
     '- `Human Review` and `In Review` are stop-coding handoff states. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
     '- Treat `Merging` and `Rework` as active workflow states only when the team exposes them.',
     '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.',
@@ -919,7 +978,348 @@ function normalizeProviderLinearWorkerChildStreamRecord(
     launched_at: launchedAt
   };
 }
+async function resolveProviderWorkerRunLocation(
+  currentManifestPath: string,
+): Promise<ProviderWorkerRunLocation | null> {
+  try {
+    const canonicalManifestPath = await realpath(currentManifestPath);
+    if (basename(canonicalManifestPath) !== 'manifest.json') {
+      return null;
+    }
+    const canonicalRunDir = dirname(canonicalManifestPath);
+    const cliDir = dirname(canonicalRunDir);
+    if (basename(cliDir) !== 'cli') {
+      return null;
+    }
+    const taskDir = dirname(cliDir);
+    const canonicalRunsRoot = dirname(taskDir);
+    if (dirname(canonicalRunsRoot) === canonicalRunsRoot) {
+      return null;
+    }
+    return {
+      canonicalRunsRoot,
+      taskId: sanitizeTaskId(basename(taskDir)),
+      runId: sanitizeRunId(basename(canonicalRunDir))
+    };
+  } catch {
+    return null;
+  }
+}
 
+async function resolveProviderControlHostManifestPath(
+  currentManifestPath: string,
+  env: NodeJS.ProcessEnv,
+  manifest: Record<string, unknown>
+): Promise<ProviderControlHostManifestTarget | null> {
+  const locator =
+    readProviderControlHostLocatorFromManifest(manifest) ??
+    readProviderControlHostLocatorFromEnv({
+      [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: env[PROVIDER_CONTROL_HOST_TASK_ID_ENV],
+      [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: env[PROVIDER_CONTROL_HOST_RUN_ID_ENV],
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE
+    });
+  if (!locator) {
+    return null;
+  }
+  const currentRun = await resolveProviderWorkerRunLocation(currentManifestPath);
+  if (!currentRun) {
+    return null;
+  }
+  return {
+    currentRun,
+    manifestPath: resolve(
+      currentRun.canonicalRunsRoot,
+      sanitizeTaskId(locator.taskId),
+      'cli',
+      sanitizeRunId(locator.runId),
+      'manifest.json'
+    )
+  };
+}
+
+function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
+  const relativePath = relative(rootPath, targetPath);
+  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
+}
+
+function resolveProviderWorkerTaskId(
+  currentRun: ProviderWorkerRunLocation,
+  manifest: Record<string, unknown>
+): string | null {
+  const manifestTaskId =
+    normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId);
+  if (manifestTaskId) {
+    const sanitizedTaskId = sanitizeTaskId(manifestTaskId);
+    return sanitizedTaskId.length > 0 ? sanitizedTaskId : null;
+  }
+  return currentRun.taskId.length > 0 ? currentRun.taskId : null;
+}
+
+async function readControlEndpointToken(tokenPath: string): Promise<string> {
+  const raw = await readFile(tokenPath, 'utf8');
+  const trimmed = raw.trim();
+  const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+  try {
+    const parsed = JSON.parse(raw);
+    if (isRecord(parsed) && typeof parsed.token === 'string' && parsed.token.trim().length > 0) {
+      return parsed.token.trim();
+    }
+    throw new Error('control auth token invalid');
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
+    if (looksLikeJson) {
+      throw new Error('control auth token invalid');
+    }
+    // Fall back to plain-text token contents.
+  }
+  const token = trimmed;
+  if (!token) {
+    throw new Error('control auth token missing');
+  }
+  return token;
+}
+
+function collectDelegationEnvOverrides(env: NodeJS.ProcessEnv): DelegationConfigLayer[] {
+  const layers: DelegationConfigLayer[] = [];
+  for (const key of CONFIG_OVERRIDE_ENV_KEYS) {
+    const raw = env[key];
+    if (!raw) {
+      continue;
+    }
+    const values = splitDelegationConfigOverrides(raw);
+    for (const value of values) {
+      try {
+        const layer = parseDelegationConfigOverride(value, 'env');
+        if (layer) {
+          layers.push(layer);
+        }
+      } catch (error) {
+        logger.warn(
+          `Invalid delegation config override (env): ${(error as Error)?.message ?? String(error)}`
+        );
+      }
+    }
+  }
+  return layers;
+}
+
+async function resolveAllowedControlHostBindHosts(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv
+): Promise<string[] | null> {
+  const configFiles = await loadDelegationConfigFiles({ repoRoot, env });
+  const layers = [configFiles.global, configFiles.repo, ...collectDelegationEnvOverrides(env)]
+    .filter(Boolean) as DelegationConfigLayer[];
+  const effective = computeEffectiveDelegationConfig({
+    repoRoot,
+    layers
+  }).ui.allowedBindHosts;
+  const hasExplicitAllowedBindHosts = Array.isArray(configFiles.repo?.ui?.allowedBindHosts);
+  return hasExplicitAllowedBindHosts ? effective : null;
+}
+
+function normalizeControlHostName(host: string): string {
+  const trimmed = host.trim().toLowerCase();
+  const normalized =
+    trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1) : trimmed;
+  if (normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1') {
+    return 'loopback';
+  }
+  return normalized;
+}
+
+function validateControlHostBaseUrl(raw: unknown, allowedHosts: string[] | null): URL {
+  if (typeof raw !== 'string' || raw.trim().length === 0) {
+    throw new Error('control base_url missing');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('control base_url invalid');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('control base_url not permitted');
+  }
+  const normalizedAllowedHosts = new Set(
+    (allowedHosts ?? ['127.0.0.1', 'localhost', '::1']).map((entry) =>
+      normalizeControlHostName(entry)
+    )
+  );
+  if (!normalizedAllowedHosts.has(normalizeControlHostName(parsed.hostname))) {
+    throw new Error('control base_url not permitted');
+  }
+  return parsed;
+}
+
+function isCompatibleControlHostRepoRoot(
+  candidateRepoRoot: string,
+  workerWorkspacePath: string,
+  taskId: string
+): boolean {
+  const canonicalCandidateRepoRoot = resolve(candidateRepoRoot);
+  const canonicalWorkerWorkspacePath = resolve(workerWorkspacePath);
+  if (
+    canonicalWorkerWorkspacePath === canonicalCandidateRepoRoot &&
+    !(
+      basename(canonicalWorkerWorkspacePath) === taskId &&
+      basename(dirname(canonicalWorkerWorkspacePath)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+    )
+  ) {
+    return true;
+  }
+  try {
+    return canonicalWorkerWorkspacePath === resolveProviderWorkspacePath(canonicalCandidateRepoRoot, taskId);
+  } catch {
+    return false;
+  }
+}
+
+async function resolveProviderControlHostRepoRoot(input: {
+  manifestPath: string;
+  workerWorkspacePath: string;
+  taskId: string;
+}): Promise<string | null> {
+  const canonicalWorkerWorkspacePath = await realpath(input.workerWorkspacePath).catch(() =>
+    resolve(input.workerWorkspacePath)
+  );
+  const runDerivedRepoRoot = await realpath(
+    resolve(dirname(input.manifestPath), '..', '..', '..', '..')
+  ).catch(() => null);
+  if (
+    runDerivedRepoRoot &&
+    isCompatibleControlHostRepoRoot(runDerivedRepoRoot, canonicalWorkerWorkspacePath, input.taskId)
+  ) {
+    return runDerivedRepoRoot;
+  }
+  try {
+    const raw = JSON.parse(await readFile(input.manifestPath, 'utf8')) as Record<string, unknown>;
+    const manifestWorkspacePath =
+      normalizeOptionalString(raw.workspace_path) ??
+      normalizeOptionalString(raw.workspacePath);
+    if (!manifestWorkspacePath) {
+      return null;
+    }
+    const canonicalManifestWorkspacePath = await realpath(manifestWorkspacePath);
+    return isCompatibleControlHostRepoRoot(
+      canonicalManifestWorkspacePath,
+      canonicalWorkerWorkspacePath,
+      input.taskId
+    )
+      ? canonicalManifestWorkspacePath
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function requestProviderControlHostRefresh(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+  proof: ProviderLinearWorkerProof;
+  repoRoot: string;
+  log: Pick<typeof logger, 'warn'>;
+}): Promise<void> {
+  if (input.proof.owner_phase !== 'ended' || input.proof.owner_status !== 'failed') {
+    return;
+  }
+  try {
+    const manifestTarget = await resolveProviderControlHostManifestPath(
+      input.currentManifestPath,
+      input.env,
+      input.manifest
+    );
+    if (!manifestTarget) {
+      return;
+    }
+    const canonicalManifestPath = await realpath(manifestTarget.manifestPath);
+    const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
+    if (!isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)) {
+      throw new Error('control-host manifest path invalid');
+    }
+    const canonicalRunDir = dirname(canonicalManifestPath);
+    const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
+    if (!workerTaskId) {
+      throw new Error('provider task id unavailable');
+    }
+    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
+      manifestPath: canonicalManifestPath,
+      workerWorkspacePath: input.repoRoot,
+      taskId: workerTaskId
+    });
+    if (!controlHostRepoRoot) {
+      throw new Error('control-host repo root unavailable');
+    }
+    const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
+    const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
+    const canonicalEndpointPath = await realpath(endpointPath);
+    if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
+      throw new Error('control endpoint path invalid');
+    }
+    const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
+    const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
+    const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
+    const resolvedTokenPath =
+      typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
+        ? resolve(canonicalRunDir, endpoint.token_path)
+        : resolve(canonicalRunDir, 'control_auth.json');
+    if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
+      throw new Error('control auth path invalid');
+    }
+    const canonicalTokenPath = await realpath(resolvedTokenPath);
+    if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
+      throw new Error('control auth path invalid');
+    }
+    const token = await readControlEndpointToken(canonicalTokenPath);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
+    try {
+      const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
+        method: 'POST',
+        redirect: 'error',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          [CSRF_HEADER]: token
+        },
+        body: JSON.stringify({
+          action: 'refresh',
+          source: 'provider-linear-worker',
+          issue_id: input.proof.issue_id,
+          issue_identifier: input.proof.issue_identifier,
+          owner_status: input.proof.owner_status,
+          end_reason: input.proof.end_reason
+        }),
+        signal: controller.signal
+      });
+      const responseBody = await response.text();
+      if (response.status !== 202) {
+        const responseDetail = responseBody.trim();
+        throw new Error(
+          responseDetail
+            ? `refresh request failed with status ${response.status}: ${responseDetail}`
+            : `refresh request failed with status ${response.status}`
+        );
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (error) {
+    const message = (error as Error)?.name === 'AbortError'
+      ? 'refresh request timeout'
+      : (error as Error)?.message ?? String(error);
+    input.log.warn(
+      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}`
+    );
+  }
+}
 async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,
   runDir: string,
@@ -962,9 +1362,11 @@ export async function runProviderLinearWorker(
   childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
   const helperCommand = resolveProviderLinearHelperCommand(childEnv);
   if (shouldForceNonInteractive(childEnv)) {
-    childEnv.CODEX_NON_INTERACTIVE = childEnv.CODEX_NON_INTERACTIVE ?? '1';
-    childEnv.CODEX_NO_INTERACTIVE = childEnv.CODEX_NO_INTERACTIVE ?? '1';
-    childEnv.CODEX_INTERACTIVE = childEnv.CODEX_INTERACTIVE ?? '0';
+    childEnv.CODEX_REVIEW_NON_INTERACTIVE = '1';
+    childEnv.FORCE_CODEX_REVIEW = '1';
+    childEnv.CODEX_NON_INTERACTIVE = '1';
+    childEnv.CODEX_NO_INTERACTIVE = '1';
+    childEnv.CODEX_INTERACTIVE = '0';
   }
 
   let finalProof: ProviderLinearWorkerProof = {
@@ -990,7 +1392,20 @@ export async function runProviderLinearWorker(
     updated_at: deps.now()
   };
 
-  finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+  const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
+    const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof);
+    await requestProviderControlHostRefresh({
+      currentManifestPath: context.manifestPath,
+      env,
+      manifest: context.manifest,
+      proof: hydratedProof,
+      repoRoot: context.repoRoot,
+      log: deps.log
+    });
+    return hydratedProof;
+  };
+
+  finalProof = await persistProof(finalProof);
   const readTrackedIssueWithFailClosedProof = async (): Promise<LiveLinearTrackedIssue> => {
     try {
       return await deps.readTrackedIssue({
@@ -1006,7 +1421,7 @@ export async function runProviderLinearWorker(
         end_reason: 'tracked_issue_read_failed',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
   };
@@ -1024,7 +1439,7 @@ export async function runProviderLinearWorker(
       end_reason: lifecycle.terminalReason,
       updated_at: deps.now()
     };
-    finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+    finalProof = await persistProof(finalProof);
     return finalProof;
   }
 
@@ -1052,7 +1467,7 @@ export async function runProviderLinearWorker(
         end_reason: 'exec_runner_failed',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
     const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
@@ -1081,7 +1496,7 @@ export async function runProviderLinearWorker(
       end_reason: null,
       updated_at: deps.now()
     };
-    finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+    finalProof = await persistProof(finalProof);
 
     if (execResult.exitCode !== 0) {
       finalProof = {
@@ -1091,7 +1506,7 @@ export async function runProviderLinearWorker(
         end_reason: `codex_exit_${execResult.exitCode ?? 'unknown'}`,
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw new Error(
         `provider-linear-worker turn ${turnNumber} failed with exit code ${execResult.exitCode ?? 'unknown'}`
       );
@@ -1105,7 +1520,7 @@ export async function runProviderLinearWorker(
         end_reason: 'thread_id_missing',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       throw new Error('provider-linear-worker could not determine thread_id from Codex JSONL output.');
     }
 
@@ -1119,7 +1534,7 @@ export async function runProviderLinearWorker(
         end_reason: lifecycle.terminalReason,
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       return finalProof;
     }
 
@@ -1131,7 +1546,7 @@ export async function runProviderLinearWorker(
         end_reason: 'max_turns_reached_issue_still_active',
         updated_at: deps.now()
       };
-      finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+      finalProof = await persistProof(finalProof);
       return finalProof;
     }
   }
@@ -1143,7 +1558,7 @@ export async function runProviderLinearWorker(
     end_reason: 'worker_completed',
     updated_at: deps.now()
   };
-  finalProof = await writeProofSnapshot(deps, context.runDir, auditPath, finalProof);
+  finalProof = await persistProof(finalProof);
   return finalProof;
 }
 

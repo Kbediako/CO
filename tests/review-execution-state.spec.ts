@@ -4,6 +4,7 @@ import {
   extractShellCommandPayload,
   inferStaticShellTruthiness,
   normalizeCommandToken,
+  normalizeShellCommandPathSeparators,
   segmentRunsInParentShell,
   separatorCarriesParentShellStateForward,
   splitShellControlSegmentsDetailed,
@@ -64,6 +65,93 @@ describe('review shell command parser', () => {
     expect(inferStaticShellTruthiness('FOO=1 env -u MANIFEST false')).toBe(false);
     expect(inferStaticShellTruthiness('export MANIFEST=/tmp/manifest.json')).toBe(true);
     expect(inferStaticShellTruthiness('printf "%s" "$MANIFEST"')).toBeNull();
+  });
+
+  it('normalizes Windows path tokens without mutating unrelated shell escapes', () => {
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`C:\Users\me\AppData\Roaming\npm\npx.cmd vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(
+      String.raw`C:/Users/me/AppData/Roaming/npm/npx.cmd vitest run tests/review-execution-state.spec.ts`
+    );
+    expect(normalizeShellCommandPathSeparators('C:\\Users\\me\\')).toBe('C:/Users/me/');
+    expect(normalizeShellCommandPathSeparators('\\\\server\\share\\')).toBe('//server/share/');
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`/bin/zsh -lc 'printf "%s\n" "$MANIFEST"'`
+      )
+    ).toBe(String.raw`/bin/zsh -lc 'printf "%s\n" "$MANIFEST"'`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest.cmd run tests/review-execution-state.spec.ts`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`echo prep&&.\bin\tool`
+      )
+    ).toBe(String.raw`echo prep&&./bin/tool`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`echo prep&&node_modules\.bin\vitest run tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`echo prep&&node_modules/.bin/vitest run tests/review-execution-state.spec.ts`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`bin\tool review --manifest x`
+      )
+    ).toBe(String.raw`bin/tool review --manifest x`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`venv\Scripts\pytest tests/review-execution-state.spec.ts`
+      )
+    ).toBe(String.raw`venv/Scripts/pytest tests/review-execution-state.spec.ts`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`rg run\|pytest file.txt`
+      )
+    ).toBe(String.raw`rg run\|pytest file.txt`);
+    expect(
+      normalizeShellCommandPathSeparators(
+        String.raw`rg "foo\w+" file.txt`
+      )
+    ).toBe(String.raw`rg "foo\w+" file.txt`);
+    expect(normalizeShellCommandPathSeparators(String.raw`".\bin\tool.cmd"`)).toBe(
+      String.raw`"./bin/tool.cmd"`
+    );
+    expect(normalizeShellCommandPathSeparators(String.raw`".\bin\tool"`)).toBe(
+      String.raw`"./bin/tool"`
+    );
+    expect(normalizeShellCommandPathSeparators(String.raw`'.\bin\tool.cmd'`)).toBe(
+      String.raw`'.\bin\tool.cmd'`
+    );
+  });
+
+  it('preserves quoted cmd shell payload backslashes for recursive boundary parsing', () => {
+    const reviewTokens = tokenizeShellSegment(
+      String.raw`cmd /C ".\bin\codex-orchestrator.cmd review --manifest x"`
+    );
+    expect(reviewTokens).toEqual([
+      'cmd',
+      '/C',
+      String.raw`.\bin\codex-orchestrator.cmd review --manifest x`
+    ]);
+    expect(extractShellCommandPayload(reviewTokens)).toBe(
+      String.raw`.\bin\codex-orchestrator.cmd review --manifest x`
+    );
+
+    const validationTokens = tokenizeShellSegment(
+      String.raw`cmd /C "node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts"`
+    );
+    expect(extractShellCommandPayload(validationTokens)).toBe(
+      String.raw`node_modules\.bin\vitest.cmd run tests/review-execution-state.spec.ts`
+    );
   });
 });
 

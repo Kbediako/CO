@@ -320,8 +320,10 @@ export async function runDoctorCloudPreflight(options: {
   taskId?: string | null;
 } = {}): Promise<DoctorCloudPreflightResult> {
   const env = options.env ?? process.env;
-  const cwd = options.cwd ?? process.cwd();
-  const configuredRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
+  const explicitCwd = normalizeOptionalString(options.cwd);
+  const cwd = explicitCwd ? resolve(explicitCwd) : process.cwd();
+  // An explicit cwd is the caller's repo hint; only fall back to the ambient root override when cwd is implicit.
+  const configuredRoot = explicitCwd ? null : normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
   const rootHint = configuredRoot ? resolve(cwd, configuredRoot) : cwd;
   const repoRoot = resolveDoctorRepoRoot(rootHint);
   const taskId =

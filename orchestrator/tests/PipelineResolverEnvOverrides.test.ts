@@ -246,7 +246,7 @@ describe('PipelineResolver env overrides', () => {
     expect(testEnv.CODEX_ORCHESTRATOR_TASK_ID).toBe('');
   });
 
-  it('forces deterministic codex review execution in gate review stages', async () => {
+  it('keeps advisory review prompt-only while forcing gate and provider-worker review lanes', async () => {
     const testDir = fileURLToPath(new URL('.', import.meta.url));
     const repoRoot = resolve(testDir, '..', '..');
     const env: EnvironmentPaths = {
@@ -259,9 +259,18 @@ describe('PipelineResolver env overrides', () => {
     const config = await loadUserConfig(env);
     const implementationGate = config?.pipelines?.find((pipeline) => pipeline.id === 'implementation-gate');
     const docsReview = config?.pipelines?.find((pipeline) => pipeline.id === 'docs-review');
+    const docsRelevanceAdvisory = config?.pipelines?.find(
+      (pipeline) => pipeline.id === 'docs-relevance-advisory'
+    );
+    const providerWorker = config?.pipelines?.find((pipeline) => pipeline.id === 'provider-linear-worker');
 
     const implementationReviewEnv = findCommandStageEnv(implementationGate, 'review');
     const docsReviewEnv = findCommandStageEnv(docsReview, 'review');
+    const docsRelevanceEnv = findCommandStageEnv(
+      docsRelevanceAdvisory,
+      'docs-relevance-review'
+    );
+    const providerWorkerEnv = findCommandStageEnv(providerWorker, 'provider-linear-worker');
 
     expect(implementationReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(implementationReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
@@ -273,6 +282,10 @@ describe('PipelineResolver env overrides', () => {
     expect(docsReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toBe(
       'Pipeline-owned docs review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
     );
+    expect(docsRelevanceEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
+    expect(docsRelevanceEnv.FORCE_CODEX_REVIEW).toBe('');
+    expect(providerWorkerEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
+    expect(providerWorkerEnv.FORCE_CODEX_REVIEW).toBe('1');
   });
 });
 

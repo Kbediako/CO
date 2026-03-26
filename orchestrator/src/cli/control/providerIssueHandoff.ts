@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { logger } from '../../logger.js';
+import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../providerLinearWorkerRunner.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import {
@@ -87,6 +88,13 @@ interface ProviderIssueRunRecord {
   issueUpdatedAt: string | null;
   startedAt: string | null;
   updatedAt: string | null;
+}
+
+interface ProviderLinearWorkerProofRecord {
+  owner_phase?: unknown;
+  owner_status?: unknown;
+  end_reason?: unknown;
+  updated_at?: unknown;
 }
 
 export interface ProviderIssueHandoffService {
@@ -2576,6 +2584,9 @@ export async function discoverProviderIssueRuns(
       if (input && (issueProvider !== input.provider || issueId !== input.issueId)) {
         continue;
       }
+      const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
+        join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
+      );
       discovered.push({
         provider: issueProvider,
         issueId,
@@ -2583,11 +2594,11 @@ export async function discoverProviderIssueRuns(
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
         pipelineId: readStringValue(manifest, 'pipeline_id'),
-        status: readStringValue(manifest, 'status'),
-        summary: readStringValue(manifest, 'summary'),
+        status: resolveProviderIssueRunStatus(manifest, proof),
+        summary: resolveProviderIssueRunSummary(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
         startedAt: readStringValue(manifest, 'started_at'),
-        updatedAt: readStringValue(manifest, 'updated_at', 'started_at')
+        updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof)
       });
     }
   }
@@ -2595,6 +2606,111 @@ export async function discoverProviderIssueRuns(
   return discovered.sort((left, right) => {
     return Date.parse(right.updatedAt ?? '') - Date.parse(left.updatedAt ?? '');
   });
+}
+
+function resolveProviderIssueRunStatus(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): string | null {
+  const manifestStatus = readStringValue(manifest, 'status');
+  if (manifestStatus && manifestStatus !== 'in_progress') {
+    return manifestStatus;
+  }
+  return shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof) ? 'failed' : manifestStatus;
+}
+
+function resolveProviderIssueRunSummary(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): string | null {
+  const manifestSummary = readStringValue(manifest, 'summary');
+  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof);
+  const proofFailureReason = proofIsAuthoritative
+    ? resolveProviderLinearWorkerFailureReason(proof)
+    : null;
+  if (
+    proofFailureReason &&
+    readStringValue(manifest, 'status') !== 'failed' &&
+    proofIsAuthoritative
+  ) {
+    return proofFailureReason;
+  }
+  return manifestSummary ?? proofFailureReason;
+}
+
+function resolveProviderIssueRunUpdatedAt(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): string | null {
+  const manifestUpdatedAt = readStringValue(manifest, 'updated_at', 'started_at');
+  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof)
+    && isProviderLinearWorkerTerminalFailure(proof);
+  const proofUpdatedAt = proofIsAuthoritative
+    ? readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at')
+    : null;
+  if (!proofUpdatedAt) {
+    return manifestUpdatedAt;
+  }
+  const proofTimestamp = Date.parse(proofUpdatedAt);
+  if (!Number.isFinite(proofTimestamp)) {
+    return manifestUpdatedAt;
+  }
+  if (!manifestUpdatedAt) {
+    return proofUpdatedAt;
+  }
+  const manifestTimestamp = Date.parse(manifestUpdatedAt);
+  if (!Number.isFinite(manifestTimestamp)) {
+    return proofUpdatedAt;
+  }
+  return proofTimestamp > manifestTimestamp ? proofUpdatedAt : manifestUpdatedAt;
+}
+
+function isProviderLinearWorkerTerminalFailure(
+  proof: ProviderLinearWorkerProofRecord | null
+): boolean {
+  if (!proof) {
+    return false;
+  }
+  const proofRecord = proof as Record<string, unknown>;
+  return (
+    readStringValue(proofRecord, 'owner_phase') === 'ended' &&
+    readStringValue(proofRecord, 'owner_status') === 'failed'
+  );
+}
+
+function shouldUseProviderLinearWorkerTerminalFailureProof(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): boolean {
+  if (!isProviderLinearWorkerTerminalFailure(proof)) {
+    return false;
+  }
+  const proofUpdatedAt = readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at');
+  if (!proofUpdatedAt) {
+    return false;
+  }
+  const manifestUpdatedAt = readStringValue(manifest, 'updated_at', 'started_at');
+  if (!manifestUpdatedAt) {
+    return true;
+  }
+  const proofTimestamp = Date.parse(proofUpdatedAt);
+  const manifestTimestamp = Date.parse(manifestUpdatedAt);
+  if (Number.isNaN(proofTimestamp)) {
+    return false;
+  }
+  if (Number.isNaN(manifestTimestamp)) {
+    return true;
+  }
+  return proofTimestamp >= manifestTimestamp;
+}
+
+function resolveProviderLinearWorkerFailureReason(
+  proof: ProviderLinearWorkerProofRecord | null
+): string | null {
+  if (!isProviderLinearWorkerTerminalFailure(proof)) {
+    return null;
+  }
+  return readStringValue(proof as Record<string, unknown>, 'end_reason');
 }
 
 function filterProviderIssueRunsForStartPipeline(
@@ -3230,6 +3346,14 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
       return null;
     }
     throw error;
+  }
+}
+
+async function readBestEffortJsonFile<T>(path: string): Promise<T | null> {
+  try {
+    return await readJsonFile<T>(path);
+  } catch {
+    return null;
   }
 }
 

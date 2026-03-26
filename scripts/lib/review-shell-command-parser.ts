@@ -17,6 +17,180 @@ export type ShellControlSegment = {
   separatorAfter: ShellControlSeparator;
 };
 
+export function normalizeShellCommandPathSeparators(command: string): string {
+  let normalized = '';
+  let currentToken = '';
+  let quote: '"' | "'" | '`' | null = null;
+  let escaped = false;
+
+  const flushToken = () => {
+    if (!currentToken) {
+      return;
+    }
+    normalized += looksLikeWindowsPathToken(currentToken)
+      ? normalizeWindowsPathToken(currentToken)
+      : currentToken;
+    currentToken = '';
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index] ?? '';
+    const next = command[index + 1] ?? '';
+    if (escaped) {
+      currentToken += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && quote !== "'") {
+      currentToken += char;
+      escaped = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      }
+      currentToken += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      currentToken += char;
+      continue;
+    }
+
+    if (/\s/u.test(char)) {
+      flushToken();
+      normalized += char;
+      continue;
+    }
+
+    if (char === ';' || char === '\n') {
+      flushToken();
+      normalized += char;
+      continue;
+    }
+
+    if (char === '&') {
+      flushToken();
+      if (next === '&') {
+        normalized += '&&';
+        index += 1;
+      } else {
+        normalized += '&';
+      }
+      continue;
+    }
+
+    if (char === '|') {
+      flushToken();
+      if (next === '|') {
+        normalized += '||';
+        index += 1;
+      } else {
+        normalized += '|';
+      }
+      continue;
+    }
+
+    currentToken += char;
+  }
+  flushToken();
+  return normalized;
+}
+
+function looksLikeWindowsPathToken(token: string): boolean {
+  const quote = getMatchingQuote(token);
+  const unquoted = quote ? token.slice(1, -1) : token;
+  const candidate = stripTrailingShellControlSuffix(unquoted);
+  if (/^[A-Za-z]:\\/u.test(candidate) || /^\\\\[^\\/\s"'`]+[\\/]/u.test(candidate)) {
+    return true;
+  }
+
+  // Single-quoted relative tokens already preserve backslashes during tokenization.
+  // Leave them untouched so quoted regex/search literals do not regress again.
+  if (quote === "'") {
+    return false;
+  }
+
+  if (quote === '"' && !looksLikeExplicitDoubleQuotedWindowsPathToken(candidate)) {
+    return false;
+  }
+
+  return looksLikeRelativeWindowsLauncherToken(candidate);
+}
+
+function stripTrailingShellControlSuffix(token: string): string {
+  return token.replace(/(?:&&|\|\||[;&|])+$/u, '');
+}
+
+function looksLikeRelativeWindowsLauncherToken(token: string): boolean {
+  if (!token.includes('\\')) {
+    return false;
+  }
+
+  if (/^(?:\.\.?\\)+(?:[^\\/\s"'`]+\\)+[^\\/\s"'`]+$/u.test(token)) {
+    return true;
+  }
+
+  if (/^(?!-)(?:[^\\/\s"'`=;&|<>]+\\)+[^\\/\s"'`.=;&|<>]+$/u.test(token)) {
+    return true;
+  }
+
+  if (
+    /^(?!-)(?:[^\\/\s"'`=;&|<>]+\\)+[^\\/\s"'`=;&|<>]+\.(?:js|ts|mjs|cjs|mts|cts|\{js,ts\})$/iu.test(
+      token
+    )
+  ) {
+    return true;
+  }
+
+  if (/^node_modules\\\.bin\\[^\\/\s"'`]+$/iu.test(token)) {
+    return true;
+  }
+
+  if (/\\[^\\/\s"'`]+\.(?:cmd|exe|bat|com|ps1)$/iu.test(token)) {
+    return true;
+  }
+
+  return false;
+}
+
+function looksLikeExplicitDoubleQuotedWindowsPathToken(token: string): boolean {
+  if (/^(?:\.\.?\\)+/u.test(token) || /^node_modules\\\.bin\\/iu.test(token)) {
+    return true;
+  }
+
+  return /^(?!-)(?:[^\\/\s"'`=;&|<>]+\\)+[^\\/\s"'`]+\.(?:cmd|exe|bat|com|ps1)$/iu.test(
+    token
+  );
+}
+
+function getMatchingQuote(token: string): '"' | "'" | '`' | null {
+  if (token.length < 2) {
+    return null;
+  }
+  const first = token[0] ?? '';
+  const last = token[token.length - 1] ?? '';
+  if ((first === '"' || first === "'" || first === '`') && last === first) {
+    return first;
+  }
+  return null;
+}
+
+function normalizeWindowsPathToken(token: string): string {
+  const first = token[0] ?? '';
+  const last = token[token.length - 1] ?? '';
+  const hasMatchingQuotes =
+    token.length >= 2 && (first === '"' || first === "'" || first === '`') && last === first;
+  const raw = hasMatchingQuotes ? token.slice(1, -1) : token;
+  const normalized = raw.replace(/\\\\(?=$|[^\\\s])/gu, '//').replace(/\\(?=$|[^\\\s])/gu, '/');
+  return hasMatchingQuotes ? `${first}${normalized}${last}` : normalized;
+}
+
 export function splitShellControlSegmentsDetailed(command: string): ShellControlSegment[] {
   if (!command.trim()) {
     return [];
@@ -145,6 +319,19 @@ export function segmentRunsInParentShell(
   return false;
 }
 
+function shellBackslashActsAsEscape(
+  quote: '"' | "'" | '`' | null,
+  nextChar: string
+): boolean {
+  if (quote === "'") {
+    return false;
+  }
+  if (quote === '"') {
+    return nextChar === '"' || nextChar === '$' || nextChar === '`' || nextChar === '\\' || nextChar === '\n';
+  }
+  return true;
+}
+
 export function tokenizeShellSegment(segment: string): string[] {
   const tokens: string[] = [];
   let current = '';
@@ -160,6 +347,7 @@ export function tokenizeShellSegment(segment: string): string[] {
 
   for (let index = 0; index < segment.length; index += 1) {
     const char = segment[index] ?? '';
+    const next = segment[index + 1] ?? '';
 
     if (escaped) {
       current += char;
@@ -167,8 +355,13 @@ export function tokenizeShellSegment(segment: string): string[] {
       continue;
     }
 
-    if (char === '\\' && quote !== "'") {
+    if (char === '\\' && shellBackslashActsAsEscape(quote, next)) {
       escaped = true;
+      continue;
+    }
+
+    if (char === '\\') {
+      current += char;
       continue;
     }
 

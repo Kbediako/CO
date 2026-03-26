@@ -32,6 +32,22 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
   return binPath;
 }
 
+function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    CODEX_CLOUD_ENV_ID: '',
+    CODEX_CLOUD_BRANCH: '',
+    MCP_RUNNER_TASK_ID: '',
+    TASK: '',
+    CODEX_ORCHESTRATOR_TASK_ID: '',
+    CODEX_ORCHESTRATOR_ROOT: '',
+    CODEX_ORCHESTRATOR_RUNTIME_MODE: '',
+    CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: '',
+    CODEX_RUNTIME_MODE: '',
+    ...overrides
+  };
+}
+
 describe('runDoctor', () => {
   it('reports missing devtools config and skill when absent', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -219,14 +235,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: process.cwd(),
-        env: {
-          ...process.env,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: '',
-          MCP_RUNNER_TASK_ID: '',
-          TASK: '',
-          CODEX_ORCHESTRATOR_TASK_ID: ''
-        }
+        env: buildDoctorCloudEnv()
       });
       expect(result.ok).toBe(false);
       expect(result.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })]));
@@ -248,7 +257,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: process.cwd(),
-        env: { ...process.env, CODEX_CLOUD_ENV_ID: 'env_123', CODEX_CLOUD_BRANCH: '' }
+        env: buildDoctorCloudEnv({ CODEX_CLOUD_ENV_ID: 'env_123' })
       });
       expect(result.ok).toBe(true);
       expect(result.issues).toHaveLength(0);
@@ -296,12 +305,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_stage_meta');
@@ -344,12 +348,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(false);
       expect(result.details.environment_id).toBeNull();
@@ -410,12 +409,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(false);
       expect(result.details.environment_id).toBeNull();
@@ -471,12 +465,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_diagnostics');
@@ -533,12 +522,10 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
+        env: buildDoctorCloudEnv({
           CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: 'env_from_env',
-          CODEX_CLOUD_BRANCH: ''
-        }
+          CODEX_CLOUD_ENV_ID: 'env_from_env'
+        })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_from_env');
@@ -555,13 +542,10 @@ describe('runDoctor', () => {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
         environmentId: 'env_override',
-        env: {
-          ...process.env,
+        env: buildDoctorCloudEnv({
           CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: '',
           CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
-        }
+        })
       });
       expect(result.ok).toBe(false);
       expect(result.details.environment_id).toBe('env_override');
@@ -614,12 +598,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_runnable');
@@ -668,12 +647,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(false);
       expect(result.details.environment_id).toBeNull();
@@ -716,12 +690,10 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
+        env: buildDoctorCloudEnv({
           CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: 'env_from_env',
-          CODEX_CLOUD_BRANCH: ''
-        }
+          CODEX_CLOUD_ENV_ID: 'env_from_env'
+        })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_stage_meta');
@@ -777,12 +749,11 @@ describe('runDoctor', () => {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
         branch: ' refs/heads/option-branch ',
-        env: {
-          ...process.env,
+        env: buildDoctorCloudEnv({
           CODEX_CLI_BIN: fakeCodexBin,
           CODEX_CLOUD_ENV_ID: 'env_from_env',
           CODEX_CLOUD_BRANCH: 'refs/heads/env-branch'
-        }
+        })
       });
 
       expect(runCloudPreflightSpy).toHaveBeenCalledOnce();
@@ -804,6 +775,50 @@ describe('runDoctor', () => {
       expect(result.details.branch).toBe('option-branch');
     } finally {
       runCloudPreflightSpy.mockRestore();
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers explicit cwd over ambient CODEX_ORCHESTRATOR_ROOT during doctor cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-explicit-cwd-'));
+    const previousRoot = process.env.CODEX_ORCHESTRATOR_ROOT;
+    const runCloudPreflightSpy = vi
+      .spyOn(cloudPreflight, 'runCloudPreflight')
+      .mockImplementation(async (request) => ({
+        ok: true,
+        issues: [],
+        details: {
+          codexBin: request.codexBin,
+          environmentId: request.environmentId,
+          branch: null
+        }
+      }));
+
+    process.env.CODEX_ORCHESTRATOR_ROOT = process.cwd();
+
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        environmentId: 'env_explicit',
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: '/tmp/fake-codex',
+          CODEX_CLOUD_BRANCH: ''
+        }
+      });
+
+      expect(runCloudPreflightSpy).toHaveBeenCalledOnce();
+      const [request] = runCloudPreflightSpy.mock.calls[0] ?? [];
+      expect(request?.repoRoot).toBe(tempDir);
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_explicit');
+    } finally {
+      runCloudPreflightSpy.mockRestore();
+      if (previousRoot === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousRoot;
+      }
       await rm(tempDir, { recursive: true, force: true });
     }
   });
@@ -844,12 +859,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_stage_set');
@@ -902,12 +912,7 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_default');
@@ -951,12 +956,10 @@ describe('runDoctor', () => {
     try {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
-        env: {
-          ...process.env,
+        env: buildDoctorCloudEnv({
           CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: 'env_from_env',
-          CODEX_CLOUD_BRANCH: ''
-        }
+          CODEX_CLOUD_ENV_ID: 'env_from_env'
+        })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_from_env');
@@ -1000,12 +1003,7 @@ describe('runDoctor', () => {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
         environmentId: 'env_override',
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_override');
@@ -1041,12 +1039,7 @@ describe('runDoctor', () => {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
         taskId: '0974-cloud-adoption-preflight-reliability',
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_task_meta');
@@ -1084,12 +1077,7 @@ describe('runDoctor', () => {
       const result = await runDoctorCloudPreflight({
         cwd: subdir,
         taskId: '0974-cloud-adoption-preflight-reliability',
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_task_meta_subdir');
@@ -1125,12 +1113,7 @@ describe('runDoctor', () => {
       const result = await runDoctorCloudPreflight({
         cwd: tempDir,
         taskId: '0974-cloud-adoption-preflight-reliability-scout',
-        env: {
-          ...process.env,
-          CODEX_CLI_BIN: fakeCodexBin,
-          CODEX_CLOUD_ENV_ID: '',
-          CODEX_CLOUD_BRANCH: ''
-        }
+        env: buildDoctorCloudEnv({ CODEX_CLI_BIN: fakeCodexBin })
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_task_meta');

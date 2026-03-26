@@ -17,7 +17,8 @@ const REQUIRED_BUCKET_PENDING = new Set(['pending']);
 const REQUIRED_BUCKET_FAILED = new Set(['fail', 'cancel', 'skipping']);
 const MERGEABLE_STATES = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
 const ACTION_REQUIRED_MERGE_STATES = new Set(['BEHIND', 'DIRTY']);
-const BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED', 'REVIEW_REQUIRED']);
+const MERGE_BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED', 'REVIEW_REQUIRED']);
+const REVIEW_HANDOFF_BLOCKED_REVIEW_DECISIONS = new Set(['CHANGES_REQUESTED']);
 const DO_NOT_MERGE_LABEL = /do[\s_-]*not[\s_-]*merge/i;
 const ACTIONABLE_BOT_LOGINS = new Set([
   'chatgpt-codex-connector',
@@ -35,6 +36,30 @@ const BOT_MENTION_PATTERNS = {
 };
 const BOT_IN_PROGRESS_REACTION_CONTENT = new Set(['eyes']);
 const BOT_COMPLETE_REACTION_CONTENT = new Set(['+1', 'hooray', 'heart', 'rocket', 'laugh', 'confused']);
+
+function normalizeReadinessMode(rawValue) {
+  return typeof rawValue === 'string' && rawValue.trim().toLowerCase() === 'review' ? 'review' : 'merge';
+}
+
+function resolveBlockedReviewDecisions(readinessMode) {
+  return readinessMode === 'review'
+    ? REVIEW_HANDOFF_BLOCKED_REVIEW_DECISIONS
+    : MERGE_BLOCKED_REVIEW_DECISIONS;
+}
+
+function isReviewDecisionBlocked(reviewDecision, readinessMode) {
+  return resolveBlockedReviewDecisions(readinessMode).has(reviewDecision);
+}
+
+function doesMergeStateBlockReady(mergeStateStatus, readinessMode) {
+  return readinessMode === 'review'
+    ? ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)
+    : !MERGEABLE_STATES.has(mergeStateStatus);
+}
+
+function doesMergeStateRequireAuthorAction(mergeStateStatus) {
+  return ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus);
+}
 
 class PrWatchMergeExitError extends Error {
   constructor(message, exitCode = 1) {
@@ -163,6 +188,13 @@ function parseTimestampMs(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+export function isNoRequiredChecksReportedErrorMessage(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return false;
+  }
+  return /no required checks reported\b/iu.test(value);
+}
+
 function maxTimestamp(values) {
   let max = null;
   for (const value of values) {
@@ -266,9 +298,13 @@ function parseMergeMethod(rawValue) {
 }
 
 export function printPrWatchMergeHelp(options = {}) {
+  const readinessMode = normalizeReadinessMode(options.readinessMode);
+  const isReviewMode = readinessMode === 'review';
   const usageCommand = typeof options.usage === 'string' && options.usage.trim().length > 0
     ? options.usage.trim()
-    : 'codex-orchestrator pr watch-merge';
+    : isReviewMode
+      ? 'codex-orchestrator pr ready-review'
+      : 'codex-orchestrator pr watch-merge';
   const defaultAutoMerge =
     typeof options.defaultAutoMerge === 'boolean'
       ? options.defaultAutoMerge
@@ -276,7 +312,9 @@ export function printPrWatchMergeHelp(options = {}) {
   const defaultExitOnActionRequired = Boolean(options.defaultExitOnActionRequired);
   console.log(`Usage: ${usageCommand} [options]
 
-Monitor PR checks/reviews with polling and optionally merge after a quiet window.
+${isReviewMode
+    ? 'Monitor PR checks/reviews with polling and report when review handoff is safe after a bounded automated-feedback drain.'
+    : 'Monitor PR checks/reviews with polling and optionally merge after a quiet window.'}
 
 Options:
   --pr <number>             PR number (default: PR for current branch)
@@ -285,25 +323,29 @@ Options:
   --interval-seconds <n>    Poll interval in seconds (default: ${DEFAULT_INTERVAL_SECONDS})
   --quiet-minutes <n>       Required quiet window after ready state (default: ${DEFAULT_QUIET_MINUTES})
   --timeout-minutes <n>     Max monitor duration before failing (default: ${DEFAULT_TIMEOUT_MINUTES})
-  --merge-method <method>   merge|squash|rebase (default: ${DEFAULT_MERGE_METHOD})
+${isReviewMode ? '' : `  --merge-method <method>   merge|squash|rebase (default: ${DEFAULT_MERGE_METHOD})
   --auto-merge              Merge automatically after quiet window
   --no-auto-merge           Never merge automatically (monitor only)
   --delete-branch           Delete remote branch when merging
   --no-delete-branch        Keep remote branch after merge
+`}
   --exit-on-action-required Exit non-zero when author action is required
   --no-exit-on-action-required Keep monitoring even when author action is required
   --dry-run                 Never call gh pr merge (report only)
   -h, --help                Show this help message
 
 Environment:
-  PR_MONITOR_AUTO_MERGE=1       Default auto-merge on (current default: ${defaultAutoMerge ? 'on' : 'off'})
-  PR_MONITOR_DELETE_BRANCH=1    Default delete branch on merge
   PR_MONITOR_QUIET_MINUTES=<n>  Override quiet window default
   PR_MONITOR_INTERVAL_SECONDS=<n>
-  PR_MONITOR_TIMEOUT_MINUTES=<n>
-  PR_MONITOR_MERGE_METHOD=<method>`);
+  PR_MONITOR_TIMEOUT_MINUTES=<n>${isReviewMode ? '' : `
+  PR_MONITOR_AUTO_MERGE=1       Default auto-merge on (current default: ${defaultAutoMerge ? 'on' : 'off'})
+  PR_MONITOR_DELETE_BRANCH=1    Default delete branch on merge
+  PR_MONITOR_MERGE_METHOD=<method>`}`);
   if (defaultExitOnActionRequired) {
-    console.log('  resolve-merge default: exit-on-action-required is on');
+    console.log(`  ${isReviewMode ? 'ready-review' : 'resolve-merge'} default: exit-on-action-required is on`);
+  }
+  if (isReviewMode) {
+    console.log('  ready-review treats REVIEW_REQUIRED as informational; CHANGES_REQUESTED and actionable machine feedback still block handoff.');
   }
 }
 
@@ -634,11 +676,12 @@ export function resolveCachedRequiredChecksSummary(previousCache, currentHeadOid
   return hasRequiredChecksSummary(previousCache.summary) ? previousCache.summary : null;
 }
 
-export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFeedback = null) {
+export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFeedback = null, options = {}) {
   const pr = response?.data?.repository?.pullRequest;
   if (!pr) {
     throw new Error('GraphQL response missing pullRequest payload.');
   }
+  const readinessMode = normalizeReadinessMode(options.readinessMode);
 
   const labels = Array.isArray(pr.labels?.nodes)
     ? pr.labels.nodes
@@ -667,6 +710,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   const botRereviewFetchError = botRereview?.fetchError === true;
   const botRereviewPending = Array.isArray(botRereview?.pendingBots) ? botRereview.pendingBots : [];
   const botRereviewInProgress = Array.isArray(botRereview?.inProgressBots) ? botRereview.inProgressBots : [];
+  const requiredChecksQueryFailed = options.requiredChecksQueryFailed === true;
   const coderabbitReviewMeta =
     botRereview?.coderabbit && typeof botRereview.coderabbit === 'object'
       ? botRereview.coderabbit
@@ -696,10 +740,17 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
         : `checks_pending=${gateChecks.pending.length}`
     );
   }
-  if (!MERGEABLE_STATES.has(mergeStateStatus)) {
+  if (gateChecksSource === 'required' && gateChecks.failed.length > 0) {
+    gateReasons.push(`required_checks_failed=${gateChecks.failed.length}`);
+  }
+  if (requiredChecksQueryFailed) {
+    gateReasons.push('required_checks_query_failed');
+  }
+  const mergeStateBlocksReady = doesMergeStateBlockReady(mergeStateStatus, readinessMode);
+  if (mergeStateBlocksReady) {
     gateReasons.push(`merge_state=${mergeStateStatus || 'UNKNOWN'}`);
   }
-  if (BLOCKED_REVIEW_DECISIONS.has(reviewDecision)) {
+  if (isReviewDecisionBlocked(reviewDecision, readinessMode)) {
     gateReasons.push(`review=${reviewDecision}`);
   }
   if (hasUnresolvedThread) {
@@ -736,30 +787,34 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     coderabbitReviewMeta,
     checks,
     requiredChecks: requiredCheckSummary,
+    requiredChecksQueryFailed,
     gateChecksSource,
     gateReasons,
+    readinessMode,
     readyToMerge: gateReasons.length === 0,
     headOid: pr.commits?.nodes?.[0]?.commit?.oid || null
   };
 }
 
-export function resolveActionRequiredReasons(snapshot) {
+export function resolveActionRequiredReasons(snapshot, options = {}) {
   if (!snapshot || typeof snapshot !== 'object') {
     return ['snapshot=unknown'];
   }
+  const readinessMode = normalizeReadinessMode(options.readinessMode ?? snapshot.readinessMode);
   const reasons = [];
   const reviewDecision = normalizeEnum(snapshot.reviewDecision);
   const mergeStateStatus = normalizeEnum(snapshot.mergeStateStatus);
+  const mergeStateRequiresAuthorAction = doesMergeStateRequireAuthorAction(mergeStateStatus);
   if (Boolean(snapshot.isDraft)) {
     reasons.push('draft');
   }
   if (Boolean(snapshot.hasDoNotMergeLabel)) {
     reasons.push('label:do-not-merge');
   }
-  if (BLOCKED_REVIEW_DECISIONS.has(reviewDecision)) {
+  if (isReviewDecisionBlocked(reviewDecision, readinessMode)) {
     reasons.push(`review=${reviewDecision}`);
   }
-  if (ACTION_REQUIRED_MERGE_STATES.has(mergeStateStatus)) {
+  if (mergeStateRequiresAuthorAction) {
     reasons.push(`merge_state=${mergeStateStatus}`);
   }
   if (typeof snapshot.unresolvedThreadCount === 'number' && snapshot.unresolvedThreadCount > 0) {
@@ -773,17 +828,39 @@ export function resolveActionRequiredReasons(snapshot) {
   }
   const requiredChecks =
     snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object' ? snapshot.requiredChecks : null;
+  if (snapshot.requiredChecksQueryFailed === true) {
+    reasons.push('required_checks_query_failed');
+  }
   const requiredFailedCount = Array.isArray(requiredChecks?.failed) ? requiredChecks.failed.length : 0;
   if (requiredFailedCount > 0 && snapshot.readyToMerge === false) {
     reasons.push(`required_checks_failed=${requiredFailedCount}`);
   } else {
     const rollupFailedCount = Array.isArray(snapshot.checks?.failed) ? snapshot.checks.failed.length : 0;
     const rollupPendingCount = Array.isArray(snapshot.checks?.pending) ? snapshot.checks.pending.length : 0;
-    if (!requiredChecks && !MERGEABLE_STATES.has(mergeStateStatus) && rollupPendingCount === 0 && rollupFailedCount > 0) {
+    if (
+      !requiredChecks
+      && snapshot.requiredChecksQueryFailed !== true
+      && readinessMode !== 'review'
+      && !mergeStateRequiresAuthorAction
+      && !MERGEABLE_STATES.has(mergeStateStatus)
+      && rollupPendingCount === 0
+      && rollupFailedCount > 0
+    ) {
       reasons.push(`checks_failed=${rollupFailedCount}`);
     }
   }
   return reasons;
+}
+
+export function shouldSucceedAfterTimeout(snapshot, options = {}) {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return false;
+  }
+  if (options.pollingHealthy === false) {
+    return false;
+  }
+  const readinessMode = normalizeReadinessMode(options.readinessMode ?? snapshot.readinessMode);
+  return readinessMode === 'review' && snapshot.readyToMerge === true;
 }
 
 function formatStatusLine(snapshot, quietRemainingMs) {
@@ -800,6 +877,7 @@ function formatStatusLine(snapshot, quietRemainingMs) {
     `state=${snapshot.state}`,
     `merge_state=${snapshot.mergeStateStatus}`,
     `review=${snapshot.reviewDecision}`,
+    `target=${normalizeReadinessMode(snapshot.readinessMode)}`,
     `gate_checks=${snapshot.gateChecksSource}`,
     `checks_ok=${snapshot.checks.successCount}/${snapshot.checks.total}`,
     `checks_pending=${snapshot.checks.pending.length}`,
@@ -843,7 +921,14 @@ async function fetchRequiredChecks(owner, repo, prNumber) {
       summary: summary.total > 0 ? summary : null,
       fetchError: false
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (isNoRequiredChecksReportedErrorMessage(message)) {
+      return {
+        summary: null,
+        fetchError: false
+      };
+    }
     return {
       summary: null,
       fetchError: true
@@ -1227,7 +1312,7 @@ async function fetchInlineBotFeedback(owner, repo, prNumber, headOid) {
   }
 }
 
-async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache = null) {
+async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache = null, options = {}) {
   const response = await runGhJson([
     'api',
     'graphql',
@@ -1253,10 +1338,18 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache 
     requiredChecksResult.fetchError
   );
   return {
-    snapshot: buildStatusSnapshot(response, requiredChecks, {
-      ...inlineBotFeedback,
-      rereview: botRereviewSignals
-    }),
+    snapshot: buildStatusSnapshot(
+      response,
+      requiredChecks,
+      {
+        ...inlineBotFeedback,
+        rereview: botRereviewSignals
+      },
+      {
+        ...options,
+        requiredChecksQueryFailed: requiredChecksResult.fetchError
+      }
+    ),
     requiredChecksForNextPoll: requiredChecks
       ? {
           headOid: currentHeadOid,
@@ -1285,6 +1378,8 @@ async function attemptMerge({ owner, repo, prNumber, mergeMethod, deleteBranch, 
 
 async function runPrWatchMergeOrThrow(argv, options) {
   const { args, positionals } = parseArgs(argv);
+  const readinessMode = normalizeReadinessMode(options.readinessMode);
+  const isReviewMode = readinessMode === 'review';
 
   if (hasFlag(args, 'h') || hasFlag(args, 'help')) {
     printPrWatchMergeHelp(options);
@@ -1315,6 +1410,22 @@ async function runPrWatchMergeOrThrow(argv, options) {
     throw new Error(`Unknown option: ${label}`);
   }
 
+  if (isReviewMode) {
+    const unsupportedFlags = [];
+    if (Object.prototype.hasOwnProperty.call(args, 'merge-method')) {
+      unsupportedFlags.push('--merge-method');
+    }
+    if (hasFlag(args, 'auto-merge') || hasFlag(args, 'no-auto-merge')) {
+      unsupportedFlags.push('--auto-merge/--no-auto-merge');
+    }
+    if (hasFlag(args, 'delete-branch') || hasFlag(args, 'no-delete-branch')) {
+      unsupportedFlags.push('--delete-branch/--no-delete-branch');
+    }
+    if (unsupportedFlags.length > 0) {
+      throw new Error(`ready-review does not support merge flags: ${unsupportedFlags.join(', ')}`);
+    }
+  }
+
   const intervalSeconds = parseNumber(
     'interval-seconds',
     typeof args['interval-seconds'] === 'string'
@@ -1336,27 +1447,35 @@ async function runPrWatchMergeOrThrow(argv, options) {
       : process.env.PR_MONITOR_TIMEOUT_MINUTES,
     DEFAULT_TIMEOUT_MINUTES
   );
-  const mergeMethod = parseMergeMethod(
-    typeof args['merge-method'] === 'string'
-      ? args['merge-method']
-      : process.env.PR_MONITOR_MERGE_METHOD || DEFAULT_MERGE_METHOD
-  );
+  const mergeMethod = isReviewMode
+    ? DEFAULT_MERGE_METHOD
+    : parseMergeMethod(
+        typeof args['merge-method'] === 'string'
+          ? args['merge-method']
+          : process.env.PR_MONITOR_MERGE_METHOD || DEFAULT_MERGE_METHOD
+      );
   const defaultAutoMergeFallback = typeof options.defaultAutoMerge === 'boolean' ? options.defaultAutoMerge : false;
   const defaultAutoMerge = envFlagEnabled(process.env.PR_MONITOR_AUTO_MERGE, defaultAutoMergeFallback);
   const defaultDeleteBranch = envFlagEnabled(process.env.PR_MONITOR_DELETE_BRANCH, true);
-  let autoMerge = defaultAutoMerge;
-  if (hasFlag(args, 'auto-merge')) {
-    autoMerge = true;
+  let autoMerge = false;
+  if (!isReviewMode) {
+    autoMerge = defaultAutoMerge;
+    if (hasFlag(args, 'auto-merge')) {
+      autoMerge = true;
+    }
+    if (hasFlag(args, 'no-auto-merge')) {
+      autoMerge = false;
+    }
   }
-  if (hasFlag(args, 'no-auto-merge')) {
-    autoMerge = false;
-  }
-  let deleteBranch = defaultDeleteBranch;
-  if (hasFlag(args, 'delete-branch')) {
-    deleteBranch = true;
-  }
-  if (hasFlag(args, 'no-delete-branch')) {
-    deleteBranch = false;
+  let deleteBranch = false;
+  if (!isReviewMode) {
+    deleteBranch = defaultDeleteBranch;
+    if (hasFlag(args, 'delete-branch')) {
+      deleteBranch = true;
+    }
+    if (hasFlag(args, 'no-delete-branch')) {
+      deleteBranch = false;
+    }
   }
   let exitOnActionRequired = Boolean(options.defaultExitOnActionRequired);
   if (hasFlag(args, 'exit-on-action-required')) {
@@ -1380,9 +1499,11 @@ async function runPrWatchMergeOrThrow(argv, options) {
   const deadline = Date.now() + timeoutMs;
 
   log(
-    `Monitoring ${owner}/${repo}#${prNumber} every ${intervalSeconds}s (quiet window ${quietMinutes}m, timeout ${timeoutMinutes}m, auto_merge=${
-      autoMerge ? 'on' : 'off'
-    }, exit_on_action_required=${exitOnActionRequired ? 'on' : 'off'}, dry_run=${dryRun ? 'on' : 'off'}).`
+    isReviewMode
+      ? `Monitoring ${owner}/${repo}#${prNumber} every ${intervalSeconds}s (quiet window ${quietMinutes}m, timeout ${timeoutMinutes}m, target=review_handoff, exit_on_action_required=${exitOnActionRequired ? 'on' : 'off'}, dry_run=${dryRun ? 'on' : 'off'}).`
+      : `Monitoring ${owner}/${repo}#${prNumber} every ${intervalSeconds}s (quiet window ${quietMinutes}m, timeout ${timeoutMinutes}m, auto_merge=${
+          autoMerge ? 'on' : 'off'
+        }, exit_on_action_required=${exitOnActionRequired ? 'on' : 'off'}, dry_run=${dryRun ? 'on' : 'off'}).`
   );
 
   let quietWindowStartedAt = null;
@@ -1390,18 +1511,25 @@ async function runPrWatchMergeOrThrow(argv, options) {
   let quietWindowAnchorHeadOid = null;
   let lastMergeAttemptHeadOid = null;
   let requiredChecksForNextPollCache = null;
+  let latestSnapshot = null;
+  let pollingHealthySinceLatestSnapshot = false;
 
   while (Date.now() <= deadline) {
     let snapshot;
     try {
-      const fetched = await fetchSnapshot(owner, repo, prNumber, requiredChecksForNextPollCache);
+      const fetched = await fetchSnapshot(owner, repo, prNumber, requiredChecksForNextPollCache, {
+        readinessMode
+      });
       snapshot = fetched.snapshot;
       requiredChecksForNextPollCache = fetched.requiredChecksForNextPoll;
     } catch (error) {
+      pollingHealthySinceLatestSnapshot = false;
       log(`Polling error: ${error instanceof Error ? error.message : String(error)} (retrying).`);
       await sleep(intervalMs);
       continue;
     }
+    latestSnapshot = snapshot;
+    pollingHealthySinceLatestSnapshot = true;
 
     if (snapshot.state === 'MERGED' || snapshot.mergedAt) {
       log(`PR #${prNumber} is merged.`);
@@ -1443,11 +1571,11 @@ async function runPrWatchMergeOrThrow(argv, options) {
     log(formatStatusLine(snapshot, quietRemainingMs));
 
     if (exitOnActionRequired) {
-      const actionRequiredReasons = resolveActionRequiredReasons(snapshot);
+      const actionRequiredReasons = resolveActionRequiredReasons(snapshot, { readinessMode });
       if (actionRequiredReasons.length > 0) {
         const details = actionRequiredReasons.join(', ');
         throw new PrWatchMergeExitError(
-          `Action required before merge: ${details}${snapshot.url ? ` (${snapshot.url})` : ''}`,
+          `${isReviewMode ? 'Action required before review handoff' : 'Action required before merge'}: ${details}${snapshot.url ? ` (${snapshot.url})` : ''}`,
           2
         );
       }
@@ -1456,12 +1584,14 @@ async function runPrWatchMergeOrThrow(argv, options) {
     if (snapshot.readyToMerge && quietWindowStartedAt !== null && quietElapsedMs >= quietMs) {
       if (!autoMerge || dryRun) {
         log(
-          dryRun
-            ? 'Dry run: merge conditions satisfied and quiet window elapsed.'
-            : 'Merge conditions satisfied and quiet window elapsed.'
+          isReviewMode
+            ? 'Review handoff conditions satisfied and quiet window elapsed.'
+            : dryRun
+              ? 'Dry run: merge conditions satisfied and quiet window elapsed.'
+              : 'Merge conditions satisfied and quiet window elapsed.'
         );
         if (snapshot.url) {
-          log(`Ready to merge: ${snapshot.url}`);
+          log(`${isReviewMode ? 'Ready for review' : 'Ready to merge'}: ${snapshot.url}`);
         }
         return;
       }
@@ -1493,6 +1623,14 @@ async function runPrWatchMergeOrThrow(argv, options) {
       break;
     }
     await sleep(Math.min(intervalMs, remainingTimeMs));
+  }
+
+  if (shouldSucceedAfterTimeout(latestSnapshot, { readinessMode, pollingHealthy: pollingHealthySinceLatestSnapshot })) {
+    log('Bounded wait expired cleanly with no remaining automated-feedback blockers.');
+    if (latestSnapshot?.url) {
+      log(`Ready for review: ${latestSnapshot.url}`);
+    }
+    return;
   }
 
   throw new PrWatchMergeExitError(

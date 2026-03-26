@@ -17,6 +17,132 @@
       }
     },
     {
+      "id": "20260326-linear-df2bd49b-2dd6-413f-8d90-af40d033dace",
+      "title": "CO Tighten Symphony-style Linear Workpad Structure and Milestone Refresh Contract",
+      "relates_to": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-26",
+      "paths": {
+        "spec": "tasks/specs/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
+        "task": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
+        "agent_task": ".agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
+        "docs": "docs/TECH_SPEC-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md"
+      }
+    },
+    {
+      "id": "20260325-linear-9d962236-4c38-4b28-b144-007c6f3a1395",
+      "title": "CO Add Bounded Pre-Review Automated-Feedback Drain Before In Review",
+      "relates_to": "tasks/tasks-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-25",
+          "manifest": ".runs/linear-9d962236-4c38-4b28-b144-007c6f3a1395/cli/2026-03-25T07-12-22-296Z-1bac6ee1/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+        "task": "tasks/tasks-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+        "agent_task": ".agent/task/linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+        "docs": "docs/TECH_SPEC-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md"
+      }
+    },
+    {
+      "id": "20260325-linear-4848ec97-cfab-45d9-9023-79107b496526",
+      "title": "CO Add Autonomous Pre-Review-Handoff Standalone and Elegance Review Gate",
+      "relates_to": "tasks/tasks-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "task": "tasks/tasks-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "agent_task": ".agent/task/linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+        "docs": "docs/TECH_SPEC-linear-4848ec97-cfab-45d9-9023-79107b496526.md"
+      }
+    },
+    {
+      "id": "20260325-linear-cc7d12e3-eabf-4168-827e-b3a023583e22",
+      "title": "CO Align Non-Interactive Standalone Review Policy Across Gate Advisory and Provider-Worker Lanes",
+      "relates_to": "tasks/tasks-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-25",
+          "manifest": ".runs/linear-cc7d12e3-eabf-4168-827e-b3a023583e22/cli/2026-03-25T07-21-52-956Z-12d6b412/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "task": "tasks/tasks-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "agent_task": ".agent/task/linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+        "docs": "docs/TECH_SPEC-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md"
+      }
+    },
+    {
+      "id": "20260325-linear-74d145eb-305b-4b27-be84-21c248b22e4d",
+      "title": "CO Recalibrate Diff Budget for Stacked Lanes While Keeping Hard PR Scope Guard",
+      "relates_to": "tasks/tasks-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+        "task": "tasks/tasks-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+        "agent_task": ".agent/task/linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+        "docs": "docs/TECH_SPEC-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md"
+      }
+    },
+    {
+      "id": "20260325-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5",
+      "title": "CO Reconcile Terminal Provider-Worker Failures and Stale Intake Workpad State",
+      "relates_to": "tasks/tasks-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+        "task": "tasks/tasks-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+        "agent_task": ".agent/task/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+        "docs": "docs/TECH_SPEC-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md"
+      }
+    },
+    {
+      "id": "20260325-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d",
+      "title": "CO Add Symphony-Style Follow-Up Issue Automation",
+      "relates_to": "tasks/tasks-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-25",
+      "paths": {
+        "spec": "tasks/specs/linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "task": "tasks/tasks-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "agent_task": ".agent/task/linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+        "docs": "docs/TECH_SPEC-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md"
+      }
+    },
+    {
       "id": "20260324-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514",
       "title": "CO Reduce Review Long Tails and Make Review Evidence Accounting Truthful",
       "relates_to": "tasks/tasks-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",

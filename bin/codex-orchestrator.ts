@@ -184,6 +184,7 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
   const booleanFlagKeys = new Set([
     'apply',
     'auto-issue-log',
+    'blocked-by-source',
     'cloud',
     'cloud-preflight',
     'codex-cli',
@@ -1416,6 +1417,9 @@ Commands:
   pr resolve-merge [options]
     Monitor until merge-ready or actionable feedback appears; exits early when author action is required.
     Use \`codex-orchestrator pr resolve-merge --help\` for full options.
+  pr ready-review [options]
+    Wait through a bounded automated-feedback drain before human review handoff; exits early when author action is required.
+    Use \`codex-orchestrator pr ready-review --help\` for full options.
   delegate-server         Run the delegation MCP server (stdio).
     --repo <path>         Repo root for config + manifests (default cwd).
     --mode <full|question_only|status_only>  Limit tool surface for child runs.
@@ -1503,6 +1507,19 @@ Subcommands:
     --team-id <id>        Optional team scope check.
     --project-id <id>     Optional project scope check.
     --format json         Emit machine-readable output.
+
+  create-follow-up
+    --issue-id <id>                   Source Linear issue id/key.
+    --title <title>                   Follow-up issue title.
+    --description <text>              Follow-up issue description.
+    --description-file <path>         Read follow-up issue description from a file.
+    --acceptance-criteria <text>      Follow-up acceptance criteria.
+    --acceptance-criteria-file <path> Read follow-up acceptance criteria from a file.
+    --blocked-by-source               Add blocker linkage when the follow-up depends on the source issue.
+    --workspace-id <id>               Optional workspace scope check.
+    --team-id <id>                    Optional team scope check.
+    --project-id <id>                 Optional project scope check.
+    --format json                     Emit machine-readable output.
 
   child-stream
     --pipeline <id>       Allowlisted child pipeline: docs-review, implementation-gate, or docs-relevance-advisory.
@@ -1605,12 +1622,15 @@ Subcommands:
                           Supports PR_MONITOR_* env vars and standard flags (see: pr watch-merge --help).
   resolve-merge           Watch for merge readiness but exit early on actionable feedback requiring author response.
                           Inherits watch-merge flags; defaults exit-on-action-required to on.
+  ready-review           Wait through a bounded automated-feedback drain before review handoff.
+                          Reuses watch-merge polling, treats REVIEW_REQUIRED as informational, and defaults exit-on-action-required to on.
 
 Examples:
   codex-orchestrator pr watch-merge --pr 211 --dry-run --quiet-minutes 10
   codex-orchestrator pr watch-merge --pr 211 --auto-merge --merge-method squash
   codex-orchestrator pr resolve-merge --pr 211 --quiet-minutes 15
   codex-orchestrator pr resolve-merge --pr 211 --auto-merge --quiet-minutes 10
+  codex-orchestrator pr ready-review --pr 211 --quiet-minutes 15 --timeout-minutes 20
 
 Guide:
   Review artifacts (prompt + output log paths): docs/guides/review-artifacts.md
