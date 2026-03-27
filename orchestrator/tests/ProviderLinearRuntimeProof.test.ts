@@ -103,6 +103,36 @@ describe('resolveProviderLinearRuntimeProof', () => {
     expect(result.handoff?.pr_markdown).toContain('Dashboard after launch-app validation');
   });
 
+  it('fails with kind-missing when blank proof-url masks other proof fields', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof({
+      repoRoot,
+      origin: 'https://app.example.com/dashboard',
+      proofUrl: '   ',
+      title: 'Dashboard after launch-app validation'
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_kind_missing',
+        status: 422
+      }
+    });
+  });
+
   it('renders multiline proof metadata as inline markdown text in handoff output', async () => {
     const repoRoot = await createRepoWithPermit({
       allowedSources: [
@@ -245,6 +275,68 @@ describe('resolveProviderLinearRuntimeProof', () => {
       ok: false,
       error: {
         code: 'runtime_proof_url_missing',
+        status: 422
+      }
+    });
+  });
+
+  it('fails closed when the proof url contains embedded credentials', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof({
+      repoRoot,
+      origin: 'https://app.example.com',
+      kind: 'screenshot',
+      proofUrl: 'https://reviewer:secret@review-assets.example.com/co-8-dashboard.png'
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_url_missing',
+        status: 422
+      }
+    });
+  });
+
+  it.each([
+    'file:///tmp/proof.png',
+    'mailto:test@example.com',
+    'data:text/plain,hi'
+  ])('fails closed when the runtime proof origin is non-http(s) (%s)', async (origin) => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof({
+      repoRoot,
+      origin
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_origin_invalid',
         status: 422
       }
     });

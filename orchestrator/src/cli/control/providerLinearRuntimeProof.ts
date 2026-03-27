@@ -93,11 +93,12 @@ export async function resolveProviderLinearRuntimeProof(
   const permitEntry = permitResult.status === 'found' ? findPermitEntry(permitResult.permit, normalizedOrigin) : null;
   const policy = buildRuntimeProofPolicy(normalizedOrigin, permitResult.path, permitResult.status, permitEntry);
 
+  const proofUrlInput = normalizeOptionalText(input.proofUrl ?? null);
   const normalizedKind = normalizeRuntimeProofKind(input.kind ?? null);
   const normalizedProofUrl = normalizeHttpUrl(input.proofUrl ?? null);
   const normalizedTitle = normalizeOptionalText(input.title ?? null);
   const normalizedSummary = normalizeOptionalText(input.summary ?? null);
-  const proofFieldsProvided = Boolean(input.proofUrl ?? input.title ?? input.summary);
+  const proofFieldsProvided = Boolean(proofUrlInput || normalizedTitle || normalizedSummary);
 
   if (!normalizedKind) {
     if (!input.kind && !proofFieldsProvided) {
@@ -311,8 +312,16 @@ function normalizeRuntimeProofKind(value: string | null): ProviderLinearRuntimeP
 }
 
 function normalizeOrigin(value: string): string | null {
+  const normalized = normalizeOptionalText(value);
+  if (!normalized) {
+    return null;
+  }
   try {
-    return new URL(value).origin;
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.origin;
   } catch {
     return null;
   }
@@ -326,6 +335,9 @@ function normalizeHttpUrl(value: string | null): string | null {
   try {
     const parsed = new URL(normalized);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    if (parsed.username || parsed.password) {
       return null;
     }
     if (isBlockedProofHostname(parsed.hostname)) {
