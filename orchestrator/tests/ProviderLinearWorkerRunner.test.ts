@@ -413,7 +413,9 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('`FORCE_CODEX_REVIEW=1`');
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(firstPrompt).toContain(`\`${helperCommand} runtime-proof --issue-id lin-issue-1 --origin <app-url> --format json\``);
-    expect(firstPrompt).toContain('the helper fails closed when the permit blocks the mode or when only a local path is available');
+    expect(firstPrompt).toContain(
+      'the helper fails closed when the permit blocks the mode, when the proof URL is loopback/local-only, or when only a local file path is available'
+    );
     expect(firstPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
     expect(firstPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
     expect(firstPrompt).toContain('`codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>`');
@@ -451,7 +453,9 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(continuationPrompt).toContain(`\`${helperCommand} runtime-proof --issue-id lin-issue-1 --origin <app-url> --format json\``);
-    expect(continuationPrompt).toContain('the helper fails closed when the permit blocks the mode or when only a local path is available');
+    expect(continuationPrompt).toContain(
+      'the helper fails closed when the permit blocks the mode, when the proof URL is loopback/local-only, or when only a local file path is available'
+    );
     expect(continuationPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
     expect(continuationPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');

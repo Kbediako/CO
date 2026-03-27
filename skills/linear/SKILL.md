@@ -117,6 +117,7 @@ The helper fails closed when:
 - the permit file is unreadable
 - the origin is not approved
 - the requested proof kind is blocked
+- the proof URL is loopback or otherwise local-only
 - only a local file path exists instead of a reviewer-visible proof URL
 
 ## Pre-Review Drain
