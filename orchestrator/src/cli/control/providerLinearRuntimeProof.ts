@@ -1,3 +1,4 @@
+import { BlockList, isIP } from 'node:net';
 import { resolve } from 'node:path';
 
 import {
@@ -66,6 +67,7 @@ export interface ResolveProviderLinearRuntimeProofInput {
 }
 
 const ALL_RUNTIME_PROOF_KINDS: ProviderLinearRuntimeProofKind[] = ['screenshot', 'external-link', 'video'];
+const LOOPBACK_HOSTS = createLoopbackBlockList();
 
 export async function resolveProviderLinearRuntimeProof(
   input: ResolveProviderLinearRuntimeProofInput
@@ -332,8 +334,21 @@ function normalizeHttpUrl(value: string | null): string | null {
 }
 
 function isLoopbackHostname(hostname: string): boolean {
-  const normalized = hostname.trim().toLowerCase();
-  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+  const normalized = hostname.trim().toLowerCase().replaceAll(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (!normalized) {
+    return false;
+  }
+  if (normalized === 'localhost' || normalized.endsWith('.localhost')) {
+    return true;
+  }
+  const ipVersion = isIP(normalized);
+  if (ipVersion === 4) {
+    return LOOPBACK_HOSTS.check(normalized, 'ipv4');
+  }
+  if (ipVersion === 6) {
+    return LOOPBACK_HOSTS.check(normalized, 'ipv6');
+  }
+  return false;
 }
 
 function normalizeOptionalText(value: unknown): string | null {
@@ -366,6 +381,13 @@ function formatKinds(kinds: ProviderLinearRuntimeProofKind[]): string {
     return `${kinds[0]} and ${kinds[1]}`;
   }
   return `${kinds.slice(0, -1).join(', ')}, and ${kinds.at(-1)}`;
+}
+
+function createLoopbackBlockList(): BlockList {
+  const blockList = new BlockList();
+  blockList.addSubnet('127.0.0.0', 8, 'ipv4');
+  blockList.addAddress('::1', 'ipv6');
+  return blockList;
 }
 
 function failure(

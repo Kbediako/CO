@@ -165,7 +165,12 @@ describe('resolveProviderLinearRuntimeProof', () => {
     });
   });
 
-  it('fails closed when the proof url is a loopback-only address', async () => {
+  it.each([
+    'http://localhost:3000/proof.png',
+    'http://127.0.0.2/proof.png',
+    'http://[::ffff:127.0.0.2]/proof.png',
+    'http://foo.localhost/proof.png'
+  ])('fails closed when the proof url is a loopback-only address (%s)', async (proofUrl) => {
     const repoRoot = await createRepoWithPermit({
       allowedSources: [
         {
@@ -183,7 +188,7 @@ describe('resolveProviderLinearRuntimeProof', () => {
       repoRoot,
       origin: 'https://app.example.com',
       kind: 'screenshot',
-      proofUrl: 'http://localhost:3000/proof.png'
+      proofUrl
     });
 
     expect(result).toMatchObject({
