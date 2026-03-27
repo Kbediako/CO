@@ -67,7 +67,7 @@ export interface ResolveProviderLinearRuntimeProofInput {
 }
 
 const ALL_RUNTIME_PROOF_KINDS: ProviderLinearRuntimeProofKind[] = ['screenshot', 'external-link', 'video'];
-const LOOPBACK_HOSTS = createLoopbackBlockList();
+const BLOCKED_PROOF_HOSTS = createBlockedProofHostBlockList();
 
 export async function resolveProviderLinearRuntimeProof(
   input: ResolveProviderLinearRuntimeProofInput
@@ -260,10 +260,12 @@ function buildWorkpadMarkdown(
   proof: ProviderLinearRuntimeProofResolutionSuccess['proof']
 ): string {
   const activeProof = proof!;
+  const inlineTitle = normalizeMarkdownInline(activeProof.title);
+  const inlineSummary = activeProof.summary ? normalizeMarkdownInline(activeProof.summary) : null;
   return [
     `- Runtime proof policy: ${policy.summary}`,
-    `- Runtime proof (${activeProof.kind}): [${escapeMarkdownLabel(activeProof.title)}](${activeProof.reviewer_url})`,
-    activeProof.summary ? `- Runtime proof summary: ${activeProof.summary}` : null
+    `- Runtime proof (${activeProof.kind}): [${escapeMarkdownLabel(inlineTitle)}](${activeProof.reviewer_url})`,
+    inlineSummary ? `- Runtime proof summary: ${inlineSummary}` : null
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');
@@ -274,11 +276,13 @@ function buildPrMarkdown(
   proof: ProviderLinearRuntimeProofResolutionSuccess['proof']
 ): string {
   const activeProof = proof!;
+  const inlineTitle = normalizeMarkdownInline(activeProof.title);
+  const inlineSummary = activeProof.summary ? normalizeMarkdownInline(activeProof.summary) : null;
   return [
     '### Runtime Proof',
     `- Policy: ${policy.summary}`,
-    `- Proof (${activeProof.kind}): [${escapeMarkdownLabel(activeProof.title)}](${activeProof.reviewer_url})`,
-    activeProof.summary ? `- Summary: ${activeProof.summary}` : null
+    `- Proof (${activeProof.kind}): [${escapeMarkdownLabel(inlineTitle)}](${activeProof.reviewer_url})`,
+    inlineSummary ? `- Summary: ${inlineSummary}` : null
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');
@@ -324,7 +328,7 @@ function normalizeHttpUrl(value: string | null): string | null {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       return null;
     }
-    if (isLoopbackHostname(parsed.hostname)) {
+    if (isBlockedProofHostname(parsed.hostname)) {
       return null;
     }
     return parsed.toString();
@@ -333,7 +337,7 @@ function normalizeHttpUrl(value: string | null): string | null {
   }
 }
 
-function isLoopbackHostname(hostname: string): boolean {
+function isBlockedProofHostname(hostname: string): boolean {
   const normalized = hostname.trim().toLowerCase().replaceAll(/^\[|\]$/g, '').replace(/\.$/, '');
   if (!normalized) {
     return false;
@@ -343,12 +347,16 @@ function isLoopbackHostname(hostname: string): boolean {
   }
   const ipVersion = isIP(normalized);
   if (ipVersion === 4) {
-    return LOOPBACK_HOSTS.check(normalized, 'ipv4');
+    return BLOCKED_PROOF_HOSTS.check(normalized, 'ipv4');
   }
   if (ipVersion === 6) {
-    return LOOPBACK_HOSTS.check(normalized, 'ipv6');
+    return BLOCKED_PROOF_HOSTS.check(normalized, 'ipv6');
   }
   return false;
+}
+
+function normalizeMarkdownInline(value: string): string {
+  return value.replaceAll(/\s*[\r\n]+\s*/g, ' ').trim();
 }
 
 function normalizeOptionalText(value: unknown): string | null {
@@ -383,12 +391,17 @@ function formatKinds(kinds: ProviderLinearRuntimeProofKind[]): string {
   return `${kinds.slice(0, -1).join(', ')}, and ${kinds.at(-1)}`;
 }
 
-function createLoopbackBlockList(): BlockList {
+function createBlockedProofHostBlockList(): BlockList {
   const blockList = new BlockList();
+  blockList.addSubnet('0.0.0.0', 8, 'ipv4');
   blockList.addSubnet('127.0.0.0', 8, 'ipv4');
-  blockList.addAddress('0.0.0.0', 'ipv4');
+  blockList.addSubnet('169.254.0.0', 16, 'ipv4');
+  blockList.addSubnet('224.0.0.0', 4, 'ipv4');
   blockList.addAddress('::', 'ipv6');
   blockList.addAddress('::1', 'ipv6');
+  blockList.addSubnet('fe80::', 10, 'ipv6');
+  blockList.addSubnet('fc00::', 7, 'ipv6');
+  blockList.addSubnet('ff00::', 8, 'ipv6');
   return blockList;
 }
 

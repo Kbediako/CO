@@ -29,5 +29,19 @@ describe('toolkit permit validation', () => {
       external_link: false,
       video: true
     });
+
+    expect(
+      resolveRuntimeProofCapabilities({
+        origin: 'https://example.com',
+        allow_video_capture: true,
+        runtime_proof: {
+          allow_video: false
+        }
+      })
+    ).toEqual({
+      screenshot: false,
+      external_link: false,
+      video: false
+    });
   });
 });

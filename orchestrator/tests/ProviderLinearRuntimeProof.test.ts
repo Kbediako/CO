@@ -25,6 +25,8 @@ describe('resolveProviderLinearRuntimeProof', () => {
       allowedSources: [
         {
           origin: 'https://app.example.com',
+          approval_id: 'permit-co-8',
+          approver: 'review-compliance',
           runtime_proof: {
             allow_screenshot: true,
             allow_external_link: false,
@@ -45,8 +47,8 @@ describe('resolveProviderLinearRuntimeProof', () => {
         origin: 'https://app.example.com',
         permit_path: join(repoRoot, 'compliance', 'permit.json'),
         permit_status: 'found',
-        approval_id: null,
-        approver: null,
+        approval_id: 'permit-co-8',
+        approver: 'review-compliance',
         capabilities: {
           screenshot: true,
           external_link: false,
@@ -99,6 +101,45 @@ describe('resolveProviderLinearRuntimeProof', () => {
     expect(result.handoff?.workpad_markdown).toContain('https://review-assets.example.com/co-8-dashboard.png');
     expect(result.handoff?.pr_markdown).toContain('### Runtime Proof');
     expect(result.handoff?.pr_markdown).toContain('Dashboard after launch-app validation');
+  });
+
+  it('renders multiline proof metadata as inline markdown text in handoff output', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof({
+      repoRoot,
+      origin: 'https://app.example.com/dashboard',
+      kind: 'screenshot',
+      proofUrl: 'https://review-assets.example.com/co-8-dashboard.png',
+      title: 'Dashboard after\nlaunch-app validation',
+      summary: 'Signed-in dashboard state\nused for review handoff.'
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.handoff?.workpad_markdown).toContain(
+      '[Dashboard after launch-app validation](https://review-assets.example.com/co-8-dashboard.png)'
+    );
+    expect(result.handoff?.workpad_markdown).toContain(
+      '- Runtime proof summary: Signed-in dashboard state used for review handoff.'
+    );
+    expect(result.handoff?.pr_markdown).toContain(
+      '- Proof (screenshot): [Dashboard after launch-app validation](https://review-assets.example.com/co-8-dashboard.png)'
+    );
+    expect(result.handoff?.pr_markdown).toContain('- Summary: Signed-in dashboard state used for review handoff.');
   });
 
   it('fails closed when the requested proof kind is blocked by policy', async () => {
@@ -169,8 +210,15 @@ describe('resolveProviderLinearRuntimeProof', () => {
     'http://localhost:3000/proof.png',
     'http://127.0.0.2/proof.png',
     'http://0.0.0.0:3000/proof.png',
+    'http://0.1.2.3:3000/proof.png',
+    'http://169.254.1.2/proof.png',
+    'http://224.0.0.1/proof.png',
     'http://[::]:3000/proof.png',
+    'http://[fe80::1]/proof.png',
+    'http://[fc00::1]/proof.png',
+    'http://[ff00::1]/proof.png',
     'http://[::ffff:127.0.0.2]/proof.png',
+    'http://[::ffff:169.254.1.2]/proof.png',
     'http://foo.localhost/proof.png'
   ])('fails closed when the proof url is a loopback-only address (%s)', async (proofUrl) => {
     const repoRoot = await createRepoWithPermit({
