@@ -1,6 +1,8 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import process from 'node:process';
 
 import {
@@ -26,6 +28,11 @@ import {
   type ProviderLinearAuditEntry
 } from './control/providerLinearWorkflowAudit.js';
 import {
+  resolveProviderLinearRuntimeProof,
+  type ProviderLinearRuntimeProofKind,
+  type ProviderLinearRuntimeProofPolicy
+} from './control/providerLinearRuntimeProof.js';
+import {
   runProviderLinearChildStreamShell,
   type ProviderLinearChildStreamResult
 } from './providerLinearChildStreamShell.js';
@@ -47,9 +54,11 @@ interface LinearCliShellDependencies {
   attachProviderLinearIssuePr: typeof attachProviderLinearIssuePr;
   runProviderLinearChildStreamShell: typeof runProviderLinearChildStreamShell;
   createProviderLinearFollowUpIssue: typeof createProviderLinearFollowUpIssue;
+  resolveProviderLinearRuntimeProof: typeof resolveProviderLinearRuntimeProof;
   appendAuditEntry: typeof appendProviderLinearAuditEntry;
   readTextFile: (path: string) => Promise<string>;
   getEnv: () => NodeJS.ProcessEnv;
+  getCwd: () => string;
   now: () => string;
   log: (line: string) => void;
   warn: (line: string) => void;
@@ -69,6 +78,38 @@ type LinearCliUsageError = Error & {
   result: LinearCliUsageFailureResult;
 };
 
+type ProviderLinearRuntimeProofResult =
+  | {
+      ok: true;
+      operation: 'runtime-proof';
+      issue_id: string;
+      source_setup: DispatchPilotSourceSetup | null;
+      policy: ProviderLinearRuntimeProofPolicy;
+      proof: {
+        kind: ProviderLinearRuntimeProofKind;
+        reviewer_url: string;
+        title: string;
+        summary: string | null;
+      } | null;
+      handoff: {
+        workpad_markdown: string;
+        pr_markdown: string;
+      } | null;
+    }
+  | {
+      ok: false;
+      operation: 'runtime-proof';
+      issue_id: string | null;
+      source_setup: DispatchPilotSourceSetup | null;
+      policy: ProviderLinearRuntimeProofPolicy | null;
+      error: {
+        code: string;
+        message: string;
+        status: number;
+        details?: Record<string, unknown>;
+      };
+    };
+
 const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   getProviderLinearIssueContext,
   upsertProviderLinearWorkpadComment,
@@ -77,9 +118,11 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   attachProviderLinearIssuePr,
   runProviderLinearChildStreamShell,
   createProviderLinearFollowUpIssue,
+  resolveProviderLinearRuntimeProof,
   appendAuditEntry: appendProviderLinearAuditEntry,
   readTextFile: async (path: string) => await readFile(path, 'utf8'),
   getEnv: () => process.env,
+  getCwd: () => process.cwd(),
   now: () => new Date().toISOString(),
   log: (line: string) => console.log(line),
   warn: (line: string) => console.warn(line),
@@ -229,6 +272,51 @@ export async function runLinearCliShell(
           sourceSetup: readSourceSetup(params.flags),
           env
         });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'runtime-proof': {
+        assertAllowedFlags(params.flags, [
+          'format',
+          'issue-id',
+          'workspace-id',
+          'team-id',
+          'project-id',
+          'origin',
+          'kind',
+          'proof-url',
+          'title',
+          'summary'
+        ]);
+        const issueId = requireFlag(params.flags, 'issue-id');
+        const sourceSetup = resolveAuditSourceSetup(params.flags, env);
+        const resolved = await dependencies.resolveProviderLinearRuntimeProof({
+          repoRoot: resolveRuntimeProofRepoRoot(dependencies.getCwd(), env),
+          origin: requireFlag(params.flags, 'origin'),
+          kind: readStringFlag(params.flags, 'kind') ?? null,
+          proofUrl: readStringFlag(params.flags, 'proof-url') ?? null,
+          title: readRawStringFlag(params.flags, 'title'),
+          summary: readRawStringFlag(params.flags, 'summary')
+        });
+        const result: ProviderLinearRuntimeProofResult = resolved.ok
+          ? {
+              ok: true,
+              operation: 'runtime-proof',
+              issue_id: issueId,
+              source_setup: sourceSetup,
+              policy: resolved.policy,
+              proof: resolved.proof,
+              handoff: resolved.handoff
+            }
+          : {
+              ok: false,
+              operation: 'runtime-proof',
+              issue_id: issueId,
+              source_setup: sourceSetup,
+              policy: resolved.policy,
+              error: resolved.error
+            };
         await recordAuditResult(result, params.flags, env, dependencies);
         emitJsonResult(result, dependencies);
         return;
@@ -413,6 +501,7 @@ type LinearCliResult =
   | ProviderLinearTransitionResult
   | ProviderLinearAttachPrResult
   | ProviderLinearCreateFollowUpResult
+  | ProviderLinearRuntimeProofResult
   | ProviderLinearChildStreamResult;
 
 async function recordAuditResult(
@@ -584,6 +673,23 @@ function buildAuditEntry(
         error_code: null,
         error_message: null
       };
+    case 'runtime-proof':
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: true,
+        issue_id: result.issue_id,
+        issue_identifier: null,
+        source_setup: result.source_setup,
+        action: result.proof?.kind ?? 'policy',
+        via: `permit:${result.policy.permit_status}`,
+        state: null,
+        ...followUpAuditFields,
+        comment_id: null,
+        attachment_id: null,
+        error_code: null,
+        error_message: null
+      };
     case 'child-stream':
       return {
         recorded_at: recordedAt,
@@ -675,4 +781,56 @@ function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): Dispatc
     env
   );
   return resolved.workspace_id || resolved.team_id || resolved.project_id ? resolved : null;
+}
+
+function resolveRuntimeProofRepoRoot(cwd: string, env: NodeJS.ProcessEnv): string {
+  const configuredRoot = normalizeEnvPath(env.CODEX_ORCHESTRATOR_ROOT);
+  if (!configuredRoot) {
+    return resolveRepoRootFromHint(cwd);
+  }
+  const configuredHint = isAbsolute(configuredRoot) ? configuredRoot : resolve(cwd, configuredRoot);
+  return resolveRepoRootFromHint(configuredHint);
+}
+
+function resolveRepoRootFromHint(rootHint: string): string {
+  const normalizedHint = resolve(rootHint);
+  const gitBoundary = findNearestGitBoundary(normalizedHint);
+  let current: string | null = normalizedHint;
+  while (current) {
+    if (existsSync(join(current, 'tasks', 'index.json'))) {
+      return current;
+    }
+    if (gitBoundary && current === gitBoundary) {
+      break;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return gitBoundary ?? normalizedHint;
+}
+
+function findNearestGitBoundary(start: string): string | null {
+  let current: string | null = resolve(start);
+  while (current) {
+    if (existsSync(join(current, '.git'))) {
+      return current;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return null;
+}
+
+function normalizeEnvPath(value: string | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }

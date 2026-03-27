@@ -1,5 +1,16 @@
+export interface CompliancePermitSource {
+  origin: string;
+  allow_video_capture?: boolean;
+  runtime_proof?: {
+    allow_screenshot?: boolean;
+    allow_external_link?: boolean;
+    allow_video?: boolean;
+  };
+  [key: string]: unknown;
+}
+
 export interface CompliancePermit {
-  allowedSources?: Array<{ origin: string; [key: string]: unknown }>;
+  allowedSources?: CompliancePermitSource[];
 }
 
 export function loadPermitFile(repoRoot: string): Promise<{
@@ -10,4 +21,7 @@ export function loadPermitFile(repoRoot: string): Promise<{
 }>;
 
 export function buildAllowedOriginSet(permit: CompliancePermit | null): Set<string>;
-export function findPermitEntry(permit: CompliancePermit | null, origin: string): { origin: string } | null;
+export function findPermitEntry(permit: CompliancePermit | null, origin: string): CompliancePermitSource | null;
+export function resolveRuntimeProofCapabilities(
+  permitEntry: CompliancePermitSource | null
+): { screenshot: boolean; external_link: boolean; video: boolean };

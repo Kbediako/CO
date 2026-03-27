@@ -19,6 +19,24 @@ export async function loadPermitFile(repoRoot) {
   }
 }
 
+export function resolveRuntimeProofCapabilities(permitEntry) {
+  const runtimeProof =
+    permitEntry && typeof permitEntry.runtime_proof === 'object' && permitEntry.runtime_proof !== null
+      ? permitEntry.runtime_proof
+      : {};
+  const screenshot = runtimeProof.allow_screenshot === true;
+  const externalLink = runtimeProof.allow_external_link === true;
+  const video =
+    typeof runtimeProof.allow_video === 'boolean'
+      ? runtimeProof.allow_video === true
+      : permitEntry?.allow_video_capture === true;
+  return {
+    screenshot,
+    external_link: externalLink,
+    video
+  };
+}
+
 export function buildAllowedOriginSet(permit) {
   const allowed = new Set();
   const sources = Array.isArray(permit?.allowedSources) ? permit.allowedSources : [];

@@ -1,0 +1,1 @@
+import './permit.test.ts';
