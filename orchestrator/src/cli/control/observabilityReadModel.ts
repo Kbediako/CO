@@ -179,6 +179,21 @@ export interface ControlProviderRetryState {
   error: string | null;
 }
 
+export interface ControlPollingHealthPayload {
+  enabled: boolean;
+  interval_ms: number | null;
+  checking: boolean;
+  queued: boolean;
+  last_mode: 'poll' | 'refresh' | null;
+  last_requested_at: string | null;
+  last_completed_at: string | null;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  last_error: string | null;
+  next_poll_at: string | null;
+  next_poll_in_ms: number | null;
+}
+
 export interface ControlRunningPayload {
   issue_id: string | null;
   issue_identifier: string;
@@ -226,6 +241,7 @@ export interface ControlStatePayload {
   tracked?: ControlTrackedPayload;
   provider_intake?: ProviderIntakeSummaryPayload;
   provider_workflow?: ControlProviderWorkflowPayload;
+  polling?: ControlPollingHealthPayload | null;
 }
 
 export interface ControlSelectedRunRuntimeSnapshot {
@@ -234,6 +250,7 @@ export interface ControlSelectedRunRuntimeSnapshot {
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  polling?: ControlPollingHealthPayload | null;
 }
 
 export interface ControlCompatibilitySourceContext extends SharedSelectedProjectionFields {}
@@ -248,6 +265,7 @@ export interface ControlCompatibilityRuntimeSnapshot {
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  polling?: ControlPollingHealthPayload | null;
 }
 
 export interface CompatibilityProjectionIssueRecord {
@@ -267,11 +285,14 @@ export interface ControlCompatibilityProjectionSnapshot {
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  polling?: ControlPollingHealthPayload | null;
 }
 
 export interface ControlIssuePayload {
   issue_identifier: string;
   issue_id: string | null;
+  task_id: string | null;
+  run_id: string | null;
   status: string;
   raw_status: string;
   display_status: string;
@@ -294,6 +315,7 @@ export interface ControlIssuePayload {
   recent_events: Array<Pick<ControlLatestEventPayload, 'at' | 'event' | 'message'>>;
   last_error: string | null;
   tracked: ControlTrackedPayload | Record<string, never>;
+  provider_linear_worker_proof?: ProviderLinearWorkerProof | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
 }
 

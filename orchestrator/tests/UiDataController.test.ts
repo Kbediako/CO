@@ -2,27 +2,9 @@ import http from 'node:http';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildUiDataset } from '../src/cli/control/selectedRunPresenter.js';
+import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
 import { handleUiDataRequest } from '../src/cli/control/uiDataController.js';
-import type { ControlState } from '../src/cli/control/controlState.js';
-import type {
-  ControlSelectedRunRuntimeSnapshot,
-  SelectedRunContext
-} from '../src/cli/control/observabilityReadModel.js';
-import type { CliManifest } from '../src/cli/types.js';
-
-const CONTROL_STATE: ControlState = {
-  run_id: 'run-1',
-  control_seq: 0,
-  latest_action: null,
-  history: [],
-  pending_confirmation: null,
-  queued_questions: null,
-  question_events: [],
-  sessions: null,
-  transport_idempotency: null,
-  provider_traces: null
-};
+import type { ControlCompatibilityProjectionSnapshot } from '../src/cli/control/observabilityReadModel.js';
 
 function createResponseRecorder() {
   const state: {
@@ -50,48 +32,27 @@ function createResponseRecorder() {
   return { res, state };
 }
 
-function buildSelectedRun(overrides: Partial<SelectedRunContext> = {}): SelectedRunContext {
+function buildProjection(
+  overrides: Partial<ControlCompatibilityProjectionSnapshot> = {}
+): ControlCompatibilityProjectionSnapshot {
   return {
-    issueIdentifier: 'ISSUE-1311',
-    issueId: 'issue-1311',
-    taskId: 'task-1311',
-    runId: 'run-1',
-    lookupAliases: ['ISSUE-1311', 'task-1311', 'run-1'],
-    rawStatus: 'in_progress',
-    displayStatus: 'paused',
-    statusReason: 'control_pause',
-    startedAt: '2026-03-20T00:00:00.000Z',
-    updatedAt: '2026-03-20T00:02:00.000Z',
-    completedAt: null,
-    summary: 'Waiting on operator',
-    lastError: null,
-    latestAction: 'pause',
-    latestEvent: {
-      at: '2026-03-20T00:02:00.000Z',
-      event: 'pause',
-      message: 'Waiting on operator',
-      requestedBy: 'operator',
-      reason: 'control_pause'
+    running: [],
+    retrying: [],
+    codexTotals: {
+      input_tokens: 0,
+      output_tokens: 0,
+      total_tokens: 0,
+      seconds_running: 0
     },
-    workspacePath: '/repo/.workspaces/task-1311',
-    pipelineTitle: 'UI Data Controller',
-    stages: [],
-    approvalsTotal: 0,
-    questionSummary: {
-      queuedCount: 0,
-      latestQuestion: null
-    },
-    tracked: null,
-    ...overrides
-  };
-}
-
-function buildSnapshot(selected: SelectedRunContext | null): ControlSelectedRunRuntimeSnapshot {
-  return {
-    selected,
+    rateLimits: null,
+    issues: [],
+    selected: null,
     dispatchPilot: null,
-    tracked: selected?.tracked ?? null,
-    providerIntake: null
+    tracked: null,
+    providerIntake: null,
+    providerWorkflow: null,
+    polling: null,
+    ...overrides
   };
 }
 
@@ -105,18 +66,7 @@ describe('UiDataController', () => {
       } as Pick<http.IncomingMessage, 'method' | 'url'>,
       res,
       presenterContext: {
-        controlStore: {
-          snapshot: () => CONTROL_STATE
-        },
-        paths: {
-          manifestPath: '/repo/.runs/task-1039/cli/run-1/manifest.json',
-          runDir: '/repo/.runs/task-1039/cli/run-1',
-          logPath: '/repo/.runs/task-1039/cli/run-1/log.txt'
-        },
-        readSelectedRunSnapshot: async () => ({
-          selected: null,
-          compatibilitySelected: null
-        })
+        readCompatibilityProjection: async () => buildProjection()
       }
     });
 
@@ -135,18 +85,7 @@ describe('UiDataController', () => {
       } as Pick<http.IncomingMessage, 'method' | 'url'>,
       res,
       presenterContext: {
-        controlStore: {
-          snapshot: () => CONTROL_STATE
-        },
-        paths: {
-          manifestPath: '/repo/.runs/task-1039/cli/run-1/manifest.json',
-          runDir: '/repo/.runs/task-1039/cli/run-1',
-          logPath: '/repo/.runs/task-1039/cli/run-1/log.txt'
-        },
-        readSelectedRunSnapshot: async () => ({
-          selected: null,
-          compatibilitySelected: null
-        })
+        readCompatibilityProjection: async () => buildProjection()
       }
     });
 
@@ -165,7 +104,7 @@ describe('UiDataController', () => {
     });
   });
 
-  it('returns the selected-run ui dataset with no-store headers', async () => {
+  it('returns the operator-dashboard ui dataset with no-store headers', async () => {
     const { res, state } = createResponseRecorder();
     const handled = await handleUiDataRequest({
       req: {
@@ -174,18 +113,7 @@ describe('UiDataController', () => {
       } as Pick<http.IncomingMessage, 'method' | 'url'>,
       res,
       presenterContext: {
-        controlStore: {
-          snapshot: () => CONTROL_STATE
-        },
-        paths: {
-          manifestPath: '/repo/.runs/task-1039/cli/run-1/manifest.json',
-          runDir: '/repo/.runs/task-1039/cli/run-1',
-          logPath: '/repo/.runs/task-1039/cli/run-1/log.txt'
-        },
-        readSelectedRunSnapshot: async () => ({
-          selected: null,
-          compatibilitySelected: null
-        })
+        readCompatibilityProjection: async () => buildProjection()
       }
     });
 
@@ -196,70 +124,49 @@ describe('UiDataController', () => {
       'Cache-Control': 'no-store'
     });
     expect(state.body).toMatchObject({
-      tasks: [],
-      runs: [],
+      mode: 'operator_dashboard',
+      read_only: true,
+      counts: {
+        running: 0,
+        retrying: 0,
+        issues: 0
+      },
+      running: [],
+      retrying: [],
+      issues: [],
       selected: null
     });
   });
 
-  it('prefers selected-run status truth over raw manifest status in the ui dataset', () => {
+  it('builds the operator-dashboard dataset directly from the compatibility projection', () => {
     const dataset = buildUiDataset({
-      manifest: {
-        run_id: 'run-1',
-        task_id: 'task-1311',
-        status: 'succeeded',
-        started_at: '2026-03-20T00:00:00.000Z',
-        updated_at: '2026-03-20T00:05:00.000Z',
-        completed_at: '2026-03-20T00:05:00.000Z',
-        summary: 'stale manifest summary',
-        commands: [],
-        approvals: [],
-        pipeline_title: 'Task 1311'
-      } as CliManifest,
-      snapshot: buildSnapshot(buildSelectedRun()),
-      control: {
-        ...CONTROL_STATE,
-        latest_action: {
-          action: 'pause',
-          requested_by: 'operator',
-          requested_at: '2026-03-20T00:02:00.000Z',
-          reason: 'control_pause'
+      projection: buildProjection({
+        polling: {
+          enabled: true,
+          interval_ms: 15000,
+          checking: true,
+          queued: false,
+          last_mode: 'poll',
+          last_requested_at: '2026-03-27T04:06:00.000Z',
+          last_completed_at: null,
+          last_success_at: null,
+          last_error_at: null,
+          last_error: null,
+          next_poll_at: null,
+          next_poll_in_ms: null
         }
-      },
-      paths: {
-        manifestPath: '/repo/.runs/task-1311/cli/run-1/manifest.json',
-        runDir: '/repo/.runs/task-1311/cli/run-1',
-        logPath: '/repo/.runs/task-1311/cli/run-1/log.txt'
-      },
-      generatedAt: '2026-03-20T00:06:00.000Z'
-    }) as {
-      tasks: Array<{
-        status?: string;
-        raw_status?: string;
-        display_status?: string;
-        bucket?: string;
-        bucket_reason?: string;
-      }>;
-      runs: Array<{
-        status?: string;
-        raw_status?: string;
-        display_status?: string;
-      }>;
-      selected: { display_status?: string } | null;
-    };
-
-    expect(dataset.selected?.display_status).toBe('paused');
-    expect(dataset.tasks[0]).toMatchObject({
-      status: 'in_progress',
-      raw_status: 'in_progress',
-      display_status: 'paused',
-      bucket: 'ongoing',
-      bucket_reason: 'paused'
+      }),
+      generatedAt: '2026-03-27T04:07:00.000Z'
     });
-    expect(dataset.runs[0]).toMatchObject({
-      status: 'in_progress',
-      raw_status: 'in_progress',
-      display_status: 'paused'
+
+    expect(dataset).toMatchObject({
+      generated_at: '2026-03-27T04:07:00.000Z',
+      mode: 'operator_dashboard',
+      polling: {
+        enabled: true,
+        checking: true,
+        last_mode: 'poll'
+      }
     });
   });
 });

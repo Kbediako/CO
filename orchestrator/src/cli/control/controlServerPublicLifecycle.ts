@@ -18,6 +18,13 @@ import type {
 import type { ProviderIntakeState } from './providerIntakeState.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
+  initializeProviderPollingHealth,
+  markProviderPollingCompleted,
+  markProviderPollingStarted,
+  noteProviderPollingRequest,
+  type ControlPollingMode
+} from './providerPollingHealth.js';
+import {
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
   type ControlServerOwnedLifecycleState
@@ -104,6 +111,11 @@ export async function startControlServerPublicLifecycle(
         }
       )
     : null;
+  if (startupInputs.requestContextShared.providerIssueHandoff) {
+    initializeProviderPollingHealth(startupInputs.requestContextShared.providerIssueHandoff, {
+      intervalMs: PROVIDER_REFRESH_INTERVAL_MS
+    });
+  }
   const providerRefreshStartupTrigger = providerRefreshCoordinator
     ? scheduleStartupProviderRefresh(providerRefreshCoordinator.trigger)
     : null;
@@ -145,6 +157,10 @@ export function runProviderIssueHandoffRefresh(
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   if (state.active) {
+    noteProviderPollingRequest(providerIssueHandoff, {
+      mode: 'refresh',
+      queued: Boolean(options?.queueIfBusy)
+    });
     if (!options?.queueIfBusy) {
       return state.active.then(() => ({
         queued: true,
@@ -157,19 +173,29 @@ export function runProviderIssueHandoffRefresh(
         coalesced: true
       }));
     }
-    return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, () => providerIssueHandoff.refresh()).then(
-      () => ({
-        queued: true,
-        coalesced: false
-      })
-    );
-  }
-  return startProviderIssueHandoffOperation(providerIssueHandoff, state, () => providerIssueHandoff.refresh()).then(
-    () => ({
+    return queueProviderIssueHandoffRefresh(
+      providerIssueHandoff,
+      state,
+      () => providerIssueHandoff.refresh(),
+      {
+        mode: 'refresh'
+      }
+    ).then(() => ({
       queued: true,
       coalesced: false
-    })
-  );
+    }));
+  }
+  return startProviderIssueHandoffOperation(
+    providerIssueHandoff,
+    state,
+    () => providerIssueHandoff.refresh(),
+    {
+      mode: 'refresh'
+    }
+  ).then(() => ({
+    queued: true,
+    coalesced: false
+  }));
 }
 
 export function runProviderIssueHandoffRehydrate(
@@ -189,7 +215,10 @@ export function runProviderIssueHandoffPoll(
       providerIssueHandoff.poll
         ? providerIssueHandoff.poll(input)
         : providerIssueHandoff.refresh(),
-    options
+    options,
+    {
+      mode: providerIssueHandoff.poll ? 'poll' : 'refresh'
+    }
   );
 }
 
@@ -222,6 +251,8 @@ function createProviderRefreshCoordinator(
       } catch {
         // Best-effort provider refreshes should not crash the public lifecycle.
       }
+    }, undefined, {
+      mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
     });
   const timer = setInterval(() => {
     void trigger();
@@ -291,29 +322,65 @@ function dedupeProviderPollTrackedIssues(
 function runProviderIssueHandoffOperation(
   providerIssueHandoff: ProviderIssueHandoffService,
   operation: () => Promise<void>,
-  options?: { queueIfBusy?: boolean }
+  options?: { queueIfBusy?: boolean },
+  healthContext?: { mode: ControlPollingMode }
 ): Promise<void> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
+  if (healthContext) {
+    noteProviderPollingRequest(providerIssueHandoff, {
+      mode: healthContext.mode,
+      queued: Boolean(state.active && options?.queueIfBusy)
+    });
+  }
   if (state.active) {
     if (!options?.queueIfBusy) {
       return state.active;
     }
-    return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation);
+    return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation, healthContext);
   }
-  return startProviderIssueHandoffOperation(providerIssueHandoff, state, operation);
+  return startProviderIssueHandoffOperation(providerIssueHandoff, state, operation, healthContext);
 }
 
 function startProviderIssueHandoffOperation(
   providerIssueHandoff: ProviderIssueHandoffService,
   state: ProviderIssueHandoffOperationState,
-  operation: () => Promise<void>
+  operation: () => Promise<void>,
+  healthContext?: { mode: ControlPollingMode }
 ): Promise<void> {
-  const operationPromise = operation().finally(() => {
-    if (state.active === operationPromise) {
-      state.active = null;
-      clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
-    }
-  });
+  if (healthContext) {
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: healthContext.mode
+    });
+  }
+  let operationResult: Promise<void>;
+  try {
+    operationResult = operation();
+  } catch (error) {
+    operationResult = Promise.reject(error);
+  }
+  const operationPromise = operationResult
+    .then(
+      (value) => {
+        if (healthContext) {
+          markProviderPollingCompleted(providerIssueHandoff);
+        }
+        return value;
+      },
+      (error: unknown) => {
+        if (healthContext) {
+          markProviderPollingCompleted(providerIssueHandoff, {
+            error
+          });
+        }
+        throw error;
+      }
+    )
+    .finally(() => {
+      if (state.active === operationPromise) {
+        state.active = null;
+        clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
+      }
+    });
   state.active = operationPromise;
   return operationPromise;
 }
@@ -321,7 +388,8 @@ function startProviderIssueHandoffOperation(
 function queueProviderIssueHandoffRefresh(
   providerIssueHandoff: ProviderIssueHandoffService,
   state: ProviderIssueHandoffOperationState,
-  operation: () => Promise<void>
+  operation: () => Promise<void>,
+  healthContext?: { mode: ControlPollingMode }
 ): Promise<void> {
   if (state.queuedRefresh) {
     return state.queuedRefresh;
@@ -336,7 +404,7 @@ function queueProviderIssueHandoffRefresh(
         return;
       }
       state.queuedRefresh = null;
-      return runProviderIssueHandoffOperation(providerIssueHandoff, operation);
+      return startProviderIssueHandoffOperation(providerIssueHandoff, state, operation, healthContext);
     })
     .finally(() => {
       if (state.queuedRefresh === queuedRefresh) {

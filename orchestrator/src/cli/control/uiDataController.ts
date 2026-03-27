@@ -1,7 +1,10 @@
 import http from 'node:http';
 
+import {
+  readUiDataset,
+  type OperatorDashboardPresenterContext
+} from './operatorDashboardPresenter.js';
 import { buildCompatibilityErrorResponse } from './observabilitySurface.js';
-import { readUiDataset, type SelectedRunPresenterContext } from './selectedRunPresenter.js';
 
 const UI_DATA_PATH = '/ui/data.json';
 const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -9,7 +12,7 @@ const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Contr
 export interface UiDataControllerContext {
   req: Pick<http.IncomingMessage, 'method' | 'url'>;
   res: http.ServerResponse;
-  presenterContext: SelectedRunPresenterContext;
+  presenterContext: OperatorDashboardPresenterContext;
 }
 
 export async function handleUiDataRequest(context: UiDataControllerContext): Promise<boolean> {

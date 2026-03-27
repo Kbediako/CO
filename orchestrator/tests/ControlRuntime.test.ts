@@ -4,6 +4,12 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { ControlStateStore } from '../src/cli/control/controlState.js';
+import type { ProviderIssueHandoffService } from '../src/cli/control/providerIssueHandoff.js';
+import {
+  initializeProviderPollingHealth,
+  markProviderPollingCompleted,
+  markProviderPollingStarted
+} from '../src/cli/control/providerPollingHealth.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
@@ -1600,6 +1606,44 @@ describe('ControlRuntime', () => {
       task_id: 'task-1303-child',
       state: 'running',
       run_id: 'run-child'
+    });
+  });
+
+  it('surfaces provider polling health through compatibility projections when a provider handoff is registered', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+
+    initializeProviderPollingHealth(providerIssueHandoff, { intervalMs: 15000 });
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'poll',
+      atMs: Date.parse('2026-03-07T00:00:05.000Z')
+    });
+    markProviderPollingCompleted(providerIssueHandoff, {
+      atMs: Date.parse('2026-03-07T00:00:06.000Z')
+    });
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+    expect(compatibilityProjection.polling).toMatchObject({
+      enabled: true,
+      interval_ms: 15000,
+      checking: false,
+      queued: false,
+      last_mode: 'poll',
+      last_requested_at: '2026-03-07T00:00:05.000Z',
+      last_completed_at: '2026-03-07T00:00:06.000Z',
+      last_success_at: '2026-03-07T00:00:06.000Z'
     });
   });
 });

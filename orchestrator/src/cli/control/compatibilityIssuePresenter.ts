@@ -99,7 +99,8 @@ export function buildCompatibilityProjectionSnapshot(
     dispatchPilot: snapshot.dispatchPilot,
     tracked: snapshot.tracked,
     providerIntake: snapshot.providerIntake,
-    providerWorkflow: snapshot.providerWorkflow
+    providerWorkflow: snapshot.providerWorkflow,
+    polling: snapshot.polling
   };
 }
 
@@ -285,12 +286,14 @@ export function buildCompatibilityIssuePayload(input: {
   return {
     issue_identifier: input.source.issueIdentifier,
     issue_id: input.source.issueId,
+    task_id: input.source.taskId,
+    run_id: input.source.runId,
     status: resolveCompatibilityIssueStatus(input.running, input.retry, input.source),
     raw_status: input.source.rawStatus,
     display_status: input.source.displayStatus,
     status_reason: input.source.statusReason,
     workspace: {
-      path: input.source.workspacePath
+      path: input.source.workspacePath ?? input.source.providerLinearWorkerProof?.workspace_path ?? null
     },
     attempts: buildCompatibilityIssueAttempts(input.source, input.retry),
     running: input.running,
@@ -304,6 +307,9 @@ export function buildCompatibilityIssuePayload(input: {
     recent_events: recentEvents,
     last_error: input.source.lastError,
     tracked: input.source.tracked ?? {},
+    ...(input.source.providerLinearWorkerProof
+      ? { provider_linear_worker_proof: input.source.providerLinearWorkerProof }
+      : {}),
     ...(input.dispatchPilotSummary ? { dispatch_pilot: input.dispatchPilotSummary } : {})
   };
 }

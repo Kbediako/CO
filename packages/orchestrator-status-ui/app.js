@@ -2,757 +2,523 @@ const params = new URLSearchParams(window.location.search);
 const runnerHosted = isRunnerHosted();
 const dataUrl =
   params.get('data') || (runnerHosted ? '/ui/data.json' : '../../out/0911-orchestrator-status-ui/data.json');
-const refreshMs = clampNumber(Number(params.get('refresh') || 4000), 2000, 5000);
-const initialControlBase = runnerHosted ? window.location.origin : null;
-const controlEnabled = Boolean(runnerHosted && initialControlBase);
+const refreshMs = clampNumber(Number(params.get('refresh') || 4000), 2000, 15000);
 
 const elements = {
-  taskFilter: document.getElementById('taskFilter'),
-  bucketFilter: document.getElementById('bucketFilter'),
+  authBadge: document.getElementById('authBadge'),
+  heroNote: document.getElementById('heroNote'),
+  refreshButton: document.getElementById('refreshButton'),
+  runningCount: document.getElementById('runningCount'),
+  runningMeta: document.getElementById('runningMeta'),
+  retryCount: document.getElementById('retryCount'),
+  retryMeta: document.getElementById('retryMeta'),
+  tokenTotal: document.getElementById('tokenTotal'),
+  tokenMeta: document.getElementById('tokenMeta'),
+  runtimeTotal: document.getElementById('runtimeTotal'),
+  runtimeMeta: document.getElementById('runtimeMeta'),
+  pollStatus: document.getElementById('pollStatus'),
+  pollMeta: document.getElementById('pollMeta'),
+  rateLimitStatus: document.getElementById('rateLimitStatus'),
+  rateLimitMeta: document.getElementById('rateLimitMeta'),
+  runningList: document.getElementById('runningList'),
+  retryList: document.getElementById('retryList'),
+  statusFilter: document.getElementById('statusFilter'),
   searchInput: document.getElementById('searchInput'),
-  controlStatus: document.getElementById('controlStatus'),
-  controlHint: document.getElementById('controlHint'),
-  syncStatus: document.getElementById('syncStatus'),
-  kpiActive: document.getElementById('kpi-active'),
-  kpiOngoing: document.getElementById('kpi-ongoing'),
-  kpiComplete: document.getElementById('kpi-complete'),
-  kpiPending: document.getElementById('kpi-pending'),
-  taskTableBody: document.getElementById('taskTableBody'),
-  runDetail: document.getElementById('runDetail'),
-  runOverlay: document.getElementById('runOverlay'),
-  runModal: document.getElementById('runModal'),
-  runClose: document.getElementById('runClose'),
-  questionOverlay: document.getElementById('questionOverlay'),
-  questionModal: document.getElementById('questionModal'),
-  questionClose: document.getElementById('questionClose'),
-  questionPrompt: document.getElementById('questionPrompt'),
-  questionAnswer: document.getElementById('questionAnswer'),
-  questionSubmit: document.getElementById('questionSubmit'),
-  questionDismiss: document.getElementById('questionDismiss'),
-  codebasePanel: document.getElementById('codebasePanel'),
-  activityPanel: document.getElementById('activityPanel'),
+  issueList: document.getElementById('issueList'),
+  issueDetail: document.getElementById('issueDetail'),
   dataSource: document.getElementById('dataSource'),
-  sideToggle: document.getElementById('sideToggle'),
-  sidePanel: document.getElementById('sidePanel'),
-  sideOverlay: document.getElementById('sideOverlay'),
-  sideClose: document.getElementById('sideClose')
+  syncStatus: document.getElementById('syncStatus'),
+  refreshStatus: document.getElementById('refreshStatus')
 };
 
 const state = {
   data: null,
-  selectedTaskId: null,
-  focusedTaskId: null,
-  control: {
-    enabled: controlEnabled,
-    baseUrl: initialControlBase,
-    token: '',
-    session: runnerHosted,
-    events: [],
-    confirmations: [],
-    questions: [],
-    status: controlEnabled ? 'connecting' : 'disabled'
-  },
+  loading: false,
+  selectedIssueIdentifier: null,
   filters: {
-    task: 'all',
-    bucket: 'all',
+    status: 'all',
     search: ''
   },
-  loading: false,
-  sideOpen: false,
-  runOpen: false,
-  questionOpen: false,
-  sideReturnFocus: null,
-  runReturnFocus: null,
-  questionReturnFocus: null,
-  activeQuestionId: null,
-  activeQuestionPrompt: ''
+  auth: {
+    enabled: runnerHosted,
+    baseUrl: runnerHosted ? window.location.origin : null,
+    token: '',
+    status: runnerHosted ? 'connecting' : 'disabled'
+  },
+  refreshRequest: {
+    pending: false,
+    status: 'Not requested',
+    error: null
+  }
 };
 
-let controlPollTimer = null;
-let controlStreamAbort = null;
-let controlReconnectTimer = null;
+let refreshTimer = null;
 
 elements.dataSource.textContent = `Data source: ${dataUrl}`;
-renderControlHeader();
-
-function selectRow(row) {
-  if (!row || !row.dataset.taskId) {
-    return false;
-  }
-  const selected = selectTaskById(row.dataset.taskId, true);
-  if (selected) {
-    openRunModal();
-  }
-  return selected;
-}
-
-function isSelectionKey(event) {
-  return event.key === 'Enter' || event.key === ' ' || event.key === 'Space' || event.key === 'Spacebar';
-}
-
-function isEditableTarget(target) {
-  if (!target || target.nodeType !== Node.ELEMENT_NODE) {
-    return false;
-  }
-  if (target.isContentEditable) {
-    return true;
-  }
-  const tagName = target.tagName;
-  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
-}
-
-function handleRowSelectionKey(event) {
-  if (!isSelectionKey(event)) {
-    return;
-  }
-  event.preventDefault();
-  selectRow(event.currentTarget);
-}
-
-function selectTaskById(taskId, shouldFocus) {
-  if (!taskId) {
-    return false;
-  }
-  state.selectedTaskId = taskId;
-  render();
-  if (shouldFocus) {
-    const safeId = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(taskId) : taskId.replace(/"/g, '\\"');
-    const row = elements.taskTableBody.querySelector(`tr[data-task-id="${safeId}"]`);
-    if (row) {
-      row.focus();
-    }
-  }
-  return true;
-}
-
-elements.taskTableBody.addEventListener('click', (event) => {
-  const row = event.target.closest('tr');
-  selectRow(row);
+elements.refreshButton.addEventListener('click', () => {
+  requestRefresh();
 });
-
-elements.taskTableBody.addEventListener('focusin', (event) => {
-  const row = event.target.closest('tr');
-  if (!row || !row.dataset.taskId) {
-    return;
-  }
-  state.focusedTaskId = row.dataset.taskId;
-});
-
-elements.taskTableBody.addEventListener('focusout', (event) => {
-  const nextFocus = event.relatedTarget;
-  if (!nextFocus || !elements.taskTableBody.contains(nextFocus)) {
-    state.focusedTaskId = null;
-  }
-});
-
-elements.taskFilter.addEventListener('change', (event) => {
-  state.filters.task = event.target.value;
-  if (state.filters.task !== 'all') {
-    state.selectedTaskId = state.filters.task;
-  }
+elements.statusFilter.addEventListener('change', (event) => {
+  state.filters.status = event.target.value;
   render();
 });
-
-elements.bucketFilter.addEventListener('change', (event) => {
-  state.filters.bucket = event.target.value;
-  render();
-});
-
 elements.searchInput.addEventListener('input', (event) => {
   state.filters.search = event.target.value;
   render();
 });
 
+boot();
 
-elements.runClose.addEventListener('click', () => {
-  setRunModalState(false);
-});
-
-elements.runOverlay.addEventListener('click', () => {
-  setRunModalState(false);
-});
-
-if (elements.questionClose) {
-  elements.questionClose.addEventListener('click', () => {
-    setQuestionModalState(false);
-  });
-}
-
-if (elements.questionOverlay) {
-  elements.questionOverlay.addEventListener('click', () => {
-    setQuestionModalState(false);
-  });
-}
-
-if (elements.questionSubmit) {
-  elements.questionSubmit.addEventListener('click', () => {
-    submitQuestionAnswer();
-  });
-}
-
-if (elements.questionDismiss) {
-  elements.questionDismiss.addEventListener('click', () => {
-    dismissActiveQuestion();
-  });
-}
-
-elements.sideToggle.addEventListener('click', () => {
-  toggleSidePanel();
-});
-
-elements.sideClose.addEventListener('click', () => {
-  setSidePanelState(false);
-});
-
-elements.sideOverlay.addEventListener('click', () => {
-  setSidePanelState(false);
-});
-
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Tab') {
-    if (state.questionOpen) {
-      if (trapQuestionFocus(event)) {
-        return;
-      }
-    } else {
-      const containers = [];
-      if (state.runOpen) {
-        containers.push(elements.runModal);
-      }
-      if (state.sideOpen) {
-        containers.push(elements.sidePanel);
-      }
-      if (trapFocus(event, containers)) {
-        return;
-      }
-    }
+async function boot() {
+  if (state.auth.enabled) {
+    await initSession();
   }
-  if (event.key === 'Escape') {
-    if (state.questionOpen) {
-      setQuestionModalState(false);
+  await loadData();
+  refreshTimer = window.setInterval(() => {
+    void loadData();
+  }, refreshMs);
+}
+
+async function initSession() {
+  const url = buildControlUrl('/auth/session');
+  if (!url) {
+    state.auth.status = 'disabled';
+    render();
+    return;
+  }
+
+  state.auth.status = 'connecting';
+  render();
+  try {
+    const response = await fetch(url, { method: 'POST', cache: 'no-store' });
+    if (!response.ok) {
+      state.auth.status = 'unauthorized';
+      render();
       return;
     }
-    if (state.runOpen) {
-      setRunModalState(false);
-      return;
-    }
-    if (state.sideOpen) {
-      setSidePanelState(false);
-      return;
-    }
+    const payload = await response.json();
+    state.auth.token = typeof payload.token === 'string' ? payload.token : '';
+    state.auth.status = state.auth.token ? 'ready' : 'unauthorized';
+  } catch {
+    state.auth.status = 'unauthorized';
   }
-  if (isEditableTarget(event.target)) {
-    return;
-  }
-  if (!isSelectionKey(event)) {
-    return;
-  }
-  if (!state.focusedTaskId) {
-    return;
-  }
-  event.preventDefault();
-  if (selectTaskById(state.focusedTaskId, true)) {
-    openRunModal();
-  }
-});
+  render();
+}
 
-setInterval(() => {
-  loadData();
-}, refreshMs);
-
-loadData();
-initControl();
-
-async function loadData() {
-  if (state.control.session && !state.control.token) {
-    return;
-  }
+async function loadData(retriedAfterUnauthorized = false) {
   if (state.loading) {
     return;
   }
+  if (state.auth.enabled && !state.auth.token) {
+    if (!retriedAfterUnauthorized) {
+      await initSession();
+      if (state.auth.token) {
+        return loadData(true);
+      }
+    }
+    setSyncStatus(state.auth.status === 'unauthorized' ? 'Session required' : 'Waiting for session', false, true);
+    render();
+    return;
+  }
+
   state.loading = true;
   setSyncStatus(null, true);
   try {
-    const headers = buildDataHeaders();
     const response = await fetch(dataUrl, {
       cache: 'no-store',
-      ...(headers ? { headers } : {})
+      ...(buildDataHeaders() ? { headers: buildDataHeaders() } : {})
     });
+    if (response.status === 401 || response.status === 403) {
+      const recovered = !retriedAfterUnauthorized && (await renewSession());
+      if (recovered) {
+        state.loading = false;
+        return loadData(true);
+      }
+      setSyncStatus('Session required', false, true);
+      return;
+    }
     if (!response.ok) {
       throw new Error(`Failed to load data (${response.status})`);
     }
-    const payload = await response.json();
-    state.data = payload;
-    setSyncStatus(formatTimestamp(payload.generated_at), false);
+    state.data = await response.json();
+    syncSelectedIssue();
+    setSyncStatus(formatTimestamp(state.data.generated_at), false);
   } catch (error) {
-    setSyncStatus(error.message || 'Failed to load data', false, true);
+    setSyncStatus(error instanceof Error ? error.message : 'Failed to load data', false, true);
   } finally {
     state.loading = false;
     render();
   }
 }
 
-async function initControl() {
-  stopControlSession();
-  if (!state.control.enabled || !state.control.baseUrl) {
-    state.control.status = 'disabled';
+async function requestRefresh(retriedAfterUnauthorized = false) {
+  if (!state.auth.token) {
+    state.refreshRequest.status = 'Session required';
+    render();
+    return;
+  }
+  const url = buildControlUrl('/api/v1/refresh');
+  if (!url) {
+    state.refreshRequest.status = 'Refresh unavailable';
     render();
     return;
   }
 
-  state.control.status = 'connecting';
+  state.refreshRequest.pending = true;
+  state.refreshRequest.error = null;
+  state.refreshRequest.status = 'Requesting…';
   render();
 
-  if (state.control.session) {
-    const token = await fetchSessionToken();
-    if (!token) {
-      state.control.status = 'unauthorized';
-      state.control.token = '';
-      render();
-      return;
-    }
-    state.control.token = token;
-  }
-
-  connectControlStream();
-  controlPollTimer = setInterval(() => {
-    loadControlData();
-  }, 5000);
-  loadControlData();
-}
-
-async function fetchSessionToken() {
-  const url = buildControlUrl('/auth/session');
-  if (!url) {
-    render();
-    return null;
-  }
   try {
-    const response = await fetch(url, { method: 'POST', cache: 'no-store' });
-    if (!response.ok) {
-      return null;
+    const response = await fetch(url, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildAuthHeaders(true)
+      },
+      body: JSON.stringify({ action: 'refresh' })
+    });
+    if (response.status === 401 || response.status === 403) {
+      const recovered = !retriedAfterUnauthorized && (await renewSession());
+      if (recovered) {
+        state.refreshRequest.pending = false;
+        render();
+        return requestRefresh(true);
+      }
+      state.refreshRequest.status = 'Session required';
+      return;
     }
     const payload = await response.json();
-    return typeof payload.token === 'string' ? payload.token : null;
-  } catch {
-    return null;
-  }
-}
-
-async function loadControlData() {
-  const confirmationsUrl = buildControlUrl('/confirmations');
-  const questionsUrl = buildControlUrl('/questions');
-  if (!confirmationsUrl || !questionsUrl) {
-    return;
-  }
-  try {
-    const headers = buildControlHeaders(false);
-    const [confirmRes, questionRes] = await Promise.all([
-      fetch(confirmationsUrl, { cache: 'no-store', headers }),
-      fetch(questionsUrl, { cache: 'no-store', headers })
-    ]);
-    if (confirmRes.status === 401 || questionRes.status === 401) {
-      await handleControlUnauthorized();
-      return;
+    if (!response.ok) {
+      const reason = payload?.error?.message || `Refresh failed (${response.status})`;
+      throw new Error(reason);
     }
-    if (confirmRes.ok) {
-      const payload = await confirmRes.json();
-      state.control.confirmations = Array.isArray(payload.pending) ? payload.pending : [];
-    }
-    if (questionRes.ok) {
-      const payload = await questionRes.json();
-      state.control.questions = Array.isArray(payload.questions) ? payload.questions : [];
-    }
-    state.control.status = confirmRes.ok || questionRes.ok ? 'connected' : 'disconnected';
-  } catch {
-    state.control.status = 'disconnected';
+    state.refreshRequest.status = formatRefreshAck(payload);
+    await loadData();
+  } catch (error) {
+    state.refreshRequest.error = error instanceof Error ? error.message : 'Refresh failed';
+    state.refreshRequest.status = state.refreshRequest.error;
   } finally {
+    state.refreshRequest.pending = false;
     render();
   }
-}
-
-async function handleControlUnauthorized() {
-  if (state.control.session) {
-    await initControl();
-    return;
-  }
-  state.control.status = 'unauthorized';
-  state.control.token = '';
-  render();
-}
-
-function buildControlUrl(pathname) {
-  if (!state.control.baseUrl) {
-    return null;
-  }
-  const rawBase = state.control.baseUrl.trim();
-  if (!rawBase) {
-    return null;
-  }
-  const normalizedBase = /^https?:\/\//i.test(rawBase) ? rawBase : `http://${rawBase}`;
-  try {
-    const url = new URL(pathname, normalizedBase);
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-function buildControlHeaders(includeCsrf) {
-  const token = state.control.token;
-  if (!token) {
-    return {};
-  }
-  const headers = {
-    Authorization: `Bearer ${token}`
-  };
-  if (includeCsrf) {
-    headers['x-csrf-token'] = token;
-  }
-  return headers;
-}
-
-function buildDataHeaders() {
-  if (!state.control.token) {
-    return null;
-  }
-  try {
-    const url = new URL(dataUrl, window.location.origin);
-    if (url.origin === window.location.origin) {
-      return buildControlHeaders(false);
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-
-function stopControlSession() {
-  state.control.token = '';
-  if (controlPollTimer) {
-    clearInterval(controlPollTimer);
-    controlPollTimer = null;
-  }
-  if (controlReconnectTimer) {
-    clearTimeout(controlReconnectTimer);
-    controlReconnectTimer = null;
-  }
-  stopControlStream();
-}
-
-function stopControlStream() {
-  if (controlStreamAbort) {
-    controlStreamAbort.abort();
-    controlStreamAbort = null;
-  }
-}
-
-async function connectControlStream() {
-  const eventUrl = buildControlUrl('/events');
-  if (!eventUrl || !state.control.token) {
-    return;
-  }
-  stopControlStream();
-
-  const controller = new AbortController();
-  controlStreamAbort = controller;
-  const headers = buildControlHeaders(false);
-  fetch(eventUrl, { cache: 'no-store', headers, signal: controller.signal })
-    .then(async (response) => {
-      if (!response.ok || !response.body) {
-        if (!controller.signal.aborted) {
-          if (response.status === 401 || response.status === 403) {
-            await handleControlUnauthorized();
-            return;
-          }
-          state.control.status = 'disconnected';
-          render();
-          scheduleControlReconnect();
-        }
-        return;
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      state.control.status = 'connected';
-      render();
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          break;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          handleSseLine(line);
-        }
-      }
-
-      if (!controller.signal.aborted) {
-        state.control.status = 'disconnected';
-        render();
-        scheduleControlReconnect();
-      }
-    })
-    .catch(() => {
-      if (controller.signal.aborted) {
-        return;
-      }
-      state.control.status = 'disconnected';
-      render();
-      scheduleControlReconnect();
-    });
-}
-
-function scheduleControlReconnect() {
-  if (!state.control.enabled) {
-    return;
-  }
-  if (controlReconnectTimer) {
-    clearTimeout(controlReconnectTimer);
-  }
-  controlReconnectTimer = setTimeout(() => {
-    if (state.control.enabled) {
-      connectControlStream();
-    }
-  }, 5000);
-}
-
-function handleSseLine(line) {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith(':')) {
-    return;
-  }
-  if (!trimmed.startsWith('data:')) {
-    return;
-  }
-  const payload = trimmed.slice('data:'.length).trim();
-  if (!payload) {
-    return;
-  }
-  try {
-    const parsed = JSON.parse(payload);
-    state.control.events.unshift(parsed);
-    state.control.events = state.control.events.slice(0, 120);
-    render();
-  } catch {
-    // ignore parse errors
-  }
-}
-
-async function sendControlAction(action) {
-  if (action === 'cancel') {
-    await requestCancel();
-    return;
-  }
-  const url = buildControlUrl('/control/action');
-  if (!url) {
-    return;
-  }
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
-    body: JSON.stringify({ action, requested_by: 'ui' })
-  });
-  if (response.status === 401 || response.status === 403) {
-    state.control.status = 'unauthorized';
-    render();
-  }
-}
-
-async function requestCancel() {
-  const url = buildControlUrl('/confirmations/create');
-  if (!url) {
-    return;
-  }
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
-    body: JSON.stringify({ action: 'cancel', tool: 'ui.cancel', params: {} })
-  });
-  if (response.status === 401 || response.status === 403) {
-    state.control.status = 'unauthorized';
-    render();
-  }
-  loadControlData();
-}
-
-async function approveConfirmation(requestId) {
-  const url = buildControlUrl('/confirmations/approve');
-  if (!url) {
-    return;
-  }
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
-    body: JSON.stringify({ request_id: requestId, actor: 'ui' })
-  });
-  if (response.status === 401 || response.status === 403) {
-    state.control.status = 'unauthorized';
-    render();
-  }
-  loadControlData();
-}
-
-function answerQuestion(questionId) {
-  const record = (state.control.questions || []).find((item) => item.question_id === questionId);
-  state.activeQuestionId = questionId;
-  state.activeQuestionPrompt = record?.prompt || '';
-  if (elements.questionPrompt) {
-    elements.questionPrompt.textContent = state.activeQuestionPrompt || 'No prompt provided.';
-  }
-  if (elements.questionAnswer) {
-    elements.questionAnswer.value = '';
-  }
-  setQuestionModalState(true);
-}
-
-async function submitQuestionAnswer() {
-  const questionId = state.activeQuestionId;
-  if (!questionId) {
-    return;
-  }
-  const url = buildControlUrl('/questions/answer');
-  if (!url) {
-    return;
-  }
-  const answer = elements.questionAnswer ? elements.questionAnswer.value : '';
-  if (!answer) {
-    return;
-  }
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
-    body: JSON.stringify({ question_id: questionId, answer, answered_by: 'ui' })
-  });
-  if (response.status === 401 || response.status === 403) {
-    state.control.status = 'unauthorized';
-    render();
-  }
-  setQuestionModalState(false);
-  loadControlData();
-}
-
-async function dismissQuestion(questionId) {
-  const url = buildControlUrl('/questions/dismiss');
-  if (!url) {
-    return;
-  }
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...buildControlHeaders(true) },
-    body: JSON.stringify({ question_id: questionId, dismissed_by: 'ui' })
-  });
-  if (response.status === 401 || response.status === 403) {
-    state.control.status = 'unauthorized';
-    render();
-  }
-  loadControlData();
-}
-
-async function dismissActiveQuestion() {
-  const questionId = state.activeQuestionId;
-  if (!questionId) {
-    return;
-  }
-  await dismissQuestion(questionId);
-  setQuestionModalState(false);
 }
 
 function render() {
-  renderControlHeader();
-  if (!state.data) {
-    renderEmpty();
-    return;
-  }
-
-  const tasks = Array.isArray(state.data.tasks) ? state.data.tasks : [];
-  const runs = Array.isArray(state.data.runs) ? state.data.runs : [];
-  const activity = Array.isArray(state.data.activity) ? state.data.activity : [];
-
-  renderKpis(tasks);
-  renderTaskFilter(tasks);
-
-  const filteredTasks = applyFilters(tasks);
-  renderTaskTable(filteredTasks);
-
-  const selectedTaskId = resolveSelectedTaskId(filteredTasks, tasks);
-  state.selectedTaskId = selectedTaskId;
-  const runMap = new Map(runs.map((run) => [run.task_id, run]));
-  renderRunDetail(runMap.get(selectedTaskId), tasks.find((task) => task.task_id === selectedTaskId));
-  renderCodebase(state.data.codebase);
-  renderActivity(activity);
+  renderHeader();
+  renderSummary();
+  renderQueues();
+  renderIssueList();
+  renderIssueDetail();
+  elements.refreshStatus.textContent = state.refreshRequest.status;
 }
 
-function renderEmpty() {
-  elements.taskTableBody.innerHTML = '';
-  elements.runDetail.innerHTML = '<div class="muted">No data loaded.</div>';
-  elements.codebasePanel.innerHTML = '<div class="muted">No git data available.</div>';
-  elements.activityPanel.innerHTML = '<div class="muted">No activity yet.</div>';
+function renderHeader() {
+  const authLabel = formatAuthStatus(state.auth.status);
+  elements.authBadge.textContent = authLabel;
+  elements.authBadge.dataset.state = state.auth.status;
+  elements.refreshButton.disabled = !state.auth.token || state.refreshRequest.pending;
+  elements.heroNote.textContent = buildHeroNote();
 }
 
-function renderControlHeader() {
-  if (!elements.controlStatus) {
-    return;
-  }
-  const label = formatControlStatus(state.control.status, state.control.enabled);
-  elements.controlStatus.textContent = label;
-  if (!elements.controlHint) {
-    return;
-  }
-  if (!state.control.enabled) {
-    elements.controlHint.textContent = 'Open the run at /ui to enable controls.';
-    return;
-  }
-  if (state.control.status === 'unauthorized') {
-    elements.controlHint.textContent = 'Session expired. Reconnecting...';
-    return;
-  }
-  elements.controlHint.textContent = 'Session auth via the runner control plane.';
+function renderSummary() {
+  const counts = state.data?.counts || { running: 0, retrying: 0, issues: 0 };
+  const totals = state.data?.totals || {
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+    seconds_running: 0
+  };
+  const polling = state.data?.polling || null;
+  const rateLimits = state.data?.rate_limits || null;
+
+  elements.runningCount.textContent = String(counts.running || 0);
+  elements.runningMeta.textContent =
+    counts.issues > 0 ? `${counts.issues} tracked issues in the dashboard` : 'No active tracked issues';
+  elements.retryCount.textContent = String(counts.retrying || 0);
+  elements.retryMeta.textContent =
+    counts.retrying > 0 ? 'Retry queue is currently populated' : 'No queued retries';
+  elements.tokenTotal.textContent = formatNumber(totals.total_tokens || 0);
+  elements.tokenMeta.textContent = `${formatNumber(totals.input_tokens || 0)} input / ${formatNumber(
+    totals.output_tokens || 0
+  )} output`;
+  elements.runtimeTotal.textContent = formatDuration(totals.seconds_running || 0);
+  elements.runtimeMeta.textContent =
+    totals.seconds_running > 0 ? 'Combined runtime across current issues' : 'No active runtime yet';
+  elements.pollStatus.textContent = formatPollStatus(polling);
+  elements.pollMeta.textContent = formatPollMeta(polling);
+  elements.rateLimitStatus.textContent = rateLimits ? 'Latest sample' : 'None';
+  elements.rateLimitMeta.textContent = rateLimits ? summarizeRateLimits(rateLimits) : 'No latest rate-limit sample';
 }
 
-function renderKpis(tasks) {
-  const counts = { active: 0, ongoing: 0, complete: 0, pending: 0 };
-  tasks.forEach((task) => {
-    if (counts[task.bucket] !== undefined) {
-      counts[task.bucket] += 1;
-    }
+function renderQueues() {
+  const running = Array.isArray(state.data?.running) ? state.data.running : [];
+  const retrying = Array.isArray(state.data?.retrying) ? state.data.retrying : [];
+
+  elements.runningList.innerHTML = running.length
+    ? running.map((entry) => renderRunningCard(entry)).join('')
+    : '<div class="empty-state">No running sessions.</div>';
+  elements.retryList.innerHTML = retrying.length
+    ? retrying.map((entry) => renderRetryCard(entry)).join('')
+    : '<div class="empty-state">No queued retries.</div>';
+}
+
+function renderIssueList() {
+  const issues = getFilteredIssues();
+  elements.issueList.innerHTML = issues.length
+    ? issues.map((issue) => renderIssueCard(issue)).join('')
+    : '<div class="empty-state">No issues match the current filter.</div>';
+
+  elements.issueList.querySelectorAll('[data-issue-id]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.selectedIssueIdentifier = button.getAttribute('data-issue-id');
+      render();
+    });
   });
-  elements.kpiActive.textContent = counts.active;
-  elements.kpiOngoing.textContent = counts.ongoing;
-  elements.kpiComplete.textContent = counts.complete;
-  elements.kpiPending.textContent = counts.pending;
 }
 
-function renderTaskFilter(tasks) {
-  const current = elements.taskFilter.value || 'all';
-  const options = ['all', ...tasks.map((task) => task.task_id)];
-  elements.taskFilter.innerHTML = options
-    .map((taskId) => {
-      const label = taskId === 'all' ? 'All tasks' : taskId;
-      const selected = taskId === current ? 'selected' : '';
-      return `<option value="${escapeHtml(taskId)}" ${selected}>${escapeHtml(label)}</option>`;
-    })
-    .join('');
+function renderIssueDetail() {
+  const issue = getSelectedIssue();
+  if (!issue) {
+    elements.issueDetail.innerHTML =
+      '<div class="empty-state">No selected issue. Wait for data or pick one from the issue list.</div>';
+    return;
+  }
+
+  elements.issueDetail.innerHTML = `
+    <section class="detail-section">
+      <div class="detail-header">
+        <div>
+          <div class="detail-eyebrow">${escapeHtml(issue.issue_identifier)}</div>
+          <h2>${escapeHtml(issue.title || 'Untitled issue')}</h2>
+        </div>
+        <div class="detail-status">
+          <span class="status-chip">${escapeHtml(issue.display_status || issue.status || 'unknown')}</span>
+          ${issue.is_selected ? '<span class="status-note">Selected run authority</span>' : ''}
+        </div>
+      </div>
+      ${issue.url ? `<a class="detail-link" href="${escapeHtml(issue.url)}" target="_blank" rel="noreferrer">Open issue in Linear</a>` : ''}
+      <p class="detail-summary">${escapeHtml(issue.summary || 'No summary available.')}</p>
+    </section>
+
+    <section class="detail-section">
+      <div class="section-title">Lifecycle</div>
+      ${renderKeyValueGrid([
+        ['Status', issue.status || 'unknown'],
+        ['Display', issue.display_status || 'unknown'],
+        ['Reason', issue.status_reason || '—'],
+        ['Task', issue.task_id || '—'],
+        ['Run', issue.run_id || '—']
+      ])}
+    </section>
+
+    <section class="detail-section">
+      <div class="section-title">Session</div>
+      ${renderKeyValueGrid([
+        ['Session', issue.session.session_id || '—'],
+        ['Thread', issue.session.thread_id || '—'],
+        ['Turns', formatNullableNumber(issue.session.turn_count)],
+        ['Owner phase', issue.owner.phase || '—'],
+        ['Owner status', issue.owner.status || '—']
+      ])}
+    </section>
+
+    <section class="detail-section">
+      <div class="section-title">Workspace</div>
+      ${renderKeyValueGrid([
+        ['Path', issue.workspace.path || '—'],
+        ['Host', issue.workspace.host || '—'],
+        ['Last error', issue.last_error || '—']
+      ])}
+    </section>
+
+    <section class="detail-section">
+      <div class="section-title">Retry State</div>
+      ${
+        issue.retry
+          ? renderKeyValueGrid([
+              ['Attempt', formatNullableNumber(issue.retry.attempt)],
+              ['Due', formatTimestamp(issue.retry.due_at)],
+              ['Error', issue.retry.error || '—'],
+              ['Last event', issue.retry.last_event || '—']
+            ])
+          : '<div class="empty-inline">No retry queued.</div>'
+      }
+    </section>
+
+    <section class="detail-section">
+      <div class="section-title">Token Usage</div>
+      ${
+        issue.tokens
+          ? renderKeyValueGrid([
+              ['Input', formatNullableNumber(issue.tokens.input_tokens)],
+              ['Output', formatNullableNumber(issue.tokens.output_tokens)],
+              ['Total', formatNullableNumber(issue.tokens.total_tokens)]
+            ])
+          : '<div class="empty-inline">No token usage available.</div>'
+      }
+    </section>
+
+    <section class="detail-section">
+      <div class="section-title">Recent Agent Activity</div>
+      ${renderActivityList(issue.recent_agent_activity, 'No recent agent activity.')}
+    </section>
+
+    <section class="detail-section">
+      <div class="section-title">Recent Linear Activity</div>
+      ${renderLinearActivity(issue.linear_activity)}
+    </section>
+  `;
 }
 
-function applyFilters(tasks) {
+function renderRunningCard(entry) {
+  return `
+    <div class="queue-card">
+      <div class="queue-card-top">
+        <div class="queue-id">${escapeHtml(entry.issue_identifier || 'unknown')}</div>
+        <div class="queue-state">${escapeHtml(entry.display_state || 'unknown')}</div>
+      </div>
+      <div class="queue-meta">
+        <span>${escapeHtml(entry.session_id || 'no session')}</span>
+        <span>${escapeHtml(formatNullableNumber(entry.turn_count))} turns</span>
+        <span>${escapeHtml(formatTimestamp(entry.last_event_at))}</span>
+      </div>
+      <div class="queue-summary">${escapeHtml(entry.last_message || entry.last_event || 'No recent message.')}</div>
+    </div>
+  `;
+}
+
+function renderRetryCard(entry) {
+  return `
+    <div class="queue-card retry-card">
+      <div class="queue-card-top">
+        <div class="queue-id">${escapeHtml(entry.issue_identifier || 'unknown')}</div>
+        <div class="queue-state">${escapeHtml(entry.display_state || 'retrying')}</div>
+      </div>
+      <div class="queue-meta">
+        <span>Attempt ${escapeHtml(formatNullableNumber(entry.attempt))}</span>
+        <span>${escapeHtml(formatTimestamp(entry.due_at))}</span>
+      </div>
+      <div class="queue-summary">${escapeHtml(entry.error || entry.last_message || 'Retry queued.')}</div>
+    </div>
+  `;
+}
+
+function renderIssueCard(issue) {
+  const classes = ['issue-card'];
+  if (issue.is_selected) {
+    classes.push('selected');
+  }
+  if (state.selectedIssueIdentifier === issue.issue_identifier) {
+    classes.push('active');
+  }
+  return `
+    <button class="${classes.join(' ')}" type="button" data-issue-id="${escapeHtml(issue.issue_identifier)}">
+      <div class="issue-card-top">
+        <div>
+          <div class="issue-card-id">${escapeHtml(issue.issue_identifier)}</div>
+          <div class="issue-card-title">${escapeHtml(issue.title || 'Untitled issue')}</div>
+        </div>
+        <div class="issue-card-status">${escapeHtml(issue.display_status || issue.status || 'unknown')}</div>
+      </div>
+      <div class="issue-card-meta">
+        <span>${escapeHtml(issue.workspace.path || 'no workspace')}</span>
+        <span>${escapeHtml(issue.session.session_id || 'no session')}</span>
+      </div>
+      <div class="issue-card-summary">${escapeHtml(issue.last_error || issue.summary || 'No summary available.')}</div>
+    </button>
+  `;
+}
+
+function renderKeyValueGrid(entries) {
+  return `<div class="key-grid">${entries
+    .map(
+      ([key, value]) => `
+        <div class="key-cell">
+          <div class="key-label">${escapeHtml(key)}</div>
+          <div class="key-value">${escapeHtml(formatGridValue(value))}</div>
+        </div>
+      `
+    )
+    .join('')}</div>`;
+}
+
+async function renewSession() {
+  if (!state.auth.enabled) {
+    return false;
+  }
+  state.auth.token = '';
+  await initSession();
+  return Boolean(state.auth.token);
+}
+
+function renderActivityList(events, emptyLabel) {
+  if (!Array.isArray(events) || events.length === 0) {
+    return `<div class="empty-inline">${escapeHtml(emptyLabel)}</div>`;
+  }
+  return `<div class="activity-list">${events
+    .map(
+      (event) => `
+        <div class="activity-row">
+          <div class="activity-head">
+            <span>${escapeHtml(event.event || 'event')}</span>
+            <span>${escapeHtml(formatTimestamp(event.at))}</span>
+          </div>
+          <div class="activity-body">${escapeHtml(event.message || 'No message available.')}</div>
+        </div>
+      `
+    )
+    .join('')}</div>`;
+}
+
+function renderLinearActivity(events) {
+  if (!Array.isArray(events) || events.length === 0) {
+    return '<div class="empty-inline">No recent Linear activity.</div>';
+  }
+  return `<div class="activity-list">${events
+    .map(
+      (event) => `
+        <div class="activity-row">
+          <div class="activity-head">
+            <span>${escapeHtml(event.actor_name || 'unknown actor')}</span>
+            <span>${escapeHtml(formatTimestamp(event.created_at))}</span>
+          </div>
+          <div class="activity-body">${escapeHtml(event.summary || 'No summary available.')}</div>
+        </div>
+      `
+    )
+    .join('')}</div>`;
+}
+
+function getFilteredIssues() {
+  const issues = Array.isArray(state.data?.issues) ? state.data.issues : [];
   const search = state.filters.search.trim().toLowerCase();
-  return tasks.filter((task) => {
-    if (state.filters.task !== 'all' && task.task_id !== state.filters.task) {
+
+  return issues.filter((issue) => {
+    if (state.filters.status === 'running' && issue.status !== 'running') {
       return false;
     }
-    if (state.filters.bucket !== 'all' && task.bucket !== state.filters.bucket) {
+    if (state.filters.status === 'retrying' && issue.status !== 'retrying') {
+      return false;
+    }
+    if (state.filters.status === 'errored' && !issue.last_error) {
+      return false;
+    }
+    if (state.filters.status === 'selected' && !issue.is_selected) {
       return false;
     }
     if (!search) {
       return true;
     }
-    const haystack = [task.task_id, task.title, task.status, task.summary]
+    const haystack = [
+      issue.issue_identifier,
+      issue.title,
+      issue.status,
+      issue.display_status,
+      issue.summary,
+      issue.last_error
+    ]
       .filter(Boolean)
       .join(' ')
       .toLowerCase();
@@ -760,457 +526,159 @@ function applyFilters(tasks) {
   });
 }
 
-function resolveSelectedTaskId(filteredTasks, tasks) {
-  if (filteredTasks.length === 0) {
-    return tasks[0]?.task_id ?? null;
+function getSelectedIssue() {
+  const issues = Array.isArray(state.data?.issues) ? state.data.issues : [];
+  if (issues.length === 0) {
+    return null;
   }
-  if (filteredTasks.some((task) => task.task_id === state.selectedTaskId)) {
-    return state.selectedTaskId;
-  }
-  return filteredTasks[0].task_id;
+  return issues.find((issue) => issue.issue_identifier === state.selectedIssueIdentifier) || issues[0];
 }
 
-function renderTaskTable(tasks) {
-  elements.taskTableBody.innerHTML = tasks
-    .map((task) => {
-      const isSelected = task.task_id === state.selectedTaskId;
-      const updated = formatTimestamp(task.last_update);
-      const approvalsPending = Number(task.approvals_pending || 0);
-      const approvalsTotal = Number(task.approvals_total || 0);
-      const approvalsDisplay = approvalsPending > 0 ? approvalsPending : approvalsTotal;
-      return `<tr data-task-id="${escapeHtml(task.task_id)}" class="${isSelected ? 'selected' : ''}" tabindex="0" aria-selected="${isSelected}">
-        <td>
-          <span class="task-id">${escapeHtml(task.task_id)}</span>
-          <span class="task-title">${escapeHtml(task.title || '')}</span>
-        </td>
-        <td>${bucketBadge(task.bucket)}</td>
-        <td><span class="status-pill">${escapeHtml(task.status || 'unknown')}</span></td>
-        <td>${escapeHtml(updated)}</td>
-        <td>${approvalsDisplay}</td>
-        <td>${escapeHtml(task.summary || '—')}</td>
-      </tr>`;
-    })
-    .join('');
-
-  elements.taskTableBody.querySelectorAll('tr').forEach((row) => {
-    row.addEventListener('keydown', handleRowSelectionKey);
-    row.addEventListener('keyup', handleRowSelectionKey);
-  });
-}
-
-function renderRunDetail(run, task) {
-  if (!task) {
-    elements.runDetail.innerHTML = '<div class="muted">Select a task to see run details.</div>';
+function syncSelectedIssue() {
+  const issues = Array.isArray(state.data?.issues) ? state.data.issues : [];
+  if (issues.length === 0) {
+    state.selectedIssueIdentifier = null;
     return;
   }
-
-  if (!run) {
-    elements.runDetail.innerHTML = `<div class="panel-body">
-      <div class="key-value">
-        <div class="key">Task</div>
-        <div class="value">${escapeHtml(task.task_id)}</div>
-        <div class="key">Bucket</div>
-        <div class="value">${bucketBadge(task.bucket)}</div>
-        <div class="key">Run</div>
-        <div class="value">No run data yet.</div>
-      </div>
-    </div>`;
+  if (issues.some((issue) => issue.issue_identifier === state.selectedIssueIdentifier)) {
     return;
   }
+  state.selectedIssueIdentifier =
+    state.data?.selected_issue_identifier ||
+    issues.find((issue) => issue.is_selected)?.issue_identifier ||
+    issues[0].issue_identifier;
+}
 
-  const stages = Array.isArray(run.stages) ? run.stages : [];
-  const stageMarkup = stages.length
-    ? `<div class="stage-list">${stages
-        .map((stage) => {
-          return `<div class="stage-item">
-            <span class="stage-title">${escapeHtml(stage.title || stage.id)}</span>
-            <span class="status-pill">${escapeHtml(stage.status || 'pending')}</span>
-          </div>`;
-        })
-        .join('')}</div>`
-    : '<div class="muted">No stage data available.</div>';
+function buildHeroNote() {
+  const workflow = state.data?.provider_workflow;
+  if (!workflow) {
+    return 'Compatibility-projection truth for running sessions, retry queues, and operator polling health.';
+  }
+  if (workflow.status === 'reload_failed') {
+    return `Workflow degraded: ${workflow.last_error || 'reload failed'}`;
+  }
+  return `Workflow ready from ${workflow.source_path}`;
+}
 
-  const heartbeatLabel = run.heartbeat_at ? (run.heartbeat_stale ? 'Stale' : 'Fresh') : '—';
-  const approvalsPending = Number(run.approvals_pending || 0);
-  const approvalsTotal = Number(run.approvals_total || 0);
-  const approvalsLabel =
-    approvalsTotal > 0 ? `${approvalsPending} pending / ${approvalsTotal} total` : `${approvalsPending} pending`;
-
-  const controlMarkup = state.control.baseUrl ? buildControlMarkup(run) : '';
-
-  elements.runDetail.innerHTML = `
-    <div class="key-value">
-      <div class="key">Task</div>
-      <div class="value">${escapeHtml(task.task_id)}</div>
-      <div class="key">Bucket</div>
-      <div class="value">${bucketBadge(task.bucket)}</div>
-      <div class="key">Run</div>
-      <div class="value">${escapeHtml(run.run_id || 'unknown')}</div>
-      <div class="key">Status</div>
-      <div class="value"><span class="status-pill">${escapeHtml(run.status || 'unknown')}</span></div>
-      <div class="key">Started</div>
-      <div class="value">${escapeHtml(formatTimestamp(run.started_at))}</div>
-      <div class="key">Updated</div>
-      <div class="value">${escapeHtml(formatTimestamp(run.updated_at))}</div>
-      <div class="key">Completed</div>
-      <div class="value">${escapeHtml(formatTimestamp(run.completed_at))}</div>
-      <div class="key">Approvals</div>
-      <div class="value">${approvalsLabel}</div>
-      <div class="key">Heartbeat</div>
-      <div class="value">${heartbeatLabel}</div>
-    </div>
-    <div>
-      <div class="panel-header">Stages</div>
-      ${stageMarkup}
-    </div>
-    <div>
-      <div class="panel-header">Links</div>
-      <div class="key-value">
-        <div class="key">Manifest</div>
-        <div class="value">${escapeHtml(run.links?.manifest || '—')}</div>
-        <div class="key">Metrics</div>
-        <div class="value">${escapeHtml(run.links?.metrics || '—')}</div>
-        <div class="key">State</div>
-        <div class="value">${escapeHtml(run.links?.state || '—')}</div>
-      </div>
-    </div>
-    ${controlMarkup}
-  `;
-
-  if (state.control.enabled && state.control.token) {
-    wireControlHandlers();
+function buildControlUrl(pathname) {
+  if (!state.auth.baseUrl) {
+    return null;
+  }
+  try {
+    return new URL(pathname, state.auth.baseUrl).toString();
+  } catch {
+    return null;
   }
 }
 
-function buildControlMarkup(run) {
-  const controlsDisabled = !state.control.enabled || !state.control.token;
-  const events = state.control.events.slice(0, 12);
-  const confirmations = state.control.confirmations || [];
-  const questions = state.control.questions || [];
-  const eventsMarkup = events.length
-    ? `<div class="event-list">${events
-        .map(
-          (entry) => `<div class="event-item">
-            <div class="event-meta">${escapeHtml(entry.event || 'event')}</div>
-            <div class="event-time">${escapeHtml(formatTimestamp(entry.timestamp))}</div>
-          </div>`
-        )
-        .join('')}</div>`
-    : '<div class="muted">No events yet.</div>';
-
-  const confirmationsMarkup = confirmations.length
-    ? `<div class="control-list">${confirmations
-        .map(
-          (item) => `<div class="control-row">
-            <div>
-              <div class="control-title">${escapeHtml(item.action || item.tool || 'confirmation')}</div>
-              <div class="muted small">${escapeHtml(item.request_id || '')}</div>
-            </div>
-            <button class="control-button" data-confirm-id="${escapeHtml(
-              item.request_id || ''
-            )}" ${controlsDisabled ? 'disabled' : ''}>Approve</button>
-          </div>`
-        )
-        .join('')}</div>`
-    : '<div class="muted">No confirmations pending.</div>';
-
-  const questionsMarkup = questions.length
-    ? `<div class="control-list">${questions
-        .map(
-          (item) => `<div class="control-row">
-            <div>
-              <div class="control-title">${escapeHtml(item.prompt || 'Question')}</div>
-              <div class="muted small">${escapeHtml(item.question_id || '')} • ${escapeHtml(item.status || '')}</div>
-            </div>
-            <div class="control-actions-inline">
-              <button class="control-button" data-question-id="${escapeHtml(
-                item.question_id || ''
-              )}" ${controlsDisabled ? 'disabled' : ''}>Answer</button>
-              <button class="control-button subtle" data-question-dismiss-id="${escapeHtml(
-                item.question_id || ''
-              )}" ${controlsDisabled ? 'disabled' : ''}>Dismiss</button>
-            </div>
-          </div>`
-        )
-        .join('')}</div>`
-    : '<div class="muted">No questions queued.</div>';
-
-  return `
-    <div>
-      <div class="panel-header">Run Controls</div>
-      <div class="control-actions">
-        <button class="control-button" data-action="pause" ${controlsDisabled ? 'disabled' : ''}>Pause</button>
-        <button class="control-button" data-action="resume" ${controlsDisabled ? 'disabled' : ''}>Resume</button>
-        <button class="control-button danger" data-action="cancel" ${controlsDisabled ? 'disabled' : ''}>Cancel</button>
-      </div>
-      <div class="panel-subtle">Control status: ${escapeHtml(state.control.status || 'unknown')}</div>
-      ${
-        controlsDisabled
-          ? '<div class="muted small">Open this run at /ui to enable controls.</div>'
-          : ''
-      }
-    </div>
-    <div>
-      <div class="panel-header">Confirmations</div>
-      ${confirmationsMarkup}
-    </div>
-    <div>
-      <div class="panel-header">Questions</div>
-      ${questionsMarkup}
-    </div>
-    <div>
-      <div class="panel-header">Live Events</div>
-      ${eventsMarkup}
-    </div>
-  `;
+function buildAuthHeaders(includeCsrf) {
+  if (!state.auth.token) {
+    return {};
+  }
+  const headers = {
+    Authorization: `Bearer ${state.auth.token}`
+  };
+  if (includeCsrf) {
+    headers['x-csrf-token'] = state.auth.token;
+  }
+  return headers;
 }
 
-function wireControlHandlers() {
-  const actionButtons = elements.runDetail.querySelectorAll('[data-action]');
-  actionButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const action = button.getAttribute('data-action');
-      if (action) {
-        sendControlAction(action);
-      }
-    });
-  });
-
-  const confirmButtons = elements.runDetail.querySelectorAll('[data-confirm-id]');
-  confirmButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const requestId = button.getAttribute('data-confirm-id');
-      if (requestId) {
-        approveConfirmation(requestId);
-      }
-    });
-  });
-
-  const questionButtons = elements.runDetail.querySelectorAll('[data-question-id]');
-  questionButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const questionId = button.getAttribute('data-question-id');
-      if (questionId) {
-        answerQuestion(questionId);
-      }
-    });
-  });
-
-  const dismissButtons = elements.runDetail.querySelectorAll('[data-question-dismiss-id]');
-  dismissButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const questionId = button.getAttribute('data-question-dismiss-id');
-      if (questionId) {
-        dismissQuestion(questionId);
-      }
-    });
-  });
+function buildDataHeaders() {
+  if (!state.auth.token) {
+    return null;
+  }
+  try {
+    const url = new URL(dataUrl, window.location.origin);
+    if (url.origin === window.location.origin) {
+      return buildAuthHeaders(false);
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
-function renderCodebase(codebase) {
-  if (!codebase) {
-    elements.codebasePanel.innerHTML = '<div class="muted">Git metadata unavailable.</div>';
+function formatAuthStatus(status) {
+  switch (status) {
+    case 'ready':
+      return 'Session Ready';
+    case 'connecting':
+      return 'Session Bootstrapping';
+    case 'unauthorized':
+      return 'Session Required';
+    case 'disabled':
+    default:
+      return 'Static Mode';
+  }
+}
+
+function formatRefreshAck(payload) {
+  const operationText = Array.isArray(payload?.operations) && payload.operations.length > 0
+    ? payload.operations.join(' + ')
+    : 'reconcile';
+  const requestedAt = formatTimestamp(payload?.requested_at);
+  return `${operationText} at ${requestedAt}`;
+}
+
+function formatPollStatus(polling) {
+  if (!polling || !polling.enabled) {
+    return 'Unavailable';
+  }
+  if (polling.checking) {
+    return 'Checking';
+  }
+  if (polling.last_error) {
+    return 'Degraded';
+  }
+  return 'Healthy';
+}
+
+function formatPollMeta(polling) {
+  if (!polling || !polling.enabled) {
+    return 'No provider polling coordinator registered';
+  }
+  const parts = [];
+  if (polling.last_mode) {
+    parts.push(`last ${polling.last_mode}`);
+  }
+  if (polling.last_success_at) {
+    parts.push(`ok ${formatTimestamp(polling.last_success_at)}`);
+  }
+  if (polling.next_poll_in_ms !== null && polling.next_poll_in_ms !== undefined) {
+    parts.push(`next ${formatDuration(polling.next_poll_in_ms / 1000)}`);
+  }
+  if (polling.last_error) {
+    parts.push(`error ${polling.last_error}`);
+  }
+  return parts.length > 0 ? parts.join(' • ') : 'Polling health not yet observed';
+}
+
+function summarizeRateLimits(rateLimits) {
+  if (!rateLimits || typeof rateLimits !== 'object') {
+    return 'No latest rate-limit sample';
+  }
+  return Object.entries(rateLimits)
+    .slice(0, 3)
+    .map(([key, value]) => `${key}: ${String(value)}`)
+    .join(' • ');
+}
+
+function setSyncStatus(message, syncing, error = false) {
+  if (syncing) {
+    elements.syncStatus.textContent = 'Syncing…';
+    elements.syncStatus.dataset.state = 'syncing';
     return;
   }
-
-  elements.codebasePanel.innerHTML = `
-    <div class="key-value">
-      <div class="key">Branch</div>
-      <div class="value">${escapeHtml(codebase.branch || 'unknown')}</div>
-      <div class="key">Head</div>
-      <div class="value">${escapeHtml(codebase.head_sha || 'unknown')}</div>
-      <div class="key">Last commit</div>
-      <div class="value">${escapeHtml(codebase.last_commit?.subject || 'unknown')}</div>
-      <div class="key">Author</div>
-      <div class="value">${escapeHtml(codebase.last_commit?.author || 'unknown')}</div>
-      <div class="key">Timestamp</div>
-      <div class="value">${escapeHtml(formatTimestamp(codebase.last_commit?.timestamp))}</div>
-      <div class="key">Dirty</div>
-      <div class="value">${codebase.dirty ? 'Yes' : 'No'}</div>
-      <div class="key">Changes</div>
-      <div class="value">${Number(codebase.staged_count || 0)} staged, ${Number(
-    codebase.unstaged_count || 0
-  )} unstaged, ${Number(codebase.untracked_count || 0)} untracked</div>
-      <div class="key">Diff</div>
-      <div class="value">${Number(codebase.diff_stat?.files || 0)} files, +${Number(
-    codebase.diff_stat?.additions || 0
-  )} / -${Number(codebase.diff_stat?.deletions || 0)}</div>
-    </div>
-  `;
+  elements.syncStatus.textContent = message || '—';
+  elements.syncStatus.dataset.state = error ? 'error' : 'ok';
 }
 
-function renderActivity(activity) {
-  if (!activity.length) {
-    elements.activityPanel.innerHTML = '<div class="muted">No recent activity.</div>';
-    return;
-  }
-
-  elements.activityPanel.innerHTML = `<div class="activity-list">${activity
-    .map((event) => {
-      return `<div class="activity-item">
-        <div class="activity-time">${escapeHtml(formatTimestamp(event.ts))}</div>
-        <div>${escapeHtml(event.message || 'Event')}</div>
-      </div>`;
-    })
-    .join('')}</div>`;
-}
-
-function toggleSidePanel() {
-  setSidePanelState(!state.sideOpen);
-}
-
-function setSidePanelState(isOpen) {
-  if (isOpen) {
-    state.sideReturnFocus = captureActiveElement();
-  } else {
-    focusOutsideContainer(elements.sidePanel, state.sideReturnFocus, elements.sideToggle);
-  }
-  state.sideOpen = isOpen;
-  document.body.classList.toggle('side-open', isOpen);
-  elements.sidePanel.classList.toggle('open', isOpen);
-  elements.sideOverlay.classList.toggle('open', isOpen);
-  elements.sidePanel.setAttribute('aria-hidden', String(!isOpen));
-  elements.sideToggle.setAttribute('aria-expanded', String(isOpen));
-}
-
-function openRunModal() {
-  setRunModalState(true);
-}
-
-function setRunModalState(isOpen) {
-  if (isOpen) {
-    state.runReturnFocus = captureActiveElement();
-  } else {
-    const fallbackRow =
-      elements.taskTableBody.querySelector('tr.selected') || elements.taskTableBody.querySelector('tr');
-    focusOutsideContainer(elements.runModal, state.runReturnFocus, fallbackRow);
-  }
-  state.runOpen = isOpen;
-  updateModalStateClass();
-  elements.runModal.classList.toggle('open', isOpen);
-  elements.runOverlay.classList.toggle('open', isOpen);
-  elements.runModal.setAttribute('aria-hidden', String(!isOpen));
-  elements.runOverlay.setAttribute('aria-hidden', String(!isOpen));
-  if (isOpen) {
-    elements.runClose.focus();
-  }
-}
-
-function setQuestionModalState(isOpen) {
-  if (isOpen) {
-    state.questionReturnFocus = captureActiveElement();
-  } else {
-    focusOutsideContainer(elements.questionModal, state.questionReturnFocus, elements.runModal);
-    state.activeQuestionId = null;
-    state.activeQuestionPrompt = '';
-    if (elements.questionAnswer) {
-      elements.questionAnswer.value = '';
-    }
-    if (elements.questionPrompt) {
-      elements.questionPrompt.textContent = '';
-    }
-  }
-  state.questionOpen = isOpen;
-  updateModalStateClass();
-  elements.questionModal.classList.toggle('open', isOpen);
-  elements.questionOverlay.classList.toggle('open', isOpen);
-  elements.questionModal.setAttribute('aria-hidden', String(!isOpen));
-  elements.questionOverlay.setAttribute('aria-hidden', String(!isOpen));
-  if (isOpen && elements.questionAnswer) {
-    elements.questionAnswer.focus();
-  }
-}
-
-function updateModalStateClass() {
-  document.body.classList.toggle('modal-open', state.runOpen || state.questionOpen);
-}
-
-function captureActiveElement() {
-  return document.activeElement instanceof HTMLElement ? document.activeElement : null;
-}
-
-function focusOutsideContainer(container, preferred, fallback) {
-  const candidates = [preferred, fallback];
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate.focus !== 'function') {
-      continue;
-    }
-    if (container && container.contains(candidate)) {
-      continue;
-    }
-    if (!document.contains(candidate)) {
-      continue;
-    }
-    candidate.focus();
-    return;
-  }
-}
-
-function trapQuestionFocus(event) {
-  return trapFocus(event, elements.questionModal);
-}
-
-function trapFocus(event, containerOrContainers) {
-  const containers = Array.isArray(containerOrContainers) ? containerOrContainers : [containerOrContainers];
-  const container = containers[0];
-  if (!container) {
-    return false;
-  }
-  const focusable = containers.flatMap((candidate) => (candidate ? getFocusableElements(candidate) : []));
-  if (focusable.length === 0) {
-    return false;
-  }
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  const active = document.activeElement;
-  if (!containers.some((candidate) => candidate && candidate.contains(active))) {
-    event.preventDefault();
-    (event.shiftKey ? last : first).focus();
-    return true;
-  }
-  if (event.shiftKey) {
-    if (active === first) {
-      event.preventDefault();
-      last.focus();
-      return true;
-    }
-    return false;
-  }
-  if (active === last) {
-    event.preventDefault();
-    first.focus();
-    return true;
-  }
-  return false;
-}
-
-function getFocusableElements(container) {
-  return Array.from(
-    container.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )
-  ).filter((el) => el instanceof HTMLElement && !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true');
-}
-
-function bucketBadge(bucket) {
-  const safe = bucket || 'pending';
-  return `<span class="badge ${escapeHtml(safe)}">${escapeHtml(safe)}</span>`;
-}
-
-function setSyncStatus(message, isSyncing, isError = false) {
-  const fallback = elements.syncStatus.textContent || '—';
-  const text = message || (isError ? 'Failed to load data' : fallback);
-  if (!isSyncing || isError) {
-    elements.syncStatus.textContent = text;
-  }
-  elements.syncStatus.dataset.state = isError ? 'error' : isSyncing ? 'syncing' : 'ok';
-}
-
-function formatTimestamp(timestamp) {
-  if (!timestamp) {
+function formatTimestamp(value) {
+  if (!value) {
     return '—';
   }
-  const date = new Date(timestamp);
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return '—';
   }
@@ -1218,28 +686,37 @@ function formatTimestamp(timestamp) {
     month: 'short',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit'
   });
 }
 
-function formatControlStatus(status, enabled) {
-  if (!enabled) {
-    return 'Read-only';
+function formatDuration(totalSeconds) {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return '0s';
   }
-  switch (status) {
-    case 'connected':
-      return 'Connected';
-    case 'connecting':
-      return 'Connecting';
-    case 'unauthorized':
-      return 'Session expired';
-    case 'disconnected':
-      return 'Disconnected';
-    case 'disabled':
-      return 'Read-only';
-    default:
-      return status || 'Control';
+  const seconds = Math.round(totalSeconds);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
   }
+  if (minutes > 0) {
+    return `${minutes}m ${remainder}s`;
+  }
+  return `${remainder}s`;
+}
+
+function formatNumber(value) {
+  if (!Number.isFinite(value)) {
+    return '0';
+  }
+  return new Intl.NumberFormat('en-US').format(value);
+}
+
+function formatNullableNumber(value) {
+  return Number.isFinite(value) ? formatNumber(value) : '—';
 }
 
 function escapeHtml(value) {
@@ -1252,6 +729,13 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function formatGridValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return '—';
+  }
+  return value;
 }
 
 function clampNumber(value, min, max) {

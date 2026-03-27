@@ -322,6 +322,7 @@ export async function readCompatibilityState(
     selected: projection.selected,
     ...(projection.providerIntake ? { provider_intake: projection.providerIntake } : {}),
     ...(projection.providerWorkflow ? { provider_workflow: projection.providerWorkflow } : {}),
+    ...(projection.polling ? { polling: projection.polling } : {}),
     ...(projection.dispatchPilot ? { dispatch_pilot: projection.dispatchPilot } : {}),
     ...(projection.tracked ? { tracked: projection.tracked } : {})
   };

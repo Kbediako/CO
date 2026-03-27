@@ -141,13 +141,15 @@ export function createControlServerSeededRuntimeAssembly(
   const sessionTokens = new SessionTokenStore(options.sessionTtlMs);
   const linearAdvisoryState = normalizeLinearAdvisoryState(options.linearAdvisorySeed);
   const providerIntakeState = normalizeProviderIntakeState(options.providerIntakeSeed);
+  let providerIssueHandoff: ProviderIssueHandoffService | null = null;
   const controlRuntime = createControlRuntime({
     controlStore,
     questionQueue,
     paths: options.paths,
     linearAdvisoryState,
     providerIntakeState,
-    providerWorkflowConfigStore: options.providerWorkflowConfigStore
+    providerWorkflowConfigStore: options.providerWorkflowConfigStore,
+    readProviderIssueHandoff: () => providerIssueHandoff
   });
 
   const clients = new Set<http.ServerResponse>();
@@ -167,7 +169,7 @@ export function createControlServerSeededRuntimeAssembly(
     linearAdvisory: async () => writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState),
     providerIntake: async () => writeJsonAtomic(providerIntakeStatePath, providerIntakeState)
   } satisfies ControlRequestPersist;
-  const providerIssueHandoff =
+  providerIssueHandoff =
     options.createProviderIssueHandoff?.({
       providerIntakeState,
       persistProviderIntake: persist.providerIntake,
