@@ -170,6 +170,49 @@ describe('resolveProviderLinearRuntimeProof', () => {
     }
   });
 
+  it('preserves trailing-dot fqdn proof hosts for dns-public lookup', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: true,
+            allow_video: false
+          }
+        }
+      ]
+    });
+    const dnsLookupMock = vi.fn(async () => [{ address: '93.184.216.34', family: 4 }]);
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com/dashboard',
+        kind: 'external-link',
+        proofUrl: 'https://review-assets.example.com./proof',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: dnsLookupMock
+      }
+    );
+
+    expect(dnsLookupMock).toHaveBeenCalledWith('review-assets.example.com.');
+    expect(result).toMatchObject({
+      ok: true,
+      proof: {
+        reviewer_url: 'https://review-assets.example.com./proof'
+      },
+      reachability: {
+        mode: 'dns-public',
+        dns_ran: true,
+        hostname: 'review-assets.example.com',
+        resolved_addresses: ['93.184.216.34']
+      }
+    });
+  });
+
   it('skips dns lookup for public ip literals in dns-public mode', async () => {
     const repoRoot = await createRepoWithPermit({
       allowedSources: [
@@ -411,6 +454,46 @@ describe('resolveProviderLinearRuntimeProof', () => {
     });
   });
 
+  it('fails closed when dns-public resolves a local-use nat64 ipv6 address', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com',
+        kind: 'screenshot',
+        proofUrl: 'https://review-assets.example.com/proof.png',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: vi.fn(async () => [{ address: '64:ff9b:1::5db8:d822', family: 6 }])
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_dns_non_public_resolution',
+        status: 422,
+        details: {
+          resolved_addresses: ['64:ff9b:1::5db8:d822'],
+          blocked_addresses: ['64:ff9b:1::5db8:d822']
+        }
+      }
+    });
+  });
+
   it('fails with kind-missing when blank proof-url masks other proof fields', async () => {
     const repoRoot = await createRepoWithPermit({
       allowedSources: [
@@ -607,6 +690,7 @@ describe('resolveProviderLinearRuntimeProof', () => {
     'http://[::ffff:10.0.0.5]/proof.png',
     'http://[::ffff:169.254.1.2]/proof.png',
     'http://[64:ff9b::a00:5]/proof.png',
+    'http://[64:ff9b:1::a00:5]/proof.png',
     'http://foo.localhost/proof.png'
   ])('fails closed when the proof url is a loopback-only address (%s)', async (proofUrl) => {
     const repoRoot = await createRepoWithPermit({

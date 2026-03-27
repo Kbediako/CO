@@ -384,8 +384,9 @@ async function resolveRuntimeProofReachability(
   dependencies: ProviderLinearRuntimeProofDependencies
 ): Promise<ProviderLinearRuntimeProofReachabilityResolution> {
   const parsed = new URL(proofUrl);
-  const hostname = normalizeHostname(parsed.hostname);
-  if (!hostname) {
+  const rawHostname = parsed.hostname.trim().toLowerCase().replaceAll(/^\[|\]$/g, '');
+  const hostname = normalizeHostname(rawHostname);
+  if (!rawHostname || !hostname) {
     return {
       ok: false,
       error: {
@@ -426,7 +427,7 @@ async function resolveRuntimeProofReachability(
 
   let answers: ProviderLinearRuntimeProofDnsAddress[];
   try {
-    answers = await dependencies.dnsLookup(hostname);
+    answers = await dependencies.dnsLookup(rawHostname);
   } catch (error) {
     const dnsError = error as NodeJS.ErrnoException;
     return {
@@ -807,6 +808,7 @@ function createBlockedProofHostBlockList(): BlockList {
   blockList.addAddress('::', 'ipv6');
   blockList.addAddress('::1', 'ipv6');
   blockList.addSubnet('2001:db8::', 32, 'ipv6');
+  blockList.addSubnet('64:ff9b:1::', 48, 'ipv6');
   blockList.addSubnet('fec0::', 10, 'ipv6');
   blockList.addSubnet('fe80::', 10, 'ipv6');
   blockList.addSubnet('fc00::', 7, 'ipv6');

@@ -90,8 +90,8 @@ last_review: 2026-03-27
   - retain runtime-proof helper audit entries
   - use the Linear workpad as the operator-facing status surface
 
-## Open Questions
-- Whether the success payload should expose resolved addresses directly or only summarize classification. Keep the first version minimal unless tests/docs need the full list for operator debugging.
+## Payload Notes
+- The success payload keeps `resolved_addresses` explicit. Deterministic mode returns an empty list because no DNS lookup runs; `dns-public` returns the worker-local resolved addresses that were checked and accepted so operators can audit exactly what the reachability decision used.
 
 ## Approvals
 - Reviewer: delegated docs-review guard stages passed; forced review stage drifted, so manual pre-implementation approval is recorded with an override note

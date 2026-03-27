@@ -57,7 +57,8 @@
       "last_review": "2026-03-27",
       "approvals": {
         "docs_review": {
-          "reviewer": "codex-orchestrator docs-review (guard stages passed; review drift override)",
+          "reviewer": "codex-orchestrator docs-review",
+          "override_reason": "guard stages passed; review drift override",
           "date": "2026-03-27",
           "manifest": ".runs/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff-docs-review/cli/2026-03-27T07-59-26-687Z-b3902cf6/manifest.json"
         }
