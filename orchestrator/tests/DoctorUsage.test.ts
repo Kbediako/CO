@@ -867,6 +867,51 @@ describe('runDoctorUsage', () => {
     );
   });
 
+  it('does not cross-close distinct receiver groups when a close event includes a shared path alias', async () => {
+    const taskId = 'task-collab-shared-path-close';
+    const runId = '2026-02-18T00-00-00-000Z-b16b00b5';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-shared-path-close-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a', 'agent-b'],
+            receiver_agent_paths: ['/root/shared', '/root/shared']
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-b',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-b'],
+            receiver_agent_paths: ['/root/shared']
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+        expect(result.collab.unclosed_spawn_agents).toBe(1);
+      }
+    );
+  });
+
   it('pairs ragged thread/path arrays before emitting fallback singleton groups', async () => {
     const taskId = 'task-collab-ragged-arrays';
     const runId = '2026-02-18T00-00-00-000Z-f00dbabe';

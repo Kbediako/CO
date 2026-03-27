@@ -301,7 +301,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
               if (closedSpawnIndexes.has(spawnIndex)) {
                 continue;
               }
-              if (receiverIdentifiers.some((id) => aliases.has(id))) {
+              if (collabReceiverGroupMatches(receiverIdentifiers, aliases)) {
                 closedSpawnIndexes.add(spawnIndex);
               }
             }
@@ -732,6 +732,14 @@ function consumeMatchingAliasIndex(
       consumedIndexes.add(index);
     }
   }
+}
+
+function collabReceiverGroupMatches(receiverIdentifiers: string[], aliases: Set<string>): boolean {
+  const threadIdentifiers = receiverIdentifiers.filter((identifier) => identifier.startsWith('thread:'));
+  if (threadIdentifiers.length > 0) {
+    return threadIdentifiers.some((identifier) => aliases.has(identifier));
+  }
+  return receiverIdentifiers.some((identifier) => aliases.has(identifier));
 }
 
 function dedupeCollabAliases(values: Array<string | null | undefined>): string[] {
