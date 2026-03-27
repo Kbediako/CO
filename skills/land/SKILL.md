@@ -44,7 +44,24 @@ npm run pr:resolve-merge -- \
 3. Confirm required checks are green or keep shepherding until they are.
 4. If merge conflicts, failing checks, or new review feedback appear, handle them immediately. If the PR needs more code changes, resume the issue through `Rework` rather than pretending merge is still blocked-only.
 5. Keep the same PR, branch, and workpad current while monitoring the merge loop.
-6. Once the PR merges, update the issue to `Done`.
+6. Once the PR merges, reconcile the shared local root checkout before `Done`.
+
+## Shared Root Reconciliation
+
+After the PR merges and before moving the issue to `Done`:
+
+1. Inspect the shared local root checkout, not the per-issue worktree. This is the repo checkout that owns `.workspaces/`.
+2. Record the before state in the same workpad closeout using `git -C "$SHARED_ROOT" status --short --branch`.
+3. Only when that checkout is on `main` and clean, run:
+
+```bash
+git -C "$SHARED_ROOT" fetch origin main
+git -C "$SHARED_ROOT" merge --ff-only origin/main
+```
+
+4. Record the after state with the same `git status --short --branch` command.
+5. If the checkout is dirty, detached, on another branch, or otherwise unsafe to mutate, do not force a sync. Leave it untouched and record the explicit skip reason in the same workpad closeout.
+6. Do not mutate the issue worktree or other active workspaces as part of this step.
 
 ## Linear Closeout
 
@@ -57,4 +74,4 @@ codex-orchestrator linear transition \
   --format json
 ```
 
-Do not transition to `Done` before the merge has actually completed.
+Do not transition to `Done` before the merge has actually completed and the shared-root reconciliation result is recorded.
