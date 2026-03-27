@@ -498,6 +498,53 @@ describe('startControlServerPublicLifecycle', () => {
     expect(refresh).toHaveBeenCalledTimes(2);
   });
 
+  it('rechecks the active lock before starting a queued refresh after the prior operation settles', async () => {
+    let resolveRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    let resolveRehydrate: (() => void) | null = null;
+    const rehydratePromise = new Promise<void>((resolve) => {
+      resolveRehydrate = resolve;
+    });
+    const refresh = vi
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(async () => {
+        await firstRefresh;
+      })
+      .mockImplementation(async () => undefined);
+    const rehydrate = vi.fn(async () => {
+      await rehydratePromise;
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate,
+      refresh
+    };
+
+    runProviderIssueHandoffRefresh(providerIssueHandoff);
+    const activeLock = runProviderIssueHandoffRehydrate(providerIssueHandoff);
+    const interposedRehydrate = activeLock.then(() => runProviderIssueHandoffRehydrate(providerIssueHandoff));
+    const queuedRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      queueIfBusy: true
+    });
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    resolveRefresh?.();
+    await activeLock;
+    await Promise.resolve();
+
+    expect(rehydrate).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    resolveRehydrate?.();
+    await interposedRehydrate;
+    await queuedRefresh;
+
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
   it('records polling health failures even when background refresh errors are swallowed', async () => {
     vi.useFakeTimers();
 

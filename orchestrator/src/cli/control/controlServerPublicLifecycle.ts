@@ -408,6 +408,9 @@ function queueProviderIssueHandoffRefresh(
         return;
       }
       state.queuedRefresh = null;
+      if (state.active) {
+        return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation, healthContext);
+      }
       return startProviderIssueHandoffOperation(providerIssueHandoff, state, operation, healthContext);
     })
     .finally(() => {
