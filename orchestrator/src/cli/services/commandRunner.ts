@@ -921,7 +921,7 @@ function parseCollabToolCallLine(
   const receiverThreadIds = Array.isArray(item.receiver_thread_ids)
     ? item.receiver_thread_ids.filter((entry) => typeof entry === 'string')
     : [];
-  const senderAgentPath = typeof item.sender_agent_path === 'string' ? item.sender_agent_path : null;
+  const senderAgentPath = normalizeOptionalString(item.sender_agent_path);
   const receiverAgentPaths = parseStringArray(item.receiver_agent_paths);
   const receiverAgents = parseCollabReceiverAgents(item.receiver_agents);
 
@@ -954,8 +954,18 @@ function parseCollabToolCallLine(
 
 function parseStringArray(value: unknown): string[] {
   return Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+    ? value
+        .map((entry) => normalizeOptionalString(entry))
+        .filter((entry): entry is string => entry !== null)
     : [];
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function parseCollabReceiverAgents(
@@ -970,10 +980,10 @@ function parseCollabReceiverAgents(
       continue;
     }
     const record = entry as Record<string, unknown>;
-    const threadId = typeof record.thread_id === 'string' ? record.thread_id : null;
-    const agentNickname = typeof record.agent_nickname === 'string' ? record.agent_nickname : null;
-    const agentRole = typeof record.agent_role === 'string' ? record.agent_role : null;
-    const agentPath = typeof record.agent_path === 'string' ? record.agent_path : null;
+    const threadId = normalizeOptionalString(record.thread_id);
+    const agentNickname = normalizeOptionalString(record.agent_nickname);
+    const agentRole = normalizeOptionalString(record.agent_role);
+    const agentPath = normalizeOptionalString(record.agent_path);
     if (!threadId && !agentNickname && !agentRole && !agentPath) {
       continue;
     }

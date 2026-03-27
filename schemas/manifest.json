@@ -886,6 +886,24 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         },
+        "sender_agent_path": { "type": ["string", "null"], "minLength": 1 },
+        "receiver_agent_paths": {
+          "type": ["array", "null"],
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "receiver_agents": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "thread_id": { "type": ["string", "null"], "minLength": 1 },
+              "agent_nickname": { "type": ["string", "null"], "minLength": 1 },
+              "agent_role": { "type": ["string", "null"], "minLength": 1 },
+              "agent_path": { "type": ["string", "null"], "minLength": 1 }
+            }
+          }
+        },
         "prompt": { "type": ["string", "null"] },
         "fork_context": { "type": ["boolean", "null"] },
         "agents_states": {

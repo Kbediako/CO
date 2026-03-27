@@ -13,7 +13,7 @@ last_review: 2026-03-28
 6. State the resulting sequencing for `CO-13` and `CO-14` explicitly, including any deferrals and guardrails.
 
 ## Outcome
-- Adoption decision: update active CO compatibility posture to `codex-cli 0.117.0` and current upstream-aligned main based on clean local canary evidence.
+- Adoption decision: keep active CO compatibility posture at `codex-cli 0.117.0` for current upstream-aligned main by pairing this lane's clean local canary evidence with the previously recorded cloud contract/fallback baseline.
 - Runtime decision: keep app-server as the normal local runtime path, but do not switch provider-worker supervision to an app-server-backed control seam in this issue; stay on `codex exec` / `codex exec resume`.
 - Collab-lineage decision: keep `sender_thread_id` / `receiver_thread_ids` as the stable manifest contract and capture agent-path metadata additively only when current payloads actually expose it.
 - Guidance decision: stop treating `max_spawn_depth` as part of the active CO baseline; preserve it only as a legacy local override advisory when older parser/runtime combinations still consume spawn-depth caps.
@@ -24,13 +24,20 @@ last_review: 2026-03-28
 - Live bounded collab canary: `out/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d/manual/live-multi-agent-canary.jsonl`
 - App-server CLI/auth surface capture: `out/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d/manual/app-server-help.txt`
 - Runtime-mode canary summary: `out/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d/manual/runtime-mode-canary/runtime-canary-summary.json`
+- Existing cloud required-contract baseline reference: `tasks/specs/0958-cloud-canary-ci.md`
+- Existing cloud fallback-contract baseline reference: `tasks/specs/0974-cloud-adoption-preflight-reliability.md`
 - Closeout summary and validation matrix: `out/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d/manual/adoption-decision-closeout.md`
 
 ## Validation And Review
-- Required repo floor completed cleanly with delegation-guard override recorded for this run, followed by `build`, `lint`, `test`, `docs:check`, `docs:freshness`, `diff-budget`, and `pack:smoke`.
+- Required repo floor completed cleanly with delegation-guard override recorded for this run, followed by `build`, `lint`, `test`, `docs:check`, `docs:freshness`, `diff-budget`, and `pack:smoke`. The full `npm run test` output completed with all visible cases passing; the runner again failed to tear down cleanly afterward, but no lingering `vitest` or test `node` process remained in `ps`.
 - Standalone review surfaced two high-signal issues during this lane and both were fixed before closeout:
   - `doctor` needed to keep warning on legacy low `max_spawn_depth` values rather than silently dropping that signal.
   - active repo-facing guidance still mentioned `max_spawn_depth` as part of the seeded baseline in `README.md`, `templates/codex/AGENTS.md`, and the delegation skill surfaces.
+- The PR feedback sweep added four more actionable fixes before handoff:
+  - manifest schema/type alignment for the additive collab lineage fields
+  - additive thread/path alias closure in `doctorUsage`
+  - whitespace normalization for optional agent metadata in `commandRunner`
+  - explicit cloud-evidence gating language in `docs/guides/codex-version-policy.md`
 - Final standalone-review reruns re-entered bounded reinspection without yielding a terminal verdict after the fixes, so the closeout uses the repo-approved manual fallback review plus explicit elegance notes captured in the closeout summary artifact.
 
 ## Sequencing

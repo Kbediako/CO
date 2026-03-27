@@ -383,12 +383,14 @@ export interface CollabToolCall {
   receiver_thread_ids: string[];
   sender_agent_path?: string | null;
   receiver_agent_paths?: string[] | null;
-  receiver_agents?: {
-    thread_id?: string | null;
-    agent_nickname?: string | null;
-    agent_role?: string | null;
-    agent_path?: string | null;
-  }[] | null;
+  receiver_agents?:
+    | {
+        thread_id?: string | null;
+        agent_nickname?: string | null;
+        agent_role?: string | null;
+        agent_path?: string | null;
+      }[]
+    | null;
   prompt?: string | null;
   fork_context?: boolean | null;
   agents_states?: {

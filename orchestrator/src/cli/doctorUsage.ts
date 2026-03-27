@@ -234,8 +234,8 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       if (collabEventsPossiblyTruncated) {
         collabRunsWithPotentiallyTruncatedToolCalls += 1;
       }
-      const spawnedAgents = new Set<string>();
-      const closedAgents = new Set<string>();
+      const spawnedAgentAliases: Set<string>[] = [];
+      const closedSpawnIndexes = new Set<number>();
       const failedSpawnIds = new Set<string>();
       let failedSpawnCalls = 0;
       if (typeof manifest.task_id === 'string' && manifest.task_id) {
@@ -282,26 +282,35 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
           if (!isCompleted) {
             continue;
           }
-          if (receiverIdentifiers.length > 0) {
-            for (const id of receiverIdentifiers) {
-              spawnedAgents.add(id);
-            }
-          } else {
-            const fallbackId = `spawn@${entry?.item_id ?? entryIndex}`;
-            spawnedAgents.add(fallbackId);
-          }
+          spawnedAgentAliases.push(
+            new Set(
+              receiverIdentifiers.length > 0
+                ? receiverIdentifiers
+                : [`spawn@${entry?.item_id ?? entryIndex}`]
+            )
+          );
           continue;
         }
 
         if (tool === 'close_agent' && isCompleted) {
-          for (const id of receiverIdentifiers) {
-            closedAgents.add(id);
+          if (receiverIdentifiers.length === 0) {
+            continue;
+          }
+          for (const [spawnIndex, aliases] of spawnedAgentAliases.entries()) {
+            if (closedSpawnIndexes.has(spawnIndex)) {
+              continue;
+            }
+            if (receiverIdentifiers.some((id) => aliases.has(id))) {
+              closedSpawnIndexes.add(spawnIndex);
+            }
           }
         }
       }
 
       if (collabCaptureLimitKnown && !collabEventsPossiblyTruncated) {
-        const unclosedSpawnAgents = [...spawnedAgents].filter((id) => !closedAgents.has(id));
+        const unclosedSpawnAgents = spawnedAgentAliases.filter(
+          (_aliases, spawnIndex) => !closedSpawnIndexes.has(spawnIndex)
+        );
         if (unclosedSpawnAgents.length > 0) {
           collabRunsWithUnclosedSpawnAgents += 1;
           collabUnclosedSpawnAgents += unclosedSpawnAgents.length;
@@ -632,35 +641,41 @@ function resolveManifestCollabCaptureLimit(manifest: CliManifest): number | null
 function resolveCollabReceiverIdentifiers(
   entry: CliManifest['collab_tool_calls'] extends (infer T)[] | null | undefined ? T | undefined : never
 ): string[] {
-  const receiverThreadIds = Array.isArray(entry?.receiver_thread_ids)
-    ? entry.receiver_thread_ids
-        .map((id) => (typeof id === 'string' ? id.trim() : ''))
-        .filter((id) => id.length > 0)
-        .map((id) => `thread:${id}`)
-    : [];
-  if (receiverThreadIds.length > 0) {
-    return receiverThreadIds;
-  }
-
-  const receiverAgentPaths = Array.isArray(entry?.receiver_agent_paths)
-    ? entry.receiver_agent_paths
-        .map((path) => (typeof path === 'string' ? path.trim() : ''))
-        .filter((path) => path.length > 0)
-        .map((path) => `path:${path}`)
-    : [];
-  if (receiverAgentPaths.length > 0) {
-    return receiverAgentPaths;
-  }
-
-  const receiverAgents = Array.isArray(entry?.receiver_agents) ? entry.receiver_agents : [];
-  return receiverAgents.flatMap((agent) => {
-    const threadId = typeof agent?.thread_id === 'string' ? agent.thread_id.trim() : '';
-    if (threadId.length > 0) {
-      return [`thread:${threadId}`];
+  const identifiers: string[] = [];
+  const seen = new Set<string>();
+  const pushIdentifier = (prefix: 'thread' | 'path', value: unknown) => {
+    if (typeof value !== 'string') {
+      return;
     }
-    const agentPath = typeof agent?.agent_path === 'string' ? agent.agent_path.trim() : '';
-    return agentPath.length > 0 ? [`path:${agentPath}`] : [];
-  });
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+    const identifier = `${prefix}:${trimmed}`;
+    if (seen.has(identifier)) {
+      return;
+    }
+    seen.add(identifier);
+    identifiers.push(identifier);
+  };
+
+  if (Array.isArray(entry?.receiver_thread_ids)) {
+    for (const receiverThreadId of entry.receiver_thread_ids) {
+      pushIdentifier('thread', receiverThreadId);
+    }
+  }
+  if (Array.isArray(entry?.receiver_agent_paths)) {
+    for (const receiverAgentPath of entry.receiver_agent_paths) {
+      pushIdentifier('path', receiverAgentPath);
+    }
+  }
+  const receiverAgents = Array.isArray(entry?.receiver_agents) ? entry.receiver_agents : [];
+  for (const agent of receiverAgents) {
+    pushIdentifier('thread', agent?.thread_id);
+    pushIdentifier('path', agent?.agent_path);
+  }
+
+  return identifiers;
 }
 
 function clampInt(value: number, min: number, max: number): number {
