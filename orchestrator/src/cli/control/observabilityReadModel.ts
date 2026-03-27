@@ -1,7 +1,10 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
 import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
+
+export type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 
 export interface SelectedRunQuestionSummary {
   queuedCount: number;
@@ -177,21 +180,6 @@ export interface ControlProviderRetryState {
   attempt: number | null;
   due_at: string | null;
   error: string | null;
-}
-
-export interface ControlPollingHealthPayload {
-  enabled: boolean;
-  interval_ms: number | null;
-  checking: boolean;
-  queued: boolean;
-  last_mode: 'poll' | 'refresh' | null;
-  last_requested_at: string | null;
-  last_completed_at: string | null;
-  last_success_at: string | null;
-  last_error_at: string | null;
-  last_error: string | null;
-  next_poll_at: string | null;
-  next_poll_in_ms: number | null;
 }
 
 export interface ControlRunningPayload {

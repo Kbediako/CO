@@ -66,6 +66,21 @@ elements.searchInput.addEventListener('input', (event) => {
   state.filters.search = event.target.value;
   render();
 });
+elements.issueList.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+  const button = event.target.closest('[data-issue-id]');
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+  const issueIdentifier = button.dataset.issueId ?? null;
+  if (!issueIdentifier || issueIdentifier === state.selectedIssueIdentifier) {
+    return;
+  }
+  state.selectedIssueIdentifier = issueIdentifier;
+  render();
+});
 
 boot();
 
@@ -99,7 +114,8 @@ async function initSession() {
     const payload = await response.json();
     state.auth.token = typeof payload.token === 'string' ? payload.token : '';
     state.auth.status = state.auth.token ? 'ready' : 'unauthorized';
-  } catch {
+  } catch (error) {
+    console.warn('[auth] Session initialization failed:', error);
     state.auth.status = 'unauthorized';
   }
   render();
@@ -124,9 +140,10 @@ async function loadData(retriedAfterUnauthorized = false) {
   state.loading = true;
   setSyncStatus(null, true);
   try {
+    const dataHeaders = buildDataHeaders();
     const response = await fetch(dataUrl, {
       cache: 'no-store',
-      ...(buildDataHeaders() ? { headers: buildDataHeaders() } : {})
+      ...(dataHeaders ? { headers: dataHeaders } : {})
     });
     if (response.status === 401 || response.status === 403) {
       const recovered = !retriedAfterUnauthorized && (await renewSession());
@@ -169,6 +186,7 @@ async function requestRefresh(retriedAfterUnauthorized = false) {
   state.refreshRequest.status = 'Requesting…';
   render();
 
+  let handledInlineRender = false;
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -183,10 +201,14 @@ async function requestRefresh(retriedAfterUnauthorized = false) {
       const recovered = !retriedAfterUnauthorized && (await renewSession());
       if (recovered) {
         state.refreshRequest.pending = false;
+        handledInlineRender = true;
         render();
         return requestRefresh(true);
       }
       state.refreshRequest.status = 'Session required';
+      state.refreshRequest.pending = false;
+      handledInlineRender = true;
+      render();
       return;
     }
     const payload = await response.json();
@@ -201,7 +223,9 @@ async function requestRefresh(retriedAfterUnauthorized = false) {
     state.refreshRequest.status = state.refreshRequest.error;
   } finally {
     state.refreshRequest.pending = false;
-    render();
+    if (!handledInlineRender) {
+      render();
+    }
   }
 }
 
@@ -269,13 +293,6 @@ function renderIssueList() {
   elements.issueList.innerHTML = issues.length
     ? issues.map((issue) => renderIssueCard(issue)).join('')
     : '<div class="empty-state">No issues match the current filter.</div>';
-
-  elements.issueList.querySelectorAll('[data-issue-id]').forEach((button) => {
-    button.addEventListener('click', () => {
-      state.selectedIssueIdentifier = button.getAttribute('data-issue-id');
-      render();
-    });
-  });
 }
 
 function renderIssueDetail() {

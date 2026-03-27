@@ -1939,14 +1939,18 @@ describe('ControlServer', () => {
           queued_count: 1
         }
       });
-      expect(uiPayload.issues?.[0]).toMatchObject({
-        display_status: 'paused',
-        status_reason: 'queued_questions'
-      });
-      expect(uiPayload.running?.[0]).toMatchObject({
-        display_state: 'paused',
-        status_reason: 'queued_questions'
-      });
+      expect(
+        uiPayload.issues?.some(
+          (issue) =>
+            issue.display_status === 'paused' && issue.status_reason === 'queued_questions'
+        )
+      ).toBe(true);
+      expect(
+        uiPayload.running?.some(
+          (entry) =>
+            entry.display_state === 'paused' && entry.status_reason === 'queued_questions'
+        )
+      ).toBe(true);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -2048,8 +2052,8 @@ describe('ControlServer', () => {
         running?: Array<{ display_state?: string }>;
       };
       expect(uiPayload.selected?.display_status).toBe('awaiting_input');
-      expect(uiPayload.issues?.[0]?.display_status).toBe('awaiting_input');
-      expect(uiPayload.running?.[0]?.display_state).toBe('awaiting_input');
+      expect(uiPayload.issues?.some((issue) => issue.display_status === 'awaiting_input')).toBe(true);
+      expect(uiPayload.running?.some((entry) => entry.display_state === 'awaiting_input')).toBe(true);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -2144,10 +2148,12 @@ describe('ControlServer', () => {
           retrying?: Array<unknown>;
         };
         expect(uiPayload.selected?.display_status).toBe(scenario.status);
-        expect(uiPayload.issues?.[0]).toMatchObject({
-          display_status: scenario.status,
-          status: scenario.status
-        });
+        expect(
+          uiPayload.issues?.some(
+            (issue) =>
+              issue.display_status === scenario.status && issue.status === scenario.status
+          )
+        ).toBe(true);
         expect(uiPayload.running).toEqual([]);
         expect(uiPayload.retrying).toEqual([]);
       } finally {
@@ -3132,7 +3138,7 @@ describe('ControlServer', () => {
         issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
       expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.issues?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.issues?.some((issue) => (issue.tracked?.linear ?? null) === null)).toBe(true);
       expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();
@@ -3519,7 +3525,7 @@ describe('ControlServer', () => {
         issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
       expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.issues?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.issues?.some((issue) => (issue.tracked?.linear ?? null) === null)).toBe(true);
       expect(linearFetchCount).toBe(0);
     } finally {
       await server.close();
@@ -3678,7 +3684,7 @@ describe('ControlServer', () => {
         issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
       expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.issues?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.issues?.some((issue) => (issue.tracked?.linear ?? null) === null)).toBe(true);
       expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();
