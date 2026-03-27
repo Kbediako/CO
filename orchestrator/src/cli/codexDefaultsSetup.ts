@@ -21,8 +21,7 @@ export const BASELINE_REASONING = 'xhigh';
 export const BASELINE_REASONING_MINIMUM = 'high';
 export const BASELINE_AGENTS = {
   max_threads: 12,
-  max_depth: 4,
-  max_spawn_depth: 4
+  max_depth: 4
 } as const;
 
 interface RoleDefinition {

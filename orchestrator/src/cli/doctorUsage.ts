@@ -245,11 +245,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
         const tool = typeof entry?.tool === 'string' && entry.tool ? entry.tool : 'unknown';
         const status = typeof entry?.status === 'string' && entry.status ? entry.status : 'unknown';
         const eventType = typeof entry?.event_type === 'string' && entry.event_type ? entry.event_type : 'unknown';
-        const receiverThreadIds = Array.isArray(entry?.receiver_thread_ids)
-          ? entry.receiver_thread_ids
-              .map((id) => (typeof id === 'string' ? id.trim() : ''))
-              .filter((id) => id.length > 0)
-          : [];
+        const receiverIdentifiers = resolveCollabReceiverIdentifiers(entry);
         const completedEventWithoutStatus = eventType === 'item.completed' && status !== 'failed';
         const isCompleted = status === 'completed' || completedEventWithoutStatus;
         const isFailed = status === 'failed';
@@ -286,8 +282,8 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
           if (!isCompleted) {
             continue;
           }
-          if (receiverThreadIds.length > 0) {
-            for (const id of receiverThreadIds) {
+          if (receiverIdentifiers.length > 0) {
+            for (const id of receiverIdentifiers) {
               spawnedAgents.add(id);
             }
           } else {
@@ -298,7 +294,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
         }
 
         if (tool === 'close_agent' && isCompleted) {
-          for (const id of receiverThreadIds) {
+          for (const id of receiverIdentifiers) {
             closedAgents.add(id);
           }
         }
@@ -631,6 +627,40 @@ function resolveManifestCollabCaptureLimit(manifest: CliManifest): number | null
     return null;
   }
   return Math.trunc(value);
+}
+
+function resolveCollabReceiverIdentifiers(
+  entry: CliManifest['collab_tool_calls'] extends (infer T)[] | null | undefined ? T | undefined : never
+): string[] {
+  const receiverThreadIds = Array.isArray(entry?.receiver_thread_ids)
+    ? entry.receiver_thread_ids
+        .map((id) => (typeof id === 'string' ? id.trim() : ''))
+        .filter((id) => id.length > 0)
+        .map((id) => `thread:${id}`)
+    : [];
+  if (receiverThreadIds.length > 0) {
+    return receiverThreadIds;
+  }
+
+  const receiverAgentPaths = Array.isArray(entry?.receiver_agent_paths)
+    ? entry.receiver_agent_paths
+        .map((path) => (typeof path === 'string' ? path.trim() : ''))
+        .filter((path) => path.length > 0)
+        .map((path) => `path:${path}`)
+    : [];
+  if (receiverAgentPaths.length > 0) {
+    return receiverAgentPaths;
+  }
+
+  const receiverAgents = Array.isArray(entry?.receiver_agents) ? entry.receiver_agents : [];
+  return receiverAgents.flatMap((agent) => {
+    const threadId = typeof agent?.thread_id === 'string' ? agent.thread_id.trim() : '';
+    if (threadId.length > 0) {
+      return [`thread:${threadId}`];
+    }
+    const agentPath = typeof agent?.agent_path === 'string' ? agent.agent_path.trim() : '';
+    return agentPath.length > 0 ? [`path:${agentPath}`] : [];
+  });
 }
 
 function clampInt(value: number, min: number, max: number): number {

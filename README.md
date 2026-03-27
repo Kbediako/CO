@@ -153,8 +153,8 @@ Caveats:
 - Under ChatGPT auth, keep top-level, delegated, and review surfaces on `gpt-5.4`; avoid `gpt-5.4-codex` until provider compatibility changes.
 - Leave `agents.explorer` undefined unless you intentionally want to override built-in explorer behavior.
 - Keep RLM/collab built-ins-first by default; add specialist custom roles only when a measured benefit justifies ongoing maintenance.
-- `max_threads = 12` is the seeded baseline. Keep explicit `max_depth = 4` / `max_spawn_depth = 4` only when your local Codex parser accepts them; if you intentionally use constrained caps like `8/2/2` or `6/1/1`, `codex-orchestrator codex defaults --yes` preserves those existing values.
-- Fallbacks are contingency-only: use `8/2/2` on constrained hosts or deterministic high-risk lanes; use `6/1/1` only as break-glass under severe contention.
+- `max_threads = 12` is the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance; if you intentionally use constrained caps like `8/2` or legacy `6/1/1`, `codex-orchestrator codex defaults --yes` preserves those existing values.
+- Fallbacks are contingency-only: use `8/2` on constrained hosts or deterministic high-risk lanes; use legacy `6/1/1` only as break-glass when an older parser/runtime still consumes spawn-depth caps.
 - Awaiter triage: long waits are expected for long-running jobs; treat it as stuck only after multiple polling windows with no status/progress movement.
 - `codex review` delegates with collab tools disabled in review threads; keep review expectations single-agent and on the same `gpt-5.4` target when running under ChatGPT auth.
 

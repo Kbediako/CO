@@ -921,6 +921,9 @@ function parseCollabToolCallLine(
   const receiverThreadIds = Array.isArray(item.receiver_thread_ids)
     ? item.receiver_thread_ids.filter((entry) => typeof entry === 'string')
     : [];
+  const senderAgentPath = typeof item.sender_agent_path === 'string' ? item.sender_agent_path : null;
+  const receiverAgentPaths = parseStringArray(item.receiver_agent_paths);
+  const receiverAgents = parseCollabReceiverAgents(item.receiver_agents);
 
   return {
     observed_at: isoTimestamp(),
@@ -932,6 +935,14 @@ function parseCollabToolCallLine(
     status: normalizeCollabStatus(item.status),
     sender_thread_id: typeof item.sender_thread_id === 'string' ? item.sender_thread_id : 'unknown',
     receiver_thread_ids: receiverThreadIds,
+    sender_agent_path: senderAgentPath,
+    receiver_agent_paths:
+      receiverAgentPaths.length > 0
+        ? receiverAgentPaths
+        : receiverAgents
+            ?.map((entry) => entry.agent_path)
+            .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0) ?? null,
+    receiver_agents: receiverAgents,
     prompt: typeof item.prompt === 'string' ? item.prompt : null,
     fork_context: typeof item.fork_context === 'boolean' ? item.fork_context : null,
     agents_states:
@@ -939,6 +950,41 @@ function parseCollabToolCallLine(
         ? (item.agents_states as Record<string, unknown>)
         : null
   };
+}
+
+function parseStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+    : [];
+}
+
+function parseCollabReceiverAgents(
+  value: unknown
+): NonNullable<CollabToolCallRecord['receiver_agents']> | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const parsed: NonNullable<CollabToolCallRecord['receiver_agents']> = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const record = entry as Record<string, unknown>;
+    const threadId = typeof record.thread_id === 'string' ? record.thread_id : null;
+    const agentNickname = typeof record.agent_nickname === 'string' ? record.agent_nickname : null;
+    const agentRole = typeof record.agent_role === 'string' ? record.agent_role : null;
+    const agentPath = typeof record.agent_path === 'string' ? record.agent_path : null;
+    if (!threadId && !agentNickname && !agentRole && !agentPath) {
+      continue;
+    }
+    parsed.push({
+      thread_id: threadId,
+      agent_nickname: agentNickname,
+      agent_role: agentRole,
+      agent_path: agentPath
+    });
+  }
+  return parsed.length > 0 ? parsed : null;
 }
 
 function normalizeCollabStatus(value: unknown): CollabToolCallRecord['status'] {

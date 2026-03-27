@@ -108,9 +108,7 @@ describe('runDoctor', () => {
       expect(result.codex_defaults.checks.model_reasoning_effort.status).toBe('ok');
       expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
       expect(result.codex_defaults.checks.max_depth.status).toBe('ok');
-      expect(result.codex_defaults.checks.max_spawn_depth.status).toBe('ok');
       expect(result.codex_defaults.checks.max_depth.actual).toBeNull();
-      expect(result.codex_defaults.checks.max_spawn_depth.actual).toBeNull();
 
       const summary = formatDoctorSummary(result).join('\n');
       for (const name of names) {
@@ -120,6 +118,49 @@ describe('runDoctor', () => {
       expect(summary).toContain('Codex defaults advisory: ok');
       expect(summary).toContain('review_model: ok');
       expect(summary).toContain('agents.max_depth: ok (actual: <unset>, expected >= 4 when set; <unset> accepted)');
+      expect(summary).not.toContain('  - agents.max_spawn_depth:');
+      expect(summary).toContain('Current CO baseline no longer seeds or expects `agents.max_spawn_depth`');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('flags legacy max_spawn_depth when it still constrains older runtimes', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12',
+          'max_depth = 4',
+          'max_spawn_depth = 1'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.legacy_max_spawn_depth).toEqual({
+        present: true,
+        status: 'advisory',
+        actual: 1,
+        detail: 'older parser/runtime may still treat this as a hard cap below the CO baseline depth; raise it to >= 4 or remove it'
+      });
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('legacy agents.max_spawn_depth: advisory (actual: 1;');
+      expect(summary).toContain('raise it to >= 4 or remove it');
     } finally {
       if (originalCodexHome === undefined) {
         delete process.env.CODEX_HOME;

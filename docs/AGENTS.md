@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 423c073bb5fcc174ea1c31ae9ceb9059fdd925d15aca42f10544d15d67c01c0d -->
+<!-- codex:instruction-stamp 217ece6766189a459bcc11bfdab48b36bacb4cfdb2b5bdcba2b44df0f5cad856 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -53,10 +53,11 @@
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Current CO compatibility/adoption target is stable Codex CLI (`0.115.0`).
+- Current CO compatibility/adoption target is stable Codex CLI (`0.117.0`).
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
 - On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.
 - CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.
+- App-server remains the normal local runtime path, but provider workers still stay on `codex exec` / `codex exec resume` supervision until a separate app-server control seam lands with explicit authority guardrails.
 - Required policy checks for newer-version lanes:
   - `scripts/runtime-mode-canary.mjs`
   - Required cloud contract run: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`
