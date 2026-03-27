@@ -68,6 +68,7 @@ export interface ResolveProviderLinearRuntimeProofInput {
 
 const ALL_RUNTIME_PROOF_KINDS: ProviderLinearRuntimeProofKind[] = ['screenshot', 'external-link', 'video'];
 const BLOCKED_PROOF_HOSTS = createBlockedProofHostBlockList();
+const BLOCKED_PROOF_TLDS = ['local', 'test', 'invalid', 'localhost', 'lan'] as const;
 
 export async function resolveProviderLinearRuntimeProof(
   input: ResolveProviderLinearRuntimeProofInput
@@ -265,7 +266,7 @@ function buildWorkpadMarkdown(
   const inlineSummary = activeProof.summary ? normalizeMarkdownInline(activeProof.summary) : null;
   return [
     `- Runtime proof policy: ${policy.summary}`,
-    `- Runtime proof (${activeProof.kind}): [${escapeMarkdownLabel(inlineTitle)}](${activeProof.reviewer_url})`,
+    `- Runtime proof (${activeProof.kind}): [${escapeMarkdownLabel(inlineTitle)}](<${activeProof.reviewer_url}>)`,
     inlineSummary ? `- Runtime proof summary: ${inlineSummary}` : null
   ]
     .filter((line): line is string => Boolean(line))
@@ -282,7 +283,7 @@ function buildPrMarkdown(
   return [
     '### Runtime Proof',
     `- Policy: ${policy.summary}`,
-    `- Proof (${activeProof.kind}): [${escapeMarkdownLabel(inlineTitle)}](${activeProof.reviewer_url})`,
+    `- Proof (${activeProof.kind}): [${escapeMarkdownLabel(inlineTitle)}](<${activeProof.reviewer_url}>)`,
     inlineSummary ? `- Summary: ${inlineSummary}` : null
   ]
     .filter((line): line is string => Boolean(line))
@@ -352,7 +353,7 @@ function normalizeHttpUrl(value: string | null): string | null {
 function isBlockedProofHostname(hostname: string): boolean {
   const normalized = hostname.trim().toLowerCase().replaceAll(/^\[|\]$/g, '').replace(/\.$/, '');
   if (!normalized) {
-    return false;
+    return true;
   }
   if (normalized === 'localhost' || normalized.endsWith('.localhost')) {
     return true;
@@ -363,6 +364,12 @@ function isBlockedProofHostname(hostname: string): boolean {
   }
   if (ipVersion === 6) {
     return BLOCKED_PROOF_HOSTS.check(normalized, 'ipv6');
+  }
+  if (!normalized.includes('.')) {
+    return true;
+  }
+  if (BLOCKED_PROOF_TLDS.some((tld) => normalized === tld || normalized.endsWith(`.${tld}`))) {
+    return true;
   }
   return false;
 }

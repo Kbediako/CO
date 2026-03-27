@@ -161,15 +161,49 @@ describe('resolveProviderLinearRuntimeProof', () => {
       return;
     }
     expect(result.handoff?.workpad_markdown).toContain(
-      '[Dashboard after launch-app validation](https://review-assets.example.com/co-8-dashboard.png)'
+      '[Dashboard after launch-app validation](<https://review-assets.example.com/co-8-dashboard.png>)'
     );
     expect(result.handoff?.workpad_markdown).toContain(
       '- Runtime proof summary: Signed-in dashboard state used for review handoff.'
     );
     expect(result.handoff?.pr_markdown).toContain(
-      '- Proof (screenshot): [Dashboard after launch-app validation](https://review-assets.example.com/co-8-dashboard.png)'
+      '- Proof (screenshot): [Dashboard after launch-app validation](<https://review-assets.example.com/co-8-dashboard.png>)'
     );
     expect(result.handoff?.pr_markdown).toContain('- Summary: Signed-in dashboard state used for review handoff.');
+  });
+
+  it('wraps runtime proof urls in angle brackets for markdown handoff links', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof({
+      repoRoot,
+      origin: 'https://app.example.com/dashboard',
+      kind: 'screenshot',
+      proofUrl: 'https://review-assets.example.com/runtime-proof(1).png',
+      title: 'Dashboard proof'
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.handoff?.workpad_markdown).toContain(
+      '[Dashboard proof](<https://review-assets.example.com/runtime-proof(1).png>)'
+    );
+    expect(result.handoff?.pr_markdown).toContain(
+      '[Dashboard proof](<https://review-assets.example.com/runtime-proof(1).png>)'
+    );
   });
 
   it('fails closed when the requested proof kind is blocked by policy', async () => {
@@ -264,6 +298,42 @@ describe('resolveProviderLinearRuntimeProof', () => {
     'http://[::ffff:169.254.1.2]/proof.png',
     'http://foo.localhost/proof.png'
   ])('fails closed when the proof url is a loopback-only address (%s)', async (proofUrl) => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof({
+      repoRoot,
+      origin: 'https://app.example.com',
+      kind: 'screenshot',
+      proofUrl
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_url_missing',
+        status: 422
+      }
+    });
+  });
+
+  it.each([
+    'https://workstation/proof.png',
+    'https://review-assets.local/proof.png',
+    'https://review-assets.test/proof.png',
+    'https://review-assets.invalid/proof.png',
+    'https://review-assets.lan/proof.png'
+  ])('fails closed when the proof url uses a non-public dns hostname (%s)', async (proofUrl) => {
     const repoRoot = await createRepoWithPermit({
       allowedSources: [
         {
