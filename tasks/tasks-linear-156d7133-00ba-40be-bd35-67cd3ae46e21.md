@@ -35,9 +35,9 @@
 - [x] `npm run pack:smoke`. Evidence: command passed on the final tree (`pack smoke passed`).
 
 ## Handoff
-- [ ] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: pending.
-- [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [x] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: updated workpad comment `3e8e1400-db00-4450-b920-c5bbbb2d3e3a`.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: Linear attachment `03a7e0f7-12b8-41a8-850f-184a3d2d5de3` for `https://github.com/Kbediako/CO/pull/312`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: `git rev-list --left-right --count HEAD...origin/main` returned `0 0` after `git fetch origin main`.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [ ] Shared root closeout records before/after root state and either fast-forward success or an explicit skip reason before moving the issue to `Done`. Evidence: pending.
 - [ ] Issue moved to the actual team review state (`In Review`) only after coding stops. Evidence: pending.
