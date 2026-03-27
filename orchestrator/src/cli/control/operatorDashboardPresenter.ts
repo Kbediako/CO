@@ -259,7 +259,7 @@ function buildRetryQueuePayload(
     session_id: entry.session_id,
     thread_id: entry.thread_id ?? null,
     turn_count: entry.turn_count ?? null,
-    workspace_path: entry.workspace_path ?? issue?.workspace.path ?? null,
+    workspace_path: entry.workspace_path ?? null,
     host: LOCAL_HOSTNAME,
     attempt: entry.attempt,
     due_at: entry.due_at,

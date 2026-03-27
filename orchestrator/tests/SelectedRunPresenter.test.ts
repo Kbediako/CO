@@ -484,6 +484,41 @@ describe('OperatorDashboardPresenter', () => {
     expect(dataset.selected?.run_id).toBe('run-7');
   });
 
+  it('does not inherit a running sibling workspace path for retry rows', () => {
+    const projection = buildProjection();
+    const runningIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-7');
+    expect(runningIssue).toBeTruthy();
+    if (!runningIssue) {
+      return;
+    }
+
+    projection.retrying = [
+      {
+        ...projection.retrying[0]!,
+        issue_identifier: 'CO-7',
+        issue_id: 'issue-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        workspace_path: null
+      }
+    ];
+    projection.issues = [runningIssue];
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        workspace_path: null
+      })
+    ]);
+  });
+
   it('falls back to provider proof workspace paths when the issue payload is missing one', () => {
     const projection = buildProjection();
     const runningIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-7');
