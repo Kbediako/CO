@@ -168,6 +168,8 @@ describe('resolveProviderLinearRuntimeProof', () => {
   it.each([
     'http://localhost:3000/proof.png',
     'http://127.0.0.2/proof.png',
+    'http://0.0.0.0:3000/proof.png',
+    'http://[::]:3000/proof.png',
     'http://[::ffff:127.0.0.2]/proof.png',
     'http://foo.localhost/proof.png'
   ])('fails closed when the proof url is a loopback-only address (%s)', async (proofUrl) => {

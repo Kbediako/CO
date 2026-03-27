@@ -386,6 +386,8 @@ function formatKinds(kinds: ProviderLinearRuntimeProofKind[]): string {
 function createLoopbackBlockList(): BlockList {
   const blockList = new BlockList();
   blockList.addSubnet('127.0.0.0', 8, 'ipv4');
+  blockList.addAddress('0.0.0.0', 'ipv4');
+  blockList.addAddress('::', 'ipv6');
   blockList.addAddress('::1', 'ipv6');
   return blockList;
 }
