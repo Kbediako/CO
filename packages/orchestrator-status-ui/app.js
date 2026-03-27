@@ -34,7 +34,7 @@ const elements = {
 const state = {
   data: null,
   loading: false,
-  selectedIssueIdentifier: null,
+  selectedRowKey: null,
   filters: {
     status: 'all',
     search: ''
@@ -81,11 +81,11 @@ elements.issueList.addEventListener('click', (event) => {
   if (!(button instanceof HTMLElement)) {
     return;
   }
-  const issueIdentifier = button.dataset.issueId ?? null;
-  if (!issueIdentifier || issueIdentifier === state.selectedIssueIdentifier) {
+  const rowKey = button.dataset.issueId ?? null;
+  if (!rowKey || rowKey === state.selectedRowKey) {
     return;
   }
-  state.selectedIssueIdentifier = issueIdentifier;
+  state.selectedRowKey = rowKey;
   render();
 });
 
@@ -262,11 +262,13 @@ async function requestRefresh(retriedAfterUnauthorized = false) {
 }
 
 function render() {
+  const issuePaneFocus = captureIssuePaneFocus();
   renderHeader();
   renderSummary();
   renderQueues();
   renderIssueList();
   renderIssueDetail();
+  restoreIssuePaneFocus(issuePaneFocus);
   elements.refreshStatus.textContent = state.refreshRequest.status;
 }
 
@@ -335,7 +337,7 @@ function renderIssueDetail() {
     return;
   }
 
-  const detailId = buildIssueDetailId(issue.issue_identifier);
+  const detailId = buildIssueDetailId(getIssueRowKey(issue));
   elements.issueDetail.innerHTML = `
     <div id="${escapeHtml(detailId)}">
       <section class="detail-section">
@@ -349,7 +351,7 @@ function renderIssueDetail() {
             ${issue.is_selected ? '<span class="status-note">Selected run authority</span>' : ''}
           </div>
         </div>
-        ${buildIssueLink(issue.url)}
+        ${buildIssueLink(issue.url, getIssueRowKey(issue))}
         <p class="detail-summary">${escapeHtml(issue.summary || 'No summary available.')}</p>
       </section>
 
@@ -462,16 +464,17 @@ function renderIssueCard(issue) {
   if (issue.is_selected) {
     classes.push('selected');
   }
-  const isActive = state.selectedIssueIdentifier === issue.issue_identifier;
+  const rowKey = getIssueRowKey(issue);
+  const isActive = rowKey !== null && state.selectedRowKey === rowKey;
   if (isActive) {
     classes.push('active');
   }
-  const detailId = buildIssueDetailId(issue.issue_identifier);
+  const detailId = buildIssueDetailId(rowKey);
   return `
     <button
       class="${classes.join(' ')}"
       type="button"
-      data-issue-id="${escapeHtml(issue.issue_identifier)}"
+      data-issue-id="${escapeHtml(rowKey || '')}"
       aria-pressed="${isActive ? 'true' : 'false'}"
       ${isActive ? 'aria-current="true"' : ''}
       aria-controls="${escapeHtml(detailId)}"
@@ -593,12 +596,12 @@ function getSelectedIssue() {
   if (issues.length === 0) {
     return null;
   }
-  return issues.find((issue) => issue.issue_identifier === state.selectedIssueIdentifier) || issues[0];
+  return issues.find((issue) => getIssueRowKey(issue) === state.selectedRowKey) || issues[0];
 }
 
 function syncSelectedIssue() {
   const issues = getAllIssues();
-  rebaseSelectedIssue(issues, state.data?.selected_issue_identifier || null);
+  rebaseSelectedIssue(issues, getPreferredSelectedRowKey(issues));
   syncVisibleSelectedIssue();
 }
 
@@ -606,12 +609,14 @@ function buildHeroNote() {
   return HERO_NOTE;
 }
 
-function buildIssueLink(value) {
+function buildIssueLink(value, rowKey = null) {
   const safeHref = sanitizeHttpUrl(value);
   if (!safeHref) {
     return '';
   }
-  return `<a class="detail-link" href="${safeHref}" target="_blank" rel="noreferrer">Open issue in Linear</a>`;
+  return `<a class="detail-link" href="${safeHref}" target="_blank" rel="noreferrer" data-detail-link-for="${escapeHtml(
+    rowKey || ''
+  )}">Open issue in Linear</a>`;
 }
 
 function sanitizeHttpUrl(value) {
@@ -629,8 +634,8 @@ function sanitizeHttpUrl(value) {
   }
 }
 
-function buildIssueDetailId(issueIdentifier) {
-  return `issue-detail-${String(issueIdentifier || 'unknown')
+function buildIssueDetailId(rowKey) {
+  return `issue-detail-${String(rowKey || 'unknown')
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, '-')}`;
 }
@@ -639,25 +644,101 @@ function getAllIssues() {
   return Array.isArray(state.data?.issues) ? state.data.issues : [];
 }
 
-function rebaseSelectedIssue(issues, preferredIssueIdentifier = null) {
+function getIssueRowKey(issue) {
+  if (!issue || typeof issue !== 'object') {
+    return null;
+  }
+  return issue.run_id || issue.task_id || issue.issue_identifier || null;
+}
+
+function getPreferredSelectedRowKey(issues) {
+  const selectedRowKey = getIssueRowKey(state.data?.selected);
+  if (selectedRowKey) {
+    return selectedRowKey;
+  }
+
+  const selectedIssue = issues.find((issue) => issue?.is_selected);
+  if (selectedIssue) {
+    return getIssueRowKey(selectedIssue);
+  }
+
+  const selectedIssueIdentifier = state.data?.selected_issue_identifier;
+  if (typeof selectedIssueIdentifier !== 'string' || selectedIssueIdentifier.length === 0) {
+    return null;
+  }
+  return getIssueRowKey(
+    issues.find((issue) => issue?.issue_identifier === selectedIssueIdentifier) ?? null
+  );
+}
+
+function rebaseSelectedIssue(issues, preferredRowKey = null) {
   if (!Array.isArray(issues) || issues.length === 0) {
-    state.selectedIssueIdentifier = null;
+    state.selectedRowKey = null;
     return;
   }
-  if (issues.some((issue) => issue.issue_identifier === state.selectedIssueIdentifier)) {
+  if (issues.some((issue) => getIssueRowKey(issue) === state.selectedRowKey)) {
     return;
   }
-  const preferredSelection = preferredIssueIdentifier
-    ? issues.find((issue) => issue.issue_identifier === preferredIssueIdentifier)?.issue_identifier
+  const preferredSelection = preferredRowKey
+    ? issues.find((issue) => getIssueRowKey(issue) === preferredRowKey) ?? null
     : null;
-  state.selectedIssueIdentifier =
-    preferredSelection ||
-    issues.find((issue) => issue.is_selected)?.issue_identifier ||
-    issues[0].issue_identifier;
+  const selectedIssue = issues.find((issue) => issue.is_selected) ?? null;
+  state.selectedRowKey = getIssueRowKey(preferredSelection || selectedIssue || issues[0]);
 }
 
 function syncVisibleSelectedIssue() {
   rebaseSelectedIssue(getFilteredIssues());
+}
+
+function captureIssuePaneFocus() {
+  const activeElement = document.activeElement;
+  if (!(activeElement instanceof HTMLElement)) {
+    return null;
+  }
+
+  const issueButton = activeElement.closest('[data-issue-id]');
+  if (issueButton instanceof HTMLElement && elements.issueList.contains(issueButton)) {
+    const rowKey = issueButton.dataset.issueId ?? null;
+    if (rowKey) {
+      return { type: 'issue-button', rowKey };
+    }
+  }
+
+  const detailLink = activeElement.closest('[data-detail-link-for]');
+  if (detailLink instanceof HTMLElement && elements.issueDetail.contains(detailLink)) {
+    const rowKey = detailLink.dataset.detailLinkFor ?? null;
+    if (rowKey) {
+      return { type: 'detail-link', rowKey };
+    }
+  }
+
+  return null;
+}
+
+function restoreIssuePaneFocus(snapshot) {
+  if (!snapshot || !snapshot.rowKey) {
+    return;
+  }
+
+  const root = snapshot.type === 'detail-link' ? elements.issueDetail : elements.issueList;
+  const attributeName = snapshot.type === 'detail-link' ? 'data-detail-link-for' : 'data-issue-id';
+  const nextFocusTarget = findElementByDataAttribute(root, attributeName, snapshot.rowKey);
+  if (nextFocusTarget instanceof HTMLElement) {
+    nextFocusTarget.focus();
+  }
+}
+
+function findElementByDataAttribute(root, attributeName, attributeValue) {
+  if (!(root instanceof HTMLElement)) {
+    return null;
+  }
+  const candidates = root.querySelectorAll(`[${attributeName}]`);
+  for (const candidate of candidates) {
+    if (candidate instanceof HTMLElement && candidate.getAttribute(attributeName) === attributeValue) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 function buildControlUrl(pathname) {
