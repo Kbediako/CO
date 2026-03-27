@@ -138,6 +138,10 @@ body {
   color: var(--danger);
 }
 
+.auth-badge[data-state="error"] {
+  color: var(--danger);
+}
+
 .auth-badge[data-state="connecting"] {
   color: var(--accent-cool);
 }

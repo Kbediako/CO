@@ -10,6 +10,7 @@ import type {
 } from './observabilityReadModel.js';
 import {
   buildProjectionSelectedPayload,
+  buildTrackedPayloadEnvelope,
   buildSelectedRunLatestEventPayload
 } from './observabilityReadModel.js';
 
@@ -306,7 +307,7 @@ export function buildCompatibilityIssuePayload(input: {
     question_summary: selectedPayload.question_summary,
     recent_events: recentEvents,
     last_error: input.source.lastError,
-    tracked: input.source.tracked ?? {},
+    tracked: buildTrackedPayloadEnvelope(input.source.tracked),
     ...(input.source.providerLinearWorkerProof
       ? { provider_linear_worker_proof: input.source.providerLinearWorkerProof }
       : {}),

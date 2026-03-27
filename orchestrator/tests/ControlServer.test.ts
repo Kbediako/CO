@@ -1415,7 +1415,12 @@ describe('ControlServer', () => {
         selected_issue_identifier?: string | null;
         running?: Array<{ issue_identifier?: string }>;
         retrying?: Array<{ issue_identifier?: string }>;
-        issues?: Array<{ issue_identifier?: string; status?: string }>;
+        issues?: Array<{
+          issue_identifier?: string;
+          status?: string;
+          display_status?: string;
+          status_reason?: string | null;
+        }>;
       };
       expect(uiPayload.selected_issue_identifier).toBe('task-1034-current');
       expect(uiPayload.running).toEqual(
@@ -1438,6 +1443,12 @@ describe('ControlServer', () => {
           expect.objectContaining({
             issue_identifier: 'task-1034-current',
             status: 'running'
+          }),
+          expect.objectContaining({
+            issue_identifier: 'task-1034-running',
+            status: 'running',
+            display_status: 'paused',
+            status_reason: 'queued_questions'
           }),
           expect.objectContaining({
             issue_identifier: 'task-1034-retrying',
@@ -3137,8 +3148,18 @@ describe('ControlServer', () => {
         selected?: { tracked?: { linear?: unknown } } | null;
         issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
-      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.issues?.some((issue) => (issue.tracked?.linear ?? null) === null)).toBe(true);
+      expect(uiPayload.selected).not.toBeNull();
+      expect(uiPayload.selected).toHaveProperty('tracked');
+      expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(
+        uiPayload.issues?.every(
+          (issue) =>
+            Object.prototype.hasOwnProperty.call(issue, 'tracked')
+            && issue.tracked !== undefined
+            && Object.prototype.hasOwnProperty.call(issue.tracked, 'linear')
+            && issue.tracked.linear === null
+        )
+      ).toBe(true);
       expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();
@@ -3524,8 +3545,18 @@ describe('ControlServer', () => {
         selected?: { tracked?: { linear?: unknown } } | null;
         issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
-      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.issues?.some((issue) => (issue.tracked?.linear ?? null) === null)).toBe(true);
+      expect(uiPayload.selected).not.toBeNull();
+      expect(uiPayload.selected).toHaveProperty('tracked');
+      expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(
+        uiPayload.issues?.every(
+          (issue) =>
+            Object.prototype.hasOwnProperty.call(issue, 'tracked')
+            && issue.tracked !== undefined
+            && Object.prototype.hasOwnProperty.call(issue.tracked, 'linear')
+            && issue.tracked.linear === null
+        )
+      ).toBe(true);
       expect(linearFetchCount).toBe(0);
     } finally {
       await server.close();
@@ -3683,8 +3714,18 @@ describe('ControlServer', () => {
         selected?: { tracked?: { linear?: unknown } } | null;
         issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
-      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.issues?.some((issue) => (issue.tracked?.linear ?? null) === null)).toBe(true);
+      expect(uiPayload.selected).not.toBeNull();
+      expect(uiPayload.selected).toHaveProperty('tracked');
+      expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(
+        uiPayload.issues?.every(
+          (issue) =>
+            Object.prototype.hasOwnProperty.call(issue, 'tracked')
+            && issue.tracked !== undefined
+            && Object.prototype.hasOwnProperty.call(issue.tracked, 'linear')
+            && issue.tracked.linear === null
+        )
+      ).toBe(true);
       expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();

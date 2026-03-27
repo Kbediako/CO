@@ -43,7 +43,7 @@ export interface ControlTrackedLinearPayload {
 }
 
 export interface ControlTrackedPayload {
-  linear: ControlTrackedLinearPayload;
+  linear: ControlTrackedLinearPayload | null;
 }
 
 export interface SelectedRunStageSummary {
@@ -161,7 +161,7 @@ export interface ControlSelectedRunPayload {
     path: string | null;
   };
   question_summary: ControlQuestionSummaryPayload;
-  tracked?: ControlTrackedPayload;
+  tracked: ControlTrackedPayload;
   provider_linear_worker_proof?: ProviderLinearWorkerProof;
 }
 
@@ -302,9 +302,15 @@ export interface ControlIssuePayload {
   question_summary: ControlQuestionSummaryPayload;
   recent_events: Array<Pick<ControlLatestEventPayload, 'at' | 'event' | 'message'>>;
   last_error: string | null;
-  tracked: ControlTrackedPayload | Record<string, never>;
+  tracked: ControlTrackedPayload;
   provider_linear_worker_proof?: ProviderLinearWorkerProof | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
+}
+
+export function buildTrackedPayloadEnvelope(
+  tracked: ControlTrackedPayload | null | undefined
+): ControlTrackedPayload {
+  return tracked ?? { linear: null };
 }
 
 export function buildTrackedLinearPayload(
@@ -396,7 +402,7 @@ export function buildProjectionSelectedPayload(
       path: selected.workspacePath
     },
     question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
-    ...(selected.tracked ? { tracked: selected.tracked } : {}),
+    tracked: buildTrackedPayloadEnvelope(selected.tracked),
     ...(selected.providerLinearWorkerProof
       ? {
           provider_linear_worker_proof: selected.providerLinearWorkerProof

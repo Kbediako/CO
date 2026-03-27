@@ -52,7 +52,12 @@ const state = {
   }
 };
 
+const HERO_NOTE =
+  'Compatibility-projection truth for running sessions, retry queues, and operator polling health.';
+
 let refreshTimer = null;
+let activeLoadPromise = null;
+let queuedLoadAfterCurrent = false;
 
 elements.dataSource.textContent = `Data source: ${dataUrl}`;
 elements.refreshButton.addEventListener('click', () => {
@@ -106,71 +111,96 @@ async function initSession() {
   render();
   try {
     const response = await fetch(url, { method: 'POST', cache: 'no-store' });
-    if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
       state.auth.status = 'unauthorized';
       render();
       return;
+    }
+    if (!response.ok) {
+      throw new Error(`Session bootstrap failed (${response.status})`);
     }
     const payload = await response.json();
     state.auth.token = typeof payload.token === 'string' ? payload.token : '';
     state.auth.status = state.auth.token ? 'ready' : 'unauthorized';
   } catch (error) {
     console.warn('[auth] Session initialization failed:', error);
-    state.auth.status = 'unauthorized';
+    state.auth.status = 'error';
   }
   render();
 }
 
-async function loadData(retriedAfterUnauthorized = false) {
-  if (state.loading) {
-    return;
-  }
-  if (state.auth.enabled && !state.auth.token) {
-    if (!retriedAfterUnauthorized) {
-      await initSession();
-      if (state.auth.token) {
-        return loadData(true);
-      }
+async function loadData(retriedAfterUnauthorized = false, options = {}) {
+  if (activeLoadPromise) {
+    if (options.queueIfBusy) {
+      queuedLoadAfterCurrent = true;
     }
-    setSyncStatus(state.auth.status === 'unauthorized' ? 'Session required' : 'Waiting for session', false, true);
-    render();
-    return;
+    return activeLoadPromise;
   }
 
-  state.loading = true;
-  setSyncStatus(null, true);
-  try {
-    const dataHeaders = buildDataHeaders();
-    const response = await fetch(dataUrl, {
-      cache: 'no-store',
-      ...(dataHeaders ? { headers: dataHeaders } : {})
-    });
-    if (response.status === 401 || response.status === 403) {
-      const recovered = !retriedAfterUnauthorized && (await renewSession());
-      if (recovered) {
-        state.loading = false;
-        return loadData(true);
+  const loadPromise = (async () => {
+    let nextRetriedAfterUnauthorized = retriedAfterUnauthorized;
+    do {
+      queuedLoadAfterCurrent = false;
+
+      if (state.auth.enabled && !state.auth.token) {
+        if (!nextRetriedAfterUnauthorized) {
+          await initSession();
+          if (state.auth.token) {
+            nextRetriedAfterUnauthorized = true;
+            continue;
+          }
+        }
+        setSyncStatus(buildMissingSessionStatusMessage(), false, true);
+        render();
+        return;
       }
-      setSyncStatus('Session required', false, true);
-      return;
+
+      state.loading = true;
+      setSyncStatus(null, true);
+      try {
+        const dataHeaders = buildDataHeaders();
+        const response = await fetch(dataUrl, {
+          cache: 'no-store',
+          ...(dataHeaders ? { headers: dataHeaders } : {})
+        });
+        if (response.status === 401 || response.status === 403) {
+          const recovered = !nextRetriedAfterUnauthorized && (await renewSession());
+          if (recovered) {
+            nextRetriedAfterUnauthorized = true;
+            continue;
+          }
+          setSyncStatus(buildMissingSessionStatusMessage(), false, true);
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`Failed to load data (${response.status})`);
+        }
+        state.data = await response.json();
+        syncSelectedIssue();
+        setSyncStatus(formatTimestamp(state.data.generated_at), false);
+        nextRetriedAfterUnauthorized = false;
+      } catch (error) {
+        setSyncStatus(error instanceof Error ? error.message : 'Failed to load data', false, true);
+        nextRetriedAfterUnauthorized = false;
+      } finally {
+        state.loading = false;
+        render();
+      }
+    } while (queuedLoadAfterCurrent);
+  })();
+
+  const wrappedLoadPromise = loadPromise.finally(() => {
+    if (activeLoadPromise === wrappedLoadPromise) {
+      activeLoadPromise = null;
     }
-    if (!response.ok) {
-      throw new Error(`Failed to load data (${response.status})`);
-    }
-    state.data = await response.json();
-    syncSelectedIssue();
-    setSyncStatus(formatTimestamp(state.data.generated_at), false);
-  } catch (error) {
-    setSyncStatus(error instanceof Error ? error.message : 'Failed to load data', false, true);
-  } finally {
-    state.loading = false;
-    render();
-  }
+  });
+  activeLoadPromise = wrappedLoadPromise;
+  return wrappedLoadPromise;
 }
 
 async function requestRefresh(retriedAfterUnauthorized = false) {
   if (!state.auth.token) {
-    state.refreshRequest.status = 'Session required';
+    state.refreshRequest.status = buildMissingSessionStatusMessage();
     render();
     return;
   }
@@ -205,7 +235,7 @@ async function requestRefresh(retriedAfterUnauthorized = false) {
         render();
         return requestRefresh(true);
       }
-      state.refreshRequest.status = 'Session required';
+      state.refreshRequest.status = buildMissingSessionStatusMessage();
       state.refreshRequest.pending = false;
       handledInlineRender = true;
       render();
@@ -217,7 +247,7 @@ async function requestRefresh(retriedAfterUnauthorized = false) {
       throw new Error(reason);
     }
     state.refreshRequest.status = formatRefreshAck(payload);
-    await loadData();
+    await loadData(false, { queueIfBusy: true });
   } catch (error) {
     state.refreshRequest.error = error instanceof Error ? error.message : 'Refresh failed';
     state.refreshRequest.status = state.refreshRequest.error;
@@ -567,14 +597,7 @@ function syncSelectedIssue() {
 }
 
 function buildHeroNote() {
-  const workflow = state.data?.provider_workflow;
-  if (!workflow) {
-    return 'Compatibility-projection truth for running sessions, retry queues, and operator polling health.';
-  }
-  if (workflow.status === 'reload_failed') {
-    return `Workflow degraded: ${workflow.last_error || 'reload failed'}`;
-  }
-  return `Workflow ready from ${workflow.source_path}`;
+  return HERO_NOTE;
 }
 
 function buildControlUrl(pathname) {
@@ -624,10 +647,16 @@ function formatAuthStatus(status) {
       return 'Session Bootstrapping';
     case 'unauthorized':
       return 'Session Required';
+    case 'error':
+      return 'Session Error';
     case 'disabled':
     default:
       return 'Static Mode';
   }
+}
+
+function buildMissingSessionStatusMessage() {
+  return state.auth.status === 'unauthorized' ? 'Session required' : 'Session bootstrap failed';
 }
 
 function formatRefreshAck(payload) {

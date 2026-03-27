@@ -42,7 +42,7 @@ function buildIssueRecord(
       },
       recent_events: payload.recent_events ?? [],
       last_error: payload.last_error ?? null,
-      tracked: payload.tracked ?? {},
+      tracked: payload.tracked ?? { linear: null },
       ...(payload.provider_linear_worker_proof
         ? { provider_linear_worker_proof: payload.provider_linear_worker_proof }
         : {}),
