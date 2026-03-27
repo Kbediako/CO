@@ -275,6 +275,26 @@ describe('provider linear worker runner', () => {
     const { manifestPath } = await createManifestRoot();
     await expect(loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: join(tempRoot ?? '', 'elsewhere') })).rejects.toThrow('Provider worker root mismatch');
   });
+  it('rejects env issue ids that do not match the manifest-backed issue', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await expect(
+      loadProviderLinearWorkerContext({
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_ISSUE_ID: 'lin-issue-2'
+      })
+    ).rejects.toThrow('Provider worker issue id mismatch');
+  });
+  it('rejects env issue identifiers that do not match the manifest-backed issue identifier', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await expect(
+      loadProviderLinearWorkerContext({
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER: 'CO-99'
+      })
+    ).rejects.toThrow('Provider worker issue identifier mismatch');
+  });
   it('requires matching live control-host env values and accepts manifest.pipelineId', async () => {
     const { manifestPath } = await createManifestRoot();
     await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');

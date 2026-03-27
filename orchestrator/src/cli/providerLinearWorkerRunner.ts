@@ -361,14 +361,26 @@ export async function loadProviderLinearWorkerContext(
     throw new Error('CODEX_ORCHESTRATOR_MANIFEST_PATH is required for provider-linear-worker.');
   }
   const manifest = await readManifest(manifestPath);
-  const issueId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_ID) ??
+  const manifestIssueId =
     normalizeOptionalString(manifest.issue_id) ??
     normalizeOptionalString(manifest.issueId);
-  const issueIdentifier =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER) ??
+  const envIssueId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_ID);
+  if (manifestIssueId && envIssueId && envIssueId !== manifestIssueId) {
+    throw new Error(`Provider worker issue id mismatch between env (${envIssueId}) and manifest (${manifestIssueId}).`);
+  }
+  const issueId = manifestIssueId ?? envIssueId;
+  const manifestIssueIdentifier =
     normalizeOptionalString(manifest.issue_identifier) ??
-    normalizeOptionalString(manifest.issueIdentifier) ??
+    normalizeOptionalString(manifest.issueIdentifier);
+  const envIssueIdentifier = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER);
+  if (manifestIssueIdentifier && envIssueIdentifier && envIssueIdentifier !== manifestIssueIdentifier) {
+    throw new Error(
+      `Provider worker issue identifier mismatch between env (${envIssueIdentifier}) and manifest (${manifestIssueIdentifier}).`
+    );
+  }
+  const issueIdentifier =
+    manifestIssueIdentifier ??
+    envIssueIdentifier ??
     issueId;
   if (!issueId || !issueIdentifier) {
     throw new Error('Provider worker requires issue_id and issue_identifier in env or manifest.');
