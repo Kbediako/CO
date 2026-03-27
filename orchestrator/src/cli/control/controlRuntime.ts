@@ -188,7 +188,6 @@ function createControlRuntimeSnapshot(
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await context.providerWorkflowConfigStore.refresh()
         : null;
-      const providerPolling = readProviderPollingSnapshot(context);
       const running = [
         ...(selected?.rawStatus === 'in_progress' ? [selected] : []),
         ...discoveredSources.filter((source) => source.rawStatus === 'in_progress')
@@ -216,8 +215,7 @@ function createControlRuntimeSnapshot(
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked,
         providerIntake,
-        providerWorkflow,
-        polling: providerPolling
+        providerWorkflow
       };
     })();
     return compatibilityRuntimeSnapshotPromise;
@@ -227,7 +225,10 @@ function createControlRuntimeSnapshot(
     compatibilityProjectionPromise ??= readCompatibilityRuntimeSnapshot().then((snapshot) =>
       buildCompatibilityProjectionSnapshot(snapshot)
     );
-    return compatibilityProjectionPromise;
+    return {
+      ...(await compatibilityProjectionPromise),
+      polling: readProviderPollingSnapshot(context)
+    };
   }
 
   async function readDispatchEvaluation(): Promise<{

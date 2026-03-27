@@ -1646,4 +1646,61 @@ describe('ControlRuntime', () => {
       last_success_at: '2026-03-07T00:00:06.000Z'
     });
   });
+
+  it('recomputes provider polling health on repeated compatibility reads without snapshot invalidation', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+
+    initializeProviderPollingHealth(providerIssueHandoff, { intervalMs: 15000 });
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'poll',
+      atMs: Date.parse('2026-03-07T00:00:05.000Z')
+    });
+    markProviderPollingCompleted(providerIssueHandoff, {
+      atMs: Date.parse('2026-03-07T00:00:06.000Z')
+    });
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const snapshot = runtime.snapshot();
+    const initialProjection = await snapshot.readCompatibilityProjection();
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-07T00:00:10.000Z')
+    });
+    markProviderPollingCompleted(providerIssueHandoff, {
+      atMs: Date.parse('2026-03-07T00:00:11.000Z'),
+      error: new Error('provider refresh failed')
+    });
+
+    const repeatedProjection = await snapshot.readCompatibilityProjection();
+
+    expect(initialProjection.polling).toMatchObject({
+      last_mode: 'poll',
+      last_requested_at: '2026-03-07T00:00:05.000Z',
+      last_completed_at: '2026-03-07T00:00:06.000Z',
+      last_success_at: '2026-03-07T00:00:06.000Z',
+      last_error_at: null,
+      last_error: null
+    });
+    expect(repeatedProjection.polling).toMatchObject({
+      last_mode: 'refresh',
+      last_requested_at: '2026-03-07T00:00:10.000Z',
+      last_completed_at: '2026-03-07T00:00:11.000Z',
+      last_success_at: '2026-03-07T00:00:06.000Z',
+      last_error_at: '2026-03-07T00:00:11.000Z',
+      last_error: 'provider refresh failed'
+    });
+  });
 });
