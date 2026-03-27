@@ -245,7 +245,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
         const tool = typeof entry?.tool === 'string' && entry.tool ? entry.tool : 'unknown';
         const status = typeof entry?.status === 'string' && entry.status ? entry.status : 'unknown';
         const eventType = typeof entry?.event_type === 'string' && entry.event_type ? entry.event_type : 'unknown';
-        const receiverIdentifiers = resolveCollabReceiverIdentifiers(entry);
+        const receiverIdentifierGroups = resolveCollabReceiverIdentifierGroups(entry);
         const completedEventWithoutStatus = eventType === 'item.completed' && status !== 'failed';
         const isCompleted = status === 'completed' || completedEventWithoutStatus;
         const isFailed = status === 'failed';
@@ -282,26 +282,28 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
           if (!isCompleted) {
             continue;
           }
-          spawnedAgentAliases.push(
-            new Set(
-              receiverIdentifiers.length > 0
-                ? receiverIdentifiers
-                : [`spawn@${entry?.item_id ?? entryIndex}`]
-            )
-          );
+          if (receiverIdentifierGroups.length > 0) {
+            for (const receiverIdentifiers of receiverIdentifierGroups) {
+              spawnedAgentAliases.push(new Set(receiverIdentifiers));
+            }
+          } else {
+            spawnedAgentAliases.push(new Set([`spawn@${entry?.item_id ?? entryIndex}`]));
+          }
           continue;
         }
 
         if (tool === 'close_agent' && isCompleted) {
-          if (receiverIdentifiers.length === 0) {
+          if (receiverIdentifierGroups.length === 0) {
             continue;
           }
-          for (const [spawnIndex, aliases] of spawnedAgentAliases.entries()) {
-            if (closedSpawnIndexes.has(spawnIndex)) {
-              continue;
-            }
-            if (receiverIdentifiers.some((id) => aliases.has(id))) {
-              closedSpawnIndexes.add(spawnIndex);
+          for (const receiverIdentifiers of receiverIdentifierGroups) {
+            for (const [spawnIndex, aliases] of spawnedAgentAliases.entries()) {
+              if (closedSpawnIndexes.has(spawnIndex)) {
+                continue;
+              }
+              if (receiverIdentifiers.some((id) => aliases.has(id))) {
+                closedSpawnIndexes.add(spawnIndex);
+              }
             }
           }
         }
@@ -638,44 +640,86 @@ function resolveManifestCollabCaptureLimit(manifest: CliManifest): number | null
   return Math.trunc(value);
 }
 
-function resolveCollabReceiverIdentifiers(
+function resolveCollabReceiverIdentifierGroups(
   entry: CliManifest['collab_tool_calls'] extends (infer T)[] | null | undefined ? T | undefined : never
-): string[] {
-  const identifiers: string[] = [];
-  const seen = new Set<string>();
-  const pushIdentifier = (prefix: 'thread' | 'path', value: unknown) => {
-    if (typeof value !== 'string') {
-      return;
-    }
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return;
-    }
-    const identifier = `${prefix}:${trimmed}`;
-    if (seen.has(identifier)) {
-      return;
-    }
-    seen.add(identifier);
-    identifiers.push(identifier);
-  };
-
-  if (Array.isArray(entry?.receiver_thread_ids)) {
-    for (const receiverThreadId of entry.receiver_thread_ids) {
-      pushIdentifier('thread', receiverThreadId);
-    }
-  }
-  if (Array.isArray(entry?.receiver_agent_paths)) {
-    for (const receiverAgentPath of entry.receiver_agent_paths) {
-      pushIdentifier('path', receiverAgentPath);
-    }
-  }
+): string[][] {
+  const receiverThreadIds = normalizeCollabAliases('thread', entry?.receiver_thread_ids);
+  const receiverAgentPaths = normalizeCollabAliases('path', entry?.receiver_agent_paths);
   const receiverAgents = Array.isArray(entry?.receiver_agents) ? entry.receiver_agents : [];
-  for (const agent of receiverAgents) {
-    pushIdentifier('thread', agent?.thread_id);
-    pushIdentifier('path', agent?.agent_path);
+  const groups: string[][] = [];
+  const consumedThreadIndexes = new Set<number>();
+  const consumedPathIndexes = new Set<number>();
+
+  if (receiverAgents.length > 0) {
+    for (const [index, agent] of receiverAgents.entries()) {
+      const identifiers = dedupeCollabAliases([
+        normalizeCollabAlias('thread', agent?.thread_id),
+        normalizeCollabAlias('path', agent?.agent_path),
+        receiverThreadIds.length === receiverAgents.length ? receiverThreadIds[index] : null,
+        receiverAgentPaths.length === receiverAgents.length ? receiverAgentPaths[index] : null
+      ]);
+      if (receiverThreadIds.length === receiverAgents.length) {
+        consumedThreadIndexes.add(index);
+      }
+      if (receiverAgentPaths.length === receiverAgents.length) {
+        consumedPathIndexes.add(index);
+      }
+      if (identifiers.length > 0) {
+        groups.push(identifiers);
+      }
+    }
+  } else if (receiverThreadIds.length > 0 && receiverThreadIds.length === receiverAgentPaths.length) {
+    for (const [index, receiverThreadId] of receiverThreadIds.entries()) {
+      const identifiers = dedupeCollabAliases([receiverThreadId, receiverAgentPaths[index] ?? null]);
+      if (identifiers.length > 0) {
+        groups.push(identifiers);
+      }
+      consumedThreadIndexes.add(index);
+      consumedPathIndexes.add(index);
+    }
   }
 
-  return identifiers;
+  for (const [index, receiverThreadId] of receiverThreadIds.entries()) {
+    if (!consumedThreadIndexes.has(index)) {
+      groups.push([receiverThreadId]);
+    }
+  }
+  for (const [index, receiverAgentPath] of receiverAgentPaths.entries()) {
+    if (!consumedPathIndexes.has(index)) {
+      groups.push([receiverAgentPath]);
+    }
+  }
+
+  return groups;
+}
+
+function normalizeCollabAliases(prefix: 'thread' | 'path', values: unknown): string[] {
+  return Array.isArray(values)
+    ? values
+        .map((value) => normalizeCollabAlias(prefix, value))
+        .filter((value): value is string => value !== null)
+    : [];
+}
+
+function normalizeCollabAlias(prefix: 'thread' | 'path', value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? `${prefix}:${trimmed}` : null;
+}
+
+function dedupeCollabAliases(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const value of values) {
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    deduped.push(value);
+  }
+  return deduped;
 }
 
 function clampInt(value: number, min: number, max: number): number {
