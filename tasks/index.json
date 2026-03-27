@@ -47,6 +47,29 @@
       }
     },
     {
+      "id": "20260327-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff",
+      "title": "CO Evaluate DNS-aware Runtime-Proof Reviewer Reachability Checks",
+      "relates_to": "tasks/tasks-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-27",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (guard stages passed; review drift override)",
+          "date": "2026-03-27",
+          "manifest": ".runs/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff-docs-review/cli/2026-03-27T07-59-26-687Z-b3902cf6/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
+        "task": "tasks/tasks-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
+        "agent_task": ".agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
+        "docs": "docs/TECH_SPEC-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md"
+      }
+    },
+    {
       "id": "20260327-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29",
       "title": "CO Add Audited Provider-Worker Child-Stream Support for Bounded Multi-Agent Work",
       "relates_to": "tasks/tasks-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",

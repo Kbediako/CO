@@ -160,7 +160,7 @@ codex-orchestrator linear create-follow-up \
   - check inline review comments and unresolved review threads
   - check review summaries / decisions
   - resolve each actionable item or post explicit, justified pushback
-- For app-touching lanes, use `runtime-proof` before review handoff so the workpad and PR carry reviewer-usable proof links instead of local-only artifact paths.
+- For app-touching lanes, use `runtime-proof` before review handoff so the workpad and PR carry reviewer-usable proof links instead of local-only artifact paths. Add `--reachability-mode dns-public` only when worker-local DNS public-resolution evidence is worth the extra environment-dependent check.
 - After opening or updating a PR, run `codex-orchestrator pr ready-review --pr "$PR_NUMBER" --quiet-minutes <window>` and keep the issue out of review until that bounded automated-feedback drain exits cleanly or reveals a blocker you handle explicitly.
 - Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff before opening a new PR for review handoff, before updating an already attached PR for handoff, and before transitioning the issue to `Human Review` or `In Review`.
 - Use the repo heuristic for non-trivial work: about 2+ changed files or about 40+ changed lines, unless you record an explicit skip justification in the workpad.

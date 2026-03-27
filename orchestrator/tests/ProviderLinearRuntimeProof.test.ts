@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveProviderLinearRuntimeProof } from '../src/cli/control/providerLinearRuntimeProof.js';
 
@@ -60,7 +60,15 @@ describe('resolveProviderLinearRuntimeProof', () => {
           'screenshot proof is permitted for https://app.example.com; external-link and video are blocked.'
       },
       proof: null,
-      handoff: null
+      handoff: null,
+      reachability: {
+        mode: 'deterministic',
+        dns_ran: false,
+        hostname: null,
+        resolved_addresses: [],
+        summary: 'No proof URL was provided; the deterministic path leaves reviewer reachability out of scope.',
+        caveat: 'No live DNS lookup was performed.'
+      }
     });
   });
 
@@ -97,10 +105,310 @@ describe('resolveProviderLinearRuntimeProof', () => {
       title: 'Dashboard after launch-app validation',
       summary: 'Signed-in dashboard state used for review handoff.'
     });
+    expect(result.reachability).toEqual({
+      mode: 'deterministic',
+      dns_ran: false,
+      hostname: 'review-assets.example.com',
+      resolved_addresses: [],
+      summary: 'Deterministic URL validation accepted the reviewer proof URL without live DNS lookup.',
+      caveat: 'No live DNS lookup was performed. Reviewer reachability remains out of scope for the default deterministic path.'
+    });
     expect(result.handoff?.workpad_markdown).toContain('Runtime proof (screenshot)');
     expect(result.handoff?.workpad_markdown).toContain('https://review-assets.example.com/co-8-dashboard.png');
+    expect(result.handoff?.workpad_markdown).toContain('Runtime proof reachability');
     expect(result.handoff?.pr_markdown).toContain('### Runtime Proof');
     expect(result.handoff?.pr_markdown).toContain('Dashboard after launch-app validation');
+    expect(result.handoff?.pr_markdown).toContain('Deterministic URL validation accepted the reviewer proof URL');
+  });
+
+  it('runs worker-local dns-public resolution when requested', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: true,
+            allow_video: false
+          }
+        }
+      ]
+    });
+    const dnsLookupMock = vi.fn(async () => [{ address: '93.184.216.34', family: 4 }]);
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com/dashboard',
+        kind: 'external-link',
+        proofUrl: 'https://review-assets.example.com/proof',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: dnsLookupMock
+      }
+    );
+
+    expect(dnsLookupMock).toHaveBeenCalledWith('review-assets.example.com');
+    expect(result).toMatchObject({
+      ok: true,
+      proof: {
+        kind: 'external-link',
+        reviewer_url: 'https://review-assets.example.com/proof'
+      },
+      reachability: {
+        mode: 'dns-public',
+        dns_ran: true,
+        hostname: 'review-assets.example.com',
+        resolved_addresses: ['93.184.216.34']
+      }
+    });
+    if (result.ok) {
+      expect(result.reachability.summary).toContain('Worker-local DNS resolved review-assets.example.com to public addresses only');
+      expect(result.reachability.caveat).toContain('worker-local DNS evidence only');
+      expect(result.handoff?.workpad_markdown).toContain('Runtime proof caveat: This is worker-local DNS evidence only.');
+    }
+  });
+
+  it('skips dns lookup for public ip literals in dns-public mode', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+    const dnsLookupMock = vi.fn();
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com',
+        kind: 'screenshot',
+        proofUrl: 'https://93.184.216.34/proof.png',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: dnsLookupMock
+      }
+    );
+
+    expect(dnsLookupMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: true,
+      reachability: {
+        mode: 'dns-public',
+        dns_ran: false,
+        hostname: '93.184.216.34',
+        resolved_addresses: ['93.184.216.34']
+      }
+    });
+  });
+
+  it('fails closed when dns-public lookup throws', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com',
+        kind: 'screenshot',
+        proofUrl: 'https://review-assets.example.com/proof.png',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: vi.fn(async () => {
+          const error = new Error('getaddrinfo ENOTFOUND review-assets.example.com') as NodeJS.ErrnoException;
+          error.code = 'ENOTFOUND';
+          throw error;
+        })
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_dns_lookup_failed',
+        status: 503,
+        details: {
+          reviewer_hostname: 'review-assets.example.com',
+          dns_error_code: 'ENOTFOUND'
+        }
+      }
+    });
+  });
+
+  it('fails closed when dns-public returns no answers', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com',
+        kind: 'screenshot',
+        proofUrl: 'https://review-assets.example.com/proof.png',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: vi.fn(async () => [])
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_dns_no_answers',
+        status: 503
+      }
+    });
+  });
+
+  it('fails closed when dns-public returns any non-public answers', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com',
+        kind: 'screenshot',
+        proofUrl: 'https://review-assets.example.com/proof.png',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: vi.fn(async () => [
+          { address: '93.184.216.34', family: 4 },
+          { address: '10.0.0.5', family: 4 }
+        ])
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_dns_non_public_resolution',
+        status: 422,
+        details: {
+          resolved_addresses: ['93.184.216.34', '10.0.0.5'],
+          blocked_addresses: ['10.0.0.5']
+        }
+      }
+    });
+  });
+
+  it('fails closed when dns-public resolves a private IPv4-embedded IPv6 address', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com',
+        kind: 'screenshot',
+        proofUrl: 'https://review-assets.example.com/proof.png',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: vi.fn(async () => [{ address: '::ffff:a00:5', family: 6 }])
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_dns_non_public_resolution',
+        status: 422,
+        details: {
+          resolved_addresses: ['::ffff:a00:5'],
+          blocked_addresses: ['::ffff:a00:5']
+        }
+      }
+    });
+  });
+
+  it('accepts public IPv4-embedded IPv6 answers in dns-public mode', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: false,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof(
+      {
+        repoRoot,
+        origin: 'https://app.example.com',
+        kind: 'screenshot',
+        proofUrl: 'https://review-assets.example.com/proof.png',
+        reachabilityMode: 'dns-public'
+      },
+      {
+        dnsLookup: vi.fn(async () => [{ address: '::ffff:5db8:d822', family: 6 }])
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      reachability: {
+        mode: 'dns-public',
+        dns_ran: true,
+        hostname: 'review-assets.example.com',
+        resolved_addresses: ['::ffff:5db8:d822']
+      }
+    });
   });
 
   it('fails with kind-missing when blank proof-url masks other proof fields', async () => {
@@ -290,12 +598,15 @@ describe('resolveProviderLinearRuntimeProof', () => {
     'http://[::127.0.0.1]/proof.png',
     'http://[100::1]/proof.png',
     'http://[2001:db8::1]/proof.png',
+    'http://[fec0::1]/proof.png',
     'http://[fe80::1]/proof.png',
     'http://[fc00::1]/proof.png',
     'http://[ff00::1]/proof.png',
     'http://[::ffff:127.0.0.2]/proof.png',
+    'http://[::ffff:0:7f00:2]/proof.png',
     'http://[::ffff:10.0.0.5]/proof.png',
     'http://[::ffff:169.254.1.2]/proof.png',
+    'http://[64:ff9b::a00:5]/proof.png',
     'http://foo.localhost/proof.png'
   ])('fails closed when the proof url is a loopback-only address (%s)', async (proofUrl) => {
     const repoRoot = await createRepoWithPermit({
@@ -329,6 +640,8 @@ describe('resolveProviderLinearRuntimeProof', () => {
 
   it.each([
     'https://workstation/proof.png',
+    'https://review-assets.example/proof.png',
+    'https://review-assets.home.arpa/proof.png',
     'https://review-assets.local/proof.png',
     'https://review-assets.test/proof.png',
     'https://review-assets.invalid/proof.png',
