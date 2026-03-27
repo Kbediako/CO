@@ -953,10 +953,6 @@ function parseCollabToolCallLine(
   };
 }
 
-function parseStringArray(value: unknown): string[] {
-  return parseStringSlots(value).filter((entry): entry is string => entry !== null);
-}
-
 function parseStringSlots(value: unknown): Array<string | null> {
   return Array.isArray(value) ? value.map((entry) => normalizeOptionalString(entry)) : [];
 }
