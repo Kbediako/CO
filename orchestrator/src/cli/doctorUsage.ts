@@ -653,19 +653,15 @@ function resolveCollabReceiverIdentifierGroups(
   if (receiverAgents.length > 0) {
     for (const [index, agent] of receiverAgents.entries()) {
       const receiverThreadId = receiverThreadIdSlots[index] ?? null;
-      const receiverAgentPath = receiverAgentPathSlots[index] ?? null;
       const identifiers = dedupeCollabAliases([
         normalizeCollabAlias('thread', agent?.thread_id),
         normalizeCollabAlias('path', agent?.agent_path),
-        receiverThreadId,
-        receiverAgentPath
+        receiverThreadId
       ]);
       if (receiverThreadId !== null) {
         consumedThreadIndexes.add(index);
       }
-      if (receiverAgentPath !== null) {
-        consumedPathIndexes.add(index);
-      }
+      consumedPathIndexes.add(index);
       if (identifiers.length > 0) {
         groups.push(identifiers);
       }
