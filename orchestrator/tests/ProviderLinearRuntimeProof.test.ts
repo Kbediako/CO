@@ -253,6 +253,7 @@ describe('resolveProviderLinearRuntimeProof', () => {
     'http://224.0.0.1/proof.png',
     'http://255.255.255.255/proof.png',
     'http://[::]:3000/proof.png',
+    'http://[::127.0.0.1]/proof.png',
     'http://[100::1]/proof.png',
     'http://[2001:db8::1]/proof.png',
     'http://[fe80::1]/proof.png',

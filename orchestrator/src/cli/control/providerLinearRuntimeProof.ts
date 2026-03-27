@@ -419,6 +419,7 @@ function createBlockedProofHostBlockList(): BlockList {
   blockList.addSubnet('203.0.113.0', 24, 'ipv4');
   blockList.addSubnet('224.0.0.0', 4, 'ipv4');
   blockList.addSubnet('240.0.0.0', 4, 'ipv4');
+  blockList.addSubnet('::', 96, 'ipv6');
   blockList.addSubnet('100::', 64, 'ipv6');
   blockList.addAddress('::', 'ipv6');
   blockList.addAddress('::1', 'ipv6');
