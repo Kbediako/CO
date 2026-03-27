@@ -31,7 +31,7 @@
 - [x] `npm run docs:check`. Evidence: command passed on the final tree.
 - [x] `npm run docs:freshness`. Evidence: command passed on the final tree.
 - [x] `node scripts/diff-budget.mjs`. Evidence: command passed on the final tree (`files=12/25`, `lines=441/1200`, `+418/-23`).
-- [x] `npm run review`. Evidence: clean manifest-backed review with no findings recorded under `.runs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21/cli/2026-03-27T22-20-59-833Z-8c11f043/review/output.log`.
+- [x] `npm run review`. Evidence: clean manifest-backed review with no findings recorded under `.runs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21/cli/2026-03-27T22-20-59-833Z-8c11f043/manifest.json` and `.runs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21/cli/2026-03-27T22-20-59-833Z-8c11f043/review/output.log`.
 - [x] `npm run pack:smoke`. Evidence: command passed on the final tree (`pack smoke passed`).
 
 ## Handoff
