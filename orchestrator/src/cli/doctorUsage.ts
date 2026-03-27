@@ -643,8 +643,8 @@ function resolveManifestCollabCaptureLimit(manifest: CliManifest): number | null
 function resolveCollabReceiverIdentifierGroups(
   entry: CliManifest['collab_tool_calls'] extends (infer T)[] | null | undefined ? T | undefined : never
 ): string[][] {
-  const receiverThreadIds = normalizeCollabAliases('thread', entry?.receiver_thread_ids);
-  const receiverAgentPaths = normalizeCollabAliases('path', entry?.receiver_agent_paths);
+  const receiverThreadIdSlots = normalizeCollabAliasSlots('thread', entry?.receiver_thread_ids);
+  const receiverAgentPathSlots = normalizeCollabAliasSlots('path', entry?.receiver_agent_paths);
   const receiverAgents = Array.isArray(entry?.receiver_agents) ? entry.receiver_agents : [];
   const groups: string[][] = [];
   const consumedThreadIndexes = new Set<number>();
@@ -652,8 +652,8 @@ function resolveCollabReceiverIdentifierGroups(
 
   if (receiverAgents.length > 0) {
     for (const [index, agent] of receiverAgents.entries()) {
-      const receiverThreadId = receiverThreadIds[index] ?? null;
-      const receiverAgentPath = receiverAgentPaths[index] ?? null;
+      const receiverThreadId = receiverThreadIdSlots[index] ?? null;
+      const receiverAgentPath = receiverAgentPathSlots[index] ?? null;
       const identifiers = dedupeCollabAliases([
         normalizeCollabAlias('thread', agent?.thread_id),
         normalizeCollabAlias('path', agent?.agent_path),
@@ -670,29 +670,45 @@ function resolveCollabReceiverIdentifierGroups(
         groups.push(identifiers);
       }
     }
-  } else if (receiverThreadIds.length > 0 && receiverAgentPaths.length > 0) {
-    const pairCount = Math.min(receiverThreadIds.length, receiverAgentPaths.length);
-    for (let index = 0; index < pairCount; index += 1) {
-      const receiverThreadId = receiverThreadIds[index];
-      const identifiers = dedupeCollabAliases([receiverThreadId, receiverAgentPaths[index] ?? null]);
-      if (identifiers.length > 0) {
+  }
+
+  const pairCount = Math.max(receiverThreadIdSlots.length, receiverAgentPathSlots.length);
+  for (let index = 0; index < pairCount; index += 1) {
+    if (consumedThreadIndexes.has(index) || consumedPathIndexes.has(index)) {
+      continue;
+    }
+    const receiverThreadId = receiverThreadIdSlots[index] ?? null;
+    const receiverAgentPath = receiverAgentPathSlots[index] ?? null;
+    if (receiverThreadId === null || receiverAgentPath === null) {
+      continue;
+    }
+    const identifiers = dedupeCollabAliases([receiverThreadId, receiverAgentPath]);
+    if (identifiers.length > 0) {
+      const existingGroup = groups.find((group) => identifiers.some((identifier) => group.includes(identifier)));
+      if (existingGroup) {
+        for (const identifier of identifiers) {
+          if (!existingGroup.includes(identifier)) {
+            existingGroup.push(identifier);
+          }
+        }
+      } else {
         groups.push(identifiers);
       }
-      consumedThreadIndexes.add(index);
-      consumedPathIndexes.add(index);
     }
+    consumedThreadIndexes.add(index);
+    consumedPathIndexes.add(index);
   }
 
   const groupedAliases = new Set(groups.flat());
 
-  for (const [index, receiverThreadId] of receiverThreadIds.entries()) {
-    if (!consumedThreadIndexes.has(index) && !groupedAliases.has(receiverThreadId)) {
+  for (const [index, receiverThreadId] of receiverThreadIdSlots.entries()) {
+    if (receiverThreadId !== null && !consumedThreadIndexes.has(index) && !groupedAliases.has(receiverThreadId)) {
       groups.push([receiverThreadId]);
       groupedAliases.add(receiverThreadId);
     }
   }
-  for (const [index, receiverAgentPath] of receiverAgentPaths.entries()) {
-    if (!consumedPathIndexes.has(index) && !groupedAliases.has(receiverAgentPath)) {
+  for (const [index, receiverAgentPath] of receiverAgentPathSlots.entries()) {
+    if (receiverAgentPath !== null && !consumedPathIndexes.has(index) && !groupedAliases.has(receiverAgentPath)) {
       groups.push([receiverAgentPath]);
       groupedAliases.add(receiverAgentPath);
     }
@@ -701,12 +717,8 @@ function resolveCollabReceiverIdentifierGroups(
   return groups;
 }
 
-function normalizeCollabAliases(prefix: 'thread' | 'path', values: unknown): string[] {
-  return Array.isArray(values)
-    ? values
-        .map((value) => normalizeCollabAlias(prefix, value))
-        .filter((value): value is string => value !== null)
-    : [];
+function normalizeCollabAliasSlots(prefix: 'thread' | 'path', values: unknown): Array<string | null> {
+  return Array.isArray(values) ? values.map((value) => normalizeCollabAlias(prefix, value)) : [];
 }
 
 function normalizeCollabAlias(prefix: 'thread' | 'path', value: unknown): string | null {
