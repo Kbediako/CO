@@ -1629,11 +1629,16 @@ describe('ControlServer', () => {
       });
       expect(uiRes.status).toBe(200);
       const uiPayload = (await uiRes.json()) as {
+        selected?: { issue_identifier?: string; run_id?: string | null } | null;
         selected_issue_identifier?: string | null;
         issues?: Array<{ issue_identifier?: string; run_id?: string; task_id?: string }>;
         running?: Array<{ issue_identifier?: string }>;
       };
       expect(uiPayload.selected_issue_identifier).toBe('ISSUE-1035');
+      expect(uiPayload.selected).toMatchObject({
+        issue_identifier: 'ISSUE-1035',
+        run_id: 'run-1'
+      });
       expect(uiPayload.running).toEqual([
         expect.objectContaining({
           issue_identifier: 'ISSUE-1035'
@@ -3151,6 +3156,7 @@ describe('ControlServer', () => {
       expect(uiPayload.selected).not.toBeNull();
       expect(uiPayload.selected).toHaveProperty('tracked');
       expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(uiPayload.issues).toHaveLength(1);
       expect(
         uiPayload.issues?.every(
           (issue) =>
@@ -3548,6 +3554,7 @@ describe('ControlServer', () => {
       expect(uiPayload.selected).not.toBeNull();
       expect(uiPayload.selected).toHaveProperty('tracked');
       expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(uiPayload.issues).toHaveLength(1);
       expect(
         uiPayload.issues?.every(
           (issue) =>
@@ -3717,6 +3724,7 @@ describe('ControlServer', () => {
       expect(uiPayload.selected).not.toBeNull();
       expect(uiPayload.selected).toHaveProperty('tracked');
       expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(uiPayload.issues).toHaveLength(1);
       expect(
         uiPayload.issues?.every(
           (issue) =>

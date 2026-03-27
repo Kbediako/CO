@@ -376,8 +376,11 @@ body {
   border-color: rgba(158, 226, 208, 0.62);
 }
 
-.issue-card.selected::after {
-  content: "selected";
+.issue-card.selected {
+  background: rgba(158, 226, 208, 0.06);
+}
+
+.issue-card-note {
   display: inline-flex;
   margin-top: 14px;
   border-radius: 999px;
@@ -545,7 +548,12 @@ body {
   .field,
   .field select,
   .field input {
+    min-width: 0;
     width: 100%;
+  }
+
+  .search-field input {
+    min-width: 0;
   }
 
   .key-grid {

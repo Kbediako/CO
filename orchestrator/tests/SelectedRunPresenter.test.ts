@@ -434,6 +434,13 @@ describe('OperatorDashboardPresenter', () => {
       projection: buildProjection({
         running: [],
         retrying: [],
+        codexTotals: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+          seconds_running: 0
+        },
+        rateLimits: null,
         issues: [],
         selected: null,
         tracked: null,
@@ -452,6 +459,13 @@ describe('OperatorDashboardPresenter', () => {
         retrying: 0,
         issues: 0
       },
+      totals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rate_limits: null,
       selected: null,
       selected_issue_identifier: null,
       running: [],

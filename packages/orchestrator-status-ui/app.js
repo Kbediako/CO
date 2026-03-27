@@ -65,10 +65,12 @@ elements.refreshButton.addEventListener('click', () => {
 });
 elements.statusFilter.addEventListener('change', (event) => {
   state.filters.status = event.target.value;
+  syncVisibleSelectedIssue();
   render();
 });
 elements.searchInput.addEventListener('input', (event) => {
   state.filters.search = event.target.value;
+  syncVisibleSelectedIssue();
   render();
 });
 elements.issueList.addEventListener('click', (event) => {
@@ -333,89 +335,92 @@ function renderIssueDetail() {
     return;
   }
 
+  const detailId = buildIssueDetailId(issue.issue_identifier);
   elements.issueDetail.innerHTML = `
-    <section class="detail-section">
-      <div class="detail-header">
-        <div>
-          <div class="detail-eyebrow">${escapeHtml(issue.issue_identifier)}</div>
-          <h2>${escapeHtml(issue.title || 'Untitled issue')}</h2>
+    <div id="${escapeHtml(detailId)}">
+      <section class="detail-section">
+        <div class="detail-header">
+          <div>
+            <div class="detail-eyebrow">${escapeHtml(issue.issue_identifier)}</div>
+            <h2>${escapeHtml(issue.title || 'Untitled issue')}</h2>
+          </div>
+          <div class="detail-status">
+            <span class="status-chip">${escapeHtml(issue.display_status || issue.status || 'unknown')}</span>
+            ${issue.is_selected ? '<span class="status-note">Selected run authority</span>' : ''}
+          </div>
         </div>
-        <div class="detail-status">
-          <span class="status-chip">${escapeHtml(issue.display_status || issue.status || 'unknown')}</span>
-          ${issue.is_selected ? '<span class="status-note">Selected run authority</span>' : ''}
-        </div>
-      </div>
-      ${issue.url ? `<a class="detail-link" href="${escapeHtml(issue.url)}" target="_blank" rel="noreferrer">Open issue in Linear</a>` : ''}
-      <p class="detail-summary">${escapeHtml(issue.summary || 'No summary available.')}</p>
-    </section>
+        ${buildIssueLink(issue.url)}
+        <p class="detail-summary">${escapeHtml(issue.summary || 'No summary available.')}</p>
+      </section>
 
-    <section class="detail-section">
-      <div class="section-title">Lifecycle</div>
-      ${renderKeyValueGrid([
-        ['Status', issue.status || 'unknown'],
-        ['Display', issue.display_status || 'unknown'],
-        ['Reason', issue.status_reason || '—'],
-        ['Task', issue.task_id || '—'],
-        ['Run', issue.run_id || '—']
-      ])}
-    </section>
+      <section class="detail-section">
+        <div class="section-title">Lifecycle</div>
+        ${renderKeyValueGrid([
+          ['Status', issue.status || 'unknown'],
+          ['Display', issue.display_status || 'unknown'],
+          ['Reason', issue.status_reason || '—'],
+          ['Task', issue.task_id || '—'],
+          ['Run', issue.run_id || '—']
+        ])}
+      </section>
 
-    <section class="detail-section">
-      <div class="section-title">Session</div>
-      ${renderKeyValueGrid([
-        ['Session', issue.session.session_id || '—'],
-        ['Thread', issue.session.thread_id || '—'],
-        ['Turns', formatNullableNumber(issue.session.turn_count)],
-        ['Owner phase', issue.owner.phase || '—'],
-        ['Owner status', issue.owner.status || '—']
-      ])}
-    </section>
+      <section class="detail-section">
+        <div class="section-title">Session</div>
+        ${renderKeyValueGrid([
+          ['Session', issue.session.session_id || '—'],
+          ['Thread', issue.session.thread_id || '—'],
+          ['Turns', formatNullableNumber(issue.session.turn_count)],
+          ['Owner phase', issue.owner.phase || '—'],
+          ['Owner status', issue.owner.status || '—']
+        ])}
+      </section>
 
-    <section class="detail-section">
-      <div class="section-title">Workspace</div>
-      ${renderKeyValueGrid([
-        ['Path', issue.workspace.path || '—'],
-        ['Host', issue.workspace.host || '—'],
-        ['Last error', issue.last_error || '—']
-      ])}
-    </section>
+      <section class="detail-section">
+        <div class="section-title">Workspace</div>
+        ${renderKeyValueGrid([
+          ['Path', issue.workspace.path || '—'],
+          ['Host', issue.workspace.host || '—'],
+          ['Last error', issue.last_error || '—']
+        ])}
+      </section>
 
-    <section class="detail-section">
-      <div class="section-title">Retry State</div>
-      ${
-        issue.retry
-          ? renderKeyValueGrid([
-              ['Attempt', formatNullableNumber(issue.retry.attempt)],
-              ['Due', formatTimestamp(issue.retry.due_at)],
-              ['Error', issue.retry.error || '—'],
-              ['Last event', issue.retry.last_event || '—']
-            ])
-          : '<div class="empty-inline">No retry queued.</div>'
-      }
-    </section>
+      <section class="detail-section">
+        <div class="section-title">Retry State</div>
+        ${
+          issue.retry
+            ? renderKeyValueGrid([
+                ['Attempt', formatNullableNumber(issue.retry.attempt)],
+                ['Due', formatTimestamp(issue.retry.due_at)],
+                ['Error', issue.retry.error || '—'],
+                ['Last event', issue.retry.last_event || '—']
+              ])
+            : '<div class="empty-inline">No retry queued.</div>'
+        }
+      </section>
 
-    <section class="detail-section">
-      <div class="section-title">Token Usage</div>
-      ${
-        issue.tokens
-          ? renderKeyValueGrid([
-              ['Input', formatNullableNumber(issue.tokens.input_tokens)],
-              ['Output', formatNullableNumber(issue.tokens.output_tokens)],
-              ['Total', formatNullableNumber(issue.tokens.total_tokens)]
-            ])
-          : '<div class="empty-inline">No token usage available.</div>'
-      }
-    </section>
+      <section class="detail-section">
+        <div class="section-title">Token Usage</div>
+        ${
+          issue.tokens
+            ? renderKeyValueGrid([
+                ['Input', formatNullableNumber(issue.tokens.input_tokens)],
+                ['Output', formatNullableNumber(issue.tokens.output_tokens)],
+                ['Total', formatNullableNumber(issue.tokens.total_tokens)]
+              ])
+            : '<div class="empty-inline">No token usage available.</div>'
+        }
+      </section>
 
-    <section class="detail-section">
-      <div class="section-title">Recent Agent Activity</div>
-      ${renderActivityList(issue.recent_agent_activity, 'No recent agent activity.')}
-    </section>
+      <section class="detail-section">
+        <div class="section-title">Recent Agent Activity</div>
+        ${renderActivityList(issue.recent_agent_activity, 'No recent agent activity.')}
+      </section>
 
-    <section class="detail-section">
-      <div class="section-title">Recent Linear Activity</div>
-      ${renderLinearActivity(issue.linear_activity)}
-    </section>
+      <section class="detail-section">
+        <div class="section-title">Recent Linear Activity</div>
+        ${renderLinearActivity(issue.linear_activity)}
+      </section>
+    </div>
   `;
 }
 
@@ -457,11 +462,20 @@ function renderIssueCard(issue) {
   if (issue.is_selected) {
     classes.push('selected');
   }
-  if (state.selectedIssueIdentifier === issue.issue_identifier) {
+  const isActive = state.selectedIssueIdentifier === issue.issue_identifier;
+  if (isActive) {
     classes.push('active');
   }
+  const detailId = buildIssueDetailId(issue.issue_identifier);
   return `
-    <button class="${classes.join(' ')}" type="button" data-issue-id="${escapeHtml(issue.issue_identifier)}">
+    <button
+      class="${classes.join(' ')}"
+      type="button"
+      data-issue-id="${escapeHtml(issue.issue_identifier)}"
+      aria-pressed="${isActive ? 'true' : 'false'}"
+      ${isActive ? 'aria-current="true"' : ''}
+      aria-controls="${escapeHtml(detailId)}"
+    >
       <div class="issue-card-top">
         <div>
           <div class="issue-card-id">${escapeHtml(issue.issue_identifier)}</div>
@@ -474,6 +488,7 @@ function renderIssueCard(issue) {
         <span>${escapeHtml(issue.session.session_id || 'no session')}</span>
       </div>
       <div class="issue-card-summary">${escapeHtml(issue.last_error || issue.summary || 'No summary available.')}</div>
+      ${issue.is_selected ? '<span class="issue-card-note">Selected run authority</span>' : ''}
     </button>
   `;
 }
@@ -539,7 +554,7 @@ function renderLinearActivity(events) {
 }
 
 function getFilteredIssues() {
-  const issues = Array.isArray(state.data?.issues) ? state.data.issues : [];
+  const issues = getAllIssues();
   const search = state.filters.search.trim().toLowerCase();
 
   return issues.filter((issue) => {
@@ -574,7 +589,7 @@ function getFilteredIssues() {
 }
 
 function getSelectedIssue() {
-  const issues = Array.isArray(state.data?.issues) ? state.data.issues : [];
+  const issues = getFilteredIssues();
   if (issues.length === 0) {
     return null;
   }
@@ -582,22 +597,67 @@ function getSelectedIssue() {
 }
 
 function syncSelectedIssue() {
-  const issues = Array.isArray(state.data?.issues) ? state.data.issues : [];
-  if (issues.length === 0) {
+  const issues = getAllIssues();
+  rebaseSelectedIssue(issues, state.data?.selected_issue_identifier || null);
+  syncVisibleSelectedIssue();
+}
+
+function buildHeroNote() {
+  return HERO_NOTE;
+}
+
+function buildIssueLink(value) {
+  const safeHref = sanitizeHttpUrl(value);
+  if (!safeHref) {
+    return '';
+  }
+  return `<a class="detail-link" href="${safeHref}" target="_blank" rel="noreferrer">Open issue in Linear</a>`;
+}
+
+function sanitizeHttpUrl(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null;
+  }
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+    return escapeHtml(url.toString());
+  } catch {
+    return null;
+  }
+}
+
+function buildIssueDetailId(issueIdentifier) {
+  return `issue-detail-${String(issueIdentifier || 'unknown')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')}`;
+}
+
+function getAllIssues() {
+  return Array.isArray(state.data?.issues) ? state.data.issues : [];
+}
+
+function rebaseSelectedIssue(issues, preferredIssueIdentifier = null) {
+  if (!Array.isArray(issues) || issues.length === 0) {
     state.selectedIssueIdentifier = null;
     return;
   }
   if (issues.some((issue) => issue.issue_identifier === state.selectedIssueIdentifier)) {
     return;
   }
+  const preferredSelection = preferredIssueIdentifier
+    ? issues.find((issue) => issue.issue_identifier === preferredIssueIdentifier)?.issue_identifier
+    : null;
   state.selectedIssueIdentifier =
-    state.data?.selected_issue_identifier ||
+    preferredSelection ||
     issues.find((issue) => issue.is_selected)?.issue_identifier ||
     issues[0].issue_identifier;
 }
 
-function buildHeroNote() {
-  return HERO_NOTE;
+function syncVisibleSelectedIssue() {
+  rebaseSelectedIssue(getFilteredIssues());
 }
 
 function buildControlUrl(pathname) {
