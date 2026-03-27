@@ -2651,7 +2651,13 @@ function createProviderLaunchToken(): string {
   return randomBytes(16).toString('hex');
 }
 
-async function discoverProviderIssueRuns(
+const PROVIDER_CHILD_STREAM_PIPELINE_IDS = new Set([
+  'docs-review',
+  'implementation-gate',
+  'docs-relevance-advisory'
+]);
+
+export async function discoverProviderIssueRuns(
   currentRunDir: string,
   input?: {
     provider: 'linear';
@@ -2674,6 +2680,11 @@ async function discoverProviderIssueRuns(
       if (!manifest) {
         continue;
       }
+      const parentRunId = readStringValue(manifest, 'parent_run_id');
+      const pipelineId = readStringValue(manifest, 'pipeline_id');
+      if (parentRunId && pipelineId && PROVIDER_CHILD_STREAM_PIPELINE_IDS.has(pipelineId)) {
+        continue;
+      }
       const issueProvider = readStringValue(manifest, 'issue_provider');
       const issueId = readStringValue(manifest, 'issue_id');
       if (issueProvider !== 'linear' || !issueId) {
@@ -2691,7 +2702,7 @@ async function discoverProviderIssueRuns(
         taskId: readStringValue(manifest, 'task_id') ?? taskEntry,
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
-        pipelineId: readStringValue(manifest, 'pipeline_id'),
+        pipelineId,
         status: resolveProviderIssueRunStatus(manifest, proof),
         summary: resolveProviderIssueRunSummary(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),

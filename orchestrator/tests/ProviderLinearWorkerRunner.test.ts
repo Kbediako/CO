@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -9,9 +9,11 @@ import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  appendProviderLinearWorkerChildStreamRecord,
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
+  readProviderLinearWorkerChildStreams,
   runProviderLinearWorker,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
@@ -198,6 +200,7 @@ describe('provider linear worker runner', () => {
     expect(context).toMatchObject({
       manifestPath,
       repoRoot: tempRoot,
+      taskId: 'linear-lin-issue-1',
       issueId: 'lin-issue-1',
       issueIdentifier: 'CO-2',
       maxTurns: 7
@@ -248,6 +251,135 @@ describe('provider linear worker runner', () => {
     expect(context.maxTurns).toBe(20);
   });
 
+  it('uses manifest.taskId when the snake_case task id is absent', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      taskId: 'linear-camel-task',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
+    });
+
+    expect(context.taskId).toBe('linear-camel-task');
+  });
+
+  it('rejects manifest task ids that are unsafe for child-stream path confinement', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear/bad-task',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    await expect(
+      loadProviderLinearWorkerContext({
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
+      })
+    ).rejects.toThrow('slashes are not allowed');
+  });
+
+  it('rejects manifest-path task fallback outside the canonical .runs layout', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-noncanonical-'));
+    const manifestDir = join(tempRoot, 'not-runs', 'run-child');
+    await mkdir(manifestDir, { recursive: true });
+    const manifestPath = join(manifestDir, 'manifest.json');
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    await expect(
+      loadProviderLinearWorkerContext({
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
+      })
+    ).rejects.toThrow('Provider worker task id unavailable');
+  });
+  it('rejects env task ids that do not match the manifest-backed worker task', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await expect(loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined, CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-2' })).rejects.toThrow('Provider worker task id mismatch');
+  });
+  it('rejects env repo roots that do not match the manifest-backed workspace', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await expect(loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: join(tempRoot ?? '', 'elsewhere') })).rejects.toThrow('Provider worker root mismatch');
+  });
+  it('rejects env issue ids that do not match the manifest-backed issue', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await expect(
+      loadProviderLinearWorkerContext({
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_ISSUE_ID: 'lin-issue-2'
+      })
+    ).rejects.toThrow('Provider worker issue id mismatch');
+  });
+  it('rejects env issue identifiers that do not match the manifest-backed issue identifier', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await expect(
+      loadProviderLinearWorkerContext({
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER: 'CO-99'
+      })
+    ).rejects.toThrow('Provider worker issue identifier mismatch');
+  });
+  it('requires matching live control-host env values and accepts manifest.pipelineId', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');
+    expect(await loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined })).toMatchObject({
+      pipelineId: 'provider-linear-worker',
+      providerControlHostTaskId: null,
+      providerControlHostRunId: null,
+      providerControlHostMatchesManifest: false
+    });
+    expect((await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
+    }))).toMatchObject({
+      providerControlHostTaskId: 'local-mcp',
+      providerControlHostRunId: 'control-host',
+      providerControlHostMatchesManifest: true
+    });
+  });
+
+  it('fails closed on mismatched live control-host env values', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      pipelineId: 'provider-linear-worker',
+      provider_control_host_task_id: 'local-mcp',
+      provider_control_host_run_id: 'control-host',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    await expect(loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'other-task',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'other-run'
+    })).resolves.toMatchObject({
+      providerControlHostTaskId: null,
+      providerControlHostRunId: null,
+      providerControlHostMatchesManifest: false
+    });
+  });
+
   it('builds a full first-turn prompt and a continuation prompt', () => {
     const issue = createTrackedIssue();
 
@@ -280,6 +412,8 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('`codex-orchestrator review` / `npm run review`');
     expect(firstPrompt).toContain('`FORCE_CODEX_REVIEW=1`');
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
+    expect(firstPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
+    expect(firstPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
     expect(firstPrompt).toContain('`codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>`');
     expect(firstPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(firstPrompt).toContain('about 2+ changed files or about 40+ changed lines');
@@ -314,6 +448,8 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('`Todo` or the live team\'s equivalent queued state (for example `Ready`)');
     expect(continuationPrompt).toContain(`use \`${helperCommand} create-follow-up --issue-id lin-issue-1 ...\` to file a same-project follow-up issue in \`Backlog\``);
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
+    expect(continuationPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
+    expect(continuationPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(continuationPrompt).toContain('Standalone-review policy for this provider-worker lane');
     expect(continuationPrompt).toContain('`codex-orchestrator review` / `npm run review`');
@@ -447,6 +583,23 @@ describe('provider linear worker runner', () => {
           state_type: 'completed'
         })
       );
+    const childStreamRecord = {
+      stream: 'docs-review',
+      pipeline_id: 'docs-review',
+      task_id: 'linear-lin-issue-1-docs-review',
+      run_id: 'docs-run-1',
+      status: 'succeeded',
+      manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1', 'manifest.json'),
+      artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1',
+      log_path: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/run.log',
+      summary: 'docs-review passed',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-21T09:00:00.050Z'
+    };
+    const secondChildStreamRecord = { ...childStreamRecord, task_id: 'linear-lin-issue-1-docs-review-alt', manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review-alt', 'cli', 'docs-run-1', 'manifest.json'), artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' };
     const execRunner = vi
       .fn<
         (request: {
@@ -460,6 +613,8 @@ describe('provider linear worker runner', () => {
       .mockImplementationOnce(async (request) => {
         const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
         expect(auditPath).toBe(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME));
+        await appendProviderLinearWorkerChildStreamRecord(runDir, childStreamRecord);
+        await appendProviderLinearWorkerChildStreamRecord(runDir, secondChildStreamRecord);
         await appendProviderLinearAuditEntry(String(auditPath), {
           recorded_at: '2026-03-21T09:00:00.100Z',
           operation: 'issue-context',
@@ -630,6 +785,7 @@ describe('provider linear worker runner', () => {
         failure_count: 1,
         latest_recorded_at: '2026-03-21T09:00:01.200Z'
       },
+      child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded' })]),
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -680,6 +836,7 @@ describe('provider linear worker runner', () => {
           }
         }
       },
+      child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' })]),
       end_reason: 'issue_inactive'
     });
   });
@@ -750,6 +907,169 @@ describe('provider linear worker runner', () => {
         project_id: 'project-1'
       }
     });
+  });
+
+  it('treats a corrupt child-stream ledger as fatal during proof hydration', async () => {
+    const { runDir } = await createManifestRoot();
+    await writeFile(
+      join(runDir, 'provider-linear-worker-child-streams.json'),
+      '{"corrupt":true}',
+      'utf8'
+    );
+
+    await expect(readProviderLinearWorkerChildStreams(runDir)).rejects.toThrow(
+      'provider-linear-worker child-stream ledger is not an array'
+    );
+  });
+
+  it('serializes overlapping child-stream ledger appends so sibling runs are not lost', async () => {
+    const { runDir } = await createManifestRoot();
+    const firstRecord = {
+      stream: 'docs-review',
+      pipeline_id: 'docs-review',
+      task_id: 'linear-lin-issue-1-docs-review',
+      run_id: 'docs-run-1',
+      status: 'succeeded',
+      manifest_path: join(runDir, 'child-1-manifest.json'),
+      artifact_root: join(runDir, 'child-1'),
+      log_path: join(runDir, 'child-1.log'),
+      summary: 'child 1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-27T01:00:00.000Z'
+    };
+    const secondRecord = {
+      ...firstRecord,
+      task_id: 'linear-lin-issue-1-implementation-gate',
+      run_id: 'impl-run-1',
+      stream: 'implementation-gate',
+      pipeline_id: 'implementation-gate',
+      manifest_path: join(runDir, 'child-2-manifest.json'),
+      artifact_root: join(runDir, 'child-2'),
+      log_path: join(runDir, 'child-2.log'),
+      summary: 'child 2',
+      launched_at: '2026-03-27T01:00:01.000Z'
+    };
+
+    let markFirstWriteStarted: (() => void) | null = null;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve;
+    });
+    let releaseFirstWrite: (() => void) | null = null;
+    const holdFirstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    let secondSettled = false;
+    const firstPromise = appendProviderLinearWorkerChildStreamRecord(
+      runDir,
+      firstRecord,
+      async (path, value) => {
+        markFirstWriteStarted?.();
+        await holdFirstWrite;
+        await writeFile(path, JSON.stringify(value), 'utf8');
+      }
+    );
+
+    await firstWriteStarted;
+    const secondPromise = appendProviderLinearWorkerChildStreamRecord(runDir, secondRecord).then((value) => {
+      secondSettled = true;
+      return value;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(secondSettled).toBe(false);
+
+    releaseFirstWrite?.();
+    const [firstResult, secondResult] = await Promise.all([
+      firstPromise,
+      secondPromise
+    ]);
+    const recorded = await readProviderLinearWorkerChildStreams(runDir);
+
+    expect(firstResult).toHaveLength(1);
+    expect(secondResult).toHaveLength(2);
+    expect(recorded).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1' }),
+        expect.objectContaining({ task_id: 'linear-lin-issue-1-implementation-gate', run_id: 'impl-run-1' })
+      ])
+    );
+  });
+
+  it('does not reap a stale-looking child-stream ledger lock while an append is still active', async () => {
+    const { runDir } = await createManifestRoot();
+    const lockPath = join(runDir, 'provider-linear-worker-child-streams.json.lock');
+    const firstRecord = {
+      stream: 'docs-review',
+      pipeline_id: 'docs-review',
+      task_id: 'linear-lin-issue-1-docs-review',
+      run_id: 'docs-run-1',
+      status: 'succeeded',
+      manifest_path: join(runDir, 'child-1-manifest.json'),
+      artifact_root: join(runDir, 'child-1'),
+      log_path: join(runDir, 'child-1.log'),
+      summary: 'child 1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-27T01:00:00.000Z'
+    };
+    const secondRecord = {
+      ...firstRecord,
+      task_id: 'linear-lin-issue-1-implementation-gate',
+      run_id: 'impl-run-1',
+      stream: 'implementation-gate',
+      pipeline_id: 'implementation-gate',
+      manifest_path: join(runDir, 'child-2-manifest.json'),
+      artifact_root: join(runDir, 'child-2'),
+      log_path: join(runDir, 'child-2.log'),
+      summary: 'child 2',
+      launched_at: '2026-03-27T01:00:01.000Z'
+    };
+
+    let markFirstWriteStarted: (() => void) | null = null;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve;
+    });
+    let releaseFirstWrite: (() => void) | null = null;
+    const holdFirstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    let secondSettled = false;
+    const firstPromise = appendProviderLinearWorkerChildStreamRecord(
+      runDir,
+      firstRecord,
+      async (path, value) => {
+        markFirstWriteStarted?.();
+        await holdFirstWrite;
+        await writeFile(path, JSON.stringify(value), 'utf8');
+      }
+    );
+
+    await firstWriteStarted;
+    const stalePast = new Date(Date.now() - 60_000);
+    await utimes(lockPath, stalePast, stalePast);
+    const secondPromise = appendProviderLinearWorkerChildStreamRecord(runDir, secondRecord).then((value) => {
+      secondSettled = true;
+      return value;
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(secondSettled).toBe(false);
+
+    releaseFirstWrite?.();
+    const recorded = await Promise.all([firstPromise, secondPromise]).then(async () =>
+      await readProviderLinearWorkerChildStreams(runDir)
+    );
+
+    expect(recorded).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1' }),
+        expect.objectContaining({ task_id: 'linear-lin-issue-1-implementation-gate', run_id: 'impl-run-1' })
+      ])
+    );
   });
 
   it('forces standalone review execution env inside non-interactive provider worker turns', async () => {

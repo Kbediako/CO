@@ -3,7 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { readFile, realpath } from 'node:fs/promises';
+import { mkdir, readFile, realpath, rm } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
@@ -48,15 +48,26 @@ import {
 } from './runtime/index.js';
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
+import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
+export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-worker-child-streams.json';
+const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME}.lock`;
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
 const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
 const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
 const CSRF_HEADER = 'x-csrf-token';
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
+const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
+  maxAttempts: 50,
+  initialDelayMs: 10,
+  backoffFactor: 1.5,
+  // Fail closed for child-stream lineage writes: a stale lock is preferable to
+  // lossy concurrent ledger rewrites.
+  maxDelayMs: 250
+};
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
@@ -68,10 +79,17 @@ export interface ProviderLinearWorkerContext {
   runDir: string;
   repoRoot: string;
   runId: string;
+  taskId: string;
+  pipelineId: string | null;
+  providerControlHostTaskId: string | null;
+  providerControlHostRunId: string | null;
+  providerControlHostRecordedInManifest: boolean;
+  providerControlHostMatchesManifest: boolean;
   workspacePath: string | null;
   sourceSetup: DispatchPilotSourceSetup | null;
   issueId: string;
   issueIdentifier: string;
+  issueUpdatedAt: string | null;
   maxTurns: number;
 }
 
@@ -79,6 +97,23 @@ export interface ProviderLinearWorkerTokenUsage {
   input_tokens: number | null;
   output_tokens: number | null;
   total_tokens: number | null;
+}
+
+export interface ProviderLinearWorkerChildStreamRecord {
+  stream: string;
+  pipeline_id: string;
+  task_id: string;
+  run_id: string;
+  status: string;
+  manifest_path: string;
+  artifact_root: string;
+  log_path: string | null;
+  summary: string | null;
+  issue_id: string;
+  issue_identifier: string;
+  workspace_path: string | null;
+  source_setup: DispatchPilotSourceSetup | null;
+  launched_at: string;
 }
 
 export interface ProviderLinearWorkerProof {
@@ -99,6 +134,7 @@ export interface ProviderLinearWorkerProof {
   workspace_path: string | null;
   source_setup?: DispatchPilotSourceSetup | null;
   linear_audit: ProviderLinearAuditSummary | null;
+  child_streams?: ProviderLinearWorkerChildStreamRecord[];
   end_reason: string | null;
   updated_at: string;
 }
@@ -335,14 +371,26 @@ export async function loadProviderLinearWorkerContext(
     throw new Error('CODEX_ORCHESTRATOR_MANIFEST_PATH is required for provider-linear-worker.');
   }
   const manifest = await readManifest(manifestPath);
-  const issueId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_ID) ??
+  const manifestIssueId =
     normalizeOptionalString(manifest.issue_id) ??
     normalizeOptionalString(manifest.issueId);
-  const issueIdentifier =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER) ??
+  const envIssueId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_ID);
+  if (manifestIssueId && envIssueId && envIssueId !== manifestIssueId) {
+    throw new Error(`Provider worker issue id mismatch between env (${envIssueId}) and manifest (${manifestIssueId}).`);
+  }
+  const issueId = manifestIssueId ?? envIssueId;
+  const manifestIssueIdentifier =
     normalizeOptionalString(manifest.issue_identifier) ??
-    normalizeOptionalString(manifest.issueIdentifier) ??
+    normalizeOptionalString(manifest.issueIdentifier);
+  const envIssueIdentifier = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER);
+  if (manifestIssueIdentifier && envIssueIdentifier && envIssueIdentifier !== manifestIssueIdentifier) {
+    throw new Error(
+      `Provider worker issue identifier mismatch between env (${envIssueIdentifier}) and manifest (${manifestIssueIdentifier}).`
+    );
+  }
+  const issueIdentifier =
+    manifestIssueIdentifier ??
+    envIssueIdentifier ??
     issueId;
   if (!issueId || !issueIdentifier) {
     throw new Error('Provider worker requires issue_id and issue_identifier in env or manifest.');
@@ -350,26 +398,92 @@ export async function loadProviderLinearWorkerContext(
   const manifestWorkspacePath =
     normalizeOptionalString(manifest.workspace_path) ??
     normalizeOptionalString(manifest.workspacePath);
-  const repoRoot =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT) ??
-    manifestWorkspacePath ??
-    process.cwd();
-  const runId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID) ??
-    normalizeOptionalString(manifest.run_id) ??
-    `provider-linear-worker-${Date.now()}`;
+  const envRepoRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
+  const normalizedManifestWorkspacePath = manifestWorkspacePath ? resolve(manifestWorkspacePath) : null;
+  const normalizedEnvRepoRoot = envRepoRoot ? resolve(envRepoRoot) : null;
+  if (normalizedManifestWorkspacePath && normalizedEnvRepoRoot && normalizedEnvRepoRoot !== normalizedManifestWorkspacePath) {
+    throw new Error(`Provider worker root mismatch between env (${normalizedEnvRepoRoot}) and manifest (${normalizedManifestWorkspacePath}).`);
+  }
+  const repoRoot = normalizedManifestWorkspacePath ?? normalizedEnvRepoRoot ?? resolve(process.cwd());
+  const manifestRunId = normalizeOptionalString(manifest.run_id), envRunId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID);
+  if (manifestRunId && envRunId && envRunId !== manifestRunId) throw new Error(`Provider worker run id mismatch between env (${envRunId}) and manifest (${manifestRunId}).`);
+  const runId = manifestRunId ?? envRunId ?? `provider-linear-worker-${Date.now()}`;
+  const manifestTaskId =
+    normalizeOptionalString(manifest.task_id) ??
+    normalizeOptionalString(manifest.taskId);
+  const taskId = manifestTaskId
+    ? sanitizeTaskId(manifestTaskId)
+    : contextTaskIdFromManifestPath(manifestPath);
+  const envTaskId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID);
+  if (!taskId || (envTaskId && envTaskId !== taskId)) {
+    throw new Error(taskId ? `Provider worker task id mismatch between env (${envTaskId}) and manifest (${taskId}).` : 'Provider worker task id unavailable.');
+  }
+  const manifestPipelineId = normalizeOptionalString(manifest.pipeline_id) ?? normalizeOptionalString(manifest.pipelineId), envPipelineId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PIPELINE_ID);
+  if (manifestPipelineId && envPipelineId && envPipelineId !== manifestPipelineId) throw new Error(`Provider worker pipeline id mismatch between env (${envPipelineId}) and manifest (${manifestPipelineId}).`);
+  const manifestProviderControlHostTaskId =
+    normalizeOptionalString(manifest.provider_control_host_task_id) ??
+    normalizeOptionalString(manifest.providerControlHostTaskId);
+  const manifestProviderControlHostRunId =
+    normalizeOptionalString(manifest.provider_control_host_run_id) ??
+    normalizeOptionalString(manifest.providerControlHostRunId);
+  const envProviderControlHostTaskId =
+    normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID);
+  const envProviderControlHostRunId =
+    normalizeOptionalString(env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID);
+  const providerControlHostMatchesManifest = Boolean(
+    envProviderControlHostTaskId &&
+      envProviderControlHostRunId &&
+      manifestProviderControlHostTaskId &&
+      manifestProviderControlHostRunId &&
+      envProviderControlHostTaskId === manifestProviderControlHostTaskId &&
+      envProviderControlHostRunId === manifestProviderControlHostRunId
+  );
   return {
     manifest,
     manifestPath,
     runDir: dirname(manifestPath),
     repoRoot,
     runId,
-    workspacePath: manifestWorkspacePath ?? repoRoot,
+    taskId,
+    pipelineId: envPipelineId ?? manifestPipelineId,
+    providerControlHostTaskId:
+      providerControlHostMatchesManifest
+        ? (envProviderControlHostTaskId ?? manifestProviderControlHostTaskId)
+        : null,
+    providerControlHostRunId:
+      providerControlHostMatchesManifest
+        ? (envProviderControlHostRunId ?? manifestProviderControlHostRunId)
+        : null,
+    providerControlHostRecordedInManifest:
+      Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
+    providerControlHostMatchesManifest,
+    workspacePath: normalizedManifestWorkspacePath ?? repoRoot,
     sourceSetup: resolveProviderLinearWorkerSourceSetup(env),
     issueId,
     issueIdentifier,
+    issueUpdatedAt:
+      normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_UPDATED_AT) ??
+      normalizeOptionalString(manifest.issue_updated_at) ??
+      normalizeOptionalString(manifest.issueUpdatedAt),
     maxTurns: await resolveProviderWorkerMaxTurns(env)
   };
+}
+
+function contextTaskIdFromManifestPath(manifestPath: string): string | null {
+  const resolvedManifestPath = resolve(manifestPath);
+  const runDir = dirname(resolvedManifestPath);
+  const cliDir = dirname(runDir);
+  const taskDir = dirname(cliDir);
+  const runsDir = dirname(taskDir);
+  if (
+    basename(resolvedManifestPath) !== 'manifest.json' ||
+    basename(cliDir) !== 'cli' ||
+    basename(runsDir) !== '.runs'
+  ) {
+    return null;
+  }
+  const taskId = sanitizeTaskId(basename(resolve(dirname(manifestPath), '..', '..')));
+  return taskId.length > 0 ? taskId : null;
 }
 
 function buildIssueDescriptionSection(issue: LiveLinearTrackedIssue): string[] {
@@ -434,6 +548,7 @@ export function buildProviderWorkerPrompt(
       '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
       `- When you discover a meaningful out-of-scope improvement, use \`${helperCommand} create-follow-up --issue-id ${issue.id} ...\` to file a same-project follow-up issue in \`Backlog\` with a clear title, description, acceptance criteria, a \`related\` link, and optional blocker linkage instead of expanding scope.`,
       '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
+      `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
       ...buildPreReviewHandoffGateSection(),
       '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
       '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
@@ -465,6 +580,7 @@ export function buildProviderWorkerPrompt(
     '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
     '- Refresh the same workpad after each meaningful milestone and immediately before any review or merge handoff. Keep final closeout in that same workpad comment.',
     '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
+    `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
     ...buildPreReviewHandoffGateSection(),
     '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
     '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
@@ -809,6 +925,130 @@ function buildProofPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
 }
 
+function buildChildStreamsPath(runDir: string): string {
+  return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME);
+}
+
+function buildChildStreamsLockPath(runDir: string): string {
+  return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME);
+}
+
+export async function readProviderLinearWorkerChildStreams(
+  runDir: string
+): Promise<ProviderLinearWorkerChildStreamRecord[]> {
+  let raw: string;
+  try {
+    raw = await readFile(buildChildStreamsPath(runDir), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error('provider-linear-worker child-stream ledger is not an array.');
+  }
+  const normalized = parsed.map((entry) => normalizeProviderLinearWorkerChildStreamRecord(entry));
+  if (normalized.some((entry) => entry === null)) {
+    throw new Error('provider-linear-worker child-stream ledger contains invalid records.');
+  }
+  return normalized as ProviderLinearWorkerChildStreamRecord[];
+}
+
+export async function appendProviderLinearWorkerChildStreamRecord(
+  runDir: string,
+  record: ProviderLinearWorkerChildStreamRecord,
+  writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
+): Promise<ProviderLinearWorkerChildStreamRecord[]> {
+  return await withProviderLinearWorkerChildStreamsLock(runDir, async () => {
+    const existing = await readProviderLinearWorkerChildStreams(runDir);
+    const next = existing.filter(
+      (entry) => !(entry.task_id === record.task_id && entry.run_id === record.run_id)
+    );
+    next.push(record);
+    await writeJson(buildChildStreamsPath(runDir), next);
+    return next;
+  });
+}
+
+async function withProviderLinearWorkerChildStreamsLock<T>(
+  runDir: string,
+  action: () => Promise<T>
+): Promise<T> {
+  const lockPath = buildChildStreamsLockPath(runDir);
+  await acquireLockWithRetry({
+    taskId: runDir,
+    lockPath,
+    retry: PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY,
+    ensureDirectory: async () => {
+      await mkdir(dirname(lockPath), { recursive: true });
+    },
+    createError: (_taskId, attempts) =>
+      new Error(`Failed to acquire provider-linear-worker child-stream ledger lock after ${attempts} attempts.`)
+  });
+  try {
+    return await action();
+  } finally {
+    await rm(lockPath, { force: true });
+  }
+}
+
+function normalizeProviderLinearWorkerChildStreamRecord(
+  value: unknown
+): ProviderLinearWorkerChildStreamRecord | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const stream = normalizeOptionalString(value.stream);
+  const pipelineId = normalizeOptionalString(value.pipeline_id);
+  const taskId = normalizeOptionalString(value.task_id);
+  const runId = normalizeOptionalString(value.run_id);
+  const status = normalizeOptionalString(value.status);
+  const manifestPath = normalizeOptionalString(value.manifest_path);
+  const artifactRoot = normalizeOptionalString(value.artifact_root);
+  const issueId = normalizeOptionalString(value.issue_id);
+  const issueIdentifier = normalizeOptionalString(value.issue_identifier);
+  const launchedAt = normalizeOptionalString(value.launched_at);
+  if (
+    !stream ||
+    !pipelineId ||
+    !taskId ||
+    !runId ||
+    !status ||
+    !manifestPath ||
+    !artifactRoot ||
+    !issueId ||
+    !issueIdentifier ||
+    !launchedAt
+  ) {
+    return null;
+  }
+  return {
+    stream,
+    pipeline_id: pipelineId,
+    task_id: taskId,
+    run_id: runId,
+    status,
+    manifest_path: manifestPath,
+    artifact_root: artifactRoot,
+    log_path: normalizeOptionalString(value.log_path),
+    summary: normalizeOptionalString(value.summary),
+    issue_id: issueId,
+    issue_identifier: issueIdentifier,
+    workspace_path: normalizeOptionalString(value.workspace_path),
+    source_setup: isRecord(value.source_setup) && value.source_setup.provider === 'linear'
+      ? {
+          provider: 'linear',
+          workspace_id: normalizeOptionalString(value.source_setup.workspace_id),
+          team_id: normalizeOptionalString(value.source_setup.team_id),
+          project_id: normalizeOptionalString(value.source_setup.project_id)
+        }
+      : null,
+    launched_at: launchedAt
+  };
+}
 async function resolveProviderWorkerRunLocation(
   currentManifestPath: string,
 ): Promise<ProviderWorkerRunLocation | null> {
@@ -1151,7 +1391,6 @@ async function requestProviderControlHostRefresh(input: {
     );
   }
 }
-
 async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,
   runDir: string,
@@ -1160,7 +1399,8 @@ async function writeProofSnapshot(
 ): Promise<ProviderLinearWorkerProof> {
   const hydratedProof = {
     ...proof,
-    linear_audit: await summarizeProviderLinearAuditPath(auditPath)
+    linear_audit: await summarizeProviderLinearAuditPath(auditPath),
+    child_streams: await readProviderLinearWorkerChildStreams(runDir)
   };
   await deps.writeProof(buildProofPath(runDir), hydratedProof);
   return hydratedProof;
@@ -1218,6 +1458,7 @@ export async function runProviderLinearWorker(
     workspace_path: context.workspacePath,
     source_setup: context.sourceSetup,
     linear_audit: null,
+    child_streams: [],
     end_reason: null,
     updated_at: deps.now()
   };
