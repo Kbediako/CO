@@ -3,7 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { readFile, realpath } from 'node:fs/promises';
+import { mkdir, readFile, realpath, rm } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
@@ -48,16 +48,25 @@ import {
 } from './runtime/index.js';
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
+import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-worker-child-streams.json';
+const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME}.lock`;
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
 const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
 const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
 const CSRF_HEADER = 'x-csrf-token';
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
+const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
+  maxAttempts: 50,
+  initialDelayMs: 10,
+  backoffFactor: 1.5,
+  maxDelayMs: 250,
+  staleMs: 30_000
+};
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
@@ -398,10 +407,12 @@ export async function loadProviderLinearWorkerContext(
   const manifestRunId = normalizeOptionalString(manifest.run_id), envRunId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID);
   if (manifestRunId && envRunId && envRunId !== manifestRunId) throw new Error(`Provider worker run id mismatch between env (${envRunId}) and manifest (${manifestRunId}).`);
   const runId = manifestRunId ?? envRunId ?? `provider-linear-worker-${Date.now()}`;
-  const taskId =
+  const manifestTaskId =
     normalizeOptionalString(manifest.task_id) ??
-    normalizeOptionalString(manifest.taskId) ??
-    contextTaskIdFromManifestPath(manifestPath);
+    normalizeOptionalString(manifest.taskId);
+  const taskId = manifestTaskId
+    ? sanitizeTaskId(manifestTaskId)
+    : contextTaskIdFromManifestPath(manifestPath);
   const envTaskId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID);
   if (!taskId || (envTaskId && envTaskId !== taskId)) {
     throw new Error(taskId ? `Provider worker task id mismatch between env (${envTaskId}) and manifest (${taskId}).` : 'Provider worker task id unavailable.');
@@ -913,6 +924,10 @@ function buildChildStreamsPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME);
 }
 
+function buildChildStreamsLockPath(runDir: string): string {
+  return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME);
+}
+
 export async function readProviderLinearWorkerChildStreams(
   runDir: string
 ): Promise<ProviderLinearWorkerChildStreamRecord[]> {
@@ -942,13 +957,37 @@ export async function appendProviderLinearWorkerChildStreamRecord(
   record: ProviderLinearWorkerChildStreamRecord,
   writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
 ): Promise<ProviderLinearWorkerChildStreamRecord[]> {
-  const existing = await readProviderLinearWorkerChildStreams(runDir);
-  const next = existing.filter(
-    (entry) => !(entry.task_id === record.task_id && entry.run_id === record.run_id)
-  );
-  next.push(record);
-  await writeJson(buildChildStreamsPath(runDir), next);
-  return next;
+  return await withProviderLinearWorkerChildStreamsLock(runDir, async () => {
+    const existing = await readProviderLinearWorkerChildStreams(runDir);
+    const next = existing.filter(
+      (entry) => !(entry.task_id === record.task_id && entry.run_id === record.run_id)
+    );
+    next.push(record);
+    await writeJson(buildChildStreamsPath(runDir), next);
+    return next;
+  });
+}
+
+async function withProviderLinearWorkerChildStreamsLock<T>(
+  runDir: string,
+  action: () => Promise<T>
+): Promise<T> {
+  const lockPath = buildChildStreamsLockPath(runDir);
+  await acquireLockWithRetry({
+    taskId: runDir,
+    lockPath,
+    retry: PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY,
+    ensureDirectory: async () => {
+      await mkdir(dirname(lockPath), { recursive: true });
+    },
+    createError: (_taskId, attempts) =>
+      new Error(`Failed to acquire provider-linear-worker child-stream ledger lock after ${attempts} attempts.`)
+  });
+  try {
+    return await action();
+  } finally {
+    await rm(lockPath, { force: true });
+  }
 }
 
 function normalizeProviderLinearWorkerChildStreamRecord(

@@ -268,6 +268,25 @@ describe('provider linear worker runner', () => {
 
     expect(context.taskId).toBe('linear-camel-task');
   });
+
+  it('rejects manifest task ids that are unsafe for child-stream path confinement', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear/bad-task',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    await expect(
+      loadProviderLinearWorkerContext({
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
+      })
+    ).rejects.toThrow('slashes are not allowed');
+  });
+
   it('rejects manifest-path task fallback outside the canonical .runs layout', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-noncanonical-'));
     const manifestDir = join(tempRoot, 'not-runs', 'run-child');
@@ -866,6 +885,81 @@ describe('provider linear worker runner', () => {
 
     await expect(readProviderLinearWorkerChildStreams(runDir)).rejects.toThrow(
       'provider-linear-worker child-stream ledger is not an array'
+    );
+  });
+
+  it('serializes overlapping child-stream ledger appends so sibling runs are not lost', async () => {
+    const { runDir } = await createManifestRoot();
+    const firstRecord = {
+      stream: 'docs-review',
+      pipeline_id: 'docs-review',
+      task_id: 'linear-lin-issue-1-docs-review',
+      run_id: 'docs-run-1',
+      status: 'succeeded',
+      manifest_path: join(runDir, 'child-1-manifest.json'),
+      artifact_root: join(runDir, 'child-1'),
+      log_path: join(runDir, 'child-1.log'),
+      summary: 'child 1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-27T01:00:00.000Z'
+    };
+    const secondRecord = {
+      ...firstRecord,
+      task_id: 'linear-lin-issue-1-implementation-gate',
+      run_id: 'impl-run-1',
+      stream: 'implementation-gate',
+      pipeline_id: 'implementation-gate',
+      manifest_path: join(runDir, 'child-2-manifest.json'),
+      artifact_root: join(runDir, 'child-2'),
+      log_path: join(runDir, 'child-2.log'),
+      summary: 'child 2',
+      launched_at: '2026-03-27T01:00:01.000Z'
+    };
+
+    let markFirstWriteStarted: (() => void) | null = null;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve;
+    });
+    let releaseFirstWrite: (() => void) | null = null;
+    const holdFirstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    let secondSettled = false;
+    const firstPromise = appendProviderLinearWorkerChildStreamRecord(
+      runDir,
+      firstRecord,
+      async (path, value) => {
+        markFirstWriteStarted?.();
+        await holdFirstWrite;
+        await writeFile(path, JSON.stringify(value), 'utf8');
+      }
+    );
+
+    await firstWriteStarted;
+    const secondPromise = appendProviderLinearWorkerChildStreamRecord(runDir, secondRecord).then((value) => {
+      secondSettled = true;
+      return value;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(secondSettled).toBe(false);
+
+    releaseFirstWrite?.();
+    const [firstResult, secondResult] = await Promise.all([
+      firstPromise,
+      secondPromise
+    ]);
+    const recorded = await readProviderLinearWorkerChildStreams(runDir);
+
+    expect(firstResult).toHaveLength(1);
+    expect(secondResult).toHaveLength(2);
+    expect(recorded).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1' }),
+        expect.objectContaining({ task_id: 'linear-lin-issue-1-implementation-gate', run_id: 'impl-run-1' })
+      ])
     );
   });
 
