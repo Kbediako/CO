@@ -352,6 +352,9 @@ describe('OperatorDashboardPresenter', () => {
       expect.arrayContaining([
         expect.objectContaining({
           issue_identifier: 'CO-7',
+          status: 'running',
+          display_status: 'paused',
+          status_reason: 'queued_questions',
           title: 'Add richer operator observability surface',
           session: {
             session_id: 'session-7',
@@ -376,13 +379,25 @@ describe('OperatorDashboardPresenter', () => {
   });
 
   it('falls back to the latest event when no recent agent-activity list exists', () => {
+    const projection = buildProjection();
+    const retryIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-8');
+    expect(retryIssue).toBeTruthy();
+    if (!retryIssue) {
+      return;
+    }
+    retryIssue.payload.provider_linear_worker_proof = {
+      ...retryIssue.payload.provider_linear_worker_proof!,
+      last_event: 'proof-only',
+      last_message: 'Provider proof only',
+      last_event_at: '2026-03-27T04:06:59.000Z'
+    };
     const dataset = buildUiDataset({
-      projection: buildProjection(),
+      projection,
       generatedAt: '2026-03-27T04:06:02.000Z'
     });
 
-    const retryIssue = dataset.issues.find((issue) => issue.issue_identifier === 'CO-8');
-    expect(retryIssue?.recent_agent_activity).toEqual([
+    const retryDatasetIssue = dataset.issues.find((issue) => issue.issue_identifier === 'CO-8');
+    expect(retryDatasetIssue?.recent_agent_activity).toEqual([
       {
         at: '2026-03-27T04:06:00.000Z',
         event: 'retry_scheduled',
@@ -399,6 +414,18 @@ describe('OperatorDashboardPresenter', () => {
       return;
     }
     retryIssue.payload.latest_event = null;
+    retryIssue.payload.retry = {
+      ...retryIssue.payload.retry!,
+      last_event: 'retry-layer-only',
+      last_message: 'Retry layer only',
+      last_event_at: '2026-03-27T04:06:58.000Z'
+    };
+    retryIssue.payload.provider_linear_worker_proof = {
+      ...retryIssue.payload.provider_linear_worker_proof!,
+      last_event: 'proof-layer-only',
+      last_message: 'Provider proof only',
+      last_event_at: '2026-03-27T04:06:59.000Z'
+    };
 
     const dataset = buildUiDataset({
       projection,
@@ -407,9 +434,9 @@ describe('OperatorDashboardPresenter', () => {
 
     expect(dataset.issues.find((issue) => issue.issue_identifier === 'CO-8')?.recent_agent_activity).toEqual([
       {
-        at: '2026-03-27T04:06:00.000Z',
-        event: 'retry_scheduled',
-        message: 'Retry queued after rate limit'
+        at: '2026-03-27T04:06:59.000Z',
+        event: 'proof-layer-only',
+        message: 'Provider proof only'
       }
     ]);
   });
@@ -453,6 +480,8 @@ describe('OperatorDashboardPresenter', () => {
         workspace_path: '/repo/.workspaces/co-7-retry'
       })
     ]);
+    expect(dataset.selected?.task_id).toBe('linear-e52');
+    expect(dataset.selected?.run_id).toBe('run-7');
   });
 
   it('falls back to provider proof workspace paths when the issue payload is missing one', () => {

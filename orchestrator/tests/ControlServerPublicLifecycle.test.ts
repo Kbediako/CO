@@ -504,10 +504,15 @@ describe('startControlServerPublicLifecycle', () => {
     const firstRefresh = new Promise<void>((resolve) => {
       resolveRefresh = resolve;
     });
+    let notifyRehydrateStarted: (() => void) | null = null;
+    const rehydrateStarted = new Promise<void>((resolve) => {
+      notifyRehydrateStarted = resolve;
+    });
     let resolveRehydrate: (() => void) | null = null;
     const rehydratePromise = new Promise<void>((resolve) => {
       resolveRehydrate = resolve;
     });
+    let queuedRefreshSettled = false;
     const refresh = vi
       .fn<() => Promise<void>>()
       .mockImplementationOnce(async () => {
@@ -515,6 +520,7 @@ describe('startControlServerPublicLifecycle', () => {
       })
       .mockImplementation(async () => undefined);
     const rehydrate = vi.fn(async () => {
+      notifyRehydrateStarted?.();
       await rehydratePromise;
     });
     const providerIssueHandoff = {
@@ -529,15 +535,19 @@ describe('startControlServerPublicLifecycle', () => {
     const queuedRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
       queueIfBusy: true
     });
+    void queuedRefresh.finally(() => {
+      queuedRefreshSettled = true;
+    });
 
     expect(refresh).toHaveBeenCalledTimes(1);
 
     resolveRefresh?.();
     await activeLock;
-    await Promise.resolve();
+    await rehydrateStarted;
 
     expect(rehydrate).toHaveBeenCalledTimes(1);
     expect(refresh).toHaveBeenCalledTimes(1);
+    expect(queuedRefreshSettled).toBe(false);
 
     resolveRehydrate?.();
     await interposedRehydrate;
