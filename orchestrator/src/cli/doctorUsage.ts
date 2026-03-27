@@ -679,14 +679,18 @@ function resolveCollabReceiverIdentifierGroups(
     }
   }
 
+  const groupedAliases = new Set(groups.flat());
+
   for (const [index, receiverThreadId] of receiverThreadIds.entries()) {
-    if (!consumedThreadIndexes.has(index)) {
+    if (!consumedThreadIndexes.has(index) && !groupedAliases.has(receiverThreadId)) {
       groups.push([receiverThreadId]);
+      groupedAliases.add(receiverThreadId);
     }
   }
   for (const [index, receiverAgentPath] of receiverAgentPaths.entries()) {
-    if (!consumedPathIndexes.has(index)) {
+    if (!consumedPathIndexes.has(index) && !groupedAliases.has(receiverAgentPath)) {
       groups.push([receiverAgentPath]);
+      groupedAliases.add(receiverAgentPath);
     }
   }
 
