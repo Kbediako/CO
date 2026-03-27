@@ -2651,6 +2651,12 @@ function createProviderLaunchToken(): string {
   return randomBytes(16).toString('hex');
 }
 
+const PROVIDER_CHILD_STREAM_PIPELINE_IDS = new Set([
+  'docs-review',
+  'implementation-gate',
+  'docs-relevance-advisory'
+]);
+
 export async function discoverProviderIssueRuns(
   currentRunDir: string,
   input?: {
@@ -2674,7 +2680,9 @@ export async function discoverProviderIssueRuns(
       if (!manifest) {
         continue;
       }
-      if (readStringValue(manifest, 'parent_run_id')) {
+      const parentRunId = readStringValue(manifest, 'parent_run_id');
+      const pipelineId = readStringValue(manifest, 'pipeline_id');
+      if (parentRunId && pipelineId && PROVIDER_CHILD_STREAM_PIPELINE_IDS.has(pipelineId)) {
         continue;
       }
       const issueProvider = readStringValue(manifest, 'issue_provider');
@@ -2694,7 +2702,7 @@ export async function discoverProviderIssueRuns(
         taskId: readStringValue(manifest, 'task_id') ?? taskEntry,
         runId: readStringValue(manifest, 'run_id') ?? runEntry,
         manifestPath,
-        pipelineId: readStringValue(manifest, 'pipeline_id'),
+        pipelineId,
         status: resolveProviderIssueRunStatus(manifest, proof),
         summary: resolveProviderIssueRunSummary(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),

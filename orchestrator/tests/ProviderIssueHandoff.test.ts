@@ -180,7 +180,7 @@ function getLatestScheduledTimeoutCallback(
 }
 
 describe('createProviderIssueHandoffService', () => {
-  it('ignores nested provider child manifests when discovering scheduler-owned issue runs', async () => {
+  it('ignores child-stream manifests without dropping provider workers that carry parent lineage', async () => {
     const { root, paths } = await createHostPaths();
     const providerRunDir = join(root, '.runs', 'linear-lin-issue-1', 'cli', 'provider-run-1');
     const providerChildDir = join(root, '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1');
@@ -190,7 +190,7 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'provider-run-1',
       task_id: 'linear-lin-issue-1',
       pipeline_id: 'provider-linear-worker',
-      parent_run_id: null,
+      parent_run_id: 'control-host-run-1',
       issue_provider: 'linear',
       issue_id: 'lin-issue-1',
       updated_at: '2026-03-27T01:00:00.000Z'
