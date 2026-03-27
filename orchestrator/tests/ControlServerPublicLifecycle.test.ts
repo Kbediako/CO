@@ -20,6 +20,7 @@ import {
 } from '../src/cli/control/controlServerPublicLifecycle.js';
 import { resolveLiveLinearTrackedIssues } from '../src/cli/control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from '../src/cli/control/linearWebhookController.js';
+import { readProviderPollingHealth } from '../src/cli/control/providerPollingHealth.js';
 import {
   prepareControlServerStartupInputs,
   type PreparedControlServerStartupInputs
@@ -495,6 +496,55 @@ describe('startControlServerPublicLifecycle', () => {
     await queuedRefresh;
 
     expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('records polling health failures even when background refresh errors are swallowed', async () => {
+    vi.useFakeTimers();
+
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => {
+        throw new Error('refresh failed');
+      })
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      last_mode: 'refresh',
+      last_error: 'refresh failed'
+    });
+
+    await closeControlServerPublicLifecycle(started);
   });
 
   it('queues a follow-up refresh when a manual refresh request arrives during rehydrate', async () => {

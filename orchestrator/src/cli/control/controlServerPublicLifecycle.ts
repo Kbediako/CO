@@ -229,9 +229,9 @@ function createProviderRefreshCoordinator(
   timer: NodeJS.Timeout;
   trigger: () => Promise<void>;
 } {
-  const trigger = (): Promise<void> =>
-    runProviderIssueHandoffOperation(providerIssueHandoff, async () => {
-      try {
+  const trigger = async (): Promise<void> => {
+    try {
+      await runProviderIssueHandoffOperation(providerIssueHandoff, async () => {
         if (!providerIssueHandoff.poll || !context.readFeatureToggles) {
           await providerIssueHandoff.refresh();
           return;
@@ -248,12 +248,13 @@ function createProviderRefreshCoordinator(
           return;
         }
         await providerIssueHandoff.refresh();
-      } catch {
-        // Best-effort provider refreshes should not crash the public lifecycle.
-      }
-    }, undefined, {
-      mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
-    });
+      }, undefined, {
+        mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
+      });
+    } catch {
+      // Best-effort provider refreshes should not crash the public lifecycle.
+    }
+  };
   const timer = setInterval(() => {
     void trigger();
   }, PROVIDER_REFRESH_INTERVAL_MS);
