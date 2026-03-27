@@ -376,22 +376,26 @@ export async function loadProviderLinearWorkerContext(
   const manifestWorkspacePath =
     normalizeOptionalString(manifest.workspace_path) ??
     normalizeOptionalString(manifest.workspacePath);
-  const repoRoot =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT) ??
-    manifestWorkspacePath ??
-    process.cwd();
-  const runId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID) ??
-    normalizeOptionalString(manifest.run_id) ??
-    `provider-linear-worker-${Date.now()}`;
+  const envRepoRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_ROOT);
+  const normalizedManifestWorkspacePath = manifestWorkspacePath ? resolve(manifestWorkspacePath) : null;
+  const normalizedEnvRepoRoot = envRepoRoot ? resolve(envRepoRoot) : null;
+  if (normalizedManifestWorkspacePath && normalizedEnvRepoRoot && normalizedEnvRepoRoot !== normalizedManifestWorkspacePath) {
+    throw new Error(`Provider worker root mismatch between env (${normalizedEnvRepoRoot}) and manifest (${normalizedManifestWorkspacePath}).`);
+  }
+  const repoRoot = normalizedManifestWorkspacePath ?? normalizedEnvRepoRoot ?? resolve(process.cwd());
+  const manifestRunId = normalizeOptionalString(manifest.run_id), envRunId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUN_ID);
+  if (manifestRunId && envRunId && envRunId !== manifestRunId) throw new Error(`Provider worker run id mismatch between env (${envRunId}) and manifest (${manifestRunId}).`);
+  const runId = manifestRunId ?? envRunId ?? `provider-linear-worker-${Date.now()}`;
   const taskId =
-    normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID) ??
     normalizeOptionalString(manifest.task_id) ??
     normalizeOptionalString(manifest.taskId) ??
     contextTaskIdFromManifestPath(manifestPath);
-  if (!taskId) {
-    throw new Error('Provider worker task id unavailable.');
+  const envTaskId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_TASK_ID);
+  if (!taskId || (envTaskId && envTaskId !== taskId)) {
+    throw new Error(taskId ? `Provider worker task id mismatch between env (${envTaskId}) and manifest (${taskId}).` : 'Provider worker task id unavailable.');
   }
+  const manifestPipelineId = normalizeOptionalString(manifest.pipeline_id) ?? normalizeOptionalString(manifest.pipelineId), envPipelineId = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PIPELINE_ID);
+  if (manifestPipelineId && envPipelineId && envPipelineId !== manifestPipelineId) throw new Error(`Provider worker pipeline id mismatch between env (${envPipelineId}) and manifest (${manifestPipelineId}).`);
   const manifestProviderControlHostTaskId =
     normalizeOptionalString(manifest.provider_control_host_task_id) ??
     normalizeOptionalString(manifest.providerControlHostTaskId);
@@ -417,10 +421,7 @@ export async function loadProviderLinearWorkerContext(
     repoRoot,
     runId,
     taskId,
-    pipelineId:
-      normalizeOptionalString(env.CODEX_ORCHESTRATOR_PIPELINE_ID) ??
-      normalizeOptionalString(manifest.pipeline_id) ??
-      normalizeOptionalString(manifest.pipelineId),
+    pipelineId: envPipelineId ?? manifestPipelineId,
     providerControlHostTaskId:
       envProviderControlHostTaskId ?? manifestProviderControlHostTaskId,
     providerControlHostRunId:
@@ -428,7 +429,7 @@ export async function loadProviderLinearWorkerContext(
     providerControlHostRecordedInManifest:
       Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
     providerControlHostMatchesManifest,
-    workspacePath: manifestWorkspacePath ?? repoRoot,
+    workspacePath: normalizedManifestWorkspacePath ?? repoRoot,
     sourceSetup: resolveProviderLinearWorkerSourceSetup(env),
     issueId,
     issueIdentifier,
@@ -919,7 +920,11 @@ export async function appendProviderLinearWorkerChildStreamRecord(
   record: ProviderLinearWorkerChildStreamRecord,
   writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
 ): Promise<ProviderLinearWorkerChildStreamRecord[]> {
-  const existing = await readProviderLinearWorkerChildStreams(runDir);
+  let existing: ProviderLinearWorkerChildStreamRecord[] = [];
+  try {
+    const parsed = JSON.parse(await readFile(buildChildStreamsPath(runDir), 'utf8')) as unknown; if (!Array.isArray(parsed)) throw new Error('provider-linear-worker child-stream ledger is not an array.');
+    const normalized = parsed.map((entry) => normalizeProviderLinearWorkerChildStreamRecord(entry)); if (normalized.some((entry) => entry === null)) throw new Error('provider-linear-worker child-stream ledger contains invalid records.'); existing = normalized as ProviderLinearWorkerChildStreamRecord[];
+  } catch (error) { if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error; }
   const next = existing.filter(
     (entry) => !(entry.task_id === record.task_id && entry.run_id === record.run_id)
   );

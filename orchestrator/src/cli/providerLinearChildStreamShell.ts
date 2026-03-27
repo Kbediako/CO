@@ -1,6 +1,5 @@
-import { join, isAbsolute } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
-
 import {
   PROVIDER_CONTROL_HOST_RUN_ID_ENV,
   PROVIDER_CONTROL_HOST_TASK_ID_ENV,
@@ -9,6 +8,7 @@ import {
 } from '../../../scripts/lib/provider-run-contract.js';
 import { PROVIDER_LINEAR_AUDIT_ENV_VAR } from './control/providerLinearWorkflowAudit.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
+import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import {
   appendProviderLinearWorkerChildStreamRecord,
   defaultExecRunner,
@@ -87,7 +87,6 @@ const DEFAULT_DEPENDENCIES: ProviderLinearChildStreamShellDependencies = {
   appendChildStreamRecord: async (runDir, record) => await appendProviderLinearWorkerChildStreamRecord(runDir, record),
   now: () => new Date().toISOString()
 };
-
 export async function runProviderLinearChildStreamShell(
   params: RunProviderLinearChildStreamShellParams,
   overrides: Partial<ProviderLinearChildStreamShellDependencies> = {}
@@ -110,7 +109,6 @@ export async function runProviderLinearChildStreamShell(
       status: 412
     });
   }
-
   const sourceSetup = context.sourceSetup ?? null;
   if (context.pipelineId !== 'provider-linear-worker') {
     return failureResult({
@@ -143,7 +141,6 @@ export async function runProviderLinearChildStreamShell(
       status: 412
     });
   }
-
   const pipelineId = normalizeProviderChildPipelineId(params.pipelineId);
   if (!pipelineId) {
     return failureResult({
@@ -158,7 +155,6 @@ export async function runProviderLinearChildStreamShell(
       status: 422
     });
   }
-
   if (!context.taskId) {
     return failureResult({
       issueId: context.issueId,
@@ -172,7 +168,6 @@ export async function runProviderLinearChildStreamShell(
       status: 412
     });
   }
-
   const stream = normalizeChildStreamName(params.streamName ?? pipelineId);
   if (!stream) {
     return failureResult({
@@ -187,7 +182,6 @@ export async function runProviderLinearChildStreamShell(
       status: 422
     });
   }
-
   const childTaskId = `${context.taskId}-${stream}`;
   const invocation = resolveCodexOrchestratorInvocation(env);
   const args = [
@@ -217,14 +211,13 @@ export async function runProviderLinearChildStreamShell(
   if (runtimeMode) {
     args.push('--runtime-mode', runtimeMode);
   }
-
   let execResult: ProviderLinearWorkerExecResult;
   try {
     execResult = await deps.execRunner({
       command: invocation.command,
       args,
       cwd: context.repoRoot,
-      env: buildProviderLinearChildStartEnv(env, context.repoRoot, pipelineId),
+      env: buildProviderLinearChildStartEnv(env, context.repoRoot, pipelineId, childTaskId, sourceSetup),
       mirrorOutput: false
     });
   } catch (error) {
@@ -240,8 +233,7 @@ export async function runProviderLinearChildStreamShell(
       status: 502
     });
   }
-
-  const childRun = parseProviderChildRunResult(execResult.stdout, context.repoRoot, pipelineId, childTaskId);
+  const childRun = parseProviderChildRunResult(execResult.stdout, context.repoRoot, context.runDir, pipelineId, childTaskId);
   if (!childRun) {
     const detail = [execResult.stderr.trim(), execResult.stdout.trim()].filter(Boolean)[0] ?? 'unknown child-stream output';
     return failureResult({
@@ -256,7 +248,6 @@ export async function runProviderLinearChildStreamShell(
       status: 502
     });
   }
-
   try {
     await deps.appendChildStreamRecord(context.runDir, {
       stream,
@@ -287,7 +278,6 @@ export async function runProviderLinearChildStreamShell(
       status: 502
     });
   }
-
   if (execResult.exitCode !== 0 || childRun.status !== 'succeeded') {
     return failureResult({
       issueId: context.issueId,
@@ -301,7 +291,6 @@ export async function runProviderLinearChildStreamShell(
       status: 502
     });
   }
-
   return {
     ok: true,
     operation: 'child-stream',
@@ -316,30 +305,21 @@ export async function runProviderLinearChildStreamShell(
     child_run: childRun
   };
 }
-function normalizeProviderChildPipelineId(value: string): ProviderLinearChildStreamPipelineId | null {
-  const normalized = value.trim();
-  return ALLOWED_PROVIDER_CHILD_PIPELINES.find((candidate) => candidate === normalized) ?? null;
-}
-function normalizeChildStreamName(value: string): string | null {
-  const normalized = slugify(value, '').toLowerCase();
-  return normalized.length > 0 ? normalized : null;
-}
-function normalizeRuntimeMode(value: string | undefined): 'cli' | 'appserver' | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const normalized = value.trim().toLowerCase();
-  return normalized === 'cli' || normalized === 'appserver' ? normalized : null;
-}
-function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: string, pipelineId: ProviderLinearChildStreamPipelineId): NodeJS.ProcessEnv {
+function normalizeProviderChildPipelineId(value: string): ProviderLinearChildStreamPipelineId | null { return ALLOWED_PROVIDER_CHILD_PIPELINES.find((candidate) => candidate === value.trim()) ?? null; }
+function normalizeChildStreamName(value: string): string | null { const normalized = slugify(value, '').toLowerCase(); return normalized.length > 0 ? normalized : null; }
+function normalizeRuntimeMode(value: string | undefined): 'cli' | 'appserver' | null { if (typeof value !== 'string') return null; const normalized = value.trim().toLowerCase(); return normalized === 'cli' || normalized === 'appserver' ? normalized : null; }
+function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string, sourceSetup: DispatchPilotSourceSetup | null): NodeJS.ProcessEnv {
   const sanitized: NodeJS.ProcessEnv = { ...process.env, ...env };
   for (const key of PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE) {
     delete sanitized[key];
   }
+  delete sanitized.CO_LINEAR_WORKSPACE_ID; delete sanitized.CO_LINEAR_TEAM_ID; delete sanitized.CO_LINEAR_PROJECT_ID;
   if (pipelineId === 'docs-relevance-advisory') {
     delete sanitized.FORCE_CODEX_REVIEW;
   }
   sanitized.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+  sanitized.MCP_RUNNER_TASK_ID = taskId;
+  if (sourceSetup?.provider === 'linear') Object.assign(sanitized, { CO_LINEAR_WORKSPACE_ID: sourceSetup.workspace_id ?? '', CO_LINEAR_TEAM_ID: sourceSetup.team_id ?? '', CO_LINEAR_PROJECT_ID: sourceSetup.project_id ?? '' });
   return sanitized;
 }
 function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
@@ -360,7 +340,7 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
     argsPrefix: []
   };
 }
-function parseProviderChildRunResult(raw: string, repoRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
+function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
   const trimmed = raw.trim();
   if (!trimmed.startsWith('{')) {
     return null;
@@ -378,18 +358,34 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, pipelineId: 
   const runId = normalizeOptionalString(record.run_id);
   const status = normalizeOptionalString(record.status);
   const artifactRoot = normalizeOptionalString(record.artifact_root);
-  const manifestPath = normalizeOptionalString(record.manifest) ?? (artifactRoot ? `${artifactRoot}/manifest.json` : null);
+  const manifestPath = normalizeOptionalString(record.manifest) ?? (artifactRoot ? join(artifactRoot, 'manifest.json') : null);
   if (!runId || !status || !artifactRoot || !manifestPath) {
     return null;
   }
+  const safeRunId = (() => { try { return sanitizeRunId(runId); } catch { return null; } })();
+  if (!safeRunId) {
+    return null;
+  }
+  const expectedRunRoot = resolve(parentRunDir, '..', '..', '..', taskId, 'cli', safeRunId);
+  const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
+  const resolvedManifestPath = resolveRunPath(repoRoot, manifestPath);
+  const resolvedLogPath = normalizeOptionalString(record.log_path);
+  const normalizedLogPath = resolvedLogPath ? resolveRunPath(repoRoot, resolvedLogPath) : null;
+  if (
+    !isPathWithinRoot(expectedRunRoot, resolvedArtifactRoot) ||
+    !isPathWithinRoot(expectedRunRoot, resolvedManifestPath) ||
+    (normalizedLogPath && !isPathWithinRoot(expectedRunRoot, normalizedLogPath))
+  ) {
+    return null;
+  }
   return {
-    run_id: runId,
+    run_id: safeRunId,
     task_id: taskId,
     pipeline_id: pipelineId,
     status,
-    artifact_root: artifactRoot,
-    manifest_path: resolveRunPath(repoRoot, manifestPath),
-    log_path: normalizeOptionalString(record.log_path),
+    artifact_root: resolvedArtifactRoot,
+    manifest_path: resolvedManifestPath,
+    log_path: normalizedLogPath,
     summary: normalizeOptionalString(record.summary),
     runtime_mode_requested: normalizeOptionalString(record.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(record.runtime_mode),
@@ -397,7 +393,11 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, pipelineId: 
   };
 }
 function resolveRunPath(repoRoot: string, value: string): string {
-  return isAbsolute(value) ? value : join(repoRoot, value);
+  return isAbsolute(value) ? resolve(value) : resolve(repoRoot, value);
+}
+function isPathWithinRoot(root: string, candidate: string): boolean {
+  const relativePath = relative(root, candidate);
+  return relativePath === '' || (!relativePath.startsWith('..') && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath));
 }
 function failureResult(input: {
   issueId: string | null;
@@ -426,10 +426,4 @@ function failureResult(input: {
     }
   };
 }
-function normalizeOptionalString(value: unknown): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
+function normalizeOptionalString(value: unknown): string | null { if (typeof value !== 'string') return null; const trimmed = value.trim(); return trimmed.length > 0 ? trimmed : null; }

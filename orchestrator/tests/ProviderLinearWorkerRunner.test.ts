@@ -267,7 +267,14 @@ describe('provider linear worker runner', () => {
 
     expect(context.taskId).toBe('linear-camel-task');
   });
-
+  it('rejects env task ids that do not match the manifest-backed worker task', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await expect(loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined, CODEX_ORCHESTRATOR_TASK_ID: 'linear-lin-issue-2' })).rejects.toThrow('Provider worker task id mismatch');
+  });
+  it('rejects env repo roots that do not match the manifest-backed workspace', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await expect(loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: join(tempRoot ?? '', 'elsewhere') })).rejects.toThrow('Provider worker root mismatch');
+  });
   it('requires matching live control-host env values and accepts manifest.pipelineId', async () => {
     const { manifestPath } = await createManifestRoot();
     await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');
