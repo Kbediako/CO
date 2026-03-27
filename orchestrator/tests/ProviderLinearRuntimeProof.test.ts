@@ -72,6 +72,74 @@ describe('resolveProviderLinearRuntimeProof', () => {
     });
   });
 
+  it('returns the no-proof dns-public reachability path when no proof fields are provided', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: true,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof({
+      repoRoot,
+      origin: 'https://app.example.com/path',
+      reachabilityMode: 'dns-public'
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      proof: null,
+      handoff: null,
+      reachability: {
+        mode: 'dns-public',
+        dns_ran: false,
+        hostname: null,
+        resolved_addresses: [],
+        summary: 'No proof URL was provided, so dns-public reachability was not exercised.',
+        caveat: 'Reviewer reachability remains unevaluated until a reviewer-usable proof URL is supplied.'
+      }
+    });
+  });
+
+  it('fails closed when an unsupported reachability mode is requested', async () => {
+    const repoRoot = await createRepoWithPermit({
+      allowedSources: [
+        {
+          origin: 'https://app.example.com',
+          runtime_proof: {
+            allow_screenshot: true,
+            allow_external_link: true,
+            allow_video: false
+          }
+        }
+      ]
+    });
+
+    const result = await resolveProviderLinearRuntimeProof({
+      repoRoot,
+      origin: 'https://app.example.com/path',
+      reachabilityMode: 'bogus-mode' as never
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'runtime_proof_reachability_mode_invalid',
+        status: 422,
+        details: {
+          requested_reachability_mode: 'bogus-mode',
+          allowed_reachability_modes: ['deterministic', 'dns-public']
+        }
+      }
+    });
+  });
+
   it('generates workpad and pr markdown for an allowed screenshot proof link', async () => {
     const repoRoot = await createRepoWithPermit({
       allowedSources: [

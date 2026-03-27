@@ -528,7 +528,7 @@ function buildPreReviewHandoffGateSection(): string[] {
 }
 
 function buildRuntimeProofGuidance(helperCommand: string, issueId: string): string {
-  return `- For app-touching lanes, inspect permit posture with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --format json\`, then generate reviewer-usable handoff content with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --kind <screenshot|external-link|video> --proof-url <reviewer-url> --title <label> --summary <what changed> --format json\`; add \`--reachability-mode dns-public\` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit blocks the mode, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.`;
+  return `- For app-touching lanes, inspect permit posture with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --format json\`, then generate reviewer-usable handoff content with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --kind <screenshot|external-link|video> --proof-url <reviewer-url> --title <label> --summary <what changed> --format json\`; add \`--reachability-mode dns-public\` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.`;
 }
 
 export function buildProviderWorkerPrompt(
