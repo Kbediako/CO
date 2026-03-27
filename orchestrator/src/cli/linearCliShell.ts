@@ -30,7 +30,8 @@ import {
 import {
   resolveProviderLinearRuntimeProof,
   type ProviderLinearRuntimeProofKind,
-  type ProviderLinearRuntimeProofPolicy
+  type ProviderLinearRuntimeProofPolicy,
+  type ProviderLinearRuntimeProofReachability
 } from './control/providerLinearRuntimeProof.js';
 import {
   runProviderLinearChildStreamShell,
@@ -95,6 +96,7 @@ type ProviderLinearRuntimeProofResult =
         workpad_markdown: string;
         pr_markdown: string;
       } | null;
+      reachability: ProviderLinearRuntimeProofReachability;
     }
   | {
       ok: false;
@@ -287,7 +289,8 @@ export async function runLinearCliShell(
           'kind',
           'proof-url',
           'title',
-          'summary'
+          'summary',
+          'reachability-mode'
         ]);
         const issueId = requireFlag(params.flags, 'issue-id');
         const sourceSetup = resolveAuditSourceSetup(params.flags, env);
@@ -297,7 +300,8 @@ export async function runLinearCliShell(
           kind: readStringFlag(params.flags, 'kind') ?? null,
           proofUrl: readStringFlag(params.flags, 'proof-url') ?? null,
           title: readRawStringFlag(params.flags, 'title'),
-          summary: readRawStringFlag(params.flags, 'summary')
+          summary: readRawStringFlag(params.flags, 'summary'),
+          reachabilityMode: readStringFlag(params.flags, 'reachability-mode') ?? null
         });
         const result: ProviderLinearRuntimeProofResult = resolved.ok
           ? {
@@ -307,7 +311,8 @@ export async function runLinearCliShell(
               source_setup: sourceSetup,
               policy: resolved.policy,
               proof: resolved.proof,
-              handoff: resolved.handoff
+              handoff: resolved.handoff,
+              reachability: resolved.reachability
             }
           : {
               ok: false,

@@ -414,7 +414,7 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(firstPrompt).toContain(`\`${helperCommand} runtime-proof --issue-id lin-issue-1 --origin <app-url> --format json\``);
     expect(firstPrompt).toContain(
-      'the helper fails closed when the permit blocks the mode, when the proof URL is loopback/local-only, or when only a local file path is available'
+      'add `--reachability-mode dns-public` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.'
     );
     expect(firstPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
     expect(firstPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
@@ -454,7 +454,7 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(continuationPrompt).toContain(`\`${helperCommand} runtime-proof --issue-id lin-issue-1 --origin <app-url> --format json\``);
     expect(continuationPrompt).toContain(
-      'the helper fails closed when the permit blocks the mode, when the proof URL is loopback/local-only, or when only a local file path is available'
+      'add `--reachability-mode dns-public` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.'
     );
     expect(continuationPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
     expect(continuationPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');

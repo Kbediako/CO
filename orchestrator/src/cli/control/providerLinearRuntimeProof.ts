@@ -1,13 +1,25 @@
+import { lookup as dnsLookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
 import { resolve } from 'node:path';
 
 import {
   findPermitEntry,
   loadPermitFile,
-  resolveRuntimeProofCapabilities
+  resolveRuntimeProofCapabilities,
+  type CompliancePermitSource
 } from '../../../../scripts/design/pipeline/permit.js';
 
 export type ProviderLinearRuntimeProofKind = 'screenshot' | 'external-link' | 'video';
+export type ProviderLinearRuntimeProofReachabilityMode = 'deterministic' | 'dns-public';
+
+export interface ProviderLinearRuntimeProofReachability {
+  mode: ProviderLinearRuntimeProofReachabilityMode;
+  dns_ran: boolean;
+  hostname: string | null;
+  resolved_addresses: string[];
+  summary: string;
+  caveat: string;
+}
 
 export interface ProviderLinearRuntimeProofPolicy {
   origin: string;
@@ -45,6 +57,7 @@ export interface ProviderLinearRuntimeProofResolutionSuccess {
     workpad_markdown: string;
     pr_markdown: string;
   } | null;
+  reachability: ProviderLinearRuntimeProofReachability;
 }
 
 export interface ProviderLinearRuntimeProofResolutionFailure {
@@ -64,15 +77,48 @@ export interface ResolveProviderLinearRuntimeProofInput {
   proofUrl?: string | null;
   title?: string | null;
   summary?: string | null;
+  reachabilityMode?: string | null;
 }
 
+interface ProviderLinearRuntimeProofDnsAddress {
+  address: string;
+  family: number;
+}
+
+interface ProviderLinearRuntimeProofDependencies {
+  dnsLookup: (hostname: string) => Promise<ProviderLinearRuntimeProofDnsAddress[]>;
+}
+
+type ProviderLinearRuntimeProofReachabilityResolution =
+  | {
+      ok: true;
+      reachability: ProviderLinearRuntimeProofReachability;
+    }
+  | {
+      ok: false;
+      error: ProviderLinearRuntimeProofError;
+    };
+
 const ALL_RUNTIME_PROOF_KINDS: ProviderLinearRuntimeProofKind[] = ['screenshot', 'external-link', 'video'];
+const ALL_RUNTIME_PROOF_REACHABILITY_MODES: ProviderLinearRuntimeProofReachabilityMode[] = ['deterministic', 'dns-public'];
 const BLOCKED_PROOF_HOSTS = createBlockedProofHostBlockList();
-const BLOCKED_PROOF_TLDS = ['local', 'test', 'invalid', 'localhost', 'lan'] as const;
+const BLOCKED_PROOF_TLDS = ['local', 'test', 'invalid', 'localhost', 'lan', 'example', 'home.arpa'] as const;
+const DEFAULT_REACHABILITY_CAVEAT =
+  'Reviewer reachability is not guaranteed across other networks, resolvers, or future DNS changes.';
+
+const DEFAULT_DEPENDENCIES: ProviderLinearRuntimeProofDependencies = {
+  dnsLookup: async (hostname: string) =>
+    (await dnsLookup(hostname, { all: true, verbatim: true })).map((result) => ({
+      address: result.address,
+      family: result.family
+    }))
+};
 
 export async function resolveProviderLinearRuntimeProof(
-  input: ResolveProviderLinearRuntimeProofInput
+  input: ResolveProviderLinearRuntimeProofInput,
+  overrides: Partial<ProviderLinearRuntimeProofDependencies> = {}
 ): Promise<ProviderLinearRuntimeProofResolution> {
+  const dependencies = { ...DEFAULT_DEPENDENCIES, ...overrides };
   const normalizedOrigin = normalizeOrigin(input.origin);
   if (!normalizedOrigin) {
     return failure('runtime_proof_origin_invalid', 'Runtime proof origin must be a valid URL.', 422);
@@ -93,6 +139,21 @@ export async function resolveProviderLinearRuntimeProof(
 
   const permitEntry = permitResult.status === 'found' ? findPermitEntry(permitResult.permit, normalizedOrigin) : null;
   const policy = buildRuntimeProofPolicy(normalizedOrigin, permitResult.path, permitResult.status, permitEntry);
+  const normalizedReachabilityMode = normalizeRuntimeProofReachabilityMode(input.reachabilityMode ?? null);
+
+  if (!normalizedReachabilityMode) {
+    return failure(
+      'runtime_proof_reachability_mode_invalid',
+      'Runtime proof reachability mode must be one of: deterministic, dns-public.',
+      422,
+      {
+        requested_reachability_mode: input.reachabilityMode,
+        allowed_reachability_modes: ALL_RUNTIME_PROOF_REACHABILITY_MODES,
+        policy
+      },
+      policy
+    );
+  }
 
   const proofUrlInput = normalizeOptionalText(input.proofUrl ?? null);
   const normalizedKind = normalizeRuntimeProofKind(input.kind ?? null);
@@ -107,7 +168,8 @@ export async function resolveProviderLinearRuntimeProof(
         ok: true,
         policy,
         proof: null,
-        handoff: null
+        handoff: null,
+        reachability: buildReachabilityWithoutProof(normalizedReachabilityMode)
       };
     }
     if (input.kind) {
@@ -192,6 +254,25 @@ export async function resolveProviderLinearRuntimeProof(
     );
   }
 
+  const reachabilityResolution = await resolveRuntimeProofReachability(
+    normalizedProofUrl,
+    normalizedReachabilityMode,
+    dependencies
+  );
+  if (!reachabilityResolution.ok) {
+    return {
+      ok: false,
+      policy,
+      error: {
+        ...reachabilityResolution.error,
+        details: {
+          ...(reachabilityResolution.error.details ?? {}),
+          policy
+        }
+      }
+    };
+  }
+
   const proofTitle = normalizedTitle ?? buildDefaultProofTitle(normalizedKind);
   const proof = {
     kind: normalizedKind,
@@ -205,9 +286,10 @@ export async function resolveProviderLinearRuntimeProof(
     policy,
     proof,
     handoff: {
-      workpad_markdown: buildWorkpadMarkdown(policy, proof),
-      pr_markdown: buildPrMarkdown(policy, proof)
-    }
+      workpad_markdown: buildWorkpadMarkdown(policy, proof, reachabilityResolution.reachability),
+      pr_markdown: buildPrMarkdown(policy, proof, reachabilityResolution.reachability)
+    },
+    reachability: reachabilityResolution.reachability
   };
 }
 
@@ -215,11 +297,11 @@ function buildRuntimeProofPolicy(
   origin: string,
   permitPath: string,
   permitStatus: 'found' | 'missing' | 'error',
-  permitEntry: Record<string, unknown> | null
+  permitEntry: CompliancePermitSource | null
 ): ProviderLinearRuntimeProofPolicy {
   const resolvedPermitStatus =
     permitStatus === 'found' ? (permitEntry ? 'found' : 'origin_missing') : 'missing';
-  const capabilities = resolveRuntimeProofCapabilities(permitEntry as never);
+  const capabilities = resolveRuntimeProofCapabilities(permitEntry);
   const allowedKinds = ALL_RUNTIME_PROOF_KINDS.filter((kind) => capabilityForKind(capabilities, kind));
   const blockedKinds = ALL_RUNTIME_PROOF_KINDS.filter((kind) => !allowedKinds.includes(kind));
 
@@ -259,7 +341,8 @@ function buildPolicySummary(
 
 function buildWorkpadMarkdown(
   policy: ProviderLinearRuntimeProofPolicy,
-  proof: ProviderLinearRuntimeProofResolutionSuccess['proof']
+  proof: ProviderLinearRuntimeProofResolutionSuccess['proof'],
+  reachability: ProviderLinearRuntimeProofReachability
 ): string {
   const activeProof = proof!;
   const inlineTitle = normalizeMarkdownInline(activeProof.title);
@@ -267,7 +350,9 @@ function buildWorkpadMarkdown(
   return [
     `- Runtime proof policy: ${policy.summary}`,
     `- Runtime proof (${activeProof.kind}): [${escapeMarkdownLabel(inlineTitle)}](<${activeProof.reviewer_url}>)`,
-    inlineSummary ? `- Runtime proof summary: ${inlineSummary}` : null
+    inlineSummary ? `- Runtime proof summary: ${inlineSummary}` : null,
+    `- Runtime proof reachability: ${reachability.summary}`,
+    `- Runtime proof caveat: ${reachability.caveat}`
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');
@@ -275,7 +360,8 @@ function buildWorkpadMarkdown(
 
 function buildPrMarkdown(
   policy: ProviderLinearRuntimeProofPolicy,
-  proof: ProviderLinearRuntimeProofResolutionSuccess['proof']
+  proof: ProviderLinearRuntimeProofResolutionSuccess['proof'],
+  reachability: ProviderLinearRuntimeProofReachability
 ): string {
   const activeProof = proof!;
   const inlineTitle = normalizeMarkdownInline(activeProof.title);
@@ -284,10 +370,166 @@ function buildPrMarkdown(
     '### Runtime Proof',
     `- Policy: ${policy.summary}`,
     `- Proof (${activeProof.kind}): [${escapeMarkdownLabel(inlineTitle)}](<${activeProof.reviewer_url}>)`,
-    inlineSummary ? `- Summary: ${inlineSummary}` : null
+    inlineSummary ? `- Summary: ${inlineSummary}` : null,
+    `- Reachability: ${reachability.summary}`,
+    `- Caveat: ${reachability.caveat}`
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');
+}
+
+async function resolveRuntimeProofReachability(
+  proofUrl: string,
+  mode: ProviderLinearRuntimeProofReachabilityMode,
+  dependencies: ProviderLinearRuntimeProofDependencies
+): Promise<ProviderLinearRuntimeProofReachabilityResolution> {
+  const parsed = new URL(proofUrl);
+  const rawHostname = parsed.hostname.trim().toLowerCase().replaceAll(/^\[|\]$/g, '');
+  const hostname = normalizeHostname(rawHostname);
+  if (!rawHostname || !hostname) {
+    return {
+      ok: false,
+      error: {
+        code: 'runtime_proof_url_missing',
+        message: 'A reviewer-usable --proof-url is required to generate runtime proof handoff content. Local-only file paths are not supported.',
+        status: 422
+      }
+    };
+  }
+
+  if (mode === 'deterministic') {
+    return {
+      ok: true,
+      reachability: {
+        mode,
+        dns_ran: false,
+        hostname,
+        resolved_addresses: [],
+        summary: 'Deterministic URL validation accepted the reviewer proof URL without live DNS lookup.',
+        caveat: 'No live DNS lookup was performed. Reviewer reachability remains out of scope for the default deterministic path.'
+      }
+    };
+  }
+
+  if (isIP(hostname) > 0) {
+    return {
+      ok: true,
+      reachability: {
+        mode,
+        dns_ran: false,
+        hostname,
+        resolved_addresses: [hostname],
+        summary: `dns-public mode accepted the public IP literal ${hostname} without DNS lookup.`,
+        caveat: DEFAULT_REACHABILITY_CAVEAT
+      }
+    };
+  }
+
+  let answers: ProviderLinearRuntimeProofDnsAddress[];
+  try {
+    answers = await dependencies.dnsLookup(rawHostname);
+  } catch (error) {
+    const dnsError = error as NodeJS.ErrnoException;
+    return {
+      ok: false,
+      error: {
+        code: 'runtime_proof_dns_lookup_failed',
+        message: `dns-public reachability could not resolve ${hostname} with the worker-local DNS resolver; runtime proof handoff is blocked.`,
+        status: 503,
+        details: {
+          reachability_mode: mode,
+          reviewer_hostname: hostname,
+          dns_error_code: dnsError.code ?? null,
+          dns_error_message: dnsError.message ?? String(error),
+          proof_url: proofUrl
+        }
+      }
+    };
+  }
+
+  const resolvedAddresses = uniqueAddresses(answers.map((answer) => answer.address));
+  if (resolvedAddresses.length === 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'runtime_proof_dns_no_answers',
+        message: `dns-public reachability returned no answers for ${hostname}; runtime proof handoff is blocked.`,
+        status: 503,
+        details: {
+          reachability_mode: mode,
+          reviewer_hostname: hostname,
+          proof_url: proofUrl
+        }
+      }
+    };
+  }
+
+  const blockedAddresses = resolvedAddresses.filter((address) => isBlockedProofHostname(address));
+  if (blockedAddresses.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'runtime_proof_dns_non_public_resolution',
+        message: `dns-public reachability resolved ${hostname} to at least one non-public address; runtime proof handoff is blocked.`,
+        status: 422,
+        details: {
+          reachability_mode: mode,
+          reviewer_hostname: hostname,
+          proof_url: proofUrl,
+          resolved_addresses: resolvedAddresses,
+          blocked_addresses: blockedAddresses
+        }
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    reachability: {
+      mode,
+      dns_ran: true,
+      hostname,
+      resolved_addresses: resolvedAddresses,
+      summary: `Worker-local DNS resolved ${hostname} to public addresses only: ${resolvedAddresses.join(', ')}.`,
+      caveat: 'This is worker-local DNS evidence only. Reviewer reachability is not guaranteed across other networks, resolvers, or future DNS changes.'
+    }
+  };
+}
+
+function buildReachabilityWithoutProof(
+  mode: ProviderLinearRuntimeProofReachabilityMode
+): ProviderLinearRuntimeProofReachability {
+  if (mode === 'dns-public') {
+    return {
+      mode,
+      dns_ran: false,
+      hostname: null,
+      resolved_addresses: [],
+      summary: 'No proof URL was provided, so dns-public reachability was not exercised.',
+      caveat: 'Reviewer reachability remains unevaluated until a reviewer-usable proof URL is supplied.'
+    };
+  }
+  return {
+    mode,
+    dns_ran: false,
+    hostname: null,
+    resolved_addresses: [],
+    summary: 'No proof URL was provided; the deterministic path leaves reviewer reachability out of scope.',
+    caveat: 'No live DNS lookup was performed.'
+  };
+}
+
+function uniqueAddresses(addresses: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const address of addresses) {
+    if (seen.has(address)) {
+      continue;
+    }
+    seen.add(address);
+    result.push(address);
+  }
+  return result;
 }
 
 function capabilityForKind(
@@ -307,6 +549,19 @@ function isKindAllowed(policy: ProviderLinearRuntimeProofPolicy, kind: ProviderL
 function normalizeRuntimeProofKind(value: string | null): ProviderLinearRuntimeProofKind | null {
   const normalized = normalizeOptionalText(value)?.toLowerCase();
   if (normalized === 'screenshot' || normalized === 'external-link' || normalized === 'video') {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeRuntimeProofReachabilityMode(
+  value: string | null
+): ProviderLinearRuntimeProofReachabilityMode | null {
+  const normalized = normalizeOptionalText(value)?.toLowerCase();
+  if (!normalized) {
+    return 'deterministic';
+  }
+  if (normalized === 'deterministic' || normalized === 'dns-public') {
     return normalized;
   }
   return null;
@@ -350,20 +605,21 @@ function normalizeHttpUrl(value: string | null): string | null {
   }
 }
 
-function isBlockedProofHostname(hostname: string): boolean {
+function normalizeHostname(hostname: string): string | null {
   const normalized = hostname.trim().toLowerCase().replaceAll(/^\[|\]$/g, '').replace(/\.$/, '');
+  return normalized.length > 0 ? normalized : null;
+}
+
+function isBlockedProofHostname(hostname: string): boolean {
+  const normalized = normalizeHostname(hostname);
   if (!normalized) {
     return true;
   }
   if (normalized === 'localhost' || normalized.endsWith('.localhost')) {
     return true;
   }
-  const ipVersion = isIP(normalized);
-  if (ipVersion === 4) {
-    return BLOCKED_PROOF_HOSTS.check(normalized, 'ipv4');
-  }
-  if (ipVersion === 6) {
-    return BLOCKED_PROOF_HOSTS.check(normalized, 'ipv6');
+  if (isIP(normalized) > 0) {
+    return isBlockedProofIpAddress(normalized);
   }
   if (!normalized.includes('.')) {
     return true;
@@ -372,6 +628,127 @@ function isBlockedProofHostname(hostname: string): boolean {
     return true;
   }
   return false;
+}
+
+function isBlockedProofIpAddress(address: string): boolean {
+  const normalized = normalizeHostname(address);
+  if (!normalized) {
+    return true;
+  }
+  const embeddedIpv4 = extractEmbeddedIpv4Address(normalized);
+  if (embeddedIpv4) {
+    return BLOCKED_PROOF_HOSTS.check(embeddedIpv4, 'ipv4');
+  }
+  const ipVersion = isIP(normalized);
+  if (ipVersion === 4) {
+    return BLOCKED_PROOF_HOSTS.check(normalized, 'ipv4');
+  }
+  if (ipVersion === 6) {
+    return BLOCKED_PROOF_HOSTS.check(normalized, 'ipv6');
+  }
+  return true;
+}
+
+function extractEmbeddedIpv4Address(address: string): string | null {
+  const hextets = expandIpv6Hextets(address);
+  if (!hextets) {
+    return null;
+  }
+  if (isIpv4MappedIpv6(hextets) || isIpv4TranslatedIpv6(hextets) || isWellKnownNat64Ipv6(hextets)) {
+    return formatEmbeddedIpv4(hextets[6], hextets[7]);
+  }
+  return null;
+}
+
+function expandIpv6Hextets(address: string): number[] | null {
+  const normalized = normalizeHostname(address);
+  if (!normalized || isIP(normalized) !== 6) {
+    return null;
+  }
+
+  let source = normalized;
+  const zoneSeparator = source.indexOf('%');
+  if (zoneSeparator >= 0) {
+    source = source.slice(0, zoneSeparator);
+  }
+
+  if (source.includes('.')) {
+    const lastColon = source.lastIndexOf(':');
+    if (lastColon < 0) {
+      return null;
+    }
+    const ipv4Suffix = source.slice(lastColon + 1);
+    if (isIP(ipv4Suffix) !== 4) {
+      return null;
+    }
+    const octets = ipv4Suffix.split('.').map((part) => Number.parseInt(part, 10));
+    source = `${source.slice(0, lastColon)}:${((octets[0] << 8) | octets[1]).toString(16)}:${((octets[2] << 8) | octets[3]).toString(16)}`;
+  }
+
+  const halves = source.split('::');
+  if (halves.length > 2) {
+    return null;
+  }
+
+  const head = halves[0] ? halves[0].split(':').filter((part) => part.length > 0) : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':').filter((part) => part.length > 0) : [];
+
+  let parts: string[];
+  if (halves.length === 1) {
+    if (head.length !== 8) {
+      return null;
+    }
+    parts = head;
+  } else {
+    const missing = 8 - (head.length + tail.length);
+    if (missing < 1) {
+      return null;
+    }
+    parts = [...head, ...Array.from({ length: missing }, () => '0'), ...tail];
+  }
+
+  if (parts.length !== 8 || parts.some((part) => !/^[0-9a-f]{1,4}$/i.test(part))) {
+    return null;
+  }
+
+  return parts.map((part) => Number.parseInt(part, 16));
+}
+
+function isIpv4MappedIpv6(hextets: number[]): boolean {
+  return (
+    hextets[0] === 0 &&
+    hextets[1] === 0 &&
+    hextets[2] === 0 &&
+    hextets[3] === 0 &&
+    hextets[4] === 0 &&
+    hextets[5] === 0xffff
+  );
+}
+
+function isIpv4TranslatedIpv6(hextets: number[]): boolean {
+  return (
+    hextets[0] === 0 &&
+    hextets[1] === 0 &&
+    hextets[2] === 0 &&
+    hextets[3] === 0 &&
+    hextets[4] === 0xffff &&
+    hextets[5] === 0
+  );
+}
+
+function isWellKnownNat64Ipv6(hextets: number[]): boolean {
+  return (
+    hextets[0] === 0x64 &&
+    hextets[1] === 0xff9b &&
+    hextets[2] === 0 &&
+    hextets[3] === 0 &&
+    hextets[4] === 0 &&
+    hextets[5] === 0
+  );
+}
+
+function formatEmbeddedIpv4(left: number, right: number): string {
+  return `${left >> 8}.${left & 0xff}.${right >> 8}.${right & 0xff}`;
 }
 
 function normalizeMarkdownInline(value: string): string {
@@ -431,6 +808,8 @@ function createBlockedProofHostBlockList(): BlockList {
   blockList.addAddress('::', 'ipv6');
   blockList.addAddress('::1', 'ipv6');
   blockList.addSubnet('2001:db8::', 32, 'ipv6');
+  blockList.addSubnet('64:ff9b:1::', 48, 'ipv6');
+  blockList.addSubnet('fec0::', 10, 'ipv6');
   blockList.addSubnet('fe80::', 10, 'ipv6');
   blockList.addSubnet('fc00::', 7, 'ipv6');
   blockList.addSubnet('ff00::', 8, 'ipv6');

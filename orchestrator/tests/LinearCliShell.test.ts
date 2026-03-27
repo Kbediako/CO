@@ -8,8 +8,11 @@ import { runLinearCliShell } from '../src/cli/linearCliShell.js';
 
 const tempDirs: string[] = [];
 
-afterEach(async () => {
+afterEach(() => {
   vi.restoreAllMocks();
+});
+
+afterEach(async () => {
   await Promise.all(
     tempDirs.splice(0).map((dir) =>
       rm(dir, {
@@ -265,6 +268,15 @@ describe('runLinearCliShell', () => {
             workpad_markdown:
               '- Runtime proof policy: screenshot proof is permitted for https://app.example.com; external-link and video are blocked.',
             pr_markdown: '### Runtime Proof'
+          },
+          reachability: {
+            mode: 'dns-public',
+            dns_ran: true,
+            hostname: 'review-assets.example.com',
+            resolved_addresses: ['93.184.216.34'],
+            summary: 'Worker-local DNS resolved review-assets.example.com to public addresses only: 93.184.216.34.',
+            caveat:
+              'This is worker-local DNS evidence only. Reviewer reachability is not guaranteed across other networks, resolvers, or future DNS changes.'
           }
         } as never);
 
@@ -278,7 +290,8 @@ describe('runLinearCliShell', () => {
           kind: 'screenshot',
           'proof-url': 'https://review-assets.example.com/proof.png',
           title: 'Dashboard after launch-app validation',
-          summary: 'Signed-in dashboard state.'
+          summary: 'Signed-in dashboard state.',
+          'reachability-mode': 'dns-public'
         },
         printHelp: vi.fn()
       },
@@ -301,7 +314,8 @@ describe('runLinearCliShell', () => {
       kind: 'screenshot',
       proofUrl: 'https://review-assets.example.com/proof.png',
       title: 'Dashboard after launch-app validation',
-      summary: 'Signed-in dashboard state.'
+      summary: 'Signed-in dashboard state.',
+      reachabilityMode: 'dns-public'
     });
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
       ok: true,
@@ -312,6 +326,10 @@ describe('runLinearCliShell', () => {
       },
       handoff: {
         pr_markdown: '### Runtime Proof'
+      },
+      reachability: {
+        mode: 'dns-public',
+        dns_ran: true
       }
     });
     expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
@@ -361,7 +379,15 @@ describe('runLinearCliShell', () => {
             summary: 'No permit'
           },
           proof: null,
-          handoff: null
+          handoff: null,
+          reachability: {
+            mode: 'deterministic',
+            dns_ran: false,
+            hostname: null,
+            resolved_addresses: [],
+            summary: 'No proof URL was provided; the deterministic path leaves reviewer reachability out of scope.',
+            caveat: 'No live DNS lookup was performed.'
+          }
         } as never);
 
     await runLinearCliShell(
@@ -388,7 +414,8 @@ describe('runLinearCliShell', () => {
       kind: null,
       proofUrl: null,
       title: undefined,
-      summary: undefined
+      summary: undefined,
+      reachabilityMode: null
     });
   });
 

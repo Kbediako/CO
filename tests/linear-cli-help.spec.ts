@@ -26,5 +26,8 @@ describe('codex-orchestrator linear help', () => {
     expect(result.stdout).toMatch(
       /--proof-url <url>\s+Reviewer-usable proof URL for workpad\/PR handoff generation\./
     );
+    expect(result.stdout).toMatch(
+      /--reachability-mode <mode>\s+Optional reviewer reachability mode: deterministic \(default\) or dns-public\./
+    );
   });
 });
