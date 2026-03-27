@@ -18,7 +18,6 @@ import {
   type ProviderLinearWorkerExecResult
 } from './providerLinearWorkerRunner.js';
 import { slugify } from './utils/strings.js';
-
 const ALLOWED_PROVIDER_CHILD_PIPELINES = ['docs-review', 'implementation-gate', 'docs-relevance-advisory'] as const;
 const PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE = [
   'MCP_RUNNER_TASK_ID',
@@ -37,9 +36,7 @@ const PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE = [
   PROVIDER_LAUNCH_TOKEN_ENV,
   PROVIDER_LINEAR_AUDIT_ENV_VAR
 ] as const;
-
 export type ProviderLinearChildStreamPipelineId = (typeof ALLOWED_PROVIDER_CHILD_PIPELINES)[number];
-
 export interface ProviderLinearChildRunResult {
   run_id: string;
   task_id: string;
@@ -53,7 +50,6 @@ export interface ProviderLinearChildRunResult {
   runtime_mode: string | null;
   runtime_provider: string | null;
 }
-
 export interface ProviderLinearChildStreamSuccessResult {
   ok: true;
   operation: 'child-stream';
@@ -64,7 +60,6 @@ export interface ProviderLinearChildStreamSuccessResult {
   pipeline_id: ProviderLinearChildStreamPipelineId;
   child_run: ProviderLinearChildRunResult;
 }
-
 export interface ProviderLinearChildStreamFailureResult {
   ok: false;
   operation: 'child-stream';
@@ -76,21 +71,17 @@ export interface ProviderLinearChildStreamFailureResult {
   child_run: ProviderLinearChildRunResult | null;
   error: { code: string; message: string; status: number };
 }
-
 export type ProviderLinearChildStreamResult = ProviderLinearChildStreamSuccessResult | ProviderLinearChildStreamFailureResult;
-
 export interface RunProviderLinearChildStreamShellParams {
   pipelineId: string;
   streamName?: string | null;
   env?: NodeJS.ProcessEnv;
 }
-
 interface ProviderLinearChildStreamShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
   appendChildStreamRecord: (runDir: string, record: ProviderLinearWorkerChildStreamRecord) => Promise<ProviderLinearWorkerChildStreamRecord[]>;
   now: () => string;
 }
-
 const DEFAULT_DEPENDENCIES: ProviderLinearChildStreamShellDependencies = {
   execRunner: defaultExecRunner,
   appendChildStreamRecord: async (runDir, record) => await appendProviderLinearWorkerChildStreamRecord(runDir, record),
@@ -325,19 +316,14 @@ export async function runProviderLinearChildStreamShell(
     child_run: childRun
   };
 }
-
-function normalizeProviderChildPipelineId(
-  value: string
-): ProviderLinearChildStreamPipelineId | null {
+function normalizeProviderChildPipelineId(value: string): ProviderLinearChildStreamPipelineId | null {
   const normalized = value.trim();
   return ALLOWED_PROVIDER_CHILD_PIPELINES.find((candidate) => candidate === normalized) ?? null;
 }
-
 function normalizeChildStreamName(value: string): string | null {
   const normalized = slugify(value, '').toLowerCase();
   return normalized.length > 0 ? normalized : null;
 }
-
 function normalizeRuntimeMode(value: string | undefined): 'cli' | 'appserver' | null {
   if (typeof value !== 'string') {
     return null;
@@ -345,12 +331,7 @@ function normalizeRuntimeMode(value: string | undefined): 'cli' | 'appserver' | 
   const normalized = value.trim().toLowerCase();
   return normalized === 'cli' || normalized === 'appserver' ? normalized : null;
 }
-
-function buildProviderLinearChildStartEnv(
-  env: NodeJS.ProcessEnv,
-  repoRoot: string,
-  pipelineId: ProviderLinearChildStreamPipelineId
-): NodeJS.ProcessEnv {
+function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: string, pipelineId: ProviderLinearChildStreamPipelineId): NodeJS.ProcessEnv {
   const sanitized: NodeJS.ProcessEnv = { ...process.env, ...env };
   for (const key of PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE) {
     delete sanitized[key];
@@ -361,7 +342,6 @@ function buildProviderLinearChildStartEnv(
   sanitized.CODEX_ORCHESTRATOR_ROOT = repoRoot;
   return sanitized;
 }
-
 function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   command: string;
   argsPrefix: string[];
@@ -380,13 +360,7 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
     argsPrefix: []
   };
 }
-
-function parseProviderChildRunResult(
-  raw: string,
-  repoRoot: string,
-  pipelineId: ProviderLinearChildStreamPipelineId,
-  taskId: string
-): ProviderLinearChildRunResult | null {
+function parseProviderChildRunResult(raw: string, repoRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
   const trimmed = raw.trim();
   if (!trimmed.startsWith('{')) {
     return null;
@@ -422,11 +396,9 @@ function parseProviderChildRunResult(
     runtime_provider: normalizeOptionalString(record.runtime_provider)
   };
 }
-
 function resolveRunPath(repoRoot: string, value: string): string {
   return isAbsolute(value) ? value : join(repoRoot, value);
 }
-
 function failureResult(input: {
   issueId: string | null;
   issueIdentifier: string | null;
@@ -454,7 +426,6 @@ function failureResult(input: {
     }
   };
 }
-
 function normalizeOptionalString(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;

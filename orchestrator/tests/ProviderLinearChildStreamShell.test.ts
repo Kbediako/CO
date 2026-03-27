@@ -3,17 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import { readProviderLinearWorkerChildStreams, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { runProviderLinearChildStreamShell } from '../src/cli/providerLinearChildStreamShell.js';
-
 let tempRoot: string | null = null;
 const RUN_ID = 'run-child';
 const TASK_ID = 'linear-lin-issue-1';
 const CONTROL_HOST_TASK_ID = 'local-mcp';
 const CONTROL_HOST_RUN_ID = 'control-host';
 const ISSUE = { issue_id: 'lin-issue-1', issue_identifier: 'CO-13' };
-
 afterEach(async () => {
   if (tempRoot) {
     await rm(tempRoot, { recursive: true, force: true });
@@ -110,17 +107,7 @@ describe('runProviderLinearChildStreamShell', () => {
     expect(execRunner).toHaveBeenCalledWith(expect.objectContaining({
       command: process.execPath,
       cwd: tempRoot,
-      args: expect.arrayContaining([
-        '/tmp/co-package-root/dist/bin/codex-orchestrator.js',
-        'start',
-        'docs-review',
-        '--task',
-        `${TASK_ID}-docs-review`,
-        '--parent-run',
-        RUN_ID,
-        '--runtime-mode',
-        'appserver'
-      ])
+      args: expect.arrayContaining(['/tmp/co-package-root/dist/bin/codex-orchestrator.js', 'start', 'docs-review', '--task', `${TASK_ID}-docs-review`, '--parent-run', RUN_ID, '--runtime-mode', 'appserver'])
     }));
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env.CODEX_ORCHESTRATOR_ROOT).toBe(tempRoot);
@@ -154,7 +141,6 @@ describe('runProviderLinearChildStreamShell', () => {
     ]);
     expect(PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME).toBe('provider-linear-worker-child-streams.json');
   });
-
   it.each([
     ['rejects unsupported child pipelines before launching anything', 'diagnostics', {}, 'provider_worker_child_stream_pipeline_unsupported', 422],
     ['fails closed when provider control-host provenance is missing', 'docs-review', { CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'unexpected-host' }, 'provider_worker_child_stream_provenance_invalid', 412]
