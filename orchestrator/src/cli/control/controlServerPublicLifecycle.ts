@@ -248,7 +248,8 @@ function createProviderRefreshCoordinator(
           return;
         }
         markProviderPollingStarted(providerIssueHandoff, {
-          mode: 'refresh'
+          mode: 'refresh',
+          queued: getProviderIssueHandoffOperationState(providerIssueHandoff).queuedRefresh !== null
         });
         await providerIssueHandoff.refresh();
       }, undefined, {

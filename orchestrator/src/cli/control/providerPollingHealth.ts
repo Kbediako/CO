@@ -67,6 +67,7 @@ export function markProviderPollingStarted(
   providerIssueHandoff: ProviderIssueHandoffService,
   input: {
     mode: ControlPollingMode;
+    queued?: boolean;
     atMs?: number;
   }
 ): void {
@@ -75,7 +76,7 @@ export function markProviderPollingStarted(
   state.lastMode = input.mode;
   state.lastRequestedAtMs = atMs;
   state.checking = true;
-  state.queued = false;
+  state.queued = input.queued ?? false;
   state.nextPollAtMs = null;
 }
 
