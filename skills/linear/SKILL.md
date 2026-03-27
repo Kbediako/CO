@@ -86,6 +86,39 @@ codex-orchestrator linear attach-pr \
   --format json
 ```
 
+## Runtime Proof
+
+For app-touching lanes, use the runtime-proof helper to turn permit policy into an explicit screenshot / external-link / video posture and, when allowed, generate reviewer-usable workpad and PR markdown.
+
+Inspect the current permit posture first:
+
+```bash
+codex-orchestrator linear runtime-proof \
+  --issue-id "$ISSUE_ID" \
+  --origin "https://app.example.com" \
+  --format json
+```
+
+Generate handoff content once you have a reviewer-visible proof URL:
+
+```bash
+codex-orchestrator linear runtime-proof \
+  --issue-id "$ISSUE_ID" \
+  --origin "https://app.example.com" \
+  --kind screenshot \
+  --proof-url "https://review-assets.example.com/co-8-dashboard.png" \
+  --title "Dashboard after launch-app validation" \
+  --summary "Signed-in dashboard state used for review handoff." \
+  --format json
+```
+
+Paste `handoff.workpad_markdown` into the workpad and `handoff.pr_markdown` into the PR description or a review-ready PR comment.
+The helper fails closed when:
+- the permit file is unreadable
+- the origin is not approved
+- the requested proof kind is blocked
+- only a local file path exists instead of a reviewer-visible proof URL
+
 ## Pre-Review Drain
 
 After opening or updating a PR, run the shipped bounded automated-feedback drain before moving the issue to `Human Review` or `In Review`.
@@ -126,6 +159,7 @@ codex-orchestrator linear create-follow-up \
   - check inline review comments and unresolved review threads
   - check review summaries / decisions
   - resolve each actionable item or post explicit, justified pushback
+- For app-touching lanes, use `runtime-proof` before review handoff so the workpad and PR carry reviewer-usable proof links instead of local-only artifact paths.
 - After opening or updating a PR, run `codex-orchestrator pr ready-review --pr "$PR_NUMBER" --quiet-minutes <window>` and keep the issue out of review until that bounded automated-feedback drain exits cleanly or reveals a blocker you handle explicitly.
 - Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff before opening a new PR for review handoff, before updating an already attached PR for handoff, and before transitioning the issue to `Human Review` or `In Review`.
 - Use the repo heuristic for non-trivial work: about 2+ changed files or about 40+ changed lines, unless you record an explicit skip justification in the workpad.

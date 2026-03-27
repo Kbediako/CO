@@ -64,3 +64,44 @@ it('preserves follow-up recovery metadata in summarized audit entries', async ()
     }
   });
 });
+
+it('accepts runtime-proof audit entries in summarized output', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-audit-'));
+  tempDirs.push(tempDir);
+  const auditPath = join(tempDir, 'provider-linear-audit.jsonl');
+
+  await appendProviderLinearAuditEntry(auditPath, {
+    recorded_at: '2026-03-27T05:00:00.000Z',
+    operation: 'runtime-proof',
+    ok: true,
+    issue_id: 'lin-issue-1',
+    issue_identifier: null,
+    source_setup: null,
+    action: 'screenshot',
+    via: 'permit:found',
+    state: null,
+    follow_up_issue_id: null,
+    follow_up_issue_identifier: null,
+    failed_relation_type: null,
+    comment_id: null,
+    attachment_id: null,
+    error_code: null,
+    error_message: null
+  });
+
+  const summary = await summarizeProviderLinearAuditPath(auditPath);
+
+  expect(summary).toMatchObject({
+    attempted_count: 1,
+    success_count: 1,
+    failure_count: 0,
+    latest_by_operation: {
+      'runtime-proof': {
+        operation: 'runtime-proof',
+        ok: true,
+        action: 'screenshot',
+        via: 'permit:found'
+      }
+    }
+  });
+});

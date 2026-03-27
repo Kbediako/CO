@@ -21,5 +21,10 @@ describe('codex-orchestrator linear help', () => {
       /--issue-id <id>\s+Linear issue id\/key whose workpad should be deleted\./
     );
     expect(result.stdout).toMatch(/--comment-id <id>\s+Optional persisted workpad comment id to delete\./);
+    expect(result.stdout).toContain('runtime-proof');
+    expect(result.stdout).toMatch(/--origin <url>\s+App origin whose permit posture should be evaluated\./);
+    expect(result.stdout).toMatch(
+      /--proof-url <url>\s+Reviewer-usable proof URL for workpad\/PR handoff generation\./
+    );
   });
 });

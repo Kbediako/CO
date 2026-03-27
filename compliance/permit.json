@@ -8,7 +8,12 @@
       "approval_id": "example-approval-0000-00-00",
       "allow_playwright": false,
       "allow_video_capture": false,
-      "allow_live_assets": false
+      "allow_live_assets": false,
+      "runtime_proof": {
+        "allow_screenshot": false,
+        "allow_external_link": false,
+        "allow_video": false
+      }
     }
   ],
   "policy": {

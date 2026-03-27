@@ -273,6 +273,12 @@ Optional prompt overrides:
 
 Check readiness with `codex-orchestrator doctor --format json` (reports DevTools skill + MCP config availability). Use `codex-orchestrator devtools setup` to print setup steps.
 
+## Linear Runtime Proof Handoff
+- Use `codex-orchestrator linear runtime-proof --issue-id <issue-id> --origin <app-url> --format json` to inspect the permit posture for app-touching lanes before review handoff.
+- When the permit allows a proof mode, rerun with `--kind <screenshot|external-link|video> --proof-url <reviewer-url>` plus optional `--title` / `--summary` to generate `handoff.workpad_markdown` and `handoff.pr_markdown`.
+- The helper is intentionally fail-closed for reviewer handoff: unreadable permit files, unapproved origins, blocked proof kinds, and local-only artifact paths all return non-zero instead of pretending proof is review-ready.
+- Screenshot and external-link proof are controlled independently through `compliance/permit.json` `runtime_proof.allow_screenshot` and `runtime_proof.allow_external_link`; video stays disabled unless `runtime_proof.allow_video` or legacy `allow_video_capture` explicitly enables it.
+
 ## Mirror Workflows
 - `npm run mirror:fetch -- --project <name> [--dry-run] [--force]`: reads `packages/<project>/mirror.config.json` (origin, routes, asset roots, rewrite/block/allow lists), caches downloads **per project** under `.runs/<task>/mirror/<project>/cache`, strips tracker patterns, rewrites externals to `/external/<host>/...`, localizes OG/twitter preview images, rewrites share links off tracker-heavy hosts, and stages into `.runs/<task>/mirror/<project>/<timestamp>/staging/public` before promoting to `packages/<project>/public`. Non-origin assets fall back to Web Archive when the primary host is down; promotion is skipped if errors are detected unless `--force` is set. Manifests live at `.runs/<task>/mirror/<project>/<timestamp>/manifest.json` (warns when `MCP_RUNNER_TASK_ID` is unset; honors `compliance/permit.json` when present).
 - `npm run mirror:serve -- --project <name> [--port <port>] [--csp <self|strict|off>] [--no-range]`: shared local-mirror server with traversal guard, HTML no-cache/asset immutability, optional CSP, optional Range support, and directory-listing blocks.
