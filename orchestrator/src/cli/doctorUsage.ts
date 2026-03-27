@@ -676,7 +676,7 @@ function resolveCollabReceiverIdentifierGroups(
     }
     const identifiers = dedupeCollabAliases([receiverThreadId, receiverAgentPath]);
     if (identifiers.length > 0) {
-      const existingGroup = groups.find((group) => identifiers.some((identifier) => group.includes(identifier)));
+      const existingGroup = groups.find((group) => group.includes(receiverThreadId));
       if (existingGroup) {
         for (const identifier of identifiers) {
           if (!existingGroup.includes(identifier)) {
