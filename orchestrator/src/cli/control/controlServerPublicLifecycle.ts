@@ -157,16 +157,16 @@ export function runProviderIssueHandoffRefresh(
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   if (state.active) {
-    noteProviderPollingRequest(providerIssueHandoff, {
-      mode: 'refresh',
-      queued: Boolean(options?.queueIfBusy)
-    });
     if (!options?.queueIfBusy) {
       return state.active.then(() => ({
         queued: true,
         coalesced: true
       }));
     }
+    noteProviderPollingRequest(providerIssueHandoff, {
+      mode: 'refresh',
+      queued: true
+    });
     if (state.queuedRefresh) {
       return state.queuedRefresh.then(() => ({
         queued: true,
@@ -330,15 +330,15 @@ function runProviderIssueHandoffOperation(
   healthContext?: { mode: ControlPollingMode }
 ): Promise<void> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
-  if (healthContext) {
-    noteProviderPollingRequest(providerIssueHandoff, {
-      mode: healthContext.mode,
-      queued: Boolean(state.active && options?.queueIfBusy)
-    });
-  }
   if (state.active) {
     if (!options?.queueIfBusy) {
       return state.active;
+    }
+    if (healthContext) {
+      noteProviderPollingRequest(providerIssueHandoff, {
+        mode: healthContext.mode,
+        queued: true
+      });
     }
     return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation, healthContext);
   }

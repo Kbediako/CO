@@ -13,6 +13,7 @@ import {
 } from '../src/cli/control/controlServerReadyInstanceLifecycle.js';
 import {
   closeControlServerPublicLifecycle,
+  runProviderIssueHandoffPoll,
   runProviderIssueHandoffRefresh,
   runProviderIssueHandoffRehydrate,
   startControlServerPublicLifecycle,
@@ -650,6 +651,41 @@ describe('startControlServerPublicLifecycle', () => {
     });
 
     await closeControlServerPublicLifecycle(started);
+  });
+
+  it('preserves the active refresh mode when a non-queued poll request coalesces behind it', async () => {
+    let resolveRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const refresh = vi.fn(async () => {
+      await firstRefresh;
+    });
+    const poll = vi.fn(async () => undefined);
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      poll,
+      rehydrate: vi.fn(async () => undefined),
+      refresh
+    };
+
+    const inFlightRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    const coalescedPoll = runProviderIssueHandoffPoll(providerIssueHandoff, {
+      trackedIssues: [buildTrackedIssue('issue-1')]
+    });
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(poll).not.toHaveBeenCalled();
+
+    resolveRefresh?.();
+    await Promise.all([inFlightRefresh, coalescedPoll]);
+
+    expect(poll).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      last_mode: 'refresh',
+      last_error: null
+    });
   });
 
   it('queues a follow-up refresh when a manual refresh request arrives during rehydrate', async () => {
