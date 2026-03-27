@@ -406,12 +406,23 @@ function formatKinds(kinds: ProviderLinearRuntimeProofKind[]): string {
 function createBlockedProofHostBlockList(): BlockList {
   const blockList = new BlockList();
   blockList.addSubnet('0.0.0.0', 8, 'ipv4');
+  blockList.addSubnet('10.0.0.0', 8, 'ipv4');
+  blockList.addSubnet('100.64.0.0', 10, 'ipv4');
   blockList.addSubnet('127.0.0.0', 8, 'ipv4');
   blockList.addSubnet('169.254.0.0', 16, 'ipv4');
+  blockList.addSubnet('172.16.0.0', 12, 'ipv4');
+  blockList.addSubnet('192.0.2.0', 24, 'ipv4');
+  blockList.addSubnet('192.88.99.0', 24, 'ipv4');
+  blockList.addSubnet('192.168.0.0', 16, 'ipv4');
+  blockList.addSubnet('198.18.0.0', 15, 'ipv4');
+  blockList.addSubnet('198.51.100.0', 24, 'ipv4');
+  blockList.addSubnet('203.0.113.0', 24, 'ipv4');
   blockList.addSubnet('224.0.0.0', 4, 'ipv4');
   blockList.addSubnet('240.0.0.0', 4, 'ipv4');
+  blockList.addSubnet('100::', 64, 'ipv6');
   blockList.addAddress('::', 'ipv6');
   blockList.addAddress('::1', 'ipv6');
+  blockList.addSubnet('2001:db8::', 32, 'ipv6');
   blockList.addSubnet('fe80::', 10, 'ipv6');
   blockList.addSubnet('fc00::', 7, 'ipv6');
   blockList.addSubnet('ff00::', 8, 'ipv6');
