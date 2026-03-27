@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -337,13 +337,47 @@ describe('provider linear worker runner', () => {
   it('requires matching live control-host env values and accepts manifest.pipelineId', async () => {
     const { manifestPath } = await createManifestRoot();
     await writeFile(manifestPath, JSON.stringify({ run_id: 'run-child', task_id: 'linear-lin-issue-1', issue_id: 'lin-issue-1', issue_identifier: 'CO-2', pipelineId: 'provider-linear-worker', provider_control_host_task_id: 'local-mcp', provider_control_host_run_id: 'control-host', workspace_path: tempRoot }), 'utf8');
-    expect(await loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined })).toMatchObject({ pipelineId: 'provider-linear-worker', providerControlHostMatchesManifest: false });
+    expect(await loadProviderLinearWorkerContext({ CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath, CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined })).toMatchObject({
+      pipelineId: 'provider-linear-worker',
+      providerControlHostTaskId: null,
+      providerControlHostRunId: null,
+      providerControlHostMatchesManifest: false
+    });
     expect((await loadProviderLinearWorkerContext({
       CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
       CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
       CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host'
-    })).providerControlHostMatchesManifest).toBe(true);
+    }))).toMatchObject({
+      providerControlHostTaskId: 'local-mcp',
+      providerControlHostRunId: 'control-host',
+      providerControlHostMatchesManifest: true
+    });
+  });
+
+  it('fails closed on mismatched live control-host env values', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      pipelineId: 'provider-linear-worker',
+      provider_control_host_task_id: 'local-mcp',
+      provider_control_host_run_id: 'control-host',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    await expect(loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'other-task',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'other-run'
+    })).resolves.toMatchObject({
+      providerControlHostTaskId: null,
+      providerControlHostRunId: null,
+      providerControlHostMatchesManifest: false
+    });
   });
 
   it('builds a full first-turn prompt and a continuation prompt', () => {
@@ -955,6 +989,81 @@ describe('provider linear worker runner', () => {
 
     expect(firstResult).toHaveLength(1);
     expect(secondResult).toHaveLength(2);
+    expect(recorded).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1' }),
+        expect.objectContaining({ task_id: 'linear-lin-issue-1-implementation-gate', run_id: 'impl-run-1' })
+      ])
+    );
+  });
+
+  it('does not reap a stale-looking child-stream ledger lock while an append is still active', async () => {
+    const { runDir } = await createManifestRoot();
+    const lockPath = join(runDir, 'provider-linear-worker-child-streams.json.lock');
+    const firstRecord = {
+      stream: 'docs-review',
+      pipeline_id: 'docs-review',
+      task_id: 'linear-lin-issue-1-docs-review',
+      run_id: 'docs-run-1',
+      status: 'succeeded',
+      manifest_path: join(runDir, 'child-1-manifest.json'),
+      artifact_root: join(runDir, 'child-1'),
+      log_path: join(runDir, 'child-1.log'),
+      summary: 'child 1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-27T01:00:00.000Z'
+    };
+    const secondRecord = {
+      ...firstRecord,
+      task_id: 'linear-lin-issue-1-implementation-gate',
+      run_id: 'impl-run-1',
+      stream: 'implementation-gate',
+      pipeline_id: 'implementation-gate',
+      manifest_path: join(runDir, 'child-2-manifest.json'),
+      artifact_root: join(runDir, 'child-2'),
+      log_path: join(runDir, 'child-2.log'),
+      summary: 'child 2',
+      launched_at: '2026-03-27T01:00:01.000Z'
+    };
+
+    let markFirstWriteStarted: (() => void) | null = null;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve;
+    });
+    let releaseFirstWrite: (() => void) | null = null;
+    const holdFirstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    let secondSettled = false;
+    const firstPromise = appendProviderLinearWorkerChildStreamRecord(
+      runDir,
+      firstRecord,
+      async (path, value) => {
+        markFirstWriteStarted?.();
+        await holdFirstWrite;
+        await writeFile(path, JSON.stringify(value), 'utf8');
+      }
+    );
+
+    await firstWriteStarted;
+    const stalePast = new Date(Date.now() - 60_000);
+    await utimes(lockPath, stalePast, stalePast);
+    const secondPromise = appendProviderLinearWorkerChildStreamRecord(runDir, secondRecord).then((value) => {
+      secondSettled = true;
+      return value;
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(secondSettled).toBe(false);
+
+    releaseFirstWrite?.();
+    const recorded = await Promise.all([firstPromise, secondPromise]).then(async () =>
+      await readProviderLinearWorkerChildStreams(runDir)
+    );
+
     expect(recorded).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1' }),

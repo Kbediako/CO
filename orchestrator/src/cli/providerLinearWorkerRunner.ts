@@ -64,8 +64,9 @@ const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
   maxAttempts: 50,
   initialDelayMs: 10,
   backoffFactor: 1.5,
-  maxDelayMs: 250,
-  staleMs: 30_000
+  // Fail closed for child-stream lineage writes: a stale lock is preferable to
+  // lossy concurrent ledger rewrites.
+  maxDelayMs: 250
 };
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
@@ -446,9 +447,13 @@ export async function loadProviderLinearWorkerContext(
     taskId,
     pipelineId: envPipelineId ?? manifestPipelineId,
     providerControlHostTaskId:
-      envProviderControlHostTaskId ?? manifestProviderControlHostTaskId,
+      providerControlHostMatchesManifest
+        ? (envProviderControlHostTaskId ?? manifestProviderControlHostTaskId)
+        : null,
     providerControlHostRunId:
-      envProviderControlHostRunId ?? manifestProviderControlHostRunId,
+      providerControlHostMatchesManifest
+        ? (envProviderControlHostRunId ?? manifestProviderControlHostRunId)
+        : null,
     providerControlHostRecordedInManifest:
       Boolean(manifestProviderControlHostTaskId && manifestProviderControlHostRunId),
     providerControlHostMatchesManifest,
