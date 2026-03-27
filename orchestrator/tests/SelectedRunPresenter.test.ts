@@ -164,10 +164,14 @@ function buildProjection(
     retry: {
       issue_id: 'issue-8',
       issue_identifier: 'CO-8',
+      task_id: 'linear-e53',
+      run_id: 'run-8',
       state: 'resumable',
       display_state: 'retrying',
       status_reason: 'retry_scheduled',
-      session_id: null,
+      session_id: 'session-8',
+      thread_id: 'thread-8',
+      turn_count: 2,
       workspace_path: '/repo/.workspaces/co-8',
       attempt: 2,
       due_at: '2026-03-27T04:10:00.000Z',
@@ -407,6 +411,47 @@ describe('OperatorDashboardPresenter', () => {
         event: 'retry_scheduled',
         message: 'Retry queued after rate limit'
       }
+    ]);
+  });
+
+  it('keeps retry rows pinned to retry-source identifiers when the issue payload prefers a running sibling', () => {
+    const projection = buildProjection();
+    const runningIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-7');
+    expect(runningIssue).toBeTruthy();
+    if (!runningIssue) {
+      return;
+    }
+
+    projection.retrying = [
+      {
+        ...projection.retrying[0]!,
+        issue_identifier: 'CO-7',
+        issue_id: 'issue-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        session_id: 'session-7-retry',
+        thread_id: 'thread-7-retry',
+        turn_count: 6,
+        workspace_path: '/repo/.workspaces/co-7-retry'
+      }
+    ];
+    projection.issues = [runningIssue];
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        session_id: 'session-7-retry',
+        thread_id: 'thread-7-retry',
+        turn_count: 6,
+        workspace_path: '/repo/.workspaces/co-7-retry'
+      })
     ]);
   });
 

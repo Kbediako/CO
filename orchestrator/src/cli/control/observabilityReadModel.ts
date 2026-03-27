@@ -200,10 +200,14 @@ export interface ControlRunningPayload {
 export interface ControlRetryPayload {
   issue_id: string | null;
   issue_identifier: string;
+  task_id?: string | null;
+  run_id?: string | null;
   state: string;
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
+  thread_id?: string | null;
+  turn_count?: number | null;
   workspace_path: string | null;
   attempt: number | null;
   due_at: string | null;

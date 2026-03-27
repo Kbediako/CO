@@ -249,18 +249,17 @@ function buildRetryQueuePayload(
   entry: ControlRetryPayload,
   issue: ControlIssuePayload | null
 ): OperatorDashboardRetryPayload {
-  const proof = issue?.provider_linear_worker_proof ?? null;
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
-    task_id: issue?.task_id ?? null,
-    run_id: issue?.run_id ?? null,
+    task_id: entry.task_id ?? issue?.task_id ?? null,
+    run_id: entry.run_id ?? issue?.run_id ?? null,
     display_state: entry.display_state,
     status_reason: entry.status_reason,
-    session_id: proof?.latest_session_id ?? entry.session_id,
-    thread_id: proof?.thread_id ?? null,
-    turn_count: proof?.turn_count ?? null,
-    workspace_path: entry.workspace_path ?? issue?.workspace.path ?? proof?.workspace_path ?? null,
+    session_id: entry.session_id,
+    thread_id: entry.thread_id ?? null,
+    turn_count: entry.turn_count ?? null,
+    workspace_path: entry.workspace_path ?? issue?.workspace.path ?? null,
     host: LOCAL_HOSTNAME,
     attempt: entry.attempt,
     due_at: entry.due_at,

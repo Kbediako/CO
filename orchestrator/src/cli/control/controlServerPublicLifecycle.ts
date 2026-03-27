@@ -43,6 +43,10 @@ interface ProviderPollTrackedIssueContext {
   readFeatureToggles: (() => ControlState['feature_toggles']) | null;
 }
 
+interface ProviderRefreshTimerHandle {
+  cancel(): void;
+}
+
 const providerIssueHandoffOperations = new WeakMap<
   ProviderIssueHandoffService,
   ProviderIssueHandoffOperationState
@@ -66,7 +70,7 @@ export interface ControlServerPublicLifecycleState {
   server: http.Server;
   requestContextShared: ControlRequestSharedContext;
   lifecycleState: ControlServerOwnedLifecycleState;
-  providerRefreshTimer?: NodeJS.Timeout | null;
+  providerRefreshTimer?: ProviderRefreshTimerHandle | null;
   providerRefreshStartupTrigger?: NodeJS.Timeout | null;
   triggerProviderRefresh?: (() => Promise<void>) | null;
 }
@@ -142,7 +146,7 @@ export async function closeControlServerPublicLifecycle(
     clearTimeout(state.providerRefreshStartupTrigger);
   }
   if (state.providerRefreshTimer) {
-    clearInterval(state.providerRefreshTimer);
+    state.providerRefreshTimer.cancel();
   }
   return closeControlServerOwnedRuntime({
     server: state.server,
@@ -226,10 +230,38 @@ function createProviderRefreshCoordinator(
   providerIssueHandoff: ProviderIssueHandoffService,
   context: ProviderPollTrackedIssueContext
 ): {
-  timer: NodeJS.Timeout;
+  timer: ProviderRefreshTimerHandle;
   trigger: () => Promise<void>;
 } {
+  let stopped = false;
+  let timer: NodeJS.Timeout | null = null;
+  let rescheduleGeneration = 0;
+
+  const clearScheduledTrigger = (): void => {
+    if (!timer) {
+      return;
+    }
+    clearTimeout(timer);
+    timer = null;
+  };
+
+  const scheduleNextTrigger = (): void => {
+    if (stopped || timer) {
+      return;
+    }
+    timer = setTimeout(() => {
+      timer = null;
+      void trigger();
+    }, PROVIDER_REFRESH_INTERVAL_MS);
+    timer.unref?.();
+  };
+
   const trigger = async (): Promise<void> => {
+    if (stopped) {
+      return;
+    }
+    clearScheduledTrigger();
+    const generation = ++rescheduleGeneration;
     try {
       await runProviderIssueHandoffOperation(providerIssueHandoff, async () => {
         if (!providerIssueHandoff.poll || !context.readFeatureToggles) {
@@ -258,12 +290,22 @@ function createProviderRefreshCoordinator(
     } catch {
       // Best-effort provider refreshes should not crash the public lifecycle.
     }
+    await waitForProviderIssueHandoffQueueToDrain(providerIssueHandoff);
+    if (stopped || generation !== rescheduleGeneration) {
+      return;
+    }
+    scheduleNextTrigger();
   };
-  const timer = setInterval(() => {
-    void trigger();
-  }, PROVIDER_REFRESH_INTERVAL_MS);
-  timer.unref?.();
-  return { timer, trigger };
+  return {
+    timer: {
+      cancel: () => {
+        stopped = true;
+        rescheduleGeneration += 1;
+        clearScheduledTrigger();
+      }
+    },
+    trigger
+  };
 }
 
 function scheduleStartupProviderRefresh(trigger: () => Promise<void>): NodeJS.Timeout {
@@ -422,6 +464,22 @@ function queueProviderIssueHandoffRefresh(
     });
   state.queuedRefresh = queuedRefresh;
   return queuedRefresh;
+}
+
+async function waitForProviderIssueHandoffQueueToDrain(
+  providerIssueHandoff: ProviderIssueHandoffService
+): Promise<void> {
+  for (;;) {
+    const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
+    const pending = state.queuedRefresh ?? state.active;
+    if (!pending) {
+      return;
+    }
+    await pending.then(
+      () => undefined,
+      () => undefined
+    );
+  }
 }
 
 function getProviderIssueHandoffOperationState(

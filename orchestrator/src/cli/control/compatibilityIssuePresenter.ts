@@ -256,13 +256,18 @@ export function buildCompatibilityRunningEntry(
 
 export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourceContext): ControlRetryPayload {
   const retryState = selected.providerRetryState ?? null;
+  const proof = selected.providerLinearWorkerProof ?? null;
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
+    task_id: selected.taskId,
+    run_id: selected.runId,
     state: selected.rawStatus,
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
-    session_id: null,
+    session_id: proof?.latest_session_id ?? null,
+    thread_id: proof?.thread_id ?? null,
+    turn_count: proof?.turn_count ?? null,
     workspace_path: selected.workspacePath,
     attempt: retryState?.attempt ?? null,
     due_at: retryState?.due_at ?? null,
