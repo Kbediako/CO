@@ -668,8 +668,10 @@ function resolveCollabReceiverIdentifierGroups(
         groups.push(identifiers);
       }
     }
-  } else if (receiverThreadIds.length > 0 && receiverThreadIds.length === receiverAgentPaths.length) {
-    for (const [index, receiverThreadId] of receiverThreadIds.entries()) {
+  } else if (receiverThreadIds.length > 0 && receiverAgentPaths.length > 0) {
+    const pairCount = Math.min(receiverThreadIds.length, receiverAgentPaths.length);
+    for (let index = 0; index < pairCount; index += 1) {
+      const receiverThreadId = receiverThreadIds[index];
       const identifiers = dedupeCollabAliases([receiverThreadId, receiverAgentPaths[index] ?? null]);
       if (identifiers.length > 0) {
         groups.push(identifiers);

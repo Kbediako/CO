@@ -890,6 +890,111 @@ describe('runDoctorUsage', () => {
     }
   });
 
+  it('pairs ragged thread/path arrays before emitting fallback singleton groups', async () => {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID,
+      collabMaxEvents: process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), 'doctor-collab-ragged-arrays-'));
+    const taskId = 'task-collab-ragged-arrays';
+    const runId = '2026-02-18T00-00-00-000Z-f00dbabe';
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      const runDir = join(repoRoot, '.runs', taskId, 'cli', runId);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, 'manifest.json'),
+        `${JSON.stringify(
+          {
+            run_id: runId,
+            task_id: taskId,
+            pipeline_id: 'implementation-gate',
+            status: 'succeeded',
+            started_at: '2026-02-18T00:00:00.000Z',
+            collab_tool_calls_max_events: 200,
+            collab_tool_calls: [
+              {
+                observed_at: '2026-02-18T00:00:10.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'spawn-a',
+                tool: 'spawn_agent',
+                status: 'completed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-a', 'agent-b'],
+                receiver_agent_paths: ['/root/explorer/a']
+              },
+              {
+                observed_at: '2026-02-18T00:00:11.000Z',
+                stage_id: 'stage-1',
+                command_index: 0,
+                event_type: 'item.completed',
+                item_id: 'close-a',
+                tool: 'close_agent',
+                status: 'completed',
+                sender_thread_id: 'parent',
+                receiver_thread_ids: ['agent-a'],
+                receiver_agent_paths: []
+              }
+            ]
+          },
+          null,
+          2
+        )}\n`,
+        'utf8'
+      );
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = taskId;
+      delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+
+      const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+      expect(result.runs.total).toBe(1);
+      expect(result.collab.runs_with_tool_calls).toBe(1);
+      expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+      expect(result.collab.unclosed_spawn_agents).toBe(1);
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      if (previousEnv.collabMaxEvents === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS = previousEnv.collabMaxEvents;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it('emits low-adoption hints when cloud is configured but cloud/RLM usage remain low', async () => {
     const previousEnv = {
       root: process.env.CODEX_ORCHESTRATOR_ROOT,
