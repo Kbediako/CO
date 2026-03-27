@@ -2651,7 +2651,7 @@ function createProviderLaunchToken(): string {
   return randomBytes(16).toString('hex');
 }
 
-async function discoverProviderIssueRuns(
+export async function discoverProviderIssueRuns(
   currentRunDir: string,
   input?: {
     provider: 'linear';
@@ -2672,6 +2672,9 @@ async function discoverProviderIssueRuns(
       const manifestPath = join(cliRoot, runEntry, 'manifest.json');
       const manifest = await readJsonFile<Record<string, unknown>>(manifestPath);
       if (!manifest) {
+        continue;
+      }
+      if (readStringValue(manifest, 'parent_run_id')) {
         continue;
       }
       const issueProvider = readStringValue(manifest, 'issue_provider');
