@@ -247,6 +247,9 @@ function createProviderRefreshCoordinator(
           });
           return;
         }
+        markProviderPollingStarted(providerIssueHandoff, {
+          mode: 'refresh'
+        });
         await providerIssueHandoff.refresh();
       }, undefined, {
         mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
