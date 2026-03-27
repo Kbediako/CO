@@ -10,6 +10,7 @@ import type {
 } from './observabilityReadModel.js';
 import {
   buildProjectionSelectedPayload,
+  buildTrackedPayloadEnvelope,
   buildSelectedRunLatestEventPayload
 } from './observabilityReadModel.js';
 
@@ -99,7 +100,8 @@ export function buildCompatibilityProjectionSnapshot(
     dispatchPilot: snapshot.dispatchPilot,
     tracked: snapshot.tracked,
     providerIntake: snapshot.providerIntake,
-    providerWorkflow: snapshot.providerWorkflow
+    providerWorkflow: snapshot.providerWorkflow,
+    polling: snapshot.polling
   };
 }
 
@@ -254,13 +256,18 @@ export function buildCompatibilityRunningEntry(
 
 export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourceContext): ControlRetryPayload {
   const retryState = selected.providerRetryState ?? null;
+  const proof = selected.providerLinearWorkerProof ?? null;
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
+    task_id: selected.taskId,
+    run_id: selected.runId,
     state: selected.rawStatus,
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
-    session_id: null,
+    session_id: proof?.latest_session_id ?? null,
+    thread_id: proof?.thread_id ?? null,
+    turn_count: proof?.turn_count ?? null,
     workspace_path: selected.workspacePath,
     attempt: retryState?.attempt ?? null,
     due_at: retryState?.due_at ?? null,
@@ -285,12 +292,14 @@ export function buildCompatibilityIssuePayload(input: {
   return {
     issue_identifier: input.source.issueIdentifier,
     issue_id: input.source.issueId,
+    task_id: input.source.taskId,
+    run_id: input.source.runId,
     status: resolveCompatibilityIssueStatus(input.running, input.retry, input.source),
     raw_status: input.source.rawStatus,
     display_status: input.source.displayStatus,
     status_reason: input.source.statusReason,
     workspace: {
-      path: input.source.workspacePath
+      path: input.source.workspacePath ?? input.source.providerLinearWorkerProof?.workspace_path ?? null
     },
     attempts: buildCompatibilityIssueAttempts(input.source, input.retry),
     running: input.running,
@@ -303,7 +312,10 @@ export function buildCompatibilityIssuePayload(input: {
     question_summary: selectedPayload.question_summary,
     recent_events: recentEvents,
     last_error: input.source.lastError,
-    tracked: input.source.tracked ?? {},
+    tracked: buildTrackedPayloadEnvelope(input.source.tracked),
+    ...(input.source.providerLinearWorkerProof
+      ? { provider_linear_worker_proof: input.source.providerLinearWorkerProof }
+      : {}),
     ...(input.dispatchPilotSummary ? { dispatch_pilot: input.dispatchPilotSummary } : {})
   };
 }

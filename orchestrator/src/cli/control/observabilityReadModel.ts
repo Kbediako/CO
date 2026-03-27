@@ -1,7 +1,10 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
 import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
+
+export type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 
 export interface SelectedRunQuestionSummary {
   queuedCount: number;
@@ -40,7 +43,7 @@ export interface ControlTrackedLinearPayload {
 }
 
 export interface ControlTrackedPayload {
-  linear: ControlTrackedLinearPayload;
+  linear: ControlTrackedLinearPayload | null;
 }
 
 export interface SelectedRunStageSummary {
@@ -158,7 +161,7 @@ export interface ControlSelectedRunPayload {
     path: string | null;
   };
   question_summary: ControlQuestionSummaryPayload;
-  tracked?: ControlTrackedPayload;
+  tracked: ControlTrackedPayload;
   provider_linear_worker_proof?: ProviderLinearWorkerProof;
 }
 
@@ -197,10 +200,14 @@ export interface ControlRunningPayload {
 export interface ControlRetryPayload {
   issue_id: string | null;
   issue_identifier: string;
+  task_id?: string | null;
+  run_id?: string | null;
   state: string;
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
+  thread_id?: string | null;
+  turn_count?: number | null;
   workspace_path: string | null;
   attempt: number | null;
   due_at: string | null;
@@ -226,6 +233,7 @@ export interface ControlStatePayload {
   tracked?: ControlTrackedPayload;
   provider_intake?: ProviderIntakeSummaryPayload;
   provider_workflow?: ControlProviderWorkflowPayload;
+  polling?: ControlPollingHealthPayload | null;
 }
 
 export interface ControlSelectedRunRuntimeSnapshot {
@@ -234,6 +242,7 @@ export interface ControlSelectedRunRuntimeSnapshot {
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  polling?: ControlPollingHealthPayload | null;
 }
 
 export interface ControlCompatibilitySourceContext extends SharedSelectedProjectionFields {}
@@ -248,6 +257,7 @@ export interface ControlCompatibilityRuntimeSnapshot {
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  polling?: ControlPollingHealthPayload | null;
 }
 
 export interface CompatibilityProjectionIssueRecord {
@@ -267,11 +277,14 @@ export interface ControlCompatibilityProjectionSnapshot {
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  polling?: ControlPollingHealthPayload | null;
 }
 
 export interface ControlIssuePayload {
   issue_identifier: string;
   issue_id: string | null;
+  task_id: string | null;
+  run_id: string | null;
   status: string;
   raw_status: string;
   display_status: string;
@@ -293,8 +306,15 @@ export interface ControlIssuePayload {
   question_summary: ControlQuestionSummaryPayload;
   recent_events: Array<Pick<ControlLatestEventPayload, 'at' | 'event' | 'message'>>;
   last_error: string | null;
-  tracked: ControlTrackedPayload | Record<string, never>;
+  tracked: ControlTrackedPayload;
+  provider_linear_worker_proof?: ProviderLinearWorkerProof | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
+}
+
+export function buildTrackedPayloadEnvelope(
+  tracked: ControlTrackedPayload | null | undefined
+): ControlTrackedPayload {
+  return tracked ?? { linear: null };
 }
 
 export function buildTrackedLinearPayload(
@@ -386,7 +406,7 @@ export function buildProjectionSelectedPayload(
       path: selected.workspacePath
     },
     question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
-    ...(selected.tracked ? { tracked: selected.tracked } : {}),
+    tracked: buildTrackedPayloadEnvelope(selected.tracked),
     ...(selected.providerLinearWorkerProof
       ? {
           provider_linear_worker_proof: selected.providerLinearWorkerProof

@@ -1,441 +1,585 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildUiDataset } from '../src/cli/control/selectedRunPresenter.js';
+import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
 import type {
-  ControlSelectedRunRuntimeSnapshot,
-  SelectedRunContext
+  CompatibilityProjectionIssueRecord,
+  ControlCompatibilityProjectionSnapshot,
+  ControlIssuePayload
 } from '../src/cli/control/observabilityReadModel.js';
-import type { ControlState } from '../src/cli/control/controlState.js';
-import type { ProviderLinearWorkerProof } from '../src/cli/providerLinearWorkerRunner.js';
-import type { CliManifest } from '../src/cli/types.js';
 
-const CONTROL_STATE: ControlState = {
-  run_id: 'run-1',
-  control_seq: 0,
-  latest_action: null,
-  history: [],
-  pending_confirmation: null,
-  queued_questions: null,
-  question_events: [],
-  sessions: null,
-  transport_idempotency: null,
-  provider_traces: null
-};
-
-function buildSelectedRun(overrides: Partial<SelectedRunContext> = {}): SelectedRunContext {
+function buildIssueRecord(
+  payload: Partial<ControlIssuePayload> & Pick<ControlIssuePayload, 'issue_identifier'>
+): CompatibilityProjectionIssueRecord {
   return {
-    issueIdentifier: 'ISSUE-1037',
-    issueId: 'issue-1037',
-    taskId: 'task-1037',
-    runId: 'run-1',
-    lookupAliases: ['ISSUE-1037', 'task-1037', 'run-1'],
-    rawStatus: 'in_progress',
-    displayStatus: 'paused',
-    statusReason: 'queued_questions',
-    startedAt: '2026-03-07T04:20:00.000Z',
-    updatedAt: '2026-03-07T04:21:00.000Z',
-    completedAt: null,
-    summary: 'Awaiting operator input',
-    lastError: null,
-    latestAction: 'pause',
-    latestEvent: {
-      at: '2026-03-07T04:21:00.000Z',
-      event: 'pause',
-      message: 'Awaiting operator input',
-      requestedBy: 'telegram',
-      reason: 'operator question'
+    issueIdentifier: payload.issue_identifier,
+    aliases: [payload.issue_identifier, payload.issue_id ?? payload.issue_identifier],
+    payload: {
+      issue_identifier: payload.issue_identifier,
+      issue_id: payload.issue_id ?? payload.issue_identifier.toLowerCase(),
+      task_id: payload.task_id ?? `${payload.issue_identifier.toLowerCase()}-task`,
+      run_id: payload.run_id ?? `${payload.issue_identifier.toLowerCase()}-run`,
+      status: payload.status ?? 'running',
+      raw_status: payload.raw_status ?? 'in_progress',
+      display_status: payload.display_status ?? 'running',
+      status_reason: payload.status_reason ?? null,
+      workspace: payload.workspace ?? {
+        path: `/repo/.workspaces/${payload.issue_identifier.toLowerCase()}`
+      },
+      attempts: payload.attempts ?? {
+        restart_count: null,
+        current_retry_attempt: null
+      },
+      running: payload.running ?? null,
+      retry: payload.retry ?? null,
+      logs: payload.logs ?? {
+        codex_session_logs: []
+      },
+      summary: payload.summary ?? null,
+      latest_event: payload.latest_event ?? null,
+      question_summary: payload.question_summary ?? {
+        queued_count: 0,
+        latest_question: null
+      },
+      recent_events: payload.recent_events ?? [],
+      last_error: payload.last_error ?? null,
+      tracked: payload.tracked ?? { linear: null },
+      ...(payload.provider_linear_worker_proof
+        ? { provider_linear_worker_proof: payload.provider_linear_worker_proof }
+        : {}),
+      ...(payload.dispatch_pilot ? { dispatch_pilot: payload.dispatch_pilot } : {})
+    }
+  };
+}
+
+function buildProjection(
+  overrides: Partial<ControlCompatibilityProjectionSnapshot> = {}
+): ControlCompatibilityProjectionSnapshot {
+  const runningIssue = buildIssueRecord({
+    issue_identifier: 'CO-7',
+    issue_id: 'issue-7',
+    task_id: 'linear-e52',
+    run_id: 'run-7',
+    status: 'running',
+    raw_status: 'in_progress',
+    display_status: 'paused',
+    status_reason: 'queued_questions',
+    workspace: {
+      path: '/repo/.workspaces/co-7'
     },
-    workspacePath: '/repo',
-    pipelineTitle: 'Selected Run Presenter',
-    stages: [
+    running: {
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      state: 'running',
+      display_state: 'paused',
+      status_reason: 'queued_questions',
+      session_id: 'session-7',
+      turn_count: 4,
+      last_event: 'pause',
+      last_message: 'Waiting on operator input',
+      started_at: '2026-03-27T04:00:00.000Z',
+      last_event_at: '2026-03-27T04:05:00.000Z',
+      tokens: {
+        input_tokens: 120,
+        output_tokens: 45,
+        total_tokens: 165
+      }
+    },
+    summary: 'Waiting on operator input',
+    latest_event: {
+      at: '2026-03-27T04:05:00.000Z',
+      event: 'pause',
+      message: 'Waiting on operator input'
+    },
+    recent_events: [
       {
-        id: 'plan',
-        title: 'Plan',
-        status: 'completed'
+        at: '2026-03-27T04:05:00.000Z',
+        event: 'pause',
+        message: 'Waiting on operator input'
       }
     ],
-    approvalsTotal: 0,
-    questionSummary: {
-      queuedCount: 1,
-      latestQuestion: {
-        questionId: 'question-1',
-        prompt: 'Approve deploy?',
-        urgency: 'high',
-        queuedAt: '2026-03-07T04:21:10.000Z'
-      }
-    },
     tracked: {
       linear: {
         provider: 'linear',
-        id: 'lin-1',
-        identifier: 'PREPROD-1037',
-        title: 'Selected-run presenter split',
-        url: 'https://linear.app/asabeko/issue/PREPROD-1037',
+        id: 'lin-7',
+        identifier: 'CO-7',
+        title: 'Add richer operator observability surface',
+        url: 'https://linear.app/asabeko/issue/CO-7',
         state: 'In Progress',
         state_type: 'started',
-        workspace_id: 'lin-workspace-1',
-        team_id: 'lin-team-1',
-        team_key: 'PREPROD',
-        team_name: 'PRE-PRO/PRODUCTION',
-        project_id: 'lin-project-1',
-        project_name: 'CO',
-        updated_at: '2026-03-07T04:22:00.000Z',
-        recent_activity: []
-      }
-    },
-    ...overrides
-  };
-}
-
-function buildProviderLinearWorkerProof(
-  overrides: Partial<ProviderLinearWorkerProof> = {}
-): ProviderLinearWorkerProof {
-  return {
-    issue_id: 'issue-1037',
-    issue_identifier: 'ISSUE-1037',
-    thread_id: 'thread-1',
-    latest_turn_id: 'turn-2',
-    latest_session_id: 'thread-1-turn-2',
-    latest_session_id_source: 'derived_from_thread_and_turn',
-    turn_count: 2,
-    last_event: 'task_complete',
-    last_message: 'done',
-    last_event_at: '2026-03-07T04:21:30.000Z',
-    tokens: {
-      input_tokens: 12,
-      output_tokens: 8,
-      total_tokens: 20
-    },
-    rate_limits: null,
-    owner_phase: 'ended',
-    owner_status: 'succeeded',
-    workspace_path: '/repo',
-    end_reason: 'issue_inactive',
-    updated_at: '2026-03-07T04:21:30.000Z',
-    ...overrides
-  };
-}
-
-function buildSnapshot(selected: SelectedRunContext | null): ControlSelectedRunRuntimeSnapshot {
-  return {
-    selected,
-    dispatchPilot: null,
-    tracked: selected?.tracked ?? null
-  };
-}
-
-function buildManifest(overrides: Partial<CliManifest> = {}): CliManifest {
-  return {
-    run_id: 'run-1',
-    task_id: 'task-1037',
-    status: 'in_progress',
-    started_at: '2026-03-07T04:20:00.000Z',
-    updated_at: '2026-03-07T04:21:00.000Z',
-    completed_at: null,
-    summary: 'Awaiting operator input',
-    commands: [
-      {
-        id: 'plan',
-        title: 'Plan',
-        status: 'completed'
-      }
-    ],
-    approvals: [],
-    pipeline_title: 'Selected Run Presenter',
-    ...overrides
-  } as CliManifest;
-}
-
-describe('SelectedRunPresenter', () => {
-  it('builds selected-run ui dataset entries with relative links and selected payload', () => {
-    const dataset = buildUiDataset({
-      manifest: buildManifest(),
-      snapshot: buildSnapshot(
-        buildSelectedRun({
-          providerLinearWorkerProof: buildProviderLinearWorkerProof()
-        })
-      ),
-      control: CONTROL_STATE,
-      paths: {
-        manifestPath: '/repo/.runs/task-1037/cli/run-1/manifest.json',
-        runDir: '/repo/.runs/task-1037/cli/run-1',
-        logPath: '/repo/.runs/task-1037/cli/run-1/log.txt'
-      },
-      generatedAt: '2026-03-07T04:30:00.000Z'
-    }) as {
-      generated_at: string;
-      selected:
-        | {
-            issue_identifier?: string;
-            display_status?: string;
-            provider_linear_worker_proof?: {
-              thread_id?: string | null;
-              turn_count?: number;
-            };
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'Codex Orchestrator',
+        updated_at: '2026-03-27T04:06:00.000Z',
+        recent_activity: [
+          {
+            id: 'activity-1',
+            created_at: '2026-03-27T04:04:00.000Z',
+            actor_name: 'operator',
+            summary: 'State moved to In Progress'
           }
-        | null;
-      runs: Array<{ links?: { manifest?: string; log?: string } }>;
-      tasks: Array<{ bucket?: string; question_summary?: { queued_count?: number } | null }>;
-    };
+        ]
+      }
+    },
+    provider_linear_worker_proof: {
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      thread_id: 'thread-7',
+      latest_turn_id: 'turn-4',
+      latest_session_id: 'session-7',
+      latest_session_id_source: 'provider',
+      turn_count: 4,
+      last_event: 'pause',
+      last_message: 'Waiting on operator input',
+      last_event_at: '2026-03-27T04:05:00.000Z',
+      tokens: {
+        input_tokens: 120,
+        output_tokens: 45,
+        total_tokens: 165
+      },
+      rate_limits: {
+        reset_seconds: 18
+      },
+      owner_phase: 'active',
+      owner_status: 'paused',
+      workspace_path: '/repo/.workspaces/co-7',
+      end_reason: null,
+      updated_at: '2026-03-27T04:05:00.000Z'
+    }
+  });
+  const retryIssue = buildIssueRecord({
+    issue_identifier: 'CO-8',
+    issue_id: 'issue-8',
+    task_id: 'linear-e53',
+    run_id: 'run-8',
+    status: 'retrying',
+    raw_status: 'resumable',
+    display_status: 'retrying',
+    status_reason: 'retry_scheduled',
+    workspace: {
+      path: '/repo/.workspaces/co-8'
+    },
+    retry: {
+      issue_id: 'issue-8',
+      issue_identifier: 'CO-8',
+      task_id: 'linear-e53',
+      run_id: 'run-8',
+      state: 'resumable',
+      display_state: 'retrying',
+      status_reason: 'retry_scheduled',
+      session_id: 'session-8',
+      thread_id: 'thread-8',
+      turn_count: 2,
+      workspace_path: '/repo/.workspaces/co-8',
+      attempt: 2,
+      due_at: '2026-03-27T04:10:00.000Z',
+      error: 'rate limit exceeded',
+      last_event: 'retry_scheduled',
+      last_message: 'Retry queued after rate limit',
+      started_at: '2026-03-27T03:30:00.000Z',
+      last_event_at: '2026-03-27T04:06:00.000Z'
+    },
+    attempts: {
+      restart_count: 1,
+      current_retry_attempt: 2
+    },
+    summary: 'Retry queued after rate limit',
+    latest_event: {
+      at: '2026-03-27T04:06:00.000Z',
+      event: 'retry_scheduled',
+      message: 'Retry queued after rate limit'
+    },
+    recent_events: [],
+    last_error: 'rate limit exceeded',
+    provider_linear_worker_proof: {
+      issue_id: 'issue-8',
+      issue_identifier: 'CO-8',
+      thread_id: 'thread-8',
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'session-8',
+      latest_session_id_source: 'provider',
+      turn_count: 2,
+      last_event: 'retry_scheduled',
+      last_message: 'Retry queued after rate limit',
+      last_event_at: '2026-03-27T04:06:00.000Z',
+      tokens: {
+        input_tokens: 40,
+        output_tokens: 12,
+        total_tokens: 52
+      },
+      rate_limits: {
+        reset_seconds: 42
+      },
+      owner_phase: 'retry',
+      owner_status: 'queued',
+      workspace_path: '/repo/.workspaces/co-8',
+      end_reason: null,
+      updated_at: '2026-03-27T04:06:00.000Z'
+    }
+  });
 
-    expect(dataset.generated_at).toBe('2026-03-07T04:30:00.000Z');
-    expect(dataset.selected).toMatchObject({
-      issue_identifier: 'ISSUE-1037',
+  return {
+    running: [runningIssue.payload.running!],
+    retrying: [retryIssue.payload.retry!],
+    codexTotals: {
+      input_tokens: 160,
+      output_tokens: 57,
+      total_tokens: 217,
+      seconds_running: 912.5
+    },
+    rateLimits: {
+      reset_seconds: 42
+    },
+    issues: [runningIssue, retryIssue],
+    selected: {
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      task_id: 'linear-e52',
+      run_id: 'run-7',
+      raw_status: 'in_progress',
       display_status: 'paused',
-      provider_linear_worker_proof: {
-        thread_id: 'thread-1',
-        turn_count: 2
-      }
-    });
-    expect(dataset.runs).toHaveLength(1);
-    expect(dataset.runs[0]).toMatchObject({
-      links: {
-        manifest: '.runs/task-1037/cli/run-1/manifest.json',
-        log: '.runs/task-1037/cli/run-1/log.txt'
-      }
-    });
-    expect(dataset.tasks).toHaveLength(1);
-    expect(dataset.tasks[0]).toMatchObject({
-      bucket: 'ongoing',
-      question_summary: {
-        queued_count: 1
-      }
-    });
-  });
-
-  it('returns the null-manifest fallback dataset', () => {
-    const dataset = buildUiDataset({
-      manifest: null,
-      snapshot: buildSnapshot(null),
-      control: CONTROL_STATE,
-      paths: {
-        manifestPath: '/repo/.runs/task-1037/cli/run-1/manifest.json',
-        runDir: '/repo/.runs/task-1037/cli/run-1',
-        logPath: '/repo/.runs/task-1037/cli/run-1/log.txt'
-      },
-      generatedAt: '2026-03-07T04:31:00.000Z'
-    });
-
-    expect(dataset).toEqual({
-      generated_at: '2026-03-07T04:31:00.000Z',
-      tasks: [],
-      runs: [],
-      codebase: null,
-      activity: [],
-      selected: null
-    });
-  });
-
-  it('keeps ui task and run rows on the selected child manifest when one is preferred', () => {
-    const dataset = buildUiDataset({
-      manifest: buildManifest({
-        run_id: 'host-run',
-        task_id: 'host-task',
-        status: 'succeeded',
-        started_at: '2026-03-07T04:10:00.000Z',
-        updated_at: '2026-03-07T04:15:00.000Z',
-        completed_at: '2026-03-07T04:15:00.000Z',
-        summary: 'Control host ready',
-        pipeline_title: 'Control Host'
-      }),
-      snapshot: buildSnapshot(
-        buildSelectedRun({
-          taskId: 'linear-lin-issue-1',
-          runId: 'child-run',
-          startedAt: '2026-03-07T04:20:00.000Z',
-          updatedAt: '2026-03-07T04:21:00.000Z',
-          summary: 'Child run awaiting operator input',
-          pipelineTitle: 'Child Pipeline',
-          stages: [
-            {
-              id: 'build',
-              title: 'Build',
-              status: 'completed'
-            },
-            {
-              id: 'review',
-              title: 'Review',
-              status: 'in_progress'
-            }
-          ],
-          approvalsTotal: 2,
-          manifestPath: '/repo/.runs/linear-lin-issue-1/cli/child-run/manifest.json',
-          runDir: '/repo/.runs/linear-lin-issue-1/cli/child-run'
-        })
-      ),
-      control: CONTROL_STATE,
-      paths: {
-        manifestPath: '/repo/.runs/host-task/cli/host-run/manifest.json',
-        runDir: '/repo/.runs/host-task/cli/host-run',
-        logPath: '/repo/.runs/host-task/cli/host-run/log.txt'
-      },
-      generatedAt: '2026-03-07T04:30:00.000Z'
-    }) as {
-      runs: Array<{
-        run_id?: string;
-        task_id?: string;
-        started_at?: string | null;
-        updated_at?: string | null;
-        completed_at?: string | null;
-        links?: { manifest?: string; log?: string };
-        stages?: unknown[];
-        approvals_total?: number;
-      }>;
-      tasks: Array<{
-        task_id?: string;
-        title?: string;
-        bucket?: string;
-        bucket_reason?: string;
-        last_update?: string | null;
-        latest_run_id?: string | null;
-        summary?: string;
-        approvals_total?: number;
-      }>;
-    };
-
-    expect(dataset.runs[0]).toMatchObject({
-      run_id: 'child-run',
-      task_id: 'linear-lin-issue-1',
-      started_at: '2026-03-07T04:20:00.000Z',
-      updated_at: '2026-03-07T04:21:00.000Z',
+      status_reason: 'queued_questions',
+      started_at: '2026-03-27T04:00:00.000Z',
+      updated_at: '2026-03-27T04:05:00.000Z',
       completed_at: null,
-      approvals_total: 2,
-      stages: [
-        {
-          id: 'build',
-          title: 'Build',
-          status: 'completed'
-        },
-        {
-          id: 'review',
-          title: 'Review',
-          status: 'in_progress'
+      summary: 'Waiting on operator input',
+      last_error: null,
+      latest_action: 'pause',
+      latest_event: {
+        at: '2026-03-27T04:05:00.000Z',
+        event: 'pause',
+        message: 'Waiting on operator input',
+        requested_by: 'operator',
+        reason: 'queued_questions'
+      },
+      workspace: {
+        path: '/repo/.workspaces/co-7'
+      },
+      question_summary: {
+        queued_count: 1,
+        latest_question: {
+          question_id: 'question-1',
+          prompt: 'Approve the scope?',
+          urgency: 'high',
+          queued_at: '2026-03-27T04:05:10.000Z'
         }
-      ],
-      links: {
-        manifest: '.runs/linear-lin-issue-1/cli/child-run/manifest.json',
-        log: '.runs/linear-lin-issue-1/cli/child-run/runner.ndjson'
+      },
+      tracked: runningIssue.payload.tracked,
+      provider_linear_worker_proof: runningIssue.payload.provider_linear_worker_proof!
+    },
+    dispatchPilot: null,
+    tracked: null,
+    providerIntake: null,
+    providerWorkflow: {
+      status: 'ready',
+      pipeline_id: 'provider-linear',
+      source_path: '/repo/provider-workflow.json',
+      snapshot_path: '/repo/.tmp/provider-workflow.snapshot.json',
+      last_reload_attempt_at: '2026-03-27T04:06:00.000Z',
+      last_success_at: '2026-03-27T04:06:00.000Z',
+      last_error_at: null,
+      last_error: null
+    },
+    polling: {
+      enabled: true,
+      interval_ms: 15000,
+      checking: false,
+      queued: false,
+      last_mode: 'poll',
+      last_requested_at: '2026-03-27T04:06:00.000Z',
+      last_completed_at: '2026-03-27T04:06:01.000Z',
+      last_success_at: '2026-03-27T04:06:01.000Z',
+      last_error_at: null,
+      last_error: null,
+      next_poll_at: '2026-03-27T04:06:16.000Z',
+      next_poll_in_ms: 15000
+    },
+    ...overrides
+  };
+}
+
+describe('OperatorDashboardPresenter', () => {
+  it('builds a richer operator dashboard dataset from the compatibility projection', () => {
+    const dataset = buildUiDataset({
+      projection: buildProjection(),
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset).toMatchObject({
+      generated_at: '2026-03-27T04:06:02.000Z',
+      mode: 'operator_dashboard',
+      read_only: true,
+      counts: {
+        running: 1,
+        retrying: 1,
+        issues: 2
+      },
+      totals: {
+        total_tokens: 217,
+        seconds_running: 912.5
+      },
+      rate_limits: {
+        reset_seconds: 42
+      },
+      polling: {
+        enabled: true,
+        last_mode: 'poll',
+        next_poll_in_ms: 15000
+      },
+      selected_issue_identifier: 'CO-7'
+    });
+
+    expect(dataset.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-7',
+        session_id: 'session-7',
+        thread_id: 'thread-7',
+        turn_count: 4,
+        display_state: 'paused'
+      })
+    ]);
+    expect(dataset.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-8',
+        attempt: 2,
+        error: 'rate limit exceeded',
+        thread_id: 'thread-8'
+      })
+    ]);
+    expect(dataset.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue_identifier: 'CO-7',
+          status: 'running',
+          display_status: 'paused',
+          status_reason: 'queued_questions',
+          title: 'Add richer operator observability surface',
+          session: {
+            session_id: 'session-7',
+            thread_id: 'thread-7',
+            turn_count: 4
+          },
+          owner: {
+            phase: 'active',
+            status: 'paused'
+          },
+          is_selected: true
+        }),
+        expect.objectContaining({
+          issue_identifier: 'CO-8',
+          last_error: 'rate limit exceeded',
+          retry: expect.objectContaining({
+            attempt: 2
+          })
+        })
+      ])
+    );
+  });
+
+  it('falls back to the latest event when no recent agent-activity list exists', () => {
+    const projection = buildProjection();
+    const retryIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-8');
+    expect(retryIssue).toBeTruthy();
+    if (!retryIssue) {
+      return;
+    }
+    retryIssue.payload.provider_linear_worker_proof = {
+      ...retryIssue.payload.provider_linear_worker_proof!,
+      last_event: 'proof-only',
+      last_message: 'Provider proof only',
+      last_event_at: '2026-03-27T04:06:59.000Z'
+    };
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    const retryDatasetIssue = dataset.issues.find((issue) => issue.issue_identifier === 'CO-8');
+    expect(retryDatasetIssue?.recent_agent_activity).toEqual([
+      {
+        at: '2026-03-27T04:06:00.000Z',
+        event: 'retry_scheduled',
+        message: 'Retry queued after rate limit'
       }
-    });
-    expect(dataset.tasks[0]).toMatchObject({
-      task_id: 'linear-lin-issue-1',
-      title: 'Child Pipeline',
-      bucket: 'ongoing',
-      bucket_reason: 'paused',
-      last_update: '2026-03-07T04:21:00.000Z',
-      latest_run_id: 'child-run',
-      summary: 'Child run awaiting operator input',
-      approvals_total: 2
-    });
+    ]);
   });
 
-  it('does not leak host summary or timestamps when a selected child manifest has null fields', () => {
-    const dataset = buildUiDataset({
-      manifest: buildManifest({
-        run_id: 'host-run',
-        task_id: 'host-task',
-        status: 'succeeded',
-        started_at: '2026-03-07T04:10:00.000Z',
-        updated_at: '2026-03-07T04:15:00.000Z',
-        completed_at: '2026-03-07T04:15:00.000Z',
-        summary: 'Control host ready',
-        pipeline_title: 'Control Host'
-      }),
-      snapshot: buildSnapshot(
-        buildSelectedRun({
-          taskId: 'linear-lin-issue-2',
-          runId: 'child-run-2',
-          startedAt: null,
-          updatedAt: null,
-          completedAt: null,
-          summary: null,
-          pipelineTitle: 'Child Pipeline',
-          manifestPath: '/repo/.runs/linear-lin-issue-2/cli/child-run-2/manifest.json',
-          runDir: '/repo/.runs/linear-lin-issue-2/cli/child-run-2'
-        })
-      ),
-      control: CONTROL_STATE,
-      paths: {
-        manifestPath: '/repo/.runs/host-task/cli/host-run/manifest.json',
-        runDir: '/repo/.runs/host-task/cli/host-run',
-        logPath: '/repo/.runs/host-task/cli/host-run/log.txt'
-      },
-      generatedAt: '2026-03-07T04:31:00.000Z'
-    }) as {
-      runs: Array<{
-        run_id?: string;
-        task_id?: string;
-        started_at?: string | null;
-        updated_at?: string | null;
-        completed_at?: string | null;
-      }>;
-      tasks: Array<{
-        task_id?: string;
-        bucket?: string;
-        bucket_reason?: string;
-        last_update?: string | null;
-        latest_run_id?: string | null;
-        summary?: string;
-      }>;
+  it('falls back to provider proof activity when manifest-backed latest-event data is absent', () => {
+    const projection = buildProjection();
+    const retryIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-8');
+    expect(retryIssue).toBeTruthy();
+    if (!retryIssue) {
+      return;
+    }
+    retryIssue.payload.latest_event = null;
+    retryIssue.payload.retry = {
+      ...retryIssue.payload.retry!,
+      last_event: 'retry-layer-only',
+      last_message: 'Retry layer only',
+      last_event_at: '2026-03-27T04:06:58.000Z'
+    };
+    retryIssue.payload.provider_linear_worker_proof = {
+      ...retryIssue.payload.provider_linear_worker_proof!,
+      last_event: 'proof-layer-only',
+      last_message: 'Provider proof only',
+      last_event_at: '2026-03-27T04:06:59.000Z'
     };
 
-    expect(dataset.runs[0]).toMatchObject({
-      run_id: 'child-run-2',
-      task_id: 'linear-lin-issue-2',
-      started_at: null,
-      updated_at: null,
-      completed_at: null
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
     });
-    expect(dataset.tasks[0]).toMatchObject({
-      task_id: 'linear-lin-issue-2',
-      bucket: 'ongoing',
-      bucket_reason: 'paused',
-      last_update: null,
-      latest_run_id: 'child-run-2',
-      summary: ''
-    });
+
+    expect(dataset.issues.find((issue) => issue.issue_identifier === 'CO-8')?.recent_agent_activity).toEqual([
+      {
+        at: '2026-03-27T04:06:59.000Z',
+        event: 'proof-layer-only',
+        message: 'Provider proof only'
+      }
+    ]);
   });
 
-  it('does not leak a host pause action into a selected child manifest with no latest action', () => {
-    const dataset = buildUiDataset({
-      manifest: buildManifest({
-        run_id: 'host-run',
-        task_id: 'host-task',
-        status: 'in_progress'
-      }),
-      snapshot: buildSnapshot(
-        buildSelectedRun({
-          taskId: 'linear-lin-issue-3',
-          runId: 'child-run-3',
-          displayStatus: 'in_progress',
-          statusReason: null,
-          latestAction: null,
-          manifestPath: '/repo/.runs/linear-lin-issue-3/cli/child-run-3/manifest.json',
-          runDir: '/repo/.runs/linear-lin-issue-3/cli/child-run-3'
-        })
-      ),
-      control: {
-        ...CONTROL_STATE,
-        latest_action: {
-          action: 'pause',
-          requested_by: 'operator',
-          reason: 'host only'
-        }
-      },
-      paths: {
-        manifestPath: '/repo/.runs/host-task/cli/host-run/manifest.json',
-        runDir: '/repo/.runs/host-task/cli/host-run',
-        logPath: '/repo/.runs/host-task/cli/host-run/log.txt'
-      },
-      generatedAt: '2026-03-07T04:32:00.000Z'
-    }) as {
-      tasks: Array<{ bucket?: string; bucket_reason?: string; display_status?: string }>;
-    };
+  it('keeps retry rows pinned to retry-source identifiers when the issue payload prefers a running sibling', () => {
+    const projection = buildProjection();
+    const runningIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-7');
+    expect(runningIssue).toBeTruthy();
+    if (!runningIssue) {
+      return;
+    }
 
-    expect(dataset.tasks[0]).toMatchObject({
-      bucket: 'active',
-      bucket_reason: 'running',
-      display_status: 'in_progress'
+    projection.retrying = [
+      {
+        ...projection.retrying[0]!,
+        issue_identifier: 'CO-7',
+        issue_id: 'issue-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        session_id: 'session-7-retry',
+        thread_id: 'thread-7-retry',
+        turn_count: 6,
+        workspace_path: '/repo/.workspaces/co-7-retry'
+      }
+    ];
+    projection.issues = [runningIssue];
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        session_id: 'session-7-retry',
+        thread_id: 'thread-7-retry',
+        turn_count: 6,
+        workspace_path: '/repo/.workspaces/co-7-retry'
+      })
+    ]);
+    expect(dataset.selected?.task_id).toBe('linear-e52');
+    expect(dataset.selected?.run_id).toBe('run-7');
+  });
+
+  it('does not inherit a running sibling workspace path for retry rows', () => {
+    const projection = buildProjection();
+    const runningIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-7');
+    expect(runningIssue).toBeTruthy();
+    if (!runningIssue) {
+      return;
+    }
+
+    projection.retrying = [
+      {
+        ...projection.retrying[0]!,
+        issue_identifier: 'CO-7',
+        issue_id: 'issue-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        workspace_path: null
+      }
+    ];
+    projection.issues = [runningIssue];
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        workspace_path: null
+      })
+    ]);
+  });
+
+  it('falls back to provider proof workspace paths when the issue payload is missing one', () => {
+    const projection = buildProjection();
+    const runningIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-7');
+    expect(runningIssue).toBeTruthy();
+    if (!runningIssue) {
+      return;
+    }
+    runningIssue.payload.workspace.path = null;
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.issues.find((issue) => issue.issue_identifier === 'CO-7')?.workspace.path).toBe(
+      '/repo/.workspaces/co-7'
+    );
+  });
+
+  it('returns an empty read-only dataset when the compatibility projection is empty', () => {
+    const dataset = buildUiDataset({
+      projection: buildProjection({
+        running: [],
+        retrying: [],
+        codexTotals: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+          seconds_running: 0
+        },
+        rateLimits: null,
+        issues: [],
+        selected: null,
+        tracked: null,
+        providerWorkflow: null,
+        polling: null
+      }),
+      generatedAt: '2026-03-27T04:07:00.000Z'
+    });
+
+    expect(dataset).toMatchObject({
+      generated_at: '2026-03-27T04:07:00.000Z',
+      mode: 'operator_dashboard',
+      read_only: true,
+      counts: {
+        running: 0,
+        retrying: 0,
+        issues: 0
+      },
+      totals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rate_limits: null,
+      selected: null,
+      selected_issue_identifier: null,
+      running: [],
+      retrying: [],
+      issues: []
     });
   });
 });

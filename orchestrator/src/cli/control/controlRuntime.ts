@@ -1,7 +1,9 @@
 import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
+import { readProviderPollingHealth } from './providerPollingHealth.js';
 import {
   buildProviderIntakeSummary,
   type ProviderIntakeClaimRecord,
@@ -13,6 +15,7 @@ import {
   type ControlCompatibilitySourceContext,
   type ControlCodexTotalsPayload,
   type ControlProviderRetryState,
+  type ControlPollingHealthPayload,
   type ControlCompatibilityRuntimeSnapshot,
   type ControlSelectedRunRuntimeSnapshot,
   type SelectedRunContext,
@@ -49,6 +52,7 @@ interface ControlRuntimeContext {
   };
   providerIntakeState?: ProviderIntakeState;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
+  readProviderIssueHandoff?: () => ProviderIssueHandoffService | null;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -221,7 +225,10 @@ function createControlRuntimeSnapshot(
     compatibilityProjectionPromise ??= readCompatibilityRuntimeSnapshot().then((snapshot) =>
       buildCompatibilityProjectionSnapshot(snapshot)
     );
-    return compatibilityProjectionPromise;
+    return {
+      ...(await compatibilityProjectionPromise),
+      polling: readProviderPollingSnapshot(context)
+    };
   }
 
   async function readDispatchEvaluation(): Promise<{
@@ -264,6 +271,12 @@ function createControlRuntimeSnapshot(
       await readSelectedRunSnapshot();
     }
   };
+}
+
+function readProviderPollingSnapshot(
+  context: Pick<ControlRuntimeContext, 'readProviderIssueHandoff'>
+): ControlPollingHealthPayload | null {
+  return readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
 }
 
 function enrichProjectionSourceWithProviderRetryState<

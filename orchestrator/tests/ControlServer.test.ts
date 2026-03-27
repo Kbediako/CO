@@ -1412,22 +1412,50 @@ describe('ControlServer', () => {
       });
       expect(uiRes.status).toBe(200);
       const uiPayload = (await uiRes.json()) as {
-        selected?: { issue_identifier?: string } | null;
-        tasks?: Array<{ task_id?: string }>;
-        runs?: Array<{ run_id?: string; task_id?: string }>;
+        selected_issue_identifier?: string | null;
+        running?: Array<{ issue_identifier?: string }>;
+        retrying?: Array<{ issue_identifier?: string }>;
+        issues?: Array<{
+          issue_identifier?: string;
+          status?: string;
+          display_status?: string;
+          status_reason?: string | null;
+        }>;
       };
-      expect(uiPayload.selected?.issue_identifier).toBe('task-1034-current');
-      expect(uiPayload.tasks).toEqual([
+      expect(uiPayload.selected_issue_identifier).toBe('task-1034-current');
+      expect(uiPayload.running).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            issue_identifier: 'task-1034-current'
+          }),
+          expect.objectContaining({
+            issue_identifier: 'task-1034-running'
+          })
+        ])
+      );
+      expect(uiPayload.retrying).toEqual([
         expect.objectContaining({
-          task_id: 'task-1034-current'
+          issue_identifier: 'task-1034-retrying'
         })
       ]);
-      expect(uiPayload.runs).toEqual([
-        expect.objectContaining({
-          run_id: 'run-1',
-          task_id: 'task-1034-current'
-        })
-      ]);
+      expect(uiPayload.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            issue_identifier: 'task-1034-current',
+            status: 'running'
+          }),
+          expect.objectContaining({
+            issue_identifier: 'task-1034-running',
+            status: 'running',
+            display_status: 'paused',
+            status_reason: 'queued_questions'
+          }),
+          expect.objectContaining({
+            issue_identifier: 'task-1034-retrying',
+            status: 'retrying'
+          })
+        ])
+      );
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -1601,25 +1629,30 @@ describe('ControlServer', () => {
       });
       expect(uiRes.status).toBe(200);
       const uiPayload = (await uiRes.json()) as {
-        selected?: { issue_identifier?: string; run_id?: string } | null;
-        tasks?: Array<{ task_id?: string }>;
-        runs?: Array<{ run_id?: string; task_id?: string }>;
+        selected?: { issue_identifier?: string; run_id?: string | null } | null;
+        selected_issue_identifier?: string | null;
+        issues?: Array<{ issue_identifier?: string; run_id?: string; task_id?: string }>;
+        running?: Array<{ issue_identifier?: string }>;
       };
+      expect(uiPayload.selected_issue_identifier).toBe('ISSUE-1035');
       expect(uiPayload.selected).toMatchObject({
         issue_identifier: 'ISSUE-1035',
         run_id: 'run-1'
       });
-      expect(uiPayload.tasks).toEqual([
+      expect(uiPayload.running).toEqual([
         expect.objectContaining({
-          task_id: 'task-1035-current'
+          issue_identifier: 'ISSUE-1035'
         })
       ]);
-      expect(uiPayload.runs).toEqual([
-        expect.objectContaining({
-          run_id: 'run-1',
-          task_id: 'task-1035-current'
-        })
-      ]);
+      expect(uiPayload.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            issue_identifier: 'ISSUE-1035',
+            run_id: 'run-3',
+            task_id: 'task-1035-current'
+          })
+        ])
+      );
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -1913,8 +1946,8 @@ describe('ControlServer', () => {
           display_status?: string;
           question_summary?: { queued_count?: number };
         } | null;
-        tasks?: Array<{ display_status?: string; status_reason?: string }>;
-        runs?: Array<{ display_status?: string; status_reason?: string }>;
+        issues?: Array<{ display_status?: string; status_reason?: string }>;
+        running?: Array<{ display_state?: string; status_reason?: string }>;
       };
       expect(uiPayload.selected).toMatchObject({
         display_status: 'paused',
@@ -1922,14 +1955,18 @@ describe('ControlServer', () => {
           queued_count: 1
         }
       });
-      expect(uiPayload.tasks?.[0]).toMatchObject({
-        display_status: 'paused',
-        status_reason: 'queued_questions'
-      });
-      expect(uiPayload.runs?.[0]).toMatchObject({
-        display_status: 'paused',
-        status_reason: 'queued_questions'
-      });
+      expect(
+        uiPayload.issues?.some(
+          (issue) =>
+            issue.display_status === 'paused' && issue.status_reason === 'queued_questions'
+        )
+      ).toBe(true);
+      expect(
+        uiPayload.running?.some(
+          (entry) =>
+            entry.display_state === 'paused' && entry.status_reason === 'queued_questions'
+        )
+      ).toBe(true);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -2027,12 +2064,12 @@ describe('ControlServer', () => {
       expect(uiRes.status).toBe(200);
       const uiPayload = (await uiRes.json()) as {
         selected?: { display_status?: string } | null;
-        tasks?: Array<{ display_status?: string }>;
-        runs?: Array<{ display_status?: string }>;
+        issues?: Array<{ display_status?: string }>;
+        running?: Array<{ display_state?: string }>;
       };
       expect(uiPayload.selected?.display_status).toBe('awaiting_input');
-      expect(uiPayload.tasks?.[0]?.display_status).toBe('awaiting_input');
-      expect(uiPayload.runs?.[0]?.display_status).toBe('awaiting_input');
+      expect(uiPayload.issues?.some((issue) => issue.display_status === 'awaiting_input')).toBe(true);
+      expect(uiPayload.running?.some((entry) => entry.display_state === 'awaiting_input')).toBe(true);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });
@@ -2122,16 +2159,19 @@ describe('ControlServer', () => {
         expect(uiRes.status).toBe(200);
         const uiPayload = (await uiRes.json()) as {
           selected?: { display_status?: string } | null;
-          tasks?: Array<{ display_status?: string; bucket?: string; bucket_reason?: string }>;
-          runs?: Array<{ display_status?: string }>;
+          issues?: Array<{ display_status?: string; status?: string }>;
+          running?: Array<unknown>;
+          retrying?: Array<unknown>;
         };
         expect(uiPayload.selected?.display_status).toBe(scenario.status);
-        expect(uiPayload.tasks?.[0]).toMatchObject({
-          display_status: scenario.status,
-          bucket: 'complete',
-          bucket_reason: 'terminal'
-        });
-        expect(uiPayload.runs?.[0]?.display_status).toBe(scenario.status);
+        expect(
+          uiPayload.issues?.some(
+            (issue) =>
+              issue.display_status === scenario.status && issue.status === scenario.status
+          )
+        ).toBe(true);
+        expect(uiPayload.running).toEqual([]);
+        expect(uiPayload.retrying).toEqual([]);
       } finally {
         await server.close();
         await rm(root, { recursive: true, force: true });
@@ -3111,12 +3151,21 @@ describe('ControlServer', () => {
       expect(uiRes.status).toBe(200);
       const uiPayload = (await uiRes.json()) as {
         selected?: { tracked?: { linear?: unknown } } | null;
-        tasks?: Array<{ tracked?: { linear?: unknown } }>;
-        runs?: Array<{ tracked?: { linear?: unknown } }>;
+        issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
-      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.tasks?.[0]?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.runs?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.selected).not.toBeNull();
+      expect(uiPayload.selected).toHaveProperty('tracked');
+      expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(uiPayload.issues).toHaveLength(1);
+      expect(
+        uiPayload.issues?.every(
+          (issue) =>
+            Object.prototype.hasOwnProperty.call(issue, 'tracked')
+            && issue.tracked !== undefined
+            && Object.prototype.hasOwnProperty.call(issue.tracked, 'linear')
+            && issue.tracked.linear === null
+        )
+      ).toBe(true);
       expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();
@@ -3500,12 +3549,21 @@ describe('ControlServer', () => {
       expect(uiRes.status).toBe(200);
       const uiPayload = (await uiRes.json()) as {
         selected?: { tracked?: { linear?: unknown } } | null;
-        tasks?: Array<{ tracked?: { linear?: unknown } }>;
-        runs?: Array<{ tracked?: { linear?: unknown } }>;
+        issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
-      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.tasks?.[0]?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.runs?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.selected).not.toBeNull();
+      expect(uiPayload.selected).toHaveProperty('tracked');
+      expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(uiPayload.issues).toHaveLength(1);
+      expect(
+        uiPayload.issues?.every(
+          (issue) =>
+            Object.prototype.hasOwnProperty.call(issue, 'tracked')
+            && issue.tracked !== undefined
+            && Object.prototype.hasOwnProperty.call(issue.tracked, 'linear')
+            && issue.tracked.linear === null
+        )
+      ).toBe(true);
       expect(linearFetchCount).toBe(0);
     } finally {
       await server.close();
@@ -3661,12 +3719,21 @@ describe('ControlServer', () => {
       expect(uiRes.status).toBe(200);
       const uiPayload = (await uiRes.json()) as {
         selected?: { tracked?: { linear?: unknown } } | null;
-        tasks?: Array<{ tracked?: { linear?: unknown } }>;
-        runs?: Array<{ tracked?: { linear?: unknown } }>;
+        issues?: Array<{ tracked?: { linear?: unknown } }>;
       };
-      expect(uiPayload.selected?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.tasks?.[0]?.tracked?.linear ?? null).toBeNull();
-      expect(uiPayload.runs?.[0]?.tracked?.linear ?? null).toBeNull();
+      expect(uiPayload.selected).not.toBeNull();
+      expect(uiPayload.selected).toHaveProperty('tracked');
+      expect(uiPayload.selected?.tracked).toHaveProperty('linear', null);
+      expect(uiPayload.issues).toHaveLength(1);
+      expect(
+        uiPayload.issues?.every(
+          (issue) =>
+            Object.prototype.hasOwnProperty.call(issue, 'tracked')
+            && issue.tracked !== undefined
+            && Object.prototype.hasOwnProperty.call(issue.tracked, 'linear')
+            && issue.tracked.linear === null
+        )
+      ).toBe(true);
       expect(linearFetchCount).toBe(1);
     } finally {
       await server.close();
