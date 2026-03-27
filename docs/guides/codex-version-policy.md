@@ -4,16 +4,21 @@
 Define the current stable compatibility/adoption target for CO and keep newer CLI/model moves evidence-gated.
 
 ## Current Posture
-- Current CO compatibility/adoption target is stable Codex CLI `0.115.0`.
+- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0` for the current upstream-aligned main baseline.
+- That `0.117.0` posture depends on both the clean local/runtime evidence refreshed in `CO-22` and the previously recorded cloud contract lanes captured in `tasks/specs/0958-cloud-canary-ci.md` and `tasks/specs/0974-cloud-adoption-preflight-reliability.md`.
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.
 - Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).
 - When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.
 - Newer stable/prerelease Codex builds may run only in task-scoped lanes with captured evidence.
+- Local appserver remains the expected default runtime path after the `CO-22` canary.
+- Provider workers should keep the current `codex exec` / `codex exec resume` supervision seam for now; app-server is promoted to a richer control-substrate candidate, not an immediate supervision replacement.
+- Treat `thread/shellCommand` as a sensitive unsandboxed surface; it is not part of the default provider-worker authority model.
 - Manual Codex re-review requests are quota-aware: send at most one `@codex` ping per PR head SHA, then wait for a new head before re-requesting.
 - Codex review quota exhaustion is an operational availability event, not an adoption/promotion signal; if it blocks review, use the merge-waiver path documented in `AGENTS.md` and `docs/AGENTS.md` (checks green, unresolved actionable threads = `0`, waiver evidence recorded).
+- Do not newly promote, re-promote, or carry forward the `0.117.0` string after baseline drift unless the candidate posture has recorded results for `node scripts/runtime-mode-canary.mjs`, `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 node scripts/cloud-canary-ci.mjs`, and `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 node scripts/cloud-canary-ci.mjs`.
 
 ## Required Evidence Gates
-For any change to the current `0.115.0` / `gpt-5.4` posture, or any promotion of a newer Codex build in CO:
+For any change to the current `0.117.0` / `gpt-5.4` posture, or any promotion of a newer Codex build in CO:
 1. Local appserver path passes on the candidate Codex CLI + model posture.
 2. Delegated/review surfaces are verified on the actual auth provider in use; for ChatGPT auth, this means `gpt-5.4`, not `gpt-5.4-codex`, unless new compatibility evidence exists.
 3. Runtime-mode canary passes (`node scripts/runtime-mode-canary.mjs`).

@@ -107,6 +107,88 @@ describe('formatDoctorUsageSummary', () => {
 });
 
 describe('runDoctorUsage', () => {
+  async function withDoctorUsageCollabFixture<T>(
+    params: {
+      tmpPrefix: string;
+      taskId: string;
+      runId: string;
+      collabToolCalls: unknown[];
+    },
+    run: () => Promise<T>
+  ): Promise<T> {
+    const previousEnv = {
+      root: process.env.CODEX_ORCHESTRATOR_ROOT,
+      runsDir: process.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+      outDir: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
+      taskId: process.env.MCP_RUNNER_TASK_ID,
+      collabMaxEvents: process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), params.tmpPrefix));
+    try {
+      await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'tasks', 'index.json'),
+        `${JSON.stringify({ items: [{ slug: params.taskId }] }, null, 2)}\n`,
+        'utf8'
+      );
+
+      const runDir = join(repoRoot, '.runs', params.taskId, 'cli', params.runId);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, 'manifest.json'),
+        `${JSON.stringify(buildSucceededCollabManifest(params.taskId, params.runId, params.collabToolCalls), null, 2)}\n`,
+        'utf8'
+      );
+
+      process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+      delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      process.env.MCP_RUNNER_TASK_ID = params.taskId;
+      delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+
+      return await run();
+    } finally {
+      if (previousEnv.root === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_ROOT = previousEnv.root;
+      }
+      if (previousEnv.runsDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_RUNS_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_RUNS_DIR = previousEnv.runsDir;
+      }
+      if (previousEnv.outDir === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_OUT_DIR;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_OUT_DIR = previousEnv.outDir;
+      }
+      if (previousEnv.taskId === undefined) {
+        delete process.env.MCP_RUNNER_TASK_ID;
+      } else {
+        process.env.MCP_RUNNER_TASK_ID = previousEnv.taskId;
+      }
+      if (previousEnv.collabMaxEvents === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS = previousEnv.collabMaxEvents;
+      }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  }
+
+  function buildSucceededCollabManifest(taskId: string, runId: string, collabToolCalls: unknown[]) {
+    return {
+      run_id: runId,
+      task_id: taskId,
+      pipeline_id: 'implementation-gate',
+      status: 'succeeded',
+      started_at: '2026-02-18T00:00:00.000Z',
+      collab_tool_calls_max_events: 200,
+      collab_tool_calls: collabToolCalls
+    };
+  }
+
   it('counts fallback-only runs as advanced usage', async () => {
     const previousEnv = {
       root: process.env.CODEX_ORCHESTRATOR_ROOT,
@@ -551,6 +633,328 @@ describe('runDoctorUsage', () => {
       }
       await rm(repoRoot, { recursive: true, force: true });
     }
+  });
+
+  it('matches close_agent calls on additive path aliases when thread ids and paths coexist', async () => {
+    const taskId = 'task-collab-aliases';
+    const runId = '2026-02-18T00-00-00-000Z-feedface';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-aliases-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a'],
+            receiver_agent_paths: [' /root/explorer '],
+            receiver_agents: [{ thread_id: 'agent-a', agent_path: '/root/explorer' }]
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-a',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: [],
+            receiver_agent_paths: ['/root/explorer']
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(0);
+        expect(result.collab.unclosed_spawn_agents).toBe(0);
+      }
+    );
+  });
+
+  it('keeps other receivers open when only one alias group is closed', async () => {
+    const taskId = 'task-collab-partial-close';
+    const runId = '2026-02-18T00-00-00-000Z-c001d00d';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-partial-close-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a', 'agent-b'],
+            receiver_agent_paths: ['/root/explorer/a', '/root/explorer/b'],
+            receiver_agents: [
+              { thread_id: 'agent-a', agent_path: '/root/explorer/a' },
+              { thread_id: 'agent-b', agent_path: '/root/explorer/b' }
+            ]
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-a',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: [],
+            receiver_agent_paths: ['/root/explorer/a']
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+        expect(result.collab.unclosed_spawn_agents).toBe(1);
+      }
+    );
+  });
+
+  it('does not add duplicate singleton groups for aliases already represented by receiver_agents', async () => {
+    const taskId = 'task-collab-duplicate-alias';
+    const runId = '2026-02-18T00-00-00-000Z-decafbad';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-duplicate-alias-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a', 'agent-b'],
+            receiver_agent_paths: ['/root/explorer/a'],
+            receiver_agents: [{ thread_id: 'agent-a', agent_path: '/root/explorer/a' }]
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-a',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a'],
+            receiver_agent_paths: []
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+        expect(result.collab.unclosed_spawn_agents).toBe(1);
+      }
+    );
+  });
+
+  it('keeps sparse receiver_agents from inheriting earlier receiver_thread_id slots', async () => {
+    const taskId = 'task-collab-sparse-receiver-agents';
+    const runId = '2026-02-18T00-00-00-000Z-baadf00d';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-sparse-receiver-agents-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a', 'agent-b'],
+            receiver_agent_paths: ['/root/explorer/b'],
+            receiver_agents: [{ thread_id: 'agent-b', agent_path: '/root/explorer/b' }]
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-b',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: [],
+            receiver_agent_paths: ['/root/explorer/b']
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+        expect(result.collab.unclosed_spawn_agents).toBe(1);
+      }
+    );
+  });
+
+  it('does not merge distinct receiver groups when only the path alias overlaps', async () => {
+    const taskId = 'task-collab-shared-path-alias';
+    const runId = '2026-02-18T00-00-00-000Z-faceb00c';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-shared-path-alias-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a', 'agent-b'],
+            receiver_agent_paths: ['/root/shared', '/root/shared']
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-b',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-b'],
+            receiver_agent_paths: []
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+        expect(result.collab.unclosed_spawn_agents).toBe(1);
+      }
+    );
+  });
+
+  it('does not cross-close distinct receiver groups when a close event includes a shared path alias', async () => {
+    const taskId = 'task-collab-shared-path-close';
+    const runId = '2026-02-18T00-00-00-000Z-b16b00b5';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-shared-path-close-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a', 'agent-b'],
+            receiver_agent_paths: ['/root/shared', '/root/shared']
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-b',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-b'],
+            receiver_agent_paths: ['/root/shared']
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+        expect(result.collab.unclosed_spawn_agents).toBe(1);
+      }
+    );
+  });
+
+  it('pairs ragged thread/path arrays before emitting fallback singleton groups', async () => {
+    const taskId = 'task-collab-ragged-arrays';
+    const runId = '2026-02-18T00-00-00-000Z-f00dbabe';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-ragged-arrays-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a', 'agent-b'],
+            receiver_agent_paths: ['/root/explorer/a']
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-a',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a'],
+            receiver_agent_paths: []
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+        expect(result.collab.unclosed_spawn_agents).toBe(1);
+      }
+    );
   });
 
   it('emits low-adoption hints when cloud is configured but cloud/RLM usage remain low', async () => {

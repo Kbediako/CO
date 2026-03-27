@@ -109,12 +109,13 @@ export interface DoctorCodexDefaultsAdvisory {
       expected_minimum: number;
       actual: number | null;
     };
-    max_spawn_depth: {
-      status: 'ok' | 'advisory';
-      expected_minimum: number;
-      actual: number | null;
-    };
   };
+  legacy_max_spawn_depth?: {
+    present: boolean;
+    status: 'ok' | 'advisory';
+    actual: number | null;
+    detail: string;
+  } | null;
   guidance: string[];
 }
 
@@ -500,9 +501,11 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   lines.push(
     `  - agents.max_depth: ${result.codex_defaults.checks.max_depth.status} (actual: ${result.codex_defaults.checks.max_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_depth.expected_minimum} when set; <unset> accepted)`
   );
-  lines.push(
-    `  - agents.max_spawn_depth: ${result.codex_defaults.checks.max_spawn_depth.status} (actual: ${result.codex_defaults.checks.max_spawn_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_spawn_depth.expected_minimum} when set; <unset> accepted)`
-  );
+  if (result.codex_defaults.legacy_max_spawn_depth?.present) {
+    lines.push(
+      `  - legacy agents.max_spawn_depth: ${result.codex_defaults.legacy_max_spawn_depth.status} (actual: ${result.codex_defaults.legacy_max_spawn_depth.actual ?? '<unset>'}; ${result.codex_defaults.legacy_max_spawn_depth.detail})`
+    );
+  }
   for (const line of result.codex_defaults.guidance) {
     lines.push(`  - ${line}`);
   }
@@ -549,13 +552,14 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
     review_model: { status: 'advisory', expected: BASELINE_REVIEW_MODEL, actual: null },
     model_reasoning_effort: { status: 'advisory', expected_minimum: BASELINE_REASONING_MINIMUM, actual: null },
     max_threads: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_threads, actual: null },
-    max_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_depth, actual: null },
-    max_spawn_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_spawn_depth, actual: null }
+    max_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_depth, actual: null }
   };
+  let legacyMaxSpawnDepth: DoctorCodexDefaultsAdvisory['legacy_max_spawn_depth'] = null;
   const guidance: string[] = [
     'Run `codex-orchestrator codex defaults --yes` to apply additive baseline defaults.',
     'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set.',
-    'Current Codex 0.111.0 parser workaround: leaving `agents.max_depth` and `agents.max_spawn_depth` unset is accepted.'
+    'Current CO baseline no longer seeds or expects `agents.max_spawn_depth`; keep it only as a legacy local override when an older parser/runtime still honors it.',
+    'Leaving `agents.max_depth` unset remains accepted when local parser/runtime constraints require it.'
   ];
 
   if (!existsSync(configPath)) {
@@ -616,18 +620,26 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   checks.max_depth.actual = maxDepth;
   checks.max_depth.status =
     maxDepth === null || (typeof maxDepth === 'number' && maxDepth >= BASELINE_AGENTS.max_depth) ? 'ok' : 'advisory';
-  checks.max_spawn_depth.actual = maxSpawnDepth;
-  checks.max_spawn_depth.status =
-    maxSpawnDepth === null
-      || (typeof maxSpawnDepth === 'number' && maxSpawnDepth >= BASELINE_AGENTS.max_spawn_depth)
-      ? 'ok'
-      : 'advisory';
+  if (maxSpawnDepth !== null) {
+    const legacySpawnDepthOk = maxSpawnDepth >= BASELINE_AGENTS.max_depth;
+    legacyMaxSpawnDepth = {
+      present: true,
+      status: legacySpawnDepthOk ? 'ok' : 'advisory',
+      actual: maxSpawnDepth,
+      detail: legacySpawnDepthOk
+        ? 'legacy override detected; safe for the CO baseline, but remove it when your local parser/runtime no longer consumes spawn-depth caps'
+        : `older parser/runtime may still treat this as a hard cap below the CO baseline depth; raise it to >= ${BASELINE_AGENTS.max_depth} or remove it`
+    };
+  }
 
-  const allChecksOk = Object.values(checks).every((check) => check.status === 'ok');
+  const allChecksOk =
+    Object.values(checks).every((check) => check.status === 'ok')
+    && legacyMaxSpawnDepth?.status !== 'advisory';
   return {
     status: allChecksOk ? 'ok' : 'advisory',
     config: { path: configPath, status: 'ok' },
     checks,
+    legacy_max_spawn_depth: legacyMaxSpawnDepth,
     guidance
   };
 }

@@ -234,8 +234,8 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
       if (collabEventsPossiblyTruncated) {
         collabRunsWithPotentiallyTruncatedToolCalls += 1;
       }
-      const spawnedAgents = new Set<string>();
-      const closedAgents = new Set<string>();
+      const spawnedAgentAliases: Set<string>[] = [];
+      const closedSpawnIndexes = new Set<number>();
       const failedSpawnIds = new Set<string>();
       let failedSpawnCalls = 0;
       if (typeof manifest.task_id === 'string' && manifest.task_id) {
@@ -245,11 +245,7 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
         const tool = typeof entry?.tool === 'string' && entry.tool ? entry.tool : 'unknown';
         const status = typeof entry?.status === 'string' && entry.status ? entry.status : 'unknown';
         const eventType = typeof entry?.event_type === 'string' && entry.event_type ? entry.event_type : 'unknown';
-        const receiverThreadIds = Array.isArray(entry?.receiver_thread_ids)
-          ? entry.receiver_thread_ids
-              .map((id) => (typeof id === 'string' ? id.trim() : ''))
-              .filter((id) => id.length > 0)
-          : [];
+        const receiverIdentifierGroups = resolveCollabReceiverIdentifierGroups(entry);
         const completedEventWithoutStatus = eventType === 'item.completed' && status !== 'failed';
         const isCompleted = status === 'completed' || completedEventWithoutStatus;
         const isFailed = status === 'failed';
@@ -286,26 +282,37 @@ export async function runDoctorUsage(options: DoctorUsageOptions = {}): Promise<
           if (!isCompleted) {
             continue;
           }
-          if (receiverThreadIds.length > 0) {
-            for (const id of receiverThreadIds) {
-              spawnedAgents.add(id);
+          if (receiverIdentifierGroups.length > 0) {
+            for (const receiverIdentifiers of receiverIdentifierGroups) {
+              spawnedAgentAliases.push(new Set(receiverIdentifiers));
             }
           } else {
-            const fallbackId = `spawn@${entry?.item_id ?? entryIndex}`;
-            spawnedAgents.add(fallbackId);
+            spawnedAgentAliases.push(new Set([`spawn@${entry?.item_id ?? entryIndex}`]));
           }
           continue;
         }
 
         if (tool === 'close_agent' && isCompleted) {
-          for (const id of receiverThreadIds) {
-            closedAgents.add(id);
+          if (receiverIdentifierGroups.length === 0) {
+            continue;
+          }
+          for (const receiverIdentifiers of receiverIdentifierGroups) {
+            for (const [spawnIndex, aliases] of spawnedAgentAliases.entries()) {
+              if (closedSpawnIndexes.has(spawnIndex)) {
+                continue;
+              }
+              if (collabReceiverGroupMatches(receiverIdentifiers, aliases)) {
+                closedSpawnIndexes.add(spawnIndex);
+              }
+            }
           }
         }
       }
 
       if (collabCaptureLimitKnown && !collabEventsPossiblyTruncated) {
-        const unclosedSpawnAgents = [...spawnedAgents].filter((id) => !closedAgents.has(id));
+        const unclosedSpawnAgents = spawnedAgentAliases.filter(
+          (_aliases, spawnIndex) => !closedSpawnIndexes.has(spawnIndex)
+        );
         if (unclosedSpawnAgents.length > 0) {
           collabRunsWithUnclosedSpawnAgents += 1;
           collabUnclosedSpawnAgents += unclosedSpawnAgents.length;
@@ -631,6 +638,121 @@ function resolveManifestCollabCaptureLimit(manifest: CliManifest): number | null
     return null;
   }
   return Math.trunc(value);
+}
+
+function resolveCollabReceiverIdentifierGroups(
+  entry: CliManifest['collab_tool_calls'] extends (infer T)[] | null | undefined ? T | undefined : never
+): string[][] {
+  const receiverThreadIdSlots = normalizeCollabAliasSlots('thread', entry?.receiver_thread_ids);
+  const receiverAgentPathSlots = normalizeCollabAliasSlots('path', entry?.receiver_agent_paths);
+  const receiverAgents = Array.isArray(entry?.receiver_agents) ? entry.receiver_agents : [];
+  const groups: string[][] = [];
+  const consumedThreadIndexes = new Set<number>();
+  const consumedPathIndexes = new Set<number>();
+
+  if (receiverAgents.length > 0) {
+    for (const agent of receiverAgents) {
+      const identifiers = dedupeCollabAliases([
+        normalizeCollabAlias('thread', agent?.thread_id),
+        normalizeCollabAlias('path', agent?.agent_path)
+      ]);
+      if (identifiers.length > 0) {
+        groups.push(identifiers);
+        consumeMatchingAliasIndex(receiverThreadIdSlots, identifiers, consumedThreadIndexes);
+        consumeMatchingAliasIndex(receiverAgentPathSlots, identifiers, consumedPathIndexes);
+      }
+    }
+  }
+
+  const pairCount = Math.max(receiverThreadIdSlots.length, receiverAgentPathSlots.length);
+  for (let index = 0; index < pairCount; index += 1) {
+    if (consumedThreadIndexes.has(index) || consumedPathIndexes.has(index)) {
+      continue;
+    }
+    const receiverThreadId = receiverThreadIdSlots[index] ?? null;
+    const receiverAgentPath = receiverAgentPathSlots[index] ?? null;
+    if (receiverThreadId === null || receiverAgentPath === null) {
+      continue;
+    }
+    const identifiers = dedupeCollabAliases([receiverThreadId, receiverAgentPath]);
+    if (identifiers.length > 0) {
+      const existingGroup = groups.find((group) => group.includes(receiverThreadId));
+      if (existingGroup) {
+        for (const identifier of identifiers) {
+          if (!existingGroup.includes(identifier)) {
+            existingGroup.push(identifier);
+          }
+        }
+      } else {
+        groups.push(identifiers);
+      }
+    }
+    consumedThreadIndexes.add(index);
+    consumedPathIndexes.add(index);
+  }
+
+  const groupedAliases = new Set(groups.flat());
+
+  for (const [index, receiverThreadId] of receiverThreadIdSlots.entries()) {
+    if (receiverThreadId !== null && !consumedThreadIndexes.has(index) && !groupedAliases.has(receiverThreadId)) {
+      groups.push([receiverThreadId]);
+      groupedAliases.add(receiverThreadId);
+    }
+  }
+  for (const [index, receiverAgentPath] of receiverAgentPathSlots.entries()) {
+    if (receiverAgentPath !== null && !consumedPathIndexes.has(index) && !groupedAliases.has(receiverAgentPath)) {
+      groups.push([receiverAgentPath]);
+      groupedAliases.add(receiverAgentPath);
+    }
+  }
+
+  return groups;
+}
+
+function normalizeCollabAliasSlots(prefix: 'thread' | 'path', values: unknown): Array<string | null> {
+  return Array.isArray(values) ? values.map((value) => normalizeCollabAlias(prefix, value)) : [];
+}
+
+function normalizeCollabAlias(prefix: 'thread' | 'path', value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? `${prefix}:${trimmed}` : null;
+}
+
+function consumeMatchingAliasIndex(
+  slots: Array<string | null>,
+  aliases: string[],
+  consumedIndexes: Set<number>
+): void {
+  for (const alias of aliases) {
+    const index = slots.findIndex((slotAlias, slotIndex) => slotAlias === alias && !consumedIndexes.has(slotIndex));
+    if (index >= 0) {
+      consumedIndexes.add(index);
+    }
+  }
+}
+
+function collabReceiverGroupMatches(receiverIdentifiers: string[], aliases: Set<string>): boolean {
+  const threadIdentifiers = receiverIdentifiers.filter((identifier) => identifier.startsWith('thread:'));
+  if (threadIdentifiers.length > 0) {
+    return threadIdentifiers.some((identifier) => aliases.has(identifier));
+  }
+  return receiverIdentifiers.some((identifier) => aliases.has(identifier));
+}
+
+function dedupeCollabAliases(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const value of values) {
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    deduped.push(value);
+  }
+  return deduped;
 }
 
 function clampInt(value: number, min: number, max: number): number {

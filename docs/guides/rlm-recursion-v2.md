@@ -76,7 +76,7 @@ If you want strict “small slice” behavior (for example, keeping subcalls aro
 As of 2026-02-25, these upstream details are relevant for CO planning:
 
 - Built-in `explorer` no longer pins an older profile in `0.105.0`; it inherits top-level model/reasoning unless role `config_file` overrides it.
-- `agents.max_threads` default remains `6`; CO now recommends `12` with `max_depth = 4` and `max_spawn_depth = 4` for active multi-agent lanes, with contingency-only fallback profiles (`8/2/2`, `6/1/1` break-glass) for constrained/high-risk work.
+- `agents.max_threads` default remains `6`; CO now recommends `12` with optional `max_depth = 4` for active multi-agent lanes, while treating `max_spawn_depth` as a legacy local override rather than current baseline guidance. Contingency-only fallback profiles remain `8/2` by default and legacy `6/1/1` only when an older parser/runtime still consumes spawn-depth caps.
 - `features.multi_agent` is canonical; `collab` is a legacy alias.
 - `features.sqlite` and `features.memories` remain experimental/eval-only (legacy alias `features.memory_tool` remains compatibility-only).
 - `features.js_repl` is enabled by default globally. For deterministic cloud contracts, pin explicit feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs). Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable with `codex features enable js_repl`.

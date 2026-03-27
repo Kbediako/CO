@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 94c865b40e35a3d952175ca24cdf4c2caec066a97ae844c4dc62c898c87668f8 -->
+<!-- codex:instruction-stamp aee3caac5bc5233ec1d33916a757a774d8680c005ed62e340740f568c3e2d78e -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -59,8 +59,8 @@
 - Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception.
 - Spark caveat: `gpt-5.3-codex-spark` is text-only.
 - Keep RLM/collab built-ins-first by default; add custom specialist roles only when there is measured value, clear ownership, and validation evidence.
-- Use `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` / `max_spawn_depth = 4` only when your local Codex parser accepts them; preserve any intentional constrained caps instead of resetting them.
-- Keep fallback usage explicit and rare: `8/2/2` for constrained/high-risk lanes, `6/1/1` only as break-glass.
+- Use `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance; preserve any intentional constrained caps instead of resetting them.
+- Keep fallback usage explicit and rare: `8/2` for constrained/high-risk lanes, legacy `6/1/1` only as break-glass when an older parser/runtime still consumes spawn-depth caps.
 - Add an explicit `worker_complex` role (`gpt-5.4`, `xhigh`) for high-risk implementation streams.
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes`.
 
