@@ -651,19 +651,15 @@ function resolveCollabReceiverIdentifierGroups(
   const consumedPathIndexes = new Set<number>();
 
   if (receiverAgents.length > 0) {
-    for (const [index, agent] of receiverAgents.entries()) {
-      const receiverThreadId = receiverThreadIdSlots[index] ?? null;
+    for (const agent of receiverAgents) {
       const identifiers = dedupeCollabAliases([
         normalizeCollabAlias('thread', agent?.thread_id),
-        normalizeCollabAlias('path', agent?.agent_path),
-        receiverThreadId
+        normalizeCollabAlias('path', agent?.agent_path)
       ]);
-      if (receiverThreadId !== null) {
-        consumedThreadIndexes.add(index);
-      }
-      consumedPathIndexes.add(index);
       if (identifiers.length > 0) {
         groups.push(identifiers);
+        consumeMatchingAliasIndex(receiverThreadIdSlots, identifiers, consumedThreadIndexes);
+        consumeMatchingAliasIndex(receiverAgentPathSlots, identifiers, consumedPathIndexes);
       }
     }
   }
@@ -723,6 +719,19 @@ function normalizeCollabAlias(prefix: 'thread' | 'path', value: unknown): string
   }
   const trimmed = value.trim();
   return trimmed ? `${prefix}:${trimmed}` : null;
+}
+
+function consumeMatchingAliasIndex(
+  slots: Array<string | null>,
+  aliases: string[],
+  consumedIndexes: Set<number>
+): void {
+  for (const alias of aliases) {
+    const index = slots.findIndex((slotAlias, slotIndex) => slotAlias === alias && !consumedIndexes.has(slotIndex));
+    if (index >= 0) {
+      consumedIndexes.add(index);
+    }
+  }
 }
 
 function dedupeCollabAliases(values: Array<string | null | undefined>): string[] {

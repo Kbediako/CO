@@ -39,7 +39,8 @@ vi.mock('../src/cli/services/execRuntime.js', () => {
           data:
             '{"type":"item.completed","item":{"type":"collab_tool_call","id":"item_1","tool":"spawn_agent","status":"completed","sender_thread_id":"parent","receiver_thread_ids":["agent-1"],"sender_agent_path":" /root ","receiver_agent_paths":[" /root/explorer ","   "],"receiver_agents":[{"thread_id":"agent-1","agent_nickname":" Scout ","agent_role":" explorer ","agent_path":" /root/explorer "},{"thread_id":"   ","agent_nickname":"  ","agent_role":"","agent_path":"  "}],"fork_context":true}}\n' +
             '{"type":"item.completed","item":{"type":"collab_tool_call","id":"item_2","tool":"close_agent","status":"completed","sender_thread_id":"parent","receiver_thread_ids":["agent-1"]}}\n' +
-            '{"type":"item.completed","item":{"type":"collab_tool_call","id":"item_3","tool":"spawn_agent","status":"completed","sender_thread_id":"parent","receiver_thread_ids":["agent-1","agent-2"],"receiver_agent_paths":["   "," /root/explorer-b "],"receiver_agents":[{"thread_id":"agent-1","agent_nickname":" Scout A ","agent_role":" explorer ","agent_path":"  "},{"thread_id":"agent-2","agent_nickname":" Scout B ","agent_role":" explorer ","agent_path":"  "}],"fork_context":false}}\n'
+            '{"type":"item.completed","item":{"type":"collab_tool_call","id":"item_3","tool":"spawn_agent","status":"completed","sender_thread_id":"parent","receiver_thread_ids":["agent-1","agent-2"],"receiver_agent_paths":["   "," /root/explorer-b "],"receiver_agents":[{"thread_id":"agent-1","agent_nickname":" Scout A ","agent_role":" explorer ","agent_path":"  "},{"thread_id":"agent-2","agent_nickname":" Scout B ","agent_role":" explorer ","agent_path":"  "}],"fork_context":false}}\n' +
+            '{"type":"item.completed","item":{"type":"collab_tool_call","id":"item_4","tool":"spawn_agent","status":"completed","sender_thread_id":"parent","receiver_thread_ids":["agent-a","agent-b"],"receiver_agent_paths":["   "," /root/sparse-b "],"receiver_agents":[{"thread_id":"   ","agent_nickname":"  ","agent_role":"","agent_path":"  "},{"thread_id":"   ","agent_nickname":" Sparse B ","agent_role":" explorer ","agent_path":"  "}],"fork_context":false}}\n'
         }
       };
       const end: import('../../packages/shared/events/types.js').ExecEvent = {
@@ -238,7 +239,7 @@ describe('runCommandStage collab capture limit persistence', () => {
     await runCommandStage({ env, paths, manifest, stage, index: 1 });
 
     expect(manifest.collab_tool_calls_max_events).toBeUndefined();
-    expect(manifest.collab_tool_calls).toHaveLength(4);
+    expect(manifest.collab_tool_calls).toHaveLength(5);
   });
 
   it('preserves receiver path slot ownership inside receiver_agents before compacting top-level path arrays', async () => {
@@ -284,6 +285,55 @@ describe('runCommandStage collab capture limit persistence', () => {
           agent_nickname: 'Scout B',
           agent_role: 'explorer',
           agent_path: '/root/explorer-b'
+        }
+      ]
+    });
+  });
+
+  it('preserves sparse receiver thread slots inside compacted receiver_agents', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-collab-cap-sparse-threads',
+      title: 'Collab Cap Sparse Threads',
+      stages: [
+        {
+          kind: 'command',
+          id: 'stage-collab-cap-sparse-threads',
+          title: 'Emit collab lines',
+          command: 'echo collab'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-collab-cap-sparse-threads', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    const stage = pipeline.stages[0] as CommandStage;
+    await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    const sparseSpawn = manifest.collab_tool_calls?.find((entry) => entry.item_id === 'item_4');
+    expect(sparseSpawn).toMatchObject({
+      tool: 'spawn_agent',
+      fork_context: false,
+      receiver_thread_ids: ['agent-a', 'agent-b'],
+      receiver_agent_paths: ['/root/sparse-b'],
+      receiver_agents: [
+        {
+          thread_id: 'agent-a',
+          agent_nickname: null,
+          agent_role: null,
+          agent_path: null
+        },
+        {
+          thread_id: 'agent-b',
+          agent_nickname: 'Sparse B',
+          agent_role: 'explorer',
+          agent_path: '/root/sparse-b'
         }
       ]
     });

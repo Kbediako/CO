@@ -776,6 +776,52 @@ describe('runDoctorUsage', () => {
     );
   });
 
+  it('keeps sparse receiver_agents from inheriting earlier receiver_thread_id slots', async () => {
+    const taskId = 'task-collab-sparse-receiver-agents';
+    const runId = '2026-02-18T00-00-00-000Z-baadf00d';
+    await withDoctorUsageCollabFixture(
+      {
+        tmpPrefix: 'doctor-collab-sparse-receiver-agents-',
+        taskId,
+        runId,
+        collabToolCalls: [
+          {
+            observed_at: '2026-02-18T00:00:10.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'spawn-a',
+            tool: 'spawn_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: ['agent-a', 'agent-b'],
+            receiver_agent_paths: ['/root/explorer/b'],
+            receiver_agents: [{ thread_id: 'agent-b', agent_path: '/root/explorer/b' }]
+          },
+          {
+            observed_at: '2026-02-18T00:00:11.000Z',
+            stage_id: 'stage-1',
+            command_index: 0,
+            event_type: 'item.completed',
+            item_id: 'close-b',
+            tool: 'close_agent',
+            status: 'completed',
+            sender_thread_id: 'parent',
+            receiver_thread_ids: [],
+            receiver_agent_paths: ['/root/explorer/b']
+          }
+        ]
+      },
+      async () => {
+        const result = await runDoctorUsage({ windowDays: 3650, taskFilter: taskId });
+        expect(result.runs.total).toBe(1);
+        expect(result.collab.runs_with_tool_calls).toBe(1);
+        expect(result.collab.runs_with_unclosed_spawn_agents).toBe(1);
+        expect(result.collab.unclosed_spawn_agents).toBe(1);
+      }
+    );
+  });
+
   it('pairs ragged thread/path arrays before emitting fallback singleton groups', async () => {
     const taskId = 'task-collab-ragged-arrays';
     const runId = '2026-02-18T00-00-00-000Z-f00dbabe';

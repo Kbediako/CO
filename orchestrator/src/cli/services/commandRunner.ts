@@ -918,13 +918,15 @@ function parseCollabToolCallLine(
   if (!item || item.type !== 'collab_tool_call') {
     return null;
   }
-  const receiverThreadIds = Array.isArray(item.receiver_thread_ids)
-    ? item.receiver_thread_ids.filter((entry) => typeof entry === 'string')
-    : [];
+  const receiverThreadIdSlots = parseStringSlots(item.receiver_thread_ids);
+  const receiverThreadIds = receiverThreadIdSlots.filter((entry): entry is string => entry !== null);
   const senderAgentPath = normalizeOptionalString(item.sender_agent_path);
   const receiverAgentPathSlots = parseStringSlots(item.receiver_agent_paths);
   const receiverAgentPaths = receiverAgentPathSlots.filter((entry): entry is string => entry !== null);
-  const receiverAgents = parseCollabReceiverAgents(item.receiver_agents, receiverAgentPathSlots);
+  const receiverAgents = parseCollabReceiverAgents(item.receiver_agents, {
+    receiverThreadIdSlots,
+    receiverAgentPathSlots
+  });
 
   return {
     observed_at: isoTimestamp(),
@@ -967,18 +969,22 @@ function normalizeOptionalString(value: unknown): string | null {
 
 function parseCollabReceiverAgents(
   value: unknown,
-  receiverAgentPathSlots: Array<string | null> = []
+  slots: {
+    receiverThreadIdSlots?: Array<string | null>;
+    receiverAgentPathSlots?: Array<string | null>;
+  } = {}
 ): NonNullable<CollabToolCallRecord['receiver_agents']> | null {
   if (!Array.isArray(value)) {
     return null;
   }
+  const { receiverThreadIdSlots = [], receiverAgentPathSlots = [] } = slots;
   const parsed: NonNullable<CollabToolCallRecord['receiver_agents']> = [];
   for (const [index, entry] of value.entries()) {
     if (!entry || typeof entry !== 'object') {
       continue;
     }
     const record = entry as Record<string, unknown>;
-    const threadId = normalizeOptionalString(record.thread_id);
+    const threadId = normalizeOptionalString(record.thread_id) ?? receiverThreadIdSlots[index] ?? null;
     const agentNickname = normalizeOptionalString(record.agent_nickname);
     const agentRole = normalizeOptionalString(record.agent_role);
     const agentPath = normalizeOptionalString(record.agent_path) ?? receiverAgentPathSlots[index] ?? null;
