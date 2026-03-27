@@ -13,6 +13,7 @@ import {
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
+  readProviderLinearWorkerChildStreams,
   runProviderLinearWorker,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
@@ -266,6 +267,25 @@ describe('provider linear worker runner', () => {
     });
 
     expect(context.taskId).toBe('linear-camel-task');
+  });
+  it('rejects manifest-path task fallback outside the canonical .runs layout', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-noncanonical-'));
+    const manifestDir = join(tempRoot, 'not-runs', 'run-child');
+    await mkdir(manifestDir, { recursive: true });
+    const manifestPath = join(manifestDir, 'manifest.json');
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot
+    }), 'utf8');
+
+    await expect(
+      loadProviderLinearWorkerContext({
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
+      })
+    ).rejects.toThrow('Provider worker task id unavailable');
   });
   it('rejects env task ids that do not match the manifest-backed worker task', async () => {
     const { manifestPath } = await createManifestRoot();
@@ -834,6 +854,19 @@ describe('provider linear worker runner', () => {
         project_id: 'project-1'
       }
     });
+  });
+
+  it('treats a corrupt child-stream ledger as fatal during proof hydration', async () => {
+    const { runDir } = await createManifestRoot();
+    await writeFile(
+      join(runDir, 'provider-linear-worker-child-streams.json'),
+      '{"corrupt":true}',
+      'utf8'
+    );
+
+    await expect(readProviderLinearWorkerChildStreams(runDir)).rejects.toThrow(
+      'provider-linear-worker child-stream ledger is not an array'
+    );
   });
 
   it('forces standalone review execution env inside non-interactive provider worker turns', async () => {

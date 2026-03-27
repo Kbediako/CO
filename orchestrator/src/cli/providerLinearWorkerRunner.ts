@@ -454,6 +454,18 @@ export async function loadProviderLinearWorkerContext(
 }
 
 function contextTaskIdFromManifestPath(manifestPath: string): string | null {
+  const resolvedManifestPath = resolve(manifestPath);
+  const runDir = dirname(resolvedManifestPath);
+  const cliDir = dirname(runDir);
+  const taskDir = dirname(cliDir);
+  const runsDir = dirname(taskDir);
+  if (
+    basename(resolvedManifestPath) !== 'manifest.json' ||
+    basename(cliDir) !== 'cli' ||
+    basename(runsDir) !== '.runs'
+  ) {
+    return null;
+  }
   const taskId = sanitizeTaskId(basename(resolve(dirname(manifestPath), '..', '..')));
   return taskId.length > 0 ? taskId : null;
 }
@@ -907,24 +919,22 @@ export async function readProviderLinearWorkerChildStreams(
   let raw: string;
   try {
     raw = await readFile(buildChildStreamsPath(runDir), 'utf8');
-  } catch {
-    return [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-
+  const parsed = JSON.parse(raw) as unknown;
   if (!Array.isArray(parsed)) {
-    return [];
+    throw new Error('provider-linear-worker child-stream ledger is not an array.');
   }
-
-  return parsed
-    .map((entry) => normalizeProviderLinearWorkerChildStreamRecord(entry))
-    .filter((entry): entry is ProviderLinearWorkerChildStreamRecord => entry !== null);
+  const normalized = parsed.map((entry) => normalizeProviderLinearWorkerChildStreamRecord(entry));
+  if (normalized.some((entry) => entry === null)) {
+    throw new Error('provider-linear-worker child-stream ledger contains invalid records.');
+  }
+  return normalized as ProviderLinearWorkerChildStreamRecord[];
 }
 
 export async function appendProviderLinearWorkerChildStreamRecord(
@@ -932,11 +942,7 @@ export async function appendProviderLinearWorkerChildStreamRecord(
   record: ProviderLinearWorkerChildStreamRecord,
   writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
 ): Promise<ProviderLinearWorkerChildStreamRecord[]> {
-  let existing: ProviderLinearWorkerChildStreamRecord[] = [];
-  try {
-    const parsed = JSON.parse(await readFile(buildChildStreamsPath(runDir), 'utf8')) as unknown; if (!Array.isArray(parsed)) throw new Error('provider-linear-worker child-stream ledger is not an array.');
-    const normalized = parsed.map((entry) => normalizeProviderLinearWorkerChildStreamRecord(entry)); if (normalized.some((entry) => entry === null)) throw new Error('provider-linear-worker child-stream ledger contains invalid records.'); existing = normalized as ProviderLinearWorkerChildStreamRecord[];
-  } catch (error) { if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error; }
+  const existing = await readProviderLinearWorkerChildStreams(runDir);
   const next = existing.filter(
     (entry) => !(entry.task_id === record.task_id && entry.run_id === record.run_id)
   );
