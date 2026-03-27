@@ -11,6 +11,7 @@ export type ProviderLinearAuditOperation =
   | 'delete-workpad'
   | 'transition'
   | 'attach-pr'
+  | 'runtime-proof'
   | 'create-follow-up'
   | 'child-stream';
 
@@ -120,6 +121,7 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
     && operation !== 'delete-workpad'
     && operation !== 'transition'
     && operation !== 'attach-pr'
+    && operation !== 'runtime-proof'
     && operation !== 'create-follow-up'
     && operation !== 'child-stream'
   ) {

@@ -1,9 +1,23 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runLinearCliShell } from '../src/cli/linearCliShell.js';
 
-afterEach(() => {
+const tempDirs: string[] = [];
+
+afterEach(async () => {
   vi.restoreAllMocks();
+  await Promise.all(
+    tempDirs.splice(0).map((dir) =>
+      rm(dir, {
+        force: true,
+        recursive: true
+      })
+    )
+  );
 });
 
 describe('runLinearCliShell', () => {
@@ -215,6 +229,166 @@ describe('runLinearCliShell', () => {
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
       }
+    });
+  });
+
+  it('routes runtime-proof into the policy resolver and records audit metadata', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const resolveProviderLinearRuntimeProofMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearRuntimeProof.js').resolveProviderLinearRuntimeProof>()
+        .mockResolvedValue({
+          ok: true,
+          policy: {
+            origin: 'https://app.example.com',
+            permit_path: '/repo/compliance/permit.json',
+            permit_status: 'found',
+            approval_id: 'approval-1',
+            approver: 'Approval Board',
+            capabilities: {
+              screenshot: true,
+              external_link: false,
+              video: false
+            },
+            allowed_kinds: ['screenshot'],
+            blocked_kinds: ['external-link', 'video'],
+            summary:
+              'screenshot proof is permitted for https://app.example.com; external-link and video are blocked.'
+          },
+          proof: {
+            kind: 'screenshot',
+            reviewer_url: 'https://review-assets.example.com/proof.png',
+            title: 'Dashboard after launch-app validation',
+            summary: 'Signed-in dashboard state.'
+          },
+          handoff: {
+            workpad_markdown:
+              '- Runtime proof policy: screenshot proof is permitted for https://app.example.com; external-link and video are blocked.',
+            pr_markdown: '### Runtime Proof'
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['runtime-proof'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          origin: 'https://app.example.com',
+          kind: 'screenshot',
+          'proof-url': 'https://review-assets.example.com/proof.png',
+          title: 'Dashboard after launch-app validation',
+          summary: 'Signed-in dashboard state.'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        resolveProviderLinearRuntimeProof: resolveProviderLinearRuntimeProofMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        getCwd: () => '/repo',
+        now: () => '2026-03-27T05:00:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(resolveProviderLinearRuntimeProofMock).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      origin: 'https://app.example.com',
+      kind: 'screenshot',
+      proofUrl: 'https://review-assets.example.com/proof.png',
+      title: 'Dashboard after launch-app validation',
+      summary: 'Signed-in dashboard state.'
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'runtime-proof',
+      issue_id: 'lin-issue-1',
+      proof: {
+        kind: 'screenshot'
+      },
+      handoff: {
+        pr_markdown: '### Runtime Proof'
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-03-27T05:00:00.000Z',
+      operation: 'runtime-proof',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: 'screenshot',
+      via: 'permit:found',
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: null,
+      error_message: null
+    });
+  });
+
+  it('resolves runtime-proof permits from the repo root when invoked in a nested package directory', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-runtime-proof-root-'));
+    tempDirs.push(repoRoot);
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, 'tasks', 'index.json'), '{"items":[]}', 'utf8');
+    await mkdir(join(repoRoot, 'packages', 'app'), { recursive: true });
+
+    const resolveProviderLinearRuntimeProofMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearRuntimeProof.js').resolveProviderLinearRuntimeProof>()
+        .mockResolvedValue({
+          ok: true,
+          policy: {
+            origin: 'https://app.example.com',
+            permit_path: join(repoRoot, 'compliance', 'permit.json'),
+            permit_status: 'missing',
+            approval_id: null,
+            approver: null,
+            capabilities: {
+              screenshot: false,
+              external_link: false,
+              video: false
+            },
+            allowed_kinds: [],
+            blocked_kinds: ['screenshot', 'external-link', 'video'],
+            summary: 'No permit'
+          },
+          proof: null,
+          handoff: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['runtime-proof'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          origin: 'https://app.example.com'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        resolveProviderLinearRuntimeProof: resolveProviderLinearRuntimeProofMock,
+        getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        getCwd: () => join(repoRoot, 'packages', 'app'),
+        log: vi.fn()
+      }
+    );
+
+    expect(resolveProviderLinearRuntimeProofMock).toHaveBeenCalledWith({
+      repoRoot,
+      origin: 'https://app.example.com',
+      kind: null,
+      proofUrl: null,
+      title: undefined,
+      summary: undefined
     });
   });
 

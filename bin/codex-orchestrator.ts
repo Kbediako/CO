@@ -1508,6 +1508,18 @@ Subcommands:
     --project-id <id>     Optional project scope check.
     --format json         Emit machine-readable output.
 
+  runtime-proof
+    --issue-id <id>       Linear issue id/key for audit continuity.
+    --origin <url>        App origin whose permit posture should be evaluated.
+    --kind <mode>         Optional proof kind: screenshot, external-link, or video.
+    --proof-url <url>     Reviewer-usable proof URL for workpad/PR handoff generation.
+    --title <title>       Optional proof label (defaults by kind).
+    --summary <text>      Optional short proof summary for workpad/PR handoff text.
+    --workspace-id <id>   Optional workspace scope check.
+    --team-id <id>        Optional team scope check.
+    --project-id <id>     Optional project scope check.
+    --format json         Emit machine-readable output.
+
   create-follow-up
     --issue-id <id>                   Source Linear issue id/key.
     --title <title>                   Follow-up issue title.
