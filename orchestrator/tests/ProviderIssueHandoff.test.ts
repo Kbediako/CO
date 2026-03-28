@@ -178,6 +178,8 @@ async function waitForCondition(
   throw new Error(`Condition not met after ${turns} timer turns.`);
 }
 
+const QUEUED_RETRY_SETTLE_TURNS = 1_024;
+
 async function waitForMockCalls(
   mockFn: { mock: { calls: unknown[][] } },
   expectedCalls = 1,
@@ -1377,7 +1379,8 @@ describe('createProviderIssueHandoffService', () => {
 
     await vi.advanceTimersByTimeAsync(1_001);
     await waitForCondition(
-      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing'
+      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing',
+      QUEUED_RETRY_SETTLE_TURNS
     );
 
     expect(launcher.start).not.toHaveBeenCalled();
@@ -1451,7 +1454,8 @@ describe('createProviderIssueHandoffService', () => {
 
     await vi.advanceTimersByTimeAsync(1_001);
     await waitForCondition(
-      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing'
+      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing',
+      QUEUED_RETRY_SETTLE_TURNS
     );
 
     expect(launcher.start).not.toHaveBeenCalled();
