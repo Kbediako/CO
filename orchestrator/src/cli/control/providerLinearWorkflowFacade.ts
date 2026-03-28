@@ -1522,13 +1522,172 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     return null;
   }
   const issue = value as Record<string, unknown>;
-  return (
-    normalizeRequiredString(issue.id as string | null | undefined) &&
-    normalizeRequiredString(issue.identifier as string | null | undefined) &&
-    normalizeRequiredString(issue.title as string | null | undefined)
-  )
-    ? (value as ProviderLinearIssueContext)
-    : null;
+  const id = normalizeRequiredString(issue.id as string | null | undefined);
+  const identifier = normalizeRequiredString(issue.identifier as string | null | undefined);
+  const title = normalizeRequiredString(issue.title as string | null | undefined);
+  const state = parseCachedWorkflowState(issue.state);
+  const team = parseCachedIssueTeam(issue.team);
+  const project = parseCachedIssueProject(issue.project);
+  const comments = parseCachedIssueComments(issue.comments);
+  const attachments = parseCachedIssueAttachments(issue.attachments);
+  if (!id || !identifier || !title || comments === null || attachments === null) {
+    return null;
+  }
+  if (issue.state !== undefined && issue.state !== null && state === null) {
+    return null;
+  }
+  if (issue.team !== undefined && issue.team !== null && team === null) {
+    return null;
+  }
+  if (issue.project !== undefined && issue.project !== null && project === null) {
+    return null;
+  }
+
+  const workpadComment = parseCachedIssueWorkpadComment(issue.workpad_comment, comments);
+  if (issue.workpad_comment !== undefined && issue.workpad_comment !== null && workpadComment === null) {
+    return null;
+  }
+
+  return {
+    id,
+    identifier,
+    title,
+    description: normalizeOptionalString(issue.description as string | null | undefined),
+    url: normalizeOptionalString(issue.url as string | null | undefined),
+    updated_at: normalizeIso(issue.updated_at as string | null | undefined),
+    workspace_id: normalizeOptionalString(issue.workspace_id as string | null | undefined),
+    state,
+    team,
+    project,
+    comments,
+    attachments,
+    workpad_comment: workpadComment
+  };
+}
+
+function parseCachedWorkflowState(value: unknown): ProviderLinearWorkflowState | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeRequiredString(record.id as string | null | undefined);
+  const name = normalizeRequiredString(record.name as string | null | undefined);
+  if (!id || !name) {
+    return null;
+  }
+  return {
+    id,
+    name,
+    type: normalizeOptionalString(record.type as string | null | undefined)
+  };
+}
+
+function parseCachedIssueTeam(value: unknown): ProviderLinearIssueContext['team'] | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (!Array.isArray(record.states)) {
+    return null;
+  }
+  const states = record.states
+    .map((entry) => parseCachedWorkflowState(entry))
+    .filter((entry): entry is ProviderLinearWorkflowState => entry !== null);
+  if (states.length !== record.states.length) {
+    return null;
+  }
+  return {
+    id: normalizeOptionalString(record.id as string | null | undefined),
+    key: normalizeOptionalString(record.key as string | null | undefined),
+    name: normalizeOptionalString(record.name as string | null | undefined),
+    states
+  };
+}
+
+function parseCachedIssueProject(value: unknown): ProviderLinearIssueContext['project'] | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    id: normalizeOptionalString(record.id as string | null | undefined),
+    name: normalizeOptionalString(record.name as string | null | undefined)
+  };
+}
+
+function parseCachedIssueComments(value: unknown): ProviderLinearWorkflowComment[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const comments = value
+    .map((entry) => parseCachedComment(entry))
+    .filter((entry): entry is ProviderLinearWorkflowComment => entry !== null);
+  return comments.length === value.length ? comments : null;
+}
+
+function parseCachedComment(value: unknown): ProviderLinearWorkflowComment | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeRequiredString(record.id as string | null | undefined);
+  const body = normalizeRequiredString(record.body as string | null | undefined);
+  if (!id || !body) {
+    return null;
+  }
+  return {
+    id,
+    body,
+    url: normalizeOptionalString(record.url as string | null | undefined),
+    created_at: normalizeIso(record.created_at as string | null | undefined),
+    updated_at: normalizeIso(record.updated_at as string | null | undefined),
+    resolved_at: normalizeIso(record.resolved_at as string | null | undefined)
+  };
+}
+
+function parseCachedIssueAttachments(value: unknown): ProviderLinearWorkflowAttachment[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const attachments = value
+    .map((entry) => parseCachedAttachment(entry))
+    .filter((entry): entry is ProviderLinearWorkflowAttachment => entry !== null);
+  return attachments.length === value.length ? attachments : null;
+}
+
+function parseCachedAttachment(value: unknown): ProviderLinearWorkflowAttachment | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeRequiredString(record.id as string | null | undefined);
+  if (!id) {
+    return null;
+  }
+  return {
+    id,
+    title: normalizeOptionalString(record.title as string | null | undefined),
+    url: normalizeOptionalString(record.url as string | null | undefined),
+    source_type: normalizeOptionalString(record.source_type as string | null | undefined)
+  };
+}
+
+function parseCachedIssueWorkpadComment(
+  value: unknown,
+  comments: readonly ProviderLinearWorkflowComment[]
+): ProviderLinearWorkflowComment | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const comment = parseCachedComment(value);
+  if (!comment) {
+    return null;
+  }
+  const matchingComment = comments.find((entry) => entry.id === comment.id) ?? null;
+  if (!matchingComment) {
+    return null;
+  }
+  return matchingComment;
 }
 
 function parseCachedSourceSetup(value: unknown): DispatchPilotSourceSetup | null {

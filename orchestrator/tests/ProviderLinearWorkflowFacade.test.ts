@@ -1,6 +1,6 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -161,6 +161,31 @@ async function createRunScopedEnv(): Promise<NodeJS.ProcessEnv> {
     CO_LINEAR_API_TOKEN: 'lin-api-token',
     CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(dir, 'provider-linear-worker-linear-audit.jsonl')
   };
+}
+
+async function writeCachedIssueContext(
+  env: NodeJS.ProcessEnv,
+  issue: Record<string, unknown>
+): Promise<void> {
+  const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
+  if (!auditPath) {
+    throw new Error('Missing CODEX_PROVIDER_LINEAR_AUDIT_PATH for cached issue-context test setup.');
+  }
+  await writeFile(
+    join(dirname(auditPath), 'provider-linear-issue-context-cache.json'),
+    JSON.stringify(
+      {
+        schema_version: 1,
+        issue_id: 'lin-issue-1',
+        recorded_at: '2026-03-22T10:00:00.000Z',
+        source_setup: null,
+        issue
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
 }
 
 describe('providerLinearWorkflowFacade', () => {
@@ -585,6 +610,72 @@ describe('providerLinearWorkflowFacade', () => {
       ok: true,
       operation: 'upsert-workpad',
       action: 'noop',
+      comment: {
+        id: 'comment-workpad',
+        body: updatedWorkpadBody
+      }
+    });
+  });
+
+  it('ignores malformed cached issue context for workpad upserts and falls back to a live read', async () => {
+    const env = await createRunScopedEnv();
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Fall back to a live issue-context read when the cache is malformed.'],
+      notesLines: ['- Malformed cached comments or attachments should not reach downstream workpad logic.']
+    });
+    await writeCachedIssueContext(env, {
+      id: 'lin-issue-1',
+      identifier: 'CO-1',
+      title: 'Corrupted cache',
+      comments: {
+        invalid: true
+      },
+      attachments: {
+        invalid: true
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: updatedWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                url: 'https://linear.app/comment/workpad',
+                body: updatedWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
       comment: {
         id: 'comment-workpad',
         body: updatedWorkpadBody
