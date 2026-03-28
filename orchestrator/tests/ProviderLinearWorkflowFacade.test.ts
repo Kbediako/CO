@@ -5801,6 +5801,83 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('does not retry attachment via URL when the GitHub-specific mutation is rate limited', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearAttachGitHubPr')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          url: 'https://github.com/openai/codex-orchestrator/pull/123',
+          title: 'PR 123'
+        });
+        return new Response(
+          JSON.stringify({
+            errors: [
+              {
+                message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+                extensions: {
+                  code: 'RATELIMITED',
+                  statusCode: 429
+                }
+              }
+            ]
+          }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'retry-after': '3600',
+              'x-ratelimit-requests-limit': '5000',
+              'x-ratelimit-requests-remaining': '0',
+              'x-ratelimit-requests-reset': '1774701380970',
+              'x-request-id': 'req-attach-1'
+            }
+          }
+        );
+      }
+      if (body.query?.includes('ProviderLinearAttachUrl')) {
+        throw new Error('URL fallback must not run after a rate-limited GitHub PR attachment failure');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await attachProviderLinearIssuePr({
+      issueId: 'lin-issue-1',
+      url: 'https://github.com/openai/codex-orchestrator/pull/123',
+      title: 'PR 123',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'attach-pr',
+      error: {
+        code: 'linear_rate_limited',
+        message: 'Linear API rate limit exceeded.',
+        status: 429,
+        retryable: true,
+        details: {
+          errors: ['Rate limit exceeded. Only 5000 requests are allowed per 1 hour.'],
+          retry_after_seconds: 3600,
+          requests_remaining: 0,
+          requests_limit: 5000,
+          requests_reset_at: '2026-03-28T12:36:20.970Z',
+          request_id: 'req-attach-1'
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it('normalizes 2xx GraphQL errors to an upstream-safe status code', async () => {
     const fetchImpl: typeof fetch = vi.fn(async () =>
       jsonResponse({

@@ -1175,7 +1175,7 @@ export async function attachProviderLinearIssuePr(input: {
         source_setup: session.session.sourceSetup
       };
     }
-  } else if (githubResult.failure.kind !== 'graphql_error') {
+  } else if (!shouldFallbackToUrlAttachment(githubResult.failure)) {
     return failureFromGraphql('attach-pr', githubResult.failure);
   }
 
@@ -2528,6 +2528,15 @@ function resolveSelectedWorkpadComment(
     ok: true,
     comment: selectedComment
   };
+}
+
+function shouldFallbackToUrlAttachment(failureValue: LinearGraphqlFailure): boolean {
+  return (
+    failureValue.kind === 'graphql_error' &&
+    failureValue.status !== null &&
+    failureValue.status >= 200 &&
+    failureValue.status < 300
+  );
 }
 
 function parseAttachment(
