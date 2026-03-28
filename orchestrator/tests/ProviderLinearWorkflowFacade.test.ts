@@ -807,6 +807,64 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('treats future-dated cached workpad records as stale before mutating', async () => {
+    const env = await createRunScopedEnv();
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Reject future-dated cache freshness before updating the workpad.'],
+      notesLines: ['- A future recorded_at should force a live revalidation read.']
+    });
+    await writeCachedIssueContext(env, buildCachedIssueContext(), {
+      recordedAt: new Date(Date.now() + 60_000).toISOString()
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: updatedWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                url: 'https://linear.app/comment/workpad',
+                body: updatedWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      comment: {
+        id: 'comment-workpad',
+        body: updatedWorkpadBody
+      }
+    });
+  });
+
   it('revalidates cached workpad noop decisions before skipping the mutation', async () => {
     const env = await createRunScopedEnv();
     const desiredWorkpadBody = buildStructuredWorkpadBody({

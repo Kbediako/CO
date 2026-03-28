@@ -1564,7 +1564,11 @@ async function readCachedIssueContextRecord(
 
 function isIssueContextCacheRecordFresh(record: ProviderLinearIssueContextCacheRecord): boolean {
   const recordedAt = Date.parse(record.recorded_at);
-  return Number.isFinite(recordedAt) && Date.now() - recordedAt <= PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS;
+  if (!Number.isFinite(recordedAt)) {
+    return false;
+  }
+  const ageMs = Date.now() - recordedAt;
+  return ageMs >= 0 && ageMs <= PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS;
 }
 
 async function writeCachedIssueContextRecord(
