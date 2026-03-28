@@ -3577,7 +3577,8 @@ function parseLinearRateLimitResetHeader(value: string | null | undefined): stri
   if (!Number.isInteger(parsed) || parsed <= 0) {
     return null;
   }
-  return new Date(parsed).toISOString();
+  const timestamp = new Date(parsed);
+  return Number.isNaN(timestamp.getTime()) ? null : timestamp.toISOString();
 }
 
 function scopeMismatchError(

@@ -364,6 +364,59 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('ignores an invalid rate-limit reset header instead of throwing while classifying the failure', async () => {
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl: vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            errors: [
+              {
+                message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+                extensions: {
+                  code: 'RATELIMITED',
+                  statusCode: 429
+                }
+              }
+            ]
+          }),
+          {
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json',
+              'retry-after': '3600',
+              'x-ratelimit-requests-limit': '5000',
+              'x-ratelimit-requests-remaining': '0',
+              'x-ratelimit-requests-reset': '8640000000000001',
+              'x-request-id': 'req-1'
+            }
+          }
+        )
+      )
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'issue-context',
+      error: {
+        code: 'linear_rate_limited',
+        message: 'Linear API rate limit exceeded.',
+        status: 429,
+        retryable: true,
+        details: {
+          errors: ['Rate limit exceeded. Only 5000 requests are allowed per 1 hour.'],
+          retry_after_seconds: 3600,
+          requests_remaining: 0,
+          requests_limit: 5000,
+          request_id: 'req-1'
+        }
+      }
+    });
+  });
+
   it('keeps a caller-supplied persisted scope authoritative instead of backfilling missing fields from env', async () => {
     const fetchImpl: typeof fetch = vi.fn(async () => jsonResponse(buildIssueContextBody()));
 
