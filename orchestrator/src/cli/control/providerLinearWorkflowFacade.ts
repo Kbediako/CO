@@ -1115,7 +1115,7 @@ export async function transitionProviderLinearIssueState(input: {
     return failure('transition', 'linear_state_transition_failed', 'Linear issue state transition did not succeed.', 503);
   }
 
-  if (cacheContext) {
+  if (cacheContext && canTrustCachedMutationContext) {
     await writeCachedIssueContextRecord(
       input.env,
       {

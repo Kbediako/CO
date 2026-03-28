@@ -5674,6 +5674,160 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('does not refresh stale workpad comment cache data after a stale cached transition', async () => {
+    const env = await createRunScopedEnv();
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        comments: [
+          {
+            id: 'comment-stale',
+            body: '## Codex Workpad\n\nOld cached body',
+            url: 'https://linear.app/comment/stale',
+            created_at: '2026-03-22T09:00:00.000Z',
+            updated_at: '2026-03-22T09:30:00.000Z',
+            resolved_at: null
+          }
+        ],
+        workpad_comment: {
+          id: 'comment-stale',
+          body: '## Codex Workpad\n\nOld cached body',
+          url: 'https://linear.app/comment/stale',
+          created_at: '2026-03-22T09:00:00.000Z',
+          updated_at: '2026-03-22T09:30:00.000Z',
+          resolved_at: null
+        }
+      }),
+      {
+        recordedAt: '2026-03-22T10:00:00.000Z'
+      }
+    );
+
+    const transitionFetch: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-1',
+          stateId: 'state-human-review'
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'CO-1',
+                state: {
+                  id: 'state-human-review',
+                  name: 'Human Review',
+                  type: 'started'
+                }
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const transitionResult = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      env,
+      fetchImpl: transitionFetch
+    });
+
+    expect(transitionFetch).toHaveBeenCalledTimes(2);
+    expect(transitionResult).toMatchObject({
+      ok: true,
+      operation: 'transition',
+      action: 'updated',
+      issue: {
+        state: {
+          id: 'state-human-review',
+          name: 'Human Review'
+        }
+      }
+    });
+
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Refresh the workpad after the stale transition cache path.'],
+      notesLines: ['- A stale transition should not make stale comment ids look fresh.']
+    });
+    const upsertFetch: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            state: {
+              id: 'state-human-review',
+              name: 'Human Review',
+              type: 'started'
+            },
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-live',
+                  body: '## Codex Workpad\n\nLive body',
+                  url: 'https://linear.app/comment/live',
+                  createdAt: '2026-03-22T09:00:00.000Z',
+                  updatedAt: '2026-03-22T09:30:00.000Z',
+                  resolvedAt: null
+                }
+              ]
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-live',
+          body: updatedWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-live',
+                url: 'https://linear.app/comment/live',
+                body: updatedWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const upsertResult = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      env,
+      fetchImpl: upsertFetch
+    });
+
+    expect(upsertFetch).toHaveBeenCalledTimes(2);
+    expect(upsertResult).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      comment: {
+        id: 'comment-live',
+        body: updatedWorkpadBody
+      }
+    });
+  });
+
   it('falls back to a live summary when cached team states miss the requested transition target', async () => {
     const env = await createRunScopedEnv();
     await writeCachedIssueContext(
