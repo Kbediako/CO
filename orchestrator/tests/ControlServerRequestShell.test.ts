@@ -1,11 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import http from 'node:http';
+import type { Socket } from 'node:net';
 
 import type { ControlRequestSharedContext } from '../src/cli/control/controlRequestContext.js';
 import type { ControlExpiryLifecycle } from '../src/cli/control/controlExpiryLifecycle.js';
 import { createControlServerRequestShell } from '../src/cli/control/controlServerRequestShell.js';
 
+const serverSockets = new Map<http.Server, Set<Socket>>();
+
 async function listen(server: http.Server): Promise<string> {
+  const sockets = new Set<Socket>();
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+  serverSockets.set(server, sockets);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') {
@@ -56,13 +65,24 @@ describe('createControlServerRequestShell', () => {
   afterEach(async () => {
     await Promise.all(
       [...servers].map(
-        (server) =>
-          new Promise<void>((resolve) => {
+        async (server) => {
+          if (!server.listening) {
+            serverSockets.get(server)?.forEach((socket) => socket.destroy());
+            serverSockets.delete(server);
+            return;
+          }
+          await new Promise<void>((resolve) => {
             server.close(() => resolve());
-          })
+            server.closeIdleConnections?.();
+            server.closeAllConnections?.();
+            serverSockets.get(server)?.forEach((socket) => socket.destroy());
+          });
+          serverSockets.delete(server);
+        }
       )
     );
     servers.clear();
+    serverSockets.clear();
   });
 
   it('returns a 503 JSON error before the control runtime is available', async () => {

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { access, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import type { Socket } from 'node:net';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -49,6 +50,7 @@ async function createControlEndpointServer(): Promise<{
   close(): Promise<void>;
 }> {
   const actions: Array<Record<string, unknown>> = [];
+  const sockets = new Set<Socket>();
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
@@ -58,6 +60,10 @@ async function createControlEndpointServer(): Promise<{
       res.end(JSON.stringify({ ok: true }));
     });
   });
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
   const address = server.address();
   if (!address || typeof address === 'string') {
@@ -66,7 +72,18 @@ async function createControlEndpointServer(): Promise<{
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
     actions,
-    close: () => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+    close: async () => {
+      if (!server.listening) {
+        sockets.forEach((socket) => socket.destroy());
+        return;
+      }
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+        server.closeIdleConnections?.();
+        server.closeAllConnections?.();
+        sockets.forEach((socket) => socket.destroy());
+      });
+    }
   };
 }
 

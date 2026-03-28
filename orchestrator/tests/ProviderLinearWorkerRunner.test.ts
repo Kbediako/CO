@@ -2,6 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
 import { mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
+import type { Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -69,6 +70,7 @@ async function createControlEndpointServer(bindHost = '127.0.0.1'): Promise<{
     headers: http.IncomingHttpHeaders;
     body: Record<string, unknown>;
   }> = [];
+  const sockets = new Set<Socket>();
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
@@ -82,6 +84,10 @@ async function createControlEndpointServer(bindHost = '127.0.0.1'): Promise<{
       res.end(JSON.stringify({ queued: true, coalesced: false }));
     });
   });
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
   await new Promise<void>((resolve) => server.listen(0, bindHost, () => resolve()));
   const address = server.address();
   if (!address || typeof address === 'string') {
@@ -91,7 +97,18 @@ async function createControlEndpointServer(bindHost = '127.0.0.1'): Promise<{
   return {
     baseUrl: `http://${host}:${address.port}`,
     requests,
-    close: () => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+    close: async () => {
+      if (!server.listening) {
+        sockets.forEach((socket) => socket.destroy());
+        return;
+      }
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+        server.closeIdleConnections?.();
+        server.closeAllConnections?.();
+        sockets.forEach((socket) => socket.destroy());
+      });
+    }
   };
 }
 

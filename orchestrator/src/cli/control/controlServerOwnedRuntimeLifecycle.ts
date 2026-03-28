@@ -80,5 +80,7 @@ export async function closeControlServerOwnedRuntime(
       }
       resolve();
     });
+    options.server.closeIdleConnections?.();
+    options.server.closeAllConnections?.();
   });
 }
