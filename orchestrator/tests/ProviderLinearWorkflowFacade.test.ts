@@ -239,7 +239,11 @@ async function createRunScopedEnv(): Promise<NodeJS.ProcessEnv> {
 
 async function writeCachedIssueContext(
   env: NodeJS.ProcessEnv,
-  issue: Record<string, unknown>
+  issue: Record<string, unknown>,
+  options?: {
+    recordedAt?: string;
+    sourceSetup?: Record<string, unknown> | null;
+  }
 ): Promise<void> {
   const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
   if (!auditPath) {
@@ -251,8 +255,8 @@ async function writeCachedIssueContext(
       {
         schema_version: 1,
         issue_id: 'lin-issue-1',
-        recorded_at: '2026-03-22T10:00:00.000Z',
-        source_setup: null,
+        recorded_at: options?.recordedAt ?? '2026-03-22T10:00:00.000Z',
+        source_setup: options?.sourceSetup ?? null,
         issue
       },
       null,
@@ -706,7 +710,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('revalidates cached workpad context before mutation and updates the cache after success', async () => {
+  it('uses a fresh cached workpad context for a direct mutation and updates the cache after success', async () => {
     const env = await createRunScopedEnv();
     await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
@@ -716,16 +720,13 @@ describe('providerLinearWorkflowFacade', () => {
 
     const updatedWorkpadBody = buildStructuredWorkpadBody({
       planLines: ['- Updated through the cached workpad path.'],
-      notesLines: ['- Cached preflight still revalidates live workpad state before mutating.']
+      notesLines: ['- Fresh cached workpad state should mutate directly without a second read.']
     });
     const mutationFetch: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
         variables?: Record<string, string>;
       };
-      if (body.query?.includes('ProviderLinearIssueContext')) {
-        return jsonResponse(buildIssueContextBody());
-      }
       if (body.query?.includes('ProviderLinearUpdateComment')) {
         expect(body.variables).toEqual({
           id: 'comment-workpad',
@@ -754,7 +755,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: mutationFetch
     });
 
-    expect(mutationFetch).toHaveBeenCalledTimes(2);
+    expect(mutationFetch).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       ok: true,
       operation: 'upsert-workpad',
@@ -898,17 +899,87 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('revalidates cached workpad selection before updating a replaced live comment', async () => {
+  it('uses a fresh cached workpad context for a direct create mutation when no workpad exists', async () => {
     const env = await createRunScopedEnv();
     await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
       env,
-      fetchImpl: vi.fn(async () => jsonResponse(buildIssueContextBody()))
+      fetchImpl: vi.fn(async () =>
+        jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-note',
+                  body: 'Unrelated note',
+                  url: 'https://linear.app/comment/note',
+                  createdAt: '2026-03-22T08:00:00.000Z',
+                  updatedAt: '2026-03-22T08:30:00.000Z',
+                  resolvedAt: null
+                }
+              ]
+            }
+          })
+        )
+      )
     });
 
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Create the workpad directly from a fresh cached issue-context read.'],
+      notesLines: ['- Fresh cached workpad absence should not force another live read before create.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created',
+                url: 'https://linear.app/comment/workpad-created',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      comment: {
+        id: 'comment-created',
+        body: createdWorkpadBody
+      }
+    });
+  });
+
+  it('revalidates stale cached workpad selection before updating a replaced live comment', async () => {
+    const env = await createRunScopedEnv();
+    await writeCachedIssueContext(env, buildCachedIssueContext());
+
     const updatedWorkpadBody = buildStructuredWorkpadBody({
-      planLines: ['- Update the currently live workpad after revalidation.'],
-      notesLines: ['- Cached workpad ids must not survive comment replacement in Linear.']
+      planLines: ['- Update the currently live workpad after stale-cache revalidation.'],
+      notesLines: ['- Stale cached workpad ids must not survive comment replacement in Linear.']
     });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -1176,15 +1247,6 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
         variables?: Record<string, string>;
       };
-      if (body.query?.includes('ProviderLinearIssueContext')) {
-        return jsonResponse(
-          buildIssueContextBody({
-            comments: {
-              nodes: []
-            }
-          })
-        );
-      }
       if (body.query?.includes('ProviderLinearCreateComment')) {
         expect(body.variables).toEqual({
           issueId: 'lin-issue-1',
@@ -1213,7 +1275,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: recreateFetch
     });
 
-    expect(recreateFetch).toHaveBeenCalledTimes(2);
+    expect(recreateFetch).toHaveBeenCalledTimes(1);
     expect(recreateResult).toMatchObject({
       ok: true,
       operation: 'upsert-workpad',
@@ -5379,7 +5441,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('revalidates cached issue summary before transition mutation and updates the cached state after success', async () => {
+  it('uses a fresh cached issue summary for a direct transition mutation and updates the cached state after success', async () => {
     const env = await createRunScopedEnv();
     await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
@@ -5392,9 +5454,6 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
         variables?: Record<string, string>;
       };
-      if (body.query?.includes('ProviderLinearIssueSummary')) {
-        return jsonResponse(buildIssueContextBody());
-      }
       if (body.query?.includes('ProviderLinearMoveIssue')) {
         expect(body.variables).toEqual({
           id: 'lin-issue-1',
@@ -5427,7 +5486,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: mutationFetch
     });
 
-    expect(mutationFetch).toHaveBeenCalledTimes(2);
+    expect(mutationFetch).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       ok: true,
       operation: 'transition',
@@ -5641,13 +5700,10 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('fails closed when a cached transition revalidation shows the issue moved out of scoped project ownership', async () => {
+  it('fails closed when a stale cached transition revalidation shows the issue moved out of scoped project ownership', async () => {
     const env = await createRunScopedEnv();
-    await getProviderLinearIssueContext({
-      issueId: 'lin-issue-1',
-      env,
-      sourceSetup: scopedSourceSetup,
-      fetchImpl: vi.fn(async () => jsonResponse(buildIssueContextBody()))
+    await writeCachedIssueContext(env, buildCachedIssueContext(), {
+      sourceSetup: scopedSourceSetup
     });
 
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {

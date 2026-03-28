@@ -219,6 +219,7 @@ const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
 const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
+const PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS = 10_000;
 
 type ProviderLinearOperation =
   | 'issue-context'
@@ -704,7 +705,8 @@ export async function upsertProviderLinearWorkpadComment(input: {
     return failureFromWorkflowError('upsert-workpad', session.error);
   }
 
-  const cachedContext = await readCachedIssueContext(input.env, issueId, session.session.sourceSetup);
+  const cachedRecord = await readCachedIssueContextRecord(input.env, issueId, session.session.sourceSetup);
+  const cachedContext = cachedRecord?.issue ?? null;
   const context = cachedContext
     ? {
         ok: true as const,
@@ -716,7 +718,8 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   let issueContext = context.issue;
-  if (cachedContext) {
+  const canTrustCachedMutationContext = cachedRecord !== null && isIssueContextCacheRecordFresh(cachedRecord);
+  if (cachedContext && !canTrustCachedMutationContext) {
     // Re-read live comment state before any mutation so cached workpad ids cannot
     // cause duplicate comments or updates against deleted/replaced workpads.
     const liveContext = await readIssueContext(session.session, issueId);
@@ -726,19 +729,34 @@ export async function upsertProviderLinearWorkpadComment(input: {
     issueContext = liveContext.issue;
   }
 
-  const workpadValidation = validateWorkpadBodyContract(body, issueContext.description);
-  if (!workpadValidation.ok) {
-    return failure(
-      'upsert-workpad',
-      workpadValidation.error.code,
-      workpadValidation.error.message,
-      workpadValidation.error.status,
-      workpadValidation.error.details
-    );
-  }
-
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
-  const selectedCommentResult = resolveSelectedWorkpadComment(issueContext, requestedCommentId);
+  const resolveWorkpadMutationContext = (
+    currentIssueContext: ProviderLinearIssueContext
+  ):
+    | {
+        ok: true;
+        comment: ProviderLinearWorkflowComment | null;
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      } => {
+    const workpadValidation = validateWorkpadBodyContract(body, currentIssueContext.description);
+    if (!workpadValidation.ok) {
+      return {
+        ok: false,
+        error: {
+          code: workpadValidation.error.code,
+          message: workpadValidation.error.message,
+          status: workpadValidation.error.status,
+          details: workpadValidation.error.details
+        }
+      };
+    }
+    return resolveSelectedWorkpadComment(currentIssueContext, requestedCommentId);
+  };
+
+  let selectedCommentResult = resolveWorkpadMutationContext(issueContext);
   if (!selectedCommentResult.ok) {
     return failure(
       'upsert-workpad',
@@ -748,7 +766,26 @@ export async function upsertProviderLinearWorkpadComment(input: {
       selectedCommentResult.error.details
     );
   }
-  const selectedComment = selectedCommentResult.comment;
+  let selectedComment = selectedCommentResult.comment;
+
+  if (selectedComment && selectedComment.body === body && cachedContext && canTrustCachedMutationContext) {
+    const liveContext = await readIssueContext(session.session, issueId);
+    if (!liveContext.ok) {
+      return failureFromWorkflowError('upsert-workpad', liveContext.error);
+    }
+    issueContext = liveContext.issue;
+    selectedCommentResult = resolveWorkpadMutationContext(issueContext);
+    if (!selectedCommentResult.ok) {
+      return failure(
+        'upsert-workpad',
+        selectedCommentResult.error.code,
+        selectedCommentResult.error.message,
+        selectedCommentResult.error.status,
+        selectedCommentResult.error.details
+      );
+    }
+    selectedComment = selectedCommentResult.comment;
+  }
 
   if (selectedComment && selectedComment.body === body) {
     await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup);
@@ -977,7 +1014,8 @@ export async function transitionProviderLinearIssueState(input: {
     return failureFromWorkflowError('transition', session.error);
   }
 
-  const cachedContext = await readCachedIssueContext(input.env, issueId, session.session.sourceSetup);
+  const cachedRecord = await readCachedIssueContextRecord(input.env, issueId, session.session.sourceSetup);
+  const cachedContext = cachedRecord?.issue ?? null;
   const initialSummary = cachedContext
     ? {
         ok: true as const,
@@ -990,7 +1028,8 @@ export async function transitionProviderLinearIssueState(input: {
 
   let summary = initialSummary.issue;
   let cacheContext = cachedContext;
-  if (cachedContext) {
+  const canTrustCachedMutationContext = cachedRecord !== null && isIssueContextCacheRecordFresh(cachedRecord);
+  if (cachedContext && !canTrustCachedMutationContext) {
     const liveSummary = await readIssueSummary(session.session, issueId);
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
@@ -999,7 +1038,16 @@ export async function transitionProviderLinearIssueState(input: {
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
   }
 
-  const targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+  let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+  if (!targetState && cachedContext && canTrustCachedMutationContext) {
+    const liveSummary = await readIssueSummary(session.session, issueId);
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+  }
   if (!targetState) {
     return failure(
       'transition',
@@ -1007,6 +1055,24 @@ export async function transitionProviderLinearIssueState(input: {
       `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
       422
     );
+  }
+
+  if (sameWorkflowState(summary.state, targetState) && cachedContext && canTrustCachedMutationContext) {
+    const liveSummary = await readIssueSummary(session.session, issueId);
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+    if (!targetState) {
+      return failure(
+        'transition',
+        'linear_state_not_found',
+        `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
+        422
+      );
+    }
   }
 
   if (sameWorkflowState(summary.state, targetState)) {
@@ -1475,11 +1541,11 @@ function resolveIssueContextCachePath(env: NodeJS.ProcessEnv | undefined): strin
   return join(dirname(auditPath), PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME);
 }
 
-async function readCachedIssueContext(
+async function readCachedIssueContextRecord(
   env: NodeJS.ProcessEnv | undefined,
   issueId: string,
   sourceSetup: DispatchPilotSourceSetup | null
-): Promise<ProviderLinearIssueContext | null> {
+): Promise<ProviderLinearIssueContextCacheRecord | null> {
   const cachePath = resolveIssueContextCachePath(env);
   if (!cachePath) {
     return null;
@@ -1490,10 +1556,15 @@ async function readCachedIssueContext(
     if (!record || record.issue_id !== issueId || !sameResolvedSourceSetup(record.source_setup, sourceSetup)) {
       return null;
     }
-    return record.issue;
+    return record;
   } catch {
     return null;
   }
+}
+
+function isIssueContextCacheRecordFresh(record: ProviderLinearIssueContextCacheRecord): boolean {
+  const recordedAt = Date.parse(record.recorded_at);
+  return Number.isFinite(recordedAt) && Date.now() - recordedAt <= PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS;
 }
 
 async function writeCachedIssueContextRecord(
