@@ -433,7 +433,7 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges.');
     expect(firstPrompt).toContain('After the PR actually merges and before moving the issue to `Done`, inspect the shared local repo checkout at `/tmp/co` rather than the per-issue workspace');
     expect(firstPrompt).toContain('`git -C "/tmp/co" status --short --branch`');
-    expect(firstPrompt).toContain('`git -C "/tmp/co" fetch origin main`');
+    expect(firstPrompt).toContain('`git -C "/tmp/co" fetch origin refs/heads/main:refs/remotes/origin/main`');
     expect(firstPrompt).toContain('`git -C "/tmp/co" merge --ff-only origin/main`');
     expect(firstPrompt).toContain('leave it untouched and record the explicit skip reason before `Done`');
     expect(firstPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
@@ -482,7 +482,7 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges.');
     expect(continuationPrompt).toContain('After the PR actually merges and before moving the issue to `Done`, inspect the shared local repo checkout at `/tmp/co` rather than the per-issue workspace');
     expect(continuationPrompt).toContain('`git -C "/tmp/co" status --short --branch`');
-    expect(continuationPrompt).toContain('`git -C "/tmp/co" fetch origin main`');
+    expect(continuationPrompt).toContain('`git -C "/tmp/co" fetch origin refs/heads/main:refs/remotes/origin/main`');
     expect(continuationPrompt).toContain('`git -C "/tmp/co" merge --ff-only origin/main`');
     expect(continuationPrompt).toContain('leave it untouched and record the explicit skip reason before `Done`');
     expect(continuationPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
@@ -776,6 +776,7 @@ describe('provider linear worker runner', () => {
     expect(firstTurnPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(firstTurnPrompt).toContain(`inspect the shared local repo checkout at \`${expectedSharedRepoCheckoutPath}\` rather than the per-issue workspace`);
     expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" status --short --branch\``);
+    expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" fetch origin refs/heads/main:refs/remotes/origin/main\``);
     expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" merge --ff-only origin/main\``);
     expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
@@ -783,6 +784,7 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(continuationPrompt).toContain(`inspect the shared local repo checkout at \`${expectedSharedRepoCheckoutPath}\` rather than the per-issue workspace`);
     expect(continuationPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" status --short --branch\``);
+    expect(continuationPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" fetch origin refs/heads/main:refs/remotes/origin/main\``);
     expect(continuationPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" merge --ff-only origin/main\``);
     expect(proof).toMatchObject({
       thread_id: 'thread-1',

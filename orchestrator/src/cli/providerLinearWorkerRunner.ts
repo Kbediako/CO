@@ -540,12 +540,12 @@ function deriveSharedRepoCheckoutPathFallback(workerRepoRoot: string, taskId: st
 
 function buildMergedCloseoutGuidance(sharedRepoCheckoutPath: string): string[] {
   const statusCommand = `git -C "${sharedRepoCheckoutPath}" status --short --branch`;
-  const fetchCommand = `git -C "${sharedRepoCheckoutPath}" fetch origin main`;
+  const fetchCommand = `git -C "${sharedRepoCheckoutPath}" fetch origin refs/heads/main:refs/remotes/origin/main`;
   const mergeCommand = `git -C "${sharedRepoCheckoutPath}" merge --ff-only origin/main`;
   return [
     '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges.',
     `- After the PR actually merges and before moving the issue to \`Done\`, inspect the shared local repo checkout at \`${sharedRepoCheckoutPath}\` rather than the per-issue workspace, and record before/after \`${statusCommand}\` in the same workpad closeout.`,
-    `- Only reconcile that shared checkout when it is on clean \`main\`: run \`${fetchCommand}\` and then \`${mergeCommand}\`; if it is dirty, detached, on another branch, or otherwise unsafe to mutate, leave it untouched and record the explicit skip reason before \`Done\`.`
+    `- Only reconcile that shared checkout when it is on clean \`main\`: refresh the local \`origin/main\` tracking ref with \`${fetchCommand}\` and then run \`${mergeCommand}\`; if it is dirty, detached, on another branch, or otherwise unsafe to mutate, leave it untouched and record the explicit skip reason before \`Done\`.`
   ];
 }
 

@@ -55,7 +55,7 @@ After the PR merges and before moving the issue to `Done`:
 3. Only when that checkout is on `main` and clean, run:
 
 ```bash
-git -C "$SHARED_ROOT" fetch origin main
+git -C "$SHARED_ROOT" fetch origin refs/heads/main:refs/remotes/origin/main
 git -C "$SHARED_ROOT" merge --ff-only origin/main
 ```
 
