@@ -18,8 +18,8 @@
 - [x] docs-review approval captured for `linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21`. Evidence: `/Users/kbediako/Code/CO/.runs/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21/cli/2026-03-28T09-20-51-476Z-b169d281/manifest.json`.
 
 ## Workflow
-- [ ] Issue moved from `Ready` to the live started state (`In Progress`) before active coding. Evidence: pending; packaged Linear `transition` mutation currently returns HTTP 400, and `issue-context` still reports state `Ready` as of `2026-03-28T09:54:20.549Z`.
-- [ ] Exactly one persistent `## Codex Workpad` comment is kept current on the issue. Evidence: pending; packaged Linear `upsert-workpad` mutation not yet healthy, and `issue-context` still reports no workpad comment as of `2026-03-28T09:54:20.549Z`.
+- [x] Issue moved from `Ready` to the live started state (`In Progress`) before active coding. Evidence: packaged `linear transition` succeeded with explicit workspace/team/project scope IDs and `issue-context` now reports state `In Progress`.
+- [x] Exactly one persistent `## Codex Workpad` comment is kept current on the issue. Evidence: packaged `linear upsert-workpad` created and updated comment `71d7292d-9968-4d0e-a2fd-f5a8377df342`, and `issue-context` now reports that comment as the active workpad.
 
 ## Implementation
 - [x] Repeated post-merge failure shape reproduced or otherwise root-caused with artifact-backed evidence. Evidence: `out/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21/manual/root-cause-evidence.md`.
@@ -41,7 +41,7 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21 npm run pack:smoke` if downstream-facing CLI/package/review-wrapper surfaces change. Evidence: not required; the working diff is limited to docs plus test-only paths and does not modify downstream runtime/package entrypoints.
 
 ## Handoff
-- [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: PR `#315` / `https://github.com/Kbediako/CO/pull/315` is attached on the issue as attachment `0b8b3520-0eab-4ac1-a1a1-825d003ce820`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: explicit `git fetch origin refs/heads/main:refs/remotes/origin/main` refreshed `origin/main`, and both local `HEAD` and refreshed `origin/main` were `b81084ed121a59ca98f2b522ca1b5b602ceb54e8` before the fix commits were published.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
-- [ ] Issue moved to the actual team review state (`In Review`) only after coding stops. Evidence: pending; live `issue-context` still reports `Ready` and no attachments as of `2026-03-28T09:54:20.549Z`.
+- [ ] Issue moved to the actual team review state (`In Review`) only after coding stops. Evidence: pending; issue is now `In Progress` with PR `#315` attached and the workpad current while required PR checks finish.
