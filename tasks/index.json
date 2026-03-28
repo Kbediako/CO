@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260328-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4",
+      "title": "Fix Active Provider-Worker Linear Write-Back When Reads Succeed",
+      "relates_to": "tasks/tasks-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-28",
+      "paths": {
+        "spec": "tasks/specs/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+        "task": "tasks/tasks-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+        "agent_task": ".agent/task/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+        "docs": "docs/TECH_SPEC-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md"
+      }
+    },
+    {
       "id": "20260328-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21",
       "title": "Fix Repeated Post-Merge Core Lane Failures in ProviderIssueHandoff and CLI Command Surface Suites",
       "relates_to": "tasks/tasks-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
