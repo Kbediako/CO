@@ -51,6 +51,9 @@ async function createControlEndpointServer(): Promise<{
 }> {
   const actions: Array<Record<string, unknown>> = [];
   const sockets = new Set<Socket>();
+  const destroyTrackedSockets = () => {
+    sockets.forEach((socket) => socket.destroy());
+  };
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
@@ -74,14 +77,14 @@ async function createControlEndpointServer(): Promise<{
     actions,
     close: async () => {
       if (!server.listening) {
-        sockets.forEach((socket) => socket.destroy());
+        destroyTrackedSockets();
         return;
       }
       await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
         server.closeIdleConnections?.();
         server.closeAllConnections?.();
-        sockets.forEach((socket) => socket.destroy());
+        destroyTrackedSockets();
       });
     }
   };

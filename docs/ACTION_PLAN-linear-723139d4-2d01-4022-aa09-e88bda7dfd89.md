@@ -50,7 +50,7 @@
 ## Risks & Mitigations
 - Risk: the suite hang is nondeterministic and resists small-scope reproduction.
   - Mitigation: keep durable reproduction notes and use bounded process/handle inspection to narrow the owner incrementally.
-- Risk: the apparent provider-handoff link is now only historical while the live owner sits elsewhere in the late suite.
+- Risk: the apparent provider-handoff link is now only historical, while the live owner sits elsewhere in the late suite.
   - Mitigation: follow the current-main evidence instead of forcing the fix into `ProviderIssueHandoff`.
 - Risk: a broad harness rewrite would overrun the lane.
   - Mitigation: adopt an explicit repo-owned validation contract only if a bounded fix is not defensible within the issue scope.

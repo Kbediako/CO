@@ -19,7 +19,7 @@
 
 ## Implementation
 - [x] Owning cause of the surviving post-suite idle path isolated with concrete handle/process/code-path evidence. Evidence: `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
-- [x] Smallest responsible fix or adopted explicit validation contract landed. Evidence: `vitest.config.core.ts`, `orchestrator/src/cli/control/controlServerOwnedRuntimeLifecycle.ts`, `tests/cli-frontend-test.spec.ts`, `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
+- [x] Smallest responsible fix or adopted explicit validation contract landed. Evidence: `vitest.config.core.ts`, `vitest.config.ts`, `orchestrator/src/cli/control/controlServerOwnedRuntimeLifecycle.ts`, `tests/cli-frontend-test.spec.ts`, `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
 - [x] Focused regressions updated for the chosen seam. Evidence: `orchestrator/tests/ControlServerReadyInstanceLifecycle.test.ts`, `orchestrator/tests/ControlServerRequestShell.test.ts`, `orchestrator/tests/OrchestratorStartPreparationShell.test.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, `orchestrator/tests/QuestionChildResolutionAdapter.test.ts`, `orchestrator/tests/TelegramOversightBridge.test.ts`, `tests/cli-frontend-test.spec.ts`.
 - [x] `CO-14` no longer remains blocked solely because repo-wide `npm run test` lacks terminal truth. Evidence: `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
 
@@ -30,11 +30,14 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run build`. Evidence: terminal output recorded in this lane; summary mirrored in `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
 - [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run lint`. Evidence: terminal output recorded in this lane; summary mirrored in `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
 - [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run test`. Evidence: `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T063601Z-npm-run-test-after-review-fixes.log`.
+- [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run test` rerun after CodeRabbit follow-up fixes. Evidence: `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T070053Z-test.log`.
+- [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run test:adapters`. Evidence: `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T070053Z-test-adapters.log`.
+- [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run eval:test` is optional for this lane and currently fails in `evaluation/tests/harness.test.ts` (`runs the TypeScript smoke scenario successfully`) outside the CO-24 changed surface. Evidence: `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T070053Z-eval-test.log`.
 - [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run docs:check`. Evidence: terminal output recorded in this lane; summary mirrored in `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
 - [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run docs:freshness`. Evidence: terminal output recorded in this lane; summary mirrored in `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
 - [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 node scripts/diff-budget.mjs`. Evidence: terminal output recorded in this lane; summary mirrored in `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T064700Z-root-cause-and-validation.md`.
 - [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run review`. Evidence: `.runs/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/cli/2026-03-28T05-30-58-373Z-5ca3fa20/review/output.log`.
-- [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run pack:smoke` if downstream-facing CLI/package/review-wrapper paths change. Evidence: not required because the final diff does not touch downstream-facing CLI/package/review-wrapper surfaces.
+- [x] `MCP_RUNNER_TASK_ID=linear-723139d4-2d01-4022-aa09-e88bda7dfd89 npm run pack:smoke` because the final diff touches downstream-facing CLI runtime/test config surfaces. Evidence: `out/linear-723139d4-2d01-4022-aa09-e88bda7dfd89/manual/20260328T070053Z-pack-smoke-rerun.log`.
 
 ## Handoff
 - [x] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: Linear comment `adf9f26f-b1ca-421b-96cc-6293fa5ed1c5`.
