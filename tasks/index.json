@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260328-linear-156d7133-00ba-40be-bd35-67cd3ae46e21",
+      "title": "Reconcile Shared Local Checkout to origin/main After Autonomous Merge Closeout",
+      "relates_to": "tasks/tasks-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-28",
+      "paths": {
+        "spec": "tasks/specs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+        "task": "tasks/tasks-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+        "agent_task": ".agent/task/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+        "docs": "docs/TECH_SPEC-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md"
+      }
+    },
+    {
       "id": "20260328-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d",
       "title": "CO Run Codex 0.117.x-to-main Canary for Multi-Agent-v2 and App-Server Adoption",
       "relates_to": "tasks/tasks-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",

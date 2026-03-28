@@ -1,0 +1,43 @@
+# Task Checklist - linear-156d7133-00ba-40be-bd35-67cd3ae46e21
+
+- Linear Issue: `CO-25` / `156d7133-00ba-40be-bd35-67cd3ae46e21`
+- MCP Task ID: `linear-156d7133-00ba-40be-bd35-67cd3ae46e21`
+- Primary PRD: `docs/PRD-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`
+- TECH_SPEC: `tasks/specs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`
+
+## Docs-First
+- [x] PRD drafted for the shared-root merge-closeout reconciliation issue. Evidence: `docs/PRD-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`.
+- [x] TECH_SPEC drafted with the bounded provider-worker merge-closeout seam and shared-root guardrails. Evidence: `tasks/specs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`, `docs/TECH_SPEC-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`.
+- [x] ACTION_PLAN drafted for docs-review, implementation, tests, and handoff. Evidence: `docs/ACTION_PLAN-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`.
+- [x] `tasks/index.json` updated with the new TECH_SPEC entry and review date. Evidence: `tasks/index.json`.
+- [x] `docs/docs-freshness-registry.json` updated with the six `linear-156d7133-00ba-40be-bd35-67cd3ae46e21` artifact entries. Evidence: `docs/docs-freshness-registry.json`.
+- [x] `docs/TASKS.md` updated with the new lane snapshot. Evidence: `docs/TASKS.md`.
+- [x] Checklist mirrored to `.agent/task/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`. Evidence: `.agent/task/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`.
+- [x] Standalone review approval captured in the spec/checklist notes. Evidence: `tasks/specs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md`.
+- [x] docs-review approval captured for `linear-156d7133-00ba-40be-bd35-67cd3ae46e21`. Evidence: `.runs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21/cli/2026-03-27T22-20-59-833Z-8c11f043/manifest.json`.
+
+## Implementation
+- [x] Update provider-worker first-turn and continuation prompts to require shared-root inspection, safe fast-forward-only sync, and explicit skip-reason evidence before `Done`. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`.
+- [x] Update repo-local `skills/linear/SKILL.md` and `skills/land/SKILL.md` so merged closeout guidance matches the new shared-root reconciliation contract. Evidence: `skills/linear/SKILL.md`, `skills/land/SKILL.md`.
+- [x] Add focused prompt/contract regression coverage for the new merged closeout requirements. Evidence: `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
+
+## Validation
+- [x] `DELEGATION_GUARD_OVERRIDE_REASON="subagent spawning unavailable in-session for this provider worker" node scripts/delegation-guard.mjs`. Evidence: override-backed guard pass recorded in the worker validation log for `linear-156d7133-00ba-40be-bd35-67cd3ae46e21`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: command passed on the final tree.
+- [x] `npm run build`. Evidence: command passed on the final tree.
+- [x] `npm run lint`. Evidence: command passed on the final tree.
+- [x] `npm run test`. Evidence: full Vitest suite passed on the final tree (`299 passed`, `2567 passed`).
+- [x] `npm run docs:check`. Evidence: command passed on the final tree.
+- [x] `npm run docs:freshness`. Evidence: command passed on the final tree.
+- [x] `node scripts/diff-budget.mjs`. Evidence: command passed on the final tree (`files=12/25`, `lines=441/1200`, `+418/-23`).
+- [x] `npm run review`. Evidence: clean manifest-backed review with no findings recorded under `.runs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21/cli/2026-03-27T22-20-59-833Z-8c11f043/manifest.json` and `.runs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21/cli/2026-03-27T22-20-59-833Z-8c11f043/review/output.log`.
+- [x] `npm run pack:smoke`. Evidence: command passed on the final tree (`pack smoke passed`).
+
+## Handoff
+- [x] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: updated workpad comment `3e8e1400-db00-4450-b920-c5bbbb2d3e3a`.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: Linear attachment `03a7e0f7-12b8-41a8-850f-184a3d2d5de3` for `https://github.com/Kbediako/CO/pull/312`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: `git rev-list --left-right --count HEAD...origin/main` returned `0 0` after `git fetch origin main`.
+- [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
+- [ ] Shared root closeout records before/after root state and either fast-forward success or an explicit skip reason before moving the issue to `Done`. Evidence: pending.
+- [ ] Issue moved to the actual team review state (`In Review`) only after coding stops. Evidence: pending.

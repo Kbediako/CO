@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
-import { mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -384,8 +384,9 @@ describe('provider linear worker runner', () => {
     const issue = createTrackedIssue();
 
     const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
-    const firstPrompt = buildProviderWorkerPrompt(issue, 1, 5, helperCommand);
-    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand);
+    const sharedRepoCheckoutPath = '/tmp/co';
+    const firstPrompt = buildProviderWorkerPrompt(issue, 1, 5, helperCommand, sharedRepoCheckoutPath);
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, sharedRepoCheckoutPath);
 
     expect(firstPrompt).toContain('You are the provider worker for Linear issue CO-2');
     expect(firstPrompt).toContain('Issue description:');
@@ -429,7 +430,12 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(firstPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work');
     expect(firstPrompt).toContain('If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.');
-    expect(firstPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.');
+    expect(firstPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges.');
+    expect(firstPrompt).toContain('After the PR actually merges and before moving the issue to `Done`, inspect the shared local repo checkout at `/tmp/co` rather than the per-issue workspace');
+    expect(firstPrompt).toContain('`git -C "/tmp/co" status --short --branch`');
+    expect(firstPrompt).toContain('`git -C "/tmp/co" fetch origin main`');
+    expect(firstPrompt).toContain('`git -C "/tmp/co" merge --ff-only origin/main`');
+    expect(firstPrompt).toContain('leave it untouched and record the explicit skip reason before `Done`');
     expect(firstPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
     expect(firstPrompt).toContain('close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`');
     expect(continuationPrompt).toContain('Continuation guidance:');
@@ -473,7 +479,12 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work');
     expect(continuationPrompt).toContain('If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.');
     expect(continuationPrompt).toContain('`Merging` and `Rework` are optional active workflow states only when the team exposes them.');
-    expect(continuationPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.');
+    expect(continuationPrompt).toContain('If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges.');
+    expect(continuationPrompt).toContain('After the PR actually merges and before moving the issue to `Done`, inspect the shared local repo checkout at `/tmp/co` rather than the per-issue workspace');
+    expect(continuationPrompt).toContain('`git -C "/tmp/co" status --short --branch`');
+    expect(continuationPrompt).toContain('`git -C "/tmp/co" fetch origin main`');
+    expect(continuationPrompt).toContain('`git -C "/tmp/co" merge --ff-only origin/main`');
+    expect(continuationPrompt).toContain('leave it untouched and record the explicit skip reason before `Done`');
     expect(continuationPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
     expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.');
   });
@@ -758,14 +769,21 @@ describe('provider linear worker runner', () => {
     ]);
     const firstTurnPrompt = String(execRunner.mock.calls[0]?.[0].args[2] ?? '');
     const continuationPrompt = String(execRunner.mock.calls[1]?.[0].args[4] ?? '');
+    const expectedSharedRepoCheckoutPath = await realpath(tempRoot ?? '');
     expect(firstTurnPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(firstTurnPrompt).toContain('about 2+ changed files or about 40+ changed lines');
     expect(firstTurnPrompt).toContain('manual elegance checklist');
     expect(firstTurnPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
+    expect(firstTurnPrompt).toContain(`inspect the shared local repo checkout at \`${expectedSharedRepoCheckoutPath}\` rather than the per-issue workspace`);
+    expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" status --short --branch\``);
+    expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" merge --ff-only origin/main\``);
     expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
     expect(continuationPrompt).toContain('manual elegance checklist');
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
+    expect(continuationPrompt).toContain(`inspect the shared local repo checkout at \`${expectedSharedRepoCheckoutPath}\` rather than the per-issue workspace`);
+    expect(continuationPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" status --short --branch\``);
+    expect(continuationPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" merge --ff-only origin/main\``);
     expect(proof).toMatchObject({
       thread_id: 'thread-1',
       latest_turn_id: 'turn-2',

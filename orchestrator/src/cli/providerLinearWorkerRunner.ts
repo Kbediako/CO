@@ -527,6 +527,28 @@ function buildPreReviewHandoffGateSection(): string[] {
   ];
 }
 
+function deriveSharedRepoCheckoutPathFallback(workerRepoRoot: string, taskId: string): string {
+  const canonicalWorkerRepoRoot = resolve(workerRepoRoot);
+  if (
+    basename(canonicalWorkerRepoRoot) === taskId &&
+    basename(dirname(canonicalWorkerRepoRoot)) === PROVIDER_WORKSPACE_ROOT_DIRNAME
+  ) {
+    return resolve(canonicalWorkerRepoRoot, '..', '..');
+  }
+  return canonicalWorkerRepoRoot;
+}
+
+function buildMergedCloseoutGuidance(sharedRepoCheckoutPath: string): string[] {
+  const statusCommand = `git -C "${sharedRepoCheckoutPath}" status --short --branch`;
+  const fetchCommand = `git -C "${sharedRepoCheckoutPath}" fetch origin main`;
+  const mergeCommand = `git -C "${sharedRepoCheckoutPath}" merge --ff-only origin/main`;
+  return [
+    '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges.',
+    `- After the PR actually merges and before moving the issue to \`Done\`, inspect the shared local repo checkout at \`${sharedRepoCheckoutPath}\` rather than the per-issue workspace, and record before/after \`${statusCommand}\` in the same workpad closeout.`,
+    `- Only reconcile that shared checkout when it is on clean \`main\`: run \`${fetchCommand}\` and then \`${mergeCommand}\`; if it is dirty, detached, on another branch, or otherwise unsafe to mutate, leave it untouched and record the explicit skip reason before \`Done\`.`
+  ];
+}
+
 function buildRuntimeProofGuidance(helperCommand: string, issueId: string): string {
   return `- For app-touching lanes, inspect permit posture with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --format json\`, then generate reviewer-usable handoff content with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --kind <screenshot|external-link|video> --proof-url <reviewer-url> --title <label> --summary <what changed> --format json\`; add \`--reachability-mode dns-public\` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.`;
 }
@@ -535,7 +557,8 @@ export function buildProviderWorkerPrompt(
   issue: LiveLinearTrackedIssue,
   turnNumber: number,
   maxTurns: number,
-  helperCommand: string
+  helperCommand: string,
+  sharedRepoCheckoutPath: string
 ): string {
   if (turnNumber > 1) {
     return [
@@ -560,7 +583,7 @@ export function buildProviderWorkerPrompt(
       '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work.',
       '- `Human Review` and `In Review` are review handoff states for the worker. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
       '- `Merging` and `Rework` are optional active workflow states only when the team exposes them.',
-      '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.',
+      ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
       '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
       '- Keep final closeout in that same workpad comment instead of creating a separate terminal summary comment.',
       '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.',
@@ -594,7 +617,7 @@ export function buildProviderWorkerPrompt(
     '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work.',
     '- `Human Review` and `In Review` are stop-coding handoff states. If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.',
     '- Treat `Merging` and `Rework` as active workflow states only when the team exposes them.',
-    '- If the issue is in `Merging`, keep ownership and shepherd the PR through conflicts, checks, and final review until it merges, then move the issue to `Done`.',
+    ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
     '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
     issue.url ? `- Linear URL: ${issue.url}` : null,
     issue.state ? `- Current state: ${issue.state}` : null,
@@ -1521,7 +1544,20 @@ export async function runProviderLinearWorker(
   }
 
   for (let turnNumber = 1; turnNumber <= context.maxTurns; turnNumber += 1) {
-    const prompt = buildProviderWorkerPrompt(issue, turnNumber, context.maxTurns, helperCommand);
+    const sharedRepoCheckoutPath =
+      (await resolveProviderControlHostRepoRoot({
+        manifestPath: context.manifestPath,
+        workerWorkspacePath: context.repoRoot,
+        taskId: context.taskId
+      })) ??
+      deriveSharedRepoCheckoutPathFallback(context.repoRoot, context.taskId);
+    const prompt = buildProviderWorkerPrompt(
+      issue,
+      turnNumber,
+      context.maxTurns,
+      helperCommand,
+      sharedRepoCheckoutPath
+    );
     const args =
       turnNumber === 1
         ? ['exec', '--json', prompt]
