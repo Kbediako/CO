@@ -990,16 +990,16 @@ export async function transitionProviderLinearIssueState(input: {
 
   let summary = initialSummary.issue;
   let cacheContext = cachedContext;
-  let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
-  if (!targetState && cachedContext) {
+  if (cachedContext) {
     const liveSummary = await readIssueSummary(session.session, issueId);
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
     summary = liveSummary.issue;
     cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
-    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
   }
+
+  const targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
   if (!targetState) {
     return failure(
       'transition',
@@ -1007,24 +1007,6 @@ export async function transitionProviderLinearIssueState(input: {
       `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
       422
     );
-  }
-
-  if (sameWorkflowState(summary.state, targetState) && cachedContext) {
-    const liveSummary = await readIssueSummary(session.session, issueId);
-    if (!liveSummary.ok) {
-      return failureFromWorkflowError('transition', liveSummary.error);
-    }
-    summary = liveSummary.issue;
-    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
-    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
-    if (!targetState) {
-      return failure(
-        'transition',
-        'linear_state_not_found',
-        `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
-        422
-      );
-    }
   }
 
   if (sameWorkflowState(summary.state, targetState)) {

@@ -5379,7 +5379,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('reuses cached issue context for transitions and updates the cached state after mutation success', async () => {
+  it('revalidates cached issue summary before transition mutation and updates the cached state after success', async () => {
     const env = await createRunScopedEnv();
     await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
@@ -5392,27 +5392,32 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
         variables?: Record<string, string>;
       };
-      expect(body.query).toContain('ProviderLinearMoveIssue');
-      expect(body.variables).toEqual({
-        id: 'lin-issue-1',
-        stateId: 'state-human-review'
-      });
-      return jsonResponse({
-        data: {
-          issueUpdate: {
-            success: true,
-            issue: {
-              id: 'lin-issue-1',
-              identifier: 'CO-1',
-              state: {
-                id: 'state-human-review',
-                name: 'Human Review',
-                type: 'started'
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-1',
+          stateId: 'state-human-review'
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'CO-1',
+                state: {
+                  id: 'state-human-review',
+                  name: 'Human Review',
+                  type: 'started'
+                }
               }
             }
           }
-        }
-      });
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
     });
 
     const result = await transitionProviderLinearIssueState({
@@ -5422,7 +5427,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: mutationFetch
     });
 
-    expect(mutationFetch).toHaveBeenCalledTimes(1);
+    expect(mutationFetch).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({
       ok: true,
       operation: 'transition',
@@ -5631,6 +5636,55 @@ describe('providerLinearWorkflowFacade', () => {
         state: {
           id: 'state-human-review',
           name: 'Human Review'
+        }
+      }
+    });
+  });
+
+  it('fails closed when a cached transition revalidation shows the issue moved out of scoped project ownership', async () => {
+    const env = await createRunScopedEnv();
+    await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      sourceSetup: scopedSourceSetup,
+      fetchImpl: vi.fn(async () => jsonResponse(buildIssueContextBody()))
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            project: null
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        throw new Error('Transition mutation must not run after live summary scope revalidation fails');
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      sourceSetup: scopedSourceSetup,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'transition',
+      error: {
+        code: 'linear_project_mismatch',
+        status: 422,
+        details: {
+          expected: 'lin-project-1',
+          actual: null
         }
       }
     });
