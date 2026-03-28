@@ -121,6 +121,80 @@ function buildIssueContextBody(overrides: Record<string, unknown> = {}): unknown
   };
 }
 
+function buildCachedIssueContext(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'lin-issue-1',
+    identifier: 'CO-1',
+    title: 'Add Linear parity helper',
+    description: 'Implement the worker-visible helper surface.',
+    workspace_id: 'lin-workspace-1',
+    state: {
+      id: 'state-in-progress',
+      name: 'In Progress',
+      type: 'started'
+    },
+    team: {
+      id: 'lin-team-1',
+      key: 'CO',
+      name: 'Codex Orchestrator',
+      states: [
+        {
+          id: 'state-backlog',
+          name: 'Backlog',
+          type: 'unstarted'
+        },
+        {
+          id: 'state-in-progress',
+          name: 'In Progress',
+          type: 'started'
+        },
+        {
+          id: 'state-human-review',
+          name: 'Human Review',
+          type: 'started'
+        },
+        {
+          id: 'state-done',
+          name: 'Done',
+          type: 'completed'
+        }
+      ]
+    },
+    project: {
+      id: 'lin-project-1',
+      name: 'CO'
+    },
+    comments: [
+      {
+        id: 'comment-workpad',
+        body: '## Codex Workpad\n\nOld plan',
+        url: 'https://linear.app/comment/workpad',
+        created_at: '2026-03-22T09:00:00.000Z',
+        updated_at: '2026-03-22T09:30:00.000Z',
+        resolved_at: null
+      },
+      {
+        id: 'comment-note',
+        body: 'Unrelated note',
+        url: 'https://linear.app/comment/note',
+        created_at: '2026-03-22T08:00:00.000Z',
+        updated_at: '2026-03-22T08:30:00.000Z',
+        resolved_at: null
+      }
+    ],
+    attachments: [],
+    workpad_comment: {
+      id: 'comment-workpad',
+      body: '## Codex Workpad\n\nOld plan',
+      url: 'https://linear.app/comment/workpad',
+      created_at: '2026-03-22T09:00:00.000Z',
+      updated_at: '2026-03-22T09:30:00.000Z',
+      resolved_at: null
+    },
+    ...overrides
+  };
+}
+
 function buildStructuredWorkpadBody(overrides: {
   environmentLines?: string[];
   planLines?: string[];
@@ -322,6 +396,7 @@ describe('providerLinearWorkflowFacade', () => {
             errors: [
               {
                 message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+                path: ['issue'],
                 extensions: {
                   code: 'RATELIMITED',
                   statusCode: 429
@@ -337,6 +412,15 @@ describe('providerLinearWorkflowFacade', () => {
               'x-ratelimit-requests-limit': '5000',
               'x-ratelimit-requests-remaining': '0',
               'x-ratelimit-requests-reset': '1774701380970',
+              'x-ratelimit-endpoint-requests-limit': '500',
+              'x-ratelimit-endpoint-requests-remaining': '12',
+              'x-ratelimit-endpoint-requests-reset': '1774701381970',
+              'x-ratelimit-complexity-limit': '1500000',
+              'x-ratelimit-complexity-remaining': '1499000',
+              'x-ratelimit-complexity-reset': '1774701382970',
+              'x-ratelimit-endpoint-complexity-limit': '200000',
+              'x-ratelimit-endpoint-complexity-remaining': '199000',
+              'x-ratelimit-endpoint-complexity-reset': '1774701383970',
               'x-request-id': 'req-1'
             }
           }
@@ -353,11 +437,29 @@ describe('providerLinearWorkflowFacade', () => {
         status: 429,
         retryable: true,
         details: {
-          errors: ['Rate limit exceeded. Only 5000 requests are allowed per 1 hour.'],
+          errors: [
+            {
+              message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+              path: ['issue'],
+              extensions: {
+                code: 'RATELIMITED',
+                statusCode: 429
+              }
+            }
+          ],
           retry_after_seconds: 3600,
           requests_remaining: 0,
           requests_limit: 5000,
           requests_reset_at: '2026-03-28T12:36:20.970Z',
+          endpoint_requests_remaining: 12,
+          endpoint_requests_limit: 500,
+          endpoint_requests_reset_at: '2026-03-28T12:36:21.970Z',
+          complexity_remaining: 1499000,
+          complexity_limit: 1500000,
+          complexity_reset_at: '2026-03-28T12:36:22.970Z',
+          endpoint_complexity_remaining: 199000,
+          endpoint_complexity_limit: 200000,
+          endpoint_complexity_reset_at: '2026-03-28T12:36:23.970Z',
           request_id: 'req-1'
         }
       }
@@ -376,6 +478,7 @@ describe('providerLinearWorkflowFacade', () => {
             errors: [
               {
                 message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+                path: ['issue'],
                 extensions: {
                   code: 'RATELIMITED',
                   statusCode: 429
@@ -407,7 +510,16 @@ describe('providerLinearWorkflowFacade', () => {
         status: 429,
         retryable: true,
         details: {
-          errors: ['Rate limit exceeded. Only 5000 requests are allowed per 1 hour.'],
+          errors: [
+            {
+              message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+              path: ['issue'],
+              extensions: {
+                code: 'RATELIMITED',
+                statusCode: 429
+              }
+            }
+          ],
           retry_after_seconds: 3600,
           requests_remaining: 0,
           requests_limit: 5000,
@@ -594,7 +706,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('reuses cached issue context for workpad upserts and updates the cache after mutation success', async () => {
+  it('revalidates cached workpad context before mutation and updates the cache after success', async () => {
     const env = await createRunScopedEnv();
     await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
@@ -604,30 +716,35 @@ describe('providerLinearWorkflowFacade', () => {
 
     const updatedWorkpadBody = buildStructuredWorkpadBody({
       planLines: ['- Updated through the cached workpad path.'],
-      notesLines: ['- Cached preflight reuse avoided another live issue-context read.']
+      notesLines: ['- Cached preflight still revalidates live workpad state before mutating.']
     });
     const mutationFetch: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
         variables?: Record<string, string>;
       };
-      expect(body.query).toContain('ProviderLinearUpdateComment');
-      expect(body.variables).toEqual({
-        id: 'comment-workpad',
-        body: updatedWorkpadBody
-      });
-      return jsonResponse({
-        data: {
-          commentUpdate: {
-            success: true,
-            comment: {
-              id: 'comment-workpad',
-              url: 'https://linear.app/comment/workpad',
-              body: updatedWorkpadBody
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: updatedWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                url: 'https://linear.app/comment/workpad',
+                body: updatedWorkpadBody
+              }
             }
           }
-        }
-      });
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
     });
 
     const result = await upsertProviderLinearWorkpadComment({
@@ -637,7 +754,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: mutationFetch
     });
 
-    expect(mutationFetch).toHaveBeenCalledTimes(1);
+    expect(mutationFetch).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({
       ok: true,
       operation: 'upsert-workpad',
@@ -777,6 +894,142 @@ describe('providerLinearWorkflowFacade', () => {
       comment: {
         id: 'comment-workpad',
         body: desiredWorkpadBody
+      }
+    });
+  });
+
+  it('revalidates cached workpad selection before updating a replaced live comment', async () => {
+    const env = await createRunScopedEnv();
+    await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl: vi.fn(async () => jsonResponse(buildIssueContextBody()))
+    });
+
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Update the currently live workpad after revalidation.'],
+      notesLines: ['- Cached workpad ids must not survive comment replacement in Linear.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-live',
+                  body: '## Codex Workpad\n\nLive workpad replaced the cached comment.',
+                  url: 'https://linear.app/comment/workpad-live',
+                  createdAt: '2026-03-22T10:00:00.000Z',
+                  updatedAt: '2026-03-22T10:15:00.000Z',
+                  resolvedAt: null
+                }
+              ]
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-live',
+          body: updatedWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-live',
+                url: 'https://linear.app/comment/workpad-live',
+                body: updatedWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      comment: {
+        id: 'comment-live',
+        body: updatedWorkpadBody
+      }
+    });
+  });
+
+  it('rejects cached issue context records whose nested issue id does not match the cache key', async () => {
+    const env = await createRunScopedEnv();
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Ignore inconsistent cached issue ids before mutating the workpad.'],
+      notesLines: ['- Cache records must fall back to a live read when the nested issue id diverges.']
+    });
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        id: 'lin-issue-2'
+      })
+    );
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: updatedWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                url: 'https://linear.app/comment/workpad',
+                body: updatedWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      comment: {
+        id: 'comment-workpad',
+        body: updatedWorkpadBody
       }
     });
   });
@@ -923,23 +1176,34 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
         variables?: Record<string, string>;
       };
-      expect(body.query).toContain('ProviderLinearCreateComment');
-      expect(body.variables).toEqual({
-        issueId: 'lin-issue-1',
-        body: workpadBody
-      });
-      return jsonResponse({
-        data: {
-          commentCreate: {
-            success: true,
-            comment: {
-              id: 'comment-workpad-recreated',
-              url: 'https://linear.app/comment/workpad-recreated',
-              body: workpadBody
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: workpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad-recreated',
+                url: 'https://linear.app/comment/workpad-recreated',
+                body: workpadBody
+              }
             }
           }
-        }
-      });
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
     });
 
     const recreateResult = await upsertProviderLinearWorkpadComment({
@@ -949,7 +1213,7 @@ describe('providerLinearWorkflowFacade', () => {
       fetchImpl: recreateFetch
     });
 
-    expect(recreateFetch).toHaveBeenCalledTimes(1);
+    expect(recreateFetch).toHaveBeenCalledTimes(2);
     expect(recreateResult).toMatchObject({
       ok: true,
       operation: 'upsert-workpad',
@@ -5288,6 +5552,90 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('falls back to a live summary when cached team states miss the requested transition target', async () => {
+    const env = await createRunScopedEnv();
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        team: {
+          id: 'lin-team-1',
+          key: 'CO',
+          name: 'Codex Orchestrator',
+          states: [
+            {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            {
+              id: 'state-in-progress',
+              name: 'In Progress',
+              type: 'started'
+            },
+            {
+              id: 'state-done',
+              name: 'Done',
+              type: 'completed'
+            }
+          ]
+        }
+      })
+    );
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-1',
+          stateId: 'state-human-review'
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'CO-1',
+                state: {
+                  id: 'state-human-review',
+                  name: 'Human Review',
+                  type: 'started'
+                }
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'transition',
+      action: 'updated',
+      issue: {
+        state: {
+          id: 'state-human-review',
+          name: 'Human Review'
+        }
+      }
+    });
+  });
+
   it('creates a same-project Backlog follow-up issue with related and blocker linkage', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -5591,7 +5939,7 @@ describe('providerLinearWorkflowFacade', () => {
         status: 409,
         retryable: false,
         details: {
-          errors: ['relation failed'],
+          errors: [{ message: 'relation failed' }],
           created_issue: {
             id: 'lin-issue-2',
             identifier: 'CO-2',
@@ -5702,7 +6050,7 @@ describe('providerLinearWorkflowFacade', () => {
         status: 409,
         retryable: false,
         details: {
-          errors: ['block relation failed'],
+          errors: [{ message: 'block relation failed' }],
           created_issue: {
             id: 'lin-issue-2',
             identifier: 'CO-2',
@@ -5866,7 +6214,15 @@ describe('providerLinearWorkflowFacade', () => {
         status: 429,
         retryable: true,
         details: {
-          errors: ['Rate limit exceeded. Only 5000 requests are allowed per 1 hour.'],
+          errors: [
+            {
+              message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+              extensions: {
+                code: 'RATELIMITED',
+                statusCode: 429
+              }
+            }
+          ],
           retry_after_seconds: 3600,
           requests_remaining: 0,
           requests_limit: 5000,
@@ -5881,7 +6237,15 @@ describe('providerLinearWorkflowFacade', () => {
   it('normalizes 2xx GraphQL errors to an upstream-safe status code', async () => {
     const fetchImpl: typeof fetch = vi.fn(async () =>
       jsonResponse({
-        errors: [{ message: 'Linear returned operation errors.' }]
+        errors: [
+          {
+            message: 'Linear returned operation errors.',
+            path: ['issue'],
+            extensions: {
+              code: 'MUTATION_FAILED'
+            }
+          }
+        ]
       })
     );
 
@@ -5901,7 +6265,15 @@ describe('providerLinearWorkflowFacade', () => {
         message: 'Linear GraphQL returned operation errors.',
         status: 502,
         details: {
-          errors: ['Linear returned operation errors.']
+          errors: [
+            {
+              message: 'Linear returned operation errors.',
+              path: ['issue'],
+              extensions: {
+                code: 'MUTATION_FAILED'
+              }
+            }
+          ]
         }
       }
     });

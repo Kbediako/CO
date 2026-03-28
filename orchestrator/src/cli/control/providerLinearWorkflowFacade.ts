@@ -714,7 +714,19 @@ export async function upsertProviderLinearWorkpadComment(input: {
   if (!context.ok) {
     return failureFromWorkflowError('upsert-workpad', context.error);
   }
-  const workpadValidation = validateWorkpadBodyContract(body, context.issue.description);
+
+  let issueContext = context.issue;
+  if (cachedContext) {
+    // Re-read live comment state before any mutation so cached workpad ids cannot
+    // cause duplicate comments or updates against deleted/replaced workpads.
+    const liveContext = await readIssueContext(session.session, issueId);
+    if (!liveContext.ok) {
+      return failureFromWorkflowError('upsert-workpad', liveContext.error);
+    }
+    issueContext = liveContext.issue;
+  }
+
+  const workpadValidation = validateWorkpadBodyContract(body, issueContext.description);
   if (!workpadValidation.ok) {
     return failure(
       'upsert-workpad',
@@ -726,8 +738,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
-  let issueContext = context.issue;
-  let selectedCommentResult = resolveSelectedWorkpadComment(issueContext, requestedCommentId);
+  const selectedCommentResult = resolveSelectedWorkpadComment(issueContext, requestedCommentId);
   if (!selectedCommentResult.ok) {
     return failure(
       'upsert-workpad',
@@ -737,26 +748,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
       selectedCommentResult.error.details
     );
   }
-  let selectedComment = selectedCommentResult.comment;
-
-  if (selectedComment && selectedComment.body === body && cachedContext) {
-    const liveContext = await readIssueContext(session.session, issueId);
-    if (!liveContext.ok) {
-      return failureFromWorkflowError('upsert-workpad', liveContext.error);
-    }
-    issueContext = liveContext.issue;
-    selectedCommentResult = resolveSelectedWorkpadComment(issueContext, requestedCommentId);
-    if (!selectedCommentResult.ok) {
-      return failure(
-        'upsert-workpad',
-        selectedCommentResult.error.code,
-        selectedCommentResult.error.message,
-        selectedCommentResult.error.status,
-        selectedCommentResult.error.details
-      );
-    }
-    selectedComment = selectedCommentResult.comment;
-  }
+  const selectedComment = selectedCommentResult.comment;
 
   if (selectedComment && selectedComment.body === body) {
     await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup);
@@ -999,6 +991,15 @@ export async function transitionProviderLinearIssueState(input: {
   let summary = initialSummary.issue;
   let cacheContext = cachedContext;
   let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+  if (!targetState && cachedContext) {
+    const liveSummary = await readIssueSummary(session.session, issueId);
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+  }
   if (!targetState) {
     return failure(
       'transition',
@@ -1549,7 +1550,7 @@ function parseIssueContextCacheRecord(value: unknown): ProviderLinearIssueContex
   const issueId = normalizeRequiredString(record.issue_id as string | null | undefined);
   const recordedAt = normalizeRequiredString(record.recorded_at as string | null | undefined);
   const issue = parseCachedIssueContext(record.issue);
-  if (!issueId || !recordedAt || !issue) {
+  if (!issueId || !recordedAt || !issue || issue.id !== issueId) {
     return null;
   }
   return {
@@ -3608,7 +3609,7 @@ function mapGraphqlFailure(failureValue: LinearGraphqlFailure): ProviderLinearWo
       message: 'Linear GraphQL returned operation errors.',
       status: normalizeGraphqlFailureStatus(failureValue.status),
       details: {
-        errors: failureValue.errors.map((entry) => entry.message ?? 'unknown_error')
+        errors: serializeLinearGraphqlErrors(failureValue.errors)
       }
     };
   }
@@ -3635,6 +3636,27 @@ function buildLinearRateLimitError(failureValue: LinearGraphqlFailure): Provider
   const requestsRemaining = parseIntegerHeader(failureValue.headers?.['x-ratelimit-requests-remaining']);
   const requestsLimit = parsePositiveIntegerHeader(failureValue.headers?.['x-ratelimit-requests-limit']);
   const requestsResetAt = parseLinearRateLimitResetHeader(failureValue.headers?.['x-ratelimit-requests-reset']);
+  const endpointRequestsRemaining = parseIntegerHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-requests-remaining']
+  );
+  const endpointRequestsLimit = parsePositiveIntegerHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-requests-limit']
+  );
+  const endpointRequestsResetAt = parseLinearRateLimitResetHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-requests-reset']
+  );
+  const complexityRemaining = parseIntegerHeader(failureValue.headers?.['x-ratelimit-complexity-remaining']);
+  const complexityLimit = parsePositiveIntegerHeader(failureValue.headers?.['x-ratelimit-complexity-limit']);
+  const complexityResetAt = parseLinearRateLimitResetHeader(failureValue.headers?.['x-ratelimit-complexity-reset']);
+  const endpointComplexityRemaining = parseIntegerHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-complexity-remaining']
+  );
+  const endpointComplexityLimit = parsePositiveIntegerHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-complexity-limit']
+  );
+  const endpointComplexityResetAt = parseLinearRateLimitResetHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-complexity-reset']
+  );
   const requestId = normalizeOptionalString(failureValue.headers?.['x-request-id']);
   return {
     code: 'linear_rate_limited',
@@ -3642,14 +3664,45 @@ function buildLinearRateLimitError(failureValue: LinearGraphqlFailure): Provider
     status: 429,
     retryable: true,
     details: {
-      errors: failureValue.errors.map((entry) => entry.message ?? 'unknown_error'),
+      errors: serializeLinearGraphqlErrors(failureValue.errors),
       ...(retryAfterSeconds !== null ? { retry_after_seconds: retryAfterSeconds } : {}),
       ...(requestsRemaining !== null ? { requests_remaining: requestsRemaining } : {}),
       ...(requestsLimit !== null ? { requests_limit: requestsLimit } : {}),
       ...(requestsResetAt !== null ? { requests_reset_at: requestsResetAt } : {}),
+      ...(endpointRequestsRemaining !== null ? { endpoint_requests_remaining: endpointRequestsRemaining } : {}),
+      ...(endpointRequestsLimit !== null ? { endpoint_requests_limit: endpointRequestsLimit } : {}),
+      ...(endpointRequestsResetAt !== null ? { endpoint_requests_reset_at: endpointRequestsResetAt } : {}),
+      ...(complexityRemaining !== null ? { complexity_remaining: complexityRemaining } : {}),
+      ...(complexityLimit !== null ? { complexity_limit: complexityLimit } : {}),
+      ...(complexityResetAt !== null ? { complexity_reset_at: complexityResetAt } : {}),
+      ...(endpointComplexityRemaining !== null
+        ? { endpoint_complexity_remaining: endpointComplexityRemaining }
+        : {}),
+      ...(endpointComplexityLimit !== null ? { endpoint_complexity_limit: endpointComplexityLimit } : {}),
+      ...(endpointComplexityResetAt !== null ? { endpoint_complexity_reset_at: endpointComplexityResetAt } : {}),
       ...(requestId ? { request_id: requestId } : {})
     }
   };
+}
+
+function serializeLinearGraphqlErrors(errors: LinearGraphqlFailure['errors']): Record<string, unknown>[] {
+  return errors.map((entry) => {
+    const path = Array.isArray(entry.path)
+      ? entry.path.filter(
+          (segment): segment is string | number =>
+            typeof segment === 'string' || (typeof segment === 'number' && Number.isFinite(segment))
+        )
+      : [];
+    const extensions =
+      entry.extensions && typeof entry.extensions === 'object'
+        ? { ...(entry.extensions as Record<string, unknown>) }
+        : null;
+    return {
+      message: normalizeOptionalString(entry.message) ?? 'unknown_error',
+      ...(path.length > 0 ? { path } : {}),
+      ...(extensions ? { extensions } : {})
+    };
+  });
 }
 
 function parseIntegerHeader(value: string | null | undefined): number | null {

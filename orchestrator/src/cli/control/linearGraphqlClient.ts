@@ -7,14 +7,21 @@ const LINEAR_GRAPHQL_RELEVANT_RESPONSE_HEADERS = [
   'x-ratelimit-requests-limit',
   'x-ratelimit-requests-remaining',
   'x-ratelimit-requests-reset',
+  'x-ratelimit-endpoint-requests-limit',
+  'x-ratelimit-endpoint-requests-remaining',
+  'x-ratelimit-endpoint-requests-reset',
   'x-ratelimit-complexity-limit',
   'x-ratelimit-complexity-remaining',
   'x-ratelimit-complexity-reset',
+  'x-ratelimit-endpoint-complexity-limit',
+  'x-ratelimit-endpoint-complexity-remaining',
+  'x-ratelimit-endpoint-complexity-reset',
   'x-request-id'
 ] as const;
 
 export interface LinearGraphqlErrorEntry {
   message?: string | null;
+  path?: Array<string | number> | null;
   extensions?: Record<string, unknown> | null;
 }
 
