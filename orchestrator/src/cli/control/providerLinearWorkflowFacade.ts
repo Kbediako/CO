@@ -726,36 +726,47 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
-  let selectedComment: ProviderLinearWorkflowComment | null;
-  if (requestedCommentId) {
-    selectedComment =
-      context.issue.comments.find(
-        (entry) => entry.id === requestedCommentId && entry.resolved_at === null && hasWorkpadMarker(entry.body)
-      ) ?? null;
-    if (!selectedComment) {
+  let issueContext = context.issue;
+  let selectedCommentResult = resolveSelectedWorkpadComment(issueContext, requestedCommentId);
+  if (!selectedCommentResult.ok) {
+    return failure(
+      'upsert-workpad',
+      selectedCommentResult.error.code,
+      selectedCommentResult.error.message,
+      selectedCommentResult.error.status,
+      selectedCommentResult.error.details
+    );
+  }
+  let selectedComment = selectedCommentResult.comment;
+
+  if (selectedComment && selectedComment.body === body && cachedContext) {
+    const liveContext = await readIssueContext(session.session, issueId);
+    if (!liveContext.ok) {
+      return failureFromWorkflowError('upsert-workpad', liveContext.error);
+    }
+    issueContext = liveContext.issue;
+    selectedCommentResult = resolveSelectedWorkpadComment(issueContext, requestedCommentId);
+    if (!selectedCommentResult.ok) {
       return failure(
         'upsert-workpad',
-        'linear_workpad_comment_id_invalid',
-        'Comment id must reference an unresolved Codex workpad comment.',
-        422,
-        {
-          comment_id: requestedCommentId
-        }
+        selectedCommentResult.error.code,
+        selectedCommentResult.error.message,
+        selectedCommentResult.error.status,
+        selectedCommentResult.error.details
       );
     }
-  } else {
-    selectedComment = context.issue.workpad_comment;
+    selectedComment = selectedCommentResult.comment;
   }
 
   if (selectedComment && selectedComment.body === body) {
-    await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup);
+    await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup);
     return {
       ok: true,
       operation: 'upsert-workpad',
       action: 'noop',
       issue: {
-        id: context.issue.id,
-        identifier: context.issue.identifier
+        id: issueContext.id,
+        identifier: issueContext.identifier
       },
       comment: selectedComment,
       source_setup: session.session.sourceSetup
@@ -782,7 +793,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
     }
     await writeCachedIssueContextRecord(
       input.env,
-      upsertIssueContextWorkpadComment(context.issue, updatedComment),
+      upsertIssueContextWorkpadComment(issueContext, updatedComment),
       session.session.sourceSetup
     );
     return {
@@ -790,8 +801,8 @@ export async function upsertProviderLinearWorkpadComment(input: {
       operation: 'upsert-workpad',
       action: 'updated',
       issue: {
-        id: context.issue.id,
-        identifier: context.issue.identifier
+        id: issueContext.id,
+        identifier: issueContext.identifier
       },
       comment: updatedComment,
       source_setup: session.session.sourceSetup
@@ -804,7 +815,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
     fetchImpl: session.session.fetchImpl,
     query: buildCreateCommentMutation(),
     variables: {
-      issueId: context.issue.id,
+      issueId: issueContext.id,
       body
     }
   });
@@ -818,7 +829,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
 
   await writeCachedIssueContextRecord(
     input.env,
-    upsertIssueContextWorkpadComment(context.issue, createdComment),
+    upsertIssueContextWorkpadComment(issueContext, createdComment),
     session.session.sourceSetup
   );
   return {
@@ -826,8 +837,8 @@ export async function upsertProviderLinearWorkpadComment(input: {
     operation: 'upsert-workpad',
     action: 'created',
     issue: {
-      id: context.issue.id,
-      identifier: context.issue.identifier
+      id: issueContext.id,
+      identifier: issueContext.identifier
     },
     comment: createdComment,
     source_setup: session.session.sourceSetup
@@ -975,37 +986,57 @@ export async function transitionProviderLinearIssueState(input: {
   }
 
   const cachedContext = await readCachedIssueContext(input.env, issueId, session.session.sourceSetup);
-  const summary = cachedContext
+  const initialSummary = cachedContext
     ? {
         ok: true as const,
         issue: summarizeIssueContext(cachedContext)
       }
     : await readIssueSummary(session.session, issueId);
-  if (!summary.ok) {
-    return failureFromWorkflowError('transition', summary.error);
+  if (!initialSummary.ok) {
+    return failureFromWorkflowError('transition', initialSummary.error);
   }
 
-  const targetState = resolveWorkflowStateByName(summary.issue.team?.states ?? [], stateName);
+  let summary = initialSummary.issue;
+  let cacheContext = cachedContext;
+  let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
   if (!targetState) {
     return failure(
       'transition',
       'linear_state_not_found',
-      `Linear team state "${stateName}" was not found for issue ${summary.issue.identifier}.`,
+      `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
       422
     );
   }
 
-  if (sameWorkflowState(summary.issue.state, targetState)) {
+  if (sameWorkflowState(summary.state, targetState) && cachedContext) {
+    const liveSummary = await readIssueSummary(session.session, issueId);
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+    if (!targetState) {
+      return failure(
+        'transition',
+        'linear_state_not_found',
+        `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
+        422
+      );
+    }
+  }
+
+  if (sameWorkflowState(summary.state, targetState)) {
     return {
       ok: true,
       operation: 'transition',
       action: 'noop',
       issue: {
-        id: summary.issue.id,
-        identifier: summary.issue.identifier,
-        state: summary.issue.state
+        id: summary.id,
+        identifier: summary.identifier,
+        state: summary.state
       },
-      previous_state: summary.issue.state,
+      previous_state: summary.state,
       target_state: targetState,
       source_setup: session.session.sourceSetup
     };
@@ -1017,7 +1048,7 @@ export async function transitionProviderLinearIssueState(input: {
     fetchImpl: session.session.fetchImpl,
     query: buildIssueTransitionMutation(),
     variables: {
-      id: summary.issue.id,
+      id: summary.id,
       stateId: targetState.id
     }
   });
@@ -1035,11 +1066,11 @@ export async function transitionProviderLinearIssueState(input: {
     return failure('transition', 'linear_state_transition_failed', 'Linear issue state transition did not succeed.', 503);
   }
 
-  if (cachedContext) {
+  if (cacheContext) {
     await writeCachedIssueContextRecord(
       input.env,
       {
-        ...cachedContext,
+        ...cacheContext,
         state: updatedState
       },
       session.session.sourceSetup
@@ -1054,7 +1085,7 @@ export async function transitionProviderLinearIssueState(input: {
       identifier: normalizeRequiredString(issue?.identifier)!,
       state: updatedState
     },
-    previous_state: summary.issue.state,
+    previous_state: summary.state,
     target_state: targetState,
     source_setup: session.session.sourceSetup
   };
@@ -1437,6 +1468,19 @@ function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinea
     state: issue.state,
     team: issue.team,
     project: issue.project
+  };
+}
+
+function mergeCachedIssueContextSummary(
+  issue: ProviderLinearIssueContext,
+  summary: ProviderLinearIssueSummary
+): ProviderLinearIssueContext {
+  return {
+    ...issue,
+    workspace_id: summary.workspace_id,
+    state: summary.state,
+    team: summary.team,
+    project: summary.project
   };
 }
 
@@ -2440,6 +2484,49 @@ function parseMutatedComment(
     created_at: null,
     updated_at: null,
     resolved_at: null
+  };
+}
+
+function resolveSelectedWorkpadComment(
+  issue: ProviderLinearIssueContext,
+  requestedCommentId: string | null
+):
+  | {
+      ok: true;
+      comment: ProviderLinearWorkflowComment | null;
+    }
+  | {
+      ok: false;
+      error: ProviderLinearWorkflowError;
+    } {
+  if (!requestedCommentId) {
+    return {
+      ok: true,
+      comment: issue.workpad_comment
+    };
+  }
+
+  const selectedComment =
+    issue.comments.find(
+      (entry) => entry.id === requestedCommentId && entry.resolved_at === null && hasWorkpadMarker(entry.body)
+    ) ?? null;
+  if (!selectedComment) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_workpad_comment_id_invalid',
+        message: 'Comment id must reference an unresolved Codex workpad comment.',
+        status: 422,
+        details: {
+          comment_id: requestedCommentId
+        }
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    comment: selectedComment
   };
 }
 
