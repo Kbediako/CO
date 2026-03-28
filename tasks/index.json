@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260328-linear-723139d4-2d01-4022-aa09-e88bda7dfd89",
+      "title": "Fix Repo-wide Full-Suite npm run test Post-Suite Idling and ProviderIssueHandoff Instability",
+      "relates_to": "tasks/tasks-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-28",
+      "paths": {
+        "spec": "tasks/specs/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+        "task": "tasks/tasks-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+        "agent_task": ".agent/task/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+        "docs": "docs/TECH_SPEC-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md"
+      }
+    },
+    {
       "id": "20260328-linear-156d7133-00ba-40be-bd35-67cd3ae46e21",
       "title": "Reconcile Shared Local Checkout to origin/main After Autonomous Merge Closeout",
       "relates_to": "tasks/tasks-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",

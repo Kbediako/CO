@@ -98,6 +98,12 @@ describe('startControlServerReadyInstanceLifecycle', () => {
       ])
     } as unknown as ControlRequestSharedContext;
     const server = {
+      closeIdleConnections: vi.fn(() => {
+        order.push('idle');
+      }),
+      closeAllConnections: vi.fn(() => {
+        order.push('all');
+      }),
       close: vi.fn((callback?: () => void) => {
         order.push('server');
         callback?.();
@@ -135,7 +141,7 @@ describe('startControlServerReadyInstanceLifecycle', () => {
       })
     ).rejects.toThrow('startup-failed');
 
-    expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server']);
+    expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server', 'idle', 'all']);
   });
 
   it('fails when startup resolves without publishing bootstrap assembly', async () => {
@@ -181,6 +187,12 @@ describe('closeControlServerOwnedRuntime', () => {
       })
     } as unknown as http.ServerResponse;
     const server = {
+      closeIdleConnections: vi.fn(() => {
+        order.push('idle');
+      }),
+      closeAllConnections: vi.fn(() => {
+        order.push('all');
+      }),
       close: vi.fn((callback?: () => void) => {
         order.push('server');
         callback?.();
@@ -207,7 +219,7 @@ describe('closeControlServerOwnedRuntime', () => {
       }
     });
 
-    expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server']);
+    expect(order).toEqual(['expiry', 'bootstrap', 'client', 'server', 'idle', 'all']);
     expect(expiryLifecycle).toBeNull();
     expect(bootstrapLifecycle).toBeNull();
   });

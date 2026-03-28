@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import type { Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,6 +12,19 @@ import {
   readDelegationHeaders
 } from '../src/cli/control/questionChildResolutionAdapter.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
+
+async function closeHttpServer(server: http.Server, sockets: Set<Socket>): Promise<void> {
+  if (!server.listening) {
+    sockets.forEach((socket) => socket.destroy());
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+    server.closeIdleConnections?.();
+    server.closeAllConnections?.();
+    sockets.forEach((socket) => socket.destroy());
+  });
+}
 
 async function createRunRoot(taskId: string) {
   const root = await mkdtemp(join(tmpdir(), 'question-child-resolution-'));
@@ -102,6 +116,7 @@ describe('QuestionChildResolutionAdapter', () => {
     await writeFile(tokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
 
     let receivedAction: Record<string, unknown> | null = null;
+    const sockets = new Set<Socket>();
     const childServer = http.createServer(async (req, res) => {
       if (req.url === '/control/action' && req.method === 'POST') {
         let body = '';
@@ -115,6 +130,10 @@ describe('QuestionChildResolutionAdapter', () => {
       }
       res.writeHead(404);
       res.end();
+    });
+    childServer.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.on('close', () => sockets.delete(socket));
     });
     await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
     const childAddress = childServer.address();
@@ -135,7 +154,7 @@ describe('QuestionChildResolutionAdapter', () => {
       });
       expect((receivedAction as { action?: string } | null)?.action).toBe('resume');
     } finally {
-      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await closeHttpServer(childServer, sockets);
       await rm(root, { recursive: true, force: true });
     }
   });
@@ -148,6 +167,7 @@ describe('QuestionChildResolutionAdapter', () => {
     await writeFile(paths.manifestPath, JSON.stringify({ run_id: 'child-run' }), 'utf8');
     await writeFile(tokenPath, JSON.stringify({ token: 'child-token' }), 'utf8');
 
+    const sockets = new Set<Socket>();
     const childServer = http.createServer((req, res) => {
       if (req.url === '/control/action' && req.method === 'POST') {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
@@ -156,6 +176,10 @@ describe('QuestionChildResolutionAdapter', () => {
       }
       res.writeHead(404);
       res.end();
+    });
+    childServer.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.on('close', () => sockets.delete(socket));
     });
     await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
     const childAddress = childServer.address();
@@ -177,7 +201,7 @@ describe('QuestionChildResolutionAdapter', () => {
         })
       ).rejects.toThrow('child control error: 500 nope');
     } finally {
-      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await closeHttpServer(childServer, sockets);
       await rm(root, { recursive: true, force: true });
     }
   });

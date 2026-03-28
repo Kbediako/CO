@@ -2,6 +2,7 @@ import http from 'node:http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import type { Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,6 +12,19 @@ import { startTelegramOversightBridge } from '../src/cli/control/telegramOversig
 import { createTelegramOversightControlActionApiClient } from '../src/cli/control/telegramOversightControlActionApiClient.js';
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
+
+async function closeHttpServer(server: http.Server, sockets: Set<Socket>): Promise<void> {
+  if (!server.listening) {
+    sockets.forEach((socket) => socket.destroy());
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+    server.closeIdleConnections?.();
+    server.closeAllConnections?.();
+    sockets.forEach((socket) => socket.destroy());
+  });
+}
 
 async function createRunRoot(taskId: string) {
   const root = await mkdtemp(join(tmpdir(), 'telegram-oversight-'));
@@ -640,6 +654,7 @@ describe('TelegramOversightBridge', () => {
     );
 
     let childControlAttempts = 0;
+    const childSockets = new Set<Socket>();
     const childServer = http.createServer((req, res) => {
       if (req.url === '/control/action' && req.method === 'POST') {
         childControlAttempts += 1;
@@ -649,6 +664,10 @@ describe('TelegramOversightBridge', () => {
       }
       res.writeHead(404);
       res.end();
+    });
+    childServer.on('connection', (socket) => {
+      childSockets.add(socket);
+      socket.on('close', () => childSockets.delete(socket));
     });
     await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
     const childAddress = childServer.address();
@@ -729,7 +748,7 @@ describe('TelegramOversightBridge', () => {
       expect(telegram.sentMessages.some((message) => message.text.includes('No queued questions.'))).toBe(true);
     } finally {
       await server.close();
-      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await closeHttpServer(childServer, childSockets);
       await rm(root, { recursive: true, force: true });
     }
   });
@@ -767,6 +786,7 @@ describe('TelegramOversightBridge', () => {
     const childActionPromise = new Promise<Record<string, unknown>>((resolve) => {
       resolveChildAction = resolve;
     });
+    const childSockets = new Set<Socket>();
     const childServer = http.createServer(async (req, res) => {
       if (req.url === '/control/action' && req.method === 'POST') {
         let body = '';
@@ -781,6 +801,10 @@ describe('TelegramOversightBridge', () => {
       }
       res.writeHead(404);
       res.end();
+    });
+    childServer.on('connection', (socket) => {
+      childSockets.add(socket);
+      socket.on('close', () => childSockets.delete(socket));
     });
     await new Promise<void>((resolve) => childServer.listen(0, '127.0.0.1', resolve));
     const childAddress = childServer.address();
@@ -861,7 +885,7 @@ describe('TelegramOversightBridge', () => {
       expect(telegram.sentMessages.some((message) => message.text.includes('No queued questions.'))).toBe(true);
     } finally {
       await server.close();
-      await new Promise<void>((resolve) => childServer.close(() => resolve()));
+      await closeHttpServer(childServer, childSockets);
       await rm(root, { recursive: true, force: true });
     }
   });

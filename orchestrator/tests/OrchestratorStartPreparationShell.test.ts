@@ -3,8 +3,28 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ManifestPersister } from '../src/cli/run/manifestPersister.js';
 import { runOrchestratorStartPreparationShell } from '../src/cli/services/orchestratorStartPreparationShell.js';
 
+const ORIGINAL_TEST_ENV = {
+  CODEX_ORCHESTRATOR_START_PREP_TEST: process.env.CODEX_ORCHESTRATOR_START_PREP_TEST,
+  CODEX_ORCHESTRATOR_RUNTIME_MODE: process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE,
+  CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE,
+  CODEX_RUNTIME_MODE: process.env.CODEX_RUNTIME_MODE
+} satisfies Partial<NodeJS.ProcessEnv>;
+
+function restoreTestEnv(
+  key: keyof typeof ORIGINAL_TEST_ENV,
+  value: string | undefined
+): void {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+}
+
 afterEach(() => {
-  delete process.env.CODEX_ORCHESTRATOR_START_PREP_TEST;
+  for (const [key, value] of Object.entries(ORIGINAL_TEST_ENV)) {
+    restoreTestEnv(key as keyof typeof ORIGINAL_TEST_ENV, value);
+  }
   vi.restoreAllMocks();
 });
 
