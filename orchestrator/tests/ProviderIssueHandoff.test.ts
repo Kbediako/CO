@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { access, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import type { Socket } from 'node:net';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -49,6 +50,10 @@ async function createControlEndpointServer(): Promise<{
   close(): Promise<void>;
 }> {
   const actions: Array<Record<string, unknown>> = [];
+  const sockets = new Set<Socket>();
+  const destroyTrackedSockets = () => {
+    sockets.forEach((socket) => socket.destroy());
+  };
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
@@ -58,6 +63,10 @@ async function createControlEndpointServer(): Promise<{
       res.end(JSON.stringify({ ok: true }));
     });
   });
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
   const address = server.address();
   if (!address || typeof address === 'string') {
@@ -66,7 +75,18 @@ async function createControlEndpointServer(): Promise<{
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
     actions,
-    close: () => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+    close: async () => {
+      if (!server.listening) {
+        destroyTrackedSockets();
+        return;
+      }
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+        server.closeIdleConnections?.();
+        server.closeAllConnections?.();
+        destroyTrackedSockets();
+      });
+    }
   };
 }
 
@@ -157,6 +177,8 @@ async function waitForCondition(
   }
   throw new Error(`Condition not met after ${turns} timer turns.`);
 }
+
+const QUEUED_RETRY_SETTLE_TURNS = 1_024;
 
 async function waitForMockCalls(
   mockFn: { mock: { calls: unknown[][] } },
@@ -1357,7 +1379,8 @@ describe('createProviderIssueHandoffService', () => {
 
     await vi.advanceTimersByTimeAsync(1_001);
     await waitForCondition(
-      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing'
+      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing',
+      QUEUED_RETRY_SETTLE_TURNS
     );
 
     expect(launcher.start).not.toHaveBeenCalled();
@@ -1431,7 +1454,8 @@ describe('createProviderIssueHandoffService', () => {
 
     await vi.advanceTimersByTimeAsync(1_001);
     await waitForCondition(
-      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing'
+      () => state.claims[0]?.retry_error === 'retry poll failed: dispatch_source_credentials_missing',
+      QUEUED_RETRY_SETTLE_TURNS
     );
 
     expect(launcher.start).not.toHaveBeenCalled();

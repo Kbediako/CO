@@ -1,3 +1,6 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+
 import {
   executeLinearGraphql,
   resolveLinearApiToken,
@@ -5,6 +8,7 @@ import {
   type LinearGraphqlFailure
 } from './linearGraphqlClient.js';
 import { resolveLinearSourceSetup } from './linearDispatchSource.js';
+import { resolveProviderLinearAuditPath } from './providerLinearWorkflowAudit.js';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 
 const LINEAR_WORKPAD_MARKER = '## Codex Workpad';
@@ -214,6 +218,8 @@ const LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_SUBCOMMANDS = new Set([
 const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
+const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
+const PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS = 10_000;
 
 type ProviderLinearOperation =
   | 'issue-context'
@@ -630,6 +636,14 @@ interface ResolvedLinearWorkflowSession {
   sourceSetup: DispatchPilotSourceSetup | null;
 }
 
+interface ProviderLinearIssueContextCacheRecord {
+  schema_version: 1;
+  issue_id: string;
+  recorded_at: string;
+  source_setup: DispatchPilotSourceSetup | null;
+  issue: ProviderLinearIssueContext;
+}
+
 export async function getProviderLinearIssueContext(input: {
   issueId: string;
   sourceSetup?: DispatchPilotSourceSetup | null;
@@ -643,14 +657,15 @@ export async function getProviderLinearIssueContext(input: {
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
   if (!session.ok) {
-    return failure('issue-context', session.error.code, session.error.message, session.error.status, session.error.details);
+    return failureFromWorkflowError('issue-context', session.error);
   }
 
   const context = await readIssueContext(session.session, issueId);
   if (!context.ok) {
-    return failure('issue-context', context.error.code, context.error.message, context.error.status, context.error.details);
+    return failureFromWorkflowError('issue-context', context.error);
   }
 
+  await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup);
   return {
     ok: true,
     operation: 'issue-context',
@@ -687,54 +702,100 @@ export async function upsertProviderLinearWorkpadComment(input: {
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
   if (!session.ok) {
-    return failure('upsert-workpad', session.error.code, session.error.message, session.error.status, session.error.details);
+    return failureFromWorkflowError('upsert-workpad', session.error);
   }
 
-  const context = await readIssueContext(session.session, issueId);
+  const cachedRecord = await readCachedIssueContextRecord(input.env, issueId, session.session.sourceSetup);
+  const cachedContext = cachedRecord?.issue ?? null;
+  const context = cachedContext
+    ? {
+        ok: true as const,
+        issue: cachedContext
+      }
+    : await readIssueContext(session.session, issueId);
   if (!context.ok) {
-    return failure('upsert-workpad', context.error.code, context.error.message, context.error.status, context.error.details);
+    return failureFromWorkflowError('upsert-workpad', context.error);
   }
-  const workpadValidation = validateWorkpadBodyContract(body, context.issue.description);
-  if (!workpadValidation.ok) {
-    return failure(
-      'upsert-workpad',
-      workpadValidation.error.code,
-      workpadValidation.error.message,
-      workpadValidation.error.status,
-      workpadValidation.error.details
-    );
+
+  let issueContext = context.issue;
+  const canTrustCachedMutationContext = cachedRecord !== null && isIssueContextCacheRecordFresh(cachedRecord);
+  if (cachedContext && !canTrustCachedMutationContext) {
+    // Re-read live comment state before any mutation so cached workpad ids cannot
+    // cause duplicate comments or updates against deleted/replaced workpads.
+    const liveContext = await readIssueContext(session.session, issueId);
+    if (!liveContext.ok) {
+      return failureFromWorkflowError('upsert-workpad', liveContext.error);
+    }
+    issueContext = liveContext.issue;
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
-  let selectedComment: ProviderLinearWorkflowComment | null;
-  if (requestedCommentId) {
-    selectedComment =
-      context.issue.comments.find(
-        (entry) => entry.id === requestedCommentId && entry.resolved_at === null && hasWorkpadMarker(entry.body)
-      ) ?? null;
-    if (!selectedComment) {
+  const resolveWorkpadMutationContext = (
+    currentIssueContext: ProviderLinearIssueContext
+  ):
+    | {
+        ok: true;
+        comment: ProviderLinearWorkflowComment | null;
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      } => {
+    const workpadValidation = validateWorkpadBodyContract(body, currentIssueContext.description);
+    if (!workpadValidation.ok) {
+      return {
+        ok: false,
+        error: {
+          code: workpadValidation.error.code,
+          message: workpadValidation.error.message,
+          status: workpadValidation.error.status,
+          details: workpadValidation.error.details
+        }
+      };
+    }
+    return resolveSelectedWorkpadComment(currentIssueContext, requestedCommentId);
+  };
+
+  let selectedCommentResult = resolveWorkpadMutationContext(issueContext);
+  if (!selectedCommentResult.ok) {
+    return failure(
+      'upsert-workpad',
+      selectedCommentResult.error.code,
+      selectedCommentResult.error.message,
+      selectedCommentResult.error.status,
+      selectedCommentResult.error.details
+    );
+  }
+  let selectedComment = selectedCommentResult.comment;
+
+  if (selectedComment && selectedComment.body === body && cachedContext && canTrustCachedMutationContext) {
+    const liveContext = await readIssueContext(session.session, issueId);
+    if (!liveContext.ok) {
+      return failureFromWorkflowError('upsert-workpad', liveContext.error);
+    }
+    issueContext = liveContext.issue;
+    selectedCommentResult = resolveWorkpadMutationContext(issueContext);
+    if (!selectedCommentResult.ok) {
       return failure(
         'upsert-workpad',
-        'linear_workpad_comment_id_invalid',
-        'Comment id must reference an unresolved Codex workpad comment.',
-        422,
-        {
-          comment_id: requestedCommentId
-        }
+        selectedCommentResult.error.code,
+        selectedCommentResult.error.message,
+        selectedCommentResult.error.status,
+        selectedCommentResult.error.details
       );
     }
-  } else {
-    selectedComment = context.issue.workpad_comment;
+    selectedComment = selectedCommentResult.comment;
   }
 
   if (selectedComment && selectedComment.body === body) {
+    await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup);
     return {
       ok: true,
       operation: 'upsert-workpad',
       action: 'noop',
       issue: {
-        id: context.issue.id,
-        identifier: context.issue.identifier
+        id: issueContext.id,
+        identifier: issueContext.identifier
       },
       comment: selectedComment,
       source_setup: session.session.sourceSetup
@@ -759,13 +820,18 @@ export async function upsertProviderLinearWorkpadComment(input: {
     if (updateResult.payload.data?.commentUpdate?.success !== true || !updatedComment) {
       return failure('upsert-workpad', 'comment_update_failed', 'Linear comment update did not succeed.', 503);
     }
+    await writeCachedIssueContextRecord(
+      input.env,
+      upsertIssueContextWorkpadComment(issueContext, updatedComment),
+      session.session.sourceSetup
+    );
     return {
       ok: true,
       operation: 'upsert-workpad',
       action: 'updated',
       issue: {
-        id: context.issue.id,
-        identifier: context.issue.identifier
+        id: issueContext.id,
+        identifier: issueContext.identifier
       },
       comment: updatedComment,
       source_setup: session.session.sourceSetup
@@ -778,7 +844,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
     fetchImpl: session.session.fetchImpl,
     query: buildCreateCommentMutation(),
     variables: {
-      issueId: context.issue.id,
+      issueId: issueContext.id,
       body
     }
   });
@@ -790,13 +856,18 @@ export async function upsertProviderLinearWorkpadComment(input: {
     return failure('upsert-workpad', 'comment_create_failed', 'Linear comment creation did not succeed.', 503);
   }
 
+  await writeCachedIssueContextRecord(
+    input.env,
+    upsertIssueContextWorkpadComment(issueContext, createdComment),
+    session.session.sourceSetup
+  );
   return {
     ok: true,
     operation: 'upsert-workpad',
     action: 'created',
     issue: {
-      id: context.issue.id,
-      identifier: context.issue.identifier
+      id: issueContext.id,
+      identifier: issueContext.identifier
     },
     comment: createdComment,
     source_setup: session.session.sourceSetup
@@ -817,24 +888,12 @@ export async function deleteProviderLinearWorkpadComment(input: {
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
   if (!session.ok) {
-    return failure(
-      'delete-workpad',
-      session.error.code,
-      session.error.message,
-      session.error.status,
-      session.error.details
-    );
+    return failureFromWorkflowError('delete-workpad', session.error);
   }
 
   const context = await readIssueContext(session.session, issueId);
   if (!context.ok) {
-    return failure(
-      'delete-workpad',
-      context.error.code,
-      context.error.message,
-      context.error.status,
-      context.error.details
-    );
+    return failureFromWorkflowError('delete-workpad', context.error);
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
@@ -875,6 +934,7 @@ export async function deleteProviderLinearWorkpadComment(input: {
   }
 
   if (!selectedComment) {
+    await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup);
     return {
       ok: true,
       operation: 'delete-workpad',
@@ -915,6 +975,11 @@ export async function deleteProviderLinearWorkpadComment(input: {
   }
   const deletedCommentId = rawDeletedCommentId ?? selectedComment.id;
 
+  await writeCachedIssueContextRecord(
+    input.env,
+    removeIssueContextComment(context.issue, deletedCommentId),
+    session.session.sourceSetup
+  );
   return {
     ok: true,
     operation: 'delete-workpad',
@@ -946,35 +1011,81 @@ export async function transitionProviderLinearIssueState(input: {
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
   if (!session.ok) {
-    return failure('transition', session.error.code, session.error.message, session.error.status, session.error.details);
+    return failureFromWorkflowError('transition', session.error);
   }
 
-  const context = await readIssueContext(session.session, issueId);
-  if (!context.ok) {
-    return failure('transition', context.error.code, context.error.message, context.error.status, context.error.details);
+  const cachedRecord = await readCachedIssueContextRecord(input.env, issueId, session.session.sourceSetup);
+  const cachedContext = cachedRecord?.issue ?? null;
+  const initialSummary = cachedContext
+    ? {
+        ok: true as const,
+        issue: summarizeIssueContext(cachedContext)
+      }
+    : await readIssueSummary(session.session, issueId);
+  if (!initialSummary.ok) {
+    return failureFromWorkflowError('transition', initialSummary.error);
   }
 
-  const targetState = resolveWorkflowStateByName(context.issue.team?.states ?? [], stateName);
+  let summary = initialSummary.issue;
+  let cacheContext = cachedContext;
+  const canTrustCachedMutationContext = cachedRecord !== null && isIssueContextCacheRecordFresh(cachedRecord);
+  if (cachedContext && !canTrustCachedMutationContext) {
+    const liveSummary = await readIssueSummary(session.session, issueId);
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+  }
+
+  let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+  if (!targetState && cachedContext && canTrustCachedMutationContext) {
+    const liveSummary = await readIssueSummary(session.session, issueId);
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+  }
   if (!targetState) {
     return failure(
       'transition',
       'linear_state_not_found',
-      `Linear team state "${stateName}" was not found for issue ${context.issue.identifier}.`,
+      `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
       422
     );
   }
 
-  if (sameWorkflowState(context.issue.state, targetState)) {
+  if (sameWorkflowState(summary.state, targetState) && cachedContext && canTrustCachedMutationContext) {
+    const liveSummary = await readIssueSummary(session.session, issueId);
+    if (!liveSummary.ok) {
+      return failureFromWorkflowError('transition', liveSummary.error);
+    }
+    summary = liveSummary.issue;
+    cacheContext = mergeCachedIssueContextSummary(cachedContext, summary);
+    targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
+    if (!targetState) {
+      return failure(
+        'transition',
+        'linear_state_not_found',
+        `Linear team state "${stateName}" was not found for issue ${summary.identifier}.`,
+        422
+      );
+    }
+  }
+
+  if (sameWorkflowState(summary.state, targetState)) {
     return {
       ok: true,
       operation: 'transition',
       action: 'noop',
       issue: {
-        id: context.issue.id,
-        identifier: context.issue.identifier,
-        state: context.issue.state
+        id: summary.id,
+        identifier: summary.identifier,
+        state: summary.state
       },
-      previous_state: context.issue.state,
+      previous_state: summary.state,
       target_state: targetState,
       source_setup: session.session.sourceSetup
     };
@@ -986,7 +1097,7 @@ export async function transitionProviderLinearIssueState(input: {
     fetchImpl: session.session.fetchImpl,
     query: buildIssueTransitionMutation(),
     variables: {
-      id: context.issue.id,
+      id: summary.id,
       stateId: targetState.id
     }
   });
@@ -1004,6 +1115,16 @@ export async function transitionProviderLinearIssueState(input: {
     return failure('transition', 'linear_state_transition_failed', 'Linear issue state transition did not succeed.', 503);
   }
 
+  if (cacheContext && canTrustCachedMutationContext) {
+    await writeCachedIssueContextRecord(
+      input.env,
+      {
+        ...cacheContext,
+        state: updatedState
+      },
+      session.session.sourceSetup
+    );
+  }
   return {
     ok: true,
     operation: 'transition',
@@ -1013,7 +1134,7 @@ export async function transitionProviderLinearIssueState(input: {
       identifier: normalizeRequiredString(issue?.identifier)!,
       state: updatedState
     },
-    previous_state: context.issue.state,
+    previous_state: summary.state,
     target_state: targetState,
     source_setup: session.session.sourceSetup
   };
@@ -1047,12 +1168,12 @@ export async function attachProviderLinearIssuePr(input: {
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
   if (!session.ok) {
-    return failure('attach-pr', session.error.code, session.error.message, session.error.status, session.error.details);
+    return failureFromWorkflowError('attach-pr', session.error);
   }
 
   const context = await readIssueContext(session.session, issueId);
   if (!context.ok) {
-    return failure('attach-pr', context.error.code, context.error.message, context.error.status, context.error.details);
+    return failureFromWorkflowError('attach-pr', context.error);
   }
 
   const existingAttachment =
@@ -1103,7 +1224,7 @@ export async function attachProviderLinearIssuePr(input: {
         source_setup: session.session.sourceSetup
       };
     }
-  } else if (githubResult.failure.kind !== 'graphql_error') {
+  } else if (!shouldFallbackToUrlAttachment(githubResult.failure)) {
     return failureFromGraphql('attach-pr', githubResult.failure);
   }
 
@@ -1180,24 +1301,12 @@ export async function createProviderLinearFollowUpIssue(input: {
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
   if (!session.ok) {
-    return failure(
-      'create-follow-up',
-      session.error.code,
-      session.error.message,
-      session.error.status,
-      session.error.details
-    );
+    return failureFromWorkflowError('create-follow-up', session.error);
   }
 
   const issueSummary = await readIssueSummary(session.session, issueId);
   if (!issueSummary.ok) {
-    return failure(
-      'create-follow-up',
-      issueSummary.error.code,
-      issueSummary.error.message,
-      issueSummary.error.status,
-      issueSummary.error.details
-    );
+    return failureFromWorkflowError('create-follow-up', issueSummary.error);
   }
 
   const teamId = normalizeOptionalString(issueSummary.issue.team?.id);
@@ -1397,6 +1506,345 @@ function resolveLinearWorkflowSession(
       fetchImpl: fetchImpl ?? fetch,
       sourceSetup: resolveWorkflowSourceSetup(sourceSetup, resolvedEnv)
     }
+  };
+}
+
+function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinearIssueSummary {
+  return {
+    id: issue.id,
+    identifier: issue.identifier,
+    workspace_id: issue.workspace_id,
+    state: issue.state,
+    team: issue.team,
+    project: issue.project
+  };
+}
+
+function mergeCachedIssueContextSummary(
+  issue: ProviderLinearIssueContext,
+  summary: ProviderLinearIssueSummary
+): ProviderLinearIssueContext {
+  return {
+    ...issue,
+    workspace_id: summary.workspace_id,
+    state: summary.state,
+    team: summary.team,
+    project: summary.project
+  };
+}
+
+function resolveIssueContextCachePath(env: NodeJS.ProcessEnv | undefined): string | null {
+  const auditPath = resolveProviderLinearAuditPath(env ?? process.env);
+  if (!auditPath) {
+    return null;
+  }
+  return join(dirname(auditPath), PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME);
+}
+
+async function readCachedIssueContextRecord(
+  env: NodeJS.ProcessEnv | undefined,
+  issueId: string,
+  sourceSetup: DispatchPilotSourceSetup | null
+): Promise<ProviderLinearIssueContextCacheRecord | null> {
+  const cachePath = resolveIssueContextCachePath(env);
+  if (!cachePath) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(await readFile(cachePath, 'utf8')) as unknown;
+    const record = parseIssueContextCacheRecord(parsed);
+    if (!record || record.issue_id !== issueId || !sameResolvedSourceSetup(record.source_setup, sourceSetup)) {
+      return null;
+    }
+    return record;
+  } catch {
+    return null;
+  }
+}
+
+function isIssueContextCacheRecordFresh(record: ProviderLinearIssueContextCacheRecord): boolean {
+  const recordedAt = Date.parse(record.recorded_at);
+  if (!Number.isFinite(recordedAt)) {
+    return false;
+  }
+  const ageMs = Date.now() - recordedAt;
+  return ageMs >= 0 && ageMs <= PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS;
+}
+
+async function writeCachedIssueContextRecord(
+  env: NodeJS.ProcessEnv | undefined,
+  issue: ProviderLinearIssueContext,
+  sourceSetup: DispatchPilotSourceSetup | null
+): Promise<void> {
+  const cachePath = resolveIssueContextCachePath(env);
+  if (!cachePath) {
+    return;
+  }
+  const record: ProviderLinearIssueContextCacheRecord = {
+    schema_version: 1,
+    issue_id: issue.id,
+    recorded_at: new Date().toISOString(),
+    source_setup: sourceSetup,
+    issue
+  };
+  try {
+    await mkdir(dirname(cachePath), { recursive: true });
+    await writeFile(cachePath, JSON.stringify(record, null, 2), 'utf8');
+  } catch {
+    // Cache persistence is best-effort for provider-worker runs; it must not
+    // change the success path of the Linear mutation itself.
+  }
+}
+
+function parseIssueContextCacheRecord(value: unknown): ProviderLinearIssueContextCacheRecord | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (record.schema_version !== 1) {
+    return null;
+  }
+  const issueId = normalizeRequiredString(record.issue_id as string | null | undefined);
+  const recordedAt = normalizeRequiredString(record.recorded_at as string | null | undefined);
+  const issue = parseCachedIssueContext(record.issue);
+  if (!issueId || !recordedAt || !issue || issue.id !== issueId) {
+    return null;
+  }
+  return {
+    schema_version: 1,
+    issue_id: issueId,
+    recorded_at: recordedAt,
+    source_setup: parseCachedSourceSetup(record.source_setup),
+    issue
+  };
+}
+
+function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const issue = value as Record<string, unknown>;
+  const id = normalizeRequiredString(issue.id as string | null | undefined);
+  const identifier = normalizeRequiredString(issue.identifier as string | null | undefined);
+  const title = normalizeRequiredString(issue.title as string | null | undefined);
+  const state = parseCachedWorkflowState(issue.state);
+  const team = parseCachedIssueTeam(issue.team);
+  const project = parseCachedIssueProject(issue.project);
+  const comments = parseCachedIssueComments(issue.comments);
+  const attachments = parseCachedIssueAttachments(issue.attachments);
+  if (!id || !identifier || !title || comments === null || attachments === null) {
+    return null;
+  }
+  if (issue.state !== undefined && issue.state !== null && state === null) {
+    return null;
+  }
+  if (issue.team !== undefined && issue.team !== null && team === null) {
+    return null;
+  }
+  if (issue.project !== undefined && issue.project !== null && project === null) {
+    return null;
+  }
+
+  const workpadComment = parseCachedIssueWorkpadComment(issue.workpad_comment, comments);
+  if (issue.workpad_comment !== undefined && issue.workpad_comment !== null && workpadComment === null) {
+    return null;
+  }
+
+  return {
+    id,
+    identifier,
+    title,
+    description: normalizeOptionalString(issue.description as string | null | undefined),
+    url: normalizeOptionalString(issue.url as string | null | undefined),
+    updated_at: normalizeIso(issue.updated_at as string | null | undefined),
+    workspace_id: normalizeOptionalString(issue.workspace_id as string | null | undefined),
+    state,
+    team,
+    project,
+    comments,
+    attachments,
+    workpad_comment: workpadComment
+  };
+}
+
+function parseCachedWorkflowState(value: unknown): ProviderLinearWorkflowState | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeRequiredString(record.id as string | null | undefined);
+  const name = normalizeRequiredString(record.name as string | null | undefined);
+  if (!id || !name) {
+    return null;
+  }
+  return {
+    id,
+    name,
+    type: normalizeOptionalString(record.type as string | null | undefined)
+  };
+}
+
+function parseCachedIssueTeam(value: unknown): ProviderLinearIssueContext['team'] | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (!Array.isArray(record.states)) {
+    return null;
+  }
+  const states = record.states
+    .map((entry) => parseCachedWorkflowState(entry))
+    .filter((entry): entry is ProviderLinearWorkflowState => entry !== null);
+  if (states.length !== record.states.length) {
+    return null;
+  }
+  return {
+    id: normalizeOptionalString(record.id as string | null | undefined),
+    key: normalizeOptionalString(record.key as string | null | undefined),
+    name: normalizeOptionalString(record.name as string | null | undefined),
+    states
+  };
+}
+
+function parseCachedIssueProject(value: unknown): ProviderLinearIssueContext['project'] | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    id: normalizeOptionalString(record.id as string | null | undefined),
+    name: normalizeOptionalString(record.name as string | null | undefined)
+  };
+}
+
+function parseCachedIssueComments(value: unknown): ProviderLinearWorkflowComment[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const comments = value
+    .map((entry) => parseCachedComment(entry))
+    .filter((entry): entry is ProviderLinearWorkflowComment => entry !== null);
+  return comments.length === value.length ? comments : null;
+}
+
+function parseCachedComment(value: unknown): ProviderLinearWorkflowComment | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeRequiredString(record.id as string | null | undefined);
+  const body = normalizeRequiredString(record.body as string | null | undefined);
+  if (!id || !body) {
+    return null;
+  }
+  return {
+    id,
+    body,
+    url: normalizeOptionalString(record.url as string | null | undefined),
+    created_at: normalizeIso(record.created_at as string | null | undefined),
+    updated_at: normalizeIso(record.updated_at as string | null | undefined),
+    resolved_at: normalizeIso(record.resolved_at as string | null | undefined)
+  };
+}
+
+function parseCachedIssueAttachments(value: unknown): ProviderLinearWorkflowAttachment[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const attachments = value
+    .map((entry) => parseCachedAttachment(entry))
+    .filter((entry): entry is ProviderLinearWorkflowAttachment => entry !== null);
+  return attachments.length === value.length ? attachments : null;
+}
+
+function parseCachedAttachment(value: unknown): ProviderLinearWorkflowAttachment | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeRequiredString(record.id as string | null | undefined);
+  if (!id) {
+    return null;
+  }
+  return {
+    id,
+    title: normalizeOptionalString(record.title as string | null | undefined),
+    url: normalizeOptionalString(record.url as string | null | undefined),
+    source_type: normalizeOptionalString(record.source_type as string | null | undefined)
+  };
+}
+
+function parseCachedIssueWorkpadComment(
+  value: unknown,
+  comments: readonly ProviderLinearWorkflowComment[]
+): ProviderLinearWorkflowComment | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const comment = parseCachedComment(value);
+  if (!comment) {
+    return null;
+  }
+  const matchingComment = comments.find((entry) => entry.id === comment.id) ?? null;
+  if (!matchingComment) {
+    return null;
+  }
+  return matchingComment;
+}
+
+function parseCachedSourceSetup(value: unknown): DispatchPilotSourceSetup | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (record.provider !== 'linear') {
+    return null;
+  }
+  return {
+    provider: 'linear',
+    workspace_id: normalizeOptionalString(record.workspace_id as string | null | undefined),
+    team_id: normalizeOptionalString(record.team_id as string | null | undefined),
+    project_id: normalizeOptionalString(record.project_id as string | null | undefined)
+  };
+}
+
+function sameResolvedSourceSetup(
+  left: DispatchPilotSourceSetup | null,
+  right: DispatchPilotSourceSetup | null
+): boolean {
+  const leftWorkspace = left?.workspace_id ?? null;
+  const leftTeam = left?.team_id ?? null;
+  const leftProject = left?.project_id ?? null;
+  const rightWorkspace = right?.workspace_id ?? null;
+  const rightTeam = right?.team_id ?? null;
+  const rightProject = right?.project_id ?? null;
+  return (
+    leftWorkspace === rightWorkspace &&
+    leftTeam === rightTeam &&
+    leftProject === rightProject
+  );
+}
+
+function upsertIssueContextWorkpadComment(
+  issue: ProviderLinearIssueContext,
+  comment: ProviderLinearWorkflowComment
+): ProviderLinearIssueContext {
+  const nextComments = issue.comments.some((entry) => entry.id === comment.id)
+    ? issue.comments.map((entry) => (entry.id === comment.id ? comment : entry))
+    : [...issue.comments, comment];
+  return {
+    ...issue,
+    comments: nextComments,
+    workpad_comment: comment
+  };
+}
+
+function removeIssueContextComment(issue: ProviderLinearIssueContext, commentId: string): ProviderLinearIssueContext {
+  const nextComments = issue.comments.filter((entry) => entry.id !== commentId);
+  return {
+    ...issue,
+    comments: nextComments,
+    workpad_comment: findWorkpadComment(nextComments)
   };
 }
 
@@ -2095,6 +2543,58 @@ function parseMutatedComment(
     updated_at: null,
     resolved_at: null
   };
+}
+
+function resolveSelectedWorkpadComment(
+  issue: ProviderLinearIssueContext,
+  requestedCommentId: string | null
+):
+  | {
+      ok: true;
+      comment: ProviderLinearWorkflowComment | null;
+    }
+  | {
+      ok: false;
+      error: ProviderLinearWorkflowError;
+    } {
+  if (!requestedCommentId) {
+    return {
+      ok: true,
+      comment: issue.workpad_comment
+    };
+  }
+
+  const selectedComment =
+    issue.comments.find(
+      (entry) => entry.id === requestedCommentId && entry.resolved_at === null && hasWorkpadMarker(entry.body)
+    ) ?? null;
+  if (!selectedComment) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_workpad_comment_id_invalid',
+        message: 'Comment id must reference an unresolved Codex workpad comment.',
+        status: 422,
+        details: {
+          comment_id: requestedCommentId
+        }
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    comment: selectedComment
+  };
+}
+
+function shouldFallbackToUrlAttachment(failureValue: LinearGraphqlFailure): boolean {
+  return (
+    failureValue.kind === 'graphql_error' &&
+    failureValue.status !== null &&
+    failureValue.status >= 200 &&
+    failureValue.status < 300
+  );
 }
 
 function parseAttachment(
@@ -3139,7 +3639,14 @@ function failureFromGraphql<T extends ProviderLinearOperation>(
   failureValue: LinearGraphqlFailure
 ): ProviderLinearOperationFailure<T> {
   const mapped = mapGraphqlFailure(failureValue);
-  return failure(operation, mapped.code, mapped.message, mapped.status, mapped.details);
+  return failure(operation, mapped.code, mapped.message, mapped.status, mapped.details, mapped.retryable);
+}
+
+function failureFromWorkflowError<T extends ProviderLinearOperation>(
+  operation: T,
+  error: ProviderLinearWorkflowError
+): ProviderLinearOperationFailure<T> {
+  return failure(operation, error.code, error.message, error.status, error.details, error.retryable);
 }
 
 function mapGraphqlFailure(failureValue: LinearGraphqlFailure): ProviderLinearWorkflowError {
@@ -3151,12 +3658,15 @@ function mapGraphqlFailure(failureValue: LinearGraphqlFailure): ProviderLinearWo
     };
   }
   if (failureValue.kind === 'graphql_error') {
+    if (isLinearRateLimitedFailure(failureValue)) {
+      return buildLinearRateLimitError(failureValue);
+    }
     return {
       code: 'linear_graphql_error',
       message: 'Linear GraphQL returned operation errors.',
       status: normalizeGraphqlFailureStatus(failureValue.status),
       details: {
-        errors: failureValue.errors.map((entry) => entry.message ?? 'unknown_error')
+        errors: serializeLinearGraphqlErrors(failureValue.errors)
       }
     };
   }
@@ -3165,6 +3675,116 @@ function mapGraphqlFailure(failureValue: LinearGraphqlFailure): ProviderLinearWo
     message: 'Linear request failed before a successful response was received.',
     status: failureValue.status ?? 503
   };
+}
+
+function isLinearRateLimitedFailure(failureValue: LinearGraphqlFailure): boolean {
+  return failureValue.errors.some((entry) => {
+    const message = normalizeOptionalString(entry.message)?.toLowerCase() ?? '';
+    const extensionCode =
+      entry.extensions && typeof entry.extensions === 'object'
+        ? normalizeOptionalString((entry.extensions as Record<string, unknown>).code as string | null | undefined)?.toLowerCase() ?? ''
+        : '';
+    return extensionCode === 'ratelimited' || message.includes('rate limit exceeded');
+  });
+}
+
+function buildLinearRateLimitError(failureValue: LinearGraphqlFailure): ProviderLinearWorkflowError {
+  const retryAfterSeconds = parsePositiveIntegerHeader(failureValue.headers?.['retry-after']);
+  const requestsRemaining = parseIntegerHeader(failureValue.headers?.['x-ratelimit-requests-remaining']);
+  const requestsLimit = parsePositiveIntegerHeader(failureValue.headers?.['x-ratelimit-requests-limit']);
+  const requestsResetAt = parseLinearRateLimitResetHeader(failureValue.headers?.['x-ratelimit-requests-reset']);
+  const endpointRequestsRemaining = parseIntegerHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-requests-remaining']
+  );
+  const endpointRequestsLimit = parsePositiveIntegerHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-requests-limit']
+  );
+  const endpointRequestsResetAt = parseLinearRateLimitResetHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-requests-reset']
+  );
+  const complexityRemaining = parseIntegerHeader(failureValue.headers?.['x-ratelimit-complexity-remaining']);
+  const complexityLimit = parsePositiveIntegerHeader(failureValue.headers?.['x-ratelimit-complexity-limit']);
+  const complexityResetAt = parseLinearRateLimitResetHeader(failureValue.headers?.['x-ratelimit-complexity-reset']);
+  const endpointComplexityRemaining = parseIntegerHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-complexity-remaining']
+  );
+  const endpointComplexityLimit = parsePositiveIntegerHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-complexity-limit']
+  );
+  const endpointComplexityResetAt = parseLinearRateLimitResetHeader(
+    failureValue.headers?.['x-ratelimit-endpoint-complexity-reset']
+  );
+  const requestId = normalizeOptionalString(failureValue.headers?.['x-request-id']);
+  return {
+    code: 'linear_rate_limited',
+    message: 'Linear API rate limit exceeded.',
+    status: 429,
+    retryable: true,
+    details: {
+      errors: serializeLinearGraphqlErrors(failureValue.errors),
+      ...(retryAfterSeconds !== null ? { retry_after_seconds: retryAfterSeconds } : {}),
+      ...(requestsRemaining !== null ? { requests_remaining: requestsRemaining } : {}),
+      ...(requestsLimit !== null ? { requests_limit: requestsLimit } : {}),
+      ...(requestsResetAt !== null ? { requests_reset_at: requestsResetAt } : {}),
+      ...(endpointRequestsRemaining !== null ? { endpoint_requests_remaining: endpointRequestsRemaining } : {}),
+      ...(endpointRequestsLimit !== null ? { endpoint_requests_limit: endpointRequestsLimit } : {}),
+      ...(endpointRequestsResetAt !== null ? { endpoint_requests_reset_at: endpointRequestsResetAt } : {}),
+      ...(complexityRemaining !== null ? { complexity_remaining: complexityRemaining } : {}),
+      ...(complexityLimit !== null ? { complexity_limit: complexityLimit } : {}),
+      ...(complexityResetAt !== null ? { complexity_reset_at: complexityResetAt } : {}),
+      ...(endpointComplexityRemaining !== null
+        ? { endpoint_complexity_remaining: endpointComplexityRemaining }
+        : {}),
+      ...(endpointComplexityLimit !== null ? { endpoint_complexity_limit: endpointComplexityLimit } : {}),
+      ...(endpointComplexityResetAt !== null ? { endpoint_complexity_reset_at: endpointComplexityResetAt } : {}),
+      ...(requestId ? { request_id: requestId } : {})
+    }
+  };
+}
+
+function serializeLinearGraphqlErrors(errors: LinearGraphqlFailure['errors']): Record<string, unknown>[] {
+  return errors.map((entry) => {
+    const path = Array.isArray(entry.path)
+      ? entry.path.filter(
+          (segment): segment is string | number =>
+            typeof segment === 'string' || (typeof segment === 'number' && Number.isFinite(segment))
+        )
+      : [];
+    const extensions =
+      entry.extensions && typeof entry.extensions === 'object'
+        ? { ...(entry.extensions as Record<string, unknown>) }
+        : null;
+    return {
+      message: normalizeOptionalString(entry.message) ?? 'unknown_error',
+      ...(path.length > 0 ? { path } : {}),
+      ...(extensions ? { extensions } : {})
+    };
+  });
+}
+
+function parseIntegerHeader(value: string | null | undefined): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function parsePositiveIntegerHeader(value: string | null | undefined): number | null {
+  const parsed = parseIntegerHeader(value);
+  return parsed !== null && parsed >= 0 ? parsed : null;
+}
+
+function parseLinearRateLimitResetHeader(value: string | null | undefined): string | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return null;
+  }
+  const timestamp = new Date(parsed);
+  return Number.isNaN(timestamp.getTime()) ? null : timestamp.toISOString();
 }
 
 function scopeMismatchError(

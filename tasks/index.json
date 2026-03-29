@@ -25,6 +25,54 @@
       }
     },
     {
+      "id": "20260328-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4",
+      "title": "Fix Active Provider-Worker Linear Write-Back When Reads Succeed",
+      "relates_to": "tasks/tasks-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-28",
+      "paths": {
+        "spec": "tasks/specs/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+        "task": "tasks/tasks-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+        "agent_task": ".agent/task/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+        "docs": "docs/TECH_SPEC-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md"
+      }
+    },
+    {
+      "id": "20260328-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21",
+      "title": "Fix Repeated Post-Merge Core Lane Failures in ProviderIssueHandoff and CLI Command Surface Suites",
+      "relates_to": "tasks/tasks-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-28",
+      "paths": {
+        "spec": "tasks/specs/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+        "task": "tasks/tasks-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+        "agent_task": ".agent/task/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+        "docs": "docs/TECH_SPEC-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md"
+      }
+    },
+    {
+      "id": "20260328-linear-723139d4-2d01-4022-aa09-e88bda7dfd89",
+      "title": "Fix Repo-wide Full-Suite npm run test Post-Suite Idling and ProviderIssueHandoff Instability",
+      "relates_to": "tasks/tasks-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-28",
+      "paths": {
+        "spec": "tasks/specs/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+        "task": "tasks/tasks-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+        "agent_task": ".agent/task/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+        "docs": "docs/TECH_SPEC-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md"
+      }
+    },
+    {
       "id": "20260328-linear-156d7133-00ba-40be-bd35-67cd3ae46e21",
       "title": "Reconcile Shared Local Checkout to origin/main After Autonomous Merge Closeout",
       "relates_to": "tasks/tasks-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",

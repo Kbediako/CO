@@ -190,27 +190,27 @@ describe('codex-orchestrator command surface', () => {
   }, TEST_TIMEOUT);
 
   it('prints resume help without requiring a run id', async () => {
-    const { stdout } = await runCli(['resume', '--help']);
+    const { stdout } = await runCli(['resume', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator resume --run <id>');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects resume without a run id through the binary shell', async () => {
-    await expect(runCli(['resume'])).rejects.toMatchObject({
+    await expect(runCli(['resume'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('resume requires --run <run-id>.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints delegate-server help', async () => {
-    const { stdout } = await runCli(['delegate-server', '--help']);
+    const { stdout } = await runCli(['delegate-server', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator delegate-server');
     expect(stdout).toContain('--mode <full|question_only|status_only>');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints delegation-server help', async () => {
-    const { stdout } = await runCli(['delegation-server', '--help']);
+    const { stdout } = await runCli(['delegation-server', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator delegate-server');
     expect(stdout).toContain('--mode <full|question_only|status_only>');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr help', async () => {
     const { stdout } = await runCli(['pr', '--help']);
@@ -246,10 +246,10 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('rejects unknown pr subcommands through the binary shell', async () => {
-    await expect(runCli(['pr', 'ship-it'])).rejects.toMatchObject({
+    await expect(runCli(['pr', 'ship-it'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown pr subcommand: ship-it')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints setup help', async () => {
     const { stdout } = await runCli(['setup', '--help']);
