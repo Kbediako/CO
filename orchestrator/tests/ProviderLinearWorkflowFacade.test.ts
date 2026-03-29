@@ -5200,6 +5200,49 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('fails closed when required checklist content appears only inside indented code blocks', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      acceptanceCriteriaLines: [
+        '    - [ ] Example checklist item inside an indented code block.',
+        '    - [ ]'
+      ],
+      normalizeRequiredChecklistSections: false
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+          missing_checkbox_sections: ['Acceptance Criteria'],
+          blank_checkbox_sections: []
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('fails closed when ticket validation requirements are not mirrored into the workpad', async () => {
     const incompleteWorkpadBody = buildStructuredWorkpadBody({
       validationLines: ['- Run npm test.'],

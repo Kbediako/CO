@@ -2868,8 +2868,8 @@ function findWorkpadCheckboxListItem(body: string, mode: 'blank' | 'non-empty'):
     }
     const matchesCheckbox =
       mode === 'non-empty'
-        ? /^\s*-\s+\[(?: |x|X)\]\s+\S.*$/u.test(line)
-        : /^\s*-\s+\[(?: |x|X)\]\s*$/u.test(line);
+        ? /^[ ]{0,3}-\s+\[(?: |x|X)\]\s+\S.*$/u.test(line)
+        : /^[ ]{0,3}-\s+\[(?: |x|X)\]\s*$/u.test(line);
     if (matchesCheckbox) {
       return true;
     }
@@ -2884,6 +2884,18 @@ function findWorkpadSectionByTitle(
 ): ProviderLinearWorkpadSection | undefined {
   const normalizedTitle = normalizeComparableValue(title);
   return sections.find((section) => normalizeComparableValue(section.title) === normalizedTitle);
+}
+
+function normalizeWorkpadSectionBody(lines: readonly string[]): string {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start].trim().length === 0) {
+    start += 1;
+  }
+  while (end > start && lines[end - 1].trim().length === 0) {
+    end -= 1;
+  }
+  return lines.slice(start, end).join('\n');
 }
 
 function isCanonicalWorkpadMarkerLine(line: string): boolean {
@@ -2912,7 +2924,7 @@ function parseWorkpadSections(body: string): {
     }
     sections.push({
       title: currentTitle,
-      body: currentLines.join('\n').trim()
+      body: normalizeWorkpadSectionBody(currentLines)
     });
   };
 
