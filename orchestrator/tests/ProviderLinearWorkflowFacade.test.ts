@@ -237,14 +237,14 @@ function buildStructuredWorkpadBody(overrides: {
 }
 
 function ensureSectionContainsCheckboxListItem(lines: string[]): string[] {
-  if (lines.some((line) => /^\s*-\s+\[(?: |x|X)\](?:\s+.*)?$/u.test(line))) {
+  if (lines.some((line) => /^\s*-\s+\[(?: |x|X)\]\s+\S.*$/u.test(line))) {
     return lines;
   }
 
   const updatedLines = [...lines];
   const lineIndex = updatedLines.findIndex((line) => {
     const trimmed = line.trim();
-    return trimmed.length > 0 && !trimmed.startsWith('###');
+    return trimmed.length > 0 && !trimmed.startsWith('###') && !/^\s*-\s+\[(?: |x|X)\]\s*$/u.test(line);
   });
   if (lineIndex === -1) {
     return updatedLines;
@@ -4984,7 +4984,7 @@ describe('providerLinearWorkflowFacade', () => {
       error: {
         code: 'workpad_checklist_required',
         message:
-          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
@@ -5023,7 +5023,7 @@ describe('providerLinearWorkflowFacade', () => {
       error: {
         code: 'workpad_checklist_required',
         message:
-          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
@@ -5062,7 +5062,7 @@ describe('providerLinearWorkflowFacade', () => {
       error: {
         code: 'workpad_checklist_required',
         message:
-          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
@@ -5101,7 +5101,7 @@ describe('providerLinearWorkflowFacade', () => {
       error: {
         code: 'workpad_checklist_required',
         message:
-          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
@@ -5140,7 +5140,7 @@ describe('providerLinearWorkflowFacade', () => {
       error: {
         code: 'workpad_checklist_required',
         message:
-          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],

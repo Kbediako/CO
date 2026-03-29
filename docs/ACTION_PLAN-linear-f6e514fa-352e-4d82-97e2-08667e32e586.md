@@ -17,7 +17,7 @@
 ## Milestones & Sequencing
 1. Register the docs-first packet for `linear-f6e514fa-352e-4d82-97e2-08667e32e586`, update `tasks/index.json`, update `docs/TASKS.md`, mirror the checklist, and record the initial `linear_rate_limited` blocker truthfully.
 2. Run docs-review with a delegation override before touching implementation code.
-3. Tighten the workpad validator so `Acceptance Criteria` and `Validation` require checkbox list items, while the other canonical sections remain free-form.
+3. Tighten the workpad validator so `Acceptance Criteria` and `Validation` require non-empty checkbox list items, while the other canonical sections remain free-form.
 4. Update the provider-worker prompt and repo-local `skills/linear/SKILL.md` wording to match the narrow checkbox rule.
 5. Add focused tests for accepted checkbox bodies and rejected plain-bullet/prose-only bodies in the two required sections.
 6. Run the required validation floor, then retry live Linear reads once budget resets so state/workpad/PR handoff actions happen only on confirmed live data.

@@ -2791,8 +2791,10 @@ function validateWorkpadBodyContract(
     };
   }
 
-  const sectionsMissingCheckboxes = [sections[2], sections[3]]
-    .filter((section): section is ProviderLinearWorkpadSection => Boolean(section))
+  const requiredCheckboxSections = LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS.map((title) =>
+    findWorkpadSectionByTitle(sections, title)
+  ).filter((section): section is ProviderLinearWorkpadSection => Boolean(section));
+  const sectionsMissingCheckboxes = requiredCheckboxSections
     .filter((section) => !containsWorkpadCheckboxListItem(section.body))
     .map((section) => section.title);
   if (sectionsMissingCheckboxes.length > 0) {
@@ -2801,7 +2803,7 @@ function validateWorkpadBodyContract(
       error: {
         code: 'workpad_checklist_required',
         message:
-          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
         status: 422,
         details: {
           required_checkbox_sections: [...LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS],
@@ -2816,8 +2818,10 @@ function validateWorkpadBodyContract(
     return { ok: true };
   }
 
+  const acceptanceCriteriaSection = findWorkpadSectionByTitle(sections, 'Acceptance Criteria');
+  const validationSection = findWorkpadSectionByTitle(sections, 'Validation');
   const mirroredValidationText = normalizeRequirementValue(
-    `${sections[2]?.body ?? ''}\n${sections[3]?.body ?? ''}`
+    `${acceptanceCriteriaSection?.body ?? ''}\n${validationSection?.body ?? ''}`
   );
   const missingRequirements = ticketValidationRequirements.filter(
     (requirement) => !containsNormalizedRequirement(mirroredValidationText, requirement.normalized)
@@ -2856,6 +2860,14 @@ function containsWorkpadCheckboxListItem(body: string): boolean {
   }
 
   return false;
+}
+
+function findWorkpadSectionByTitle(
+  sections: readonly ProviderLinearWorkpadSection[],
+  title: string
+): ProviderLinearWorkpadSection | undefined {
+  const normalizedTitle = normalizeComparableValue(title);
+  return sections.find((section) => normalizeComparableValue(section.title) === normalizedTitle);
 }
 
 function isCanonicalWorkpadMarkerLine(line: string): boolean {
