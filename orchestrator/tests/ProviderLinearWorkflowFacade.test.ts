@@ -5506,10 +5506,11 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('accepts a real checklist item after a four-space-indented fence marker line', async () => {
+  it('accepts a real checklist item after a four-space-indented code example heading', async () => {
     const validWorkpadBody = buildStructuredWorkpadBody({
       acceptanceCriteriaLines: [
         '    ```md',
+        '    ### Example Heading',
         '- Real checklist content that should still be normalized and validated.',
         '    ```'
       ]

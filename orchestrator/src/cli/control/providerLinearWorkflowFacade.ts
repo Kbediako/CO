@@ -2953,7 +2953,7 @@ function parseWorkpadSections(body: string): {
       }
       continue;
     }
-    const headingMatch = line.match(/^\s*###\s+(.+?)\s*$/u);
+    const headingMatch = line.match(/^[ ]{0,3}###\s+(.+?)\s*$/u);
     if (headingMatch) {
       flushCurrent();
       const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
