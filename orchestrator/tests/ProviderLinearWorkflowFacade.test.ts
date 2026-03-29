@@ -242,31 +242,65 @@ const TEST_WORKPAD_RUNTIME_INDENTATION_PATTERN = /^[ ]{0,3}(?:\S|$)/u;
 
 function ensureSectionContainsCheckboxListItem(lines: string[]): string[] {
   let activeCodeFenceDelimiter: string | null = null;
+  const listContinuationIndents: number[] = [];
   let lineIndex = -1;
 
   for (const [index, line] of lines.entries()) {
-    const codeFenceTransition = getTestWorkpadCodeFenceTransition(activeCodeFenceDelimiter, line);
+    const leadingSpaces = line.match(/^ */u)?.[0].length ?? 0;
+    if (line.trim().length > 0) {
+      while (
+        listContinuationIndents.length > 0 &&
+        leadingSpaces < listContinuationIndents[listContinuationIndents.length - 1]
+      ) {
+        listContinuationIndents.pop();
+      }
+    }
+    const containerIndent = listContinuationIndents[listContinuationIndents.length - 1] ?? 0;
+    const structuralLine = leadingSpaces >= containerIndent ? line.slice(containerIndent) : line;
+    const codeFenceTransition = getTestWorkpadCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
     if (codeFenceTransition.isBoundary || activeCodeFenceDelimiter !== null) {
       continue;
     }
 
-    if (TEST_WORKPAD_NON_EMPTY_CHECKBOX_LIST_ITEM_PATTERN.test(line)) {
+    if (TEST_WORKPAD_NON_EMPTY_CHECKBOX_LIST_ITEM_PATTERN.test(structuralLine)) {
       return lines;
     }
 
     if (lineIndex !== -1) {
+      const listItemMatch = structuralLine.match(/^([ ]{0,3})(?:[-+*]|\d+[.)])\s+/u);
+      if (listItemMatch) {
+        const nextIndent = containerIndent + listItemMatch[0].length;
+        while (
+          listContinuationIndents.length > 0 &&
+          nextIndent <= listContinuationIndents[listContinuationIndents.length - 1]
+        ) {
+          listContinuationIndents.pop();
+        }
+        listContinuationIndents.push(nextIndent);
+      }
       continue;
     }
 
-    const trimmed = line.trim();
+    const trimmed = structuralLine.trim();
     if (
-      TEST_WORKPAD_RUNTIME_INDENTATION_PATTERN.test(line) &&
+      TEST_WORKPAD_RUNTIME_INDENTATION_PATTERN.test(structuralLine) &&
       trimmed.length > 0 &&
       !trimmed.startsWith('###') &&
-      !TEST_WORKPAD_BLANK_CHECKBOX_LIST_ITEM_PATTERN.test(line)
+      !TEST_WORKPAD_BLANK_CHECKBOX_LIST_ITEM_PATTERN.test(structuralLine)
     ) {
       lineIndex = index;
+    }
+    const listItemMatch = structuralLine.match(/^([ ]{0,3})(?:[-+*]|\d+[.)])\s+/u);
+    if (listItemMatch) {
+      const nextIndent = containerIndent + listItemMatch[0].length;
+      while (
+        listContinuationIndents.length > 0 &&
+        nextIndent <= listContinuationIndents[listContinuationIndents.length - 1]
+      ) {
+        listContinuationIndents.pop();
+      }
+      listContinuationIndents.push(nextIndent);
     }
   }
 
