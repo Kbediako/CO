@@ -4980,12 +4980,22 @@ describe('providerLinearWorkflowFacade', () => {
     const validWorkpadBody = buildStructuredWorkpadBody({
       environmentLines: ['Workspace rooted at `/tmp/co` with the provider-worker helper command available.'],
       planLines: ['Tighten only the two execution-heavy workpad sections and leave narrative sections untouched.'],
-      acceptanceCriteriaLines: ['- [ ] Reject workpads whose Acceptance Criteria section has no checkbox items.'],
+      acceptanceCriteriaLines: [
+        '- Checklist semantics to preserve:',
+        '  - Nested fenced example:',
+        '    ```md',
+        '    ### Example Heading',
+        '    - [ ] Example checklist item inside nested fenced content.',
+        '    ```',
+        '  - [ ] Reject workpads whose Acceptance Criteria section has no checkbox items.'
+      ],
       validationLines: [
         'Local validation pass follows after the implementation patch.',
-        '- [x] npm run test -- orchestrator/tests/ProviderLinearWorkflowFacade.test.ts'
+        '1. Focused verification',
+        '   - [x] npm run test -- orchestrator/tests/ProviderLinearWorkflowFacade.test.ts'
       ],
-      notesLines: ['Live Linear writes stay blocked until a successful post-rate-limit `issue-context` read.']
+      notesLines: ['Live Linear writes stay blocked until a successful post-rate-limit `issue-context` read.'],
+      normalizeRequiredChecklistSections: false
     });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -5346,6 +5356,18 @@ describe('providerLinearWorkflowFacade', () => {
         }
       });
       expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['- [ ]', '- [x]', '- [X]'])(
+    'fails closed when Validation mixes valid and blank checkbox items (%s)',
+    async (blankCheckbox) => {
+      await expectValidationChecklistRequirementFailure({
+        validationLines: ['- [ ] Run npm test.', blankCheckbox],
+        normalizeRequiredChecklistSections: false,
+        missing_checkbox_sections: [],
+        blank_checkbox_sections: ['Validation']
+      });
     }
   );
 

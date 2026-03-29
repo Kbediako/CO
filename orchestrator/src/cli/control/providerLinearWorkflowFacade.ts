@@ -2859,19 +2859,42 @@ function containsBlankWorkpadCheckboxListItem(body: string): boolean {
 
 function findWorkpadCheckboxListItem(body: string, mode: 'blank' | 'non-empty'): boolean {
   let activeCodeFenceDelimiter: string | null = null;
+  const listContinuationIndents: number[] = [];
 
   for (const line of body.split(/\r?\n/u)) {
-    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    const leadingSpaces = line.match(/^ */u)?.[0].length ?? 0;
+    if (normalizeRequiredString(line) !== null) {
+      while (
+        listContinuationIndents.length > 0 &&
+        leadingSpaces < listContinuationIndents[listContinuationIndents.length - 1]
+      ) {
+        listContinuationIndents.pop();
+      }
+    }
+    const containerIndent = listContinuationIndents[listContinuationIndents.length - 1] ?? 0;
+    const structuralLine = leadingSpaces >= containerIndent ? line.slice(containerIndent) : line;
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
     if (codeFenceTransition.isBoundary || activeCodeFenceDelimiter !== null) {
       continue;
     }
     const matchesCheckbox =
       mode === 'non-empty'
-        ? /^[ ]{0,3}-\s+\[(?: |x|X)\]\s+\S.*$/u.test(line)
-        : /^[ ]{0,3}-\s+\[(?: |x|X)\]\s*$/u.test(line);
+        ? /^[ ]{0,3}-\s+\[(?: |x|X)\]\s+\S.*$/u.test(structuralLine)
+        : /^[ ]{0,3}-\s+\[(?: |x|X)\]\s*$/u.test(structuralLine);
     if (matchesCheckbox) {
       return true;
+    }
+    const listItemMatch = structuralLine.match(/^([ ]{0,3})(?:[-+*]|\d+[.)])\s+/u);
+    if (listItemMatch) {
+      const nextIndent = containerIndent + listItemMatch[0].length;
+      while (
+        listContinuationIndents.length > 0 &&
+        nextIndent <= listContinuationIndents[listContinuationIndents.length - 1]
+      ) {
+        listContinuationIndents.pop();
+      }
+      listContinuationIndents.push(nextIndent);
     }
   }
 
