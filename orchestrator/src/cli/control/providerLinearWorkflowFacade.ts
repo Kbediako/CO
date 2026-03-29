@@ -2797,7 +2797,10 @@ function validateWorkpadBodyContract(
   const sectionsMissingCheckboxes = requiredCheckboxSections
     .filter((section) => !containsWorkpadCheckboxListItem(section.body))
     .map((section) => section.title);
-  if (sectionsMissingCheckboxes.length > 0) {
+  const sectionsWithBlankCheckboxes = requiredCheckboxSections
+    .filter((section) => containsBlankWorkpadCheckboxListItem(section.body))
+    .map((section) => section.title);
+  if (sectionsMissingCheckboxes.length > 0 || sectionsWithBlankCheckboxes.length > 0) {
     return {
       ok: false,
       error: {
@@ -2807,7 +2810,8 @@ function validateWorkpadBodyContract(
         status: 422,
         details: {
           required_checkbox_sections: [...LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS],
-          missing_checkbox_sections: sectionsMissingCheckboxes
+          missing_checkbox_sections: sectionsMissingCheckboxes,
+          blank_checkbox_sections: sectionsWithBlankCheckboxes
         }
       }
     };
@@ -2846,6 +2850,14 @@ function validateWorkpadBodyContract(
 }
 
 function containsWorkpadCheckboxListItem(body: string): boolean {
+  return findWorkpadCheckboxListItem(body, 'non-empty');
+}
+
+function containsBlankWorkpadCheckboxListItem(body: string): boolean {
+  return findWorkpadCheckboxListItem(body, 'blank');
+}
+
+function findWorkpadCheckboxListItem(body: string, mode: 'blank' | 'non-empty'): boolean {
   let activeCodeFenceDelimiter: string | null = null;
 
   for (const line of body.split(/\r?\n/u)) {
@@ -2854,7 +2866,11 @@ function containsWorkpadCheckboxListItem(body: string): boolean {
     if (codeFenceTransition.isBoundary || activeCodeFenceDelimiter !== null) {
       continue;
     }
-    if (/^\s*-\s+\[(?: |x|X)\]\s+\S.*$/u.test(line)) {
+    const matchesCheckbox =
+      mode === 'non-empty'
+        ? /^\s*-\s+\[(?: |x|X)\]\s+\S.*$/u.test(line)
+        : /^\s*-\s+\[(?: |x|X)\]\s*$/u.test(line);
+    if (matchesCheckbox) {
       return true;
     }
   }

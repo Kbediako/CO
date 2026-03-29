@@ -4988,7 +4988,8 @@ describe('providerLinearWorkflowFacade', () => {
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
-          missing_checkbox_sections: ['Acceptance Criteria']
+          missing_checkbox_sections: ['Acceptance Criteria'],
+          blank_checkbox_sections: []
         }
       }
     });
@@ -5027,7 +5028,8 @@ describe('providerLinearWorkflowFacade', () => {
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
-          missing_checkbox_sections: ['Acceptance Criteria']
+          missing_checkbox_sections: ['Acceptance Criteria'],
+          blank_checkbox_sections: []
         }
       }
     });
@@ -5066,7 +5068,8 @@ describe('providerLinearWorkflowFacade', () => {
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
-          missing_checkbox_sections: ['Validation']
+          missing_checkbox_sections: ['Validation'],
+          blank_checkbox_sections: []
         }
       }
     });
@@ -5105,7 +5108,8 @@ describe('providerLinearWorkflowFacade', () => {
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
-          missing_checkbox_sections: ['Validation']
+          missing_checkbox_sections: ['Validation'],
+          blank_checkbox_sections: []
         }
       }
     });
@@ -5144,7 +5148,48 @@ describe('providerLinearWorkflowFacade', () => {
         status: 422,
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
-          missing_checkbox_sections: ['Acceptance Criteria']
+          missing_checkbox_sections: ['Acceptance Criteria'],
+          blank_checkbox_sections: ['Acceptance Criteria']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when a required checklist section mixes valid and blank checkbox items', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      acceptanceCriteriaLines: ['- [ ] Keep the canonical five-section workpad shape.', '- [ ]'],
+      normalizeRequiredChecklistSections: false
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+          missing_checkbox_sections: [],
+          blank_checkbox_sections: ['Acceptance Criteria']
         }
       }
     });
