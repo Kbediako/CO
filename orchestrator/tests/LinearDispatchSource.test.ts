@@ -221,6 +221,69 @@ describe('resolveLiveLinearTrackedIssueById', () => {
       reason: 'dispatch_source_issue_not_found'
     });
   });
+
+  it('surfaces explicit Linear rate-limit metadata for by-id rereads', async () => {
+    const result = await resolveLiveLinearTrackedIssueById({
+      issueId: 'lin-issue-1',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl: vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            errors: [
+              {
+                message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+                path: ['issue'],
+                extensions: {
+                  code: 'RATELIMITED',
+                  statusCode: 429
+                }
+              }
+            ]
+          }),
+          {
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json',
+              'retry-after': '3',
+              'x-ratelimit-requests-limit': '5000',
+              'x-ratelimit-requests-remaining': '0',
+              'x-ratelimit-requests-reset': '1774701380970',
+              'x-request-id': 'req-by-id-1'
+            }
+          }
+        )
+      )
+    });
+
+    expect(result).toEqual({
+      kind: 'unavailable',
+      status: 429,
+      code: 'dispatch_source_unavailable',
+      reason: 'dispatch_source_provider_rate_limited',
+      message: 'Linear API rate limit exceeded.',
+      retryable: true,
+      details: {
+        error_code: 'linear_rate_limited',
+        errors: [
+          {
+            message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+            path: ['issue'],
+            extensions: {
+              code: 'RATELIMITED',
+              statusCode: 429
+            }
+          }
+        ],
+        retry_after_seconds: 3,
+        requests_remaining: 0,
+        requests_limit: 5000,
+        requests_reset_at: '2026-03-28T12:36:20.970Z',
+        request_id: 'req-by-id-1'
+      }
+    });
+  });
 });
 
 describe('resolveLiveLinearTrackedIssues', () => {

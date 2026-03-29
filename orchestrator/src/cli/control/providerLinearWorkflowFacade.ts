@@ -7,6 +7,7 @@ import {
   resolveLinearRequestTimeoutMs,
   type LinearGraphqlFailure
 } from './linearGraphqlClient.js';
+import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
 import { resolveLinearSourceSetup } from './linearDispatchSource.js';
 import { resolveProviderLinearAuditPath } from './providerLinearWorkflowAudit.js';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
@@ -3876,8 +3877,9 @@ function mapGraphqlFailure(failureValue: LinearGraphqlFailure): ProviderLinearWo
     };
   }
   if (failureValue.kind === 'graphql_error') {
-    if (isLinearRateLimitedFailure(failureValue)) {
-      return buildLinearRateLimitError(failureValue);
+    const rateLimitFailure = mapLinearRateLimitedFailure(failureValue);
+    if (rateLimitFailure) {
+      return rateLimitFailure;
     }
     return {
       code: 'linear_graphql_error',
@@ -3892,71 +3894,6 @@ function mapGraphqlFailure(failureValue: LinearGraphqlFailure): ProviderLinearWo
     code: 'linear_request_failed',
     message: 'Linear request failed before a successful response was received.',
     status: failureValue.status ?? 503
-  };
-}
-
-function isLinearRateLimitedFailure(failureValue: LinearGraphqlFailure): boolean {
-  return failureValue.errors.some((entry) => {
-    const message = normalizeOptionalString(entry.message)?.toLowerCase() ?? '';
-    const extensionCode =
-      entry.extensions && typeof entry.extensions === 'object'
-        ? normalizeOptionalString((entry.extensions as Record<string, unknown>).code as string | null | undefined)?.toLowerCase() ?? ''
-        : '';
-    return extensionCode === 'ratelimited' || message.includes('rate limit exceeded');
-  });
-}
-
-function buildLinearRateLimitError(failureValue: LinearGraphqlFailure): ProviderLinearWorkflowError {
-  const retryAfterSeconds = parsePositiveIntegerHeader(failureValue.headers?.['retry-after']);
-  const requestsRemaining = parseIntegerHeader(failureValue.headers?.['x-ratelimit-requests-remaining']);
-  const requestsLimit = parsePositiveIntegerHeader(failureValue.headers?.['x-ratelimit-requests-limit']);
-  const requestsResetAt = parseLinearRateLimitResetHeader(failureValue.headers?.['x-ratelimit-requests-reset']);
-  const endpointRequestsRemaining = parseIntegerHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-requests-remaining']
-  );
-  const endpointRequestsLimit = parsePositiveIntegerHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-requests-limit']
-  );
-  const endpointRequestsResetAt = parseLinearRateLimitResetHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-requests-reset']
-  );
-  const complexityRemaining = parseIntegerHeader(failureValue.headers?.['x-ratelimit-complexity-remaining']);
-  const complexityLimit = parsePositiveIntegerHeader(failureValue.headers?.['x-ratelimit-complexity-limit']);
-  const complexityResetAt = parseLinearRateLimitResetHeader(failureValue.headers?.['x-ratelimit-complexity-reset']);
-  const endpointComplexityRemaining = parseIntegerHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-complexity-remaining']
-  );
-  const endpointComplexityLimit = parsePositiveIntegerHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-complexity-limit']
-  );
-  const endpointComplexityResetAt = parseLinearRateLimitResetHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-complexity-reset']
-  );
-  const requestId = normalizeOptionalString(failureValue.headers?.['x-request-id']);
-  return {
-    code: 'linear_rate_limited',
-    message: 'Linear API rate limit exceeded.',
-    status: 429,
-    retryable: true,
-    details: {
-      errors: serializeLinearGraphqlErrors(failureValue.errors),
-      ...(retryAfterSeconds !== null ? { retry_after_seconds: retryAfterSeconds } : {}),
-      ...(requestsRemaining !== null ? { requests_remaining: requestsRemaining } : {}),
-      ...(requestsLimit !== null ? { requests_limit: requestsLimit } : {}),
-      ...(requestsResetAt !== null ? { requests_reset_at: requestsResetAt } : {}),
-      ...(endpointRequestsRemaining !== null ? { endpoint_requests_remaining: endpointRequestsRemaining } : {}),
-      ...(endpointRequestsLimit !== null ? { endpoint_requests_limit: endpointRequestsLimit } : {}),
-      ...(endpointRequestsResetAt !== null ? { endpoint_requests_reset_at: endpointRequestsResetAt } : {}),
-      ...(complexityRemaining !== null ? { complexity_remaining: complexityRemaining } : {}),
-      ...(complexityLimit !== null ? { complexity_limit: complexityLimit } : {}),
-      ...(complexityResetAt !== null ? { complexity_reset_at: complexityResetAt } : {}),
-      ...(endpointComplexityRemaining !== null
-        ? { endpoint_complexity_remaining: endpointComplexityRemaining }
-        : {}),
-      ...(endpointComplexityLimit !== null ? { endpoint_complexity_limit: endpointComplexityLimit } : {}),
-      ...(endpointComplexityResetAt !== null ? { endpoint_complexity_reset_at: endpointComplexityResetAt } : {}),
-      ...(requestId ? { request_id: requestId } : {})
-    }
   };
 }
 
@@ -3980,30 +3917,6 @@ function serializeLinearGraphqlErrors(errors: LinearGraphqlFailure['errors']): R
   });
 }
 
-function parseIntegerHeader(value: string | null | undefined): number | null {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    return null;
-  }
-  const parsed = Number.parseInt(value, 10);
-  return Number.isInteger(parsed) ? parsed : null;
-}
-
-function parsePositiveIntegerHeader(value: string | null | undefined): number | null {
-  const parsed = parseIntegerHeader(value);
-  return parsed !== null && parsed >= 0 ? parsed : null;
-}
-
-function parseLinearRateLimitResetHeader(value: string | null | undefined): string | null {
-  if (typeof value !== 'string' || value.trim().length === 0) {
-    return null;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return null;
-  }
-  const timestamp = new Date(parsed);
-  return Number.isNaN(timestamp.getTime()) ? null : timestamp.toISOString();
-}
 
 function scopeMismatchError(
   scope: 'workspace' | 'team' | 'project',
