@@ -1,6 +1,7 @@
 import { spawn, type StdioOptions } from 'node:child_process';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import process from 'node:process';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { mkdir, readFile, realpath, rm } from 'node:fs/promises';
@@ -23,7 +24,8 @@ import {
   hasLinearSourceBinding,
   resolveLinearSourceSetup,
   resolveLiveLinearTrackedIssueById,
-  type LiveLinearTrackedIssue
+  type LiveLinearTrackedIssue,
+  type LiveLinearTrackedIssueResolution
 } from './control/linearDispatchSource.js';
 import {
   classifyProviderLinearWorkerLifecycle,
@@ -58,6 +60,25 @@ const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME = `${PROVIDER_LINEAR_WO
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
 const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
 const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
+const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_MAX_WAIT_MS = 15_000;
+const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_BUCKETS = [
+  {
+    remaining: 'requests_remaining',
+    resetAt: 'requests_reset_at'
+  },
+  {
+    remaining: 'endpoint_requests_remaining',
+    resetAt: 'endpoint_requests_reset_at'
+  },
+  {
+    remaining: 'complexity_remaining',
+    resetAt: 'complexity_reset_at'
+  },
+  {
+    remaining: 'endpoint_complexity_remaining',
+    resetAt: 'endpoint_complexity_reset_at'
+  }
+] as const;
 const CSRF_HEADER = 'x-csrf-token';
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
@@ -135,8 +156,18 @@ export interface ProviderLinearWorkerProof {
   source_setup?: DispatchPilotSourceSetup | null;
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
+  tracked_issue_error?: ProviderLinearTrackedIssueError | null;
   end_reason: string | null;
   updated_at: string;
+}
+
+export interface ProviderLinearTrackedIssueError {
+  code: string;
+  reason: string;
+  message: string;
+  status: number;
+  retryable: boolean;
+  details?: Record<string, unknown>;
 }
 
 export interface ProviderLinearWorkerJsonlParseResult {
@@ -187,6 +218,7 @@ export interface ProviderLinearWorkerDependencies {
     repoRoot: string,
     runId: string
   ) => Promise<RuntimeCodexCommandContext>;
+  sleep: (ms: number) => Promise<void>;
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
   writeProof: (path: string, proof: ProviderLinearWorkerProof) => Promise<void>;
   log: Pick<typeof logger, 'info' | 'warn' | 'error'>;
@@ -947,9 +979,114 @@ async function readTrackedIssueOrThrow(input: {
     sourceSetup: input.sourceSetup
   });
   if (resolution.kind !== 'ready') {
-    throw new Error(`Unable to resolve provider issue ${input.issueId}: ${resolution.reason}`);
+    throw new ProviderLinearTrackedIssueReadError(input.issueId, resolution);
   }
   return resolution.tracked_issue;
+}
+
+export class ProviderLinearTrackedIssueReadError extends Error {
+  readonly issueId: string;
+  readonly resolution: Exclude<LiveLinearTrackedIssueResolution, { kind: 'ready' }>;
+
+  constructor(issueId: string, resolution: Exclude<LiveLinearTrackedIssueResolution, { kind: 'ready' }>) {
+    super(
+      resolution.message
+        ? `Unable to resolve provider issue ${issueId}: ${resolution.reason} (${resolution.message})`
+        : `Unable to resolve provider issue ${issueId}: ${resolution.reason}`
+    );
+    this.name = 'ProviderLinearTrackedIssueReadError';
+    this.issueId = issueId;
+    this.resolution = resolution;
+  }
+}
+
+function buildProviderLinearTrackedIssueError(error: unknown): ProviderLinearTrackedIssueError | null {
+  if (error instanceof ProviderLinearTrackedIssueReadError) {
+    const details = isRecord(error.resolution.details) ? { ...error.resolution.details } : undefined;
+    const code = normalizeOptionalString(details?.error_code) ?? error.resolution.code;
+    return {
+      code,
+      reason: error.resolution.reason,
+      message: error.resolution.message ?? error.message,
+      status: error.resolution.status,
+      retryable: error.resolution.retryable === true,
+      ...(details ? { details } : {})
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      code: 'tracked_issue_read_failed',
+      reason: 'tracked_issue_read_failed',
+      message: error.message,
+      status: 503,
+      retryable: false
+    };
+  }
+
+  return {
+    code: 'tracked_issue_read_failed',
+    reason: 'tracked_issue_read_failed',
+    message: String(error),
+    status: 503,
+    retryable: false
+  };
+}
+
+function resolveTrackedIssueRateLimitWaitMs(error: ProviderLinearTrackedIssueError | null): number | null {
+  if (!error || error.code !== 'linear_rate_limited' || !isRecord(error.details)) {
+    return null;
+  }
+
+  const retryAfterSeconds =
+    typeof error.details.retry_after_seconds === 'number' && Number.isFinite(error.details.retry_after_seconds)
+      ? error.details.retry_after_seconds
+      : null;
+  if (retryAfterSeconds !== null && retryAfterSeconds >= 0) {
+    return Math.round(retryAfterSeconds * 1000);
+  }
+
+  const exhaustedBucketWaits: number[] = [];
+  const unknownBucketWaits: number[] = [];
+  for (const bucket of PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_BUCKETS) {
+    const value = normalizeOptionalString(error.details[bucket.resetAt]);
+    if (!value) {
+      continue;
+    }
+    const resetAt = Date.parse(value);
+    if (!Number.isFinite(resetAt)) {
+      continue;
+    }
+    const waitMs = Math.max(0, resetAt - Date.now());
+    const remaining = parseTrackedIssueRateLimitRemaining(error.details[bucket.remaining]);
+    if (remaining !== null) {
+      if (remaining <= 0) {
+        exhaustedBucketWaits.push(waitMs);
+      }
+      continue;
+    }
+    unknownBucketWaits.push(waitMs);
+  }
+
+  const candidateWaits = [...exhaustedBucketWaits, ...unknownBucketWaits];
+  if (candidateWaits.length > 0) {
+    // A single retry should wait until every exhausted or still-unknown bucket has reset.
+    return Math.max(...candidateWaits);
+  }
+
+  return null;
+}
+
+function parseTrackedIssueRateLimitRemaining(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isInteger(parsed) ? parsed : null;
 }
 
 function buildProofPath(runDir: string): string {
@@ -1446,6 +1583,9 @@ export async function runProviderLinearWorker(
     readManifest: async (path) => JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>,
     readTrackedIssue: readTrackedIssueOrThrow,
     resolveRuntimeContext: resolveProviderLinearWorkerRuntimeContext,
+    sleep: async (ms) => {
+      await sleep(ms);
+    },
     execRunner: defaultExecRunner,
     writeProof: async (path, proof) => writeJsonAtomic(path, proof),
     log: logger,
@@ -1490,6 +1630,7 @@ export async function runProviderLinearWorker(
     source_setup: context.sourceSetup,
     linear_audit: null,
     child_streams: [],
+    tracked_issue_error: null,
     end_reason: null,
     updated_at: deps.now()
   };
@@ -1509,23 +1650,50 @@ export async function runProviderLinearWorker(
 
   finalProof = await persistProof(finalProof);
   const readTrackedIssueWithFailClosedProof = async (): Promise<LiveLinearTrackedIssue> => {
-    try {
-      return await deps.readTrackedIssue({
-        issueId: context.issueId,
-        env: childEnv,
-        sourceSetup: context.sourceSetup
-      });
-    } catch (error) {
-      finalProof = {
-        ...finalProof,
-        owner_phase: 'ended',
-        owner_status: 'failed',
-        end_reason: 'tracked_issue_read_failed',
-        updated_at: deps.now()
-      };
-      finalProof = await persistProof(finalProof);
-      throw error instanceof Error ? error : new Error(String(error));
+    let rateLimitRetryConsumed = false;
+    let shouldReadTrackedIssue = true;
+    while (shouldReadTrackedIssue) {
+      try {
+        const trackedIssue = await deps.readTrackedIssue({
+          issueId: context.issueId,
+          env: childEnv,
+          sourceSetup: context.sourceSetup
+        });
+        shouldReadTrackedIssue = false;
+        return trackedIssue;
+      } catch (error) {
+        const trackedIssueError = buildProviderLinearTrackedIssueError(error);
+        const rateLimitWaitMs = resolveTrackedIssueRateLimitWaitMs(trackedIssueError);
+        if (
+          !rateLimitRetryConsumed &&
+          trackedIssueError?.retryable === true &&
+          rateLimitWaitMs !== null &&
+          rateLimitWaitMs <= PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_MAX_WAIT_MS
+        ) {
+          rateLimitRetryConsumed = true;
+          deps.log.warn(
+            `[provider-linear-worker] tracked issue reread rate limited; waiting ${rateLimitWaitMs}ms before one retry`
+          );
+          await deps.sleep(rateLimitWaitMs);
+          continue;
+        }
+
+        finalProof = {
+          ...finalProof,
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          tracked_issue_error: trackedIssueError,
+          end_reason:
+            trackedIssueError?.code === 'linear_rate_limited'
+              ? 'tracked_issue_rate_limited'
+              : 'tracked_issue_read_failed',
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        throw error instanceof Error ? error : new Error(String(error));
+      }
     }
+    throw new Error('provider-linear-worker tracked issue read loop exited unexpectedly.');
   };
 
   let issue = await readTrackedIssueWithFailClosedProof();
@@ -1608,6 +1776,7 @@ export async function runProviderLinearWorker(
       workspace_path: context.workspacePath,
       source_setup: context.sourceSetup,
       linear_audit: finalProof.linear_audit,
+      tracked_issue_error: null,
       end_reason: null,
       updated_at: deps.now()
     };

@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260329-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced",
+      "title": "CO: Surface and handle Linear rate limits in provider tracked-issue rereads",
+      "relates_to": "tasks/tasks-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-29",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-29",
+          "manifest": ".runs/linear-ebb62cc0-77d0-41e4-8640-abbd5126cced-docs-review/cli/2026-03-29T11-31-24-681Z-749a0ed3/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md",
+        "task": "tasks/tasks-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md",
+        "agent_task": ".agent/task/linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md",
+        "docs": "docs/TECH_SPEC-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md"
+      }
+    },
+    {
       "id": "20260329-linear-f6e514fa-352e-4d82-97e2-08667e32e586",
       "title": "CO Standardize Linear Workpad Checkbox Semantics for Acceptance Criteria and Validation",
       "relates_to": "tasks/tasks-linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",

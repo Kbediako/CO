@@ -6,6 +6,7 @@ import {
   type LinearGraphqlFailure,
   type LinearGraphqlPayload
 } from './linearGraphqlClient.js';
+import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
 import { isProviderLinearTrackedIssueEligibleForExecution } from './providerLinearWorkflowStates.js';
 
 const LINEAR_RECENT_ACTIVITY_LIMIT = 3;
@@ -56,6 +57,9 @@ interface LiveLinearFailureResolution {
   status: number;
   code: 'dispatch_source_unavailable' | 'dispatch_source_malformed';
   reason: string;
+  message?: string;
+  retryable?: boolean;
+  details?: Record<string, unknown>;
 }
 
 export type LiveLinearDispatchResolution =
@@ -857,15 +861,38 @@ function mapLinearGraphqlFailureToDispatchResolution(failure: LinearGraphqlFailu
   if (failure.kind === 'response_invalid') {
     return malformed('dispatch_source_provider_response_invalid');
   }
+  const rateLimitFailure = mapLinearRateLimitedFailure(failure);
+  if (rateLimitFailure) {
+    return unavailable('dispatch_source_provider_rate_limited', {
+      status: rateLimitFailure.status,
+      message: rateLimitFailure.message,
+      retryable: rateLimitFailure.retryable,
+      details: {
+        error_code: rateLimitFailure.code,
+        ...rateLimitFailure.details
+      }
+    });
+  }
   return unavailable('dispatch_source_provider_request_failed');
 }
 
-function unavailable(reason: string): LiveLinearFailureResolution {
+function unavailable(
+  reason: string,
+  options: {
+    status?: number;
+    message?: string;
+    retryable?: boolean;
+    details?: Record<string, unknown>;
+  } = {}
+): LiveLinearFailureResolution {
   return {
     kind: 'unavailable',
-    status: 503,
+    status: options.status ?? 503,
     code: 'dispatch_source_unavailable',
-    reason
+    reason,
+    ...(options.message ? { message: options.message } : {}),
+    ...(typeof options.retryable === 'boolean' ? { retryable: options.retryable } : {}),
+    ...(options.details ? { details: options.details } : {})
   };
 }
 

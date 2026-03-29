@@ -14,6 +14,7 @@ import {
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
+  ProviderLinearTrackedIssueReadError,
   readProviderLinearWorkerChildStreams,
   runProviderLinearWorker,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
@@ -3094,6 +3095,312 @@ describe('provider linear worker runner', () => {
       owner_phase: 'ended',
       owner_status: 'failed',
       end_reason: 'tracked_issue_read_failed'
+    });
+  });
+
+  it('waits through a bounded tracked-issue rate-limit window and retries the reread once', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const shortWaitRateLimit = new ProviderLinearTrackedIssueReadError('lin-issue-1', {
+      kind: 'unavailable',
+      status: 429,
+      code: 'dispatch_source_unavailable',
+      reason: 'dispatch_source_provider_rate_limited',
+      message: 'Linear API rate limit exceeded.',
+      retryable: true,
+      details: {
+        error_code: 'linear_rate_limited',
+        retry_after_seconds: 2,
+        requests_remaining: 0,
+        request_id: 'req-worker-short'
+      }
+    });
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockRejectedValueOnce(shortWaitRateLimit)
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-03-21T09:00:02.000Z'
+        })
+      );
+    const execRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+        '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+      ].join('\n'),
+      stderr: ''
+    }));
+    const waitForRateLimitReset = vi.fn(async () => undefined);
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        sleep: waitForRateLimitReset,
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:03.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    expect(readTrackedIssue).toHaveBeenCalledTimes(3);
+    expect(waitForRateLimitReset).toHaveBeenCalledTimes(1);
+    expect(waitForRateLimitReset).toHaveBeenCalledWith(2000);
+    expect(proof).toMatchObject({
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive'
+    });
+    expect(proof.tracked_issue_error ?? null).toBeNull();
+  });
+
+  it('uses the exhausted reset bucket when retry-after is absent', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-21T10:00:00.000Z'));
+
+    try {
+      const { manifestPath } = await createManifestRoot();
+      const shortEndpointWaitRateLimit = new ProviderLinearTrackedIssueReadError('lin-issue-1', {
+        kind: 'unavailable',
+        status: 429,
+        code: 'dispatch_source_unavailable',
+        reason: 'dispatch_source_provider_rate_limited',
+        message: 'Linear API rate limit exceeded.',
+        retryable: true,
+        details: {
+          error_code: 'linear_rate_limited',
+          requests_remaining: 12,
+          requests_reset_at: '2026-03-21T10:00:30.000Z',
+          endpoint_requests_remaining: 0,
+          endpoint_requests_reset_at: '2026-03-21T10:00:02.000Z',
+          request_id: 'req-worker-endpoint-short'
+        }
+      });
+      const readTrackedIssue = vi
+        .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+        .mockResolvedValueOnce(createTrackedIssue())
+        .mockRejectedValueOnce(shortEndpointWaitRateLimit)
+        .mockResolvedValueOnce(
+          createTrackedIssue({
+            state: 'Done',
+            state_type: 'completed'
+          })
+        );
+      const execRunner = vi.fn(async () => ({
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      }));
+      const waitForRateLimitReset = vi.fn(async () => undefined);
+
+      const proof = await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child'
+        },
+        {
+          readTrackedIssue,
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          sleep: waitForRateLimitReset,
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      );
+
+      expect(execRunner).toHaveBeenCalledTimes(1);
+      expect(readTrackedIssue).toHaveBeenCalledTimes(3);
+      expect(waitForRateLimitReset).toHaveBeenCalledTimes(1);
+      expect(waitForRateLimitReset).toHaveBeenCalledWith(2000);
+      expect(proof).toMatchObject({
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive'
+      });
+      expect(proof.tracked_issue_error ?? null).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for the latest unknown reset window when remaining headers are missing', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-21T10:00:00.000Z'));
+
+    try {
+      const { manifestPath } = await createManifestRoot();
+      const mixedBucketRateLimit = new ProviderLinearTrackedIssueReadError('lin-issue-1', {
+        kind: 'unavailable',
+        status: 429,
+        code: 'dispatch_source_unavailable',
+        reason: 'dispatch_source_provider_rate_limited',
+        message: 'Linear API rate limit exceeded.',
+        retryable: true,
+        details: {
+          error_code: 'linear_rate_limited',
+          requests_remaining: 0,
+          requests_reset_at: '2026-03-21T10:00:02.000Z',
+          endpoint_requests_reset_at: '2026-03-21T10:00:12.000Z',
+          request_id: 'req-worker-mixed-buckets'
+        }
+      });
+      const lateResetIssue = createTrackedIssue({
+        state: 'Done',
+        state_type: 'completed'
+      });
+      const waitForRateLimitReset = vi.fn(async () => undefined);
+      const readTrackedIssue = vi
+        .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+        .mockResolvedValueOnce(createTrackedIssue())
+        .mockRejectedValueOnce(mixedBucketRateLimit)
+        .mockImplementation(async () => {
+          if (waitForRateLimitReset.mock.calls[0]?.[0] === 12_000) {
+            return lateResetIssue;
+          }
+          throw mixedBucketRateLimit;
+        });
+      const execRunner = vi.fn(async () => ({
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      }));
+
+      const proof = await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child'
+        },
+        {
+          readTrackedIssue,
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          sleep: waitForRateLimitReset,
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      );
+
+      expect(execRunner).toHaveBeenCalledTimes(1);
+      expect(readTrackedIssue).toHaveBeenCalledTimes(3);
+      expect(waitForRateLimitReset).toHaveBeenCalledTimes(1);
+      expect(waitForRateLimitReset).toHaveBeenCalledWith(12_000);
+      expect(proof).toMatchObject({
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive'
+      });
+      expect(proof.tracked_issue_error ?? null).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails explicitly as rate limited when the tracked issue refresh reset window is too long', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const longWaitRateLimit = new ProviderLinearTrackedIssueReadError('lin-issue-1', {
+      kind: 'unavailable',
+      status: 429,
+      code: 'dispatch_source_unavailable',
+      reason: 'dispatch_source_provider_rate_limited',
+      message: 'Linear API rate limit exceeded.',
+      retryable: true,
+      details: {
+        error_code: 'linear_rate_limited',
+        retry_after_seconds: 3600,
+        requests_remaining: 0,
+        requests_reset_at: '2026-03-21T10:00:00.000Z',
+        request_id: 'req-worker-long'
+      }
+    });
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockRejectedValueOnce(longWaitRateLimit);
+    const execRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+        '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+      ].join('\n'),
+      stderr: ''
+    }));
+    const waitForRateLimitReset = vi.fn(async () => undefined);
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child'
+        },
+        {
+          readTrackedIssue,
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          sleep: waitForRateLimitReset,
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('dispatch_source_provider_rate_limited');
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    expect(waitForRateLimitReset).not.toHaveBeenCalled();
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'tracked_issue_rate_limited',
+      tracked_issue_error: {
+        code: 'linear_rate_limited',
+        reason: 'dispatch_source_provider_rate_limited',
+        message: 'Linear API rate limit exceeded.',
+        status: 429,
+        retryable: true,
+        details: {
+          error_code: 'linear_rate_limited',
+          retry_after_seconds: 3600,
+          requests_remaining: 0,
+          requests_reset_at: '2026-03-21T10:00:00.000Z',
+          request_id: 'req-worker-long'
+        }
+      }
     });
   });
 
