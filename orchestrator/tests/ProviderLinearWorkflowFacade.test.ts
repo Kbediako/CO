@@ -3315,6 +3315,78 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('ignores top-level four-space-indented validation examples when mirroring ticket requirements', async () => {
+    const createdWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.'],
+      notesLines: ['- Top-level four-space-indented examples should not become required validation items.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            description: ['Validation', '- Run npm test.', '    ```sh', '    - Run npm run lint.', '    ```'].join(
+              '\n'
+            ),
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        expect(body.variables).toEqual({
+          issueId: 'lin-issue-1',
+          body: createdWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-created-top-level-indented-fenced-validation',
+                url: 'https://linear.app/comment/workpad-created-top-level-indented-fenced-validation',
+                body: createdWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: createdWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-created-top-level-indented-fenced-validation',
+        url: 'https://linear.app/comment/workpad-created-top-level-indented-fenced-validation',
+        body: createdWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+  });
+
   it('keeps nested validation buckets active when fenced examples appear before the real checklist', async () => {
     const incompleteWorkpadBody = buildStructuredWorkpadBody({
       validationLines: ['- Run npm test.'],

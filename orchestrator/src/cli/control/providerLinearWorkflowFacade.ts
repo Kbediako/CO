@@ -3110,6 +3110,9 @@ function extractIssueValidationRequirements(
     if (activeCodeFenceDelimiter) {
       continue;
     }
+    if (isTopLevelIndentedCodeBlockLine(line, containerIndent)) {
+      continue;
+    }
     const nextLine = lines[index + 1] ?? null;
     const previousLine = lines[index - 1] ?? null;
     const nextVisibleLines = getNextVisibleIssueLines(lines, index + 1, 2);
@@ -3471,6 +3474,10 @@ function isListLikeLine(line: string | null): boolean {
   return /^[-*+]\s/u.test(trimmed) || /^\d+[.)]\s/u.test(trimmed) || /^\[[ xX]\]\s/u.test(trimmed);
 }
 
+function isTopLevelIndentedCodeBlockLine(line: string, containerIndent: number): boolean {
+  return containerIndent === 0 && countLeadingSpaces(line) >= 4 && normalizeRequiredString(line) !== null;
+}
+
 function isListIntroductionLine(line: string, nextLine: string | null): boolean {
   const trimmed = line.trim();
   return Boolean(trimmed) && /:\s*$/u.test(trimmed) && isListLikeLine(nextLine);
@@ -3543,6 +3550,9 @@ function getNextVisibleIssueLines(lines: string[], startIndex: number, count: nu
       continue;
     }
     if (activeCodeFenceDelimiter) {
+      continue;
+    }
+    if (isTopLevelIndentedCodeBlockLine(line, containerIndent)) {
       continue;
     }
     if (normalizeRequiredString(line) === null) {
