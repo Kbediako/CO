@@ -2904,6 +2904,24 @@ function getMarkdownStructuralLine(
   };
 }
 
+function getMarkdownFenceAwareStructuralLine(
+  listContinuationIndents: number[],
+  line: string,
+  activeCodeFenceDelimiter: string | null,
+  activeCodeFenceContainerIndent: number
+): { containerIndent: number; structuralLine: string } {
+  if (activeCodeFenceDelimiter === null) {
+    const leadingSpaces = pruneMarkdownListContinuationIndents(listContinuationIndents, line);
+    return getMarkdownStructuralLine(listContinuationIndents, line, leadingSpaces);
+  }
+  const containerIndent = activeCodeFenceContainerIndent;
+  const leadingSpaces = countLeadingSpaces(line);
+  return {
+    containerIndent,
+    structuralLine: leadingSpaces >= containerIndent ? line.slice(containerIndent) : line
+  };
+}
+
 function recordMarkdownListContinuationIndent(
   listContinuationIndents: number[],
   structuralLine: string,
@@ -2925,17 +2943,19 @@ function recordMarkdownListContinuationIndent(
 
 function findWorkpadCheckboxListItem(body: string, mode: 'blank' | 'non-empty'): boolean {
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
   const listContinuationIndents: number[] = [];
 
   for (const line of body.split(/\r?\n/u)) {
-    const leadingSpaces = pruneMarkdownListContinuationIndents(listContinuationIndents, line);
-    const { containerIndent, structuralLine } = getMarkdownStructuralLine(
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
       listContinuationIndents,
       line,
-      leadingSpaces
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
     );
     const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+    activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
     if (codeFenceTransition.isBoundary || activeCodeFenceDelimiter !== null) {
       continue;
     }
@@ -2988,6 +3008,7 @@ function parseWorkpadSections(body: string): {
   const sections: ProviderLinearWorkpadSection[] = [];
   let markerSeen = false;
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
   const listContinuationIndents: number[] = [];
   let currentTitle: string | null = null;
   let currentLines: string[] = [];
@@ -3004,11 +3025,11 @@ function parseWorkpadSections(body: string): {
   };
 
   for (const line of body.split(/\r?\n/u)) {
-    const leadingSpaces = pruneMarkdownListContinuationIndents(listContinuationIndents, line);
-    const { containerIndent, structuralLine } = getMarkdownStructuralLine(
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
       listContinuationIndents,
       line,
-      leadingSpaces
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
     );
     const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     if (codeFenceTransition.isBoundary) {
@@ -3018,6 +3039,7 @@ function parseWorkpadSections(body: string): {
         currentLines.push(line);
       }
       activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
       continue;
     }
     if (!markerSeen) {
@@ -3069,18 +3091,20 @@ function extractIssueValidationRequirements(
   let activeSection: string | null = null;
   let previousNonEmptyLine: string | null = null;
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
   const listContinuationIndents: number[] = [];
   const lines = description.split(/\r?\n/u);
   for (const [index, line] of lines.entries()) {
-    const leadingSpaces = pruneMarkdownListContinuationIndents(listContinuationIndents, line);
-    const { containerIndent, structuralLine } = getMarkdownStructuralLine(
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
       listContinuationIndents,
       line,
-      leadingSpaces
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
     );
     const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     if (codeFenceTransition.isBoundary) {
       activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
       continue;
     }
     if (activeCodeFenceDelimiter) {
@@ -3502,18 +3526,20 @@ function getNextVisibleIssueLines(lines: string[], startIndex: number, count: nu
   }
   const visibleLines: string[] = [];
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
   const listContinuationIndents: number[] = [];
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index];
-    const leadingSpaces = pruneMarkdownListContinuationIndents(listContinuationIndents, line);
-    const { containerIndent, structuralLine } = getMarkdownStructuralLine(
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
       listContinuationIndents,
       line,
-      leadingSpaces
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
     );
     const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     if (codeFenceTransition.isBoundary) {
       activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
       continue;
     }
     if (activeCodeFenceDelimiter) {

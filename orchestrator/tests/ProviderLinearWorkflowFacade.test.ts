@@ -5217,6 +5217,78 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it('accepts real checklist items that follow ordered-list-indented fenced examples with dedented inner content', async () => {
+    const validWorkpadBody = buildStructuredWorkpadBody({
+      acceptanceCriteriaLines: [
+        '10. Nested example',
+        '    ```md',
+        '### Example Heading',
+        '    ```',
+        '- [ ] Keep the canonical five-section workpad shape.'
+      ],
+      validationLines: ['- [ ] Run npm test.'],
+      notesLines: ['- Ordered-list-indented fenced examples should not hide later real checklist items.'],
+      normalizeRequiredChecklistSections: false
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: validWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                body: validWorkpadBody,
+                url: 'https://linear.app/comment/workpad'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: validWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-workpad',
+        url: 'https://linear.app/comment/workpad',
+        body: validWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it('fails closed when Acceptance Criteria uses plain bullets instead of checkbox items', async () => {
     const invalidWorkpadBody = buildStructuredWorkpadBody({
       acceptanceCriteriaLines: ['- Keep the canonical five-section workpad shape.'],
