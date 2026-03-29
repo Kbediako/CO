@@ -20,6 +20,7 @@ const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
   'Validation',
   'Notes'
 ] as const;
+const LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS = ['Acceptance Criteria', 'Validation'] as const;
 const LINEAR_ISSUE_VALIDATION_SECTION_TITLES = new Set(['validation', 'test plan', 'testing']);
 const LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES = new Set([
   'automated',
@@ -2699,14 +2700,32 @@ function findUnresolvedWorkpadComments(
 
 function hasWorkpadMarker(body: string): boolean {
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
   for (const line of body.split(/\r?\n/u)) {
-    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    let containerIndent = activeCodeFenceContainerIndent;
+    let structuralLine = line;
+    if (activeCodeFenceDelimiter === null) {
+      const leadingSpaces = pruneMarkdownListContinuationIndents(listContinuationIndents, line);
+      ({ containerIndent, structuralLine } = getMarkdownStructuralLine(
+        listContinuationIndents,
+        line,
+        leadingSpaces
+      ));
+    } else if (countLeadingSpaces(line) >= activeCodeFenceContainerIndent) {
+      structuralLine = line.slice(activeCodeFenceContainerIndent);
+    }
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     if (codeFenceTransition.isBoundary) {
       activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
       continue;
     }
     if (!activeCodeFenceDelimiter && /^##\s+Codex Workpad\b/u.test(line)) {
       return true;
+    }
+    if (!activeCodeFenceDelimiter) {
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
     }
   }
   return false;
@@ -2790,13 +2809,41 @@ function validateWorkpadBodyContract(
     };
   }
 
+  const requiredCheckboxSections = LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS.map((title) =>
+    findWorkpadSectionByTitle(sections, title)
+  ).filter((section): section is ProviderLinearWorkpadSection => Boolean(section));
+  const sectionsMissingCheckboxes = requiredCheckboxSections
+    .filter((section) => !containsWorkpadCheckboxListItem(section.body))
+    .map((section) => section.title);
+  const sectionsWithBlankCheckboxes = requiredCheckboxSections
+    .filter((section) => containsBlankWorkpadCheckboxListItem(section.body))
+    .map((section) => section.title);
+  if (sectionsMissingCheckboxes.length > 0 || sectionsWithBlankCheckboxes.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: [...LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS],
+          missing_checkbox_sections: sectionsMissingCheckboxes,
+          blank_checkbox_sections: sectionsWithBlankCheckboxes
+        }
+      }
+    };
+  }
+
   const ticketValidationRequirements = extractIssueValidationRequirements(issueDescription);
   if (ticketValidationRequirements.length === 0) {
     return { ok: true };
   }
 
+  const acceptanceCriteriaSection = findWorkpadSectionByTitle(sections, 'Acceptance Criteria');
+  const validationSection = findWorkpadSectionByTitle(sections, 'Validation');
   const mirroredValidationText = normalizeRequirementValue(
-    `${sections[2]?.body ?? ''}\n${sections[3]?.body ?? ''}`
+    `${acceptanceCriteriaSection?.body ?? ''}\n${validationSection?.body ?? ''}`
   );
   const missingRequirements = ticketValidationRequirements.filter(
     (requirement) => !containsNormalizedRequirement(mirroredValidationText, requirement.normalized)
@@ -2820,6 +2867,131 @@ function validateWorkpadBodyContract(
   return { ok: true };
 }
 
+function containsWorkpadCheckboxListItem(body: string): boolean {
+  return findWorkpadCheckboxListItem(body, 'non-empty');
+}
+
+function containsBlankWorkpadCheckboxListItem(body: string): boolean {
+  return findWorkpadCheckboxListItem(body, 'blank');
+}
+
+function countLeadingSpaces(line: string): number {
+  return line.match(/^ */u)?.[0].length ?? 0;
+}
+
+function pruneMarkdownListContinuationIndents(listContinuationIndents: number[], line: string): number {
+  const leadingSpaces = countLeadingSpaces(line);
+  if (normalizeRequiredString(line) !== null) {
+    while (
+      listContinuationIndents.length > 0 &&
+      leadingSpaces < listContinuationIndents[listContinuationIndents.length - 1]
+    ) {
+      listContinuationIndents.pop();
+    }
+  }
+  return leadingSpaces;
+}
+
+function getMarkdownStructuralLine(
+  listContinuationIndents: readonly number[],
+  line: string,
+  leadingSpaces: number
+): { containerIndent: number; structuralLine: string } {
+  const containerIndent = listContinuationIndents[listContinuationIndents.length - 1] ?? 0;
+  return {
+    containerIndent,
+    structuralLine: leadingSpaces >= containerIndent ? line.slice(containerIndent) : line
+  };
+}
+
+function getMarkdownFenceAwareStructuralLine(
+  listContinuationIndents: number[],
+  line: string,
+  activeCodeFenceDelimiter: string | null,
+  activeCodeFenceContainerIndent: number
+): { containerIndent: number; structuralLine: string } {
+  if (activeCodeFenceDelimiter === null) {
+    const leadingSpaces = pruneMarkdownListContinuationIndents(listContinuationIndents, line);
+    return getMarkdownStructuralLine(listContinuationIndents, line, leadingSpaces);
+  }
+  const containerIndent = activeCodeFenceContainerIndent;
+  const leadingSpaces = countLeadingSpaces(line);
+  return {
+    containerIndent,
+    structuralLine: leadingSpaces >= containerIndent ? line.slice(containerIndent) : line
+  };
+}
+
+function recordMarkdownListContinuationIndent(
+  listContinuationIndents: number[],
+  structuralLine: string,
+  containerIndent: number
+): void {
+  const listItemMatch = structuralLine.match(/^([ ]{0,3})(?:[-+*]|\d+[.)])\s+/u);
+  if (!listItemMatch) {
+    return;
+  }
+  const nextIndent = containerIndent + listItemMatch[0].length;
+  while (
+    listContinuationIndents.length > 0 &&
+    nextIndent <= listContinuationIndents[listContinuationIndents.length - 1]
+  ) {
+    listContinuationIndents.pop();
+  }
+  listContinuationIndents.push(nextIndent);
+}
+
+function findWorkpadCheckboxListItem(body: string, mode: 'blank' | 'non-empty'): boolean {
+  let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
+
+  for (const line of body.split(/\r?\n/u)) {
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
+      listContinuationIndents,
+      line,
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
+    );
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
+    activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+    activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
+    if (codeFenceTransition.isBoundary || activeCodeFenceDelimiter !== null) {
+      continue;
+    }
+    const matchesCheckbox =
+      mode === 'non-empty'
+        ? /^[ ]{0,3}-\s+\[(?: |x|X)\]\s+\S.*$/u.test(structuralLine)
+        : /^[ ]{0,3}-\s+\[(?: |x|X)\]\s*$/u.test(structuralLine);
+    if (matchesCheckbox) {
+      return true;
+    }
+    recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
+  }
+
+  return false;
+}
+
+function findWorkpadSectionByTitle(
+  sections: readonly ProviderLinearWorkpadSection[],
+  title: string
+): ProviderLinearWorkpadSection | undefined {
+  const normalizedTitle = normalizeComparableValue(title);
+  return sections.find((section) => normalizeComparableValue(section.title) === normalizedTitle);
+}
+
+function normalizeWorkpadSectionBody(lines: readonly string[]): string {
+  let start = 0;
+  let end = lines.length;
+  while (start < end && lines[start].trim().length === 0) {
+    start += 1;
+  }
+  while (end > start && lines[end - 1].trim().length === 0) {
+    end -= 1;
+  }
+  return lines.slice(start, end).join('\n');
+}
+
 function isCanonicalWorkpadMarkerLine(line: string): boolean {
   const headingMatch = line.match(/^\s*##\s+(.+?)\s*$/u);
   if (!headingMatch) {
@@ -2836,6 +3008,8 @@ function parseWorkpadSections(body: string): {
   const sections: ProviderLinearWorkpadSection[] = [];
   let markerSeen = false;
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
   let currentTitle: string | null = null;
   let currentLines: string[] = [];
   let hasLeadingContentBeforeFirstSection = false;
@@ -2846,12 +3020,18 @@ function parseWorkpadSections(body: string): {
     }
     sections.push({
       title: currentTitle,
-      body: currentLines.join('\n').trim()
+      body: normalizeWorkpadSectionBody(currentLines)
     });
   };
 
   for (const line of body.split(/\r?\n/u)) {
-    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
+      listContinuationIndents,
+      line,
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
+    );
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     if (codeFenceTransition.isBoundary) {
       if (markerSeen && !currentTitle) {
         hasLeadingContentBeforeFirstSection = true;
@@ -2859,6 +3039,7 @@ function parseWorkpadSections(body: string): {
         currentLines.push(line);
       }
       activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
       continue;
     }
     if (!markerSeen) {
@@ -2875,12 +3056,13 @@ function parseWorkpadSections(body: string): {
       }
       continue;
     }
-    const headingMatch = line.match(/^\s*###\s+(.+?)\s*$/u);
+    const headingMatch = line.match(/^[ ]{0,3}###\s+(.+?)\s*$/u);
     if (headingMatch) {
       flushCurrent();
       const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
       currentTitle = normalizeRequiredString(headingTitle) ?? headingTitle;
       currentLines = [];
+      listContinuationIndents.length = 0;
       continue;
     }
     if (!currentTitle && normalizeRequiredString(line) !== null) {
@@ -2888,6 +3070,7 @@ function parseWorkpadSections(body: string): {
     } else if (currentTitle) {
       currentLines.push(line);
     }
+    recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
   }
   flushCurrent();
 
@@ -2908,14 +3091,26 @@ function extractIssueValidationRequirements(
   let activeSection: string | null = null;
   let previousNonEmptyLine: string | null = null;
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
   const lines = description.split(/\r?\n/u);
   for (const [index, line] of lines.entries()) {
-    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
+      listContinuationIndents,
+      line,
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
+    );
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     if (codeFenceTransition.isBoundary) {
       activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
       continue;
     }
     if (activeCodeFenceDelimiter) {
+      continue;
+    }
+    if (isTopLevelIndentedCodeBlockLine(line, containerIndent)) {
       continue;
     }
     const nextLine = lines[index + 1] ?? null;
@@ -2952,12 +3147,14 @@ function extractIssueValidationRequirements(
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
       continue;
     }
     if (!activeSection) {
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
       continue;
     }
     if (
@@ -2967,6 +3164,7 @@ function extractIssueValidationRequirements(
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
       continue;
     }
     const rawRequirement = stripRequirementPrefix(line);
@@ -2974,6 +3172,7 @@ function extractIssueValidationRequirements(
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
       continue;
     }
     const normalizedRequirement = normalizeRequirementValue(rawRequirement);
@@ -2981,12 +3180,14 @@ function extractIssueValidationRequirements(
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
       continue;
     }
     if (requirements.some((entry) => entry.normalized === normalizedRequirement)) {
       if (line.trim().length > 0) {
         previousNonEmptyLine = line;
       }
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
       continue;
     }
     requirements.push({
@@ -2997,6 +3198,7 @@ function extractIssueValidationRequirements(
     if (line.trim().length > 0) {
       previousNonEmptyLine = line;
     }
+    recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
   }
 
   return requirements;
@@ -3272,6 +3474,10 @@ function isListLikeLine(line: string | null): boolean {
   return /^[-*+]\s/u.test(trimmed) || /^\d+[.)]\s/u.test(trimmed) || /^\[[ xX]\]\s/u.test(trimmed);
 }
 
+function isTopLevelIndentedCodeBlockLine(line: string, containerIndent: number): boolean {
+  return containerIndent === 0 && countLeadingSpaces(line) >= 4 && normalizeRequiredString(line) !== null;
+}
+
 function isListIntroductionLine(line: string, nextLine: string | null): boolean {
   const trimmed = line.trim();
   return Boolean(trimmed) && /:\s*$/u.test(trimmed) && isListLikeLine(nextLine);
@@ -3327,20 +3533,33 @@ function getNextVisibleIssueLines(lines: string[], startIndex: number, count: nu
   }
   const visibleLines: string[] = [];
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
   for (let index = startIndex; index < lines.length; index += 1) {
     const line = lines[index];
-    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
+      listContinuationIndents,
+      line,
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
+    );
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     if (codeFenceTransition.isBoundary) {
       activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
       continue;
     }
     if (activeCodeFenceDelimiter) {
+      continue;
+    }
+    if (isTopLevelIndentedCodeBlockLine(line, containerIndent)) {
       continue;
     }
     if (normalizeRequiredString(line) === null) {
       continue;
     }
     visibleLines.push(line);
+    recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
     if (visibleLines.length >= count) {
       break;
     }
@@ -3501,8 +3720,7 @@ function parseCodeFenceLine(line: string): {
   delimiter: string;
   trailingText: string;
 } | null {
-  const trimmedLine = line.trimStart();
-  const match = trimmedLine.match(/^(`{3,}|~{3,})(.*)$/u);
+  const match = line.match(/^[ ]{0,3}(`{3,}|~{3,})(.*)$/u);
   if (!match) {
     return null;
   }

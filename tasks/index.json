@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260329-linear-f6e514fa-352e-4d82-97e2-08667e32e586",
+      "title": "CO Standardize Linear Workpad Checkbox Semantics for Acceptance Criteria and Validation",
+      "relates_to": "tasks/tasks-linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-29",
+      "paths": {
+        "spec": "tasks/specs/linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
+        "task": "tasks/tasks-linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
+        "agent_task": ".agent/task/linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
+        "docs": "docs/TECH_SPEC-linear-f6e514fa-352e-4d82-97e2-08667e32e586.md"
+      }
+    },
+    {
       "id": "20260328-linear-62527426-2f74-4134-98e0-bb50c3da7913",
       "title": "CO: Umbrella Epic for Issue-Parent Orchestration Above Multiple Workers Per Issue",
       "relates_to": "tasks/tasks-linear-62527426-2f74-4134-98e0-bb50c3da7913.md",
