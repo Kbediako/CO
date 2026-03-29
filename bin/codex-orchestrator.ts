@@ -1662,11 +1662,29 @@ function isCliHelpToken(value: string | undefined): boolean {
   return value === '--help' || value === '-h' || value === 'help';
 }
 
+function envFlagEnabled(value: string | undefined, fallback = false): boolean {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized.length === 0) {
+    return fallback;
+  }
+  if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') {
+    return true;
+  }
+  if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') {
+    return false;
+  }
+  return fallback;
+}
+
 function isPrHelpSubcommand(value: string | undefined): value is PrHelpSubcommand {
   return value === 'watch-merge' || value === 'resolve-merge' || value === 'ready-review';
 }
 
 function printPrSubcommandHelp(subcommand: PrHelpSubcommand): void {
+  const defaultAutoMerge = envFlagEnabled(process.env.PR_MONITOR_AUTO_MERGE, false);
   switch (subcommand) {
     case 'watch-merge':
       console.log(`Usage: codex-orchestrator pr watch-merge [options]
@@ -1689,6 +1707,14 @@ Options:
   --no-exit-on-action-required Keep monitoring even when author action is required
   --dry-run                 Never call gh pr merge (report only)
   -h, --help                Show this help message
+
+Environment:
+  PR_MONITOR_QUIET_MINUTES=<n>  Override quiet window default
+  PR_MONITOR_INTERVAL_SECONDS=<n>
+  PR_MONITOR_TIMEOUT_MINUTES=<n>
+  PR_MONITOR_AUTO_MERGE=1       Default auto-merge on (current default: ${defaultAutoMerge ? 'on' : 'off'})
+  PR_MONITOR_DELETE_BRANCH=1    Default delete branch on merge
+  PR_MONITOR_MERGE_METHOD=<method>
 `);
       return;
     case 'resolve-merge':
@@ -1714,6 +1740,12 @@ Options:
   -h, --help                Show this help message
 
 Environment:
+  PR_MONITOR_QUIET_MINUTES=<n>  Override quiet window default
+  PR_MONITOR_INTERVAL_SECONDS=<n>
+  PR_MONITOR_TIMEOUT_MINUTES=<n>
+  PR_MONITOR_AUTO_MERGE=1       Default auto-merge on (current default: ${defaultAutoMerge ? 'on' : 'off'})
+  PR_MONITOR_DELETE_BRANCH=1    Default delete branch on merge
+  PR_MONITOR_MERGE_METHOD=<method>
   resolve-merge default: exit-on-action-required is on
 `);
       return;
@@ -1735,6 +1767,9 @@ Options:
   -h, --help                Show this help message
 
 Environment:
+  PR_MONITOR_QUIET_MINUTES=<n>  Override quiet window default
+  PR_MONITOR_INTERVAL_SECONDS=<n>
+  PR_MONITOR_TIMEOUT_MINUTES=<n>
   ready-review default: exit-on-action-required is on
   ready-review treats REVIEW_REQUIRED as informational; CHANGES_REQUESTED and actionable machine feedback still block handoff.
 `);
