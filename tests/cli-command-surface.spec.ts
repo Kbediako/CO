@@ -190,9 +190,9 @@ describe('codex-orchestrator command surface', () => {
   }, TEST_TIMEOUT);
 
   it('prints resume help without requiring a run id', async () => {
-    const { stdout } = await runCli(['resume', '--help']);
+    const { stdout } = await runCli(['resume', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator resume --run <id>');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects resume without a run id through the binary shell', async () => {
     await expect(runCli(['resume'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({

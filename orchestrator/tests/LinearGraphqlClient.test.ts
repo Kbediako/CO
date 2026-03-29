@@ -76,8 +76,33 @@ describe('linearGraphqlClient', () => {
     });
   });
 
-  it('treats non-ok responses as request failures without parsing the response body', async () => {
-    const json = vi.fn();
+  it('parses GraphQL errors from non-ok JSON responses before falling back to request failures', async () => {
+    const result = await executeLinearGraphql({
+      token: 'lin-api-token',
+      timeoutMs: 30_000,
+      fetchImpl: vi.fn(async () =>
+        jsonResponse(
+          {
+            errors: [{ message: 'Rate limit exceeded.', extensions: { code: 'RATELIMITED', statusCode: 429 } }]
+          },
+          400
+        )
+      ),
+      query: 'query Viewer { viewer { id } }'
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      failure: {
+        kind: 'graphql_error',
+        status: 400,
+        errors: [{ message: 'Rate limit exceeded.', extensions: { code: 'RATELIMITED', statusCode: 429 } }]
+      }
+    });
+  });
+
+  it('treats non-ok responses without a GraphQL payload as request failures', async () => {
+    const text = vi.fn(async () => 'temporary outage');
     const result = await executeLinearGraphql({
       token: 'lin-api-token',
       timeoutMs: 30_000,
@@ -85,8 +110,9 @@ describe('linearGraphqlClient', () => {
         ({
           ok: false,
           status: 503,
-          json
-        }) as Response
+          headers: new Headers(),
+          text
+        }) as unknown as Response
       ),
       query: 'query Viewer { viewer { id } }'
     });
@@ -99,7 +125,7 @@ describe('linearGraphqlClient', () => {
         errors: []
       }
     });
-    expect(json).not.toHaveBeenCalled();
+    expect(text).toHaveBeenCalledTimes(1);
   });
 
   it('resolves auth and timeout from the Linear env keys with the expected precedence', () => {
