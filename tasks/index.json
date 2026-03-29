@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260330-linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60",
+      "title": "CO: Investigate Core Lane vitest teardown hang after visible full-suite pass",
+      "relates_to": "tasks/tasks-linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "paths": {
+        "spec": "tasks/specs/linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60.md",
+        "task": "tasks/tasks-linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60.md",
+        "agent_task": ".agent/task/linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60.md",
+        "docs": "docs/TECH_SPEC-linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60.md"
+      }
+    },
+    {
       "id": "20260329-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced",
       "title": "CO: Surface and handle Linear rate limits in provider tracked-issue rereads",
       "relates_to": "tasks/tasks-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md",

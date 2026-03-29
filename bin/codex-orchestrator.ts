@@ -28,7 +28,6 @@ import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
 import { runDevtoolsCliShell } from '../orchestrator/src/cli/devtoolsCliShell.js';
 import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
 import { runLinearCliShell } from '../orchestrator/src/cli/linearCliShell.js';
-import { runPrCliShell } from '../orchestrator/src/cli/prCliShell.js';
 import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
 import { runFlowCliRequestShell } from '../orchestrator/src/cli/flowCliRequestShell.js';
 import { runStartCliRequestShell } from '../orchestrator/src/cli/startCliRequestShell.js';
@@ -1032,10 +1031,16 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
 }
 
 async function handlePr(rawArgs: string[]): Promise<void> {
-  if (rawArgs.length === 0 || rawArgs[0] === '--help' || rawArgs[0] === '-h' || rawArgs[0] === 'help') {
+  if (rawArgs.length === 0 || isCliHelpToken(rawArgs[0])) {
     printPrHelp();
     return;
   }
+  const [subcommand, ...subcommandArgs] = rawArgs;
+  if (isPrHelpSubcommand(subcommand) && subcommandArgs.some((arg) => isCliHelpToken(arg))) {
+    printPrSubcommandHelp(subcommand);
+    return;
+  }
+  const { runPrCliShell } = await import('../orchestrator/src/cli/prCliShell.js');
   await runPrCliShell({ rawArgs });
 }
 
@@ -1649,6 +1654,92 @@ Examples:
 Guide:
   Review artifacts (prompt + output log paths): docs/guides/review-artifacts.md
 `);
+}
+
+type PrHelpSubcommand = 'watch-merge' | 'resolve-merge' | 'ready-review';
+
+function isCliHelpToken(value: string | undefined): boolean {
+  return value === '--help' || value === '-h' || value === 'help';
+}
+
+function isPrHelpSubcommand(value: string | undefined): value is PrHelpSubcommand {
+  return value === 'watch-merge' || value === 'resolve-merge' || value === 'ready-review';
+}
+
+function printPrSubcommandHelp(subcommand: PrHelpSubcommand): void {
+  switch (subcommand) {
+    case 'watch-merge':
+      console.log(`Usage: codex-orchestrator pr watch-merge [options]
+
+Monitor PR checks/reviews with polling and optionally merge after a quiet window.
+
+Options:
+  --pr <number>             PR number (default: PR for current branch)
+  --owner <name>            Repo owner (default: inferred via gh repo view)
+  --repo <name>             Repo name (default: inferred via gh repo view)
+  --interval-seconds <n>    Poll interval in seconds (default: 30)
+  --quiet-minutes <n>       Required quiet window after ready state (default: 15)
+  --timeout-minutes <n>     Max monitor duration before failing (default: 180)
+  --merge-method <method>   merge|squash|rebase (default: squash)
+  --auto-merge              Merge automatically after quiet window
+  --no-auto-merge           Never merge automatically (monitor only)
+  --delete-branch           Delete remote branch when merging
+  --no-delete-branch        Keep remote branch after merge
+  --exit-on-action-required Exit non-zero when author action is required
+  --no-exit-on-action-required Keep monitoring even when author action is required
+  --dry-run                 Never call gh pr merge (report only)
+  -h, --help                Show this help message
+`);
+      return;
+    case 'resolve-merge':
+      console.log(`Usage: codex-orchestrator pr resolve-merge [options]
+
+Monitor until merge-ready or actionable feedback appears; exits early when author action is required.
+
+Options:
+  --pr <number>             PR number (default: PR for current branch)
+  --owner <name>            Repo owner (default: inferred via gh repo view)
+  --repo <name>             Repo name (default: inferred via gh repo view)
+  --interval-seconds <n>    Poll interval in seconds (default: 30)
+  --quiet-minutes <n>       Required quiet window after ready state (default: 15)
+  --timeout-minutes <n>     Max monitor duration before failing (default: 180)
+  --merge-method <method>   merge|squash|rebase (default: squash)
+  --auto-merge              Merge automatically after quiet window
+  --no-auto-merge           Never merge automatically (monitor only)
+  --delete-branch           Delete remote branch when merging
+  --no-delete-branch        Keep remote branch after merge
+  --exit-on-action-required Exit non-zero when author action is required
+  --no-exit-on-action-required Keep monitoring even when author action is required
+  --dry-run                 Never call gh pr merge (report only)
+  -h, --help                Show this help message
+
+Environment:
+  resolve-merge default: exit-on-action-required is on
+`);
+      return;
+    case 'ready-review':
+      console.log(`Usage: codex-orchestrator pr ready-review [options]
+
+Monitor PR checks/reviews with polling and report when review handoff is safe after a bounded automated-feedback drain.
+
+Options:
+  --pr <number>             PR number (default: PR for current branch)
+  --owner <name>            Repo owner (default: inferred via gh repo view)
+  --repo <name>             Repo name (default: inferred via gh repo view)
+  --interval-seconds <n>    Poll interval in seconds (default: 30)
+  --quiet-minutes <n>       Required quiet window after ready state (default: 15)
+  --timeout-minutes <n>     Max monitor duration before failing (default: 180)
+  --exit-on-action-required Exit non-zero when author action is required
+  --no-exit-on-action-required Keep monitoring even when author action is required
+  --dry-run                 Never call gh pr merge (report only)
+  -h, --help                Show this help message
+
+Environment:
+  ready-review default: exit-on-action-required is on
+  ready-review treats REVIEW_REQUIRED as informational; CHANGES_REQUESTED and actionable machine feedback still block handoff.
+`);
+      return;
+  }
 }
 
 function printRlmHelp(): void {
