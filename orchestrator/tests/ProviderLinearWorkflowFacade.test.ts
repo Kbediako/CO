@@ -4904,19 +4904,23 @@ describe('providerLinearWorkflowFacade', () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
-        variables?: { input?: { body?: string } };
+        variables?: Record<string, string>;
       };
       if (body.query?.includes('ProviderLinearIssueContext')) {
         return jsonResponse(buildIssueContextBody());
       }
-      if (body.query?.includes('commentUpdate')) {
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: validWorkpadBody
+        });
         return jsonResponse({
           data: {
             commentUpdate: {
               success: true,
               comment: {
                 id: 'comment-workpad',
-                body: body.variables?.input?.body ?? null,
+                body: validWorkpadBody,
                 url: 'https://linear.app/comment/workpad'
               }
             }
