@@ -284,10 +284,18 @@ describe('control status dashboard', () => {
     const dataset = buildDataset();
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
+        generated_at: '2026-03-30T01:15:00.000Z\u001b[31m unsafe',
+        host: 'co-control-host\u0007bell',
         issues: dataset.issues.map((issue, index) =>
           index === 0
             ? {
                 ...issue,
+                issue_identifier: 'CO-26\u001b[31m',
+                display_status: 'running\u001b[2J',
+                workspace: {
+                  ...issue.workspace,
+                  host: 'co-control-host\u001b[31m'
+                },
                 summary: 'unsafe\n\u001b]8;;https://example.com\u0007link\u001b]8;;\u0007',
                 last_error: 'oops\u001b[31mred',
                 latest_event: {
@@ -302,15 +310,19 @@ describe('control status dashboard', () => {
             : issue
         )
       }),
-      baseUrl: 'http://127.0.0.1:4100',
-      taskId: 'local-mcp',
-      runId: 'control-host',
-      runDir: '/repo/.runs/local-mcp/cli/control-host',
-      startPipelineId: 'provider-linear-worker'
+      baseUrl: 'http://127.0.0.1:4100\u001b[2J',
+      taskId: 'local\u0007mcp',
+      runId: 'control\u001b[31mhost',
+      runDir: '/repo/.runs/local-mcp/\u001b[2Jcontrol-host',
+      startPipelineId: 'provider\u001b[31m-linear-worker'
     });
 
     expect(frame).not.toContain('\u001b');
     expect(frame).not.toContain('\u0007');
+    expect(frame).toContain('Generated: 2026-03-30T01:15:00.000Z unsafe | Mode: read-only | Host: co-control-host bell');
+    expect(frame).toContain('Control: http://127.0.0.1:4100 | Task: local mcp | Run: control host | Start pipeline: provider -linear-worker');
+    expect(frame).toContain('Run dir: /repo/.runs/local-mcp/ control-host');
+    expect(frame).toContain('* CO-26 | state=running | owner=active/running | session=session-26 thread=thread-26 turns=4 | workspace=/repo/.workspaces/linear-a861 | host=co-control-host');
     expect(frame).toContain('last_error=oops red');
     expect(frame).toContain('latest=turn_started | 2026-03-30T01:14:59.000Z | message wipe');
     expect(frame).toContain('summary=unsafe link');
@@ -426,5 +438,80 @@ describe('control status dashboard', () => {
     handle.stop();
     await vi.advanceTimersByTimeAsync(5000);
     expect(requestRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not queue follow-up renders after stop when a render is already in flight', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let listener: (() => void) | null = null;
+    let resolveDataset: ((value: OperatorDashboardDataset) => void) | null = null;
+    let signalDatasetStarted: (() => void) | null = null;
+    const datasetStarted = new Promise<void>((resolve) => {
+      signalDatasetStarted = resolve;
+    });
+    const requestRefresh = vi.fn(async () => undefined);
+    const subscribe = vi.fn((input: () => void) => {
+      listener = input;
+      return () => {
+        listener = null;
+      };
+    });
+    const runtime = {
+      requestRefresh,
+      subscribe,
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+    const readDataset = vi.fn(
+      async () => {
+        signalDatasetStarted?.();
+        return await new Promise<OperatorDashboardDataset>((resolve) => {
+          resolveDataset = resolve;
+        });
+      }
+    );
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          }
+        }
+      },
+      {
+        readDataset,
+        // Uses the mocked timer functions installed by vi.useFakeTimers().
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await datasetStarted;
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+    expect(readDataset).toHaveBeenCalledTimes(1);
+
+    listener?.();
+    handle.stop();
+    resolveDataset?.(buildDataset());
+
+    await handle.flush();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(readDataset).toHaveBeenCalledTimes(1);
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+    expect(writes).toHaveLength(0);
   });
 });

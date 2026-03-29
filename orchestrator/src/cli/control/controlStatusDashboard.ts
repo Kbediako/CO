@@ -113,6 +113,9 @@ export function startControlStatusDashboard(
   let queuedForceRefresh = false;
 
   const requestRender = (forceRefresh: boolean): void => {
+    if (stopped) {
+      return;
+    }
     queuedForceRefresh = queuedForceRefresh || forceRefresh;
     if (activeRender) {
       queuedRender = true;
@@ -133,7 +136,13 @@ export function startControlStatusDashboard(
     }
     timer = deps.setTimeout(() => {
       timer = null;
+      if (stopped) {
+        return;
+      }
       requestRender(true);
+      if (stopped) {
+        return;
+      }
       scheduleTick();
     }, refreshIntervalMs);
     timer.unref?.();
@@ -149,6 +158,8 @@ export function startControlStatusDashboard(
   return {
     stop() {
       stopped = true;
+      queuedRender = false;
+      queuedForceRefresh = false;
       if (timer) {
         deps.clearTimeout(timer);
         timer = null;
@@ -192,18 +203,19 @@ export function startControlStatusDashboard(
 }
 
 export function renderControlStatusFrame(input: RenderControlStatusFrameInput): string {
+  const safe = (value: unknown): string => sanitizeDisplayValue(value);
   const lines: string[] = [];
   lines.push('CO STATUS');
-  lines.push(`Generated: ${input.dataset.generated_at} | Mode: read-only | Host: ${input.dataset.host}`);
+  lines.push(`Generated: ${safe(input.dataset.generated_at)} | Mode: read-only | Host: ${safe(input.dataset.host)}`);
   lines.push(
-    `Control: ${input.baseUrl} | Task: ${input.taskId} | Run: ${input.runId} | Start pipeline: ${input.startPipelineId}`
+    `Control: ${safe(input.baseUrl)} | Task: ${safe(input.taskId)} | Run: ${safe(input.runId)} | Start pipeline: ${safe(input.startPipelineId)}`
   );
-  lines.push(`Run dir: ${input.runDir}`);
+  lines.push(`Run dir: ${safe(input.runDir)}`);
   lines.push(
-    `Summary: running=${input.dataset.counts.running} retrying=${input.dataset.counts.retrying} issues=${input.dataset.counts.issues} tokens=${input.dataset.totals.total_tokens} runtime=${formatSeconds(input.dataset.totals.seconds_running)}`
+    `Summary: running=${safe(input.dataset.counts.running)} retrying=${safe(input.dataset.counts.retrying)} issues=${safe(input.dataset.counts.issues)} tokens=${safe(input.dataset.totals.total_tokens)} runtime=${safe(formatSeconds(input.dataset.totals.seconds_running))}`
   );
-  lines.push(`Rate limits: ${formatRecord(input.dataset.rate_limits)}`);
-  lines.push(`Polling: ${formatPolling(input.dataset)}`);
+  lines.push(`Rate limits: ${safe(formatRecord(input.dataset.rate_limits))}`);
+  lines.push(`Polling: ${safe(formatPolling(input.dataset))}`);
   lines.push('');
   lines.push('RUNNING SESSIONS');
   lines.push(...renderRunningSessions(input.dataset.running));
@@ -221,12 +233,13 @@ function renderControlStatusErrorFrame(
   now: Date,
   message: string
 ): string {
+  const safe = (value: unknown): string => sanitizeDisplayValue(value);
   return [
     'CO STATUS',
     `Generated: ${now.toISOString()} | Mode: read-only | Host: unavailable`,
-    `Control: ${input.baseUrl} | Task: ${input.taskId} | Run: ${input.runId} | Start pipeline: ${input.startPipelineId}`,
-    `Run dir: ${input.runDir}`,
-    `Dashboard error: ${sanitizeTerminalText(message) || '-'}`
+    `Control: ${safe(input.baseUrl)} | Task: ${safe(input.taskId)} | Run: ${safe(input.runId)} | Start pipeline: ${safe(input.startPipelineId)}`,
+    `Run dir: ${safe(input.runDir)}`,
+    `Dashboard error: ${safe(message)}`
   ].join('\n');
 }
 
@@ -234,9 +247,10 @@ function renderRunningSessions(entries: OperatorDashboardSessionPayload[]): stri
   if (entries.length === 0) {
     return ['(none)'];
   }
+  const safe = (value: unknown): string => sanitizeDisplayValue(value);
   return entries.map(
     (entry) =>
-      `${entry.issue_identifier} | ${entry.display_state} | session=${formatNullable(entry.session_id)} | thread=${formatNullable(entry.thread_id)} | turns=${formatNullable(entry.turn_count)} | tokens=${formatNullable(entry.tokens.total_tokens)} | workspace=${formatPath(entry.workspace_path)} | host=${entry.host}`
+      `${safe(entry.issue_identifier)} | ${safe(entry.display_state)} | session=${safe(formatNullable(entry.session_id))} | thread=${safe(formatNullable(entry.thread_id))} | turns=${safe(formatNullable(entry.turn_count))} | tokens=${safe(formatNullable(entry.tokens.total_tokens))} | workspace=${safe(formatPath(entry.workspace_path))} | host=${safe(entry.host)}`
   );
 }
 
@@ -244,9 +258,10 @@ function renderRetryQueue(entries: OperatorDashboardRetryPayload[]): string[] {
   if (entries.length === 0) {
     return ['(none)'];
   }
+  const safe = (value: unknown): string => sanitizeDisplayValue(value);
   return entries.map(
     (entry) =>
-      `${entry.issue_identifier} | ${entry.display_state} | attempt=${formatNullable(entry.attempt)} | due=${formatNullable(entry.due_at)} | session=${formatNullable(entry.session_id)} | workspace=${formatPath(entry.workspace_path)} | host=${entry.host} | error=${formatNullable(entry.error)}`
+      `${safe(entry.issue_identifier)} | ${safe(entry.display_state)} | attempt=${safe(formatNullable(entry.attempt))} | due=${safe(formatNullable(entry.due_at))} | session=${safe(formatNullable(entry.session_id))} | workspace=${safe(formatPath(entry.workspace_path))} | host=${safe(entry.host)} | error=${safe(formatNullable(entry.error))}`
   );
 }
 
@@ -255,27 +270,28 @@ function renderIssues(entries: OperatorDashboardIssuePayload[]): string[] {
     return ['(none)'];
   }
   const lines: string[] = [];
+  const safe = (value: unknown): string => sanitizeDisplayValue(value);
   for (const issue of entries) {
     lines.push(
-      `${issue.is_selected ? '*' : '-'} ${issue.issue_identifier} | state=${issue.display_status} | owner=${formatOwner(issue)} | session=${formatSession(issue)} | workspace=${formatPath(issue.workspace.path)} | host=${issue.workspace.host}`
+      `${issue.is_selected ? '*' : '-'} ${safe(issue.issue_identifier)} | state=${safe(issue.display_status)} | owner=${safe(formatOwner(issue))} | session=${safe(formatSession(issue))} | workspace=${safe(formatPath(issue.workspace.path))} | host=${safe(issue.workspace.host)}`
     );
     lines.push(
-      `  retry=${formatIssueRetry(issue)} | last_error=${formatNullable(issue.last_error)} | latest=${formatLatest(issue)} | summary=${truncate(issue.summary ?? '-', 96)}`
+      `  retry=${safe(formatIssueRetry(issue))} | last_error=${safe(formatNullable(issue.last_error))} | latest=${safe(formatLatest(issue))} | summary=${safe(truncate(issue.summary ?? '-', 96))}`
     );
   }
   return lines;
 }
 
 function formatOwner(issue: OperatorDashboardIssuePayload): string {
-  const phase = issue.owner.phase ?? '-';
-  const status = issue.owner.status ?? '-';
+  const phase = formatNullable(issue.owner.phase);
+  const status = formatNullable(issue.owner.status);
   return `${phase}/${status}`;
 }
 
 function formatSession(issue: OperatorDashboardIssuePayload): string {
-  const sessionId = issue.session.session_id ?? '-';
-  const threadId = issue.session.thread_id ?? '-';
-  const turns = issue.session.turn_count ?? '-';
+  const sessionId = formatNullable(issue.session.session_id);
+  const threadId = formatNullable(issue.session.thread_id);
+  const turns = formatNullable(issue.session.turn_count);
   return `${sessionId} thread=${threadId} turns=${turns}`;
 }
 
@@ -283,7 +299,7 @@ function formatIssueRetry(issue: OperatorDashboardIssuePayload): string {
   if (!issue.retry) {
     return 'none';
   }
-  return `attempt=${formatNullable(issue.retry.attempt)} due=${formatNullable(issue.retry.due_at)} status=${issue.retry.display_state}`;
+  return `attempt=${formatNullable(issue.retry.attempt)} due=${formatNullable(issue.retry.due_at)} status=${formatNullable(issue.retry.display_state)}`;
 }
 
 function formatLatest(issue: OperatorDashboardIssuePayload): string {
@@ -305,7 +321,7 @@ function formatPolling(dataset: OperatorDashboardDataset): string {
     `enabled=${polling.enabled ? 'yes' : 'no'}`,
     `checking=${polling.checking ? 'yes' : 'no'}`,
     `queued=${polling.queued ? 'yes' : 'no'}`,
-    `mode=${polling.last_mode ?? '-'}`,
+    `mode=${formatNullable(polling.last_mode)}`,
     `next=${formatMilliseconds(polling.next_poll_in_ms)}`,
     `last_success=${formatNullable(polling.last_success_at)}`,
     `last_error=${formatNullable(polling.last_error)}`
@@ -354,7 +370,7 @@ function formatRecord(value: Record<string, unknown> | null | undefined): string
   }
   return truncate(
     Object.entries(value)
-      .map(([key, entry]) => `${key}=${formatRecordValue(entry)}`)
+      .map(([key, entry]) => `${sanitizeDisplayValue(key)}=${formatRecordValue(entry)}`)
       .join(' | '),
     140
   );
@@ -365,13 +381,21 @@ function formatRecordValue(value: unknown): string {
     return '-';
   }
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
+    return sanitizeDisplayValue(value);
   }
   try {
-    return JSON.stringify(value);
+    return sanitizeDisplayValue(JSON.stringify(value));
   } catch {
-    return String(value);
+    return sanitizeDisplayValue(String(value));
   }
+}
+
+function sanitizeDisplayValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  const sanitized = sanitizeTerminalText(String(value));
+  return sanitized.length === 0 ? '-' : sanitized;
 }
 
 function truncate(value: string, maxLength: number): string {
