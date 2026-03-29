@@ -236,15 +236,24 @@ function buildStructuredWorkpadBody(overrides: {
     .trimEnd();
 }
 
+const TEST_WORKPAD_NON_EMPTY_CHECKBOX_LIST_ITEM_PATTERN = /^[ ]{0,3}-\s+\[(?: |x|X)\]\s+\S.*$/u;
+const TEST_WORKPAD_BLANK_CHECKBOX_LIST_ITEM_PATTERN = /^[ ]{0,3}-\s+\[(?: |x|X)\]\s*$/u;
+const TEST_WORKPAD_RUNTIME_INDENTATION_PATTERN = /^[ ]{0,3}(?:\S|$)/u;
+
 function ensureSectionContainsCheckboxListItem(lines: string[]): string[] {
-  if (lines.some((line) => /^\s*-\s+\[(?: |x|X)\]\s+\S.*$/u.test(line))) {
+  if (lines.some((line) => TEST_WORKPAD_NON_EMPTY_CHECKBOX_LIST_ITEM_PATTERN.test(line))) {
     return lines;
   }
 
   const updatedLines = [...lines];
   const lineIndex = updatedLines.findIndex((line) => {
     const trimmed = line.trim();
-    return trimmed.length > 0 && !trimmed.startsWith('###') && !/^\s*-\s+\[(?: |x|X)\]\s*$/u.test(line);
+    return (
+      TEST_WORKPAD_RUNTIME_INDENTATION_PATTERN.test(line) &&
+      trimmed.length > 0 &&
+      !trimmed.startsWith('###') &&
+      !TEST_WORKPAD_BLANK_CHECKBOX_LIST_ITEM_PATTERN.test(line)
+    );
   });
   if (lineIndex === -1) {
     return updatedLines;
@@ -252,18 +261,19 @@ function ensureSectionContainsCheckboxListItem(lines: string[]): string[] {
 
   const originalLine = updatedLines[lineIndex];
   const trimmedLine = originalLine.trim();
-  const plainBulletMatch = trimmedLine.match(/^-\s+(.*)$/u);
+  const plainBulletMatch = originalLine.match(/^([ ]{0,3})-\s+(.*)$/u);
   if (plainBulletMatch) {
-    updatedLines[lineIndex] = originalLine.replace(/^\s*-\s+/u, '- [ ] ');
+    updatedLines[lineIndex] = `${plainBulletMatch[1]}- [ ] ${plainBulletMatch[2]}`;
     return updatedLines;
   }
-  const orderedListMatch = trimmedLine.match(/^\d+[.)]\s+(.*)$/u);
+  const orderedListMatch = originalLine.match(/^([ ]{0,3})\d+[.)]\s+(.*)$/u);
   if (orderedListMatch) {
-    updatedLines[lineIndex] = `- [ ] ${orderedListMatch[1]}`;
+    updatedLines[lineIndex] = `${orderedListMatch[1]}- [ ] ${orderedListMatch[2]}`;
     return updatedLines;
   }
 
-  updatedLines[lineIndex] = `- [ ] ${trimmedLine}`;
+  const indentation = (originalLine.match(/^[ ]{0,3}/u) ?? [''])[0];
+  updatedLines[lineIndex] = `${indentation}- [ ] ${trimmedLine}`;
   return updatedLines;
 }
 
@@ -5120,9 +5130,98 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('fails closed when a required checklist section contains only a blank checkbox item', async () => {
+  it.each(['- [ ]', '- [x]', '- [X]'])(
+    'fails closed when a required checklist section contains only a blank checkbox item (%s)',
+    async (blankCheckbox) => {
+      const invalidWorkpadBody = buildStructuredWorkpadBody({
+        acceptanceCriteriaLines: [blankCheckbox],
+        normalizeRequiredChecklistSections: false
+      });
+      const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+        if (body.query?.includes('ProviderLinearIssueContext')) {
+          return jsonResponse(buildIssueContextBody());
+        }
+        throw new Error(`Unexpected query: ${body.query}`);
+      });
+
+      const result = await upsertProviderLinearWorkpadComment({
+        issueId: 'lin-issue-1',
+        body: invalidWorkpadBody,
+        env: {
+          CO_LINEAR_API_TOKEN: 'lin-api-token'
+        },
+        fetchImpl
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        operation: 'upsert-workpad',
+        error: {
+          code: 'workpad_checklist_required',
+          message:
+            'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
+          status: 422,
+          details: {
+            required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+            missing_checkbox_sections: ['Acceptance Criteria'],
+            blank_checkbox_sections: ['Acceptance Criteria']
+          }
+        }
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['- [ ]', '- [x]', '- [X]'])(
+    'fails closed when a required checklist section mixes valid and blank checkbox items (%s)',
+    async (blankCheckbox) => {
+      const invalidWorkpadBody = buildStructuredWorkpadBody({
+        acceptanceCriteriaLines: ['- [ ] Keep the canonical five-section workpad shape.', blankCheckbox],
+        normalizeRequiredChecklistSections: false
+      });
+      const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+        if (body.query?.includes('ProviderLinearIssueContext')) {
+          return jsonResponse(buildIssueContextBody());
+        }
+        throw new Error(`Unexpected query: ${body.query}`);
+      });
+
+      const result = await upsertProviderLinearWorkpadComment({
+        issueId: 'lin-issue-1',
+        body: invalidWorkpadBody,
+        env: {
+          CO_LINEAR_API_TOKEN: 'lin-api-token'
+        },
+        fetchImpl
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        operation: 'upsert-workpad',
+        error: {
+          code: 'workpad_checklist_required',
+          message:
+            'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
+          status: 422,
+          details: {
+            required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+            missing_checkbox_sections: [],
+            blank_checkbox_sections: ['Acceptance Criteria']
+          }
+        }
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('fails closed when required checklist content appears only inside indented code blocks', async () => {
     const invalidWorkpadBody = buildStructuredWorkpadBody({
-      acceptanceCriteriaLines: ['- [ ]'],
+      acceptanceCriteriaLines: [
+        '    - [ ] Example checklist item inside an indented code block.',
+        '    - [ ]'
+      ],
       normalizeRequiredChecklistSections: false
     });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -5153,60 +5252,16 @@ describe('providerLinearWorkflowFacade', () => {
         details: {
           required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
           missing_checkbox_sections: ['Acceptance Criteria'],
-          blank_checkbox_sections: ['Acceptance Criteria']
+          blank_checkbox_sections: []
         }
       }
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('fails closed when a required checklist section mixes valid and blank checkbox items', async () => {
+  it('fails closed when the default required-section normalizer only sees indented code-block checklist content', async () => {
     const invalidWorkpadBody = buildStructuredWorkpadBody({
-      acceptanceCriteriaLines: ['- [ ] Keep the canonical five-section workpad shape.', '- [ ]'],
-      normalizeRequiredChecklistSections: false
-    });
-    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
-      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
-      if (body.query?.includes('ProviderLinearIssueContext')) {
-        return jsonResponse(buildIssueContextBody());
-      }
-      throw new Error(`Unexpected query: ${body.query}`);
-    });
-
-    const result = await upsertProviderLinearWorkpadComment({
-      issueId: 'lin-issue-1',
-      body: invalidWorkpadBody,
-      env: {
-        CO_LINEAR_API_TOKEN: 'lin-api-token'
-      },
-      fetchImpl
-    });
-
-    expect(result).toEqual({
-      ok: false,
-      operation: 'upsert-workpad',
-      error: {
-        code: 'workpad_checklist_required',
-        message:
-          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
-        status: 422,
-        details: {
-          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
-          missing_checkbox_sections: [],
-          blank_checkbox_sections: ['Acceptance Criteria']
-        }
-      }
-    });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-  });
-
-  it('fails closed when required checklist content appears only inside indented code blocks', async () => {
-    const invalidWorkpadBody = buildStructuredWorkpadBody({
-      acceptanceCriteriaLines: [
-        '    - [ ] Example checklist item inside an indented code block.',
-        '    - [ ]'
-      ],
-      normalizeRequiredChecklistSections: false
+      acceptanceCriteriaLines: ['    - [ ] Example checklist item inside an indented code block.']
     });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
