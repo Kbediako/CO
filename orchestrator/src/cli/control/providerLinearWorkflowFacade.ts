@@ -2700,14 +2700,32 @@ function findUnresolvedWorkpadComments(
 
 function hasWorkpadMarker(body: string): boolean {
   let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
   for (const line of body.split(/\r?\n/u)) {
-    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    let containerIndent = activeCodeFenceContainerIndent;
+    let structuralLine = line;
+    if (activeCodeFenceDelimiter === null) {
+      const leadingSpaces = pruneMarkdownListContinuationIndents(listContinuationIndents, line);
+      ({ containerIndent, structuralLine } = getMarkdownStructuralLine(
+        listContinuationIndents,
+        line,
+        leadingSpaces
+      ));
+    } else if (countLeadingSpaces(line) >= activeCodeFenceContainerIndent) {
+      structuralLine = line.slice(activeCodeFenceContainerIndent);
+    }
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
     if (codeFenceTransition.isBoundary) {
       activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
       continue;
     }
     if (!activeCodeFenceDelimiter && /^##\s+Codex Workpad\b/u.test(line)) {
       return true;
+    }
+    if (!activeCodeFenceDelimiter) {
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
     }
   }
   return false;

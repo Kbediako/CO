@@ -518,6 +518,63 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('ignores ordered-list-indented fenced marker examples when selecting the active workpad comment', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
+      expect(body.variables?.issueId).toBe('lin-issue-1');
+      return jsonResponse(
+        buildIssueContextBody({
+          comments: {
+            nodes: [
+              {
+                id: 'comment-example',
+                body: [
+                  '10. Nested example',
+                  '    ```md',
+                  '## Codex Workpad',
+                  '### Notes',
+                  '- Example only.',
+                  '    ```'
+                ].join('\n'),
+                url: 'https://linear.app/comment/example',
+                createdAt: '2026-03-22T10:00:00.000Z',
+                updatedAt: '2026-03-22T10:30:00.000Z',
+                resolvedAt: null
+              },
+              {
+                id: 'comment-workpad',
+                body: '## Codex Workpad\n\nOld plan',
+                url: 'https://linear.app/comment/workpad',
+                createdAt: '2026-03-22T09:00:00.000Z',
+                updatedAt: '2026-03-22T09:30:00.000Z',
+                resolvedAt: null
+              }
+            ]
+          }
+        })
+      );
+    });
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        workpad_comment: {
+          id: 'comment-workpad',
+          body: '## Codex Workpad\n\nOld plan'
+        }
+      }
+    });
+  });
+
   it.each([
     ['team', { team: null }, 'linear_team_mismatch', 'lin-team-1'],
     ['project', { project: null }, 'linear_project_mismatch', 'lin-project-1']
@@ -5803,6 +5860,69 @@ describe('providerLinearWorkflowFacade', () => {
                 {
                   id: 'comment-example',
                   body: ['```md', '## Codex Workpad', '### Notes', '- Example only.', '```'].join('\n'),
+                  url: 'https://linear.app/comment/example',
+                  createdAt: '2026-03-22T10:00:00.000Z',
+                  updatedAt: '2026-03-22T10:30:00.000Z',
+                  resolvedAt: null
+                }
+              ]
+            }
+          })
+        );
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: updatedWorkpadBody,
+      commentId: 'comment-example',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'linear_workpad_comment_id_invalid',
+        message: 'Comment id must reference an unresolved Codex workpad comment.',
+        status: 422,
+        details: {
+          comment_id: 'comment-example'
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when commentId points at a comment whose marker only appears inside an ordered-list-indented fenced example', async () => {
+    const updatedWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Updated targeted workpad.'],
+      notesLines: ['- Ordered-list-indented fenced examples are not valid workpad comments.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: [
+                {
+                  id: 'comment-example',
+                  body: [
+                    '10. Nested example',
+                    '    ```md',
+                    '## Codex Workpad',
+                    '### Notes',
+                    '- Example only.',
+                    '    ```'
+                  ].join('\n'),
                   url: 'https://linear.app/comment/example',
                   createdAt: '2026-03-22T10:00:00.000Z',
                   updatedAt: '2026-03-22T10:30:00.000Z',
