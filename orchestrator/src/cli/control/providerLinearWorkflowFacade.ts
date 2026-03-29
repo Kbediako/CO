@@ -20,6 +20,7 @@ const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
   'Validation',
   'Notes'
 ] as const;
+const LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS = ['Acceptance Criteria', 'Validation'] as const;
 const LINEAR_ISSUE_VALIDATION_SECTION_TITLES = new Set(['validation', 'test plan', 'testing']);
 const LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES = new Set([
   'automated',
@@ -2790,6 +2791,26 @@ function validateWorkpadBodyContract(
     };
   }
 
+  const sectionsMissingCheckboxes = [sections[2], sections[3]]
+    .filter((section): section is ProviderLinearWorkpadSection => Boolean(section))
+    .filter((section) => !containsWorkpadCheckboxListItem(section.body))
+    .map((section) => section.title);
+  if (sectionsMissingCheckboxes.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: [...LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS],
+          missing_checkbox_sections: sectionsMissingCheckboxes
+        }
+      }
+    };
+  }
+
   const ticketValidationRequirements = extractIssueValidationRequirements(issueDescription);
   if (ticketValidationRequirements.length === 0) {
     return { ok: true };
@@ -2818,6 +2839,23 @@ function validateWorkpadBodyContract(
   }
 
   return { ok: true };
+}
+
+function containsWorkpadCheckboxListItem(body: string): boolean {
+  let activeCodeFenceDelimiter: string | null = null;
+
+  for (const line of body.split(/\r?\n/u)) {
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, line);
+    activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+    if (codeFenceTransition.isBoundary || activeCodeFenceDelimiter !== null) {
+      continue;
+    }
+    if (/^\s*-\s+\[(?: |x|X)\]\s+\S.*$/u.test(line)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function isCanonicalWorkpadMarkerLine(line: string): boolean {

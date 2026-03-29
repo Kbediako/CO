@@ -419,6 +419,8 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('`### Acceptance Criteria`');
     expect(firstPrompt).toContain('`### Validation`');
     expect(firstPrompt).toContain('`### Notes`');
+    expect(firstPrompt).toContain('`Acceptance Criteria` and `Validation` must contain checkbox list items (`- [ ]` / `- [x]`)');
+    expect(firstPrompt).toContain('`Environment / Workspace Stamp`, `Plan`, and `Notes` can stay free-form');
     expect(firstPrompt).toContain('If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements');
     expect(firstPrompt).toContain('Refresh the same workpad after each meaningful milestone and immediately before any review or merge handoff');
     expect(firstPrompt).toContain('Keep final closeout in that same workpad comment');
@@ -469,6 +471,8 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('`### Acceptance Criteria`');
     expect(continuationPrompt).toContain('`### Validation`');
     expect(continuationPrompt).toContain('`### Notes`');
+    expect(continuationPrompt).toContain('`Acceptance Criteria` and `Validation` must contain checkbox list items (`- [ ]` / `- [x]`)');
+    expect(continuationPrompt).toContain('`Environment / Workspace Stamp`, `Plan`, and `Notes` can stay free-form');
     expect(continuationPrompt).toContain('If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements');
     expect(continuationPrompt).toContain('Keep final closeout in that same workpad comment');
     expect(continuationPrompt).toContain(`${helperCommand} issue-context --issue-id lin-issue-1`);

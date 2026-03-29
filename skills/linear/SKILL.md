@@ -52,6 +52,9 @@ Keep the workpad body in this exact top-level order, with every section non-empt
 ### Notes
 ```
 
+`Acceptance Criteria` and `Validation` must contain checkbox list items (`- [ ]` / `- [x]`).
+`Environment / Workspace Stamp`, `Plan`, and `Notes` may stay free-form as long as they remain non-empty.
+
 If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.
 
 Delete the current unresolved workpad comment when a Symphony-style `Rework` reset requires a fresh attempt:

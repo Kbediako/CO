@@ -202,30 +202,69 @@ function buildStructuredWorkpadBody(overrides: {
   validationLines?: string[];
   notesLines?: string[];
   extraSections?: Array<{ title: string; lines: string[] }>;
+  normalizeRequiredChecklistSections?: boolean;
 } = {}): string {
   const {
     environmentLines = ['- Issue: `CO-1`.', '- Workspace: `linear-workspace`.'],
     planLines = ['- Update the durable workpad contract.'],
-    acceptanceCriteriaLines = ['- Keep the canonical five-section workpad shape.'],
-    validationLines = ['- Run npm test.', '- Run npm run lint.'],
+    acceptanceCriteriaLines = ['- [ ] Keep the canonical five-section workpad shape.'],
+    validationLines = ['- [ ] Run npm test.', '- [ ] Run npm run lint.'],
     notesLines = ['- Preserve a single active workpad comment.'],
-    extraSections = []
+    extraSections = [],
+    normalizeRequiredChecklistSections = true
   } = overrides;
 
   const renderSection = (title: string, lines: string[]) => [`### ${title}`, ...lines, ''];
+  const checkboxAcceptanceCriteriaLines = normalizeRequiredChecklistSections
+    ? ensureSectionContainsCheckboxListItem(acceptanceCriteriaLines)
+    : acceptanceCriteriaLines;
+  const checkboxValidationLines = normalizeRequiredChecklistSections
+    ? ensureSectionContainsCheckboxListItem(validationLines)
+    : validationLines;
 
   return [
     '## Codex Workpad',
     '',
     ...renderSection('Environment / Workspace Stamp', environmentLines),
     ...renderSection('Plan', planLines),
-    ...renderSection('Acceptance Criteria', acceptanceCriteriaLines),
-    ...renderSection('Validation', validationLines),
+    ...renderSection('Acceptance Criteria', checkboxAcceptanceCriteriaLines),
+    ...renderSection('Validation', checkboxValidationLines),
     ...renderSection('Notes', notesLines),
     ...extraSections.flatMap((section) => renderSection(section.title, section.lines))
   ]
     .join('\n')
     .trimEnd();
+}
+
+function ensureSectionContainsCheckboxListItem(lines: string[]): string[] {
+  if (lines.some((line) => /^\s*-\s+\[(?: |x|X)\](?:\s+.*)?$/u.test(line))) {
+    return lines;
+  }
+
+  const updatedLines = [...lines];
+  const lineIndex = updatedLines.findIndex((line) => {
+    const trimmed = line.trim();
+    return trimmed.length > 0 && !trimmed.startsWith('###');
+  });
+  if (lineIndex === -1) {
+    return updatedLines;
+  }
+
+  const originalLine = updatedLines[lineIndex];
+  const trimmedLine = originalLine.trim();
+  const plainBulletMatch = trimmedLine.match(/^-\s+(.*)$/u);
+  if (plainBulletMatch) {
+    updatedLines[lineIndex] = originalLine.replace(/^\s*-\s+/u, '- [ ] ');
+    return updatedLines;
+  }
+  const orderedListMatch = trimmedLine.match(/^\d+[.)]\s+(.*)$/u);
+  if (orderedListMatch) {
+    updatedLines[lineIndex] = `- [ ] ${orderedListMatch[1]}`;
+    return updatedLines;
+  }
+
+  updatedLines[lineIndex] = `- [ ] ${trimmedLine}`;
+  return updatedLines;
 }
 
 async function createRunScopedEnv(): Promise<NodeJS.ProcessEnv> {
@@ -4504,11 +4543,11 @@ describe('providerLinearWorkflowFacade', () => {
       '- Update the durable workpad contract.',
       '',
       '### Acceptance Criteria ###',
-      '- Keep the canonical five-section workpad shape.',
+      '- [ ] Keep the canonical five-section workpad shape.',
       '',
       '### Validation ###',
-      '- Run npm test.',
-      '- Run npm run lint.',
+      '- [ ] Run npm test.',
+      '- [ ] Run npm run lint.',
       '',
       '### Notes ###',
       '- Preserve a single active workpad comment.'
@@ -4845,6 +4884,267 @@ describe('providerLinearWorkflowFacade', () => {
         status: 422,
         details: {
           empty_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts checkbox-backed Acceptance Criteria and Validation while keeping the other sections free-form', async () => {
+    const validWorkpadBody = buildStructuredWorkpadBody({
+      environmentLines: ['Workspace rooted at `/tmp/co` with the provider-worker helper command available.'],
+      planLines: ['Tighten only the two execution-heavy workpad sections and leave narrative sections untouched.'],
+      acceptanceCriteriaLines: ['- [ ] Reject workpads whose Acceptance Criteria section has no checkbox items.'],
+      validationLines: [
+        'Local validation pass follows after the implementation patch.',
+        '- [x] npm run test -- orchestrator/tests/ProviderLinearWorkflowFacade.test.ts'
+      ],
+      notesLines: ['Live Linear writes stay blocked until a successful post-rate-limit `issue-context` read.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: { input?: { body?: string } };
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('commentUpdate')) {
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                body: body.variables?.input?.body ?? null,
+                url: 'https://linear.app/comment/workpad'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: validWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-workpad',
+        url: 'https://linear.app/comment/workpad',
+        body: validWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed when Acceptance Criteria uses plain bullets instead of checkbox items', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      acceptanceCriteriaLines: ['- Keep the canonical five-section workpad shape.'],
+      normalizeRequiredChecklistSections: false
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+          missing_checkbox_sections: ['Acceptance Criteria']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when Acceptance Criteria uses prose instead of checkbox items', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      acceptanceCriteriaLines: ['Keep the canonical five-section workpad shape.'],
+      normalizeRequiredChecklistSections: false
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+          missing_checkbox_sections: ['Acceptance Criteria']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when Validation uses plain bullets instead of checkbox items', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['- Run npm test.', '- Run npm run lint.'],
+      normalizeRequiredChecklistSections: false
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+          missing_checkbox_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when Validation uses prose instead of checkbox items', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      validationLines: ['Run npm test.', 'Run npm run lint.'],
+      normalizeRequiredChecklistSections: false
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+          missing_checkbox_sections: ['Validation']
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when a required checklist section contains only a blank checkbox item', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      acceptanceCriteriaLines: ['- [ ]'],
+      normalizeRequiredChecklistSections: false
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain checkbox list items (`- [ ]` or `- [x]`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+          missing_checkbox_sections: ['Acceptance Criteria']
         }
       }
     });
