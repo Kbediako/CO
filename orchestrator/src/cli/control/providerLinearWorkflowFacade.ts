@@ -3579,8 +3579,7 @@ function parseCodeFenceLine(line: string): {
   delimiter: string;
   trailingText: string;
 } | null {
-  const trimmedLine = line.trimStart();
-  const match = trimmedLine.match(/^(`{3,}|~{3,})(.*)$/u);
+  const match = line.match(/^[ ]{0,3}(`{3,}|~{3,})(.*)$/u);
   if (!match) {
     return null;
   }

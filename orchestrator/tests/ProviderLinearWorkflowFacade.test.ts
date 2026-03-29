@@ -297,8 +297,7 @@ function parseTestWorkpadCodeFenceLine(line: string): {
   delimiter: string;
   trailingText: string;
 } | null {
-  const trimmedLine = line.trimStart();
-  const match = trimmedLine.match(/^(`{3,}|~{3,})(.*)$/u);
+  const match = line.match(/^[ ]{0,3}(`{3,}|~{3,})(.*)$/u);
   if (!match) {
     return null;
   }
@@ -5416,6 +5415,73 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts a real checklist item after a four-space-indented fence marker line', async () => {
+    const validWorkpadBody = buildStructuredWorkpadBody({
+      acceptanceCriteriaLines: [
+        '    ```md',
+        '- Real checklist content that should still be normalized and validated.',
+        '    ```'
+      ]
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearUpdateComment')) {
+        expect(body.variables).toEqual({
+          id: 'comment-workpad',
+          body: validWorkpadBody
+        });
+        return jsonResponse({
+          data: {
+            commentUpdate: {
+              success: true,
+              comment: {
+                id: 'comment-workpad',
+                url: 'https://linear.app/comment/workpad',
+                body: validWorkpadBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: validWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'updated',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-workpad',
+        url: 'https://linear.app/comment/workpad',
+        body: validWorkpadBody,
+        created_at: null,
+        updated_at: null,
+        resolved_at: null
+      },
+      source_setup: null
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it('fails closed when ticket validation requirements are not mirrored into the workpad', async () => {
