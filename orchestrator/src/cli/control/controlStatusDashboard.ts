@@ -59,6 +59,14 @@ export interface ControlStatusDashboardGateInput {
 const ANSI_CLEAR_HOME = '\u001b[H\u001b[2J';
 const DEFAULT_REFRESH_INTERVAL_MS = 1_000;
 const DEFAULT_OUTPUT: DashboardOutput = process.stdout;
+const ESCAPE_CHARACTER = String.fromCharCode(0x1b);
+const BELL_CHARACTER = String.fromCharCode(0x07);
+const CONTROL_CHARACTER_CLASS = `${String.fromCharCode(0x00)}-${String.fromCharCode(0x1f)}${String.fromCharCode(0x7f)}-${String.fromCharCode(0x9f)}`;
+const ANSI_CONTROL_SEQUENCE_PATTERN = new RegExp(
+  `${ESCAPE_CHARACTER}(?:\\[[0-?]*[ -/]*[@-~]|\\][^${BELL_CHARACTER}${ESCAPE_CHARACTER}]*(?:${BELL_CHARACTER}|${ESCAPE_CHARACTER}\\\\)|[@-Z\\\\-_])`,
+  'g'
+);
+const CONTROL_CHARACTER_PATTERN = new RegExp(`[${CONTROL_CHARACTER_CLASS}]`, 'g');
 
 const DEFAULT_DEPENDENCIES: ControlStatusDashboardDependencies = {
   readDataset: async (runtime) =>
@@ -218,7 +226,7 @@ function renderControlStatusErrorFrame(
     `Generated: ${now.toISOString()} | Mode: read-only | Host: unavailable`,
     `Control: ${input.baseUrl} | Task: ${input.taskId} | Run: ${input.runId} | Start pipeline: ${input.startPipelineId}`,
     `Run dir: ${input.runDir}`,
-    `Dashboard error: ${message}`
+    `Dashboard error: ${sanitizeTerminalText(message) || '-'}`
   ].join('\n');
 }
 
@@ -367,16 +375,32 @@ function formatRecordValue(value: unknown): string {
 }
 
 function truncate(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value;
+  const sanitized = sanitizeTerminalText(value);
+  if (sanitized.length === 0) {
+    return '-';
   }
-  return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
+  if (sanitized.length <= maxLength) {
+    return sanitized;
+  }
+  return `${sanitized.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
 function truncateMiddle(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value;
+  const sanitized = sanitizeTerminalText(value);
+  if (sanitized.length === 0) {
+    return '-';
+  }
+  if (sanitized.length <= maxLength) {
+    return sanitized;
   }
   const sliceLength = Math.max(1, Math.floor((maxLength - 3) / 2));
-  return `${value.slice(0, sliceLength)}...${value.slice(value.length - sliceLength)}`;
+  return `${sanitized.slice(0, sliceLength)}...${sanitized.slice(sanitized.length - sliceLength)}`;
+}
+
+function sanitizeTerminalText(value: string): string {
+  return value
+    .replace(ANSI_CONTROL_SEQUENCE_PATTERN, ' ')
+    .replace(CONTROL_CHARACTER_PATTERN, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

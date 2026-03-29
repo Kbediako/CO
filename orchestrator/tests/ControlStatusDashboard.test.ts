@@ -280,6 +280,42 @@ describe('control status dashboard', () => {
     expect(frame).toContain('ISSUES\n(none)');
   });
 
+  it('sanitizes terminal control characters before rendering issue text fields', () => {
+    const dataset = buildDataset();
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        issues: dataset.issues.map((issue, index) =>
+          index === 0
+            ? {
+                ...issue,
+                summary: 'unsafe\n\u001b]8;;https://example.com\u0007link\u001b]8;;\u0007',
+                last_error: 'oops\u001b[31mred',
+                latest_event: {
+                  ...(issue.latest_event ?? {
+                    at: '2026-03-30T01:14:59.000Z',
+                    event: 'turn_started',
+                    message: null
+                  }),
+                  message: 'message\u001b[2Jwipe'
+                }
+              }
+            : issue
+        )
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker'
+    });
+
+    expect(frame).not.toContain('\u001b');
+    expect(frame).not.toContain('\u0007');
+    expect(frame).toContain('last_error=oops red');
+    expect(frame).toContain('latest=turn_started | 2026-03-30T01:14:59.000Z | message wipe');
+    expect(frame).toContain('summary=unsafe link');
+  });
+
   it('enables the dashboard only for text-mode tty output', () => {
     expect(
       shouldEnableControlStatusDashboard({
