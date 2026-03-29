@@ -53,7 +53,7 @@ last_review: 2026-03-29
 - Architecture / design adjustments:
   - extract or reuse a shared Linear rate-limit mapper so tracked-issue reads and workflow-facade helper mutations speak the same metadata contract
   - preserve structured tracked-issue resolution failures instead of converting them to a plain thrown string in the worker runner
-  - compute a bounded reread wait from Linear reset semantics, preferring the earliest trustworthy reset boundary derived from `retry-after` and `x-ratelimit-requests-reset`
+  - compute a bounded reread wait from Linear reset semantics, preferring `retry-after` and otherwise waiting for the latest exhausted or still-unknown reset boundary advertised by the rate-limit headers
   - skip or defer unnecessary immediate rereads only when the worker already has a fresh post-turn truth source and the omission does not weaken ownership/state checks
 - Data model changes / migrations:
   - widen `ProviderLinearWorkerProof` with structured tracked-issue reread failure metadata

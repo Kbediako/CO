@@ -3196,7 +3196,7 @@ describe('provider linear worker runner', () => {
         .mockResolvedValueOnce(
           createTrackedIssue({
             state: 'Done',
-            stateType: 'completed'
+            state_type: 'completed'
           })
         );
       const execRunner = vi.fn(async () => ({
@@ -3266,7 +3266,7 @@ describe('provider linear worker runner', () => {
       });
       const lateResetIssue = createTrackedIssue({
         state: 'Done',
-        stateType: 'completed'
+        state_type: 'completed'
       });
       const waitForRateLimitReset = vi.fn(async () => undefined);
       const readTrackedIssue = vi
