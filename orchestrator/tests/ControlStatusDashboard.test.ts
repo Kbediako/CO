@@ -402,6 +402,7 @@ describe('control status dashboard', () => {
       },
       {
         readDataset: async () => buildDataset(),
+        // Uses the mocked timer functions installed by vi.useFakeTimers().
         setTimeout,
         clearTimeout
       }

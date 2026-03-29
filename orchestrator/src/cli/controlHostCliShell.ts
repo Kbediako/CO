@@ -312,6 +312,7 @@ export async function runControlHostCliShell(
     await waitForSignal();
   } finally {
     dashboard?.stop();
+    await dashboard?.flush();
     await closeControlServerPublicLifecycle(lifecycle);
   }
 }
