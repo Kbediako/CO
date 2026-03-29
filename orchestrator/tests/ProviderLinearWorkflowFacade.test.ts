@@ -241,24 +241,40 @@ const TEST_WORKPAD_BLANK_CHECKBOX_LIST_ITEM_PATTERN = /^[ ]{0,3}-\s+\[(?: |x|X)\
 const TEST_WORKPAD_RUNTIME_INDENTATION_PATTERN = /^[ ]{0,3}(?:\S|$)/u;
 
 function ensureSectionContainsCheckboxListItem(lines: string[]): string[] {
-  if (lines.some((line) => TEST_WORKPAD_NON_EMPTY_CHECKBOX_LIST_ITEM_PATTERN.test(line))) {
-    return lines;
-  }
+  let activeCodeFenceDelimiter: string | null = null;
+  let lineIndex = -1;
 
-  const updatedLines = [...lines];
-  const lineIndex = updatedLines.findIndex((line) => {
+  for (const [index, line] of lines.entries()) {
+    const codeFenceTransition = getTestWorkpadCodeFenceTransition(activeCodeFenceDelimiter, line);
+    activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+    if (codeFenceTransition.isBoundary || activeCodeFenceDelimiter !== null) {
+      continue;
+    }
+
+    if (TEST_WORKPAD_NON_EMPTY_CHECKBOX_LIST_ITEM_PATTERN.test(line)) {
+      return lines;
+    }
+
+    if (lineIndex !== -1) {
+      continue;
+    }
+
     const trimmed = line.trim();
-    return (
+    if (
       TEST_WORKPAD_RUNTIME_INDENTATION_PATTERN.test(line) &&
       trimmed.length > 0 &&
       !trimmed.startsWith('###') &&
       !TEST_WORKPAD_BLANK_CHECKBOX_LIST_ITEM_PATTERN.test(line)
-    );
-  });
-  if (lineIndex === -1) {
-    return updatedLines;
+    ) {
+      lineIndex = index;
+    }
   }
 
+  if (lineIndex === -1) {
+    return [...lines];
+  }
+
+  const updatedLines = [...lines];
   const originalLine = updatedLines[lineIndex];
   const trimmedLine = originalLine.trim();
   const plainBulletMatch = originalLine.match(/^([ ]{0,3})-\s+(.*)$/u);
@@ -275,6 +291,67 @@ function ensureSectionContainsCheckboxListItem(lines: string[]): string[] {
   const indentation = (originalLine.match(/^[ ]{0,3}/u) ?? [''])[0];
   updatedLines[lineIndex] = `${indentation}- [ ] ${trimmedLine}`;
   return updatedLines;
+}
+
+function parseTestWorkpadCodeFenceLine(line: string): {
+  delimiter: string;
+  trailingText: string;
+} | null {
+  const trimmedLine = line.trimStart();
+  const match = trimmedLine.match(/^(`{3,}|~{3,})(.*)$/u);
+  if (!match) {
+    return null;
+  }
+  return {
+    delimiter: match[1],
+    trailingText: match[2] ?? ''
+  };
+}
+
+function isClosingTestWorkpadCodeFenceLine(
+  activeDelimiter: string,
+  codeFenceLine: {
+    delimiter: string;
+    trailingText: string;
+  }
+): boolean {
+  return (
+    codeFenceLine.delimiter[0] === activeDelimiter[0] &&
+    codeFenceLine.delimiter.length >= activeDelimiter.length &&
+    codeFenceLine.trailingText.trim().length === 0
+  );
+}
+
+function getTestWorkpadCodeFenceTransition(
+  activeDelimiter: string | null,
+  line: string
+): {
+  isBoundary: boolean;
+  nextDelimiter: string | null;
+} {
+  const codeFenceLine = parseTestWorkpadCodeFenceLine(line);
+  if (!codeFenceLine) {
+    return {
+      isBoundary: false,
+      nextDelimiter: activeDelimiter
+    };
+  }
+  if (activeDelimiter === null) {
+    return {
+      isBoundary: true,
+      nextDelimiter: codeFenceLine.delimiter
+    };
+  }
+  if (isClosingTestWorkpadCodeFenceLine(activeDelimiter, codeFenceLine)) {
+    return {
+      isBoundary: true,
+      nextDelimiter: null
+    };
+  }
+  return {
+    isBoundary: false,
+    nextDelimiter: activeDelimiter
+  };
 }
 
 async function createRunScopedEnv(): Promise<NodeJS.ProcessEnv> {
@@ -5262,6 +5339,49 @@ describe('providerLinearWorkflowFacade', () => {
   it('fails closed when the default required-section normalizer only sees indented code-block checklist content', async () => {
     const invalidWorkpadBody = buildStructuredWorkpadBody({
       acceptanceCriteriaLines: ['    - [ ] Example checklist item inside an indented code block.']
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: invalidWorkpadBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'upsert-workpad',
+      error: {
+        code: 'workpad_checklist_required',
+        message:
+          'Workpad Acceptance Criteria and Validation sections must contain non-empty checkbox list items (`- [ ] task` or `- [x] task`).',
+        status: 422,
+        details: {
+          required_checkbox_sections: ['Acceptance Criteria', 'Validation'],
+          missing_checkbox_sections: ['Acceptance Criteria'],
+          blank_checkbox_sections: []
+        }
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the default required-section normalizer only sees fenced code-block checklist content', async () => {
+    const invalidWorkpadBody = buildStructuredWorkpadBody({
+      acceptanceCriteriaLines: [
+        '```md',
+        '- [ ] Example checklist item inside a fenced code block.',
+        '```'
+      ]
     });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string };
