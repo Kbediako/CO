@@ -1036,7 +1036,7 @@ async function handlePr(rawArgs: string[]): Promise<void> {
     return;
   }
   const [subcommand, ...subcommandArgs] = rawArgs;
-  if (isPrHelpSubcommand(subcommand) && subcommandArgs.some((arg) => isCliHelpToken(arg))) {
+  if (isPrHelpSubcommand(subcommand) && shouldPrintPrSubcommandHelp(subcommandArgs)) {
     printPrSubcommandHelp(subcommand);
     return;
   }
@@ -1681,6 +1681,16 @@ function envFlagEnabled(value: string | undefined, fallback = false): boolean {
 
 function isPrHelpSubcommand(value: string | undefined): value is PrHelpSubcommand {
   return value === 'watch-merge' || value === 'resolve-merge' || value === 'ready-review';
+}
+
+function shouldPrintPrSubcommandHelp(args: string[]): boolean {
+  if (args.length === 0) {
+    return false;
+  }
+  if (args[0] === 'help') {
+    return true;
+  }
+  return args.some((arg) => arg === '--help' || arg === '-h');
 }
 
 function printPrSubcommandHelp(subcommand: PrHelpSubcommand): void {
