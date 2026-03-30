@@ -807,6 +807,58 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('accepts a non-stale child lane rooted under an in-repo custom runs directory', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      manifest_path: join(tempRoot ?? '', 'artifacts', 'runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1', 'manifest.json'),
+      artifact_root: join(tempRoot ?? '', 'artifacts', 'runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1'),
+      log_path: join(tempRoot ?? '', 'artifacts', 'runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1', 'run.log'),
+      patch_artifact_path: join(tempRoot ?? '', 'artifacts', 'runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1', 'provider-linear-child-lane.patch')
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_ORCHESTRATOR_RUNS_DIR: join(tempRoot ?? '', 'artifacts', 'runs')
+        })
+      },
+      {
+        applyPatchArtifact,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'accepted',
+      child_lane: {
+        stream: childLane.stream,
+        decision: 'accepted'
+      }
+    });
+    expect(applyPatchArtifact).toHaveBeenCalledWith(tempRoot, childLane.patch_artifact_path);
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'accepted'
+      })
+    ]);
+  });
+
   it('rejects acceptance when the persisted patch artifact escapes the child run artifact root', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord({

@@ -673,7 +673,11 @@ async function resolveChildLaneDecision(
         status: 409
       });
     }
-    const artifactRoot = resolveAcceptedChildLaneArtifactRoot(context.repoRoot, target);
+    const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
+      context.repoRoot,
+      resolveWorkspaceScopedArtifactDir(context.repoRoot, params.env.CODEX_ORCHESTRATOR_RUNS_DIR, '.runs'),
+      target
+    );
     if (!artifactRoot) {
       return failureResult({
         action: 'accept',
@@ -839,6 +843,7 @@ function resolveAcceptedPatchArtifactPath(
 
 function resolveAcceptedChildLaneArtifactRoot(
   repoRoot: string,
+  childRunsRoot: string,
   childLane: ProviderLinearWorkerChildLaneRecord
 ): string | null {
   const taskId = normalizeOptionalString(childLane.task_id);
@@ -854,7 +859,7 @@ function resolveAcceptedChildLaneArtifactRoot(
   } catch {
     return null;
   }
-  const expectedArtifactRoot = resolve(repoRoot, '.runs', taskId, 'cli', safeRunId);
+  const expectedArtifactRoot = resolve(childRunsRoot, taskId, 'cli', safeRunId);
   const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
   if (resolvedArtifactRoot !== expectedArtifactRoot) {
     return null;
