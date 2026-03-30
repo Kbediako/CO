@@ -370,6 +370,107 @@ describe('runProviderLinearChildLaneShell', () => {
     });
   });
 
+  it('preserves the parent repo-config override when launching a child lane', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
+    const repoConfigOverride = join(tempRoot ?? '', '.runs', CONTROL_HOST_TASK_ID, 'cli', CONTROL_HOST_RUN_ID, 'provider-workflow.last-known-good.json');
+    const childProof: ProviderLinearChildLaneProof = {
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      task_id: `${TASK_ID}-impl-a`,
+      run_id: 'child-run-1',
+      parent_run_id: RUN_ID,
+      stream: 'impl-a',
+      purpose: 'Implement bounded child lane support',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-30T07:10:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-30T07:11:00.000Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+      lane_branch: 'child-lane/impl-a-child-run-1',
+      patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+      patch_bytes: 128,
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'task_complete',
+      last_message: 'child lane complete',
+      last_event_at: '2026-03-30T07:12:00.000Z',
+      tokens: {
+        input_tokens: 10,
+        output_tokens: 12,
+        total_tokens: 22
+      },
+      rate_limits: null,
+      status: 'succeeded',
+      updated_at: '2026-03-30T07:12:00.000Z'
+    };
+    const execRunner = vi.fn(async (request) => {
+      expect(request.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(repoConfigOverride);
+      await mkdir(childRunDir, { recursive: true });
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+        JSON.stringify(childProof),
+        'utf8'
+      );
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: 'child-run-1',
+          status: 'succeeded',
+          artifact_root: `.runs/${TASK_ID}-impl-a/cli/child-run-1`,
+          manifest: `.runs/${TASK_ID}-impl-a/cli/child-run-1/manifest.json`,
+          log_path: `.runs/${TASK_ID}-impl-a/cli/child-run-1/run.log`,
+          summary: 'child lane finished'
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: repoConfigOverride
+        })
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      action: 'launched',
+      child_lane: {
+        run_id: 'child-run-1',
+        status: 'succeeded'
+      }
+    });
+  });
+
   it('accepts workspace-local child output when the parent manifest lives under an external shared runs root', async () => {
     externalRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-shared-'));
     const { manifestPath } = await createProviderWorkerManifest(externalRoot);

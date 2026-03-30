@@ -1584,7 +1584,8 @@ function buildProviderLinearChildLaneStartEnv(
   delete sanitized.CO_LINEAR_TEAM_ID;
   delete sanitized.CO_LINEAR_PROJECT_ID;
   sanitized.CODEX_ORCHESTRATOR_ROOT = input.repoRoot;
-  sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH = join(input.repoRoot, 'codex.orchestrator.json');
+  sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH =
+    normalizeOptionalString(sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH) ?? join(input.repoRoot, 'codex.orchestrator.json');
   sanitized.CODEX_ORCHESTRATOR_RUNS_DIR = resolveWorkspaceScopedArtifactDir(
     input.repoRoot,
     sanitized.CODEX_ORCHESTRATOR_RUNS_DIR,
