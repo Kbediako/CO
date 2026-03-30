@@ -22,9 +22,6 @@ const PROVIDER_OVERRIDE_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
   REPO_CONFIG_PATH_ENV_KEY
 ] as const;
-const ALWAYS_EXPLICIT_PROVIDER_OVERRIDE_ENV_KEYS = new Set<string>([
-  'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'
-]);
 const DEFAULT_RUNTIME_TEST_ENV = {
   CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
   CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
@@ -44,7 +41,8 @@ afterEach(async () => {
 async function runCli(
   args: string[],
   env?: NodeJS.ProcessEnv,
-  timeoutMs: number = CLI_EXEC_TIMEOUT_MS
+  timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
   const mergedEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -67,7 +65,7 @@ async function runCli(
         return [];
       }
       if (
-        !ALWAYS_EXPLICIT_PROVIDER_OVERRIDE_ENV_KEYS.has(key) &&
+        !explicitProviderOverrideKeys.has(key) &&
         env[key] === process.env[key] &&
         Object.prototype.hasOwnProperty.call(process.env, key)
       ) {
@@ -1503,7 +1501,14 @@ describe('codex-orchestrator command surface', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
         CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
       };
-      await expect(runCli(['plan', 'docs-review'], env)).rejects.toMatchObject({
+      await expect(
+        runCli(
+          ['plan', 'docs-review'],
+          env,
+          CLI_EXEC_TIMEOUT_MS,
+          new Set(['CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'])
+        )
+      ).rejects.toMatchObject({
         stderr: expect.stringContaining('Repo-local codex.orchestrator.json is required')
       });
     } finally {
@@ -1524,7 +1529,12 @@ describe('codex-orchestrator command surface', () => {
       CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
       CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
     };
-    const { stdout } = await runCli(['plan', 'docs-review', '--format', 'json', '--repo-config-required=false'], env);
+    const { stdout } = await runCli(
+      ['plan', 'docs-review', '--format', 'json', '--repo-config-required=false'],
+      env,
+      CLI_EXEC_TIMEOUT_MS,
+      new Set(['CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'])
+    );
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
       pipeline?: { id?: string };
