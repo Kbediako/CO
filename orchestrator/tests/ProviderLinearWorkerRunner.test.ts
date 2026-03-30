@@ -447,6 +447,11 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('manual correctness/regressions/missing-tests review');
     expect(firstPrompt).toContain('manual elegance checklist');
     expect(firstPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
+    expect(firstPrompt).toContain('`review_outcome: bounded-success`');
+    expect(firstPrompt).toContain('successful bounded review completion, not as a blocker or generic quiet-tail failure');
+    expect(firstPrompt).toContain('Treat `review_outcome: failed-boundary`');
+    expect(firstPrompt).toContain('Treat `failed-other` as a failed review command without a classified boundary');
+    expect(firstPrompt).toContain('not as proof of wrapper breakage');
     expect(firstPrompt).toContain('Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`)');
     expect(firstPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(firstPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work');
@@ -499,6 +504,11 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('manual correctness/regressions/missing-tests review');
     expect(continuationPrompt).toContain('manual elegance checklist');
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
+    expect(continuationPrompt).toContain('`review_outcome: bounded-success`');
+    expect(continuationPrompt).toContain('successful bounded review completion, not as a blocker or generic quiet-tail failure');
+    expect(continuationPrompt).toContain('Treat `review_outcome: failed-boundary`');
+    expect(continuationPrompt).toContain('Treat `failed-other` as a failed review command without a classified boundary');
+    expect(continuationPrompt).toContain('not as proof of wrapper breakage');
     expect(continuationPrompt).toContain('Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green');
     expect(continuationPrompt).toContain('the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work');
     expect(continuationPrompt).toContain('If the issue is in either review state, do not code; refresh the workpad if needed, record the handoff clearly, and end the turn.');

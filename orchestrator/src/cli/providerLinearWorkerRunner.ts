@@ -559,6 +559,13 @@ function buildPreReviewHandoffGateSection(): string[] {
   ];
 }
 
+function buildReviewOutcomeGuidanceSection(): string[] {
+  return [
+    '- When `review/telemetry.json` reports `status: succeeded` with `review_outcome: bounded-success` (or a legacy succeeded payload with a preserved `termination_boundary`), record that in the workpad and validation notes as successful bounded review completion, not as a blocker or generic quiet-tail failure.',
+    '- Treat `review_outcome: failed-boundary` (or legacy failed telemetry with a non-null `termination_boundary`) as an explicit review-wrapper boundary failure. Treat `failed-other` as a failed review command without a classified boundary, not as proof of wrapper breakage; keep unrelated validation, CI, or merge blockers labeled separately instead of blaming review closeout.'
+  ];
+}
+
 function deriveSharedRepoCheckoutPathFallback(workerRepoRoot: string, taskId: string): string {
   const canonicalWorkerRepoRoot = resolve(workerRepoRoot);
   if (
@@ -611,6 +618,7 @@ export function buildProviderWorkerPrompt(
       buildRuntimeProofGuidance(helperCommand, issue.id),
       `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
       ...buildPreReviewHandoffGateSection(),
+      ...buildReviewOutcomeGuidanceSection(),
       '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
       '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
       '- Before handing off to the team\'s review state (`Human Review` or `In Review`), ensure required validation is green, actionable PR feedback is handled or explicitly pushed back, the latest `origin/main` is merged into the branch, PR checks are green, the `pr ready-review` drain is clean, and the workpad is refreshed to match completed work.',
@@ -645,6 +653,7 @@ export function buildProviderWorkerPrompt(
     buildRuntimeProofGuidance(helperCommand, issue.id),
     `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
     ...buildPreReviewHandoffGateSection(),
+    ...buildReviewOutcomeGuidanceSection(),
     '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
     '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
     '- Attach the PR to the Linear issue before handing off to the team\'s review state (`Human Review` or `In Review`).',

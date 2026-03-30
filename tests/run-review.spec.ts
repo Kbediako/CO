@@ -3717,10 +3717,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     });
 
     expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(
+      '[run-review] review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure.'
+    );
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      review_outcome: string;
       termination_boundary: {
         kind: string;
         provenance: string;
@@ -3736,6 +3740,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       };
     };
     expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.review_outcome).toBe('bounded-success');
     expect(telemetry.termination_boundary).toEqual(
       expect.objectContaining({
         kind: 'relevant-reinspection-dwell',
@@ -3769,6 +3774,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
+      review_outcome: string;
       error: string | null;
       termination_boundary: {
         kind: string;
@@ -3776,6 +3782,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       } | null;
     };
     expect(telemetry.status).toBe('failed');
+    expect(telemetry.review_outcome).toBe('failed-boundary');
     expect(telemetry.error).toBeTruthy();
     expect(telemetry.termination_boundary).toEqual(
       expect.objectContaining({
