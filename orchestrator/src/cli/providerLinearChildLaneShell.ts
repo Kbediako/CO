@@ -746,8 +746,21 @@ async function resolveChildLaneDecision(
   }
 
   const target = claimed.childLane;
-  const currentHeadSha = await deps.readParentHeadSha(context.repoRoot);
-  const currentIssue = await resolveParentSnapshot(context, params.env, deps);
+  let currentHeadSha: string | null;
+  let currentIssue: ParentIssueSnapshot & { captured_at: string };
+  try {
+    currentHeadSha = await deps.readParentHeadSha(context.repoRoot);
+    currentIssue = await resolveParentSnapshot(context, params.env, deps);
+  } catch (error) {
+    try {
+      await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    } catch (releaseError) {
+      deps.warn(
+        `provider-linear-child-lane warning: failed to release accept claim after snapshot read failure for ${stream}: ${releaseError instanceof Error ? releaseError.message : String(releaseError)}`
+      );
+    }
+    throw error;
+  }
   const staleReason = resolveChildLaneStaleReason(target, currentHeadSha, currentIssue);
   if (staleReason) {
     const invalidated = await finalizeClaimedChildLaneDecision({

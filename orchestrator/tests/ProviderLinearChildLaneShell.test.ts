@@ -1164,6 +1164,43 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('releases the accept claim when parent snapshot reads fail before stale checks', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        readParentHeadSha: vi.fn(async () => {
+          throw new Error('rev-parse exploded');
+        }) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_unhandled_failure',
+        message: 'rev-parse exploded',
+        status: 502
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'pending',
+        in_flight_action: null
+      })
+    ]);
+  });
+
   it('rejects acceptance when the pending child lane is not bound to the expected parent-owned task id', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord({
