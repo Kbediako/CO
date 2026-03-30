@@ -8,6 +8,7 @@ import type { ProviderIssueHandoffService } from '../src/cli/control/providerIss
 import {
   initializeProviderPollingHealth,
   markProviderPollingCompleted,
+  markProviderPollingStuck,
   markProviderPollingStarted,
   readProviderPollingHealth
 } from '../src/cli/control/providerPollingHealth.js';
@@ -1684,6 +1685,64 @@ describe('ControlRuntime', () => {
       stuck: false,
       stalled_after_ms: null
     });
+  });
+
+  it('lets stuck flush failures reject while keeping later polling updates serialized', async () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const onUpdate = vi.fn(async (payload: { stuck?: boolean }) => {
+      if (payload.stuck === true) {
+        throw new Error('persist failed');
+      }
+    });
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      onUpdate
+    });
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    onUpdate.mockClear();
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-07T00:00:00.000Z')
+    });
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    onUpdate.mockClear();
+
+    await expect(
+      markProviderPollingStuck(providerIssueHandoff, {
+        atMs: Date.parse('2026-03-07T00:00:45.000Z')
+      })
+    ).rejects.toThrow('persist failed');
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stuck: true,
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      })
+    );
+
+    onUpdate.mockImplementation(async () => undefined);
+    onUpdate.mockClear();
+
+    markProviderPollingCompleted(providerIssueHandoff, {
+      atMs: Date.parse('2026-03-07T00:01:00.000Z')
+    });
+
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        checking: false,
+        stuck: false,
+        restart_required: false,
+        last_completed_at: '2026-03-07T00:01:00.000Z'
+      })
+    );
   });
 
   it('recomputes provider polling health on repeated compatibility reads without snapshot invalidation', async () => {

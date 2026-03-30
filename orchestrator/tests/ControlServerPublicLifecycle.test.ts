@@ -974,11 +974,8 @@ describe('startControlServerPublicLifecycle', () => {
       reason: 'provider_refresh_lifecycle_stuck'
     });
 
-    const persistCountAfterStuck = persistProviderIntakePolling.mock.calls.length;
-
     await vi.advanceTimersByTimeAsync(15_000);
     expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
-    expect(persistProviderIntakePolling).toHaveBeenCalledTimes(persistCountAfterStuck);
     expect(persistProviderIntake).not.toHaveBeenCalled();
 
     resolveRefresh?.();

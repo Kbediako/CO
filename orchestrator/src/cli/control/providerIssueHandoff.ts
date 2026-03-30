@@ -246,23 +246,68 @@ export function createProviderIssueHandoffService(
     claims: ProviderIntakeClaimRecord[];
   };
 
+  const cloneProviderPollingSnapshot = (
+    polling: ProviderStateSnapshot['polling']
+  ): ProviderStateSnapshot['polling'] => (polling ? { ...polling } : polling);
+
+  const readProviderPollingSnapshotUpdatedAtMs = (
+    polling: ProviderStateSnapshot['polling']
+  ): number | null => {
+    const updatedAt =
+      polling && typeof polling.updated_at === 'string' ? Date.parse(polling.updated_at) : Number.NaN;
+    return Number.isFinite(updatedAt) ? updatedAt : null;
+  };
+
+  const pickRestoredProviderPollingSnapshot = (
+    snapshotPolling: ProviderStateSnapshot['polling'],
+    currentPolling: ProviderStateSnapshot['polling']
+  ): ProviderStateSnapshot['polling'] => {
+    const snapshotUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(snapshotPolling);
+    const currentUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(currentPolling);
+    if (
+      currentUpdatedAtMs !== null &&
+      (snapshotUpdatedAtMs === null || currentUpdatedAtMs >= snapshotUpdatedAtMs)
+    ) {
+      return cloneProviderPollingSnapshot(currentPolling);
+    }
+    return cloneProviderPollingSnapshot(snapshotPolling);
+  };
+
+  const pickRestoredProviderStateUpdatedAt = (
+    snapshotUpdatedAt: string,
+    polling: ProviderStateSnapshot['polling']
+  ): string => {
+    const snapshotUpdatedAtMs = Date.parse(snapshotUpdatedAt);
+    const pollingUpdatedAtMs = readProviderPollingSnapshotUpdatedAtMs(polling);
+    if (
+      pollingUpdatedAtMs !== null &&
+      (!Number.isFinite(snapshotUpdatedAtMs) || pollingUpdatedAtMs > snapshotUpdatedAtMs) &&
+      polling &&
+      typeof polling.updated_at === 'string'
+    ) {
+      return polling.updated_at;
+    }
+    return snapshotUpdatedAt;
+  };
+
   const captureProviderStateSnapshot = (): ProviderStateSnapshot => ({
     schema_version: options.state.schema_version,
     updated_at: options.state.updated_at,
     rehydrated_at: options.state.rehydrated_at,
     latest_provider_key: options.state.latest_provider_key,
     latest_reason: options.state.latest_reason,
-    polling: options.state.polling ? { ...options.state.polling } : options.state.polling,
+    polling: cloneProviderPollingSnapshot(options.state.polling),
     claims: options.state.claims.map((claim) => ({ ...claim }))
   });
 
   const restoreProviderStateSnapshot = (snapshot: ProviderStateSnapshot): void => {
+    const restoredPolling = pickRestoredProviderPollingSnapshot(snapshot.polling, options.state.polling);
     options.state.schema_version = snapshot.schema_version;
-    options.state.updated_at = snapshot.updated_at;
+    options.state.updated_at = pickRestoredProviderStateUpdatedAt(snapshot.updated_at, restoredPolling);
     options.state.rehydrated_at = snapshot.rehydrated_at;
     options.state.latest_provider_key = snapshot.latest_provider_key;
     options.state.latest_reason = snapshot.latest_reason;
-    options.state.polling = snapshot.polling ? { ...snapshot.polling } : snapshot.polling;
+    options.state.polling = restoredPolling;
     options.state.claims = snapshot.claims.map((claim) => ({ ...claim }));
     rebuildRetryQueue();
   };

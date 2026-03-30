@@ -300,16 +300,20 @@ function queueProviderPollingHealthUpdate(
     return state.updateChain;
   }
   const payload = buildProviderPollingHealthPayload(state, nowMs);
-  state.updateChain = state.updateChain
+  const nextUpdate = state.updateChain
+    .catch(() => undefined)
     .then(async () => {
       await state.onUpdate?.(payload);
-    })
-    .catch((error: unknown) => {
-      logger.warn(
-        `Failed to sync provider polling health: ${(error as Error)?.message ?? String(error)}`
-      );
     });
-  return state.updateChain;
+  // Most callers intentionally fire-and-forget polling sync. Attach a no-op handler so those
+  // paths do not surface unhandled rejections while explicit awaiters still observe failures.
+  void nextUpdate.catch(() => undefined);
+  state.updateChain = nextUpdate.catch((error: unknown) => {
+    logger.warn(
+      `Failed to sync provider polling health: ${(error as Error)?.message ?? String(error)}`
+    );
+  });
+  return nextUpdate;
 }
 
 function toIsoTimestamp(value: number | null): string | null {
