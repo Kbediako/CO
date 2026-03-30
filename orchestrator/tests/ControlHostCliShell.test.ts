@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, rm, utimes, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -22,6 +22,7 @@ const {
   rehydrateProviderIssueHandoffOnStartup,
   refreshProviderIssueHandoffOnStartup,
   resolveProviderResumeLaunchSpec,
+  resolveProviderOverridePackageRoot,
   snapshotRunManifests
 } = controlHostCliShellTest;
 const execFileAsync = promisify(execFile);
@@ -118,6 +119,33 @@ describe('controlHostCliShell manifest discovery', () => {
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1'
       }
     });
+  });
+
+  it('resolves provider override package root from the real CLI target when the entrypoint is symlinked', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    const originalPackageRoot = process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
+    delete process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
+
+    const packageRoot = join(tempRoot, 'package-root');
+    const realCliEntrypoint = join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js');
+    const symlinkedEntrypoint = join(tempRoot, 'node_modules', '.bin', 'codex-orchestrator');
+    await mkdir(join(packageRoot, 'dist', 'bin'), { recursive: true });
+    await mkdir(join(tempRoot, 'node_modules', '.bin'), { recursive: true });
+    await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ name: '@kbediako/codex-orchestrator' }), 'utf8');
+    await writeFile(realCliEntrypoint, 'export {};\n', 'utf8');
+    await symlink(realCliEntrypoint, symlinkedEntrypoint);
+
+    try {
+      await expect(realpath(resolveProviderOverridePackageRoot(symlinkedEntrypoint) as string)).resolves.toBe(
+        await realpath(packageRoot)
+      );
+    } finally {
+      if (originalPackageRoot === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT = originalPackageRoot;
+      }
+    }
   });
 
   it('keeps the newly spawned manifest even when its mtime falls before the local spawn timestamp', async () => {

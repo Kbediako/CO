@@ -1,6 +1,7 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { spawn } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { mkdir, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
@@ -386,10 +387,17 @@ function resolveProviderOverridePackageRoot(cliEntrypoint: string): string | nul
   if (configured) {
     return configured;
   }
+  const resolvedCliEntrypoint = (() => {
+    try {
+      return realpathSync(cliEntrypoint);
+    } catch {
+      return cliEntrypoint;
+    }
+  })();
   try {
-    return findPackageRoot(pathToFileURL(cliEntrypoint).href);
+    return findPackageRoot(pathToFileURL(resolvedCliEntrypoint).href);
   } catch {
-    return normalizeProviderLinearSourceValue(resolve(dirname(cliEntrypoint), '..'));
+    return normalizeProviderLinearSourceValue(resolve(dirname(resolvedCliEntrypoint), '..'));
   }
 }
 
@@ -619,6 +627,7 @@ export const __test__ = {
   refreshProviderIssueHandoffOnStartup,
   resolveProviderResumeLaunchSpec,
   resolveProviderResumeTaskId,
+  resolveProviderOverridePackageRoot,
   snapshotRunManifests
 };
 
