@@ -5,6 +5,7 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
+import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
 import * as orchestratorControlPlaneLifecycle from '../orchestrator/src/cli/services/orchestratorControlPlaneLifecycle.js';
 import { getTelemetrySchemas, validateCliManifest } from '../orchestrator/src/cli/telemetry/schema.js';
 import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
@@ -74,7 +75,9 @@ const diagnosticsConfig = {
 const TEST_TIMEOUT_MS = 15000;
 const ORIGINAL_ENV = {
   configOverrides: process.env.CODEX_CONFIG_OVERRIDES,
-  mcpConfigOverrides: process.env.CODEX_MCP_CONFIG_OVERRIDES
+  mcpConfigOverrides: process.env.CODEX_MCP_CONFIG_OVERRIDES,
+  repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
+  repoConfigPath: process.env[REPO_CONFIG_PATH_ENV_KEY]
 };
 
 describe('CodexOrchestrator CLI', () => {
@@ -90,6 +93,8 @@ describe('CodexOrchestrator CLI', () => {
     process.env.MCP_RUNNER_TASK_ID = '0101';
     process.env.CODEX_CONFIG_OVERRIDES = 'ui.control_enabled=false';
     delete process.env.CODEX_MCP_CONFIG_OVERRIDES;
+    delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+    delete process.env[REPO_CONFIG_PATH_ENV_KEY];
 
     await fs.writeFile(
       path.join(tempDir, 'codex.orchestrator.json'),
@@ -115,6 +120,16 @@ describe('CodexOrchestrator CLI', () => {
       delete process.env.CODEX_MCP_CONFIG_OVERRIDES;
     } else {
       process.env.CODEX_MCP_CONFIG_OVERRIDES = ORIGINAL_ENV.mcpConfigOverrides;
+    }
+    if (ORIGINAL_ENV.repoConfigRequired === undefined) {
+      delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+    } else {
+      process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = ORIGINAL_ENV.repoConfigRequired;
+    }
+    if (ORIGINAL_ENV.repoConfigPath === undefined) {
+      delete process.env[REPO_CONFIG_PATH_ENV_KEY];
+    } else {
+      process.env[REPO_CONFIG_PATH_ENV_KEY] = ORIGINAL_ENV.repoConfigPath;
     }
     await fs.rm(tempDir, { recursive: true, force: true });
   });

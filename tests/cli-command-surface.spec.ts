@@ -5,6 +5,7 @@ import { isAbsolute, join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
@@ -16,6 +17,10 @@ const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
   'CODEX_RUNTIME_MODE'
+] as const;
+const PROVIDER_OVERRIDE_ENV_KEYS = [
+  'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
+  REPO_CONFIG_PATH_ENV_KEY
 ] as const;
 const DEFAULT_RUNTIME_TEST_ENV = {
   CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
@@ -53,13 +58,28 @@ async function runCli(
       return [[key, env[key]]];
     })
   ) as NodeJS.ProcessEnv;
+  const explicitProviderOverrides = Object.fromEntries(
+    PROVIDER_OVERRIDE_ENV_KEYS.flatMap((key) => {
+      if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
+        return [];
+      }
+      if (env[key] === process.env[key] && Object.prototype.hasOwnProperty.call(process.env, key)) {
+        return [];
+      }
+      return [[key, env[key]]];
+    })
+  ) as NodeJS.ProcessEnv;
   for (const key of RUNTIME_TEST_ENV_KEYS) {
+    delete mergedEnv[key];
+  }
+  for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
     delete mergedEnv[key];
   }
   return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
     env: {
       ...mergedEnv,
       ...DEFAULT_RUNTIME_TEST_ENV,
+      ...explicitProviderOverrides,
       ...explicitRuntimeOverrides
     },
     timeout: timeoutMs

@@ -4,15 +4,25 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
-import { loadUserConfig } from '../src/cli/config/userConfig.js';
+import {
+  loadUserConfig,
+  REPO_CONFIG_PATH_ENV_KEY
+} from '../src/cli/config/userConfig.js';
 
 let workspaceRoot: string;
+const initialRepoConfigPathEnv = process.env[REPO_CONFIG_PATH_ENV_KEY];
 
 beforeEach(async () => {
   workspaceRoot = await mkdtemp(join(tmpdir(), 'user-config-stagesets-'));
+  delete process.env[REPO_CONFIG_PATH_ENV_KEY];
 });
 
 afterEach(async () => {
+  if (initialRepoConfigPathEnv === undefined) {
+    delete process.env[REPO_CONFIG_PATH_ENV_KEY];
+  } else {
+    process.env[REPO_CONFIG_PATH_ENV_KEY] = initialRepoConfigPathEnv;
+  }
   await rm(workspaceRoot, { recursive: true, force: true });
 });
 

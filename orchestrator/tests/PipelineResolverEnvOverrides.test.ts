@@ -6,14 +6,18 @@ import { fileURLToPath } from 'node:url';
 
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import { PipelineResolver } from '../src/cli/services/pipelineResolver.js';
-import { loadUserConfig } from '../src/cli/config/userConfig.js';
+import {
+  loadUserConfig,
+  REPO_CONFIG_PATH_ENV_KEY
+} from '../src/cli/config/userConfig.js';
 import type { PipelineDefinition } from '../src/cli/types.js';
 import { logger } from '../src/logger.js';
 
 const ORIGINAL_ENV = {
   designPipeline: process.env.DESIGN_PIPELINE,
   designConfigPath: process.env.DESIGN_CONFIG_PATH,
-  repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED
+  repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
+  repoConfigPath: process.env[REPO_CONFIG_PATH_ENV_KEY]
 };
 
 let workspaceRoot: string;
@@ -23,6 +27,7 @@ beforeEach(async () => {
   delete process.env.DESIGN_PIPELINE;
   delete process.env.DESIGN_CONFIG_PATH;
   delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+  delete process.env[REPO_CONFIG_PATH_ENV_KEY];
 });
 
 afterEach(async () => {
@@ -41,6 +46,11 @@ afterEach(async () => {
     delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
   } else {
     process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = ORIGINAL_ENV.repoConfigRequired;
+  }
+  if (ORIGINAL_ENV.repoConfigPath === undefined) {
+    delete process.env[REPO_CONFIG_PATH_ENV_KEY];
+  } else {
+    process.env[REPO_CONFIG_PATH_ENV_KEY] = ORIGINAL_ENV.repoConfigPath;
   }
   await rm(workspaceRoot, { recursive: true, force: true });
 });
