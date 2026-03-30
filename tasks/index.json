@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260330-linear-97aef5e3-dadb-4909-9b00-68c698f10f93",
+      "title": "CO Make Linear Child-Stream JSON Parsing Robust to Wrapper Prelude Logs",
+      "relates_to": "tasks/tasks-linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-97aef5e3-dadb-4909-9b00-68c698f10f93-docs-review/cli/2026-03-30T06-50-00-271Z-a27a59eb/manifest.json",
+          "override_reason": "child-stream helper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md",
+        "task": "tasks/tasks-linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md",
+        "agent_task": ".agent/task/linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md",
+        "docs": "docs/TECH_SPEC-linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md"
+      }
+    },
+    {
       "id": "20260330-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2",
       "title": "CO: Fix stale merge-handoff after successful provider-worker review handoff",
       "relates_to": "tasks/tasks-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
