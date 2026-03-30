@@ -18,6 +18,7 @@ import {
   type ProviderLinearWorkerExecRequest,
   type ProviderLinearWorkerExecResult
 } from './providerLinearWorkerRunner.js';
+import { logger } from '../logger.js';
 import { slugify } from './utils/strings.js';
 const ALLOWED_PROVIDER_CHILD_PIPELINES = ['docs-review', 'implementation-gate', 'docs-relevance-advisory'] as const;
 const PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE = [
@@ -83,6 +84,7 @@ interface ProviderLinearChildStreamShellDependencies {
   appendChildStreamRecord: (runDir: string, record: ProviderLinearWorkerChildStreamRecord) => Promise<ProviderLinearWorkerChildStreamRecord[]>;
   refreshProofSnapshot: (runDir: string, auditPath: string | null) => Promise<void>;
   now: () => string;
+  warn: (message: string) => void;
 }
 const DEFAULT_DEPENDENCIES: ProviderLinearChildStreamShellDependencies = {
   execRunner: defaultExecRunner,
@@ -90,7 +92,10 @@ const DEFAULT_DEPENDENCIES: ProviderLinearChildStreamShellDependencies = {
   refreshProofSnapshot: async (runDir, auditPath) => {
     await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath);
   },
-  now: () => new Date().toISOString()
+  now: () => new Date().toISOString(),
+  warn: (message) => {
+    logger.warn(message);
+  }
 };
 export async function runProviderLinearChildStreamShell(
   params: RunProviderLinearChildStreamShellParams,
@@ -283,7 +288,6 @@ export async function runProviderLinearChildStreamShell(
       source_setup: sourceSetup,
       launched_at: deps.now()
     });
-    await deps.refreshProofSnapshot(context.runDir, env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
   } catch (error) {
     return failureResult({
       issueId: context.issueId,
@@ -296,6 +300,13 @@ export async function runProviderLinearChildStreamShell(
       message: `Failed to record child stream lineage: ${error instanceof Error ? error.message : String(error)}`,
       status: 502
     });
+  }
+  try {
+    await deps.refreshProofSnapshot(context.runDir, env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
+  } catch (error) {
+    deps.warn(
+      `provider-linear-child-stream warning: failed to refresh proof snapshot after recording child stream ${stream}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
   if (execResult.exitCode !== 0 || childRun.status !== 'succeeded') {
     return failureResult({

@@ -1857,6 +1857,7 @@ async function writeProofSnapshot(
 export async function refreshProviderLinearWorkerProofSnapshot(
   runDir: string,
   auditPath: string | null,
+  now: () => string = () => new Date().toISOString(),
   writeProof: (path: string, proof: ProviderLinearWorkerProof) => Promise<void> = async (path, proof) =>
     await writeJsonAtomic(path, proof)
 ): Promise<ProviderLinearWorkerProof | null> {
@@ -1875,7 +1876,8 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     ...parsed,
     linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
     child_streams: await readProviderLinearWorkerChildStreams(runDir),
-    child_lanes: await readProviderLinearWorkerChildLanes(runDir)
+    child_lanes: await readProviderLinearWorkerChildLanes(runDir),
+    updated_at: now()
   };
   await writeProof(proofPath, hydrated);
   return hydrated;

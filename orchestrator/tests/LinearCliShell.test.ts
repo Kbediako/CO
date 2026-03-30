@@ -1312,4 +1312,86 @@ describe('runLinearCliShell', () => {
       }
     });
   });
+
+  it('blocks Linear mutation commands from subordinate same-issue child lanes when only the pipeline env is present', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['transition'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          state: 'In Review'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-child-lane'
+        }),
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'provider_worker_parent_mutation_required',
+        message: 'transition is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.',
+        status: 409
+      }
+    });
+  });
+
+  it('blocks mutation commands when child-lane manifests use camelCase lineage fields', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-child-lane-guard-camel-'));
+    tempDirs.push(repoRoot);
+    const manifestPath = join(repoRoot, 'manifest.json');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        pipelineId: 'provider-linear-child-lane',
+        parentRunId: 'provider-run-1'
+      }),
+      'utf8'
+    );
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['transition'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          state: 'In Review'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        readTextFile: vi.fn(async (path: string) =>
+          await import('node:fs/promises').then((fs) => fs.readFile(path, 'utf8'))
+        ),
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+        }),
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'provider_worker_parent_mutation_required',
+        message: 'transition is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.',
+        status: 409
+      }
+    });
+  });
 });

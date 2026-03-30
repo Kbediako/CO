@@ -146,7 +146,8 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
     '',
     'Constraints:',
     '- Work only inside this lane workspace. The parent lane owns the authoritative issue workspace, Linear state, workpad, and PR lifecycle.',
-    '- Stay strictly inside the declared scope below. Do not edit files outside the declared file scope unless they are required by the same bounded change and remain clearly adjacent.',
+    '- Stay strictly inside the declared scope below. Do not edit files outside the declared file or phase scope.',
+    '- If the change cannot be completed within that scope, stop and report back to the parent lane so it can relaunch with widened ownership.',
     '- Do not call Linear mutation helpers. Parent-owned integration happens by patch artifact only.',
     '- Do not run full repo validation suites. Keep checks tightly scoped to the touched area when needed.',
     '',
@@ -236,14 +237,27 @@ async function loadProviderLinearChildLaneContext(
   };
 }
 
+function sanitizeChildLaneStreamSegment(stream: string): string {
+  const collapsed = stream.trim().replaceAll('\\', '/').split('/').map((segment) => segment.trim()).filter(Boolean).join('-');
+  const sanitized = collapsed
+    .replace(/[^A-Za-z0-9._-]+/gu, '-')
+    .replace(/\.{2,}/gu, '-')
+    .replace(/^-+/u, '')
+    .replace(/-+$/u, '')
+    .replace(/^\.+/u, '')
+    .replace(/\.+$/u, '');
+  return sanitized.length > 0 ? sanitized : 'lane';
+}
+
 async function prepareLaneWorkspace(
   context: ProviderLinearChildLaneContext
 ): Promise<{ laneWorkspacePath: string; laneBranch: string }> {
+  const safeStream = sanitizeChildLaneStreamSegment(context.stream);
   const laneWorkspacePath = ensurePathWithinRoot(
     context.parentWorkspacePath,
-    join(context.parentWorkspacePath, '.child-lanes', `${context.stream}-${context.runId}`)
+    join(context.parentWorkspacePath, '.child-lanes', `${safeStream}-${context.runId}`)
   );
-  const laneBranch = `child-lane/${context.stream}-${context.runId}`.slice(0, 120);
+  const laneBranch = `child-lane/${safeStream}-${context.runId}`.slice(0, 120);
   await rm(laneWorkspacePath, { recursive: true, force: true });
   await mkdir(dirname(laneWorkspacePath), { recursive: true });
   await execFileAsync('git', ['clone', '--local', context.parentWorkspacePath, laneWorkspacePath]);

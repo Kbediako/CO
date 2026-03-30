@@ -206,6 +206,17 @@ describe('runProviderLinearChildStreamShell', () => {
       '.runs',
       externalRoot
     );
+    const execRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        run_id: 'docs-run-1',
+        status: 'succeeded',
+        artifact_root: `.runs/${TASK_ID}-docs-review/cli/docs-run-1`,
+        manifest: `.runs/${TASK_ID}-docs-review/cli/docs-run-1/manifest.json`,
+        summary: 'ok'
+      }),
+      stderr: ''
+    }));
     const result = await runProviderLinearChildStreamShell(
       {
         pipelineId: 'docs-review',
@@ -213,19 +224,7 @@ describe('runProviderLinearChildStreamShell', () => {
           CODEX_ORCHESTRATOR_RUNS_DIR: join(externalRoot, '.runs')
         })
       },
-      {
-        execRunner: vi.fn(async () => ({
-          exitCode: 0,
-          stdout: JSON.stringify({
-            run_id: 'docs-run-1',
-            status: 'succeeded',
-            artifact_root: `.runs/${TASK_ID}-docs-review/cli/docs-run-1`,
-            manifest: `.runs/${TASK_ID}-docs-review/cli/docs-run-1/manifest.json`,
-            summary: 'ok'
-          }),
-          stderr: ''
-        })) as never
-      }
+      { execRunner: execRunner as never }
     );
     expect(result).toMatchObject({
       ok: true,
@@ -233,6 +232,45 @@ describe('runProviderLinearChildStreamShell', () => {
         manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-docs-review`, 'cli', 'docs-run-1', 'manifest.json')
       }
     });
+    expect(execRunner.mock.calls[0]?.[0]?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
+  });
+
+  it('keeps launch success when proof refresh fails after the child stream record is appended', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const warn = vi.fn();
+
+    const result = await runProviderLinearChildStreamShell(
+      {
+        pipelineId: 'docs-review',
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner: vi.fn(async () => createExecResult('docs-review', 'docs-run-1', 'docs-review passed')) as never,
+        refreshProofSnapshot: vi.fn(async () => {
+          throw new Error('proof refresh exploded');
+        }) as never,
+        warn
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-stream',
+      stream: 'docs-review',
+      child_run: {
+        run_id: 'docs-run-1',
+        task_id: 'linear-lin-issue-1-docs-review'
+      }
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'provider-linear-child-stream warning: failed to refresh proof snapshot after recording child stream docs-review: proof refresh exploded'
+    );
+    expect(await readProviderLinearWorkerChildStreams(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'docs-review',
+        run_id: 'docs-run-1'
+      })
+    ]);
   });
   it('clears FORCE_CODEX_REVIEW for advisory children and returns child-run details when sidecar writes fail', async () => {
     const { manifestPath } = await createProviderWorkerManifest();

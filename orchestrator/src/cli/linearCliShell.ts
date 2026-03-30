@@ -601,14 +601,30 @@ async function assertLinearMutationAllowed(
   if (!LINEAR_MUTATING_SUBCOMMANDS.has(subcommand)) {
     return;
   }
+  const pipelineIdFromEnv = readStringEnv(env, 'CODEX_ORCHESTRATOR_PIPELINE_ID');
+  const isChildLane = pipelineIdFromEnv === 'provider-linear-child-lane';
   const manifestPath = readStringEnv(env, 'CODEX_ORCHESTRATOR_MANIFEST_PATH');
   if (!manifestPath) {
+    if (isChildLane) {
+      throw cliError(
+        'provider_worker_parent_mutation_required',
+        `${subcommand} is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.`,
+        409
+      );
+    }
     return;
   }
   let manifestRecord: Record<string, unknown>;
   try {
     manifestRecord = JSON.parse(await readTextFile(manifestPath)) as Record<string, unknown>;
   } catch {
+    if (isChildLane) {
+      throw cliError(
+        'provider_worker_parent_mutation_required',
+        `${subcommand} is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.`,
+        409
+      );
+    }
     return;
   }
   const pipelineId = readUnknownString(manifestRecord.pipeline_id) ?? readUnknownString(manifestRecord.pipelineId);

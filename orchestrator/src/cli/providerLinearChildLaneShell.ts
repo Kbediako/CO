@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 
@@ -67,6 +67,13 @@ const PROVIDER_LINEAR_CHILD_LANE_ENV_KEYS_TO_REMOVE = [
   PROVIDER_LAUNCH_SOURCE_ENV,
   PROVIDER_LAUNCH_TOKEN_ENV,
   PROVIDER_LINEAR_AUDIT_ENV_VAR
+] as const;
+const PROVIDER_LINEAR_CHILD_LANE_OPTIONAL_ENV_KEYS = [
+  PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV,
+  PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV,
+  PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV,
+  PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV,
+  PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV
 ] as const;
 
 export interface ProviderLinearChildLaneRunResult {
@@ -263,9 +270,21 @@ export async function runProviderLinearChildLaneShell(
       status: 422
     });
   }
+  try {
+    if (action === 'launch') {
+      return await launchChildLane(
+        {
+          ...params,
+          action,
+          env
+        },
+        context,
+        deps,
+        sourceSetup
+      );
+    }
 
-  if (action === 'launch') {
-    return await launchChildLane(
+    return await resolveChildLaneDecision(
       {
         ...params,
         action,
@@ -275,18 +294,20 @@ export async function runProviderLinearChildLaneShell(
       deps,
       sourceSetup
     );
-  }
-
-  return await resolveChildLaneDecision(
-    {
-      ...params,
+  } catch (error) {
+    return failureResult({
       action,
-      env
-    },
-    context,
-    deps,
-    sourceSetup
-  );
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream: normalizeChildLaneStreamName(params.streamName) ?? params.streamName ?? null,
+      childRun: null,
+      childLane: null,
+      code: 'provider_worker_child_lane_unhandled_failure',
+      message: error instanceof Error ? error.message : String(error),
+      status: 502
+    });
+  }
 }
 
 async function launchChildLane(
@@ -328,9 +349,14 @@ async function launchChildLane(
   }
   const existing = await deps.readChildLanes(context.runDir);
   const conflicting = existing.find(
-    (entry) => entry.decision === 'pending' && scopesOverlap(entry.scope, scope)
+    (entry) =>
+      entry.decision === 'pending' &&
+      (entry.stream === stream || scopesOverlap(entry.scope, scope))
   );
   if (conflicting) {
+    const message = conflicting.stream === stream
+      ? `Child lane stream ${stream} already has unresolved lane ${conflicting.run_id}; accept, reject, or invalidate that lane before relaunching the same stream.`
+      : `Child lane scope overlaps unresolved lane ${conflicting.stream} (${conflicting.run_id}); reject, accept, or invalidate that lane before launching another overlapping lane.`;
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -340,7 +366,7 @@ async function launchChildLane(
       childRun: null,
       childLane: conflicting,
       code: 'provider_worker_child_lane_scope_conflict',
-      message: `Child lane scope overlaps unresolved lane ${conflicting.stream} (${conflicting.run_id}); reject, accept, or invalidate that lane before launching another overlapping lane.`,
+      message,
       status: 409
     });
   }
@@ -470,6 +496,20 @@ async function launchChildLane(
 
   const proofPath = join(childRun.artifact_root, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
   const childProof = await deps.readChildLaneProof(proofPath).catch(() => null);
+  if (childRun.status === 'succeeded' && (!childProof || !childProof.patch_artifact_path)) {
+    return failureResult({
+      action: 'launch',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun,
+      childLane: null,
+      code: 'provider_worker_child_lane_proof_missing',
+      message: `Child lane ${stream} did not produce a readable proof bundle with a patch artifact.`,
+      status: 502
+    });
+  }
   const childLane: ProviderLinearWorkerChildLaneRecord = {
     stream,
     pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
@@ -777,8 +817,8 @@ function normalizeChildLaneScope(
   files: string[],
   phases: string[]
 ): ProviderLinearWorkerChildLaneScope | null {
-  const normalizedFiles = normalizeScopeEntries(files);
-  const normalizedPhases = normalizeScopeEntries(phases);
+  const normalizedFiles = normalizeScopeEntries(files, 'file');
+  const normalizedPhases = normalizeScopeEntries(phases, 'phase');
   if (normalizedFiles.length === 0 && normalizedPhases.length === 0) {
     return null;
   }
@@ -788,8 +828,30 @@ function normalizeChildLaneScope(
   };
 }
 
-function normalizeScopeEntries(values: string[]): string[] {
-  return [...new Set(values.map((value) => normalizeOptionalString(value)).filter((value): value is string => value !== null))];
+function normalizeScopeEntries(values: string[], kind: 'file' | 'phase' = 'file'): string[] {
+  return [
+    ...new Set(
+      values
+        .map((value) => normalizeOptionalString(value))
+        .map((value) => {
+          if (!value) {
+            return null;
+          }
+          return kind === 'file' ? normalizeScopeFileEntry(value) : value;
+        })
+        .filter((value): value is string => value !== null)
+    )
+  ];
+}
+
+function normalizeScopeFileEntry(value: string): string | null {
+  const normalized = posix.normalize(value.replaceAll('\\', '/'));
+  const withoutCurrentDir = normalized.replace(/^(?:\.\/)+/u, '');
+  const trimmed = withoutCurrentDir.replace(/\/+/gu, '/').replace(/\/$/u, '');
+  if (trimmed === '' || trimmed === '.') {
+    return null;
+  }
+  return trimmed;
 }
 
 async function resolveParentDirtyScopeConflict(
@@ -848,6 +910,9 @@ function buildProviderLinearChildLaneStartEnv(
   for (const key of PROVIDER_LINEAR_CHILD_LANE_ENV_KEYS_TO_REMOVE) {
     delete sanitized[key];
   }
+  for (const key of PROVIDER_LINEAR_CHILD_LANE_OPTIONAL_ENV_KEYS) {
+    sanitized[key] = '';
+  }
   delete sanitized.CO_LINEAR_WORKSPACE_ID;
   delete sanitized.CO_LINEAR_TEAM_ID;
   delete sanitized.CO_LINEAR_PROJECT_ID;
@@ -866,24 +931,14 @@ function buildProviderLinearChildLaneStartEnv(
   sanitized.MCP_RUNNER_TASK_ID = input.taskId;
   sanitized[PROVIDER_LINEAR_CHILD_LANE_STREAM_ENV] = input.stream;
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PURPOSE_ENV] = input.purpose;
-  if (input.instructions) {
-    sanitized[PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV] = input.instructions;
-  }
+  sanitized[PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV] = input.instructions ?? '';
   sanitized[PROVIDER_LINEAR_CHILD_LANE_FILES_ENV] = JSON.stringify(input.scope.files);
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PHASES_ENV] = JSON.stringify(input.scope.phases);
   sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_WORKSPACE_PATH_ENV] = input.parentWorkspacePath;
-  if (input.parentSnapshot.base_sha) {
-    sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV] = input.parentSnapshot.base_sha;
-  }
-  if (input.parentSnapshot.issue_updated_at) {
-    sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV] = input.parentSnapshot.issue_updated_at;
-  }
-  if (input.parentSnapshot.issue_state) {
-    sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV] = input.parentSnapshot.issue_state;
-  }
-  if (input.parentSnapshot.issue_state_type) {
-    sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV] = input.parentSnapshot.issue_state_type;
-  }
+  sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV] = input.parentSnapshot.base_sha ?? '';
+  sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_UPDATED_AT_ENV] = input.parentSnapshot.issue_updated_at ?? '';
+  sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_ENV] = input.parentSnapshot.issue_state ?? '';
+  sanitized[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_ISSUE_STATE_TYPE_ENV] = input.parentSnapshot.issue_state_type ?? '';
   if (input.sourceSetup?.provider === 'linear') {
     sanitized.CO_LINEAR_WORKSPACE_ID = input.sourceSetup.workspace_id ?? '';
     sanitized.CO_LINEAR_TEAM_ID = input.sourceSetup.team_id ?? '';

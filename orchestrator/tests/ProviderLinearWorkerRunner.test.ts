@@ -875,7 +875,7 @@ describe('provider linear worker runner', () => {
         latest_recorded_at: '2026-03-21T09:00:01.200Z'
       },
       child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded' })]),
-      child_lanes: expect.arrayContaining([expect.objectContaining({ stream: 'impl-a', task_id: 'linear-lin-issue-1-impl-a', run_id: 'child-run-1', decision: 'pending' })]),
+      child_lanes: expect.arrayContaining([expect.objectContaining({ stream: 'impl-a', task_id: 'linear-lin-issue-1-impl-a', run_id: 'child-run-1', decision: 'pending', patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch') })]),
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
