@@ -759,6 +759,47 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('rejects acceptance when the pending child lane is not bound to the expected parent-owned task id', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      task_id: `${TASK_ID}-other-stream`
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_provenance_invalid',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+  });
+
   it('accepts a non-stale child lane by applying the patch artifact and updating the decision', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();
@@ -775,6 +816,7 @@ describe('runProviderLinearChildLaneShell', () => {
       },
       {
         applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
         readTrackedIssue: vi.fn(async () => ({
           id: ISSUE.issue_id,
@@ -829,6 +871,7 @@ describe('runProviderLinearChildLaneShell', () => {
       },
       {
         applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
         readTrackedIssue: vi.fn(async () => ({
           id: ISSUE.issue_id,
@@ -875,6 +918,7 @@ describe('runProviderLinearChildLaneShell', () => {
       },
       {
         applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
         readTrackedIssue: vi.fn(async () => ({
           id: ISSUE.issue_id,
@@ -916,6 +960,7 @@ describe('runProviderLinearChildLaneShell', () => {
       },
       {
         applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
         readTrackedIssue: vi.fn(async () => ({
           id: ISSUE.issue_id,
@@ -958,6 +1003,7 @@ describe('runProviderLinearChildLaneShell', () => {
       },
       {
         applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
         readTrackedIssue: vi.fn(async () => ({
           id: ISSUE.issue_id,
@@ -980,6 +1026,94 @@ describe('runProviderLinearChildLaneShell', () => {
       }
     });
     expect(applyPatchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('rejects acceptance when the parent workspace picked up in-scope pending edits after launch', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => ['orchestrator/src/cli/providerLinearChildStreamShell.ts']) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_parent_dirty',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('accepts when the parent only dirtied declared files that the child patch does not touch', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      scope: {
+        files: [
+          'orchestrator/src/cli/providerLinearChildStreamShell.ts',
+          'orchestrator/src/cli/providerLinearChildLaneShell.ts'
+        ],
+        phases: []
+      }
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => ['orchestrator/src/cli/providerLinearChildLaneShell.ts']) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'accepted',
+      child_lane: {
+        stream: childLane.stream,
+        decision: 'accepted'
+      }
+    });
+    expect(applyPatchArtifact).toHaveBeenCalledWith(tempRoot, childLane.patch_artifact_path);
   });
 
   it('rejects acceptance for phase-only lanes until the patch can be machine-checked against explicit files', async () => {
@@ -1005,6 +1139,7 @@ describe('runProviderLinearChildLaneShell', () => {
       },
       {
         applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
         readTrackedIssue: vi.fn(async () => ({
           id: ISSUE.issue_id,

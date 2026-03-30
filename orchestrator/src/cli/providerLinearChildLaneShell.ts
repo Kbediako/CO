@@ -629,6 +629,21 @@ async function resolveChildLaneDecision(
       status: 404
     });
   }
+  const provenanceViolation = resolveChildLaneDecisionProvenanceViolation(context, stream, target);
+  if (provenanceViolation) {
+    return failureResult({
+      action: params.action,
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_provenance_invalid',
+      message: provenanceViolation,
+      status: 409
+    });
+  }
 
   if (params.action === 'accept') {
     const currentHeadSha = await deps.readParentHeadSha(context.repoRoot);
@@ -739,6 +754,37 @@ async function resolveChildLaneDecision(
         status: 409
       });
     }
+    let dirtyPatchConflict: string | null;
+    try {
+      dirtyPatchConflict = await resolveAcceptedPatchDirtyConflict(context.repoRoot, patchChangedPaths, deps);
+    } catch (error) {
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_parent_dirty_check_failed',
+        message: `Failed to inspect parent workspace state before accepting child lane: ${error instanceof Error ? error.message : String(error)}`,
+        status: 502
+      });
+    }
+    if (dirtyPatchConflict) {
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_parent_dirty',
+        message: dirtyPatchConflict,
+        status: 409
+      });
+    }
     try {
       await deps.applyPatchArtifact(context.repoRoot, patchArtifactPath);
     } catch (error) {
@@ -828,6 +874,24 @@ function defaultDecisionReason(
   return 'Parent invalidated child lane output.';
 }
 
+function resolveChildLaneDecisionProvenanceViolation(
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueId' | 'issueIdentifier' | 'taskId'>,
+  stream: string,
+  childLane: ProviderLinearWorkerChildLaneRecord
+): string | null {
+  const expectedTaskId = `${context.taskId}-${stream}`;
+  if (childLane.pipeline_id !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID) {
+    return `Pending child lane ${stream} must remain recorded as ${PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID}; recorded pipeline was ${childLane.pipeline_id}.`;
+  }
+  if (childLane.task_id !== expectedTaskId) {
+    return `Pending child lane ${stream} must stay bound to task ${expectedTaskId}; recorded task was ${childLane.task_id}.`;
+  }
+  if (childLane.issue_id !== context.issueId || childLane.issue_identifier !== context.issueIdentifier) {
+    return `Pending child lane ${stream} must stay bound to issue ${context.issueIdentifier}; recorded issue was ${childLane.issue_identifier} (${childLane.issue_id}).`;
+  }
+  return null;
+}
+
 function resolveAcceptedPatchArtifactPath(
   repoRoot: string,
   childLane: ProviderLinearWorkerChildLaneRecord,
@@ -906,6 +970,24 @@ function resolveAcceptedPatchScopeViolation(
     return null;
   }
   return `Child lane patch touches files outside the declared file scope (${outOfScopePaths.join(', ')}). Declared scope: ${declaredFiles.join(', ')}.`;
+}
+
+async function resolveAcceptedPatchDirtyConflict(
+  workspacePath: string,
+  patchChangedPaths: string[],
+  deps: ProviderLinearChildLaneShellDependencies
+): Promise<string | null> {
+  const dirtyPaths = (await deps.readParentDirtyPaths(workspacePath)).filter(
+    (entry) => !isIgnoredParentArtifactPath(entry)
+  );
+  if (dirtyPaths.length === 0) {
+    return null;
+  }
+  const overlapping = patchChangedPaths.filter((entry) => dirtyPaths.includes(entry));
+  if (overlapping.length === 0) {
+    return null;
+  }
+  return `Parent workspace already has pending edits to files this child-lane patch would update (${overlapping.join(', ')}); clean, commit, or incorporate those parent edits before accepting the child-lane patch.`;
 }
 
 async function resolveParentSnapshot(
