@@ -18,6 +18,10 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
     binPath,
     [
       '#!/bin/sh',
+      'if [ "$1" = "--version" ]; then',
+      '  echo "codex 0.0.0-test"',
+      '  exit 0',
+      'fi',
       'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
       `  echo "${featureLine}"`,
       '  exit 0',
@@ -38,6 +42,8 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
     ...sanitizeProviderOverrideEnv(process.env),
     CODEX_CLOUD_ENV_ID: '',
     CODEX_CLOUD_BRANCH: '',
+    CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
+    CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '',
     MCP_RUNNER_TASK_ID: '',
     TASK: '',
     CODEX_ORCHESTRATOR_TASK_ID: '',
@@ -951,7 +957,9 @@ describe('runDoctor', () => {
         env: {
           ...process.env,
           CODEX_CLI_BIN: '/tmp/fake-codex',
-          CODEX_CLOUD_BRANCH: ''
+          CODEX_CLOUD_BRANCH: '',
+          CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
+          CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: ''
         }
       });
 

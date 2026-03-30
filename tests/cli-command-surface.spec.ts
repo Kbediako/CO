@@ -19,10 +19,19 @@ const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
   'CODEX_RUNTIME_MODE'
 ] as const;
+const REPO_CONFIG_TEST_ENV_KEYS = [
+  'CODEX_ORCHESTRATOR_REPO_CONFIG_PATH',
+  'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'
+] as const;
+const CLI_SANITIZED_ENV_KEYS = [...RUNTIME_TEST_ENV_KEYS, ...REPO_CONFIG_TEST_ENV_KEYS] as const;
 const DEFAULT_RUNTIME_TEST_ENV = {
   CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
   CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
   CODEX_RUNTIME_MODE: 'cli'
+} satisfies NodeJS.ProcessEnv;
+const DEFAULT_REPO_CONFIG_TEST_ENV = {
+  CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
+  CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: ''
 } satisfies NodeJS.ProcessEnv;
 
 let tempDir: string | null = null;
@@ -44,8 +53,8 @@ async function runCli(
     ...process.env,
     ...(env ?? {})
   });
-  const explicitRuntimeOverrides = Object.fromEntries(
-    RUNTIME_TEST_ENV_KEYS.flatMap((key) => {
+  const explicitCliOverrides = Object.fromEntries(
+    CLI_SANITIZED_ENV_KEYS.flatMap((key) => {
       if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
         return [];
       }
@@ -55,14 +64,15 @@ async function runCli(
       return [[key, env[key]]];
     })
   ) as NodeJS.ProcessEnv;
-  for (const key of RUNTIME_TEST_ENV_KEYS) {
+  for (const key of CLI_SANITIZED_ENV_KEYS) {
     delete mergedEnv[key];
   }
   return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
     env: {
       ...mergedEnv,
       ...DEFAULT_RUNTIME_TEST_ENV,
-      ...explicitRuntimeOverrides
+      ...DEFAULT_REPO_CONFIG_TEST_ENV,
+      ...explicitCliOverrides
     },
     timeout: timeoutMs
   });

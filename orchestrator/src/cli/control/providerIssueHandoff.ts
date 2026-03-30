@@ -2702,7 +2702,8 @@ function createProviderLaunchToken(): string {
 const PROVIDER_CHILD_STREAM_PIPELINE_IDS = new Set([
   'docs-review',
   'implementation-gate',
-  'docs-relevance-advisory'
+  'docs-relevance-advisory',
+  'provider-linear-child-lane'
 ]);
 
 export async function discoverProviderIssueRuns(

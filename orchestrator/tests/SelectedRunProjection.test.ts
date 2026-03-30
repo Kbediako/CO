@@ -13,6 +13,7 @@ import {
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
 import {
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  type ProviderLinearWorkerChildLaneRecord,
   type ProviderLinearWorkerProof
 } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
@@ -579,9 +580,47 @@ describe('SelectedRunProjection', () => {
       }),
       'utf8'
     );
-    const proof = buildProviderLinearWorkerProof({
-      workspace_path: join(root, '.workspaces', 'linear-lin-issue-1')
-    });
+    const childLane: ProviderLinearWorkerChildLaneRecord = {
+      stream: 'projection-proof',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: 'linear-lin-issue-1-projection-proof',
+      run_id: 'child-lane-run-1',
+      status: 'succeeded',
+      manifest_path: join(root, '.runs', 'linear-lin-issue-1-projection-proof', 'cli', 'child-lane-run-1', 'manifest.json'),
+      artifact_root: join(root, '.runs', 'linear-lin-issue-1-projection-proof', 'cli', 'child-lane-run-1'),
+      log_path: null,
+      summary: 'Selected-run projection proof lane finished',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: join(root, '.workspaces', 'linear-lin-issue-1'),
+      source_setup: null,
+      launched_at: '2026-03-20T01:15:40.000Z',
+      purpose: 'Add child_lanes proof coverage',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/tests/SelectedRunProjection.test.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-20T01:15:28.970Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-20T01:15:35.000Z'
+      },
+      lane_workspace_path: join(root, '.child-lanes', 'projection-proof-child-run-1'),
+      patch_artifact_path: join(root, '.runs', 'linear-lin-issue-1-projection-proof', 'cli', 'child-lane-run-1', 'provider-linear-child-lane.patch'),
+      patch_bytes: 128,
+      decision: 'accepted',
+      decision_at: '2026-03-20T01:15:50.000Z',
+      decision_reason: 'Parent accepted the projection proof lane.'
+    };
+    const proof: ProviderLinearWorkerProof = {
+      ...buildProviderLinearWorkerProof({
+        workspace_path: join(root, '.workspaces', 'linear-lin-issue-1')
+      }),
+      child_lanes: [childLane]
+    };
     await writeFile(
       join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
       JSON.stringify(proof),
@@ -592,6 +631,9 @@ describe('SelectedRunProjection', () => {
 
     expect(selected?.runId).toBe('run-child');
     expect(selected?.providerLinearWorkerProof).toEqual(proof);
+    expect(selected?.providerLinearWorkerProof?.child_lanes?.[0]?.scope.files).toEqual([
+      'orchestrator/tests/SelectedRunProjection.test.ts'
+    ]);
   });
 
   it('prefers queued retry claim status text over a retained prior manifest summary', async () => {

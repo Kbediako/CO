@@ -8,12 +8,19 @@ import { loadUserConfig } from '../src/cli/config/userConfig.js';
 import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 
 let workspaceRoot: string;
+const ORIGINAL_REPO_CONFIG_PATH = process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH;
 
 beforeEach(async () => {
   workspaceRoot = await mkdtemp(join(tmpdir(), 'user-config-stagesets-'));
+  delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH;
 });
 
 afterEach(async () => {
+  if (ORIGINAL_REPO_CONFIG_PATH === undefined) {
+    delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH;
+  } else {
+    process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH = ORIGINAL_REPO_CONFIG_PATH;
+  }
   await rm(workspaceRoot, { recursive: true, force: true });
 });
 
