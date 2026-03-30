@@ -919,6 +919,11 @@ describe('startControlServerPublicLifecycle', () => {
     await flushStartupProviderRefresh();
     expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
 
+    const waitingRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    const queuedWaitingRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      queueIfBusy: true
+    });
+
     await vi.advanceTimersByTimeAsync(45_001);
 
     expect(providerIntakeState.polling).toMatchObject({
@@ -931,6 +936,20 @@ describe('startControlServerPublicLifecycle', () => {
 
     expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
       checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(waitingRefresh).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(queuedWaitingRefresh).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
       stuck: true,
       restart_required: true,
       reason: 'provider_refresh_lifecycle_stuck'
@@ -1025,9 +1044,16 @@ describe('startControlServerPublicLifecycle', () => {
       restart_required: true,
       reason: 'provider_refresh_lifecycle_stuck'
     });
+    await expect(inFlightRefresh).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
 
     resolveRefresh?.();
-    await Promise.all([inFlightRefresh, closeControlServerPublicLifecycle(started)]);
+    await closeControlServerPublicLifecycle(started);
   });
 
   it('queues a follow-up refresh when a manual refresh request arrives during rehydrate', async () => {

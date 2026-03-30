@@ -32,6 +32,7 @@ import {
 } from './linearWebhookController.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import {
+  isRecordLike,
   normalizeProviderIntakeState,
   type ProviderIntakeState
 } from './providerIntakeState.js';
@@ -196,8 +197,7 @@ export function createControlServerSeededRuntimeAssembly(
     providerIntakePolling: async (polling) =>
       await queueProviderIntakePersist(async () => {
         const nextState = (await readPersistedProviderIntakeState()) ?? normalizeProviderIntakeState(null);
-        nextState.polling =
-          polling && typeof polling === 'object' ? { ...polling } : null;
+        nextState.polling = isRecordLike(polling) ? { ...polling } : null;
         await writeJsonAtomic(providerIntakeStatePath, nextState);
       })
   } satisfies ControlRequestPersist;

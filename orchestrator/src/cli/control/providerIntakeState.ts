@@ -436,7 +436,7 @@ function normalizeProviderIntakeClaim(
   };
 }
 
-function isRecordLike(value: unknown): value is Record<string, unknown> {
+export function isRecordLike(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
