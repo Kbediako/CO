@@ -381,7 +381,7 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
     argsPrefix: []
   };
 }
-function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
+function parseProviderChildRunResult(raw: string, repoRoot: string, runsRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
   const parsed = parseTrailingJsonObject(raw);
   if (!parsed) {
     return null;
@@ -398,7 +398,7 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir
   if (!safeRunId) {
     return null;
   }
-  const expectedRunRoot = resolve(parentRunDir, taskId, 'cli', safeRunId);
+  const expectedRunRoot = resolve(runsRoot, taskId, 'cli', safeRunId);
   const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
   const resolvedManifestPath = resolveRunPath(repoRoot, manifestPath);
   const resolvedLogPath = normalizeOptionalString(record.log_path);

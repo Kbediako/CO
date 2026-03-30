@@ -18,13 +18,12 @@ import {
 } from './control/linearDispatchSource.js';
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import {
-  appendProviderLinearWorkerChildLaneRecord,
   defaultExecRunner,
   loadProviderLinearWorkerContext,
-  readProviderLinearWorkerChildLanes,
   refreshProviderLinearWorkerProofSnapshot,
-  updateProviderLinearWorkerChildLaneRecord,
+  transactProviderLinearWorkerChildLanes,
   type ProviderLinearWorkerChildLaneDecision,
+  type ProviderLinearWorkerChildLaneInFlightAction,
   type ProviderLinearWorkerChildLaneRecord,
   type ProviderLinearWorkerChildLaneScope,
   type ProviderLinearWorkerExecRequest,
@@ -139,14 +138,13 @@ interface ParentIssueSnapshot {
 
 interface ProviderLinearChildLaneShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
-  appendChildLaneRecord: (runDir: string, record: ProviderLinearWorkerChildLaneRecord) => Promise<ProviderLinearWorkerChildLaneRecord[]>;
-  readChildLanes: (runDir: string) => Promise<ProviderLinearWorkerChildLaneRecord[]>;
   readParentDirtyPaths: (workspacePath: string) => Promise<string[]>;
-  updateChildLaneRecord: (
+  transactChildLanes: <T>(
     runDir: string,
-    matcher: (record: ProviderLinearWorkerChildLaneRecord) => boolean,
-    updater: (record: ProviderLinearWorkerChildLaneRecord) => ProviderLinearWorkerChildLaneRecord
-  ) => Promise<ProviderLinearWorkerChildLaneRecord | null>;
+    action: (
+      records: ProviderLinearWorkerChildLaneRecord[]
+    ) => Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; result: T }> | { records: ProviderLinearWorkerChildLaneRecord[]; result: T }
+  ) => Promise<T>;
   refreshProofSnapshot: (runDir: string, auditPath: string | null) => Promise<void>;
   readTrackedIssue: (input: {
     issueId: string;
@@ -161,8 +159,7 @@ interface ProviderLinearChildLaneShellDependencies {
 
 const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
   execRunner: defaultExecRunner,
-  appendChildLaneRecord: async (runDir, record) => await appendProviderLinearWorkerChildLaneRecord(runDir, record),
-  readChildLanes: async (runDir) => await readProviderLinearWorkerChildLanes(runDir),
+  transactChildLanes: async (runDir, action) => await transactProviderLinearWorkerChildLanes(runDir, action),
   readParentDirtyPaths: async (workspacePath) => {
     const modified = await execFileAsync('git', ['-C', workspacePath, 'diff', '--name-only', '--relative', 'HEAD', '--'], {
       maxBuffer: 10 * 1024 * 1024
@@ -172,8 +169,6 @@ const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
     });
     return normalizeScopeEntries([...modified.stdout.split(/\r?\n/u), ...untracked.stdout.split(/\r?\n/u)]);
   },
-  updateChildLaneRecord: async (runDir, matcher, updater) =>
-    await updateProviderLinearWorkerChildLaneRecord(runDir, matcher, updater),
   refreshProofSnapshot: async (runDir, auditPath) => {
     await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath);
   },
@@ -333,7 +328,7 @@ async function launchChildLane(
   }
   const purpose = normalizeOptionalString(params.purpose);
   const scope = normalizeChildLaneScope(params.files ?? [], params.phases ?? [], context.repoRoot);
-  if (!purpose || !scope) {
+  if (!purpose || !scope || scope.files.length === 0) {
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -343,31 +338,8 @@ async function launchChildLane(
       childRun: null,
       childLane: null,
       code: 'provider_worker_child_lane_scope_missing',
-      message: 'Provider worker child lanes require --purpose and at least one declared file or phase scope.',
+      message: 'Provider worker child lanes require --purpose and at least one declared file scope; phases remain optional.',
       status: 422
-    });
-  }
-  const existing = await deps.readChildLanes(context.runDir);
-  const conflicting = existing.find(
-    (entry) =>
-      entry.decision === 'pending' &&
-      (entry.stream === stream || scopesOverlap(entry.scope, scope))
-  );
-  if (conflicting) {
-    const message = conflicting.stream === stream
-      ? `Child lane stream ${stream} already has unresolved lane ${conflicting.run_id}; accept, reject, or invalidate that lane before relaunching the same stream.`
-      : `Child lane scope overlaps unresolved lane ${conflicting.stream} (${conflicting.run_id}); reject, accept, or invalidate that lane before launching another overlapping lane.`;
-    return failureResult({
-      action: 'launch',
-      issueId: context.issueId,
-      issueIdentifier: context.issueIdentifier,
-      sourceSetup,
-      stream,
-      childRun: null,
-      childLane: conflicting,
-      code: 'provider_worker_child_lane_scope_conflict',
-      message,
-      status: 409
     });
   }
 
@@ -406,6 +378,57 @@ async function launchChildLane(
   const parentSnapshot = await resolveParentSnapshot(context, params.env, deps);
   const baseSha = await deps.readParentHeadSha(context.repoRoot);
   const childTaskId = `${context.taskId}-${stream}`;
+  const childRunsRoot = resolveWorkspaceScopedArtifactDir(
+    context.repoRoot,
+    params.env.CODEX_ORCHESTRATOR_RUNS_DIR,
+    '.runs'
+  );
+  const launchReservation = buildReservedChildLaneRecord({
+    stream,
+    childRunsRoot,
+    childTaskId,
+    context,
+    purpose,
+    instructions: params.instructions ?? null,
+    scope,
+    sourceSetup,
+    parentSnapshot: {
+      ...parentSnapshot,
+      base_sha: baseSha
+    },
+    now: deps.now()
+  });
+  const reservation = await deps.transactChildLanes<{
+    conflicting: ProviderLinearWorkerChildLaneRecord | null;
+    reserved: ProviderLinearWorkerChildLaneRecord | null;
+  }>(context.runDir, async (records) => {
+    const conflicting = findPendingChildLaneConflict(records, stream, scope);
+    if (conflicting) {
+      return {
+        records,
+        result: { conflicting, reserved: null }
+      };
+    }
+    return {
+      records: [...records, launchReservation],
+      result: { conflicting: null, reserved: launchReservation }
+    };
+  });
+  if (reservation.conflicting) {
+    return failureResult({
+      action: 'launch',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: reservation.conflicting,
+      code: 'provider_worker_child_lane_scope_conflict',
+      message: describePendingChildLaneConflict(stream, reservation.conflicting),
+      status: 409
+    });
+  }
+
   const invocation = resolveCodexOrchestratorInvocation(params.env);
   const args = [
     ...invocation.argsPrefix,
@@ -459,6 +482,7 @@ async function launchChildLane(
       mirrorOutput: false
     });
   } catch (error) {
+    await removeReservedChildLane(context.runDir, launchReservation, deps);
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -479,6 +503,7 @@ async function launchChildLane(
     childTaskId
   );
   if (!childRun) {
+    await removeReservedChildLane(context.runDir, launchReservation, deps);
     const detail = [execResult.stderr.trim(), execResult.stdout.trim()].filter(Boolean)[0] ?? 'unknown child-lane output';
     return failureResult({
       action: 'launch',
@@ -497,6 +522,7 @@ async function launchChildLane(
   const proofPath = join(childRun.artifact_root, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
   const childProof = await deps.readChildLaneProof(proofPath).catch(() => null);
   if (childRun.status === 'succeeded' && (!childProof || !childProof.patch_artifact_path)) {
+    await removeReservedChildLane(context.runDir, launchReservation, deps);
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -524,7 +550,7 @@ async function launchChildLane(
     issue_identifier: context.issueIdentifier,
     workspace_path: context.repoRoot,
     source_setup: sourceSetup,
-    launched_at: deps.now(),
+    launched_at: launchReservation.launched_at,
     purpose,
     instructions: normalizeOptionalString(params.instructions),
     scope,
@@ -537,14 +563,43 @@ async function launchChildLane(
     patch_artifact_path: childProof?.patch_artifact_path ?? null,
     patch_bytes: childProof?.patch_bytes ?? null,
     decision: 'pending',
+    in_flight_action: null,
     decision_at: null,
     decision_reason: null
   };
 
   try {
-    await deps.appendChildLaneRecord(context.runDir, childLane);
+    const recorded = await deps.transactChildLanes(context.runDir, async (records) => {
+      const next = replaceChildLaneRecord(records, launchReservation, childLane);
+      if (!next) {
+        return {
+          records,
+          result: null as ProviderLinearWorkerChildLaneRecord | null
+        };
+      }
+      return {
+        records: next,
+        result: childLane
+      };
+    });
+    if (!recorded) {
+      await removeReservedChildLane(context.runDir, launchReservation, deps);
+      return failureResult({
+        action: 'launch',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun,
+        childLane,
+        code: 'provider_worker_child_lane_record_failed',
+        message: 'Failed to replace the reserved child lane entry with the completed child run record.',
+        status: 502
+      });
+    }
     await deps.refreshProofSnapshot(context.runDir, params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
   } catch (error) {
+    await removeReservedChildLane(context.runDir, launchReservation, deps).catch(() => undefined);
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -611,213 +666,229 @@ async function resolveChildLaneDecision(
       status: 422
     });
   }
-  const childLanes = await deps.readChildLanes(context.runDir);
-  const target = [...childLanes]
-    .reverse()
-    .find((entry) => entry.stream === stream && entry.decision === 'pending');
-  if (!target) {
-    return failureResult({
+  if (params.action !== 'accept') {
+    const finalized = await finalizePendingChildLaneDecision({
       action: params.action,
+      context,
+      stream,
+      deps,
+      reason: normalizeOptionalString(params.reason),
+      now: deps.now()
+    });
+    if (finalized.kind !== 'updated') {
+      return childLaneDecisionFailureResult({
+        action: params.action,
+        context,
+        sourceSetup,
+        stream,
+        outcome: finalized
+      });
+    }
+    await deps.refreshProofSnapshot(context.runDir, params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
+    return {
+      ok: true,
+      operation: 'child-lane',
+      action: finalized.decision === 'rejected' ? 'rejected' : 'invalidated',
+      issue: {
+        id: context.issueId,
+        identifier: context.issueIdentifier
+      },
+      source_setup: sourceSetup,
+      stream,
+      child_run: null,
+      child_lane: finalized.childLane
+    };
+  }
+
+  const claimed = await claimPendingChildLaneAcceptance({
+    context,
+    stream,
+    deps
+  });
+  if (claimed.kind !== 'claimed') {
+    return childLaneDecisionFailureResult({
+      action: 'accept',
+      context,
+      sourceSetup,
+      stream,
+      outcome: claimed
+    });
+  }
+
+  const target = claimed.childLane;
+  const currentHeadSha = await deps.readParentHeadSha(context.repoRoot);
+  const currentIssue = await resolveParentSnapshot(context, params.env, deps);
+  const staleReason = resolveChildLaneStaleReason(target, currentHeadSha, currentIssue);
+  if (staleReason) {
+    const invalidated = await finalizeClaimedChildLaneDecision({
+      context,
+      target,
+      decision: 'invalidated',
+      decisionReason: staleReason,
+      deps,
+      now: deps.now()
+    });
+    await deps.refreshProofSnapshot(context.runDir, params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
+    return failureResult({
+      action: 'accept',
       issueId: context.issueId,
       issueIdentifier: context.issueIdentifier,
       sourceSetup,
       stream,
       childRun: null,
-      childLane: null,
-      code: 'provider_worker_child_lane_not_found',
-      message: `No pending child lane found for stream ${stream}.`,
-      status: 404
+      childLane: invalidated ?? target,
+      code: 'provider_worker_child_lane_stale',
+      message: staleReason,
+      status: 409
     });
   }
-  const provenanceViolation = resolveChildLaneDecisionProvenanceViolation(context, stream, target);
-  if (provenanceViolation) {
+  if (target.status !== 'succeeded' || !target.patch_artifact_path) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
     return failureResult({
-      action: params.action,
+      action: 'accept',
       issueId: context.issueId,
       issueIdentifier: context.issueIdentifier,
       sourceSetup,
       stream,
       childRun: null,
       childLane: target,
-      code: 'provider_worker_child_lane_provenance_invalid',
-      message: provenanceViolation,
+      code: 'provider_worker_child_lane_patch_missing',
+      message: 'Child lane has no accepted patch artifact to apply.',
+      status: 409
+    });
+  }
+  const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
+    context.repoRoot,
+    resolveWorkspaceScopedArtifactDir(context.repoRoot, params.env.CODEX_ORCHESTRATOR_RUNS_DIR, '.runs'),
+    target
+  );
+  if (!artifactRoot) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_patch_invalid',
+      message: 'Child lane artifact root must stay anchored to the expected workspace-local child run directory before parent acceptance.',
+      status: 409
+    });
+  }
+  const patchArtifactPath = resolveAcceptedPatchArtifactPath(context.repoRoot, target, artifactRoot);
+  if (!patchArtifactPath) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_patch_invalid',
+      message: 'Child lane patch artifact must stay within the child lane artifact root before parent acceptance.',
+      status: 409
+    });
+  }
+  let patchChangedPaths: string[];
+  try {
+    patchChangedPaths = await readPatchChangedPaths(patchArtifactPath);
+  } catch (error) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_patch_invalid',
+      message: `Child lane patch artifact could not be inspected before parent acceptance: ${error instanceof Error ? error.message : String(error)}`,
+      status: 409
+    });
+  }
+  const patchScopeViolation = resolveAcceptedPatchScopeViolation(target.scope, patchChangedPaths);
+  if (patchScopeViolation) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_patch_scope_invalid',
+      message: patchScopeViolation,
+      status: 409
+    });
+  }
+  let dirtyPatchConflict: string | null;
+  try {
+    dirtyPatchConflict = await resolveAcceptedPatchDirtyConflict(context.repoRoot, patchChangedPaths, deps);
+  } catch (error) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_parent_dirty_check_failed',
+      message: `Failed to inspect parent workspace state before accepting child lane: ${error instanceof Error ? error.message : String(error)}`,
+      status: 502
+    });
+  }
+  if (dirtyPatchConflict) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_parent_dirty',
+      message: dirtyPatchConflict,
+      status: 409
+    });
+  }
+  try {
+    await deps.applyPatchArtifact(context.repoRoot, patchArtifactPath);
+  } catch (error) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_apply_failed',
+      message: error instanceof Error ? error.message : String(error),
       status: 409
     });
   }
 
-  if (params.action === 'accept') {
-    const currentHeadSha = await deps.readParentHeadSha(context.repoRoot);
-    const currentIssue = await resolveParentSnapshot(context, params.env, deps);
-    const staleReason = resolveChildLaneStaleReason(target, currentHeadSha, currentIssue);
-    if (staleReason) {
-      const invalidated = await deps.updateChildLaneRecord(
-        context.runDir,
-        (entry) => entry.stream === target.stream && entry.run_id === target.run_id,
-        (entry) => ({
-          ...entry,
-          decision: 'invalidated',
-          decision_at: deps.now(),
-          decision_reason: staleReason
-        })
-      );
-      await deps.refreshProofSnapshot(context.runDir, params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: invalidated ?? target,
-        code: 'provider_worker_child_lane_stale',
-        message: staleReason,
-        status: 409
-      });
-    }
-    if (target.status !== 'succeeded' || !target.patch_artifact_path) {
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_patch_missing',
-        message: 'Child lane has no accepted patch artifact to apply.',
-        status: 409
-      });
-    }
-    const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
-      context.repoRoot,
-      resolveWorkspaceScopedArtifactDir(context.repoRoot, params.env.CODEX_ORCHESTRATOR_RUNS_DIR, '.runs'),
-      target
-    );
-    if (!artifactRoot) {
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_patch_invalid',
-        message: 'Child lane artifact root must stay anchored to the expected workspace-local child run directory before parent acceptance.',
-        status: 409
-      });
-    }
-    const patchArtifactPath = resolveAcceptedPatchArtifactPath(context.repoRoot, target, artifactRoot);
-    if (!patchArtifactPath) {
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_patch_invalid',
-        message: 'Child lane patch artifact must stay within the child lane artifact root before parent acceptance.',
-        status: 409
-      });
-    }
-    let patchChangedPaths: string[];
-    try {
-      patchChangedPaths = await readPatchChangedPaths(patchArtifactPath);
-    } catch (error) {
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_patch_invalid',
-        message: `Child lane patch artifact could not be inspected before parent acceptance: ${error instanceof Error ? error.message : String(error)}`,
-        status: 409
-      });
-    }
-    const patchScopeViolation = resolveAcceptedPatchScopeViolation(target.scope, patchChangedPaths);
-    if (patchScopeViolation) {
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_patch_scope_invalid',
-        message: patchScopeViolation,
-        status: 409
-      });
-    }
-    let dirtyPatchConflict: string | null;
-    try {
-      dirtyPatchConflict = await resolveAcceptedPatchDirtyConflict(context.repoRoot, patchChangedPaths, deps);
-    } catch (error) {
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_parent_dirty_check_failed',
-        message: `Failed to inspect parent workspace state before accepting child lane: ${error instanceof Error ? error.message : String(error)}`,
-        status: 502
-      });
-    }
-    if (dirtyPatchConflict) {
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_parent_dirty',
-        message: dirtyPatchConflict,
-        status: 409
-      });
-    }
-    try {
-      await deps.applyPatchArtifact(context.repoRoot, patchArtifactPath);
-    } catch (error) {
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_apply_failed',
-        message: error instanceof Error ? error.message : String(error),
-        status: 409
-      });
-    }
-  }
-
-  const decision = mapActionToDecision(params.action);
-  const decisionReason = normalizeOptionalString(params.reason) ?? defaultDecisionReason(params.action, target);
-  const updated = await deps.updateChildLaneRecord(
-    context.runDir,
-    (entry) => entry.stream === target.stream && entry.run_id === target.run_id,
-    (entry) => ({
-      ...entry,
-      decision,
-      decision_at: deps.now(),
-      decision_reason: decisionReason
-    })
-  );
-  if (!updated) {
+  const accepted = await finalizeClaimedChildLaneDecision({
+    context,
+    target,
+    decision: 'accepted',
+    decisionReason: normalizeOptionalString(params.reason) ?? defaultDecisionReason('accept', target),
+    deps,
+    now: deps.now()
+  });
+  if (!accepted) {
     return failureResult({
-      action: params.action,
+      action: 'accept',
       issueId: context.issueId,
       issueIdentifier: context.issueIdentifier,
       sourceSetup,
@@ -833,7 +904,7 @@ async function resolveChildLaneDecision(
   return {
     ok: true,
     operation: 'child-lane',
-    action: decision === 'accepted' ? 'accepted' : decision === 'rejected' ? 'rejected' : 'invalidated',
+    action: 'accepted',
     issue: {
       id: context.issueId,
       identifier: context.issueIdentifier
@@ -841,8 +912,271 @@ async function resolveChildLaneDecision(
     source_setup: sourceSetup,
     stream,
     child_run: null,
-    child_lane: updated
+    child_lane: accepted
   };
+}
+
+type ChildLaneDecisionBlockedOutcome =
+  | { kind: 'not_ready'; childLane: ProviderLinearWorkerChildLaneRecord }
+  | { kind: 'in_flight'; childLane: ProviderLinearWorkerChildLaneRecord; inFlightAction: ProviderLinearWorkerChildLaneInFlightAction }
+  | { kind: 'provenance_invalid'; childLane: ProviderLinearWorkerChildLaneRecord; message: string };
+
+type ChildLaneDecisionFailureOutcome =
+  | { kind: 'not_found' }
+  | ChildLaneDecisionBlockedOutcome;
+
+function childLaneDecisionFailureResult(input: {
+  action: 'accept' | 'reject' | 'invalidate';
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueId' | 'issueIdentifier'>;
+  sourceSetup: DispatchPilotSourceSetup | null;
+  stream: string;
+  outcome: ChildLaneDecisionFailureOutcome;
+}): ProviderLinearChildLaneFailureResult {
+  if (input.outcome.kind === 'not_found') {
+    return failureResult({
+      action: input.action,
+      issueId: input.context.issueId,
+      issueIdentifier: input.context.issueIdentifier,
+      sourceSetup: input.sourceSetup,
+      stream: input.stream,
+      childRun: null,
+      childLane: null,
+      code: 'provider_worker_child_lane_not_found',
+      message: `No pending child lane found for stream ${input.stream}.`,
+      status: 404
+    });
+  }
+  if (input.outcome.kind === 'provenance_invalid') {
+    return failureResult({
+      action: input.action,
+      issueId: input.context.issueId,
+      issueIdentifier: input.context.issueIdentifier,
+      sourceSetup: input.sourceSetup,
+      stream: input.stream,
+      childRun: null,
+      childLane: input.outcome.childLane,
+      code: 'provider_worker_child_lane_provenance_invalid',
+      message: input.outcome.message,
+      status: 409
+    });
+  }
+  if (input.outcome.kind === 'in_flight') {
+    return failureResult({
+      action: input.action,
+      issueId: input.context.issueId,
+      issueIdentifier: input.context.issueIdentifier,
+      sourceSetup: input.sourceSetup,
+      stream: input.stream,
+      childRun: null,
+      childLane: input.outcome.childLane,
+      code: 'provider_worker_child_lane_decision_in_flight',
+      message: `Pending child lane ${input.stream} already has an in-flight ${input.outcome.inFlightAction} decision; wait for that parent-owned decision to finish before retrying ${input.action}.`,
+      status: 409
+    });
+  }
+  return failureResult({
+    action: input.action,
+    issueId: input.context.issueId,
+    issueIdentifier: input.context.issueIdentifier,
+    sourceSetup: input.sourceSetup,
+    stream: input.stream,
+    childRun: null,
+    childLane: input.outcome.childLane,
+    code: 'provider_worker_child_lane_not_ready',
+    message: `Pending child lane ${input.stream} is still launching and cannot be ${input.action === 'accept' ? 'accepted' : input.action === 'reject' ? 'rejected' : 'invalidated'} yet.`,
+    status: 409
+  });
+}
+
+async function finalizePendingChildLaneDecision(input: {
+  action: 'reject' | 'invalidate';
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runDir' | 'issueId' | 'issueIdentifier' | 'taskId'>;
+  stream: string;
+  deps: ProviderLinearChildLaneShellDependencies;
+  reason: string | null;
+  now: string;
+}): Promise<ChildLaneDecisionFailureOutcome | { kind: 'updated'; childLane: ProviderLinearWorkerChildLaneRecord; decision: ProviderLinearWorkerChildLaneDecision }> {
+  const decision = mapActionToDecision(input.action);
+  return await input.deps.transactChildLanes<
+    ChildLaneDecisionFailureOutcome | { kind: 'updated'; childLane: ProviderLinearWorkerChildLaneRecord; decision: ProviderLinearWorkerChildLaneDecision }
+  >(input.context.runDir, async (records) => {
+    const target = findLatestPendingChildLane(records, input.stream);
+    if (!target) {
+      return { records, result: { kind: 'not_found' } };
+    }
+    const blocked = resolveChildLaneDecisionBlockedOutcome(input.context, input.stream, target);
+    if (blocked) {
+      return { records, result: blocked };
+    }
+    const updated: ProviderLinearWorkerChildLaneRecord = {
+      ...target,
+      decision,
+      in_flight_action: null,
+      decision_at: input.now,
+      decision_reason: input.reason ?? defaultDecisionReason(input.action, target)
+    };
+    const next = replaceChildLaneRecord(records, target, updated);
+    if (!next) {
+      return { records, result: { kind: 'not_found' } };
+    }
+    return {
+      records: next,
+      result: { kind: 'updated', childLane: updated, decision }
+    };
+  });
+}
+
+async function claimPendingChildLaneAcceptance(input: {
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runDir' | 'issueId' | 'issueIdentifier' | 'taskId'>;
+  stream: string;
+  deps: ProviderLinearChildLaneShellDependencies;
+}): Promise<ChildLaneDecisionFailureOutcome | { kind: 'claimed'; childLane: ProviderLinearWorkerChildLaneRecord }> {
+  return await input.deps.transactChildLanes<
+    ChildLaneDecisionFailureOutcome | { kind: 'claimed'; childLane: ProviderLinearWorkerChildLaneRecord }
+  >(input.context.runDir, async (records) => {
+    const target = findLatestPendingChildLane(records, input.stream);
+    if (!target) {
+      return { records, result: { kind: 'not_found' } };
+    }
+    const blocked = resolveChildLaneDecisionBlockedOutcome(input.context, input.stream, target);
+    if (blocked) {
+      return { records, result: blocked };
+    }
+    const claimed: ProviderLinearWorkerChildLaneRecord = {
+      ...target,
+      in_flight_action: 'accept'
+    };
+    const next = replaceChildLaneRecord(records, target, claimed);
+    if (!next) {
+      return { records, result: { kind: 'not_found' } };
+    }
+    return {
+      records: next,
+      result: { kind: 'claimed', childLane: claimed }
+    };
+  });
+}
+
+async function releaseClaimedChildLaneAcceptance(
+  runDir: string,
+  target: ProviderLinearWorkerChildLaneRecord,
+  deps: ProviderLinearChildLaneShellDependencies
+): Promise<void> {
+  await deps.transactChildLanes(runDir, async (records) => {
+    const next = replaceChildLaneRecord(records, target, {
+      ...target,
+      in_flight_action: null
+    });
+    return {
+      records: next ?? records,
+      result: undefined
+    };
+  });
+}
+
+async function finalizeClaimedChildLaneDecision(input: {
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runDir'>;
+  target: ProviderLinearWorkerChildLaneRecord;
+  decision: 'accepted' | 'invalidated';
+  decisionReason: string;
+  deps: ProviderLinearChildLaneShellDependencies;
+  now: string;
+}): Promise<ProviderLinearWorkerChildLaneRecord | null> {
+  return await input.deps.transactChildLanes(input.context.runDir, async (records) => {
+    const next = replaceChildLaneRecord(records, input.target, {
+      ...input.target,
+      decision: input.decision,
+      in_flight_action: null,
+      decision_at: input.now,
+      decision_reason: input.decisionReason
+    });
+    if (!next) {
+      return {
+        records,
+        result: null
+      };
+    }
+    const updated = findChildLaneByIdentity(next, input.target);
+    return {
+      records: next,
+      result: updated
+    };
+  });
+}
+
+function resolveChildLaneDecisionBlockedOutcome(
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueId' | 'issueIdentifier' | 'taskId'>,
+  stream: string,
+  target: ProviderLinearWorkerChildLaneRecord
+): ChildLaneDecisionBlockedOutcome | null {
+  const provenanceViolation = resolveChildLaneDecisionProvenanceViolation(context, stream, target);
+  if (provenanceViolation) {
+    return {
+      kind: 'provenance_invalid',
+      childLane: target,
+      message: provenanceViolation
+    };
+  }
+  if (target.in_flight_action) {
+    return {
+      kind: 'in_flight',
+      childLane: target,
+      inFlightAction: target.in_flight_action
+    };
+  }
+  if (target.status === 'launching') {
+    return {
+      kind: 'not_ready',
+      childLane: target
+    };
+  }
+  return null;
+}
+
+function findLatestPendingChildLane(
+  records: ProviderLinearWorkerChildLaneRecord[],
+  stream: string
+): ProviderLinearWorkerChildLaneRecord | null {
+  return [...records]
+    .reverse()
+    .find((entry) => entry.stream === stream && entry.decision === 'pending') ?? null;
+}
+
+function findChildLaneByIdentity(
+  records: ProviderLinearWorkerChildLaneRecord[],
+  target: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord | null {
+  return records.find((entry) => matchesChildLaneRecordIdentity(entry, target)) ?? null;
+}
+
+function replaceChildLaneRecord(
+  records: ProviderLinearWorkerChildLaneRecord[],
+  target: ProviderLinearWorkerChildLaneRecord,
+  replacement: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord[] | null {
+  let replaced = false;
+  const next = records.map((entry) => {
+    if (replaced || !matchesChildLaneRecordIdentity(entry, target)) {
+      return entry;
+    }
+    replaced = true;
+    return replacement;
+  });
+  return replaced ? next : null;
+}
+
+function removeChildLaneRecord(
+  records: ProviderLinearWorkerChildLaneRecord[],
+  target: ProviderLinearWorkerChildLaneRecord
+): ProviderLinearWorkerChildLaneRecord[] {
+  return records.filter((entry) => !matchesChildLaneRecordIdentity(entry, target));
+}
+
+function matchesChildLaneRecordIdentity(
+  left: Pick<ProviderLinearWorkerChildLaneRecord, 'stream' | 'task_id' | 'run_id'>,
+  right: Pick<ProviderLinearWorkerChildLaneRecord, 'stream' | 'task_id' | 'run_id'>
+): boolean {
+  return left.stream === right.stream && left.task_id === right.task_id && left.run_id === right.run_id;
 }
 
 function normalizeAction(value: string): ProviderLinearChildLaneAction | null {
@@ -872,6 +1206,85 @@ function defaultDecisionReason(
     return 'Parent rejected child lane output.';
   }
   return 'Parent invalidated child lane output.';
+}
+
+function buildReservedChildLaneRecord(input: {
+  stream: string;
+  childRunsRoot: string;
+  childTaskId: string;
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueId' | 'issueIdentifier' | 'repoRoot'>;
+  purpose: string;
+  instructions: string | null;
+  scope: ProviderLinearWorkerChildLaneScope;
+  sourceSetup: DispatchPilotSourceSetup | null;
+  parentSnapshot: ParentIssueSnapshot & { base_sha: string | null; captured_at: string };
+  now: string;
+}): ProviderLinearWorkerChildLaneRecord {
+  const reservationRunId = buildChildLaneReservationRunId();
+  const artifactRoot = join(input.childRunsRoot, input.childTaskId, 'cli', reservationRunId);
+  return {
+    stream: input.stream,
+    pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+    task_id: input.childTaskId,
+    run_id: reservationRunId,
+    status: 'launching',
+    manifest_path: join(artifactRoot, 'manifest.json'),
+    artifact_root: artifactRoot,
+    log_path: join(artifactRoot, 'run.log'),
+    summary: 'Child lane reserved before child run startup.',
+    issue_id: input.context.issueId,
+    issue_identifier: input.context.issueIdentifier,
+    workspace_path: input.context.repoRoot,
+    source_setup: input.sourceSetup,
+    launched_at: input.now,
+    purpose: input.purpose,
+    instructions: normalizeOptionalString(input.instructions),
+    scope: input.scope,
+    parent_snapshot: input.parentSnapshot,
+    lane_workspace_path: null,
+    patch_artifact_path: null,
+    patch_bytes: null,
+    decision: 'pending',
+    in_flight_action: null,
+    decision_at: null,
+    decision_reason: null
+  };
+}
+
+function buildChildLaneReservationRunId(): string {
+  return `launching-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function findPendingChildLaneConflict(
+  records: ProviderLinearWorkerChildLaneRecord[],
+  stream: string,
+  scope: ProviderLinearWorkerChildLaneScope
+): ProviderLinearWorkerChildLaneRecord | null {
+  return records.find(
+    (entry) =>
+      entry.decision === 'pending' &&
+      (entry.stream === stream || scopesOverlap(entry.scope, scope))
+  ) ?? null;
+}
+
+function describePendingChildLaneConflict(
+  stream: string,
+  conflict: ProviderLinearWorkerChildLaneRecord
+): string {
+  return conflict.stream === stream
+    ? `Child lane stream ${stream} already has unresolved lane ${conflict.run_id}; accept, reject, or invalidate that lane before relaunching the same stream.`
+    : `Child lane scope overlaps unresolved lane ${conflict.stream} (${conflict.run_id}); reject, accept, or invalidate that lane before launching another overlapping lane.`;
+}
+
+async function removeReservedChildLane(
+  runDir: string,
+  reserved: ProviderLinearWorkerChildLaneRecord,
+  deps: ProviderLinearChildLaneShellDependencies
+): Promise<void> {
+  await deps.transactChildLanes(runDir, async (records) => ({
+    records: removeChildLaneRecord(records, reserved),
+    result: undefined
+  }));
 }
 
 function resolveChildLaneDecisionProvenanceViolation(
@@ -945,10 +1358,14 @@ async function readPatchChangedPaths(patchPath: string): Promise<string[]> {
     if (!match) {
       continue;
     }
-    const candidate = match[2] === '/dev/null' ? match[1] : match[2];
-    const normalized = normalizeScopeFileEntry(candidate);
-    if (normalized) {
-      changedPaths.add(normalized);
+    for (const candidate of [match[1], match[2]]) {
+      if (candidate === 'dev/null') {
+        continue;
+      }
+      const normalized = normalizeScopeFileEntry(candidate);
+      if (normalized) {
+        changedPaths.add(normalized);
+      }
     }
   }
   return [...changedPaths];

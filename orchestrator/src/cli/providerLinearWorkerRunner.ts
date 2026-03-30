@@ -158,6 +158,11 @@ export type ProviderLinearWorkerChildLaneDecision =
   | 'rejected'
   | 'invalidated';
 
+export type ProviderLinearWorkerChildLaneInFlightAction =
+  | 'accept'
+  | 'reject'
+  | 'invalidate';
+
 export interface ProviderLinearWorkerChildLaneRecord {
   stream: string;
   pipeline_id: string;
@@ -181,6 +186,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
   patch_artifact_path: string | null;
   patch_bytes: number | null;
   decision: ProviderLinearWorkerChildLaneDecision;
+  in_flight_action?: ProviderLinearWorkerChildLaneInFlightAction | null;
   decision_at: string | null;
   decision_reason: string | null;
 }
@@ -1284,6 +1290,21 @@ export async function updateProviderLinearWorkerChildLaneRecord(
   });
 }
 
+export async function transactProviderLinearWorkerChildLanes<T>(
+  runDir: string,
+  action: (
+    records: ProviderLinearWorkerChildLaneRecord[]
+  ) => Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; result: T }> | { records: ProviderLinearWorkerChildLaneRecord[]; result: T },
+  writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
+): Promise<T> {
+  return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
+    const existing = await readProviderLinearWorkerChildLanes(runDir);
+    const next = await action(existing);
+    await writeJson(buildChildLanesPath(runDir), next.records);
+    return next.result;
+  });
+}
+
 async function withProviderLinearWorkerChildStreamsLock<T>(
   runDir: string,
   action: () => Promise<T>
@@ -1401,6 +1422,7 @@ function normalizeProviderLinearWorkerChildLaneRecord(
   const launchedAt = normalizeOptionalString(value.launched_at);
   const purpose = normalizeOptionalString(value.purpose);
   const decision = normalizeChildLaneDecision(value.decision);
+  const inFlightAction = normalizeChildLaneInFlightAction(value.in_flight_action);
   const scope = normalizeProviderLinearWorkerChildLaneScope(value.scope);
   const parentSnapshot = normalizeProviderLinearWorkerChildLaneParentSnapshot(value.parent_snapshot);
   if (
@@ -1451,6 +1473,7 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     patch_artifact_path: normalizeOptionalString(value.patch_artifact_path),
     patch_bytes: normalizeOptionalInteger(value.patch_bytes),
     decision,
+    in_flight_action: inFlightAction,
     decision_at: normalizeOptionalString(value.decision_at),
     decision_reason: normalizeOptionalString(value.decision_reason)
   };
@@ -1493,6 +1516,14 @@ function normalizeChildLaneDecision(
   value: unknown
 ): ProviderLinearWorkerChildLaneDecision | null {
   return value === 'pending' || value === 'accepted' || value === 'rejected' || value === 'invalidated'
+    ? value
+    : null;
+}
+
+function normalizeChildLaneInFlightAction(
+  value: unknown
+): ProviderLinearWorkerChildLaneInFlightAction | null {
+  return value === 'accept' || value === 'reject' || value === 'invalidate'
     ? value
     : null;
 }
