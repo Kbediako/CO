@@ -478,6 +478,36 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(execRunner).not.toHaveBeenCalled();
   });
 
+  it('normalizes repo-root absolute file scopes before comparing them against dirty parent paths', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const execRunner = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-b',
+        purpose: 'Attempt overlapping work',
+        files: [join(tempRoot ?? '', 'orchestrator/src/cli/providerLinearChildStreamShell.ts')],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner: execRunner as never,
+        readParentDirtyPaths: vi.fn(async () => ['orchestrator/src/cli/providerLinearChildStreamShell.ts']) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      error: {
+        code: 'provider_worker_child_lane_parent_dirty',
+        status: 409
+      }
+    });
+    expect(execRunner).not.toHaveBeenCalled();
+  });
+
   it('ignores child-lane artifact paths when checking phase-scoped parent dirtiness', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
@@ -765,6 +795,46 @@ describe('runProviderLinearChildLaneShell', () => {
         decision_reason: 'Parent integrated the bounded lane patch.'
       })
     ]);
+  });
+
+  it('rejects acceptance when the persisted patch artifact escapes the child run artifact root', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      patch_artifact_path: join(tempRoot ?? '', 'escape.patch')
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_patch_invalid',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
   });
 
   it('clears stale optional child-lane env before layering the new launch context', async () => {

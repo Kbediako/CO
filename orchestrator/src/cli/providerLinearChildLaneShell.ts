@@ -332,7 +332,7 @@ async function launchChildLane(
     });
   }
   const purpose = normalizeOptionalString(params.purpose);
-  const scope = normalizeChildLaneScope(params.files ?? [], params.phases ?? []);
+  const scope = normalizeChildLaneScope(params.files ?? [], params.phases ?? [], context.repoRoot);
   if (!purpose || !scope) {
     return failureResult({
       action: 'launch',
@@ -673,8 +673,23 @@ async function resolveChildLaneDecision(
         status: 409
       });
     }
+    const patchArtifactPath = resolveAcceptedPatchArtifactPath(context.repoRoot, target);
+    if (!patchArtifactPath) {
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_patch_invalid',
+        message: 'Child lane patch artifact must stay within the child lane artifact root before parent acceptance.',
+        status: 409
+      });
+    }
     try {
-      await deps.applyPatchArtifact(context.repoRoot, target.patch_artifact_path);
+      await deps.applyPatchArtifact(context.repoRoot, patchArtifactPath);
     } catch (error) {
       return failureResult({
         action: 'accept',
@@ -762,6 +777,20 @@ function defaultDecisionReason(
   return 'Parent invalidated child lane output.';
 }
 
+function resolveAcceptedPatchArtifactPath(
+  repoRoot: string,
+  childLane: ProviderLinearWorkerChildLaneRecord
+): string | null {
+  const patchArtifactPath = normalizeOptionalString(childLane.patch_artifact_path);
+  const artifactRoot = normalizeOptionalString(childLane.artifact_root);
+  if (!patchArtifactPath || !artifactRoot) {
+    return null;
+  }
+  const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
+  const resolvedPatchArtifactPath = resolveRunPath(repoRoot, patchArtifactPath);
+  return isPathWithinRoot(resolvedArtifactRoot, resolvedPatchArtifactPath) ? resolvedPatchArtifactPath : null;
+}
+
 async function resolveParentSnapshot(
   context: Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
   env: NodeJS.ProcessEnv,
@@ -815,9 +844,10 @@ function normalizeChildLaneStreamName(value: string | null | undefined): string 
 
 function normalizeChildLaneScope(
   files: string[],
-  phases: string[]
+  phases: string[],
+  repoRoot?: string
 ): ProviderLinearWorkerChildLaneScope | null {
-  const normalizedFiles = normalizeScopeEntries(files, 'file');
+  const normalizedFiles = normalizeScopeEntries(files, 'file', repoRoot);
   const normalizedPhases = normalizeScopeEntries(phases, 'phase');
   if (normalizedFiles.length === 0 && normalizedPhases.length === 0) {
     return null;
@@ -828,7 +858,7 @@ function normalizeChildLaneScope(
   };
 }
 
-function normalizeScopeEntries(values: string[], kind: 'file' | 'phase' = 'file'): string[] {
+function normalizeScopeEntries(values: string[], kind: 'file' | 'phase' = 'file', repoRoot?: string): string[] {
   return [
     ...new Set(
       values
@@ -837,18 +867,33 @@ function normalizeScopeEntries(values: string[], kind: 'file' | 'phase' = 'file'
           if (!value) {
             return null;
           }
-          return kind === 'file' ? normalizeScopeFileEntry(value) : value;
+          return kind === 'file' ? normalizeScopeFileEntry(value, repoRoot) : value;
         })
         .filter((value): value is string => value !== null)
     )
   ];
 }
 
-function normalizeScopeFileEntry(value: string): string | null {
-  const normalized = posix.normalize(value.replaceAll('\\', '/'));
+function normalizeScopeFileEntry(value: string, repoRoot?: string): string | null {
+  const normalizedInput = normalizeOptionalString(value);
+  if (!normalizedInput) {
+    return null;
+  }
+  if (repoRoot && isAbsolute(normalizedInput)) {
+    const absoluteCandidate = resolve(normalizedInput);
+    if (!isPathWithinRoot(repoRoot, absoluteCandidate)) {
+      return null;
+    }
+    const relativeToRoot = relative(repoRoot, absoluteCandidate);
+    const relativePosix = posix.normalize(relativeToRoot.replaceAll('\\', '/'));
+    return relativePosix === '' || relativePosix === '.'
+      ? null
+      : relativePosix;
+  }
+  const normalized = posix.normalize(normalizedInput.replaceAll('\\', '/'));
   const withoutCurrentDir = normalized.replace(/^(?:\.\/)+/u, '');
   const trimmed = withoutCurrentDir.replace(/\/+/gu, '/').replace(/\/$/u, '');
-  if (trimmed === '' || trimmed === '.') {
+  if (trimmed === '' || trimmed === '.' || trimmed === '..' || trimmed.startsWith('../')) {
     return null;
   }
   return trimmed;
