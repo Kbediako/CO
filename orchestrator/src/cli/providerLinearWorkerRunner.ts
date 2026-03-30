@@ -57,6 +57,7 @@ export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-pro
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-worker-child-streams.json';
 export const PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME = 'provider-linear-worker-child-lanes.json';
+const PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_PROOF_FILENAME}.lock`;
 const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME}.lock`;
 const PROVIDER_LINEAR_WORKER_CHILD_LANES_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME}.lock`;
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
@@ -89,6 +90,14 @@ const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
   backoffFactor: 1.5,
   // Fail closed for child-stream lineage writes: a stale lock is preferable to
   // lossy concurrent ledger rewrites.
+  maxDelayMs: 250
+};
+const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
+  maxAttempts: 50,
+  initialDelayMs: 10,
+  backoffFactor: 1.5,
+  // The proof sidecar is shared by the parent worker and child refresh paths;
+  // prefer a short wait over allowing stale snapshots to overwrite newer state.
   maxDelayMs: 250
 };
 const require = createRequire(import.meta.url);
@@ -1170,6 +1179,10 @@ function buildProofPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
 }
 
+function buildProofLockPath(runDir: string): string {
+  return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME);
+}
+
 function buildChildStreamsPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME);
 }
@@ -1319,6 +1332,28 @@ async function withProviderLinearWorkerChildStreamsLock<T>(
     },
     createError: (_taskId, attempts) =>
       new Error(`Failed to acquire provider-linear-worker child-stream ledger lock after ${attempts} attempts.`)
+  });
+  try {
+    return await action();
+  } finally {
+    await rm(lockPath, { force: true });
+  }
+}
+
+async function withProviderLinearWorkerProofLock<T>(
+  runDir: string,
+  action: () => Promise<T>
+): Promise<T> {
+  const lockPath = buildProofLockPath(runDir);
+  await acquireLockWithRetry({
+    taskId: runDir,
+    lockPath,
+    retry: PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY,
+    ensureDirectory: async () => {
+      await mkdir(dirname(lockPath), { recursive: true });
+    },
+    createError: (_taskId, attempts) =>
+      new Error(`Failed to acquire provider-linear-worker proof lock after ${attempts} attempts.`)
   });
   try {
     return await action();
@@ -1875,14 +1910,16 @@ async function writeProofSnapshot(
   auditPath: string,
   proof: ProviderLinearWorkerProof
 ): Promise<ProviderLinearWorkerProof> {
-  const hydratedProof = {
-    ...proof,
-    linear_audit: await summarizeProviderLinearAuditPath(auditPath),
-    child_streams: await readProviderLinearWorkerChildStreams(runDir),
-    child_lanes: await readProviderLinearWorkerChildLanes(runDir)
-  };
-  await deps.writeProof(buildProofPath(runDir), hydratedProof);
-  return hydratedProof;
+  return await withProviderLinearWorkerProofLock(runDir, async () => {
+    const hydratedProof = {
+      ...proof,
+      linear_audit: await summarizeProviderLinearAuditPath(auditPath),
+      child_streams: await readProviderLinearWorkerChildStreams(runDir),
+      child_lanes: await readProviderLinearWorkerChildLanes(runDir)
+    };
+    await deps.writeProof(buildProofPath(runDir), hydratedProof);
+    return hydratedProof;
+  });
 }
 
 export async function refreshProviderLinearWorkerProofSnapshot(
@@ -1892,26 +1929,28 @@ export async function refreshProviderLinearWorkerProofSnapshot(
   writeProof: (path: string, proof: ProviderLinearWorkerProof) => Promise<void> = async (path, proof) =>
     await writeJsonAtomic(path, proof)
 ): Promise<ProviderLinearWorkerProof | null> {
-  const proofPath = buildProofPath(runDir);
-  let raw: string;
-  try {
-    raw = await readFile(proofPath, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-      return null;
+  return await withProviderLinearWorkerProofLock(runDir, async () => {
+    const proofPath = buildProofPath(runDir);
+    let raw: string;
+    try {
+      raw = await readFile(proofPath, 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return null;
+      }
+      throw error;
     }
-    throw error;
-  }
-  const parsed = JSON.parse(raw) as ProviderLinearWorkerProof;
-  const hydrated: ProviderLinearWorkerProof = {
-    ...parsed,
-    linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
-    child_streams: await readProviderLinearWorkerChildStreams(runDir),
-    child_lanes: await readProviderLinearWorkerChildLanes(runDir),
-    updated_at: now()
-  };
-  await writeProof(proofPath, hydrated);
-  return hydrated;
+    const parsed = JSON.parse(raw) as ProviderLinearWorkerProof;
+    const hydrated: ProviderLinearWorkerProof = {
+      ...parsed,
+      linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
+      child_streams: await readProviderLinearWorkerChildStreams(runDir),
+      child_lanes: await readProviderLinearWorkerChildLanes(runDir),
+      updated_at: now()
+    };
+    await writeProof(proofPath, hydrated);
+    return hydrated;
+  });
 }
 
 export async function runProviderLinearWorker(

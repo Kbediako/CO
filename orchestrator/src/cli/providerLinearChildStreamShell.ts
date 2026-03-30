@@ -348,7 +348,8 @@ function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: stri
     delete sanitized.FORCE_CODEX_REVIEW;
   }
   sanitized.CODEX_ORCHESTRATOR_ROOT = repoRoot;
-  sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH = join(repoRoot, 'codex.orchestrator.json');
+  sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH =
+    normalizeOptionalString(sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH) ?? join(repoRoot, 'codex.orchestrator.json');
   sanitized.CODEX_ORCHESTRATOR_RUNS_DIR = resolveWorkspaceScopedArtifactDir(
     repoRoot,
     sanitized.CODEX_ORCHESTRATOR_RUNS_DIR,

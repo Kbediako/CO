@@ -471,6 +471,119 @@ describe('runProviderLinearChildLaneShell', () => {
     });
   });
 
+  it('keeps launch success when proof refresh fails after recording the child lane', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
+    const patchPath = join(childRunDir, 'provider-linear-child-lane.patch');
+    const childProof: ProviderLinearChildLaneProof = {
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      task_id: `${TASK_ID}-impl-a`,
+      run_id: 'child-run-1',
+      parent_run_id: RUN_ID,
+      stream: 'impl-a',
+      purpose: 'Implement bounded child lane support',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-30T07:10:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-30T07:11:00.000Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+      lane_branch: 'child-lane/impl-a-child-run-1',
+      patch_artifact_path: patchPath,
+      patch_bytes: 128,
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'task_complete',
+      last_message: 'child lane complete',
+      last_event_at: '2026-03-30T07:12:00.000Z',
+      tokens: {
+        input_tokens: 10,
+        output_tokens: 12,
+        total_tokens: 22
+      },
+      rate_limits: null,
+      status: 'succeeded',
+      updated_at: '2026-03-30T07:12:00.000Z'
+    };
+    const warn = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner: vi.fn(async () => {
+          await mkdir(childRunDir, { recursive: true });
+          await writeFile(
+            join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+            JSON.stringify(childProof),
+            'utf8'
+          );
+          await writePatchArtifact(patchPath, 'orchestrator/src/cli/providerLinearChildStreamShell.ts');
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify({
+              run_id: 'child-run-1',
+              status: 'succeeded',
+              artifact_root: `.runs/${TASK_ID}-impl-a/cli/child-run-1`,
+              manifest: `.runs/${TASK_ID}-impl-a/cli/child-run-1/manifest.json`,
+              log_path: `.runs/${TASK_ID}-impl-a/cli/child-run-1/run.log`,
+              summary: 'child lane finished'
+            }),
+            stderr: ''
+          };
+        }) as never,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => {
+          throw new Error('proof refresh exploded');
+        }) as never,
+        warn
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      stream: 'impl-a',
+      child_run: {
+        run_id: 'child-run-1',
+        task_id: `${TASK_ID}-impl-a`
+      }
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'provider-linear-child-lane warning: failed to refresh proof snapshot after recording child lane impl-a: proof refresh exploded'
+    );
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'impl-a',
+        run_id: 'child-run-1'
+      })
+    ]);
+  });
+
   it('accepts workspace-local child output when the parent manifest lives under an external shared runs root', async () => {
     externalRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-lane-shared-'));
     const { manifestPath } = await createProviderWorkerManifest(externalRoot);
@@ -1003,6 +1116,54 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('keeps stale-lane invalidation recorded when proof refresh fails after finalizing the lane', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    const warn = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        readParentHeadSha: vi.fn(async () => 'new-parent-head'),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => {
+          throw new Error('proof refresh exploded');
+        }) as never,
+        warn
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_stale',
+        status: 409
+      }
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'provider-linear-child-lane warning: failed to refresh proof snapshot after invalidating stale child lane impl-a: proof refresh exploded'
+    );
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'invalidated'
+      })
+    ]);
+  });
+
   it('rejects acceptance when the pending child lane is not bound to the expected parent-owned task id', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord({
@@ -1413,6 +1574,97 @@ describe('runProviderLinearChildLaneShell', () => {
       }
     });
     expect(applyPatchArtifact).toHaveBeenCalledWith(tempRoot, childLane.patch_artifact_path);
+  });
+
+  it('keeps acceptance success when proof refresh fails after finalizing the accepted lane', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
+    const warn = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact: vi.fn(async () => undefined),
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => {
+          throw new Error('proof refresh exploded');
+        }) as never,
+        warn
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'accepted',
+      child_lane: {
+        stream: childLane.stream,
+        decision: 'accepted'
+      }
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'provider-linear-child-lane warning: failed to refresh proof snapshot after accepting child lane impl-a: proof refresh exploded'
+    );
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'accepted'
+      })
+    ]);
+  });
+
+  it('keeps rejection success when proof refresh fails after finalizing the lane', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    const warn = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'reject',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        refreshProofSnapshot: vi.fn(async () => {
+          throw new Error('proof refresh exploded');
+        }) as never,
+        warn
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'rejected',
+      child_lane: {
+        stream: childLane.stream,
+        decision: 'rejected'
+      }
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'provider-linear-child-lane warning: failed to refresh proof snapshot after finalizing rejected child lane impl-a: proof refresh exploded'
+    );
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'rejected'
+      })
+    ]);
   });
 
   it('rejects concurrent child-lane decisions while acceptance is already in flight', async () => {

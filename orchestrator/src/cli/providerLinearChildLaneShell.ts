@@ -17,6 +17,7 @@ import {
   type LiveLinearTrackedIssue
 } from './control/linearDispatchSource.js';
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
+import { logger } from '../logger.js';
 import {
   defaultExecRunner,
   loadProviderLinearWorkerContext,
@@ -155,6 +156,7 @@ interface ProviderLinearChildLaneShellDependencies {
   applyPatchArtifact: (workspacePath: string, patchPath: string) => Promise<void>;
   readChildLaneProof: (proofPath: string) => Promise<ProviderLinearChildLaneProof>;
   now: () => string;
+  warn: (message: string) => void;
 }
 
 const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
@@ -189,8 +191,26 @@ const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
   },
   readChildLaneProof: async (proofPath) =>
     JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearChildLaneProof,
-  now: () => new Date().toISOString()
+  now: () => new Date().toISOString(),
+  warn: (message) => {
+    logger.warn(message);
+  }
 };
+
+async function refreshProviderLinearChildLaneProofSnapshotBestEffort(input: {
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'refreshProofSnapshot' | 'warn'>;
+  runDir: string;
+  auditPath: string | null;
+  warningContext: string;
+}): Promise<void> {
+  try {
+    await input.deps.refreshProofSnapshot(input.runDir, input.auditPath);
+  } catch (error) {
+    input.deps.warn(
+      `provider-linear-child-lane warning: failed to refresh proof snapshot ${input.warningContext}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
 
 export async function runProviderLinearChildLaneShell(
   params: RunProviderLinearChildLaneShellParams,
@@ -597,7 +617,6 @@ async function launchChildLane(
         status: 502
       });
     }
-    await deps.refreshProofSnapshot(context.runDir, params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
   } catch (error) {
     await removeReservedChildLane(context.runDir, launchReservation, deps).catch(() => undefined);
     return failureResult({
@@ -613,6 +632,12 @@ async function launchChildLane(
       status: 502
     });
   }
+  await refreshProviderLinearChildLaneProofSnapshotBestEffort({
+    deps,
+    runDir: context.runDir,
+    auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+    warningContext: `after recording child lane ${stream}`
+  });
   if (execResult.exitCode !== 0 || childRun.status !== 'succeeded') {
     return failureResult({
       action: 'launch',
@@ -684,7 +709,12 @@ async function resolveChildLaneDecision(
         outcome: finalized
       });
     }
-    await deps.refreshProofSnapshot(context.runDir, params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
+    await refreshProviderLinearChildLaneProofSnapshotBestEffort({
+      deps,
+      runDir: context.runDir,
+      auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+      warningContext: `after finalizing ${finalized.decision} child lane ${stream}`
+    });
     return {
       ok: true,
       operation: 'child-lane',
@@ -728,7 +758,12 @@ async function resolveChildLaneDecision(
       deps,
       now: deps.now()
     });
-    await deps.refreshProofSnapshot(context.runDir, params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
+    await refreshProviderLinearChildLaneProofSnapshotBestEffort({
+      deps,
+      runDir: context.runDir,
+      auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+      warningContext: `after invalidating stale child lane ${stream}`
+    });
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -900,7 +935,12 @@ async function resolveChildLaneDecision(
       status: 502
     });
   }
-  await deps.refreshProofSnapshot(context.runDir, params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
+  await refreshProviderLinearChildLaneProofSnapshotBestEffort({
+    deps,
+    runDir: context.runDir,
+    auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+    warningContext: `after accepting child lane ${stream}`
+  });
   return {
     ok: true,
     operation: 'child-lane',

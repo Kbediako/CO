@@ -17,6 +17,7 @@ import {
   parseProviderLinearWorkerJsonl,
   ProviderLinearTrackedIssueReadError,
   readProviderLinearWorkerChildStreams,
+  refreshProviderLinearWorkerProofSnapshot,
   runProviderLinearWorker,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
@@ -1161,6 +1162,60 @@ describe('provider linear worker runner', () => {
         expect.objectContaining({ task_id: 'linear-lin-issue-1-implementation-gate', run_id: 'impl-run-1' })
       ])
     );
+  });
+
+  it('waits for the shared proof lock before refreshing the provider proof snapshot', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const proofLockPath = `${proofPath}.lock`;
+    await writeFile(
+      proofPath,
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'task_complete',
+        last_message: 'done',
+        last_event_at: '2026-03-21T09:00:00.000Z',
+        tokens: {
+          input_tokens: 1,
+          output_tokens: 2,
+          total_tokens: 3
+        },
+        rate_limits: null,
+        owner_phase: 'implementation',
+        owner_status: 'in_progress',
+        workspace_path: tempRoot,
+        linear_audit: null,
+        end_reason: null,
+        updated_at: '2026-03-21T09:00:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(proofLockPath, 'locked', 'utf8');
+    const writeProof = vi.fn(async () => undefined);
+
+    const refreshPromise = refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      writeProof
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(writeProof).not.toHaveBeenCalled();
+    await rm(proofLockPath, { force: true });
+
+    const refreshed = await refreshPromise;
+    expect(writeProof).toHaveBeenCalledTimes(1);
+    expect(refreshed).toMatchObject({
+      issue_identifier: 'CO-2',
+      updated_at: '2026-03-21T09:00:10.000Z'
+    });
   });
 
   it('forces standalone review execution env inside non-interactive provider worker turns', async () => {
