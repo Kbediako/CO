@@ -342,20 +342,11 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   };
 }
 function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
-  const trimmed = raw.trim();
-  if (!trimmed.startsWith('{')) {
+  const parsed = parseTrailingJsonObject(raw);
+  if (!parsed) {
     return null;
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return null;
-  }
-  if (!parsed || typeof parsed !== 'object') {
-    return null;
-  }
-  const record = parsed as Record<string, unknown>;
+  const record = parsed;
   const runId = normalizeOptionalString(record.run_id);
   const status = normalizeOptionalString(record.status);
   const artifactRoot = normalizeOptionalString(record.artifact_root);
@@ -395,6 +386,37 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir
 }
 function resolveRunPath(repoRoot: string, value: string): string {
   return isAbsolute(value) ? resolve(value) : resolve(repoRoot, value);
+}
+function parseTrailingJsonObject(raw: string): Record<string, unknown> | null {
+  const trimmed = raw.trim();
+  if (!trimmed.endsWith('}')) {
+    return null;
+  }
+  const direct = safeJsonObjectParse(trimmed);
+  if (direct) {
+    return direct;
+  }
+  const lines = trimmed.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!lines[index].trimStart().startsWith('{')) {
+      continue;
+    }
+    const parsed = safeJsonObjectParse(lines.slice(index).join('\n'));
+    if (parsed) {
+      return parsed;
+    }
+  }
+  return null;
+}
+function safeJsonObjectParse(value: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
 }
 function isPathWithinRoot(root: string, candidate: string): boolean {
   const relativePath = relative(root, candidate);
