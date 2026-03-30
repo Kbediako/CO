@@ -311,7 +311,6 @@ function createProviderRefreshCoordinator(
     }
     clearScheduledTrigger();
     const generation = ++rescheduleGeneration;
-    let stuckWatchdog: NodeJS.Timeout | null = null;
     try {
       const operation = runProviderIssueHandoffOperation(
         providerIssueHandoff,
@@ -343,26 +342,15 @@ function createProviderRefreshCoordinator(
           mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
         }
       );
-      await Promise.race([
+      await waitForProviderIssueHandoffPendingWithWatchdog(
+        providerIssueHandoff,
         operation,
-        new Promise<void>((resolve) => {
-          const watchdogDelayMs = resolveWatchdogDelayMs();
-          stuckWatchdog = setTimeout(() => {
-            markProviderPollingStuck(providerIssueHandoff);
-            resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
-            resolve();
-          }, watchdogDelayMs);
-          stuckWatchdog.unref?.();
-        })
-      ]);
+        resolveWatchdogDelayMs
+      );
     } catch {
       // Best-effort provider refreshes should not crash the public lifecycle.
-    } finally {
-      if (stuckWatchdog) {
-        clearTimeout(stuckWatchdog);
-      }
     }
-    await waitForProviderIssueHandoffQueueToDrain(providerIssueHandoff);
+    await waitForProviderIssueHandoffQueueToDrain(providerIssueHandoff, resolveWatchdogDelayMs);
     if (stopped || generation !== rescheduleGeneration) {
       return;
     }
@@ -549,7 +537,10 @@ function queueProviderIssueHandoffRefresh(
       if (state.active) {
         return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation, healthContext);
       }
-      return startProviderIssueHandoffOperation(providerIssueHandoff, state, operation, healthContext);
+      return waitForProviderIssueHandoffPending(
+        providerIssueHandoff,
+        startProviderIssueHandoffOperation(providerIssueHandoff, state, operation, healthContext)
+      );
     })
     .finally(() => {
       if (state.queuedRefresh === queuedRefresh) {
@@ -562,11 +553,12 @@ function queueProviderIssueHandoffRefresh(
 }
 
 async function waitForProviderIssueHandoffQueueToDrain(
-  providerIssueHandoff: ProviderIssueHandoffService
+  providerIssueHandoff: ProviderIssueHandoffService,
+  resolveWatchdogDelayMs: () => number
 ): Promise<void> {
   for (;;) {
     const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
-    const pending = state.queuedRefresh ?? state.active;
+    const pending = state.active ?? state.queuedRefresh;
     if (!pending) {
       return;
     }
@@ -574,7 +566,11 @@ async function waitForProviderIssueHandoffQueueToDrain(
       return;
     }
     try {
-      await waitForProviderIssueHandoffPending(providerIssueHandoff, pending);
+      await waitForProviderIssueHandoffPendingWithWatchdog(
+        providerIssueHandoff,
+        pending,
+        resolveWatchdogDelayMs
+      );
     } catch {
       if (resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
         return;
@@ -654,6 +650,32 @@ function waitForProviderIssueHandoffPending(
       throw new Error(outcome.reason ?? 'provider_refresh_lifecycle_stuck');
     })
   ]);
+}
+
+async function waitForProviderIssueHandoffPendingWithWatchdog(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  pending: Promise<void>,
+  resolveWatchdogDelayMs: () => number
+): Promise<void> {
+  let stuckWatchdog: NodeJS.Timeout | null = null;
+  try {
+    await Promise.race([
+      waitForProviderIssueHandoffPending(providerIssueHandoff, pending),
+      new Promise<void>((resolve) => {
+        const watchdogDelayMs = resolveWatchdogDelayMs();
+        stuckWatchdog = setTimeout(() => {
+          markProviderPollingStuck(providerIssueHandoff);
+          resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+          resolve();
+        }, watchdogDelayMs);
+        stuckWatchdog.unref?.();
+      })
+    ]);
+  } finally {
+    if (stuckWatchdog) {
+      clearTimeout(stuckWatchdog);
+    }
+  }
 }
 
 function createProviderIssueHandoffStuckSignal(): Pick<
