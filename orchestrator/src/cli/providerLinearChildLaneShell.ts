@@ -859,7 +859,9 @@ async function resolveParentDirtyScopeConflict(
   scope: ProviderLinearWorkerChildLaneScope,
   deps: ProviderLinearChildLaneShellDependencies
 ): Promise<string | null> {
-  const dirtyPaths = await deps.readParentDirtyPaths(workspacePath);
+  const dirtyPaths = (await deps.readParentDirtyPaths(workspacePath)).filter(
+    (entry) => !isIgnoredParentArtifactPath(entry)
+  );
   if (dirtyPaths.length === 0) {
     return null;
   }
@@ -872,6 +874,10 @@ async function resolveParentDirtyScopeConflict(
     return null;
   }
   return `Parent workspace already has in-scope pending changes (${overlapping.join(', ')}); child lanes launch from HEAD and would miss those parent edits. Clean, commit, or narrow the lane scope before launching it.`;
+}
+
+function isIgnoredParentArtifactPath(path: string): boolean {
+  return path === '.child-lanes' || path.startsWith('.child-lanes/');
 }
 
 function scopesOverlap(

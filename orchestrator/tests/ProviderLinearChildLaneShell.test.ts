@@ -478,6 +478,120 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(execRunner).not.toHaveBeenCalled();
   });
 
+  it('ignores child-lane artifact paths when checking phase-scoped parent dirtiness', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
+    const childProof: ProviderLinearChildLaneProof = {
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      task_id: `${TASK_ID}-impl-a`,
+      run_id: 'child-run-1',
+      parent_run_id: RUN_ID,
+      stream: 'impl-a',
+      purpose: 'Implement bounded child lane support',
+      instructions: null,
+      scope: {
+        files: [],
+        phases: ['implementation']
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-30T07:10:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-30T07:11:00.000Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+      lane_branch: 'child-lane/impl-a-child-run-1',
+      patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+      patch_bytes: 128,
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'task_complete',
+      last_message: 'child lane complete',
+      last_event_at: '2026-03-30T07:12:00.000Z',
+      tokens: {
+        input_tokens: 10,
+        output_tokens: 12,
+        total_tokens: 22
+      },
+      rate_limits: null,
+      status: 'succeeded',
+      updated_at: '2026-03-30T07:12:00.000Z'
+    };
+    const execRunner = vi.fn(async () => {
+      await mkdir(childRunDir, { recursive: true });
+      await writeFile(
+        join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME),
+        JSON.stringify(childProof),
+        'utf8'
+      );
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          run_id: 'child-run-1',
+          status: 'succeeded',
+          artifact_root: `.runs/${TASK_ID}-impl-a/cli/child-run-1`,
+          manifest: `.runs/${TASK_ID}-impl-a/cli/child-run-1/manifest.json`,
+          summary: 'child lane finished'
+        }),
+        stderr: ''
+      };
+    });
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        phases: ['implementation'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => [
+          '.child-lanes/impl-a-child-run-0/provider-linear-child-lane-proof.json'
+        ]) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      child_lane: {
+        stream: 'impl-a',
+        decision: 'pending',
+        scope: {
+          files: [],
+          phases: ['implementation']
+        }
+      }
+    });
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'impl-a',
+        decision: 'pending',
+        scope: {
+          files: [],
+          phases: ['implementation']
+        }
+      })
+    ]);
+  });
+
   it('fails launch when a succeeded child lane does not write a readable proof bundle with a patch artifact', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
