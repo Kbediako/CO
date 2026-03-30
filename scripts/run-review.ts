@@ -355,6 +355,11 @@ async function main(): Promise<void> {
     printReviewWrapperHelp();
     return;
   }
+  const reviewSurface = options.surface ?? 'diff';
+  const explicitScopeSurfaceGateError = buildExplicitScopeSurfaceGateError(options, reviewSurface);
+  if (explicitScopeSurfaceGateError) {
+    throw new Error(explicitScopeSurfaceGateError);
+  }
   if (shouldRunDiffBudget()) {
     await runDiffBudget(options);
   } else {
@@ -370,11 +375,6 @@ async function main(): Promise<void> {
   const envTask = process.env.MCP_RUNNER_TASK_ID ?? process.env.TASK;
   const taskKey = options.task ?? envTask ?? manifestTask;
   const taskLabel = taskKey ?? 'unknown-task';
-  const reviewSurface = options.surface ?? 'diff';
-  const explicitScopeSurfaceGateError = buildExplicitScopeSurfaceGateError(options, reviewSurface);
-  if (explicitScopeSurfaceGateError) {
-    throw new Error(explicitScopeSurfaceGateError);
-  }
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
   const scopeMode = resolveEffectiveScopeMode(options);
   const allowHeavyCommands = allowHeavyReviewCommands();

@@ -2615,6 +2615,25 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     await expect(readFile(argsLogPath, 'utf8')).rejects.toThrow();
   });
 
+  it('fails explicit scoped non-diff surfaces before diff-budget or manifest preflight', async () => {
+    const sandbox = await makeSandbox();
+    const codexBin = await makeFakeCodex(sandbox);
+
+    const result = await runReviewCommand(
+      null,
+      {
+        ...baseEnv(sandbox, codexBin),
+        TASK: 'missing-scoped-surface-preflight-task'
+      },
+      ['--base', 'definitely-not-a-ref', '--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('explicit scoped review cannot honor --surface audit');
+    expect(result.stderr).not.toContain('Explicit diff base requested but no valid ref was found');
+    expect(result.stderr).not.toContain('No run manifests found');
+  });
+
   it('fails when explicit base scope is rejected with a generic unknown-option error', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
