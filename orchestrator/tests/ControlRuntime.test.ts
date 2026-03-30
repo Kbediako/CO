@@ -8,7 +8,8 @@ import type { ProviderIssueHandoffService } from '../src/cli/control/providerIss
 import {
   initializeProviderPollingHealth,
   markProviderPollingCompleted,
-  markProviderPollingStarted
+  markProviderPollingStarted,
+  readProviderPollingHealth
 } from '../src/cli/control/providerPollingHealth.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
@@ -1644,6 +1645,44 @@ describe('ControlRuntime', () => {
       last_requested_at: '2026-03-07T00:00:05.000Z',
       last_completed_at: '2026-03-07T00:00:06.000Z',
       last_success_at: '2026-03-07T00:00:06.000Z'
+    });
+  });
+
+  it('honors explicit null when reinitializing provider polling health state', async () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const onUpdate = vi.fn();
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      onUpdate
+    });
+
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    onUpdate.mockClear();
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 30000,
+      stuckAfterMs: null,
+      onUpdate: null
+    });
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'poll',
+      atMs: Date.parse('2026-03-07T00:00:05.000Z')
+    });
+
+    await Promise.resolve();
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      interval_ms: 30000,
+      checking: true,
+      stuck: false,
+      stalled_after_ms: null
     });
   });
 

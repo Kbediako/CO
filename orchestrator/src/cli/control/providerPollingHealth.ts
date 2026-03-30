@@ -61,8 +61,12 @@ export function initializeProviderPollingHealth(
 ): void {
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff, input.intervalMs);
   state.intervalMs = input.intervalMs;
-  state.stuckAfterMs = input.stuckAfterMs ?? state.stuckAfterMs;
-  state.onUpdate = input.onUpdate ?? state.onUpdate;
+  if (input.stuckAfterMs !== undefined) {
+    state.stuckAfterMs = input.stuckAfterMs;
+  }
+  if (input.onUpdate !== undefined) {
+    state.onUpdate = input.onUpdate;
+  }
   if (state.nextPollAtMs === null && input.intervalMs !== null) {
     state.nextPollAtMs = Date.now();
   }
