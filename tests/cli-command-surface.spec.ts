@@ -245,6 +245,12 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).not.toContain('--auto-merge');
   }, CLI_BOOT_TIMEOUT);
 
+  it('does not treat help-like option values as pr help requests', async () => {
+    await expect(runCli(['pr', 'ready-review', '--interval-seconds', 'help'])).rejects.toMatchObject({
+      stderr: expect.stringContaining('--interval-seconds must be a number > 0')
+    });
+  }, TEST_TIMEOUT);
+
   it('rejects unknown pr subcommands through the binary shell', async () => {
     await expect(runCli(['pr', 'ship-it'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown pr subcommand: ship-it')
