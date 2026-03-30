@@ -249,7 +249,7 @@ describe('codex-orchestrator command surface', () => {
     await expect(runCli(['pr', 'ready-review', '--interval-seconds', 'help'])).rejects.toMatchObject({
       stderr: expect.stringContaining('--interval-seconds must be a number > 0')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects unknown pr subcommands through the binary shell', async () => {
     await expect(runCli(['pr', 'ship-it'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
