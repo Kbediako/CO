@@ -284,4 +284,91 @@ describe('createControlServerSeededRuntimeAssembly', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('persists polling snapshots without serializing unpersisted claim mutations', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'run-1',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: {
+          schema_version: 1,
+          updated_at: '2026-03-09T00:00:30.000Z',
+          rehydrated_at: null,
+          latest_provider_key: null,
+          latest_reason: null,
+          polling: null,
+          claims: []
+        }
+      });
+      const context = assembly.requestContextShared;
+      const providerIntakeState = context.providerIntakeState;
+      expect(providerIntakeState).toBeDefined();
+      if (!providerIntakeState) {
+        throw new Error('Expected provider intake state to be available');
+      }
+
+      await context.persist.providerIntake?.();
+
+      providerIntakeState.latest_provider_key = 'linear:ISSUE-1';
+      providerIntakeState.latest_reason = 'provider_issue_start_launched';
+      providerIntakeState.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:ISSUE-1',
+        issue_id: 'ISSUE-1',
+        issue_identifier: 'PRE-1',
+        issue_title: 'Unpersisted issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-09T00:01:00.000Z',
+        task_id: 'linear-issue-1',
+        mapping_source: 'provider_id_fallback',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        accepted_at: '2026-03-09T00:01:00.000Z',
+        updated_at: '2026-03-09T00:01:00.000Z',
+        last_delivery_id: 'delivery-1',
+        last_event: 'issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_700_000_000_000,
+        run_id: null,
+        run_manifest_path: null
+      });
+
+      await context.persist.providerIntakePolling?.({
+        enabled: true,
+        checking: true,
+        stuck: true,
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      });
+
+      const providerIntakeSnapshot = JSON.parse(
+        await readFile(join(paths.runDir, PROVIDER_INTAKE_STATE_FILE), 'utf8')
+      ) as ProviderIntakeState;
+      expect(providerIntakeSnapshot.claims).toHaveLength(0);
+      expect(providerIntakeSnapshot.latest_provider_key).toBeNull();
+      expect(providerIntakeSnapshot.latest_reason).toBeNull();
+      expect(providerIntakeSnapshot.polling).toMatchObject({
+        enabled: true,
+        checking: true,
+        stuck: true,
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      });
+      expect(providerIntakeState.claims).toHaveLength(1);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

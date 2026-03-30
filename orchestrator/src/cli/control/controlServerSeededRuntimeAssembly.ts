@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { writeJsonAtomic } from '../utils/fs.js';
@@ -160,6 +161,27 @@ export function createControlServerSeededRuntimeAssembly(
   });
   const linearAdvisoryStatePath = join(options.paths.runDir, LINEAR_ADVISORY_STATE_FILE);
   const providerIntakeStatePath = join(options.paths.runDir, PROVIDER_INTAKE_STATE_FILE);
+  let providerIntakePersistChain = Promise.resolve();
+  const queueProviderIntakePersist = async <T>(operation: () => Promise<T>): Promise<T> => {
+    const nextOperation = providerIntakePersistChain.then(operation, operation);
+    providerIntakePersistChain = nextOperation.then(
+      () => undefined,
+      () => undefined
+    );
+    return await nextOperation;
+  };
+  const readPersistedProviderIntakeState = async (): Promise<ProviderIntakeState | null> => {
+    try {
+      return normalizeProviderIntakeState(
+        JSON.parse(await readFile(providerIntakeStatePath, 'utf8')) as ProviderIntakeState
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return null;
+      }
+      throw error;
+    }
+  };
   const persist = {
     control: async () => writeJsonAtomic(options.paths.controlPath, controlStore.snapshot()),
     confirmations: async () => writeJsonAtomic(options.paths.confirmationsPath, confirmationStore.snapshot()),
@@ -167,7 +189,17 @@ export function createControlServerSeededRuntimeAssembly(
     delegationTokens: async () =>
       writeJsonAtomic(options.paths.delegationTokensPath, { tokens: delegationTokens.list() }),
     linearAdvisory: async () => writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState),
-    providerIntake: async () => writeJsonAtomic(providerIntakeStatePath, providerIntakeState)
+    providerIntake: async () =>
+      await queueProviderIntakePersist(async () => {
+        await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
+      }),
+    providerIntakePolling: async (polling) =>
+      await queueProviderIntakePersist(async () => {
+        const nextState = (await readPersistedProviderIntakeState()) ?? normalizeProviderIntakeState(null);
+        nextState.polling =
+          polling && typeof polling === 'object' ? { ...polling } : null;
+        await writeJsonAtomic(providerIntakeStatePath, nextState);
+      })
   } satisfies ControlRequestPersist;
   providerIssueHandoff =
     options.createProviderIssueHandoff?.({

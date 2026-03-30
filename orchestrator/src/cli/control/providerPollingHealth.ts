@@ -1,4 +1,5 @@
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
+import { logger } from '../../logger.js';
 
 export type ControlPollingMode = 'poll' | 'refresh';
 
@@ -15,10 +16,19 @@ export interface ControlPollingHealthPayload {
   last_error: string | null;
   next_poll_at: string | null;
   next_poll_in_ms: number | null;
+  updated_at: string | null;
+  operation_started_at: string | null;
+  operation_elapsed_ms: number | null;
+  stalled_after_ms: number | null;
+  stuck: boolean;
+  stuck_since_at: string | null;
+  restart_required: boolean;
+  reason: string | null;
 }
 
 interface MutableProviderPollingHealthState {
   intervalMs: number | null;
+  stuckAfterMs: number | null;
   checking: boolean;
   queued: boolean;
   lastMode: ControlPollingMode | null;
@@ -28,6 +38,12 @@ interface MutableProviderPollingHealthState {
   lastErrorAtMs: number | null;
   lastError: string | null;
   nextPollAtMs: number | null;
+  updatedAtMs: number | null;
+  operationStartedAtMs: number | null;
+  stuckAtMs: number | null;
+  reason: string | null;
+  onUpdate: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
+  updateChain: Promise<void>;
 }
 
 const providerPollingHealthStates = new WeakMap<
@@ -39,13 +55,18 @@ export function initializeProviderPollingHealth(
   providerIssueHandoff: ProviderIssueHandoffService,
   input: {
     intervalMs: number | null;
+    stuckAfterMs?: number | null;
+    onUpdate?: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
   }
 ): void {
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff, input.intervalMs);
   state.intervalMs = input.intervalMs;
+  state.stuckAfterMs = input.stuckAfterMs ?? state.stuckAfterMs;
+  state.onUpdate = input.onUpdate ?? state.onUpdate;
   if (state.nextPollAtMs === null && input.intervalMs !== null) {
     state.nextPollAtMs = Date.now();
   }
+  queueProviderPollingHealthUpdate(providerIssueHandoff, state);
 }
 
 export function noteProviderPollingRequest(
@@ -53,6 +74,7 @@ export function noteProviderPollingRequest(
   input: {
     mode: ControlPollingMode;
     queued: boolean;
+    replaceQueued?: boolean;
     atMs?: number;
   }
 ): void {
@@ -60,7 +82,9 @@ export function noteProviderPollingRequest(
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
   state.lastMode = input.mode;
   state.lastRequestedAtMs = atMs;
-  state.queued = state.queued || input.queued;
+  state.queued = input.replaceQueued ? input.queued : state.queued || input.queued;
+  state.updatedAtMs = atMs;
+  queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
 export function markProviderPollingStarted(
@@ -78,6 +102,11 @@ export function markProviderPollingStarted(
   state.checking = true;
   state.queued = input.queued ?? false;
   state.nextPollAtMs = null;
+  state.updatedAtMs = atMs;
+  state.operationStartedAtMs = atMs;
+  state.stuckAtMs = null;
+  state.reason = null;
+  queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
 export function markProviderPollingCompleted(
@@ -100,6 +129,41 @@ export function markProviderPollingCompleted(
     state.lastError = normalizePollingError(input.error);
   }
   state.nextPollAtMs = state.intervalMs !== null ? atMs + state.intervalMs : null;
+  state.updatedAtMs = atMs;
+  state.operationStartedAtMs = null;
+  state.stuckAtMs = null;
+  state.reason = null;
+  queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
+}
+
+export function isProviderPollingStuck(
+  providerIssueHandoff: ProviderIssueHandoffService | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  return readProviderPollingHealth(providerIssueHandoff, nowMs)?.stuck === true;
+}
+
+export function markProviderPollingStuck(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  input: {
+    atMs?: number;
+  } = {}
+): void {
+  const atMs = input.atMs ?? Date.now();
+  const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
+  if (!state.checking || state.operationStartedAtMs === null) {
+    return;
+  }
+  if (state.stuckAtMs !== null) {
+    return;
+  }
+  state.stuckAtMs =
+    state.stuckAfterMs !== null ? state.operationStartedAtMs + state.stuckAfterMs : atMs;
+  state.lastErrorAtMs = atMs;
+  state.lastError = buildProviderPollingStuckMessage(state);
+  state.reason = buildProviderPollingStuckReason(state);
+  state.updatedAtMs = atMs;
+  queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
 export function readProviderPollingHealth(
@@ -113,6 +177,20 @@ export function readProviderPollingHealth(
   if (!state) {
     return null;
   }
+  maybeMarkProviderPollingStuck(providerIssueHandoff, state, nowMs);
+  return buildProviderPollingHealthPayload(state, nowMs);
+}
+
+function buildProviderPollingHealthPayload(
+  state: MutableProviderPollingHealthState,
+  nowMs: number
+): ControlPollingHealthPayload {
+  const operationElapsedMs =
+    state.checking && state.operationStartedAtMs !== null
+      ? Math.max(0, nowMs - state.operationStartedAtMs)
+      : null;
+  const stuck = state.stuckAtMs !== null;
+  const reason = stuck ? state.reason ?? buildProviderPollingStuckReason(state) : null;
   return {
     enabled: true,
     interval_ms: state.intervalMs,
@@ -126,7 +204,15 @@ export function readProviderPollingHealth(
     last_error: state.lastError,
     next_poll_at: toIsoTimestamp(state.nextPollAtMs),
     next_poll_in_ms:
-      state.nextPollAtMs === null ? null : Math.max(0, state.nextPollAtMs - nowMs)
+      state.nextPollAtMs === null ? null : Math.max(0, state.nextPollAtMs - nowMs),
+    updated_at: toIsoTimestamp(state.updatedAtMs),
+    operation_started_at: toIsoTimestamp(state.operationStartedAtMs),
+    operation_elapsed_ms: operationElapsedMs,
+    stalled_after_ms: state.stuckAfterMs,
+    stuck,
+    stuck_since_at: toIsoTimestamp(state.stuckAtMs),
+    restart_required: stuck,
+    reason
   };
 }
 
@@ -143,6 +229,7 @@ function getOrCreateProviderPollingHealthState(
   }
   const nextState: MutableProviderPollingHealthState = {
     intervalMs,
+    stuckAfterMs: null,
     checking: false,
     queued: false,
     lastMode: null,
@@ -151,10 +238,70 @@ function getOrCreateProviderPollingHealthState(
     lastSuccessAtMs: null,
     lastErrorAtMs: null,
     lastError: null,
-    nextPollAtMs: intervalMs !== null ? Date.now() : null
+    nextPollAtMs: intervalMs !== null ? Date.now() : null,
+    updatedAtMs: null,
+    operationStartedAtMs: null,
+    stuckAtMs: null,
+    reason: null,
+    onUpdate: null,
+    updateChain: Promise.resolve()
   };
   providerPollingHealthStates.set(providerIssueHandoff, nextState);
   return nextState;
+}
+
+function maybeMarkProviderPollingStuck(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  state: MutableProviderPollingHealthState,
+  nowMs: number
+): void {
+  if (
+    !state.checking ||
+    state.operationStartedAtMs === null ||
+    state.stuckAfterMs === null ||
+    nowMs - state.operationStartedAtMs < state.stuckAfterMs
+  ) {
+    return;
+  }
+  markProviderPollingStuck(providerIssueHandoff, {
+    atMs: nowMs
+  });
+}
+
+function buildProviderPollingStuckReason(state: MutableProviderPollingHealthState): string {
+  return state.lastMode === 'poll'
+    ? 'provider_poll_lifecycle_stuck'
+    : 'provider_refresh_lifecycle_stuck';
+}
+
+function buildProviderPollingStuckMessage(state: MutableProviderPollingHealthState): string {
+  const thresholdText =
+    typeof state.stuckAfterMs === 'number' && Number.isFinite(state.stuckAfterMs)
+      ? `${state.stuckAfterMs}ms`
+      : 'the configured safe budget';
+  return `${
+    state.lastMode === 'poll' ? 'Provider poll' : 'Provider refresh'
+  } lifecycle exceeded ${thresholdText}; restart required`;
+}
+
+function queueProviderPollingHealthUpdate(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  state: MutableProviderPollingHealthState,
+  nowMs: number = Date.now()
+): void {
+  if (!state.onUpdate) {
+    return;
+  }
+  const payload = buildProviderPollingHealthPayload(state, nowMs);
+  state.updateChain = state.updateChain
+    .then(async () => {
+      await state.onUpdate?.(payload);
+    })
+    .catch((error: unknown) => {
+      logger.warn(
+        `Failed to sync provider polling health: ${(error as Error)?.message ?? String(error)}`
+      );
+    });
 }
 
 function toIsoTimestamp(value: number | null): string | null {

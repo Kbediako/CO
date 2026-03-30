@@ -65,6 +65,7 @@ export interface ProviderIntakeState {
   rehydrated_at: string | null;
   latest_provider_key: string | null;
   latest_reason: string | null;
+  polling?: Record<string, unknown> | null;
   claims: ProviderIntakeClaimRecord[];
 }
 
@@ -96,6 +97,7 @@ export function normalizeProviderIntakeState(
     rehydrated_at: null,
     latest_provider_key: null,
     latest_reason: null,
+    polling: null,
     claims: []
   };
   return {
@@ -108,6 +110,7 @@ export function normalizeProviderIntakeState(
     latest_provider_key:
       typeof state.latest_provider_key === 'string' ? state.latest_provider_key : null,
     latest_reason: typeof state.latest_reason === 'string' ? state.latest_reason : null,
+    polling: isRecordLike(state.polling) ? { ...state.polling } : null,
     claims: Array.isArray(state.claims)
       ? state.claims
           .map(normalizeProviderIntakeClaim)
@@ -431,6 +434,10 @@ function normalizeProviderIntakeClaim(
     retry_due_at: normalizeRetryTimestamp(input.retry_due_at),
     retry_error: normalizeRetryError(input.retry_error)
   };
+}
+
+function isRecordLike(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function normalizeRetryQueued(value: unknown): boolean | null {

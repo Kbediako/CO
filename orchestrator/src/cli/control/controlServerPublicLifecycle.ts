@@ -19,9 +19,12 @@ import type { ProviderIntakeState } from './providerIntakeState.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
   initializeProviderPollingHealth,
+  isProviderPollingStuck,
+  markProviderPollingStuck,
   markProviderPollingCompleted,
   markProviderPollingStarted,
   noteProviderPollingRequest,
+  readProviderPollingHealth,
   type ControlPollingMode
 } from './providerPollingHealth.js';
 import {
@@ -33,6 +36,7 @@ import { prepareControlServerStartupInputs } from './controlServerStartupInputPr
 
 const EXPIRY_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_INTERVAL_MS = 15_000;
+const PROVIDER_REFRESH_STUCK_AFTER_MS = 45_000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 interface ProviderIssueHandoffOperationState {
   active: Promise<void> | null;
@@ -82,6 +86,9 @@ export interface StartedControlServerPublicLifecycle extends ControlServerPublic
 export interface ProviderIssueHandoffRefreshRequestOutcome {
   queued: true;
   coalesced: boolean;
+  stuck?: boolean;
+  restart_required?: boolean;
+  reason?: string | null;
 }
 
 export async function startControlServerPublicLifecycle(
@@ -117,7 +124,23 @@ export async function startControlServerPublicLifecycle(
     : null;
   if (startupInputs.requestContextShared.providerIssueHandoff) {
     initializeProviderPollingHealth(startupInputs.requestContextShared.providerIssueHandoff, {
-      intervalMs: PROVIDER_REFRESH_INTERVAL_MS
+      intervalMs: PROVIDER_REFRESH_INTERVAL_MS,
+      stuckAfterMs: PROVIDER_REFRESH_STUCK_AFTER_MS,
+      onUpdate:
+        startupInputs.requestContextShared.providerIntakeState &&
+        (startupInputs.requestContextShared.persist.providerIntakePolling ??
+          startupInputs.requestContextShared.persist.providerIntake)
+          ? async (polling) => {
+              startupInputs.requestContextShared.providerIntakeState!.polling = { ...polling };
+              if (startupInputs.requestContextShared.persist.providerIntakePolling) {
+                await startupInputs.requestContextShared.persist.providerIntakePolling({
+                  ...polling
+                });
+                return;
+              }
+              await startupInputs.requestContextShared.persist.providerIntake?.();
+            }
+          : null
     });
   }
   const providerRefreshStartupTrigger = providerRefreshCoordinator
@@ -161,6 +184,15 @@ export function runProviderIssueHandoffRefresh(
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   if (state.active) {
+    const stuckOutcome = resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+    if (stuckOutcome) {
+      noteProviderPollingRequest(providerIssueHandoff, {
+        mode: 'refresh',
+        queued: state.queuedRefresh !== null,
+        replaceQueued: true
+      });
+      return Promise.resolve(stuckOutcome);
+    }
     if (!options?.queueIfBusy) {
       return state.active.then(() => ({
         queued: true,
@@ -260,35 +292,59 @@ function createProviderRefreshCoordinator(
     if (stopped) {
       return;
     }
+    if (isProviderPollingStuck(providerIssueHandoff)) {
+      scheduleNextTrigger();
+      return;
+    }
     clearScheduledTrigger();
     const generation = ++rescheduleGeneration;
+    let stuckWatchdog: NodeJS.Timeout | null = null;
     try {
-      await runProviderIssueHandoffOperation(providerIssueHandoff, async () => {
-        if (!providerIssueHandoff.poll || !context.readFeatureToggles) {
-          await providerIssueHandoff.refresh();
-          return;
-        }
+      const operation = runProviderIssueHandoffOperation(
+        providerIssueHandoff,
+        async () => {
+          if (!providerIssueHandoff.poll || !context.readFeatureToggles) {
+            await providerIssueHandoff.refresh();
+            return;
+          }
 
-        const refetchTrackedIssues = async (): Promise<ProviderTrackedIssuePollResolution> =>
-          await resolveProviderPollTrackedIssues(context);
-        const pollResolution = await refetchTrackedIssues();
-        if (pollResolution.kind === 'ready') {
-          await providerIssueHandoff.poll({
-            trackedIssues: pollResolution.trackedIssues,
-            refetchTrackedIssues
+          const refetchTrackedIssues = async (): Promise<ProviderTrackedIssuePollResolution> =>
+            await resolveProviderPollTrackedIssues(context);
+          const pollResolution = await refetchTrackedIssues();
+          if (pollResolution.kind === 'ready') {
+            await providerIssueHandoff.poll({
+              trackedIssues: pollResolution.trackedIssues,
+              refetchTrackedIssues
+            });
+            return;
+          }
+          markProviderPollingStarted(providerIssueHandoff, {
+            mode: 'refresh',
+            queued: getProviderIssueHandoffOperationState(providerIssueHandoff).queuedRefresh !== null
           });
-          return;
+          await providerIssueHandoff.refresh();
+        },
+        undefined,
+        {
+          mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
         }
-        markProviderPollingStarted(providerIssueHandoff, {
-          mode: 'refresh',
-          queued: getProviderIssueHandoffOperationState(providerIssueHandoff).queuedRefresh !== null
-        });
-        await providerIssueHandoff.refresh();
-      }, undefined, {
-        mode: providerIssueHandoff.poll && context.readFeatureToggles ? 'poll' : 'refresh'
-      });
+      );
+      await Promise.race([
+        operation,
+        new Promise<void>((resolve) => {
+          stuckWatchdog = setTimeout(() => {
+            markProviderPollingStuck(providerIssueHandoff);
+            resolve();
+          }, PROVIDER_REFRESH_STUCK_AFTER_MS);
+          stuckWatchdog.unref?.();
+        })
+      ]);
     } catch {
       // Best-effort provider refreshes should not crash the public lifecycle.
+    } finally {
+      if (stuckWatchdog) {
+        clearTimeout(stuckWatchdog);
+      }
     }
     await waitForProviderIssueHandoffQueueToDrain(providerIssueHandoff);
     if (stopped || generation !== rescheduleGeneration) {
@@ -374,6 +430,19 @@ function runProviderIssueHandoffOperation(
 ): Promise<void> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   if (state.active) {
+    const stuckOutcome = resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+    if (stuckOutcome) {
+      if (healthContext) {
+        noteProviderPollingRequest(providerIssueHandoff, {
+          mode: healthContext.mode,
+          queued: state.queuedRefresh !== null,
+          replaceQueued: true
+        });
+      }
+      return Promise.reject(
+        new Error(stuckOutcome.reason ?? 'provider_refresh_lifecycle_stuck')
+      );
+    }
     if (!options?.queueIfBusy) {
       return state.active;
     }
@@ -475,6 +544,9 @@ async function waitForProviderIssueHandoffQueueToDrain(
     if (!pending) {
       return;
     }
+    if (resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
+      return;
+    }
     await pending.then(
       () => undefined,
       () => undefined
@@ -504,4 +576,20 @@ function clearProviderIssueHandoffOperationState(
   if (!state.active && !state.queuedRefresh) {
     providerIssueHandoffOperations.delete(providerIssueHandoff);
   }
+}
+
+function resolveProviderIssueHandoffStuckOutcome(
+  providerIssueHandoff: ProviderIssueHandoffService
+): ProviderIssueHandoffRefreshRequestOutcome | null {
+  if (!isProviderPollingStuck(providerIssueHandoff)) {
+    return null;
+  }
+  markProviderPollingStuck(providerIssueHandoff);
+  return {
+    queued: true,
+    coalesced: true,
+    stuck: true,
+    restart_required: true,
+    reason: readProviderPollingHealth(providerIssueHandoff)?.reason ?? 'provider_refresh_lifecycle_stuck'
+  };
 }

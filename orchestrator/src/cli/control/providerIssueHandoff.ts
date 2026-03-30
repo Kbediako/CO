@@ -242,6 +242,7 @@ export function createProviderIssueHandoffService(
     rehydrated_at: string | null;
     latest_provider_key: string | null;
     latest_reason: string | null;
+    polling: Record<string, unknown> | null | undefined;
     claims: ProviderIntakeClaimRecord[];
   };
 
@@ -251,6 +252,7 @@ export function createProviderIssueHandoffService(
     rehydrated_at: options.state.rehydrated_at,
     latest_provider_key: options.state.latest_provider_key,
     latest_reason: options.state.latest_reason,
+    polling: options.state.polling ? { ...options.state.polling } : options.state.polling,
     claims: options.state.claims.map((claim) => ({ ...claim }))
   });
 
@@ -260,6 +262,7 @@ export function createProviderIssueHandoffService(
     options.state.rehydrated_at = snapshot.rehydrated_at;
     options.state.latest_provider_key = snapshot.latest_provider_key;
     options.state.latest_reason = snapshot.latest_reason;
+    options.state.polling = snapshot.polling ? { ...snapshot.polling } : snapshot.polling;
     options.state.claims = snapshot.claims.map((claim) => ({ ...claim }));
     rebuildRetryQueue();
   };

@@ -1703,4 +1703,46 @@ describe('ControlRuntime', () => {
       last_error: 'provider refresh failed'
     });
   });
+
+  it('surfaces stuck provider polling as restart-required through compatibility projections', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:00:46.000Z'));
+
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000
+    });
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-07T00:00:00.000Z')
+    });
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+    expect(compatibilityProjection.polling).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      operation_started_at: '2026-03-07T00:00:00.000Z',
+      stalled_after_ms: 45000,
+      stuck_since_at: '2026-03-07T00:00:45.000Z'
+    });
+
+    vi.useRealTimers();
+  });
 });
