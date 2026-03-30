@@ -521,6 +521,61 @@ Usage: codex review [options]
     expect(logTerminationBoundaryFallback).toHaveBeenCalledTimes(1);
   });
 
+  it('does not retry when dropping scope flags would not change the resolved review command', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
+    const launchArgs: string[][] = [];
+    const failureState = makeState(sandbox);
+    const writeTelemetry = vi.fn().mockResolvedValue(null);
+    const logTerminationBoundaryFallback = vi.fn();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      runReviewLaunchAttemptShell({
+        cliOptions: { task: 'sample-task', title: 'Sample review' },
+        prompt: 'Prompt body',
+        runtimeContext: {} as any,
+        repoRoot: sandbox,
+        manifestPath,
+        artifactPaths,
+        autoIssueLogEnabled: false,
+        telemetryDebugEnabled: false,
+        telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+        ensureReviewCommandAvailableFn: async () => {},
+        resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
+        runReview: async (resolved) => {
+          launchArgs.push(resolved.args);
+          throw new CodexReviewError('custom prompt cannot be combined with --title', {
+            exitCode: 1,
+            signal: null,
+            timedOut: false,
+            outputPreview: 'custom prompt cannot be combined with --title',
+            reviewState: failureState
+          });
+        },
+        writeTelemetry,
+        logTelemetrySummary: () => {
+          throw new Error('telemetry summary should not run when telemetry persistence returns null');
+        },
+        logTerminationBoundaryFallback
+      })
+    ).rejects.toThrow('custom prompt cannot be combined with --title');
+
+    expect(launchArgs).toHaveLength(1);
+    expect(launchArgs[0]).toEqual(['review', '--title', 'Sample review', 'Prompt body']);
+    expect(writeTelemetry).toHaveBeenCalledTimes(1);
+    expect(writeTelemetry).toHaveBeenCalledWith(
+      failureState,
+      'failed',
+      'custom prompt cannot be combined with --title',
+      null,
+      reviewLaunchContext(null, 'inline')
+    );
+    expect(logTerminationBoundaryFallback).toHaveBeenCalledTimes(1);
+  });
+
   it('fails instead of retrying when a title/base incompatibility would drop explicit scope', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);

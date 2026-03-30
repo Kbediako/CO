@@ -23,7 +23,7 @@
 - [x] Baseline audit captured the failing scoped-launch seam and bounded fix target before implementation. Evidence: `out/linear-ea3ee445-72d1-4c3d-90cc-1673c714eb2d/manual/20260330T004235Z-baseline-audit.md`.
 
 ## Implementation
-- [ ] Update the review launch builder so explicit commit/base scoped Codex review runs do not pass an unsupported prompt argument.
+- [ ] Update the review launch builder so explicit commit/base/uncommitted scoped Codex review runs do not pass an unsupported prompt argument.
 - [ ] Keep prompt/context artifacts and any persisted evidence truthful for scoped launch modes.
 - [ ] Update standalone-review guidance/help to describe scoped launch behavior truthfully.
 - [ ] Add focused contract coverage for scoped launch behavior in wrapper unit/end-to-end tests.
@@ -34,6 +34,7 @@
 - [ ] `node scripts/spec-guard.mjs --dry-run`.
 - [ ] `npm run build`.
 - [ ] `npm run lint`.
+- [ ] `npm run test` (unit + integration harness covering orchestrator + patterns; includes `tests/run-review.spec.ts`).
 - [ ] Focused `vitest` coverage for the scoped review launch seam.
 - [ ] `npm run docs:check`.
 - [ ] `npm run docs:freshness`.

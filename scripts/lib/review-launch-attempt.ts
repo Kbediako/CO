@@ -318,7 +318,6 @@ export async function runReviewLaunchAttemptShell(
         await reportFailure(retryGateError, scopedLaunchContext);
         throw retryGateError;
       }
-      console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
       const unscopedArgs = buildReviewArgs(options.cliOptions, options.prompt, {
         includeScopeFlags: false,
         disableDelegationMcp
@@ -327,6 +326,11 @@ export async function runReviewLaunchAttemptShell(
         includeScopeFlags: false
       });
       const resolvedUnscoped = resolveCommand(unscopedArgs, options.runtimeContext);
+      if (resolvedReviewCommandsEqual(resolvedScoped, resolvedUnscoped)) {
+        await reportFailure(error, scopedLaunchContext);
+        throw error;
+      }
+      console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
       try {
         const retryExecution = await options.runReview(resolvedUnscoped);
         await reportSuccess(retryExecution, unscopedLaunchContext);
@@ -526,6 +530,17 @@ function shouldLogPartialReviewOutput(
   return (
     terminationBoundary !== null &&
     REVIEW_PARTIAL_OUTPUT_HINT_BOUNDARY_KINDS.has(terminationBoundary.kind)
+  );
+}
+
+function resolvedReviewCommandsEqual(
+  left: ResolvedReviewCommand,
+  right: ResolvedReviewCommand
+): boolean {
+  return (
+    left.command === right.command &&
+    left.args.length === right.args.length &&
+    left.args.every((arg, index) => arg === right.args[index])
   );
 }
 
