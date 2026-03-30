@@ -177,10 +177,16 @@ describe('codex-orchestrator command surface', () => {
 
   it('rejects skills install --only when no skill list is provided', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-only-'));
-    await expect(runCli(['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'])).rejects.toMatchObject({
+    await expect(
+      runCli(
+        ['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'],
+        undefined,
+        CLI_BOOT_TIMEOUT
+      )
+    ).rejects.toMatchObject({
       stderr: expect.stringContaining('--only requires a comma-separated list of skill names.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('emits skills install JSON output', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-json-'));
