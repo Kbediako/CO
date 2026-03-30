@@ -766,6 +766,14 @@ describe('startControlServerPublicLifecycle', () => {
 
     await flushStartupProviderRefresh();
     expect(resolveLiveLinearTrackedIssues).toHaveBeenCalledTimes(1);
+    const initialHealth = readProviderPollingHealth(providerIssueHandoff);
+    const initialStartedAt = initialHealth?.operation_started_at;
+    expect(initialHealth).toMatchObject({
+      checking: true,
+      last_mode: 'poll'
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
 
     const queuedRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
       queueIfBusy: true
@@ -780,7 +788,8 @@ describe('startControlServerPublicLifecycle', () => {
     expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
       checking: true,
       queued: true,
-      last_mode: 'refresh'
+      last_mode: 'refresh',
+      operation_started_at: initialStartedAt
     });
 
     resolveRefresh?.();

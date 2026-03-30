@@ -318,9 +318,10 @@ function createProviderRefreshCoordinator(
             });
             return;
           }
-          markProviderPollingStarted(providerIssueHandoff, {
+          noteProviderPollingRequest(providerIssueHandoff, {
             mode: 'refresh',
-            queued: getProviderIssueHandoffOperationState(providerIssueHandoff).queuedRefresh !== null
+            queued: getProviderIssueHandoffOperationState(providerIssueHandoff).queuedRefresh !== null,
+            replaceQueued: true
           });
           await providerIssueHandoff.refresh();
         },
