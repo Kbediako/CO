@@ -55,6 +55,11 @@ import {
   createProviderWorkflowConfigStore,
   type ProviderWorkflowConfigStore
 } from './control/providerWorkflowConfigStore.js';
+import {
+  shouldEnableControlStatusDashboard,
+  startControlStatusDashboard,
+  type ControlStatusDashboardHandle
+} from './control/controlStatusDashboard.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -257,6 +262,7 @@ export async function runControlHostCliShell(
       })
   });
 
+  let dashboard: ControlStatusDashboardHandle | null = null;
   try {
     await rehydrateProviderIssueHandoffOnStartup(lifecycle.requestContextShared.providerIssueHandoff);
     const providerRefreshStartupTrigger = lifecycle.providerRefreshStartupTrigger ?? null;
@@ -278,6 +284,23 @@ export async function runControlHostCliShell(
     };
     if (format === 'json') {
       console.log(JSON.stringify(payload));
+    } else if (
+      shouldEnableControlStatusDashboard({
+        format,
+        stdoutIsTTY: process.stdout.isTTY === true,
+        stderrIsTTY: process.stderr.isTTY === true,
+        term: process.env.TERM ?? null,
+        env: process.env
+      })
+    ) {
+      dashboard = startControlStatusDashboard({
+        runtime: lifecycle.requestContextShared.runtime,
+        baseUrl: lifecycle.baseUrl,
+        taskId,
+        runId,
+        runDir: paths.runDir,
+        startPipelineId
+      });
     } else {
       console.log(`Control host ready: ${lifecycle.baseUrl}`);
       console.log(`Task: ${taskId}`);
@@ -288,6 +311,8 @@ export async function runControlHostCliShell(
 
     await waitForSignal();
   } finally {
+    dashboard?.stop();
+    await dashboard?.flush();
     await closeControlServerPublicLifecycle(lifecycle);
   }
 }
