@@ -10,6 +10,7 @@ import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  appendProviderLinearWorkerChildLaneRecord,
   appendProviderLinearWorkerChildStreamRecord,
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
@@ -643,6 +644,41 @@ describe('provider linear worker runner', () => {
       launched_at: '2026-03-21T09:00:00.050Z'
     };
     const secondChildStreamRecord = { ...childStreamRecord, task_id: 'linear-lin-issue-1-docs-review-alt', manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review-alt', 'cli', 'docs-run-1', 'manifest.json'), artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' };
+    const childLaneRecord = {
+      stream: 'impl-a',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: 'linear-lin-issue-1-impl-a',
+      run_id: 'child-run-1',
+      status: 'succeeded',
+      manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'manifest.json'),
+      artifact_root: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1',
+      log_path: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1/run.log',
+      summary: 'child lane finished',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-21T09:00:00.075Z',
+      purpose: 'Implement bounded same-issue child lanes',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-21T09:00:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-21T09:00:00.075Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+      patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch'),
+      patch_bytes: 256,
+      decision: 'pending',
+      decision_at: null,
+      decision_reason: null
+    };
     const execRunner = vi
       .fn<
         (request: {
@@ -658,6 +694,7 @@ describe('provider linear worker runner', () => {
         expect(auditPath).toBe(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME));
         await appendProviderLinearWorkerChildStreamRecord(runDir, childStreamRecord);
         await appendProviderLinearWorkerChildStreamRecord(runDir, secondChildStreamRecord);
+        await appendProviderLinearWorkerChildLaneRecord(runDir, childLaneRecord);
         await appendProviderLinearAuditEntry(String(auditPath), {
           recorded_at: '2026-03-21T09:00:00.100Z',
           operation: 'issue-context',
@@ -838,6 +875,7 @@ describe('provider linear worker runner', () => {
         latest_recorded_at: '2026-03-21T09:00:01.200Z'
       },
       child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded' })]),
+      child_lanes: expect.arrayContaining([expect.objectContaining({ stream: 'impl-a', task_id: 'linear-lin-issue-1-impl-a', run_id: 'child-run-1', decision: 'pending' })]),
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -889,6 +927,7 @@ describe('provider linear worker runner', () => {
         }
       },
       child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' })]),
+      child_lanes: expect.arrayContaining([expect.objectContaining({ stream: 'impl-a', task_id: 'linear-lin-issue-1-impl-a', run_id: 'child-run-1', decision: 'pending', patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch') })]),
       end_reason: 'issue_inactive'
     });
   });

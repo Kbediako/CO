@@ -13,6 +13,7 @@ import {
   appendProviderLinearWorkerChildStreamRecord,
   defaultExecRunner,
   loadProviderLinearWorkerContext,
+  refreshProviderLinearWorkerProofSnapshot,
   type ProviderLinearWorkerChildStreamRecord,
   type ProviderLinearWorkerExecRequest,
   type ProviderLinearWorkerExecResult
@@ -80,11 +81,15 @@ export interface RunProviderLinearChildStreamShellParams {
 interface ProviderLinearChildStreamShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
   appendChildStreamRecord: (runDir: string, record: ProviderLinearWorkerChildStreamRecord) => Promise<ProviderLinearWorkerChildStreamRecord[]>;
+  refreshProofSnapshot: (runDir: string, auditPath: string | null) => Promise<void>;
   now: () => string;
 }
 const DEFAULT_DEPENDENCIES: ProviderLinearChildStreamShellDependencies = {
   execRunner: defaultExecRunner,
   appendChildStreamRecord: async (runDir, record) => await appendProviderLinearWorkerChildStreamRecord(runDir, record),
+  refreshProofSnapshot: async (runDir, auditPath) => {
+    await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath);
+  },
   now: () => new Date().toISOString()
 };
 export async function runProviderLinearChildStreamShell(
@@ -211,13 +216,20 @@ export async function runProviderLinearChildStreamShell(
   if (runtimeMode) {
     args.push('--runtime-mode', runtimeMode);
   }
+  const childStartEnv = buildProviderLinearChildStartEnv(
+    env,
+    context.repoRoot,
+    pipelineId,
+    childTaskId,
+    sourceSetup
+  );
   let execResult: ProviderLinearWorkerExecResult;
   try {
     execResult = await deps.execRunner({
       command: invocation.command,
       args,
       cwd: context.repoRoot,
-      env: buildProviderLinearChildStartEnv(env, context.repoRoot, pipelineId, childTaskId, sourceSetup),
+      env: childStartEnv,
       mirrorOutput: false
     });
   } catch (error) {
@@ -233,7 +245,13 @@ export async function runProviderLinearChildStreamShell(
       status: 502
     });
   }
-  const childRun = parseProviderChildRunResult(execResult.stdout, context.repoRoot, context.runDir, pipelineId, childTaskId);
+  const childRun = parseProviderChildRunResult(
+    execResult.stdout,
+    context.repoRoot,
+    childStartEnv.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(context.repoRoot, '.runs'),
+    pipelineId,
+    childTaskId
+  );
   if (!childRun) {
     const detail = [execResult.stderr.trim(), execResult.stdout.trim()].filter(Boolean)[0] ?? 'unknown child-stream output';
     return failureResult({
@@ -265,6 +283,7 @@ export async function runProviderLinearChildStreamShell(
       source_setup: sourceSetup,
       launched_at: deps.now()
     });
+    await deps.refreshProofSnapshot(context.runDir, env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
   } catch (error) {
     return failureResult({
       issueId: context.issueId,
@@ -318,6 +337,17 @@ function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: stri
     delete sanitized.FORCE_CODEX_REVIEW;
   }
   sanitized.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+  sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH = join(repoRoot, 'codex.orchestrator.json');
+  sanitized.CODEX_ORCHESTRATOR_RUNS_DIR = resolveWorkspaceScopedArtifactDir(
+    repoRoot,
+    sanitized.CODEX_ORCHESTRATOR_RUNS_DIR,
+    '.runs'
+  );
+  sanitized.CODEX_ORCHESTRATOR_OUT_DIR = resolveWorkspaceScopedArtifactDir(
+    repoRoot,
+    sanitized.CODEX_ORCHESTRATOR_OUT_DIR,
+    'out'
+  );
   sanitized.MCP_RUNNER_TASK_ID = taskId;
   if (sourceSetup?.provider === 'linear') Object.assign(sanitized, { CO_LINEAR_WORKSPACE_ID: sourceSetup.workspace_id ?? '', CO_LINEAR_TEAM_ID: sourceSetup.team_id ?? '', CO_LINEAR_PROJECT_ID: sourceSetup.project_id ?? '' });
   return sanitized;
@@ -341,17 +371,8 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   };
 }
 function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
-  const trimmed = raw.trim();
-  if (!trimmed.startsWith('{')) {
-    return null;
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return null;
-  }
-  if (!parsed || typeof parsed !== 'object') {
+  const parsed = parseTrailingJsonObject(raw);
+  if (!parsed) {
     return null;
   }
   const record = parsed as Record<string, unknown>;
@@ -366,7 +387,7 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir
   if (!safeRunId) {
     return null;
   }
-  const expectedRunRoot = resolve(parentRunDir, '..', '..', '..', taskId, 'cli', safeRunId);
+  const expectedRunRoot = resolve(parentRunDir, taskId, 'cli', safeRunId);
   const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
   const resolvedManifestPath = resolveRunPath(repoRoot, manifestPath);
   const resolvedLogPath = normalizeOptionalString(record.log_path);
@@ -392,8 +413,34 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir
     runtime_provider: normalizeOptionalString(record.runtime_provider)
   };
 }
+function parseTrailingJsonObject(raw: string): Record<string, unknown> | null {
+  const lines = raw.split(/\r?\n/u);
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!lines[index]?.trim().startsWith('{')) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(lines.slice(index).join('\n')) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
 function resolveRunPath(repoRoot: string, value: string): string {
   return isAbsolute(value) ? resolve(value) : resolve(repoRoot, value);
+}
+function resolveWorkspaceScopedArtifactDir(repoRoot: string, value: string | undefined, fallbackDirname: string): string {
+  const normalized = normalizeOptionalString(value);
+  const fallback = join(repoRoot, fallbackDirname);
+  if (!normalized) {
+    return fallback;
+  }
+  const candidate = isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
+  return isPathWithinRoot(repoRoot, candidate) ? candidate : fallback;
 }
 function isPathWithinRoot(root: string, candidate: string): boolean {
   const relativePath = relative(root, candidate);
