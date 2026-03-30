@@ -57,6 +57,7 @@ export function initializeProviderPollingHealth(
     intervalMs: number | null;
     stuckAfterMs?: number | null;
     onUpdate?: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
+    skipInitialUpdate?: boolean;
   }
 ): void {
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff, input.intervalMs);
@@ -69,6 +70,9 @@ export function initializeProviderPollingHealth(
   }
   if (state.nextPollAtMs === null && input.intervalMs !== null) {
     state.nextPollAtMs = Date.now();
+  }
+  if (input.skipInitialUpdate) {
+    return;
   }
   queueProviderPollingHealthUpdate(providerIssueHandoff, state);
 }

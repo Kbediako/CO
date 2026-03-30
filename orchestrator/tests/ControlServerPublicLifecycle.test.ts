@@ -606,6 +606,86 @@ describe('startControlServerPublicLifecycle', () => {
     await closeControlServerPublicLifecycle(started);
   });
 
+  it('preserves a persisted polling snapshot across startup until the first live refresh update', async () => {
+    vi.useFakeTimers();
+
+    const persistProviderIntakePolling = vi.fn(async () => undefined);
+    const providerIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-24T00:00:45.000Z',
+      rehydrated_at: null,
+      latest_provider_key: null,
+      latest_reason: null,
+      polling: {
+        enabled: true,
+        interval_ms: 15000,
+        checking: true,
+        queued: false,
+        last_mode: 'refresh',
+        last_requested_at: '2026-03-24T00:00:00.000Z',
+        updated_at: '2026-03-24T00:00:45.000Z',
+        operation_started_at: '2026-03-24T00:00:00.000Z',
+        operation_elapsed_ms: 45000,
+        stalled_after_ms: 45000,
+        stuck: true,
+        stuck_since_at: '2026-03-24T00:00:45.000Z',
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      },
+      claims: []
+    };
+    const refresh = vi.fn(async () => undefined);
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      persist: {
+        providerIntakePolling: persistProviderIntakePolling
+      },
+      providerIntakeState,
+      providerIssueHandoff: {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh
+      }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    expect(persistProviderIntakePolling).not.toHaveBeenCalled();
+    expect(providerIntakeState.polling).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      updated_at: '2026-03-24T00:00:45.000Z'
+    });
+
+    await flushStartupProviderRefresh();
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    await closeControlServerPublicLifecycle(started);
+  });
+
   it('records refresh mode when polling falls back to refresh after tracked-issue resolution skips', async () => {
     vi.useFakeTimers();
 

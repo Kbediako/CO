@@ -1649,6 +1649,63 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('falls back to the persisted polling snapshot before live polling health restarts', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true
+    });
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      providerIntakeState: {
+        schema_version: 1,
+        updated_at: '2026-03-07T00:00:45.000Z',
+        rehydrated_at: null,
+        latest_provider_key: null,
+        latest_reason: null,
+        polling: {
+          enabled: true,
+          interval_ms: 15000,
+          checking: true,
+          queued: false,
+          last_mode: 'refresh',
+          last_requested_at: '2026-03-07T00:00:00.000Z',
+          updated_at: '2026-03-07T00:00:45.000Z',
+          operation_started_at: '2026-03-07T00:00:00.000Z',
+          operation_elapsed_ms: 45000,
+          stalled_after_ms: 45000,
+          stuck: true,
+          stuck_since_at: '2026-03-07T00:00:45.000Z',
+          restart_required: true,
+          reason: 'provider_refresh_lifecycle_stuck'
+        },
+        claims: []
+      },
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+    expect(compatibilityProjection.polling).toMatchObject({
+      interval_ms: 15000,
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      updated_at: '2026-03-07T00:00:45.000Z'
+    });
+  });
+
   it('honors explicit null when reinitializing provider polling health state', async () => {
     const providerIssueHandoff = {
       handleAcceptedTrackedIssue: vi.fn(),

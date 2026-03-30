@@ -128,9 +128,12 @@ export async function startControlServerPublicLifecycle(
   if (startupInputs.requestContextShared.providerIssueHandoff) {
     const persistProviderIntakePolling =
       startupInputs.requestContextShared.persist?.providerIntakePolling ?? null;
+    const persistedPollingSnapshot =
+      startupInputs.requestContextShared.providerIntakeState?.polling ?? null;
     initializeProviderPollingHealth(startupInputs.requestContextShared.providerIssueHandoff, {
       intervalMs: PROVIDER_REFRESH_INTERVAL_MS,
       stuckAfterMs: PROVIDER_REFRESH_STUCK_AFTER_MS,
+      skipInitialUpdate: persistedPollingSnapshot !== null,
       onUpdate:
         startupInputs.requestContextShared.providerIntakeState && persistProviderIntakePolling
           ? async (polling) => {
