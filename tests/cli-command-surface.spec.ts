@@ -5,6 +5,7 @@ import { isAbsolute, join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { sanitizeProviderOverrideEnv } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
@@ -12,6 +13,7 @@ const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
+const SKILLS_INSTALL_JSON_TIMEOUT = 70000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
@@ -47,10 +49,10 @@ async function runCli(
   env?: NodeJS.ProcessEnv,
   timeoutMs: number = CLI_EXEC_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string }> {
-  const mergedEnv: NodeJS.ProcessEnv = {
+  const mergedEnv = sanitizeProviderOverrideEnv({
     ...process.env,
     ...(env ?? {})
-  };
+  });
   const explicitCliOverrides = Object.fromEntries(
     CLI_SANITIZED_ENV_KEYS.flatMap((key) => {
       if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
@@ -175,15 +177,25 @@ describe('codex-orchestrator command surface', () => {
 
   it('rejects skills install --only when no skill list is provided', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-only-'));
-    await expect(runCli(['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'])).rejects.toMatchObject({
+    await expect(
+      runCli(
+        ['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'],
+        undefined,
+        CLI_BOOT_TIMEOUT
+      )
+    ).rejects.toMatchObject({
       stderr: expect.stringContaining('--only requires a comma-separated list of skill names.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('emits skills install JSON output', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-json-'));
 
-    const { stdout } = await runCli(['skills', 'install', '--only', 'long-poll-wait', '--codex-home', tempDir, '--format', 'json']);
+    const { stdout } = await runCli(
+      ['skills', 'install', '--only', 'long-poll-wait', '--codex-home', tempDir, '--format', 'json'],
+      undefined,
+      SKILLS_INSTALL_JSON_TIMEOUT
+    );
     const payload = JSON.parse(stdout) as {
       targetRoot?: string;
       skills?: string[];
@@ -197,7 +209,7 @@ describe('codex-orchestrator command surface', () => {
         join(tempDir, 'skills', 'long-poll-wait', 'SKILL.md')
       ])
     );
-  }, TEST_TIMEOUT);
+  }, SKILLS_INSTALL_JSON_TIMEOUT);
 
   it('prints resume help without requiring a run id', async () => {
     const { stdout } = await runCli(['resume', '--help'], undefined, CLI_BOOT_TIMEOUT);

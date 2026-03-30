@@ -86,4 +86,71 @@ describe('runFrontendTestCliRequestShell', () => {
       })
     );
   });
+
+  it('scrubs provider-owned ambient overrides for the command and restores process env afterward', async () => {
+    const runFrontendTestCliShellMock = vi.fn(async () => {
+      expect(process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+      expect(process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBeUndefined();
+      expect(process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBe('0');
+    });
+    const originalEnv = {
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID,
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID,
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE,
+      CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH,
+      CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT:
+        process.env.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT,
+      CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH,
+      CODEX_ORCHESTRATOR_PACKAGE_ROOT: process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT,
+      CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED:
+        process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED
+    };
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID = 'local-mcp';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID = 'control-host';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE = 'control-host';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH =
+      '/tmp/provider-workflow.last-known-good.json';
+    process.env.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT = '/tmp/provider-package-root';
+    process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH = '/tmp/provider-workflow.last-known-good.json';
+    process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT = '/tmp/provider-package-root';
+    process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = '1';
+
+    try {
+      await runFrontendTestCliRequestShell(
+        {
+          orchestrator: { start: vi.fn() } as never,
+          positionals: [],
+          flags: {},
+          resolveRuntimeModeFlag: vi.fn(() => undefined),
+          applyRepoConfigRequiredPolicy: vi.fn(() => {
+            process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = '0';
+            return false;
+          }),
+          resolveTargetStageId: vi.fn(() => undefined),
+          runWithUi: vi.fn(async () => undefined),
+          emitRunOutput: vi.fn(),
+          warn: vi.fn()
+        },
+        { runFrontendTestCliShell: runFrontendTestCliShellMock as never }
+      );
+      expect(runFrontendTestCliShellMock).toHaveBeenCalledTimes(1);
+      expect(process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(
+        '/tmp/provider-workflow.last-known-good.json'
+      );
+      expect(process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBe('/tmp/provider-package-root');
+      expect(process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBe('1');
+    } finally {
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
 });

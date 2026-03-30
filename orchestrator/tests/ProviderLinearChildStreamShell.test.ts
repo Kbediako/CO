@@ -103,6 +103,13 @@ describe('runProviderLinearChildStreamShell', () => {
           CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(runDir, 'provider-linear-worker-linear-audit.jsonl'),
           CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
           CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN: 'provider-launch-token',
+          CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH: join(
+            runDir,
+            'provider-workflow.last-known-good.json'
+          ),
+          CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT: '/tmp/co-package-root',
+          CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: join(runDir, 'provider-workflow.last-known-good.json'),
+          CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1',
           CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/co-package-root',
           MCP_RUNNER_TASK_ID: TASK_ID
         })
@@ -117,7 +124,13 @@ describe('runProviderLinearChildStreamShell', () => {
     }));
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env.CODEX_ORCHESTRATOR_ROOT).toBe(tempRoot);
-    expect(request?.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBe('/tmp/co-package-root');
+    expect(request?.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBeUndefined();
+    expect(request?.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(
+      join(tempRoot ?? '', 'codex.orchestrator.json')
+    );
+    expect(request?.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBeUndefined();
+    expect(request?.env.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH).toBeUndefined();
+    expect(request?.env.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT).toBeUndefined();
     expect(request?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
     expect(request?.env.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot ?? '', 'out'));
     expect(request?.env.MCP_RUNNER_TASK_ID).toBe(`${TASK_ID}-docs-review`);

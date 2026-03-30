@@ -9,6 +9,7 @@ import {
   runDoctor,
   runDoctorCloudPreflight
 } from '../src/cli/doctor.js';
+import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
 
 async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
@@ -38,7 +39,7 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
 
 function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
-    ...process.env,
+    ...sanitizeProviderOverrideEnv(process.env),
     CODEX_CLOUD_ENV_ID: '',
     CODEX_CLOUD_BRANCH: '',
     CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
@@ -356,6 +357,112 @@ describe('runDoctor', () => {
       });
       expect(result.ok).toBe(true);
       expect(result.details.environment_id).toBe('env_stage_meta');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores ambient provider snapshot env when doctor cloud preflight resolves repo-local metadata', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-provider-env-scrub-'));
+    await writeFile(
+      join(tempDir, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_repo_local' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...process.env,
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+          CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host',
+          CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+          CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH: join(
+            tempDir,
+            'provider-workflow.last-known-good.json'
+          ),
+          CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT: '/tmp/provider-package-root',
+          CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: join(tempDir, 'provider-workflow.last-known-good.json'),
+          CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/provider-package-root',
+          CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_repo_local');
+      expect(result.issues).toHaveLength(0);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('honors explicit repo config overrides when doctor cloud preflight is not provider-launched', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-explicit-override-'));
+    const overridePath = join(tempDir, 'override.json');
+    await writeFile(
+      overridePath,
+      JSON.stringify(
+        {
+          defaultPipeline: 'diagnostics',
+          pipelines: [
+            {
+              id: 'diagnostics',
+              title: 'Diagnostics',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'review',
+                  title: 'Review',
+                  command: 'echo review',
+                  plan: { cloudEnvId: 'env_custom' }
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: tempDir,
+        env: {
+          ...sanitizeProviderOverrideEnv(process.env),
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: overridePath,
+          CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+        }
+      });
+      expect(result.ok).toBe(true);
+      expect(result.details.environment_id).toBe('env_custom');
       expect(result.issues).toHaveLength(0);
     } finally {
       await rm(tempDir, { recursive: true, force: true });

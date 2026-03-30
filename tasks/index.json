@@ -25,6 +25,30 @@
       }
     },
     {
+      "id": "20260330-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3",
+      "title": "CO: Prevent provider-worker env override leakage into repo validation",
+      "relates_to": "tasks/tasks-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3-co-42-docs-review-final-4/cli/2026-03-30T08-47-15-708Z-b66bf956/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "task": "tasks/tasks-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "agent_task": ".agent/task/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "docs": "docs/TECH_SPEC-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md"
+      }
+    },
+    {
       "id": "20260330-linear-97aef5e3-dadb-4909-9b00-68c698f10f93",
       "title": "CO Make Linear Child-Stream JSON Parsing Robust to Wrapper Prelude Logs",
       "relates_to": "tasks/tasks-linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md",
