@@ -6,7 +6,10 @@ import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
-import { sanitizeProviderOverrideEnv } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
+import {
+  PROVIDER_OVERRIDE_ENV_KEYS,
+  sanitizeProviderOverrideEnv
+} from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
@@ -25,7 +28,6 @@ const REPO_CONFIG_TEST_ENV_KEYS = [
   REPO_CONFIG_PATH_ENV_KEY
 ] as const;
 const CLI_SANITIZED_ENV_KEYS = [...RUNTIME_TEST_ENV_KEYS, ...REPO_CONFIG_TEST_ENV_KEYS] as const;
-const PROVIDER_OVERRIDE_ENV_KEYS = [REPO_CONFIG_PATH_ENV_KEY] as const;
 const DEFAULT_RUNTIME_TEST_ENV = {
   CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
   CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
