@@ -4682,6 +4682,7 @@ describe('createProviderIssueHandoffService', () => {
       ),
       resume: vi.fn(async () => undefined)
     };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     const service = createProviderIssueHandoffService({
       paths,
@@ -4698,10 +4699,17 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     await service.rehydrate();
+    await waitForMockCalls(setTimeoutSpy);
 
-    await vi.advanceTimersByTimeAsync(1_001);
+    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+    expect(delayMs).toBeGreaterThanOrEqual(999);
+    expect(delayMs).toBeLessThanOrEqual(1_000);
+    vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
+    const startCallsBeforeRetry = launcher.start.mock.calls.length;
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
     await flushAsyncWork();
-    await waitForMockCalls(launcher.start, 1, 1024);
+    await waitForMockCalls(launcher.start, startCallsBeforeRetry + 1, QUEUED_RETRY_SETTLE_TURNS);
 
     const refreshPromise = service.refresh();
     await flushAsyncWork();
