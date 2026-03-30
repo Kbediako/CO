@@ -202,12 +202,14 @@ function getLatestScheduledTimeoutCallback(
 }
 
 describe('createProviderIssueHandoffService', () => {
-  it('ignores child-stream manifests without dropping provider workers that carry parent lineage', async () => {
+  it('ignores child-stream and child-lane manifests without dropping provider workers that carry parent lineage', async () => {
     const { root, paths } = await createHostPaths();
     const providerRunDir = join(root, '.runs', 'linear-lin-issue-1', 'cli', 'provider-run-1');
     const providerChildDir = join(root, '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1');
+    const providerChildLaneDir = join(root, '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1');
     await mkdir(providerRunDir, { recursive: true });
     await mkdir(providerChildDir, { recursive: true });
+    await mkdir(providerChildLaneDir, { recursive: true });
     await writeFile(join(providerRunDir, 'manifest.json'), JSON.stringify({
       run_id: 'provider-run-1',
       task_id: 'linear-lin-issue-1',
@@ -225,6 +227,15 @@ describe('createProviderIssueHandoffService', () => {
       issue_provider: 'linear',
       issue_id: 'lin-issue-1',
       updated_at: '2026-03-27T01:01:00.000Z'
+    }), 'utf8');
+    await writeFile(join(providerChildLaneDir, 'manifest.json'), JSON.stringify({
+      run_id: 'child-run-1',
+      task_id: 'linear-lin-issue-1-impl-a',
+      pipeline_id: 'provider-linear-child-lane',
+      parent_run_id: 'provider-run-1',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      updated_at: '2026-03-27T01:02:00.000Z'
     }), 'utf8');
 
     await expect(
