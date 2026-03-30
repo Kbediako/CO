@@ -246,7 +246,9 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('does not treat help-like option values as pr help requests', async () => {
-    await expect(runCli(['pr', 'ready-review', '--interval-seconds', 'help'])).rejects.toMatchObject({
+    await expect(
+      runCli(['pr', 'ready-review', '--interval-seconds', 'help'], undefined, CLI_BOOT_TIMEOUT)
+    ).rejects.toMatchObject({
       stderr: expect.stringContaining('--interval-seconds must be a number > 0')
     });
   }, CLI_BOOT_TIMEOUT);
