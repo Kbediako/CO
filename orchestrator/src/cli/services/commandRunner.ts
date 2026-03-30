@@ -336,7 +336,7 @@ export async function runCommandStage(
     const reviewTelemetryPath = join(paths.runDir, 'review', 'telemetry.json');
     const shouldAwaitReviewTelemetry =
       isReviewCommandStage(stage) &&
-      shouldAwaitReviewTelemetryEvidence(stage, enforceReviewEvidenceConsistency);
+      shouldAwaitReviewTelemetryEvidence(execEnv, enforceReviewEvidenceConsistency);
     const reviewTelemetry = isReviewCommandStage(stage)
       ? await loadReviewTelemetryEvidence(reviewTelemetryPath, {
           waitForEvidence: shouldAwaitReviewTelemetry
@@ -539,13 +539,13 @@ function shouldEnforceReviewEvidenceConsistency(stage: CommandStage): boolean {
 }
 
 function shouldAwaitReviewTelemetryEvidence(
-  stage: CommandStage,
+  execEnv: NodeJS.ProcessEnv,
   enforceReviewEvidenceConsistency: boolean
 ): boolean {
   if (enforceReviewEvidenceConsistency) {
     return true;
   }
-  return parseBooleanEnvFlag(stage.env?.FORCE_CODEX_REVIEW);
+  return parseBooleanEnvFlag(execEnv.FORCE_CODEX_REVIEW);
 }
 
 function isReviewCommandStage(stage: CommandStage): boolean {
@@ -734,18 +734,20 @@ function coerceReviewOutcomeDisposition(value: unknown): ReviewOutcomeDispositio
 function hasTelemetryTerminationBoundary(
   telemetry: ReviewTelemetryEvidencePayload | null
 ): boolean {
-  return telemetry?.termination_boundary !== null && typeof telemetry?.termination_boundary === 'object';
+  return coerceTelemetryTerminationBoundaryKind(telemetry) !== null;
 }
 
 function coerceTelemetryTerminationBoundaryKind(
   telemetry: ReviewTelemetryEvidencePayload | null
 ): string | null {
-  if (!telemetry || telemetry.termination_boundary === null || typeof telemetry.termination_boundary !== 'object') {
+  if (!telemetry) {
     return null;
   }
-  return coerceTelemetryString(
-    (telemetry.termination_boundary as Record<string, unknown>).kind
-  );
+  const boundary = telemetry.termination_boundary;
+  if (boundary === null || typeof boundary !== 'object' || Array.isArray(boundary)) {
+    return null;
+  }
+  return coerceTelemetryString((boundary as Record<string, unknown>).kind);
 }
 
 function resolveReviewTelemetryOutcomeDisposition(

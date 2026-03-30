@@ -381,6 +381,47 @@ describe('runCommandStage review evidence consistency', () => {
     expect(elapsedMs).toBeLessThan(1_500);
   });
 
+  it('waits for review telemetry when FORCE_CODEX_REVIEW is supplied via envOverrides', async () => {
+    mockState.runImpl = async (input) => {
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          status: 'succeeded',
+          review_outcome: 'bounded-success',
+          termination_boundary: {
+            kind: 'relevant-reinspection-dwell',
+            provenance: 'post-startup-anchor',
+            reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+            sample: null
+          }
+        });
+      }, 50);
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({
+      ...context,
+      manifest,
+      stage,
+      index: 1,
+      envOverrides: {
+        FORCE_CODEX_REVIEW: '1'
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain(
+      'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+    );
+    expect(manifest.commands[0]?.summary).toContain(
+      'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+    );
+  });
+
   it('does not enforce review telemetry consistency for non-review command stages even when the env leaks in globally', async () => {
     mockState.runImpl = async () => buildSuccessfulExecResult();
 
@@ -424,6 +465,31 @@ describe('runCommandStage review evidence consistency', () => {
         process.env.CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY = previous;
       }
     }
+  });
+
+  it('falls back to failed-other when telemetry carries a malformed termination boundary payload', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'failed-boundary',
+        error: 'codex review exited with code 1',
+        termination_boundary: {} as Record<string, unknown>
+      });
+      return buildFailedExecResult('codex review exited with code 1\n');
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
+    );
+    expect(result.summary).not.toContain('review outcome: review-wrapper failure');
   });
 });
 
