@@ -386,7 +386,7 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir
   if (!parsed) {
     return null;
   }
-  const record = parsed as Record<string, unknown>;
+  const record = parsed;
   const runId = normalizeOptionalString(record.run_id);
   const status = normalizeOptionalString(record.status);
   const artifactRoot = normalizeOptionalString(record.artifact_root);
@@ -425,18 +425,22 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir
   };
 }
 function parseTrailingJsonObject(raw: string): Record<string, unknown> | null {
-  const lines = raw.split(/\r?\n/u);
+  const trimmed = raw.trim();
+  if (!trimmed.endsWith('}')) {
+    return null;
+  }
+  const direct = safeJsonObjectParse(trimmed);
+  if (direct) {
+    return direct;
+  }
+  const lines = trimmed.split(/\r?\n/u);
   for (let index = 0; index < lines.length; index += 1) {
-    if (!lines[index]?.trim().startsWith('{')) {
+    if (!lines[index]?.trimStart().startsWith('{')) {
       continue;
     }
-    try {
-      const parsed = JSON.parse(lines.slice(index).join('\n')) as unknown;
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-    } catch {
-      continue;
+    const parsed = safeJsonObjectParse(lines.slice(index).join('\n'));
+    if (parsed) {
+      return parsed;
     }
   }
   return null;
@@ -452,6 +456,16 @@ function resolveWorkspaceScopedArtifactDir(repoRoot: string, value: string | und
   }
   const candidate = isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
   return isPathWithinRoot(repoRoot, candidate) ? candidate : fallback;
+}
+function safeJsonObjectParse(value: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
 }
 function isPathWithinRoot(root: string, candidate: string): boolean {
   const relativePath = relative(root, candidate);

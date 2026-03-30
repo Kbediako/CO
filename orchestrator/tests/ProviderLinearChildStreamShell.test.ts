@@ -74,6 +74,17 @@ function createExecResult(pipelineId: 'docs-review' | 'docs-relevance-advisory',
     stderr: ''
   };
 }
+function createPreludeExecResult(pipelineId: 'docs-review' | 'docs-relevance-advisory', runId: string, summary: string) {
+  const child = createExecResult(pipelineId, runId, summary);
+  return {
+    ...child,
+    stdout: [
+      `[Codex-Orchestrator] prepareRun start for pipeline ${pipelineId}`,
+      `[Codex-Orchestrator] prepareRun complete for pipeline ${pipelineId}`,
+      JSON.stringify(JSON.parse(child.stdout), null, 2)
+    ].join('\n')
+  };
+}
 describe('runProviderLinearChildStreamShell', () => {
   it('launches an allowlisted provider child stream and records parent lineage', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
@@ -234,7 +245,47 @@ describe('runProviderLinearChildStreamShell', () => {
     });
     expect(execRunner.mock.calls[0]?.[0]?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
   });
-
+  it('parses a valid trailing child-run json object after prelude logs', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const result = await runProviderLinearChildStreamShell(
+      { pipelineId: 'docs-review', env: buildProviderWorkerEnv(manifestPath) },
+      { execRunner: vi.fn(async () => createPreludeExecResult('docs-review', 'docs-run-1', 'docs-review passed')) as never }
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-stream',
+      pipeline_id: 'docs-review',
+      child_run: {
+        run_id: 'docs-run-1',
+        task_id: `${TASK_ID}-docs-review`,
+        status: 'succeeded',
+        manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-docs-review`, 'cli', 'docs-run-1', 'manifest.json')
+      }
+    });
+  });
+  it('fails closed when prelude logs precede a malformed final json payload', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const badStdout = [
+      '[Codex-Orchestrator] prepareRun start for pipeline docs-review',
+      '{',
+      '  "run_id": "docs-run-1",',
+      '  "status": "succeeded",',
+      `  "artifact_root": ".runs/${TASK_ID}-docs-review/cli/docs-run-1",`,
+      `  "manifest": ".runs/${TASK_ID}-docs-review/cli/docs-run-1/manifest.json"`
+    ].join('\n');
+    const result = await runProviderLinearChildStreamShell(
+      { pipelineId: 'docs-review', env: buildProviderWorkerEnv(manifestPath) },
+      { execRunner: vi.fn(async () => ({ exitCode: 0, stdout: badStdout, stderr: '' })) as never }
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-stream',
+      ...ISSUE,
+      pipeline_id: 'docs-review',
+      child_run: null,
+      error: { code: 'provider_worker_child_stream_output_invalid', status: 502 }
+    });
+  });
   it('keeps launch success when proof refresh fails after the child stream record is appended', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const warn = vi.fn();
