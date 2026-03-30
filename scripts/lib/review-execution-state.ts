@@ -31,6 +31,7 @@ import {
 import {
   buildReviewTelemetryPayload,
   inferTerminationBoundaryKindsFromErrorMessage,
+  type ReviewLaunchContext,
   type ReviewTelemetryPayload,
 } from './review-execution-telemetry.js';
 
@@ -294,6 +295,7 @@ interface ReviewExecutionTelemetryPayloadOptions {
   repoRoot: string;
   includeRawTelemetry: boolean;
   telemetryDebugEnvKey: string;
+  launchContext?: ReviewLaunchContext | null;
 }
 
 export interface ReviewTerminationBoundaryRecord {
@@ -775,6 +777,7 @@ export class ReviewExecutionState {
       repoRoot: options.repoRoot,
       includeRawTelemetry: options.includeRawTelemetry,
       telemetryDebugEnvKey: options.telemetryDebugEnvKey,
+      launchContext: options.launchContext ?? null,
       summary: this.buildOutputSummary()
     });
   }
