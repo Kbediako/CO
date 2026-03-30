@@ -20,7 +20,7 @@ export interface ReviewTelemetryPayload {
 
 export interface ReviewLaunchContext {
   scope_flag_mode: 'commit' | 'base' | 'uncommitted' | null;
-  prompt_delivery: 'inline' | 'stdin';
+  prompt_delivery: 'inline' | 'artifact-only';
 }
 
 export interface BuildReviewTelemetryPayloadOptions {

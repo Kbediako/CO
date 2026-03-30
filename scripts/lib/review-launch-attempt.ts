@@ -70,7 +70,6 @@ interface ReviewFailureIssueLogOptions {
 interface ResolvedReviewCommand {
   command: string;
   args: string[];
-  stdinText?: string | null;
 }
 
 interface ReviewRunResult {
@@ -185,10 +184,7 @@ export async function runReviewLaunchAttemptShell(
   const scopedLaunchContext = buildReviewLaunchContext(options.cliOptions, {
     includeScopeFlags: true
   });
-  const resolvedScoped = {
-    ...resolveCommand(scopedReviewArgs, options.runtimeContext),
-    stdinText: resolveReviewStdinText(scopedLaunchContext, options.prompt)
-  };
+  const resolvedScoped = resolveCommand(scopedReviewArgs, options.runtimeContext);
   const launchedWithExplicitScope = scopedReviewArgs.some(
     (arg) => arg === '--base' || arg === '--commit' || arg === '--uncommitted'
   );
@@ -198,11 +194,11 @@ export async function runReviewLaunchAttemptShell(
     `Launching Codex review (evidence: ${path.relative(options.repoRoot, options.manifestPath)})`
   );
   if (
-    scopedLaunchContext.prompt_delivery === 'stdin' &&
+    scopedLaunchContext.prompt_delivery === 'artifact-only' &&
     scopedLaunchContext.scope_flag_mode !== null
   ) {
     console.log(
-      `[run-review] explicit ${scopedLaunchContext.scope_flag_mode} scope keeps prompt context in the saved artifact and streams it to codex review via stdin; launching without an inline prompt argument.`
+      `[run-review] explicit ${scopedLaunchContext.scope_flag_mode} scope keeps prompt context in the saved artifact only; current codex review still treats stdin ("-") as [PROMPT], so this launch omits any prompt argument.`
     );
   }
 
@@ -330,10 +326,7 @@ export async function runReviewLaunchAttemptShell(
       const unscopedLaunchContext = buildReviewLaunchContext(options.cliOptions, {
         includeScopeFlags: false
       });
-      const resolvedUnscoped = {
-        ...resolveCommand(unscopedArgs, options.runtimeContext),
-        stdinText: resolveReviewStdinText(unscopedLaunchContext, options.prompt)
-      };
+      const resolvedUnscoped = resolveCommand(unscopedArgs, options.runtimeContext);
       try {
         const retryExecution = await options.runReview(resolvedUnscoped);
         await reportSuccess(retryExecution, unscopedLaunchContext);
@@ -459,8 +452,6 @@ function buildReviewArgs(
   const launchContext = buildReviewLaunchContext(options, opts);
   if (launchContext.prompt_delivery === 'inline') {
     args.push(prompt);
-  } else if (launchContext.prompt_delivery === 'stdin') {
-    args.push('-');
   }
   return args;
 }
@@ -472,15 +463,8 @@ function buildReviewLaunchContext(
   const scopedFlag = opts.includeScopeFlags ? resolveScopeFlag(options) : null;
   return {
     scope_flag_mode: scopedFlag?.mode ?? null,
-    prompt_delivery: scopedFlag ? 'stdin' : 'inline'
+    prompt_delivery: scopedFlag ? 'artifact-only' : 'inline'
   };
-}
-
-function resolveReviewStdinText(
-  launchContext: ReviewLaunchContext,
-  prompt: string
-): string | null {
-  return launchContext.prompt_delivery === 'stdin' ? prompt : null;
 }
 
 function resolveReviewCommand(

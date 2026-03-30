@@ -8,19 +8,19 @@
 
 ## Summary
 - Problem Statement: `npm run review -- --commit <sha>` and `npm run review -- --base <ref>` still launch `codex review` with an inline prompt payload even though the current Codex CLI rejects combining prompt arguments with diff-scoping flags. The wrapper then refuses to drop the explicit scope, so manifest-backed standalone review fails instead of executing truthfully on the requested commit/base surface.
-- Desired Outcome: explicit commit-scoped and base-scoped standalone review invocations run successfully, while the wrapper still saves prompt/context artifacts, streams that same context to scoped Codex review launches via stdin, and describes the behavior truthfully in help, docs, and telemetry.
+- Desired Outcome: explicit commit-scoped and base-scoped standalone review invocations run successfully, while the wrapper still saves prompt/context artifacts and describes the scoped-launch contract truthfully in help, docs, and telemetry.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): Complete Linear issue `CO-39` in this workspace by fixing the standalone review wrapper so provider-worker and manual review flows can run exact commit/base scoped `npm run review` commands without falling back to manual review.
 - Success criteria / acceptance:
   - `npm run review -- --commit <sha>` executes successfully without the prompt-plus-scope incompatibility
   - `npm run review -- --base <ref>` executes successfully without the prompt-plus-scope incompatibility
-  - wrapper help/docs and telemetry stay truthful about how prompt/context reaches `codex review` in scoped modes
+  - wrapper help/docs and telemetry stay truthful about what prompt/context reaches `codex review` in scoped modes
   - manifest-backed standalone review remains auditable and does not silently widen or drop the requested scope
 - Constraints / non-goals:
   - stay bounded to the scoped standalone-review launch seam plus the docs/tests needed to keep it truthful
   - do not widen into broader review-policy redesign, provider-worker workflow changes, or unrelated telemetry cleanup
-  - preserve prompt/context artifacts for operator evidence while explicit scoped launches deliver that prompt to the CLI via stdin instead of argv
+  - preserve prompt/context artifacts for operator evidence even when explicit scope launches cannot pass that prompt to the CLI
 
 ## Goals
 - Make explicit commit-scoped standalone review launch successfully.
@@ -46,7 +46,7 @@
   - tests fail if scoped launch ever reintroduces prompt-plus-scope incompatibility
 - Guardrails / Error Budgets:
   - never drop explicit scope flags silently
-  - never claim scoped modes use an inline prompt argument when the wrapper is actually using stdin delivery
+  - never claim scoped modes pass prompt context to `codex review` if they do not
   - keep the change narrow to wrapper launch behavior, docs, and focused coverage
 
 ## User Experience
@@ -54,13 +54,13 @@
 - User Journeys:
   - a provider worker runs forced standalone review against the exact issue commit before `In Review`
   - an operator runs `npm run review -- --base origin/main` and gets a real scoped review instead of a prompt incompatibility failure
-  - a reviewer inspects saved artifacts and can tell whether prompt context was delivered inline to Codex or streamed over stdin for scoped review
+  - a reviewer inspects saved artifacts and can tell whether prompt context was delivered inline to Codex or retained as wrapper-side evidence only
 
 ## Technical Considerations
 - Architectural Notes:
   - the launch seam currently lives in `scripts/lib/review-launch-attempt.ts`
   - wrapper prompt/context assembly lives in `scripts/run-review.ts` and `scripts/lib/review-prompt-context.ts`
-  - current tests already assert prompt artifacts and path-only scope notes, but they do not yet prove that explicit scoped launches keep prompt context while avoiding the unsupported inline prompt argv form
+  - current tests already assert prompt artifacts and path-only scope notes, but they do not yet prove that explicit scoped launches omit prompt arguments while staying auditable
 - Dependencies / Integrations:
   - `scripts/run-review.ts`
   - `scripts/lib/review-launch-attempt.ts`

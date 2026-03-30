@@ -6,8 +6,8 @@
  * Note: some codex CLI versions reject combining diff-scoping flags
  * (`--uncommitted`, `--base`, `--commit`) with a custom prompt. This wrapper
  * still writes the prompt artifact for audit continuity, but explicit scoped
- * launches stream that prompt via stdin (`-`) instead of a raw inline prompt
- * argument so the requested scope remains both executable and truthful.
+ * launches omit any prompt argument because the current Codex CLI still treats
+ * stdin (`-`) as `[PROMPT]` and rejects it when scope flags are present.
  */
 
 import { spawn } from 'node:child_process';
@@ -502,22 +502,12 @@ async function main(): Promise<void> {
     allowedMetaSurfaceEnvVarPaths
   } = boundaryPreflight;
   const autoIssueLogEnabled = options.autoIssueLog ?? false;
-  const runReview = async (resolved: {
-    command: string;
-    args: string[];
-    stdinText?: string | null;
-  }) =>
+  const runReview = async (resolved: { command: string; args: string[] }) =>
     runCodexReview({
       command: resolved.command,
       args: resolved.args,
-      stdinText: resolved.stdinText ?? null,
       env: runtimeContext.env,
-      stdio:
-        resolved.stdinText != null
-          ? ['pipe', 'pipe', 'pipe']
-          : nonInteractive
-            ? ['ignore', 'pipe', 'pipe']
-            : ['inherit', 'pipe', 'pipe'],
+      stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
       activeCloseoutBundleRoots,
       blockHeavyCommands: enforceBoundedMode,
       allowValidationCommandIntents: allowHeavyCommands,
@@ -675,7 +665,7 @@ Environment:
 
 Behavior:
   Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt
-                                and stream it to codex review via stdin (\`-\`) instead of an inline prompt argument.
+                                but launch codex review without any prompt argument because current CLI still treats stdin (\`-\`) as [PROMPT].
   Unscoped wrapper runs         Pass the saved prompt/context inline to codex review.
 `);
 }

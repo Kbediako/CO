@@ -39,7 +39,7 @@ afterEach(async () => {
 
 function reviewLaunchContext(
   scopeFlagMode: 'commit' | 'base' | 'uncommitted' | null,
-  promptDelivery: 'inline' | 'stdin' = scopeFlagMode === null ? 'inline' : 'stdin'
+  promptDelivery: 'inline' | 'artifact-only' = scopeFlagMode === null ? 'inline' : 'artifact-only'
 ) {
   return {
     scope_flag_mode: scopeFlagMode,
@@ -65,7 +65,6 @@ describe('review-launch-attempt', () => {
     const manifestPath = await makeManifest(sandbox);
     const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
     const launchArgs: string[][] = [];
-    const stdinTexts: Array<string | null | undefined> = [];
     const successState = makeState(sandbox);
     const writeTelemetry = vi.fn().mockResolvedValue(null);
     const logTerminationBoundaryFallback = vi.fn();
@@ -88,7 +87,6 @@ describe('review-launch-attempt', () => {
       resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
       runReview: async (resolved) => {
         launchArgs.push(resolved.args);
-        stdinTexts.push(resolved.stdinText);
         return {
           preview: 'stdout-ok',
           state: successState,
@@ -103,9 +101,8 @@ describe('review-launch-attempt', () => {
     });
 
     expect(launchArgs).toHaveLength(1);
-    expect(launchArgs[0]).toEqual(['review', '--base', 'origin/main', '-']);
+    expect(launchArgs[0]).toEqual(['review', '--base', 'origin/main']);
     expect(launchArgs[0]).not.toContain('Prompt body');
-    expect(stdinTexts).toEqual(['Prompt body']);
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
       successState,
@@ -122,7 +119,6 @@ describe('review-launch-attempt', () => {
     const manifestPath = await makeManifest(sandbox);
     const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
     const launchArgs: string[][] = [];
-    const stdinTexts: Array<string | null | undefined> = [];
     const successState = makeState(sandbox);
     const writeTelemetry = vi.fn().mockResolvedValue(null);
     const logTerminationBoundaryFallback = vi.fn();
@@ -145,7 +141,6 @@ describe('review-launch-attempt', () => {
       resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
       runReview: async (resolved) => {
         launchArgs.push(resolved.args);
-        stdinTexts.push(resolved.stdinText);
         return {
           preview: 'stdout-ok',
           state: successState,
@@ -160,9 +155,8 @@ describe('review-launch-attempt', () => {
     });
 
     expect(launchArgs).toHaveLength(1);
-    expect(launchArgs[0]).toEqual(['review', '--commit', 'ce9314aa8', '-']);
+    expect(launchArgs[0]).toEqual(['review', '--commit', 'ce9314aa8']);
     expect(launchArgs[0]).not.toContain('Prompt body');
-    expect(stdinTexts).toEqual(['Prompt body']);
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
       successState,
@@ -179,7 +173,6 @@ describe('review-launch-attempt', () => {
     const manifestPath = await makeManifest(sandbox);
     const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
     const launchArgs: string[][] = [];
-    const stdinTexts: Array<string | null | undefined> = [];
     const successState = makeState(sandbox);
     const writeTelemetry = vi.fn().mockResolvedValue(null);
     const logTerminationBoundaryFallback = vi.fn();
@@ -202,7 +195,6 @@ describe('review-launch-attempt', () => {
       resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
       runReview: async (resolved) => {
         launchArgs.push(resolved.args);
-        stdinTexts.push(resolved.stdinText);
         return {
           preview: 'stdout-ok',
           state: successState,
@@ -217,9 +209,8 @@ describe('review-launch-attempt', () => {
     });
 
     expect(launchArgs).toHaveLength(1);
-    expect(launchArgs[0]).toEqual(['review', '--uncommitted', '-']);
+    expect(launchArgs[0]).toEqual(['review', '--uncommitted']);
     expect(launchArgs[0]).not.toContain('Prompt body');
-    expect(stdinTexts).toEqual(['Prompt body']);
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
       successState,
