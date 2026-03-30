@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { writeJsonAtomic } from '../utils/fs.js';
+import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream } from '../events/runEventStream.js';
@@ -194,10 +195,18 @@ export function createControlServerSeededRuntimeAssembly(
       await queueProviderIntakePersist(async () => {
         await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
       }),
-    providerIntakePolling: async (polling) =>
+    providerIntakePolling: async (polling, updatedAt) =>
       await queueProviderIntakePersist(async () => {
         const nextState = (await readPersistedProviderIntakeState()) ?? normalizeProviderIntakeState(null);
-        nextState.polling = isRecordLike(polling) ? { ...polling } : null;
+        const nextPolling = isRecordLike(polling) ? { ...polling } : null;
+        nextState.polling = nextPolling;
+        const nextPollingUpdatedAt =
+          typeof nextPolling?.updated_at === 'string' && nextPolling.updated_at.trim().length > 0
+            ? nextPolling.updated_at
+            : isoTimestamp();
+        const nextStateUpdatedAt =
+          typeof updatedAt === 'string' && updatedAt.trim().length > 0 ? updatedAt : nextPollingUpdatedAt;
+        nextState.updated_at = pickLatestTimestamp(nextState.updated_at, nextStateUpdatedAt);
         await writeJsonAtomic(providerIntakeStatePath, nextState);
       })
   } satisfies ControlRequestPersist;
@@ -229,4 +238,16 @@ export function createControlServerSeededRuntimeAssembly(
   return {
     requestContextShared
   };
+}
+
+function pickLatestTimestamp(currentIso: string | null | undefined, candidateIso: string): string {
+  const currentMs = Date.parse(currentIso ?? '');
+  const candidateMs = Date.parse(candidateIso);
+  if (!Number.isFinite(currentMs)) {
+    return candidateIso;
+  }
+  if (!Number.isFinite(candidateMs)) {
+    return currentIso ?? candidateIso;
+  }
+  return candidateMs >= currentMs ? candidateIso : currentIso ?? candidateIso;
 }

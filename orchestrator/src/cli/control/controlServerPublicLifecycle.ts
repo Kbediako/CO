@@ -3,6 +3,7 @@ import http from 'node:http';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream } from '../events/runEventStream.js';
 import type { RunPaths } from '../run/runPaths.js';
+import { isoTimestamp } from '../utils/time.js';
 import type { ControlState } from './controlState.js';
 import type { ControlRequestSharedContext } from './controlRequestContext.js';
 import {
@@ -133,10 +134,21 @@ export async function startControlServerPublicLifecycle(
       onUpdate:
         startupInputs.requestContextShared.providerIntakeState && persistProviderIntakePolling
           ? async (polling) => {
-              startupInputs.requestContextShared.providerIntakeState!.polling = { ...polling };
-              await persistProviderIntakePolling({
-                ...polling
-              });
+              const pollingUpdatedAt =
+                typeof polling.updated_at === 'string' && polling.updated_at.trim().length > 0
+                  ? polling.updated_at
+                  : isoTimestamp();
+              const stateUpdatedAt = pickLatestTimestamp(
+                startupInputs.requestContextShared.providerIntakeState!.updated_at,
+                pollingUpdatedAt
+              );
+              const nextPolling = {
+                ...polling,
+                updated_at: pollingUpdatedAt
+              };
+              startupInputs.requestContextShared.providerIntakeState!.polling = nextPolling;
+              startupInputs.requestContextShared.providerIntakeState!.updated_at = stateUpdatedAt;
+              await persistProviderIntakePolling(nextPolling, stateUpdatedAt);
             }
           : null
     });
@@ -433,6 +445,18 @@ function dedupeProviderPollTrackedIssues(
     deduped.push(trackedIssue);
   }
   return deduped;
+}
+
+function pickLatestTimestamp(currentIso: string | null | undefined, candidateIso: string): string {
+  const currentMs = Date.parse(currentIso ?? '');
+  const candidateMs = Date.parse(candidateIso);
+  if (!Number.isFinite(currentMs)) {
+    return candidateIso;
+  }
+  if (!Number.isFinite(candidateMs)) {
+    return currentIso ?? candidateIso;
+  }
+  return candidateMs >= currentMs ? candidateIso : currentIso ?? candidateIso;
 }
 
 function runProviderIssueHandoffOperation(
