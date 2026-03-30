@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260330-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6",
+      "title": "CO Add Terminal Observability Dashboard as CO STATUS",
+      "relates_to": "tasks/tasks-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6-docs-review/cli/2026-03-29T14-13-11-459Z-591874a0/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md",
+        "task": "tasks/tasks-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md",
+        "agent_task": ".agent/task/linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md",
+        "docs": "docs/TECH_SPEC-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md"
+      }
+    },
+    {
       "id": "20260330-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1",
       "title": "CO: Investigate control-host provider refresh stall that stops new Ready issue pickup until restart",
       "relates_to": "tasks/tasks-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
