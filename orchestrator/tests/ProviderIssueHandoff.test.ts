@@ -11171,6 +11171,285 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
+  it('reclassifies a stale running claim from terminal successful proof evidence and resumes the later Merging handoff', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-review-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-review-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-review-completed',
+        task_id: 'task-1303-review-completed',
+        status: 'in_progress',
+        summary: 'worker still running',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:29:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'task-1303-review-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-review-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-review-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-continuation',
+        manifestPath: '/tmp/provider-run/continuation-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:30:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    const expectedCompletedClaim = {
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-review-completed',
+      run_id: 'run-review-completed',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedCompletedClaim);
+    expect(getPersistedState().claims[0]).toMatchObject(expectedCompletedClaim);
+
+    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+    expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
+    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+    expect(delayMs).toBeGreaterThanOrEqual(999);
+    expect(delayMs).toBeLessThanOrEqual(1_000);
+    vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
+    const startCallsBeforeRetry = launcher.start.mock.calls.length;
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.start, startCallsBeforeRetry + 1, 1_024);
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:30:30.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_post_worker_exit_start_launched',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-continuation',
+      run_manifest_path: '/tmp/provider-run/continuation-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      retry_queued: false,
+      retry_attempt: 1,
+      retry_due_at: null,
+      retry_error: null
+    });
+  });
+
+  it('keeps an active running claim when a terminal successful proof sidecar is older than the manifest', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-review-completed'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-review-completed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-review-completed',
+        task_id: 'task-1303-review-completed',
+        status: 'in_progress',
+        summary: 'worker resumed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:25:00.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'task-1303-review-completed',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-review-completed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-review-completed',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:30:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    const expectedClaim = {
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'task-1303-review-completed',
+      run_id: 'run-review-completed',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: null,
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+  });
+
   it('does not leak a stale failed proof summary onto a manifest-backed failed run', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));

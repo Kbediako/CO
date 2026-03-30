@@ -2725,7 +2725,10 @@ function resolveProviderIssueRunStatus(
   if (manifestStatus && manifestStatus !== 'in_progress') {
     return manifestStatus;
   }
-  return shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof) ? 'failed' : manifestStatus;
+  const proofTerminalStatus = shouldUseProviderLinearWorkerTerminalProof(manifest, proof)
+    ? resolveProviderLinearWorkerTerminalStatus(proof)
+    : null;
+  return proofTerminalStatus ?? manifestStatus;
 }
 
 function resolveProviderIssueRunSummary(
@@ -2733,18 +2736,22 @@ function resolveProviderIssueRunSummary(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
   const manifestSummary = readStringValue(manifest, 'summary');
-  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof);
-  const proofFailureReason = proofIsAuthoritative
-    ? resolveProviderLinearWorkerFailureReason(proof)
+  const manifestStatus = readStringValue(manifest, 'status');
+  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProof(manifest, proof);
+  const proofTerminalStatus = proofIsAuthoritative
+    ? resolveProviderLinearWorkerTerminalStatus(proof)
+    : null;
+  const proofTerminalReason = proofIsAuthoritative
+    ? resolveProviderLinearWorkerTerminalReason(proof)
     : null;
   if (
-    proofFailureReason &&
-    readStringValue(manifest, 'status') !== 'failed' &&
-    proofIsAuthoritative
+    proofTerminalReason &&
+    proofTerminalStatus &&
+    manifestStatus !== proofTerminalStatus
   ) {
-    return proofFailureReason;
+    return proofTerminalReason;
   }
-  return manifestSummary ?? proofFailureReason;
+  return manifestSummary ?? proofTerminalReason;
 }
 
 function resolveProviderIssueRunUpdatedAt(
@@ -2752,8 +2759,8 @@ function resolveProviderIssueRunUpdatedAt(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
   const manifestUpdatedAt = readStringValue(manifest, 'updated_at', 'started_at');
-  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalFailureProof(manifest, proof)
-    && isProviderLinearWorkerTerminalFailure(proof);
+  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProof(manifest, proof)
+    && resolveProviderLinearWorkerTerminalStatus(proof) !== null;
   const proofUpdatedAt = proofIsAuthoritative
     ? readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at')
     : null;
@@ -2774,24 +2781,25 @@ function resolveProviderIssueRunUpdatedAt(
   return proofTimestamp > manifestTimestamp ? proofUpdatedAt : manifestUpdatedAt;
 }
 
-function isProviderLinearWorkerTerminalFailure(
+function resolveProviderLinearWorkerTerminalStatus(
   proof: ProviderLinearWorkerProofRecord | null
-): boolean {
+): 'failed' | 'succeeded' | null {
   if (!proof) {
-    return false;
+    return null;
   }
   const proofRecord = proof as Record<string, unknown>;
-  return (
-    readStringValue(proofRecord, 'owner_phase') === 'ended' &&
-    readStringValue(proofRecord, 'owner_status') === 'failed'
-  );
+  if (readStringValue(proofRecord, 'owner_phase') !== 'ended') {
+    return null;
+  }
+  const ownerStatus = readStringValue(proofRecord, 'owner_status');
+  return ownerStatus === 'failed' || ownerStatus === 'succeeded' ? ownerStatus : null;
 }
 
-function shouldUseProviderLinearWorkerTerminalFailureProof(
+function shouldUseProviderLinearWorkerTerminalProof(
   manifest: Record<string, unknown>,
   proof: ProviderLinearWorkerProofRecord | null
 ): boolean {
-  if (!isProviderLinearWorkerTerminalFailure(proof)) {
+  if (!resolveProviderLinearWorkerTerminalStatus(proof)) {
     return false;
   }
   const proofUpdatedAt = readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at');
@@ -2813,10 +2821,10 @@ function shouldUseProviderLinearWorkerTerminalFailureProof(
   return proofTimestamp >= manifestTimestamp;
 }
 
-function resolveProviderLinearWorkerFailureReason(
+function resolveProviderLinearWorkerTerminalReason(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
-  if (!isProviderLinearWorkerTerminalFailure(proof)) {
+  if (!resolveProviderLinearWorkerTerminalStatus(proof)) {
     return null;
   }
   return readStringValue(proof as Record<string, unknown>, 'end_reason');
