@@ -161,6 +161,23 @@ describe('controlHostCliShell manifest discovery', () => {
     }
   });
 
+  it('falls back to the package root when dist/bin lookup cannot find package metadata', () => {
+    const originalPackageRoot = process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
+    delete process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
+
+    try {
+      expect(
+        resolveProviderOverridePackageRoot('/tmp/provider-package/dist/bin/codex-orchestrator.js')
+      ).toBe('/tmp/provider-package');
+    } finally {
+      if (originalPackageRoot === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT = originalPackageRoot;
+      }
+    }
+  });
+
   it('keeps the newly spawned manifest even when its mtime falls before the local spawn timestamp', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
 

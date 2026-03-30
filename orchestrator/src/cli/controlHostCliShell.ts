@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { mkdir, readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
@@ -399,7 +399,13 @@ function resolveProviderOverridePackageRoot(cliEntrypoint: string): string | nul
   try {
     return findPackageRoot(pathToFileURL(resolvedCliEntrypoint).href);
   } catch {
-    return normalizeProviderLinearSourceValue(resolve(dirname(resolvedCliEntrypoint), '..'));
+    const cliDir = dirname(resolvedCliEntrypoint);
+    const parentDir = dirname(cliDir);
+    const fallbackRoot =
+      basename(cliDir) === 'bin' && basename(parentDir) === 'dist'
+        ? dirname(parentDir)
+        : parentDir;
+    return normalizeProviderLinearSourceValue(fallbackRoot);
   }
 }
 
