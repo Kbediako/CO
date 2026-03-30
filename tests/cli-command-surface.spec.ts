@@ -22,6 +22,9 @@ const PROVIDER_OVERRIDE_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
   REPO_CONFIG_PATH_ENV_KEY
 ] as const;
+const ALWAYS_EXPLICIT_PROVIDER_OVERRIDE_ENV_KEYS = new Set<string>([
+  'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'
+]);
 const DEFAULT_RUNTIME_TEST_ENV = {
   CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
   CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
@@ -63,7 +66,11 @@ async function runCli(
       if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
         return [];
       }
-      if (env[key] === process.env[key] && Object.prototype.hasOwnProperty.call(process.env, key)) {
+      if (
+        !ALWAYS_EXPLICIT_PROVIDER_OVERRIDE_ENV_KEYS.has(key) &&
+        env[key] === process.env[key] &&
+        Object.prototype.hasOwnProperty.call(process.env, key)
+      ) {
         return [];
       }
       return [[key, env[key]]];
@@ -1482,6 +1489,30 @@ describe('codex-orchestrator command surface', () => {
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Repo-local codex.orchestrator.json is required')
     });
+  }, TEST_TIMEOUT);
+
+  it('preserves explicit strict repo config env when it matches the ambient provider-worker value', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-ambient-match-'));
+    const originalStrictRepoConfig = process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+    process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = '1';
+    try {
+      const env = {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: tempDir,
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+        CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+      };
+      await expect(runCli(['plan', 'docs-review'], env)).rejects.toMatchObject({
+        stderr: expect.stringContaining('Repo-local codex.orchestrator.json is required')
+      });
+    } finally {
+      if (originalStrictRepoConfig === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = originalStrictRepoConfig;
+      }
+    }
   }, TEST_TIMEOUT);
 
   it('allows disabling strict repo config mode per command with --repo-config-required=false', async () => {
