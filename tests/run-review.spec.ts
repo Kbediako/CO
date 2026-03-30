@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
+import type { ReviewOutcomeDisposition } from '../scripts/lib/review-execution-telemetry.js';
+
 const execFileAsync = promisify(execFile);
 const runReviewScript = join(process.cwd(), 'scripts', 'run-review.ts');
 const createdSandboxes: string[] = [];
@@ -3724,7 +3726,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
-      review_outcome: string;
+      review_outcome: ReviewOutcomeDisposition;
       termination_boundary: {
         kind: string;
         provenance: string;
@@ -3774,7 +3776,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
-      review_outcome: string;
+      review_outcome: ReviewOutcomeDisposition;
       error: string | null;
       termination_boundary: {
         kind: string;

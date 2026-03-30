@@ -20,7 +20,7 @@
 - [x] Bootstrap workpad comment updated in the issue using the single active `## Codex Workpad` comment. Evidence: `linear upsert-workpad --issue-id 98ba135e-832e-4bec-bf4a-58acb3803f08 ... --format json`.
 - [x] Current artifact and code truth for bounded-success versus failed review-wrapper outcomes was audited before implementation. Evidence: `out/linear-98ba135e-832e-4bec-bf4a-58acb3803f08/manual/20260330T064530Z-baseline-audit.md`.
 - [x] The detached workspace was moved onto a task branch before repo edits. Evidence: local branch `co-28-clarify-bounded-review-outcomes`.
-- [ ] A bounded child stream was launched for docs or review help so delegation evidence stays task-scoped and auditable. Evidence: pending `linear child-stream` manifest.
+- [ ] A bounded child stream was launched for docs or review help, so delegation evidence stays task-scoped and auditable. Evidence: pending `linear child-stream` manifest.
 
 ## Implementation
 - [ ] Persist an explicit review terminal-outcome classification that distinguishes bounded-success from real wrapper failure.
@@ -29,7 +29,7 @@
 - [ ] Add focused regressions for the presentation and interpretation seam without reopening broader review-runtime policy.
 
 ## Validation
-- [ ] `node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --format json`. Evidence: pending docs-review manifest.
+- [ ] `node dist/bin/codex-orchestrator.js linear child-stream --pipeline docs-review --format json`. Evidence: pending docs-review manifest.
 - [ ] Focused tests for touched review-outcome surfaces. Evidence: pending test logs.
 - [ ] `node scripts/delegation-guard.mjs`. Evidence: pending validation log.
 - [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: pending validation log.

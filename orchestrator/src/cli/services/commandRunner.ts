@@ -350,6 +350,7 @@ export async function runCommandStage(
           expectedStatus: result.status === 'succeeded' ? 'succeeded' : 'failed',
           startedAt: entry.started_at,
           telemetry: reviewTelemetry,
+          telemetryPreloaded: shouldAwaitReviewTelemetry,
           telemetryPath: reviewTelemetryPath
         })
       : null;
@@ -583,10 +584,14 @@ async function verifyReviewEvidenceConsistency(options: {
   expectedStatus: 'succeeded' | 'failed';
   startedAt: string | null | undefined;
   telemetry?: ReviewTelemetryEvidencePayload | null;
+  telemetryPreloaded?: boolean;
   telemetryPath?: string;
 }): Promise<ReviewEvidenceMismatch | null> {
   const telemetryPath = options.telemetryPath ?? join(options.paths.runDir, 'review', 'telemetry.json');
-  const telemetry = options.telemetry ?? (await waitForReviewTelemetryEvidence(telemetryPath));
+  const telemetry =
+    options.telemetryPreloaded === true
+      ? options.telemetry ?? null
+      : options.telemetry ?? (await waitForReviewTelemetryEvidence(telemetryPath));
   if (!telemetry) {
     return {
       message: 'review telemetry is missing, unreadable, or incomplete at terminal stage closeout.',

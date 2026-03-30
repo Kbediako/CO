@@ -52,6 +52,7 @@ vi.mock('../src/cli/services/execRuntime.js', () => {
 });
 
 import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import { deriveReviewOutcomeDisposition } from '../../scripts/lib/review-execution-telemetry.js';
 import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import { bootstrapManifest } from '../src/cli/run/manifest.js';
 import { runCommandStage } from '../src/cli/services/commandRunner.js';
@@ -548,17 +549,25 @@ async function writeReviewArtifacts(
   const outputLogPath = join(reviewDir, 'output.log');
   await mkdir(reviewDir, { recursive: true });
   await writeFile(outputLogPath, 'review output\n', 'utf8');
+  const status = overrides.status ?? 'succeeded';
+  const terminationBoundary = overrides.termination_boundary ?? null;
+  const reviewOutcome =
+    overrides.review_outcome ??
+    deriveReviewOutcomeDisposition({
+      status,
+      terminationBoundary
+    });
   await writeFile(
     join(reviewDir, 'telemetry.json'),
     `${JSON.stringify(
       {
         version: 1,
         generated_at: new Date().toISOString(),
-        status: 'succeeded',
-        review_outcome: 'clean-success',
+        status,
+        review_outcome: reviewOutcome,
         error: null,
         output_log_path: relative(repoRoot, outputLogPath),
-        termination_boundary: null,
+        termination_boundary: terminationBoundary,
         summary: {
           lineCount: 1,
           commandStarts: [],

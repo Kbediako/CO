@@ -20,7 +20,7 @@
 - [x] Bootstrap workpad comment updated in the issue using the single active `## Codex Workpad` comment. Evidence: `linear upsert-workpad --issue-id 98ba135e-832e-4bec-bf4a-58acb3803f08 ... --format json`.
 - [x] Current artifact and code truth for bounded-success versus failed review-wrapper outcomes was audited before implementation. Evidence: `out/linear-98ba135e-832e-4bec-bf4a-58acb3803f08/manual/20260330T064530Z-baseline-audit.md`.
 - [x] The detached workspace was moved onto a task branch before repo edits. Evidence: local branch `co-28-clarify-bounded-review-outcomes`.
-- [ ] A bounded child stream was launched for docs or review help so delegation evidence stays task-scoped and auditable. Evidence: pending `linear child-stream` manifest.
+- [ ] A bounded child stream was launched for docs or review help, so delegation evidence stays task-scoped and auditable. Evidence: pending `linear child-stream` manifest.
 
 ## Implementation
 - [ ] Persist an explicit review terminal-outcome classification that distinguishes bounded-success from real wrapper failure.

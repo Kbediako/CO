@@ -91,7 +91,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
   - `review_outcome: bounded-success` means review completed successfully with a preserved bounded stop. Treat it as successful review completion, not as a blocker or generic quiet-tail failure.
   - `review_outcome: failed-boundary` means the review wrapper failed on an explicit machine-checkable boundary family (for example `command-intent`, `startup-loop`, `timeout`, or `stall`).
   - `review_outcome: failed-other` means the review command failed without a classified termination boundary. Treat it as a failed review outcome that still needs inspection, but not as proof that the wrapper itself hit a first-class boundary failure.
-  - Older telemetry may not have `review_outcome`; when absent, interpret succeeded + non-null `termination_boundary` as bounded success, failed + non-null `termination_boundary` as failed boundary, and failed + null `termination_boundary` as failed-other.
+  - Older telemetry may not have `review_outcome`; when absent, interpret succeeded + null `termination_boundary` as clean success, succeeded + non-null `termination_boundary` as bounded success, failed + non-null `termination_boundary` as failed boundary, and failed + null `termination_boundary` as failed-other.
 - Pipeline-owned review gates can require terminal review-evidence consistency by setting `CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY=1`; an explicit waiver can be recorded with `CODEX_REVIEW_EVIDENCE_WAIVER_REASON="<reason>"`.
 - Optional timeout/stall/startup-loop guards:
   - `CODEX_REVIEW_TIMEOUT_SECONDS=<seconds>` (`0` disables when set); when this guard fires, runtime telemetry records a first-class `timeout` termination boundary
