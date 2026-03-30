@@ -7,7 +7,7 @@
 - Linear URL: https://linear.app/asabeko/issue/CO-37/co-make-linear-child-stream-json-parsing-robust-to-wrapper-prelude
 
 ## Summary
-- Problem Statement: `linear child-stream --format json` can currently report `provider_worker_child_stream_output_invalid` even when the launched child pipeline succeeds, because `parseProviderChildRunResult(...)` only attempts `JSON.parse(...)` when the trimmed stdout begins with `{`. Real provider-worker evidence for `CO-26` shows successful `docs-review` child runs whose stdout included Codex-Orchestrator prelude logs before the final JSON payload, which breaks the helper parse and forces manual manifest inspection.
+- Problem Statement: `linear child-stream --format json` can currently report `provider_worker_child_stream_output_invalid` even when the launched child pipeline succeeds because `parseProviderChildRunResult(...)` only attempts `JSON.parse(...)` when the trimmed stdout begins with `{`. Real provider-worker evidence for `CO-26` shows successful `docs-review` child runs whose stdout included Codex-Orchestrator prelude logs before the final JSON payload, which breaks the helper parse and forces manual manifest inspection.
 - Desired Outcome: provider-worker lanes can rely on `linear child-stream --format json` again when child commands emit leading informational logs before the final JSON object, while malformed or missing final JSON still fails closed and the returned structured payload stays unchanged on success.
 
 ## User Request Translation (Context Anchor)
