@@ -8,10 +8,16 @@ import {
   startControlStatusDashboard
 } from '../src/cli/control/controlStatusDashboard.js';
 
+const ANSI_PATTERN = new RegExp(`${String.fromCharCode(0x1b)}(?:\\[[0-?]*[ -/]*[@-~]|[@-Z\\\\-_])`, 'g');
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
+
+function stripAnsi(value: string): string {
+  return value.replace(ANSI_PATTERN, '');
+}
 
 function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): OperatorDashboardDataset {
   return {
@@ -31,8 +37,20 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
       seconds_running: 912.5
     },
     rate_limits: {
-      reset_seconds: 42,
-      rpm_remaining: 19
+      limit_id: 'gpt-5',
+      primary: {
+        remaining: 19,
+        limit: 30,
+        reset_in_seconds: 42
+      },
+      secondary: {
+        remaining: 3,
+        limit: 5,
+        reset_in_seconds: 7
+      },
+      credits: {
+        balance: 1234.5
+      }
     },
     polling: {
       enabled: true,
@@ -141,7 +159,25 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
         running: null,
         retry: null,
         attempts: [],
-        tracked: null,
+        tracked: {
+          linear: {
+            provider: 'linear',
+            id: 'issue-26',
+            identifier: 'CO-26',
+            title: 'Add terminal observability dashboard as CO STATUS',
+            url: 'https://linear.app/asabeko/issue/CO-26',
+            state: 'In Progress',
+            state_type: 'started',
+            workspace_id: 'workspace-1',
+            team_id: 'team-1',
+            team_key: 'CO',
+            team_name: 'CO',
+            project_id: 'project-1',
+            project_name: 'CO Control and Advisory',
+            updated_at: '2026-03-30T01:14:59.000Z',
+            recent_activity: []
+          }
+        },
         provider_linear_worker_proof: {
           issue_id: 'issue-26',
           issue_identifier: 'CO-26',
@@ -233,31 +269,169 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
         is_selected: false
       }
     ],
+    tracked: {
+      linear: {
+        provider: 'linear',
+        id: 'issue-26',
+        identifier: 'CO-26',
+        title: 'Add terminal observability dashboard as CO STATUS',
+        url: 'https://linear.app/asabeko/issue/CO-26',
+        state: 'In Progress',
+        state_type: 'started',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO Control and Advisory',
+        updated_at: '2026-03-30T01:14:59.000Z',
+        recent_activity: []
+      }
+    },
     ...overrides
   };
 }
 
 describe('control status dashboard', () => {
-  it('renders the CO STATUS frame with summary, queue, and issue sections', () => {
+  it('renders a wide full-frame snapshot with Symphony-style terminal chrome', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset(),
       baseUrl: 'http://127.0.0.1:4100',
       taskId: 'local-mcp',
       runId: 'control-host',
       runDir: '/repo/.runs/local-mcp/cli/control-host',
-      startPipelineId: 'provider-linear-worker'
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 1842.7
     });
 
-    expect(frame).toContain('CO STATUS');
-    expect(frame).toContain('Summary: running=1 retrying=1 issues=2 tokens=217 runtime=15m12s');
-    expect(frame).toContain('Rate limits: reset_seconds=42 | rpm_remaining=19');
-    expect(frame).toContain('RUNNING SESSIONS');
-    expect(frame).toContain('CO-26 | running | session=session-26');
-    expect(frame).toContain('RETRY / BACKOFF');
-    expect(frame).toContain('CO-27 | retrying | attempt=2');
-    expect(frame).toContain('ISSUES');
-    expect(frame).toContain('* CO-26 | state=running | owner=active/running');
-    expect(frame).toContain('retry=attempt=2 due=2026-03-30T01:16:00.000Z status=retrying | last_error=rate limit exceeded');
+    expect(frame).toContain('\u001b[1m╭─ CO STATUS\u001b[0m');
+    expect(stripAnsi(frame)).toBe([
+      '╭─ CO STATUS',
+      '│ Agents: 1/2 tracked',
+      '│ Throughput: 1,842 tps',
+      '│ Runtime: 15m 12s',
+      '│ Tokens: in 100 | out 117 | total 217',
+      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
+      '│ Project: CO Control and Advisory',
+      '│ Dashboard: http://127.0.0.1:4100',
+      '│ Next refresh: 15s',
+      '├─ Running',
+      '│',
+      '│   ID         STAGE        AGE / TURN   TOKENS     SESSION        EVENT                                                ',
+      '│   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────',
+      '│ ● CO-26      running      15m 0s / 4          217 session-26     Worker turn active                                   ',
+      '│',
+      '├─ Backoff queue',
+      '│',
+      '│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded',
+      '╰─'
+    ].join('\n'));
+  });
+
+  it('renders narrow terminals with an explicit reduced running table and sorted retry queue', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        counts: {
+          running: 1,
+          retrying: 3,
+          issues: 4
+        },
+        retrying: [
+          {
+            issue_identifier: 'CO-31',
+            issue_id: 'issue-31',
+            task_id: 'linear-c31',
+            run_id: 'run-31',
+            display_state: 'retrying',
+            status_reason: 'network',
+            session_id: 'session-31',
+            thread_id: 'thread-31',
+            turn_count: 1,
+            workspace_path: '/repo/.workspaces/linear-c31',
+            host: 'co-control-host',
+            attempt: 4,
+            due_at: '2026-03-30T01:15:04.250Z',
+            error: 'network timeout',
+            last_event: 'retry_scheduled',
+            last_message: 'Retry queued',
+            started_at: '2026-03-30T01:10:00.000Z',
+            last_event_at: '2026-03-30T01:14:40.000Z'
+          },
+          {
+            issue_identifier: 'CO-30',
+            issue_id: 'issue-30',
+            task_id: 'linear-c30',
+            run_id: 'run-30',
+            display_state: 'retrying',
+            status_reason: 'rate_limited',
+            session_id: 'session-30',
+            thread_id: 'thread-30',
+            turn_count: 1,
+            workspace_path: '/repo/.workspaces/linear-c30',
+            host: 'co-control-host',
+            attempt: 1,
+            due_at: '2026-03-30T01:15:01.500Z',
+            error: 'error with \\nnewline',
+            last_event: 'retry_scheduled',
+            last_message: 'Retry queued',
+            started_at: '2026-03-30T01:10:00.000Z',
+            last_event_at: '2026-03-30T01:14:40.000Z'
+          },
+          {
+            issue_identifier: 'CO-32',
+            issue_id: 'issue-32',
+            task_id: 'linear-c32',
+            run_id: 'run-32',
+            display_state: 'retrying',
+            status_reason: 'provider_error',
+            session_id: 'session-32',
+            thread_id: 'thread-32',
+            turn_count: 1,
+            workspace_path: '/repo/.workspaces/linear-c32',
+            host: 'co-control-host',
+            attempt: 2,
+            due_at: '2026-03-30T01:15:09.000Z',
+            error: 'worker crashed\nrestarting cleanly',
+            last_event: 'retry_scheduled',
+            last_message: 'Retry queued',
+            started_at: '2026-03-30T01:10:00.000Z',
+            last_event_at: '2026-03-30T01:14:40.000Z'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 84,
+      throughputTps: 15.4
+    });
+
+    expect(stripAnsi(frame)).toBe([
+      '╭─ CO STATUS',
+      '│ Agents: 1/4 tracked',
+      '│ Throughput: 15 tps',
+      '│ Runtime: 15m 12s',
+      '│ Tokens: in 100 | out 117 | total 217',
+      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
+      '│ Project: CO Control and Advisory',
+      '│ Dashboard: http://127.0.0.1:4100',
+      '│ Next refresh: 15s',
+      '├─ Running',
+      '│',
+      '│   ID        STAGE      TOKENS    EVENT                                            ',
+      '│   ────────────────────────────────────────────────────────────────────────────────',
+      '│ ● CO-26     running          217 Worker turn active                               ',
+      '│',
+      '├─ Backoff queue',
+      '│',
+      '│  ↻ CO-30 attempt=1 in 1.500s error=error with newline',
+      '│  ↻ CO-31 attempt=4 in 4.250s error=network timeout',
+      '│  ↻ CO-32 attempt=2 in 9.000s error=worker crashed restarting cleanly',
+      '╰─'
+    ].join('\n'));
   });
 
   it('renders empty sections cleanly', () => {
@@ -266,66 +440,103 @@ describe('control status dashboard', () => {
         counts: { running: 0, retrying: 0, issues: 0 },
         running: [],
         retrying: [],
-        issues: []
+        issues: [],
+        tracked: { linear: null }
       }),
       baseUrl: 'http://127.0.0.1:4100',
       taskId: 'local-mcp',
       runId: 'control-host',
       runDir: '/repo/.runs/local-mcp/cli/control-host',
-      startPipelineId: 'provider-linear-worker'
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
     });
 
-    expect(frame).toContain('RUNNING SESSIONS\n(none)');
-    expect(frame).toContain('RETRY / BACKOFF\n(none)');
-    expect(frame).toContain('ISSUES\n(none)');
+    expect(stripAnsi(frame)).toBe([
+      '╭─ CO STATUS',
+      '│ Agents: 0/0 tracked',
+      '│ Throughput: 0 tps',
+      '│ Runtime: 15m 12s',
+      '│ Tokens: in 100 | out 117 | total 217',
+      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
+      '│ Project: n/a',
+      '│ Dashboard: http://127.0.0.1:4100',
+      '│ Next refresh: 15s',
+      '├─ Running',
+      '│',
+      '│   ID         STAGE        AGE / TURN   TOKENS     SESSION        EVENT                                                ',
+      '│   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────',
+      '│  No active agents',
+      '│',
+      '├─ Backoff queue',
+      '│',
+      '│  No queued retries',
+      '╰─'
+    ].join('\n'));
   });
 
-  it('sanitizes terminal control characters before rendering issue text fields', () => {
-    const dataset = buildDataset();
+  it('renders absolute rate-limit reset timestamps against the dashboard snapshot time', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-30T02:00:00.000Z'));
+
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
-        generated_at: '2026-03-30T01:15:00.000Z\u001b[31m unsafe',
-        host: 'co-control-host\u0007bell',
-        issues: dataset.issues.map((issue, index) =>
-          index === 0
-            ? {
-                ...issue,
-                issue_identifier: 'CO-26\u001b[31m',
-                display_status: 'running\u001b[2J',
-                workspace: {
-                  ...issue.workspace,
-                  host: 'co-control-host\u001b[31m'
-                },
-                summary: 'unsafe\n\u001b]8;;https://example.com\u0007link\u001b]8;;\u0007',
-                last_error: 'oops\u001b[31mred',
-                latest_event: {
-                  ...(issue.latest_event ?? {
-                    at: '2026-03-30T01:14:59.000Z',
-                    event: 'turn_started',
-                    message: null
-                  }),
-                  message: 'message\u001b[2Jwipe'
-                }
-              }
-            : issue
-        )
+        rate_limits: {
+          limit_id: 'gpt-5',
+          primary: {
+            remaining: 19,
+            limit: 30,
+            reset_at: '2026-03-30T01:16:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    expect(stripAnsi(frame)).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 60s');
+  });
+
+  it('sanitizes terminal control characters before rendering text fields', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        tracked: { linear: null },
+        running: [
+          {
+            ...buildDataset().running[0],
+            issue_identifier: 'CO-26\u001b[31m',
+            display_state: 'running\u001b[2J',
+            last_message: 'worker\n\u001b]8;;https://example.com\u0007link\u001b]8;;\u0007 active'
+          }
+        ],
+        retrying: [
+          {
+            ...buildDataset().retrying[0],
+            issue_identifier: 'CO-27\u001b[31m',
+            error: 'oops\u001b[31mred\nnext line'
+          }
+        ]
       }),
       baseUrl: 'http://127.0.0.1:4100\u001b[2J',
       taskId: 'local\u0007mcp',
       runId: 'control\u001b[31mhost',
       runDir: '/repo/.runs/local-mcp/\u001b[2Jcontrol-host',
-      startPipelineId: 'provider\u001b[31m-linear-worker'
+      startPipelineId: 'provider\u001b[31m-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
     });
 
-    expect(frame).not.toContain('\u001b');
-    expect(frame).not.toContain('\u0007');
-    expect(frame).toContain('Generated: 2026-03-30T01:15:00.000Z unsafe | Mode: read-only | Host: co-control-host bell');
-    expect(frame).toContain('Control: http://127.0.0.1:4100 | Task: local mcp | Run: control host | Start pipeline: provider -linear-worker');
-    expect(frame).toContain('Run dir: /repo/.runs/local-mcp/ control-host');
-    expect(frame).toContain('* CO-26 | state=running | owner=active/running | session=session-26 thread=thread-26 turns=4 | workspace=/repo/.workspaces/linear-a861 | host=co-control-host');
-    expect(frame).toContain('last_error=oops red');
-    expect(frame).toContain('latest=turn_started | 2026-03-30T01:14:59.000Z | message wipe');
-    expect(frame).toContain('summary=unsafe link');
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).not.toContain('\u0007');
+    expect(plainFrame).toContain('│ Dashboard: http://127.0.0.1:4100');
+    expect(plainFrame).toContain('│ ● CO-26      running');
+    expect(plainFrame).toContain('worker link active');
+    expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=oops red next line');
   });
 
   it('enables the dashboard only for text-mode tty output', () => {
@@ -409,12 +620,12 @@ describe('control status dashboard', () => {
           write(chunk: string) {
             writes.push(chunk);
             return true;
-          }
+          },
+          columns: 120
         }
       },
       {
         readDataset: async () => buildDataset(),
-        // Uses the mocked timer functions installed by vi.useFakeTimers().
         setTimeout,
         clearTimeout
       }
@@ -423,7 +634,7 @@ describe('control status dashboard', () => {
     await handle.flush();
     expect(requestRefresh).toHaveBeenCalledTimes(1);
     expect(subscribe).toHaveBeenCalledTimes(1);
-    expect(writes[0]).toContain('\u001b[H\u001b[2JCO STATUS');
+    expect(writes[0]).toContain('\u001b[H\u001b[2J\u001b[1m╭─ CO STATUS');
 
     listener?.();
     await handle.flush();
@@ -466,14 +677,12 @@ describe('control status dashboard', () => {
         })
       }))
     } as unknown as ControlRuntime;
-    const readDataset = vi.fn(
-      async () => {
-        signalDatasetStarted?.();
-        return await new Promise<OperatorDashboardDataset>((resolve) => {
-          resolveDataset = resolve;
-        });
-      }
-    );
+    const readDataset = vi.fn(async () => {
+      signalDatasetStarted?.();
+      return await new Promise<OperatorDashboardDataset>((resolve) => {
+        resolveDataset = resolve;
+      });
+    });
 
     const handle = startControlStatusDashboard(
       {
@@ -488,12 +697,12 @@ describe('control status dashboard', () => {
           write(chunk: string) {
             writes.push(chunk);
             return true;
-          }
+          },
+          columns: 120
         }
       },
       {
         readDataset,
-        // Uses the mocked timer functions installed by vi.useFakeTimers().
         setTimeout,
         clearTimeout
       }
