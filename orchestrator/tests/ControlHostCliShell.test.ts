@@ -17,6 +17,7 @@ const {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
   buildProviderLinearSourceEnvOverrides,
+  buildProviderOverrideOwnershipEnv,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
   rehydrateProviderIssueHandoffOnStartup,
@@ -118,6 +119,18 @@ describe('controlHostCliShell manifest discovery', () => {
           '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1'
       }
+    });
+  });
+
+  it('prefers launch-time package-root overrides when stamping provider ownership markers', () => {
+    expect(
+      buildProviderOverrideOwnershipEnv('/tmp/codex-orchestrator.js', {
+        CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/override-package-root',
+        [REPO_CONFIG_PATH_ENV_KEY]: '/tmp/provider-workflow.last-known-good.json'
+      })
+    ).toEqual({
+      CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH: '/tmp/provider-workflow.last-known-good.json',
+      CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT: '/tmp/override-package-root'
     });
   });
 

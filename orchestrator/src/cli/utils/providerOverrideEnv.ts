@@ -32,11 +32,16 @@ export function sanitizeProviderOverrideEnv(
   }
   const currentRepoConfigPath = normalizeEnvString(sanitized[REPO_CONFIG_PATH_ENV_KEY]);
   const currentPackageRoot = normalizeEnvString(sanitized.CODEX_ORCHESTRATOR_PACKAGE_ROOT);
+  const providerPackageRootMarker = normalizeEnvString(sanitized[PROVIDER_PACKAGE_ROOT_ENV_KEY]);
   const providerRepoConfigPath =
     normalizeEnvString(sanitized[PROVIDER_REPO_CONFIG_PATH_ENV_KEY]) ??
-    deriveProviderRepoConfigPath(currentPackageRoot, controlHostLocator.taskId, controlHostLocator.runId);
+    deriveProviderRepoConfigPath(
+      providerPackageRootMarker ?? currentPackageRoot,
+      controlHostLocator.taskId,
+      controlHostLocator.runId
+    );
   const providerPackageRoot =
-    normalizeEnvString(sanitized[PROVIDER_PACKAGE_ROOT_ENV_KEY]) ??
+    providerPackageRootMarker ??
     (currentRepoConfigPath && providerRepoConfigPath && currentRepoConfigPath === providerRepoConfigPath
       ? currentPackageRoot
       : null);

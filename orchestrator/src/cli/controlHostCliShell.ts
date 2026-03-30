@@ -374,8 +374,10 @@ function buildProviderOverrideOwnershipEnv(
   cliEntrypoint: string,
   envOverrides: Record<string, string>
 ): Record<string, string> {
-  const repoConfigPath = envOverrides[REPO_CONFIG_PATH_ENV_KEY];
-  const packageRoot = resolveProviderOverridePackageRoot(cliEntrypoint);
+  const repoConfigPath = normalizeProviderLinearSourceValue(envOverrides[REPO_CONFIG_PATH_ENV_KEY]);
+  const packageRoot =
+    normalizeProviderLinearSourceValue(envOverrides.CODEX_ORCHESTRATOR_PACKAGE_ROOT) ??
+    resolveProviderOverridePackageRoot(cliEntrypoint);
   return {
     ...(repoConfigPath ? { [PROVIDER_REPO_CONFIG_PATH_ENV_KEY]: repoConfigPath } : {}),
     ...(packageRoot ? { [PROVIDER_PACKAGE_ROOT_ENV_KEY]: packageRoot } : {})
@@ -621,6 +623,7 @@ export const __test__ = {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
   buildProviderLinearSourceEnvOverrides,
+  buildProviderOverrideOwnershipEnv,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
   rehydrateProviderIssueHandoffOnStartup,
