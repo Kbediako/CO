@@ -6,6 +6,7 @@ import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.
 import { readProviderPollingHealth } from './providerPollingHealth.js';
 import {
   buildProviderIntakeSummary,
+  isRecordLike,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
 } from './providerIntakeState.js';
@@ -274,9 +275,61 @@ function createControlRuntimeSnapshot(
 }
 
 function readProviderPollingSnapshot(
-  context: Pick<ControlRuntimeContext, 'readProviderIssueHandoff'>
+  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readProviderIssueHandoff'>
 ): ControlPollingHealthPayload | null {
-  return readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
+  const livePolling = readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null);
+  const persistedPolling = normalizePersistedProviderPollingSnapshot(
+    context.providerIntakeState?.polling
+  );
+  if (persistedPolling && livePolling?.updated_at === null) {
+    return persistedPolling;
+  }
+  return livePolling ?? persistedPolling;
+}
+
+function normalizePersistedProviderPollingSnapshot(
+  polling: ProviderIntakeState['polling'] | null | undefined
+): ControlPollingHealthPayload | null {
+  if (!isRecordLike(polling)) {
+    return null;
+  }
+  return {
+    enabled: polling.enabled !== false,
+    interval_ms:
+      typeof polling.interval_ms === 'number' && Number.isFinite(polling.interval_ms)
+        ? polling.interval_ms
+        : null,
+    checking: polling.checking === true,
+    queued: polling.queued === true,
+    last_mode: polling.last_mode === 'poll' || polling.last_mode === 'refresh' ? polling.last_mode : null,
+    last_requested_at:
+      typeof polling.last_requested_at === 'string' ? polling.last_requested_at : null,
+    last_completed_at:
+      typeof polling.last_completed_at === 'string' ? polling.last_completed_at : null,
+    last_success_at: typeof polling.last_success_at === 'string' ? polling.last_success_at : null,
+    last_error_at: typeof polling.last_error_at === 'string' ? polling.last_error_at : null,
+    last_error: typeof polling.last_error === 'string' ? polling.last_error : null,
+    next_poll_at: typeof polling.next_poll_at === 'string' ? polling.next_poll_at : null,
+    next_poll_in_ms:
+      typeof polling.next_poll_in_ms === 'number' && Number.isFinite(polling.next_poll_in_ms)
+        ? polling.next_poll_in_ms
+        : null,
+    updated_at: typeof polling.updated_at === 'string' ? polling.updated_at : null,
+    operation_started_at:
+      typeof polling.operation_started_at === 'string' ? polling.operation_started_at : null,
+    operation_elapsed_ms:
+      typeof polling.operation_elapsed_ms === 'number' && Number.isFinite(polling.operation_elapsed_ms)
+        ? polling.operation_elapsed_ms
+        : null,
+    stalled_after_ms:
+      typeof polling.stalled_after_ms === 'number' && Number.isFinite(polling.stalled_after_ms)
+        ? polling.stalled_after_ms
+        : null,
+    stuck: polling.stuck === true,
+    stuck_since_at: typeof polling.stuck_since_at === 'string' ? polling.stuck_since_at : null,
+    restart_required: polling.restart_required === true,
+    reason: typeof polling.reason === 'string' ? polling.reason : null
+  };
 }
 
 function enrichProjectionSourceWithProviderRetryState<

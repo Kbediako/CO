@@ -217,7 +217,10 @@ describe('prepareControlServerStartupInputs', () => {
       expect(context.questionQueue.list()).toEqual(questions);
       expect(context.delegationTokens.list()).toEqual(tokens);
       expect(context.linearAdvisoryState).toEqual(linearAdvisorySeed);
-      expect(context.providerIntakeState).toEqual(providerIntakeSeed);
+      expect(context.providerIntakeState).toEqual({
+        ...providerIntakeSeed,
+        polling: null
+      });
       expect(context.runtime).toBeDefined();
       expect(context.eventTransport).toBeDefined();
     } finally {
@@ -272,6 +275,7 @@ describe('prepareControlServerStartupInputs', () => {
         rehydrated_at: null,
         latest_provider_key: null,
         latest_reason: null,
+        polling: null,
         claims: []
       });
     } finally {

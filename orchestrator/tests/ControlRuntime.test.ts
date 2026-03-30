@@ -8,7 +8,9 @@ import type { ProviderIssueHandoffService } from '../src/cli/control/providerIss
 import {
   initializeProviderPollingHealth,
   markProviderPollingCompleted,
-  markProviderPollingStarted
+  markProviderPollingStuck,
+  markProviderPollingStarted,
+  readProviderPollingHealth
 } from '../src/cli/control/providerPollingHealth.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
@@ -1647,6 +1649,160 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('falls back to the persisted polling snapshot before live polling health restarts', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true
+    });
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      providerIntakeState: {
+        schema_version: 1,
+        updated_at: '2026-03-07T00:00:45.000Z',
+        rehydrated_at: null,
+        latest_provider_key: null,
+        latest_reason: null,
+        polling: {
+          enabled: true,
+          interval_ms: 15000,
+          checking: true,
+          queued: false,
+          last_mode: 'refresh',
+          last_requested_at: '2026-03-07T00:00:00.000Z',
+          updated_at: '2026-03-07T00:00:45.000Z',
+          operation_started_at: '2026-03-07T00:00:00.000Z',
+          operation_elapsed_ms: 45000,
+          stalled_after_ms: 45000,
+          stuck: true,
+          stuck_since_at: '2026-03-07T00:00:45.000Z',
+          restart_required: true,
+          reason: 'provider_refresh_lifecycle_stuck'
+        },
+        claims: []
+      },
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+    expect(compatibilityProjection.polling).toMatchObject({
+      interval_ms: 15000,
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      updated_at: '2026-03-07T00:00:45.000Z'
+    });
+  });
+
+  it('honors explicit null when reinitializing provider polling health state', async () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const onUpdate = vi.fn();
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      onUpdate
+    });
+
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    onUpdate.mockClear();
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 30000,
+      stuckAfterMs: null,
+      onUpdate: null
+    });
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'poll',
+      atMs: Date.parse('2026-03-07T00:00:05.000Z')
+    });
+
+    await Promise.resolve();
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      interval_ms: 30000,
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      stalled_after_ms: null
+    });
+  });
+
+  it('lets stuck flush failures reject while keeping later polling updates serialized', async () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const onUpdate = vi.fn(async (payload: { stuck?: boolean }) => {
+      if (payload.stuck === true) {
+        throw new Error('persist failed');
+      }
+    });
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      onUpdate
+    });
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    onUpdate.mockClear();
+
+    markProviderPollingStarted(providerIssueHandoff, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-03-07T00:00:00.000Z')
+    });
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    onUpdate.mockClear();
+
+    await expect(
+      markProviderPollingStuck(providerIssueHandoff, {
+        atMs: Date.parse('2026-03-07T00:00:45.000Z')
+      })
+    ).rejects.toThrow('persist failed');
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stuck: true,
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      })
+    );
+
+    onUpdate.mockImplementation(async () => undefined);
+    onUpdate.mockClear();
+
+    markProviderPollingCompleted(providerIssueHandoff, {
+      atMs: Date.parse('2026-03-07T00:01:00.000Z')
+    });
+
+    await vi.waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        checking: false,
+        stuck: false,
+        restart_required: false,
+        last_completed_at: '2026-03-07T00:01:00.000Z'
+      })
+    );
+  });
+
   it('recomputes provider polling health on repeated compatibility reads without snapshot invalidation', async () => {
     const fixture = await createFixture();
     const providerIssueHandoff = {
@@ -1702,5 +1858,48 @@ describe('ControlRuntime', () => {
       last_error_at: '2026-03-07T00:00:11.000Z',
       last_error: 'provider refresh failed'
     });
+  });
+
+  it('surfaces stuck provider polling as restart-required through compatibility projections', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:00:46.000Z'));
+    try {
+      const fixture = await createFixture();
+      const providerIssueHandoff = {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => {}),
+        refresh: vi.fn(async () => {})
+      } as unknown as ProviderIssueHandoffService;
+
+      initializeProviderPollingHealth(providerIssueHandoff, {
+        intervalMs: 15000,
+        stuckAfterMs: 45000
+      });
+      markProviderPollingStarted(providerIssueHandoff, {
+        mode: 'refresh',
+        atMs: Date.parse('2026-03-07T00:00:00.000Z')
+      });
+
+      const runtime = createControlRuntime({
+        controlStore: fixture.controlStore,
+        questionQueue: { list: () => [] },
+        paths: fixture.paths,
+        linearAdvisoryState: { tracked_issue: null },
+        readProviderIssueHandoff: () => providerIssueHandoff
+      });
+
+      const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+      expect(compatibilityProjection.polling).toMatchObject({
+        checking: true,
+        stuck: true,
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck',
+        operation_started_at: '2026-03-07T00:00:00.000Z',
+        stalled_after_ms: 45000,
+        stuck_since_at: '2026-03-07T00:00:45.000Z'
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
