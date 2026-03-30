@@ -9,6 +9,7 @@ import {
   runDoctor,
   runDoctorCloudPreflight
 } from '../src/cli/doctor.js';
+import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
 
@@ -47,9 +48,11 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
     MCP_RUNNER_TASK_ID: '',
     TASK: '',
     CODEX_ORCHESTRATOR_TASK_ID: '',
+    CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '',
     CODEX_ORCHESTRATOR_ROOT: '',
     CODEX_ORCHESTRATOR_RUNTIME_MODE: '',
     CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: '',
+    [REPO_CONFIG_PATH_ENV_KEY]: '',
     CODEX_RUNTIME_MODE: '',
     ...overrides
   };

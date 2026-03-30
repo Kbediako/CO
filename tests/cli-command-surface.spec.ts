@@ -5,7 +5,11 @@ import { isAbsolute, join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { sanitizeProviderOverrideEnv } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
+import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
+import {
+  PROVIDER_OVERRIDE_ENV_KEYS,
+  sanitizeProviderOverrideEnv
+} from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
@@ -20,8 +24,8 @@ const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_RUNTIME_MODE'
 ] as const;
 const REPO_CONFIG_TEST_ENV_KEYS = [
-  'CODEX_ORCHESTRATOR_REPO_CONFIG_PATH',
-  'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'
+  'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
+  REPO_CONFIG_PATH_ENV_KEY
 ] as const;
 const CLI_SANITIZED_ENV_KEYS = [...RUNTIME_TEST_ENV_KEYS, ...REPO_CONFIG_TEST_ENV_KEYS] as const;
 const DEFAULT_RUNTIME_TEST_ENV = {
@@ -30,7 +34,7 @@ const DEFAULT_RUNTIME_TEST_ENV = {
   CODEX_RUNTIME_MODE: 'cli'
 } satisfies NodeJS.ProcessEnv;
 const DEFAULT_REPO_CONFIG_TEST_ENV = {
-  CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
+  [REPO_CONFIG_PATH_ENV_KEY]: '',
   CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: ''
 } satisfies NodeJS.ProcessEnv;
 
@@ -47,14 +51,15 @@ afterEach(async () => {
 async function runCli(
   args: string[],
   env?: NodeJS.ProcessEnv,
-  timeoutMs: number = CLI_EXEC_TIMEOUT_MS
+  timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
   const mergedEnv = sanitizeProviderOverrideEnv({
     ...process.env,
     ...(env ?? {})
   });
-  const explicitCliOverrides = Object.fromEntries(
-    CLI_SANITIZED_ENV_KEYS.flatMap((key) => {
+  const explicitRuntimeOverrides = Object.fromEntries(
+    RUNTIME_TEST_ENV_KEYS.flatMap((key) => {
       if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
         return [];
       }
@@ -64,7 +69,25 @@ async function runCli(
       return [[key, env[key]]];
     })
   ) as NodeJS.ProcessEnv;
+  const explicitProviderOverrides = Object.fromEntries(
+    REPO_CONFIG_TEST_ENV_KEYS.flatMap((key) => {
+      if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
+        return [];
+      }
+      if (
+        !explicitProviderOverrideKeys.has(key) &&
+        env[key] === process.env[key] &&
+        Object.prototype.hasOwnProperty.call(process.env, key)
+      ) {
+        return [];
+      }
+      return [[key, env[key]]];
+    })
+  ) as NodeJS.ProcessEnv;
   for (const key of CLI_SANITIZED_ENV_KEYS) {
+    delete mergedEnv[key];
+  }
+  for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
     delete mergedEnv[key];
   }
   return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
@@ -72,7 +95,8 @@ async function runCli(
       ...mergedEnv,
       ...DEFAULT_RUNTIME_TEST_ENV,
       ...DEFAULT_REPO_CONFIG_TEST_ENV,
-      ...explicitCliOverrides
+      ...explicitProviderOverrides,
+      ...explicitRuntimeOverrides
     },
     timeout: timeoutMs
   });
@@ -1486,6 +1510,37 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('preserves explicit strict repo config env when it matches the ambient provider-worker value', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-ambient-match-'));
+    const originalStrictRepoConfig = process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+    process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = '1';
+    try {
+      const env = {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: tempDir,
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+        CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+      };
+      await expect(
+        runCli(
+          ['plan', 'docs-review'],
+          env,
+          CLI_EXEC_TIMEOUT_MS,
+          new Set(['CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'])
+        )
+      ).rejects.toMatchObject({
+        stderr: expect.stringContaining('Repo-local codex.orchestrator.json is required')
+      });
+    } finally {
+      if (originalStrictRepoConfig === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = originalStrictRepoConfig;
+      }
+    }
+  }, TEST_TIMEOUT);
+
   it('allows disabling strict repo config mode per command with --repo-config-required=false', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-override-'));
     const env = {
@@ -1495,7 +1550,12 @@ describe('codex-orchestrator command surface', () => {
       CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
       CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
     };
-    const { stdout } = await runCli(['plan', 'docs-review', '--format', 'json', '--repo-config-required=false'], env);
+    const { stdout } = await runCli(
+      ['plan', 'docs-review', '--format', 'json', '--repo-config-required=false'],
+      env,
+      CLI_EXEC_TIMEOUT_MS,
+      new Set(['CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'])
+    );
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
       pipeline?: { id?: string };

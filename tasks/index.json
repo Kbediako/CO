@@ -25,6 +25,30 @@
       }
     },
     {
+      "id": "20260330-linear-9553982c-6360-4c9c-83a4-674702701158",
+      "title": "CO: Restore baseline doctor and stage-set tests blocking review handoff",
+      "relates_to": "tasks/tasks-linear-9553982c-6360-4c9c-83a4-674702701158.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-9553982c-6360-4c9c-83a4-674702701158-docs-review/cli/2026-03-30T08-24-59-533Z-f3defab8/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, and the forced review stage stalled in low-signal repo reinspection after docs:check/docs:freshness passed; manual fallback review recorded no findings in out/linear-9553982c-6360-4c9c-83a4-674702701158/manual/20260330T083228Z-docs-review-fallback.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9553982c-6360-4c9c-83a4-674702701158.md",
+        "task": "tasks/tasks-linear-9553982c-6360-4c9c-83a4-674702701158.md",
+        "agent_task": ".agent/task/linear-9553982c-6360-4c9c-83a4-674702701158.md",
+        "docs": "docs/TECH_SPEC-linear-9553982c-6360-4c9c-83a4-674702701158.md"
+      }
+    },
+    {
       "id": "20260330-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3",
       "title": "CO: Prevent provider-worker env override leakage into repo validation",
       "relates_to": "tasks/tasks-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",

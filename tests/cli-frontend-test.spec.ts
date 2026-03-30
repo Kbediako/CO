@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
+import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
 import { sanitizeProviderOverrideEnv } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
 
 const execFileAsync = promisify(execFile);
@@ -13,7 +14,9 @@ const TEST_TIMEOUT = 30000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
-  'CODEX_RUNTIME_MODE'
+  'CODEX_RUNTIME_MODE',
+  'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
+  REPO_CONFIG_PATH_ENV_KEY
 ] as const;
 const ISOLATED_RUNTIME_TEST_ENV = {
   CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
