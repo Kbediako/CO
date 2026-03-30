@@ -10,12 +10,14 @@ import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  appendProviderLinearWorkerChildLaneRecord,
   appendProviderLinearWorkerChildStreamRecord,
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
   ProviderLinearTrackedIssueReadError,
   readProviderLinearWorkerChildStreams,
+  refreshProviderLinearWorkerProofSnapshot,
   runProviderLinearWorker,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
@@ -643,6 +645,41 @@ describe('provider linear worker runner', () => {
       launched_at: '2026-03-21T09:00:00.050Z'
     };
     const secondChildStreamRecord = { ...childStreamRecord, task_id: 'linear-lin-issue-1-docs-review-alt', manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review-alt', 'cli', 'docs-run-1', 'manifest.json'), artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' };
+    const childLaneRecord = {
+      stream: 'impl-a',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: 'linear-lin-issue-1-impl-a',
+      run_id: 'child-run-1',
+      status: 'succeeded',
+      manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'manifest.json'),
+      artifact_root: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1',
+      log_path: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1/run.log',
+      summary: 'child lane finished',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-21T09:00:00.075Z',
+      purpose: 'Implement bounded same-issue child lanes',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-21T09:00:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-21T09:00:00.075Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+      patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch'),
+      patch_bytes: 256,
+      decision: 'pending',
+      decision_at: null,
+      decision_reason: null
+    };
     const execRunner = vi
       .fn<
         (request: {
@@ -658,6 +695,7 @@ describe('provider linear worker runner', () => {
         expect(auditPath).toBe(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME));
         await appendProviderLinearWorkerChildStreamRecord(runDir, childStreamRecord);
         await appendProviderLinearWorkerChildStreamRecord(runDir, secondChildStreamRecord);
+        await appendProviderLinearWorkerChildLaneRecord(runDir, childLaneRecord);
         await appendProviderLinearAuditEntry(String(auditPath), {
           recorded_at: '2026-03-21T09:00:00.100Z',
           operation: 'issue-context',
@@ -838,6 +876,7 @@ describe('provider linear worker runner', () => {
         latest_recorded_at: '2026-03-21T09:00:01.200Z'
       },
       child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded' })]),
+      child_lanes: expect.arrayContaining([expect.objectContaining({ stream: 'impl-a', task_id: 'linear-lin-issue-1-impl-a', run_id: 'child-run-1', decision: 'pending', patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch') })]),
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -889,6 +928,7 @@ describe('provider linear worker runner', () => {
         }
       },
       child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' })]),
+      child_lanes: expect.arrayContaining([expect.objectContaining({ stream: 'impl-a', task_id: 'linear-lin-issue-1-impl-a', run_id: 'child-run-1', decision: 'pending', patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch') })]),
       end_reason: 'issue_inactive'
     });
   });
@@ -1122,6 +1162,60 @@ describe('provider linear worker runner', () => {
         expect.objectContaining({ task_id: 'linear-lin-issue-1-implementation-gate', run_id: 'impl-run-1' })
       ])
     );
+  });
+
+  it('waits for the shared proof lock before refreshing the provider proof snapshot', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const proofLockPath = `${proofPath}.lock`;
+    await writeFile(
+      proofPath,
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'task_complete',
+        last_message: 'done',
+        last_event_at: '2026-03-21T09:00:00.000Z',
+        tokens: {
+          input_tokens: 1,
+          output_tokens: 2,
+          total_tokens: 3
+        },
+        rate_limits: null,
+        owner_phase: 'implementation',
+        owner_status: 'in_progress',
+        workspace_path: tempRoot,
+        linear_audit: null,
+        end_reason: null,
+        updated_at: '2026-03-21T09:00:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(proofLockPath, 'locked', 'utf8');
+    const writeProof = vi.fn(async () => undefined);
+
+    const refreshPromise = refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      writeProof
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(writeProof).not.toHaveBeenCalled();
+    await rm(proofLockPath, { force: true });
+
+    const refreshed = await refreshPromise;
+    expect(writeProof).toHaveBeenCalledTimes(1);
+    expect(refreshed).toMatchObject({
+      issue_identifier: 'CO-2',
+      updated_at: '2026-03-21T09:00:10.000Z'
+    });
   });
 
   it('forces standalone review execution env inside non-interactive provider worker turns', async () => {

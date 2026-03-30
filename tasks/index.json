@@ -49,6 +49,29 @@
       }
     },
     {
+      "id": "20260330-linear-271cbab4-de28-4847-a468-128df007c4a0",
+      "title": "CO: Implement parent-owned same-issue multi-worker runtime end to end",
+      "relates_to": "tasks/tasks-linear-271cbab4-de28-4847-a468-128df007c4a0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-271cbab4-de28-4847-a468-128df007c4a0-co-35-docs-review-rerun/cli/2026-03-30T07-04-16-131Z-88752c3e/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-271cbab4-de28-4847-a468-128df007c4a0.md",
+        "task": "tasks/tasks-linear-271cbab4-de28-4847-a468-128df007c4a0.md",
+        "agent_task": ".agent/task/linear-271cbab4-de28-4847-a468-128df007c4a0.md",
+        "docs": "docs/TECH_SPEC-linear-271cbab4-de28-4847-a468-128df007c4a0.md"
+      }
+    },
+    {
       "id": "20260330-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2",
       "title": "CO: Fix stale merge-handoff after successful provider-worker review handoff",
       "relates_to": "tasks/tasks-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",

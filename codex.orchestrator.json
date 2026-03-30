@@ -292,6 +292,30 @@
       ]
     },
     {
+      "id": "provider-linear-child-lane",
+      "title": "Provider Linear Child Lane",
+      "description": "Runs a bounded same-issue child lane in an isolated lane workspace and emits a patch artifact for parent-owned integration.",
+      "tags": [
+        "provider-worker",
+        "linear",
+        "child-lane"
+      ],
+      "guardrailsRequired": false,
+      "stages": [
+        {
+          "kind": "command",
+          "id": "provider-linear-child-lane",
+          "title": "Run provider linear child lane",
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearChildLaneRunner.js\"",
+          "env": {
+            "CODEX_NON_INTERACTIVE": "1",
+            "CODEX_NO_INTERACTIVE": "1"
+          },
+          "summaryHint": "Provider linear child lane completed and wrote a patch artifact for parent review"
+        }
+      ]
+    },
+    {
       "id": "frontend-testing",
       "title": "Frontend Testing",
       "description": "Runs the frontend testing runner (DevTools off by default).",

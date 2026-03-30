@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readProviderLinearWorkerChildStreams, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { runProviderLinearChildStreamShell } from '../src/cli/providerLinearChildStreamShell.js';
 let tempRoot: string | null = null;
+let externalRoot: string | null = null;
 const RUN_ID = 'run-child';
 const TASK_ID = 'linear-lin-issue-1';
 const CONTROL_HOST_TASK_ID = 'local-mcp';
@@ -15,10 +16,19 @@ afterEach(async () => {
     await rm(tempRoot, { recursive: true, force: true });
     tempRoot = null;
   }
+  if (externalRoot) {
+    await rm(externalRoot, { recursive: true, force: true });
+    externalRoot = null;
+  }
 });
-async function createProviderWorkerManifest(pipelineId = 'provider-linear-worker', runsDir = '.runs') {
+async function createProviderWorkerManifest(
+  pipelineId = 'provider-linear-worker',
+  runsDir = '.runs',
+  runsRootOverride: string | null = null
+) {
   tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-stream-'));
-  const runDir = join(tempRoot, runsDir, TASK_ID, 'cli', RUN_ID);
+  const runsRoot = runsRootOverride ?? tempRoot;
+  const runDir = join(runsRoot, runsDir, TASK_ID, 'cli', RUN_ID);
   const manifestPath = join(runDir, 'manifest.json');
   await mkdir(runDir, { recursive: true });
   await writeFile(
@@ -87,6 +97,8 @@ describe('runProviderLinearChildStreamShell', () => {
           CODEX_ORCHESTRATOR_RUNTIME_MODE: 'appserver',
           CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'appserver',
           CODEX_RUNTIME_MODE: 'appserver',
+          CODEX_ORCHESTRATOR_RUNS_DIR: join('/tmp', 'shared-runs'),
+          CODEX_ORCHESTRATOR_OUT_DIR: join('/tmp', 'shared-out'),
           CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID: 'appserver-run-child',
           CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(runDir, 'provider-linear-worker-linear-audit.jsonl'),
           CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
@@ -106,6 +118,8 @@ describe('runProviderLinearChildStreamShell', () => {
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env.CODEX_ORCHESTRATOR_ROOT).toBe(tempRoot);
     expect(request?.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBe('/tmp/co-package-root');
+    expect(request?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
+    expect(request?.env.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot ?? '', 'out'));
     expect(request?.env.MCP_RUNNER_TASK_ID).toBe(`${TASK_ID}-docs-review`);
     for (const key of [
       'CODEX_ORCHESTRATOR_MANIFEST_PATH',
@@ -171,10 +185,96 @@ describe('runProviderLinearChildStreamShell', () => {
     const result = await runProviderLinearChildStreamShell({ pipelineId: 'docs-review', env: buildProviderWorkerEnv(manifestPath) }, { execRunner: vi.fn(async () => ({ exitCode: 0, stdout: JSON.stringify({ status: 'succeeded', ...payload }), stderr: '' })) as never });
     expect(result).toMatchObject({ ok: false, operation: 'child-stream', ...ISSUE, pipeline_id: 'docs-review', child_run: null, error: { code: 'provider_worker_child_stream_output_invalid', status: 502 } });
   });
-  it('accepts child output rooted under the parent manifest runs root when runs-dir is overridden', async () => {
-    const { manifestPath } = await createProviderWorkerManifest('provider-linear-worker', 'alt-runs');
-    const result = await runProviderLinearChildStreamShell({ pipelineId: 'docs-review', env: buildProviderWorkerEnv(manifestPath) }, { execRunner: vi.fn(async () => ({ exitCode: 0, stdout: JSON.stringify({ run_id: 'docs-run-1', status: 'succeeded', artifact_root: `alt-runs/${TASK_ID}-docs-review/cli/docs-run-1`, manifest: `alt-runs/${TASK_ID}-docs-review/cli/docs-run-1/manifest.json`, summary: 'ok' }), stderr: '' })) as never });
+  it('accepts child output rooted under a workspace-local overridden runs dir', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const result = await runProviderLinearChildStreamShell(
+      {
+        pipelineId: 'docs-review',
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_ORCHESTRATOR_RUNS_DIR: join(tempRoot ?? '', 'alt-runs')
+        })
+      },
+      {
+        execRunner: vi.fn(async () => ({
+          exitCode: 0,
+          stdout: JSON.stringify({
+            run_id: 'docs-run-1',
+            status: 'succeeded',
+            artifact_root: `alt-runs/${TASK_ID}-docs-review/cli/docs-run-1`,
+            manifest: `alt-runs/${TASK_ID}-docs-review/cli/docs-run-1/manifest.json`,
+            summary: 'ok'
+          }),
+          stderr: ''
+        })) as never
+      }
+    );
     expect(result).toMatchObject({ ok: true, child_run: { manifest_path: join(tempRoot ?? '', 'alt-runs', `${TASK_ID}-docs-review`, 'cli', 'docs-run-1', 'manifest.json') } });
+  });
+  it('preserves the parent repo-config override when launching a child stream', async () => {
+    const { manifestPath } = await createProviderWorkerManifest();
+    const repoConfigOverride = join(tempRoot ?? '', 'custom', 'codex.orchestrator.json');
+    const execRunner = vi.fn(async (request) => {
+      expect(request.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(repoConfigOverride);
+      return createExecResult('docs-review', 'docs-run-1', 'docs-review passed');
+    });
+
+    const result = await runProviderLinearChildStreamShell(
+      {
+        pipelineId: 'docs-review',
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: repoConfigOverride
+        })
+      },
+      {
+        execRunner,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-stream',
+      stream: 'docs-review',
+      child_run: {
+        run_id: 'docs-run-1',
+        task_id: `${TASK_ID}-docs-review`
+      }
+    });
+  });
+  it('accepts workspace-local child output when the parent manifest lives under an external shared runs root', async () => {
+    externalRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-stream-shared-'));
+    const { manifestPath } = await createProviderWorkerManifest(
+      'provider-linear-worker',
+      '.runs',
+      externalRoot
+    );
+    const execRunner = vi.fn(async () => ({
+      exitCode: 0,
+      stdout: JSON.stringify({
+        run_id: 'docs-run-1',
+        status: 'succeeded',
+        artifact_root: `.runs/${TASK_ID}-docs-review/cli/docs-run-1`,
+        manifest: `.runs/${TASK_ID}-docs-review/cli/docs-run-1/manifest.json`,
+        summary: 'ok'
+      }),
+      stderr: ''
+    }));
+    const result = await runProviderLinearChildStreamShell(
+      {
+        pipelineId: 'docs-review',
+        env: buildProviderWorkerEnv(manifestPath, {
+          CODEX_ORCHESTRATOR_RUNS_DIR: join(externalRoot, '.runs')
+        })
+      },
+      { execRunner: execRunner as never }
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      child_run: {
+        manifest_path: join(tempRoot ?? '', '.runs', `${TASK_ID}-docs-review`, 'cli', 'docs-run-1', 'manifest.json')
+      }
+    });
+    expect(execRunner.mock.calls[0]?.[0]?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
   });
   it('parses a valid trailing child-run json object after prelude logs', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
@@ -216,6 +316,43 @@ describe('runProviderLinearChildStreamShell', () => {
       child_run: null,
       error: { code: 'provider_worker_child_stream_output_invalid', status: 502 }
     });
+  });
+  it('keeps launch success when proof refresh fails after the child stream record is appended', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const warn = vi.fn();
+
+    const result = await runProviderLinearChildStreamShell(
+      {
+        pipelineId: 'docs-review',
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner: vi.fn(async () => createExecResult('docs-review', 'docs-run-1', 'docs-review passed')) as never,
+        refreshProofSnapshot: vi.fn(async () => {
+          throw new Error('proof refresh exploded');
+        }) as never,
+        warn
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-stream',
+      stream: 'docs-review',
+      child_run: {
+        run_id: 'docs-run-1',
+        task_id: 'linear-lin-issue-1-docs-review'
+      }
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'provider-linear-child-stream warning: failed to refresh proof snapshot after recording child stream docs-review: proof refresh exploded'
+    );
+    expect(await readProviderLinearWorkerChildStreams(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'docs-review',
+        run_id: 'docs-run-1'
+      })
+    ]);
   });
   it('clears FORCE_CODEX_REVIEW for advisory children and returns child-run details when sidecar writes fail', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
