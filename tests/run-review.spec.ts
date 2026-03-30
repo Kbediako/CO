@@ -155,6 +155,27 @@ has_arg() {
   done
   return 1
 }
+has_inline_prompt() {
+  local args=("$@")
+  local index=0
+  while [[ $index -lt \${#args[@]} ]]; do
+    local arg="\${args[$index]}"
+    case "$arg" in
+      review|--uncommitted)
+        ;;
+      --base|--commit|--title)
+        index=$((index + 1))
+        ;;
+      --*)
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+    index=$((index + 1))
+  done
+  return 1
+}
 if [[ "\${1:-}" == "--help" ]]; then
   if [[ "\${RUN_REVIEW_MODE:-ok}" == "delete-after-help" ]]; then
     rm -f "$0"
@@ -169,15 +190,15 @@ fi
       while true; do sleep 1; done
     fi
     if [[ "$mode" == "reject-scoped-prompt" ]]; then
-      if has_arg "--base" "$@"; then
+      if has_inline_prompt "$@" && has_arg "--base" "$@"; then
         echo "custom prompt cannot be combined with --base" >&2
         exit 1
       fi
-      if has_arg "--commit" "$@"; then
+      if has_inline_prompt "$@" && has_arg "--commit" "$@"; then
         echo "custom prompt cannot be combined with --commit" >&2
         exit 1
       fi
-      if has_arg "--uncommitted" "$@"; then
+      if has_inline_prompt "$@" && has_arg "--uncommitted" "$@"; then
         echo "custom prompt cannot be combined with --uncommitted" >&2
         exit 1
       fi
@@ -186,23 +207,25 @@ fi
       exit 0
     fi
     if [[ "$mode" == "reject-scoped-prompt-generic-diff-scoping" ]]; then
-      if has_arg "--base" "$@" || has_arg "--commit" "$@" || has_arg "--uncommitted" "$@"; then
-        echo "custom prompt cannot be combined with diff scoping" >&2
-        exit 1
+      if has_inline_prompt "$@"; then
+        if has_arg "--base" "$@" || has_arg "--commit" "$@" || has_arg "--uncommitted" "$@"; then
+          echo "custom prompt cannot be combined with diff scoping" >&2
+          exit 1
+        fi
       fi
       echo "stdout-ok"
       echo "stderr-ok" >&2
       exit 0
     fi
     if [[ "$mode" == "reject-scoped-prompt-usage-footer" ]]; then
-      if has_arg "--base" "$@"; then
+      if has_inline_prompt "$@" && has_arg "--base" "$@"; then
         echo "custom prompt cannot be combined with diff scoping" >&2
         echo "Usage: codex review [options]" >&2
         echo "  --base <ref>" >&2
         echo "  --commit <sha>" >&2
         exit 1
       fi
-      if has_arg "--commit" "$@"; then
+      if has_inline_prompt "$@" && has_arg "--commit" "$@"; then
         echo "custom prompt cannot be combined with diff scoping" >&2
         echo "Usage: codex review [options]" >&2
         echo "  --base <ref>" >&2
@@ -2495,7 +2518,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).not.toContain('R100\t');
   });
 
-  it('fails when explicit base scope would be dropped after a CLI scope rejection', async () => {
+  it('executes explicit base-scoped review without an inline prompt argument', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
@@ -2516,22 +2539,30 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       ['--base', baseRef]
     );
 
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
-    expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('stdout-ok');
+    expect(result.stderr).toContain('stderr-ok');
     const argsLog = await readFile(argsLogPath, 'utf8');
     const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
+    expect(reviewInvocations[0]).toBe(`argv=review --base ${baseRef}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
+      launch_context: {
+        scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
+        prompt_delivery: 'inline' | 'artifact-only';
+      } | null;
     };
-    expect(telemetry.status).toBe('failed');
-    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.error).toBeNull();
+    expect(telemetry.launch_context).toEqual({
+      scope_flag_mode: 'base',
+      prompt_delivery: 'artifact-only'
+    });
   });
 
   it('fails when explicit base scope is rejected with a generic unknown-option error', async () => {
@@ -2568,10 +2599,18 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
+      launch_context: {
+        scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
+        prompt_delivery: 'inline' | 'artifact-only';
+      } | null;
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toBeTruthy();
     expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+    expect(telemetry.launch_context).toEqual({
+      scope_flag_mode: 'base',
+      prompt_delivery: 'artifact-only'
+    });
   });
 
   it('still blocks dropping explicit base scope when a pipeline-owned large-scope override is set', async () => {
@@ -2589,8 +2628,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       manifestPath,
       {
         ...baseEnv(sandbox, codexBin),
-        RUN_REVIEW_MODE: 'reject-scoped-prompt',
+        RUN_REVIEW_MODE: 'reject-base-unknown-option',
         RUN_REVIEW_ARGS_LOG: argsLogPath,
+        CODEX_REVIEW_DEBUG_TELEMETRY: '1',
         CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON:
           'Pipeline-owned implementation gate review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
       },
@@ -2610,49 +2650,71 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
+      launch_context: {
+        scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
+        prompt_delivery: 'inline' | 'artifact-only';
+      } | null;
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toBeTruthy();
+    expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
+    expect(telemetry.launch_context).toEqual({
+      scope_flag_mode: 'base',
+      prompt_delivery: 'artifact-only'
+    });
   });
 
-  it('fails when explicit uncommitted scope would be dropped after a CLI scope rejection', async () => {
+  it('executes explicit commit-scoped review without an inline prompt argument', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     await initGitRepoWithCommittedFiles(sandbox, 1);
     await writeFile(join(sandbox, 'file-1.txt'), 'updated-file-1.txt\n', 'utf8');
+    await runGit(['commit', '-am', 'commit-only review scope'], sandbox);
+    const { stdout: commitStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const commitSha = commitStdout.trim();
     const argsLogPath = join(sandbox, 'review-args.log');
 
     const result = await runReviewCommand(
       manifestPath,
       {
         ...baseEnv(sandbox, codexBin),
-        RUN_REVIEW_MODE: 'reject-scoped-prompt',
+        RUN_REVIEW_MODE: 'reject-scoped-prompt-usage-footer',
         RUN_REVIEW_ARGS_LOG: argsLogPath,
         CODEX_REVIEW_DEBUG_TELEMETRY: '1'
       },
-      ['--uncommitted']
+      ['--commit', commitSha]
     );
 
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
-    expect(result.stderr).toContain('explicit `--uncommitted` review scope must remain auditable');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('stdout-ok');
+    expect(result.stderr).toContain('stderr-ok');
     const argsLog = await readFile(argsLogPath, 'utf8');
     const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toContain('argv=review --uncommitted');
+    expect(reviewInvocations[0]).toBe(`argv=review --commit ${commitSha}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
+      launch_context: {
+        scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
+        prompt_delivery: 'inline' | 'artifact-only';
+      } | null;
     };
-    expect(telemetry.status).toBe('failed');
-    expect(telemetry.error).toContain('explicit `--uncommitted` review scope must remain auditable');
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.error).toBeNull();
+    expect(telemetry.launch_context).toEqual({
+      scope_flag_mode: 'commit',
+      prompt_delivery: 'artifact-only'
+    });
   });
 
-  it('fails when explicit uncommitted scope is rejected with generic diff-scoping wording', async () => {
+  it('executes explicit uncommitted review without an inline prompt argument', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
@@ -2671,61 +2733,45 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       ['--uncommitted']
     );
 
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
-    expect(result.stderr).toContain('explicit `--uncommitted` review scope must remain auditable');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('stdout-ok');
+    expect(result.stderr).toContain('stderr-ok');
     const argsLog = await readFile(argsLogPath, 'utf8');
     const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toContain('argv=review --uncommitted');
+    expect(reviewInvocations[0]).toBe('argv=review --uncommitted');
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
+      launch_context: {
+        scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
+        prompt_delivery: 'inline' | 'artifact-only';
+      } | null;
     };
-    expect(telemetry.status).toBe('failed');
-    expect(telemetry.error).toContain('explicit `--uncommitted` review scope must remain auditable');
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.error).toBeNull();
+    expect(telemetry.launch_context).toEqual({
+      scope_flag_mode: 'uncommitted',
+      prompt_delivery: 'artifact-only'
+    });
   });
 
-  it('blocks unscoped fallback retry when prompt incompatibility mentions the scope only in a usage footer', async () => {
+  it('documents scoped launch prompt handling in the wrapper help output', async () => {
     const sandbox = await makeSandbox();
-    const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
-    await initGitRepoWithCommittedFiles(sandbox, 1);
-    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
-      cwd: sandbox
-    });
-    const baseRef = baseStdout.trim();
-    const argsLogPath = join(sandbox, 'review-args.log');
+    const result = await runReviewCommand(null, baseEnv(sandbox, codexBin), ['--help']);
 
-    const result = await runReviewCommand(
-      manifestPath,
-      {
-        ...baseEnv(sandbox, codexBin),
-        RUN_REVIEW_MODE: 'reject-scoped-prompt-usage-footer',
-        RUN_REVIEW_ARGS_LOG: argsLogPath
-      },
-      ['--base', baseRef]
+    expect(result.exitCode).toBe(0);
+    const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
+    expect(normalizedHelp).toContain(
+      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without an inline prompt argument.'
     );
-
-    expect(result.exitCode).toBeGreaterThan(0);
-    expect(result.stderr).toContain('retrying without them would remove explicit review scope');
-    expect(result.stderr).toContain('explicit `--base` review scope must remain auditable');
-    const argsLog = await readFile(argsLogPath, 'utf8');
-    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
-      entry.includes('argv=review')
+    expect(normalizedHelp).toContain(
+      'Unscoped wrapper runs Pass the saved prompt/context inline to codex review.'
     );
-    expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
-    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
-    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
-      status: string;
-      error: string | null;
-    };
-    expect(telemetry.status).toBe('failed');
-    expect(telemetry.error).toBeTruthy();
   });
 
   it('preserves unrelated CLI option failures instead of rewriting them as scope-gate errors', async () => {

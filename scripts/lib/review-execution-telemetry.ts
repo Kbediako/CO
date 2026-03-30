@@ -13,8 +13,14 @@ export interface ReviewTelemetryPayload {
   status: 'succeeded' | 'failed';
   error: string | null;
   output_log_path: string;
+  launch_context: ReviewLaunchContext | null;
   termination_boundary: ReviewTerminationBoundaryRecord | null;
   summary: ReviewOutputSummary;
+}
+
+export interface ReviewLaunchContext {
+  scope_flag_mode: 'commit' | 'base' | 'uncommitted' | null;
+  prompt_delivery: 'inline' | 'artifact-only';
 }
 
 export interface BuildReviewTelemetryPayloadOptions {
@@ -25,6 +31,7 @@ export interface BuildReviewTelemetryPayloadOptions {
   repoRoot: string;
   includeRawTelemetry: boolean;
   telemetryDebugEnvKey: string;
+  launchContext?: ReviewLaunchContext | null;
   summary: ReviewOutputSummary;
 }
 
@@ -42,6 +49,7 @@ export interface ReviewTelemetryPayloadBuilder {
     repoRoot: string;
     includeRawTelemetry: boolean;
     telemetryDebugEnvKey: string;
+    launchContext?: ReviewLaunchContext | null;
   }): ReviewTelemetryPayload;
 }
 
@@ -55,6 +63,7 @@ export interface WriteReviewExecutionTelemetryOptions {
   telemetryPath: string;
   includeRawTelemetry: boolean;
   telemetryDebugEnvKey: string;
+  launchContext?: ReviewLaunchContext | null;
   logPersistFailure?: (message: string) => void;
 }
 
@@ -76,6 +85,7 @@ export function buildReviewTelemetryPayload(
       options.telemetryDebugEnvKey
     ),
     output_log_path: path.relative(options.repoRoot, options.outputLogPath),
+    launch_context: options.launchContext ?? null,
     termination_boundary: sanitizeTerminationBoundaryForPersistence(
       options.terminationBoundary ?? null,
       options.includeRawTelemetry,
@@ -106,7 +116,8 @@ export async function writeReviewExecutionTelemetry(
       outputLogPath: options.outputLogPath,
       repoRoot: options.repoRoot,
       includeRawTelemetry: options.includeRawTelemetry,
-      telemetryDebugEnvKey: options.telemetryDebugEnvKey
+      telemetryDebugEnvKey: options.telemetryDebugEnvKey,
+      launchContext: options.launchContext ?? null
     };
     if (Object.prototype.hasOwnProperty.call(options, 'terminationBoundary')) {
       payloadOptions.terminationBoundary = options.terminationBoundary;

@@ -23,7 +23,10 @@ import {
   CodexReviewError,
   signalChildProcess
 } from './review-execution-runtime.js';
-import type { ReviewTelemetryPayload } from './review-execution-telemetry.js';
+import type {
+  ReviewLaunchContext,
+  ReviewTelemetryPayload
+} from './review-execution-telemetry.js';
 
 const REVIEW_COMMAND_CHECK_TIMEOUT_MS = 30_000;
 const REVIEW_ARTIFACTS_DIRNAME = 'review';
@@ -91,7 +94,8 @@ export interface ReviewLaunchAttemptShellOptions {
     state: ReviewExecutionState,
     status: 'succeeded' | 'failed',
     errorMessage?: string | null,
-    terminationBoundary?: ReviewTerminationBoundaryRecord | null
+    terminationBoundary?: ReviewTerminationBoundaryRecord | null,
+    launchContext?: ReviewLaunchContext | null
   ) => Promise<ReviewTelemetryPayload | null>;
   logTelemetrySummary: (
     payload: ReviewTelemetryPayload,
@@ -177,6 +181,9 @@ export async function runReviewLaunchAttemptShell(
     includeScopeFlags: true,
     disableDelegationMcp
   });
+  const scopedLaunchContext = buildReviewLaunchContext(options.cliOptions, {
+    includeScopeFlags: true
+  });
   const resolvedScoped = resolveCommand(scopedReviewArgs, options.runtimeContext);
   const launchedWithExplicitScope = scopedReviewArgs.some(
     (arg) => arg === '--base' || arg === '--commit' || arg === '--uncommitted'
@@ -186,13 +193,25 @@ export async function runReviewLaunchAttemptShell(
   console.log(
     `Launching Codex review (evidence: ${path.relative(options.repoRoot, options.manifestPath)})`
   );
+  if (
+    scopedLaunchContext.prompt_delivery === 'artifact-only' &&
+    scopedLaunchContext.scope_flag_mode !== null
+  ) {
+    console.log(
+      `[run-review] explicit ${scopedLaunchContext.scope_flag_mode} scope keeps prompt context in the saved artifact only; launching codex review without an inline prompt argument.`
+    );
+  }
 
-  const reportSuccess = async (execution: ReviewRunResult): Promise<void> => {
+  const reportSuccess = async (
+    execution: ReviewRunResult,
+    launchContext: ReviewLaunchContext
+  ): Promise<void> => {
     const telemetryPayload = await options.writeTelemetry(
       execution.state,
       'succeeded',
       null,
-      execution.terminationBoundary ?? null
+      execution.terminationBoundary ?? null,
+      launchContext
     );
     console.log(`Review output saved to: ${path.relative(options.repoRoot, options.artifactPaths.outputLogPath)}`);
     if (telemetryPayload) {
@@ -206,7 +225,10 @@ export async function runReviewLaunchAttemptShell(
     }
   };
 
-  const reportFailure = async (error: unknown): Promise<void> => {
+  const reportFailure = async (
+    error: unknown,
+    launchContext: ReviewLaunchContext
+  ): Promise<void> => {
     await captureReviewFailureIssueLog({
       enabled: options.autoIssueLogEnabled,
       error,
@@ -230,7 +252,8 @@ export async function runReviewLaunchAttemptShell(
           failureState,
           'failed',
           errorMessage,
-          failureTerminationBoundary
+          failureTerminationBoundary,
+          launchContext
         )
       : null;
     if (telemetryPayload) {
@@ -256,9 +279,16 @@ export async function runReviewLaunchAttemptShell(
 
   try {
     const execution = await options.runReview(resolvedScoped);
-    await reportSuccess(execution);
+    await reportSuccess(execution, scopedLaunchContext);
     return;
   } catch (error) {
+    if (
+      scopedLaunchContext.prompt_delivery !== 'inline' &&
+      isPromptScopeIncompatibility(error)
+    ) {
+      await reportFailure(error, scopedLaunchContext);
+      throw error;
+    }
     if (shouldRetryWithoutScopeFlags(error)) {
       if (launchedWithExplicitScope) {
         if (
@@ -270,10 +300,10 @@ export async function runReviewLaunchAttemptShell(
             options.repoRoot,
             options.retryWithoutScopeFlagsGateError
           );
-          await reportFailure(retryGateError);
+          await reportFailure(retryGateError, scopedLaunchContext);
           throw retryGateError;
         }
-        await reportFailure(error);
+        await reportFailure(error, scopedLaunchContext);
         throw error;
       }
       if (
@@ -285,7 +315,7 @@ export async function runReviewLaunchAttemptShell(
           options.repoRoot,
           options.retryWithoutScopeFlagsGateError
         );
-        await reportFailure(retryGateError);
+        await reportFailure(retryGateError, scopedLaunchContext);
         throw retryGateError;
       }
       console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
@@ -293,18 +323,21 @@ export async function runReviewLaunchAttemptShell(
         includeScopeFlags: false,
         disableDelegationMcp
       });
+      const unscopedLaunchContext = buildReviewLaunchContext(options.cliOptions, {
+        includeScopeFlags: false
+      });
       const resolvedUnscoped = resolveCommand(unscopedArgs, options.runtimeContext);
       try {
         const retryExecution = await options.runReview(resolvedUnscoped);
-        await reportSuccess(retryExecution);
+        await reportSuccess(retryExecution, unscopedLaunchContext);
         return;
       } catch (retryError) {
-        await reportFailure(retryError);
+        await reportFailure(retryError, unscopedLaunchContext);
         throw retryError;
       }
     }
 
-    await reportFailure(error);
+    await reportFailure(error, scopedLaunchContext);
     throw error;
   }
 }
@@ -416,8 +449,22 @@ function buildReviewArgs(
     args.push(...scopeFlag.args);
   }
 
-  args.push(prompt);
+  const launchContext = buildReviewLaunchContext(options, opts);
+  if (launchContext.prompt_delivery === 'inline') {
+    args.push(prompt);
+  }
   return args;
+}
+
+function buildReviewLaunchContext(
+  options: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'uncommitted'>,
+  opts: Pick<ReviewArgsOptions, 'includeScopeFlags'>
+): ReviewLaunchContext {
+  const scopedFlag = opts.includeScopeFlags ? resolveScopeFlag(options) : null;
+  return {
+    scope_flag_mode: scopedFlag?.mode ?? null,
+    prompt_delivery: scopedFlag ? 'artifact-only' : 'inline'
+  };
 }
 
 function resolveReviewCommand(
@@ -496,6 +543,20 @@ function shouldRetryWithoutScopeFlags(error: unknown): boolean {
     combined.includes('cannot be used with') ||
     combined.includes('cannot be combined') ||
     combined.includes('incompatible with') ||
+    combined.includes('prompt cannot') ||
+    combined.includes('custom prompt') ||
+    combined.includes('with a prompt')
+  );
+}
+
+function isPromptScopeIncompatibility(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const preview = 'outputPreview' in error ? String((error as any).outputPreview ?? '') : '';
+  const message = 'message' in error ? String((error as any).message ?? '') : '';
+  const combined = `${message}\n${preview}`.toLowerCase();
+  return (
     combined.includes('prompt cannot') ||
     combined.includes('custom prompt') ||
     combined.includes('with a prompt')

@@ -5,9 +5,9 @@
  *
  * Note: some codex CLI versions reject combining diff-scoping flags
  * (`--uncommitted`, `--base`, `--commit`) with a custom prompt. This wrapper
- * always supplies a custom prompt (to include manifest evidence), so it will
- * try real scope flags first and only fall back when that does not remove the
- * caller's explicit scope or audit trail.
+ * still writes the prompt artifact for audit continuity, but explicit scoped
+ * launches omit the inline prompt argument so the requested scope remains both
+ * executable and truthful.
  */
 
 import { spawn } from 'node:child_process';
@@ -50,6 +50,7 @@ import {
 } from './lib/review-execution-runtime.js';
 import {
   logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
+  type ReviewLaunchContext,
   type ReviewTelemetryPayload,
   writeReviewExecutionTelemetry
 } from './lib/review-execution-telemetry.js';
@@ -536,13 +537,15 @@ async function main(): Promise<void> {
     state: ReviewExecutionState,
     status: 'succeeded' | 'failed',
     errorMessage?: string | null,
-    terminationBoundary?: ReviewTerminationBoundaryRecord | null
+    terminationBoundary?: ReviewTerminationBoundaryRecord | null,
+    launchContext?: ReviewLaunchContext | null
   ): Promise<ReviewTelemetryPayload | null> =>
     writeReviewExecutionTelemetry({
       state,
       status,
       error: errorMessage ?? null,
       terminationBoundary,
+      launchContext: launchContext ?? null,
       outputLogPath: artifactPaths.outputLogPath,
       repoRoot,
       telemetryPath: artifactPaths.telemetryPath,
@@ -659,5 +662,10 @@ Environment:
   MCP_RUNNER_TASK_ID / TASK      Task id fallback when --task is omitted.
   ${REVIEW_SURFACE_ENV_KEY}      Review surface fallback when --surface is omitted.
   CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON  Auditable override for large uncommitted review scope gating.
+
+Behavior:
+  Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt
+                                and launch codex review without an inline prompt argument.
+  Unscoped wrapper runs         Pass the saved prompt/context inline to codex review.
 `);
 }
