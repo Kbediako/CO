@@ -161,7 +161,12 @@ has_inline_prompt() {
   while [[ $index -lt \${#args[@]} ]]; do
     local arg="\${args[$index]}"
     case "$arg" in
-      review|--uncommitted)
+      review)
+        if [[ $index -ne 0 ]]; then
+          return 0
+        fi
+        ;;
+      --uncommitted)
         ;;
       --base|--commit|--title)
         index=$((index + 1))
@@ -2563,6 +2568,26 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       scope_flag_mode: 'base',
       prompt_delivery: 'artifact-only'
     });
+  });
+
+  it('treats later review positional tokens as inline prompt content in the fake codex harness', async () => {
+    const sandbox = await makeSandbox();
+    const codexBin = await makeFakeCodex(sandbox);
+
+    try {
+      await execFileAsync(codexBin, ['review', '--base', 'HEAD', 'review'], {
+        cwd: sandbox,
+        env: {
+          ...process.env,
+          RUN_REVIEW_MODE: 'reject-scoped-prompt'
+        }
+      });
+      throw new Error('expected fake codex to reject inline prompt content');
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException & { stderr?: string; code?: number };
+      expect(err.code).toBe(1);
+      expect(String(err.stderr ?? '')).toContain('custom prompt cannot be combined with --base');
+    }
   });
 
   it('fails when explicit scoped review requests a non-diff surface', async () => {
