@@ -47,6 +47,9 @@ export interface CompatibilityRefreshAcknowledgement {
   coalesced: boolean;
   requested_at: string;
   operations: string[];
+  stuck?: boolean;
+  restart_required?: boolean;
+  reason?: string | null;
 }
 
 export interface ObservabilityRefreshContext extends ObservabilityTraceabilityContext {
@@ -278,7 +281,10 @@ function normalizeRefreshAcknowledgement(
     queued: value?.queued ?? true,
     coalesced: value?.coalesced ?? false,
     requested_at: value?.requested_at ?? isoTimestamp(),
-    operations: value?.operations ?? ['poll', 'reconcile']
+    operations: value?.operations ?? ['poll', 'reconcile'],
+    stuck: value?.stuck ?? false,
+    restart_required: value?.restart_required ?? false,
+    reason: value?.reason ?? null
   };
 }
 

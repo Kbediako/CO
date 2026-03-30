@@ -425,6 +425,72 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('preserves newer polling state when claim persistence rolls back after a concurrent polling update', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    let persistCallCount = 0;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      if (persistCallCount === 2) {
+        state.polling = {
+          checking: true,
+          stuck: true,
+          restart_required: true,
+          reason: 'provider_refresh_lifecycle_stuck',
+          updated_at: '2026-03-19T04:00:10.000Z'
+        };
+        state.updated_at = '2026-03-19T04:00:10.000Z';
+        throw new Error('pre-launch persist failed');
+      }
+    });
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await expect(
+      service.poll?.({
+        trackedIssues: [createTrackedIssue()]
+      })
+    ).resolves.toBeUndefined();
+
+    expect(state.claims).toEqual([]);
+    expect(state.polling).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      updated_at: '2026-03-19T04:00:10.000Z'
+    });
+    expect(state.updated_at).toBe('2026-03-19T04:00:10.000Z');
+
+    await expect(
+      service.poll?.({
+        trackedIssues: [createTrackedIssue()]
+      })
+    ).resolves.toBeUndefined();
+
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(state.polling).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      updated_at: '2026-03-19T04:00:10.000Z'
+    });
+  });
+
   it('dispatches fresh poll candidates in Symphony order', async () => {
     const { paths } = await createHostPaths();
     const launcher = {
