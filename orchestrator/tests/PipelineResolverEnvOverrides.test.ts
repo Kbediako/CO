@@ -13,7 +13,8 @@ import { logger } from '../src/logger.js';
 const ORIGINAL_ENV = {
   designPipeline: process.env.DESIGN_PIPELINE,
   designConfigPath: process.env.DESIGN_CONFIG_PATH,
-  repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED
+  repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
+  repoConfigPath: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH
 };
 
 let workspaceRoot: string;
@@ -23,6 +24,7 @@ beforeEach(async () => {
   delete process.env.DESIGN_PIPELINE;
   delete process.env.DESIGN_CONFIG_PATH;
   delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+  delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH;
 });
 
 afterEach(async () => {
@@ -41,6 +43,11 @@ afterEach(async () => {
     delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
   } else {
     process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = ORIGINAL_ENV.repoConfigRequired;
+  }
+  if (ORIGINAL_ENV.repoConfigPath === undefined) {
+    delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH;
+  } else {
+    process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH = ORIGINAL_ENV.repoConfigPath;
   }
   await rm(workspaceRoot, { recursive: true, force: true });
 });
