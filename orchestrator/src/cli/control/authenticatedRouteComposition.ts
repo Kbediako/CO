@@ -370,6 +370,9 @@ function buildRefreshAcknowledgement(
     queued: providerRefresh?.queued ?? true,
     coalesced: providerRefresh?.coalesced ?? false,
     requested_at: requestedAt,
-    operations: providerRefresh ? ['poll', 'reconcile'] : ['reconcile']
+    operations: providerRefresh ? ['poll', 'reconcile'] : ['reconcile'],
+    stuck: providerRefresh?.stuck ?? false,
+    restart_required: providerRefresh?.restart_required ?? false,
+    reason: providerRefresh?.reason ?? null
   };
 }
