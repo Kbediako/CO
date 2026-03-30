@@ -189,7 +189,8 @@ export function runProviderIssueHandoffRefresh(
       noteProviderPollingRequest(providerIssueHandoff, {
         mode: 'refresh',
         queued: state.queuedRefresh !== null,
-        replaceQueued: true
+        replaceQueued: true,
+        preserveActiveMode: true
       });
       return Promise.resolve(stuckOutcome);
     }
@@ -201,7 +202,8 @@ export function runProviderIssueHandoffRefresh(
     }
     noteProviderPollingRequest(providerIssueHandoff, {
       mode: 'refresh',
-      queued: true
+      queued: true,
+      preserveActiveMode: true
     });
     if (state.queuedRefresh) {
       return state.queuedRefresh.then(() => ({
@@ -288,6 +290,14 @@ function createProviderRefreshCoordinator(
     timer.unref?.();
   };
 
+  const resolveWatchdogDelayMs = (): number => {
+    const health = readProviderPollingHealth(providerIssueHandoff);
+    if (!health?.checking || health.operation_elapsed_ms === null) {
+      return PROVIDER_REFRESH_STUCK_AFTER_MS;
+    }
+    return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - health.operation_elapsed_ms);
+  };
+
   const trigger = async (): Promise<void> => {
     if (stopped) {
       return;
@@ -333,10 +343,11 @@ function createProviderRefreshCoordinator(
       await Promise.race([
         operation,
         new Promise<void>((resolve) => {
+          const watchdogDelayMs = resolveWatchdogDelayMs();
           stuckWatchdog = setTimeout(() => {
             markProviderPollingStuck(providerIssueHandoff);
             resolve();
-          }, PROVIDER_REFRESH_STUCK_AFTER_MS);
+          }, watchdogDelayMs);
           stuckWatchdog.unref?.();
         })
       ]);
@@ -437,7 +448,8 @@ function runProviderIssueHandoffOperation(
         noteProviderPollingRequest(providerIssueHandoff, {
           mode: healthContext.mode,
           queued: state.queuedRefresh !== null,
-          replaceQueued: true
+          replaceQueued: true,
+          preserveActiveMode: true
         });
       }
       return Promise.reject(
@@ -450,7 +462,8 @@ function runProviderIssueHandoffOperation(
     if (healthContext) {
       noteProviderPollingRequest(providerIssueHandoff, {
         mode: healthContext.mode,
-        queued: true
+        queued: true,
+        preserveActiveMode: true
       });
     }
     return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation, healthContext);

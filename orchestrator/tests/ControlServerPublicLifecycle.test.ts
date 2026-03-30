@@ -698,6 +698,57 @@ describe('startControlServerPublicLifecycle', () => {
     });
   });
 
+  it('preserves the active poll mode when a refresh request queues behind it', async () => {
+    let resolvePoll: (() => void) | null = null;
+    const firstPoll = new Promise<void>((resolve) => {
+      resolvePoll = resolve;
+    });
+    let notifyPollStarted: (() => void) | null = null;
+    const pollStarted = new Promise<void>((resolve) => {
+      notifyPollStarted = resolve;
+    });
+    const refresh = vi.fn(async () => undefined);
+    const poll = vi
+      .fn<(_: ProviderIssueHandoffPollInput) => Promise<void>>()
+      .mockImplementationOnce(async () => {
+        notifyPollStarted?.();
+        await firstPoll;
+      });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      poll,
+      rehydrate: vi.fn(async () => undefined),
+      refresh
+    };
+
+    const inFlightPoll = runProviderIssueHandoffPoll(providerIssueHandoff, {
+      trackedIssues: [buildTrackedIssue('issue-1')]
+    });
+    await pollStarted;
+
+    const queuedRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff, {
+      queueIfBusy: true
+    });
+
+    expect(refresh).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: true,
+      queued: true,
+      last_mode: 'poll'
+    });
+
+    resolvePoll?.();
+    await Promise.all([inFlightPoll, queuedRefresh]);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      queued: false,
+      last_mode: 'refresh',
+      last_error: null
+    });
+  });
+
   it('keeps queued polling health visible when poll falls back to refresh with queued follow-up work', async () => {
     vi.useFakeTimers();
 
@@ -912,6 +963,71 @@ describe('startControlServerPublicLifecycle', () => {
 
     resolveRefresh?.();
     await closeControlServerPublicLifecycle(started);
+  });
+
+  it('uses the remaining stuck budget when the lifecycle attaches to an in-flight refresh', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-30T01:00:00.000Z'));
+
+    let resolveRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => {
+        await firstRefresh;
+      })
+    };
+
+    const inFlightRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(30_001);
+
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+
+    resolveRefresh?.();
+    await Promise.all([inFlightRefresh, closeControlServerPublicLifecycle(started)]);
   });
 
   it('queues a follow-up refresh when a manual refresh request arrives during rehydrate', async () => {

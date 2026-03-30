@@ -75,12 +75,15 @@ export function noteProviderPollingRequest(
     mode: ControlPollingMode;
     queued: boolean;
     replaceQueued?: boolean;
+    preserveActiveMode?: boolean;
     atMs?: number;
   }
 ): void {
   const atMs = input.atMs ?? Date.now();
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
-  state.lastMode = input.mode;
+  const preserveActiveMode =
+    input.preserveActiveMode && state.checking && state.operationStartedAtMs !== null;
+  state.lastMode = preserveActiveMode ? state.lastMode ?? input.mode : input.mode;
   state.lastRequestedAtMs = atMs;
   state.queued = input.replaceQueued ? input.queued : state.queued || input.queued;
   state.updatedAtMs = atMs;
