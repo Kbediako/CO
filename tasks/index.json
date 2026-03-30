@@ -88,6 +88,30 @@
       }
     },
     {
+      "id": "20260330-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1",
+      "title": "CO: Investigate control-host provider refresh stall that stops new Ready issue pickup until restart",
+      "relates_to": "tasks/tasks-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1-docs-review/cli/2026-03-30T01-25-36-879Z-17cd2f7d/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+        "task": "tasks/tasks-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+        "agent_task": ".agent/task/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+        "docs": "docs/TECH_SPEC-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md"
+      }
+    },
+    {
       "id": "20260330-linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60",
       "title": "CO: Investigate Core Lane vitest teardown hang after visible full-suite pass",
       "relates_to": "tasks/tasks-linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60.md",
