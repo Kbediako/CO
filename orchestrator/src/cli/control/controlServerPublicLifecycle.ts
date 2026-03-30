@@ -182,47 +182,55 @@ export function runProviderIssueHandoffRefresh(
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   if (state.active) {
-    const stuckOutcome = resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
-    if (stuckOutcome) {
+    const continueWhileBusy = (): Promise<ProviderIssueHandoffRefreshRequestOutcome> => {
+      if (!options?.queueIfBusy) {
+        return mapProviderIssueHandoffRefreshOutcome(
+          providerIssueHandoff,
+          waitForProviderIssueHandoffPending(providerIssueHandoff, state.active!),
+          {
+            queued: true,
+            coalesced: true
+          }
+        );
+      }
       noteProviderPollingRequest(providerIssueHandoff, {
         mode: 'refresh',
-        queued: state.queuedRefresh !== null,
-        replaceQueued: true,
+        queued: true,
         preserveActiveMode: true
       });
-      return Promise.resolve(stuckOutcome);
-    }
-    if (!options?.queueIfBusy) {
-      return mapProviderIssueHandoffRefreshOutcome(
-        providerIssueHandoff,
-        waitForProviderIssueHandoffPending(providerIssueHandoff, state.active),
-        {
+      if (state.queuedRefresh) {
+        return mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, state.queuedRefresh, {
           queued: true,
           coalesced: true
+        });
+      }
+      return mapProviderIssueHandoffRefreshOutcome(
+        providerIssueHandoff,
+        queueProviderIssueHandoffRefresh(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
+          mode: 'refresh'
+        }),
+        {
+          queued: true,
+          coalesced: false
         }
       );
+    };
+    if (isProviderPollingStuck(providerIssueHandoff)) {
+      return (async () => {
+        const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+        if (!stuckOutcome) {
+          return continueWhileBusy();
+        }
+        noteProviderPollingRequest(providerIssueHandoff, {
+          mode: 'refresh',
+          queued: state.queuedRefresh !== null,
+          replaceQueued: true,
+          preserveActiveMode: true
+        });
+        return stuckOutcome;
+      })();
     }
-    noteProviderPollingRequest(providerIssueHandoff, {
-      mode: 'refresh',
-      queued: true,
-      preserveActiveMode: true
-    });
-    if (state.queuedRefresh) {
-      return mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, state.queuedRefresh, {
-        queued: true,
-        coalesced: true
-      });
-    }
-    return mapProviderIssueHandoffRefreshOutcome(
-      providerIssueHandoff,
-      queueProviderIssueHandoffRefresh(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
-        mode: 'refresh'
-      }),
-      {
-        queued: true,
-        coalesced: false
-      }
-    );
+    return continueWhileBusy();
   }
   return mapProviderIssueHandoffRefreshOutcome(
     providerIssueHandoff,
@@ -306,7 +314,7 @@ function createProviderRefreshCoordinator(
       return;
     }
     if (isProviderPollingStuck(providerIssueHandoff)) {
-      resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+      await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
       scheduleNextTrigger();
       return;
     }
@@ -435,31 +443,37 @@ function runProviderIssueHandoffOperation(
 ): Promise<void> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   if (state.active) {
-    const stuckOutcome = resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
-    if (stuckOutcome) {
+    const continueWhileBusy = (): Promise<void> => {
+      if (!options?.queueIfBusy) {
+        return waitForProviderIssueHandoffPending(providerIssueHandoff, state.active!);
+      }
       if (healthContext) {
         noteProviderPollingRequest(providerIssueHandoff, {
           mode: healthContext.mode,
-          queued: state.queuedRefresh !== null,
-          replaceQueued: true,
+          queued: true,
           preserveActiveMode: true
         });
       }
-      return Promise.reject(
-        new Error(stuckOutcome.reason ?? 'provider_refresh_lifecycle_stuck')
-      );
+      return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation, healthContext);
+    };
+    if (isProviderPollingStuck(providerIssueHandoff)) {
+      return (async () => {
+        const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+        if (!stuckOutcome) {
+          return continueWhileBusy();
+        }
+        if (healthContext) {
+          noteProviderPollingRequest(providerIssueHandoff, {
+            mode: healthContext.mode,
+            queued: state.queuedRefresh !== null,
+            replaceQueued: true,
+            preserveActiveMode: true
+          });
+        }
+        throw new Error(stuckOutcome?.reason ?? 'provider_refresh_lifecycle_stuck');
+      })();
     }
-    if (!options?.queueIfBusy) {
-      return waitForProviderIssueHandoffPending(providerIssueHandoff, state.active);
-    }
-    if (healthContext) {
-      noteProviderPollingRequest(providerIssueHandoff, {
-        mode: healthContext.mode,
-        queued: true,
-        preserveActiveMode: true
-      });
-    }
-    return queueProviderIssueHandoffRefresh(providerIssueHandoff, state, operation, healthContext);
+    return continueWhileBusy();
   }
   return waitForProviderIssueHandoffPending(
     providerIssueHandoff,
@@ -522,14 +536,20 @@ function queueProviderIssueHandoffRefresh(
     return state.queuedRefresh;
   }
   const queuedRefresh = waitForProviderIssueHandoffPending(providerIssueHandoff, state.active!)
-    .catch(() => {
-      if (resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
-        throw new Error(readProviderPollingHealth(providerIssueHandoff)?.reason ?? 'provider_refresh_lifecycle_stuck');
+    .catch(async () => {
+      if (await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
+        throw new Error(
+          readProviderPollingHealth(providerIssueHandoff)?.reason ??
+            'provider_refresh_lifecycle_stuck'
+        );
       }
     })
-    .then(() => {
-      if (resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
-        throw new Error(readProviderPollingHealth(providerIssueHandoff)?.reason ?? 'provider_refresh_lifecycle_stuck');
+    .then(async () => {
+      if (await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
+        throw new Error(
+          readProviderPollingHealth(providerIssueHandoff)?.reason ??
+            'provider_refresh_lifecycle_stuck'
+        );
       }
       if (state.queuedRefresh !== queuedRefresh) {
         return;
@@ -563,7 +583,7 @@ async function waitForProviderIssueHandoffQueueToDrain(
     if (!pending) {
       return;
     }
-    if (resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
+    if (await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
       return;
     }
     try {
@@ -573,7 +593,7 @@ async function waitForProviderIssueHandoffQueueToDrain(
         resolveWatchdogDelayMs
       );
     } catch {
-      if (resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
+      if (await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff)) {
         return;
       }
     }
@@ -605,13 +625,13 @@ function clearProviderIssueHandoffOperationState(
   }
 }
 
-function resolveProviderIssueHandoffStuckOutcome(
+async function resolveProviderIssueHandoffStuckOutcome(
   providerIssueHandoff: ProviderIssueHandoffService
-): ProviderIssueHandoffRefreshRequestOutcome | null {
+): Promise<ProviderIssueHandoffRefreshRequestOutcome | null> {
   if (!isProviderPollingStuck(providerIssueHandoff)) {
     return null;
   }
-  markProviderPollingStuck(providerIssueHandoff);
+  await markProviderPollingStuck(providerIssueHandoff);
   const outcome: ProviderIssueHandoffRefreshRequestOutcome = {
     queued: true,
     coalesced: true,
@@ -630,8 +650,8 @@ function mapProviderIssueHandoffRefreshOutcome(
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
   return pending.then(
     () => successOutcome,
-    (error: unknown) => {
-      const stuckOutcome = resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+    async (error: unknown) => {
+      const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
       if (stuckOutcome) {
         return stuckOutcome;
       }
@@ -665,9 +685,7 @@ async function waitForProviderIssueHandoffPendingWithWatchdog(
       new Promise<void>((resolve) => {
         const watchdogDelayMs = resolveWatchdogDelayMs();
         stuckWatchdog = setTimeout(() => {
-          markProviderPollingStuck(providerIssueHandoff);
-          resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
-          resolve();
+          void resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff).finally(resolve);
         }, watchdogDelayMs);
         stuckWatchdog.unref?.();
       })

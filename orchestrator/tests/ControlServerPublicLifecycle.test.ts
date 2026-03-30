@@ -985,6 +985,112 @@ describe('startControlServerPublicLifecycle', () => {
     await closeControlServerPublicLifecycle(started);
   });
 
+  it('flushes stuck polling evidence before releasing waiting refresh callers', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-30T01:00:00.000Z'));
+
+    let resolveRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    let resolvePersistPolling: (() => void) | null = null;
+    const persistPolling = new Promise<void>((resolve) => {
+      resolvePersistPolling = resolve;
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => {
+        await firstRefresh;
+      })
+    };
+    const persistProviderIntakePolling = vi.fn(async (polling: Record<string, unknown>) => {
+      if (polling.stuck === true) {
+        await persistPolling;
+      }
+    });
+    const providerIntakeState = {
+      schema_version: 1,
+      updated_at: new Date(0).toISOString(),
+      rehydrated_at: null,
+      latest_provider_key: null,
+      latest_reason: null,
+      polling: null,
+      claims: []
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff,
+      providerIntakeState,
+      persist: {
+        providerIntake: vi.fn(async () => undefined),
+        providerIntakePolling: persistProviderIntakePolling
+      }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+
+    const waitingRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    let waitingRefreshOutcome: Awaited<typeof waitingRefresh> | null = null;
+    void waitingRefresh.then((outcome) => {
+      waitingRefreshOutcome = outcome;
+    });
+
+    await vi.advanceTimersByTimeAsync(45_001);
+
+    expect(providerIntakeState.polling).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    expect(persistProviderIntakePolling).toHaveBeenCalled();
+    await Promise.resolve();
+    expect(waitingRefreshOutcome).toBeNull();
+
+    resolvePersistPolling?.();
+    await expect(waitingRefresh).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+
+    resolveRefresh?.();
+    await closeControlServerPublicLifecycle(started);
+  });
+
   it('keeps the watchdog active while draining a queued follow-up refresh', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-30T01:00:00.000Z'));

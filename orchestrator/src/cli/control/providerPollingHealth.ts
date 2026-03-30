@@ -151,14 +151,14 @@ export function markProviderPollingStuck(
   input: {
     atMs?: number;
   } = {}
-): void {
+): Promise<void> {
   const atMs = input.atMs ?? Date.now();
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
   if (!state.checking || state.operationStartedAtMs === null) {
-    return;
+    return Promise.resolve();
   }
   if (state.stuckAtMs !== null) {
-    return;
+    return state.updateChain;
   }
   state.stuckAtMs =
     state.stuckAfterMs !== null ? state.operationStartedAtMs + state.stuckAfterMs : atMs;
@@ -166,7 +166,7 @@ export function markProviderPollingStuck(
   state.lastError = buildProviderPollingStuckMessage(state);
   state.reason = buildProviderPollingStuckReason(state);
   state.updatedAtMs = atMs;
-  queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
+  return queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
 export function readProviderPollingHealth(
@@ -291,9 +291,9 @@ function queueProviderPollingHealthUpdate(
   providerIssueHandoff: ProviderIssueHandoffService,
   state: MutableProviderPollingHealthState,
   nowMs: number = Date.now()
-): void {
+): Promise<void> {
   if (!state.onUpdate) {
-    return;
+    return state.updateChain;
   }
   const payload = buildProviderPollingHealthPayload(state, nowMs);
   state.updateChain = state.updateChain
@@ -305,6 +305,7 @@ function queueProviderPollingHealthUpdate(
         `Failed to sync provider polling health: ${(error as Error)?.message ?? String(error)}`
       );
     });
+  return state.updateChain;
 }
 
 function toIsoTimestamp(value: number | null): string | null {
