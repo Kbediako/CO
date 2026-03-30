@@ -1525,6 +1525,56 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(applyPatchArtifact).not.toHaveBeenCalled();
   });
 
+  it('accepts quoted git diff headers when patch scope uses non-ascii paths', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      scope: {
+        files: ['orchestrator/src/cli/caf\u00e9.ts'],
+        phases: []
+      }
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await mkdir(dirname(childLane.patch_artifact_path ?? ''), { recursive: true });
+    await writeFile(
+      childLane.patch_artifact_path ?? '',
+      'diff --git "a/orchestrator/src/cli/caf\\303\\251.ts" "b/orchestrator/src/cli/caf\\303\\251.ts"\n',
+      'utf8'
+    );
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'accepted',
+      child_lane: {
+        stream: childLane.stream,
+        decision: 'accepted'
+      }
+    });
+    expect(applyPatchArtifact).toHaveBeenCalledWith(tempRoot, childLane.patch_artifact_path);
+  });
+
   it('rejects acceptance when the parent workspace picked up in-scope pending edits after launch', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();

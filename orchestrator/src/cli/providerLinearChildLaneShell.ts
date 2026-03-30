@@ -1407,11 +1407,11 @@ async function readPatchChangedPaths(patchPath: string): Promise<string[]> {
   const rawPatch = await readFile(patchPath, 'utf8');
   const changedPaths = new Set<string>();
   for (const line of rawPatch.split(/\r?\n/u)) {
-    const match = /^diff --git a\/(.+?) b\/(.+)$/u.exec(line);
-    if (!match) {
+    const parsed = parseGitDiffHeaderPaths(line);
+    if (!parsed) {
       continue;
     }
-    for (const candidate of [match[1], match[2]]) {
+    for (const candidate of parsed) {
       if (candidate === 'dev/null') {
         continue;
       }
@@ -1422,6 +1422,98 @@ async function readPatchChangedPaths(patchPath: string): Promise<string[]> {
     }
   }
   return [...changedPaths];
+}
+
+function parseGitDiffHeaderPaths(line: string): string[] | null {
+  if (!line.startsWith('diff --git ')) {
+    return null;
+  }
+  const tokens: string[] = [];
+  let index = 'diff --git '.length;
+  while (index < line.length && tokens.length < 2) {
+    while (line[index] === ' ') {
+      index += 1;
+    }
+    if (index >= line.length) {
+      break;
+    }
+    if (line[index] === '"') {
+      let end = index + 1;
+      let escaped = false;
+      while (end < line.length) {
+        const current = line[end];
+        if (escaped) {
+          escaped = false;
+        } else if (current === '\\') {
+          escaped = true;
+        } else if (current === '"') {
+          end += 1;
+          break;
+        }
+        end += 1;
+      }
+      tokens.push(line.slice(index, end));
+      index = end;
+      continue;
+    }
+    let end = index;
+    while (end < line.length && line[end] !== ' ') {
+      end += 1;
+    }
+    tokens.push(line.slice(index, end));
+    index = end;
+  }
+  if (tokens.length !== 2) {
+    return null;
+  }
+  return tokens
+    .map((token) => decodeGitDiffPathToken(token))
+    .map((token) => (token.startsWith('a/') || token.startsWith('b/') ? token.slice(2) : token));
+}
+
+function decodeGitDiffPathToken(token: string): string {
+  if (!(token.startsWith('"') && token.endsWith('"'))) {
+    return token;
+  }
+  const bytes: number[] = [];
+  const raw = token.slice(1, -1);
+  for (let index = 0; index < raw.length; index += 1) {
+    const current = raw[index];
+    if (current !== '\\') {
+      bytes.push(...Buffer.from(current, 'utf8'));
+      continue;
+    }
+    const next = raw[index + 1];
+    if (next === undefined) {
+      bytes.push('\\'.charCodeAt(0));
+      continue;
+    }
+    if (/[0-7]{3}/u.test(raw.slice(index + 1, index + 4))) {
+      bytes.push(parseInt(raw.slice(index + 1, index + 4), 8));
+      index += 3;
+      continue;
+    }
+    switch (next) {
+      case '\\':
+      case '"':
+        bytes.push(next.charCodeAt(0));
+        break;
+      case 'n':
+        bytes.push('\n'.charCodeAt(0));
+        break;
+      case 'r':
+        bytes.push('\r'.charCodeAt(0));
+        break;
+      case 't':
+        bytes.push('\t'.charCodeAt(0));
+        break;
+      default:
+        bytes.push(next.charCodeAt(0));
+        break;
+    }
+    index += 1;
+  }
+  return Buffer.from(bytes).toString('utf8');
 }
 
 function resolveAcceptedPatchScopeViolation(
