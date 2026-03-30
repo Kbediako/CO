@@ -21,6 +21,10 @@ import { persistManifest, type ManifestPersister } from '../run/manifestPersiste
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
+import {
+  deriveReviewOutcomeDisposition,
+  type ReviewOutcomeDisposition
+} from '../../../../scripts/lib/review-execution-telemetry.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
 
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
@@ -32,6 +36,12 @@ const REVIEW_EVIDENCE_CONSISTENCY_ENV_KEY = 'CODEX_REVIEW_ENFORCE_EVIDENCE_CONSI
 const REVIEW_EVIDENCE_WAIVER_REASON_ENV_KEY = 'CODEX_REVIEW_EVIDENCE_WAIVER_REASON';
 const REVIEW_TELEMETRY_POLL_INTERVAL_MS = 50;
 const REVIEW_TELEMETRY_WAIT_TIMEOUT_MS = 2_000;
+const REVIEW_OUTCOME_BOUNDARY_PRESENCE_SENTINEL = {
+  kind: 'timeout',
+  provenance: 'review-timeout',
+  reason: '',
+  sample: null
+} as const;
 
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
@@ -66,12 +76,6 @@ interface ReviewTelemetryEvidencePayload {
   review_outcome?: unknown;
   termination_boundary?: unknown;
 }
-
-type ReviewOutcomeDisposition =
-  | 'clean-success'
-  | 'bounded-success'
-  | 'failed-boundary'
-  | 'failed-other';
 
 interface ReviewEvidenceMismatch {
   message: string;
@@ -545,7 +549,13 @@ function shouldAwaitReviewTelemetryEvidence(
   if (enforceReviewEvidenceConsistency) {
     return true;
   }
-  return parseBooleanEnvFlag(execEnv.FORCE_CODEX_REVIEW);
+  const forced = parseBooleanEnvFlag(execEnv.FORCE_CODEX_REVIEW);
+  const nonInteractive =
+    process.stdin.isTTY === false ||
+    parseBooleanEnvFlag(execEnv.CODEX_REVIEW_NON_INTERACTIVE) ||
+    parseBooleanEnvFlag(execEnv.CODEX_NON_INTERACTIVE) ||
+    parseBooleanEnvFlag(execEnv.CODEX_NO_INTERACTIVE);
+  return forced || !nonInteractive;
 }
 
 function isReviewCommandStage(stage: CommandStage): boolean {
@@ -761,14 +771,12 @@ function resolveReviewTelemetryOutcomeDisposition(
   if (!telemetryStatus) {
     return null;
   }
-  const derivedDisposition =
-    telemetryStatus === 'succeeded'
-      ? hasTelemetryTerminationBoundary(telemetry)
-        ? 'bounded-success'
-        : 'clean-success'
-      : hasTelemetryTerminationBoundary(telemetry)
-        ? 'failed-boundary'
-        : 'failed-other';
+  const derivedDisposition = deriveReviewOutcomeDisposition({
+    status: telemetryStatus,
+    terminationBoundary: hasTelemetryTerminationBoundary(telemetry)
+      ? REVIEW_OUTCOME_BOUNDARY_PRESENCE_SENTINEL
+      : null
+  });
   return explicitDisposition === derivedDisposition ? explicitDisposition : derivedDisposition;
 }
 

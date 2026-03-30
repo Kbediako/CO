@@ -422,6 +422,53 @@ describe('runCommandStage review evidence consistency', () => {
     );
   });
 
+  it('waits for delayed review telemetry on interactive runs without FORCE_CODEX_REVIEW', async () => {
+    const isTTYDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true
+    });
+
+    mockState.runImpl = async (input) => {
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          status: 'succeeded',
+          review_outcome: 'bounded-success',
+          termination_boundary: {
+            kind: 'relevant-reinspection-dwell',
+            provenance: 'post-startup-anchor',
+            reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+            sample: null
+          }
+        });
+      }, 50);
+      return buildSuccessfulExecResult();
+    };
+
+    try {
+      const { manifest, stage, ...context } = await bootstrapCommandStage({
+        id: 'review',
+        title: 'npm run review',
+        command: 'npm run review'
+      });
+      const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.summary).toContain(
+        'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+      );
+      expect(manifest.commands[0]?.summary).toContain(
+        'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+      );
+    } finally {
+      if (isTTYDescriptor) {
+        Object.defineProperty(process.stdin, 'isTTY', isTTYDescriptor);
+      } else {
+        delete (process.stdin as NodeJS.ReadStream & { isTTY?: boolean }).isTTY;
+      }
+    }
+  });
+
   it('does not enforce review telemetry consistency for non-review command stages even when the env leaks in globally', async () => {
     mockState.runImpl = async () => buildSuccessfulExecResult();
 
