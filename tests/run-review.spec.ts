@@ -2565,6 +2565,31 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     });
   });
 
+  it('fails when explicit scoped review requests a non-diff surface', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_ARGS_LOG: argsLogPath
+      },
+      ['--base', baseRef, '--surface', 'audit']
+    );
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain('explicit scoped review cannot honor --surface audit');
+    await expect(readFile(argsLogPath, 'utf8')).rejects.toThrow();
+  });
+
   it('fails when explicit base scope is rejected with a generic unknown-option error', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -2768,6 +2793,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
     expect(normalizedHelp).toContain(
       'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt but launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT].'
+    );
+    expect(normalizedHelp).toContain(
+      'Explicit scoped wrapper runs Support only the default diff surface; audit/architecture require prompt-capable unscoped review.'
     );
     expect(normalizedHelp).toContain(
       'Unscoped wrapper runs Pass the saved prompt/context inline to codex review.'

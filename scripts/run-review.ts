@@ -107,6 +107,19 @@ function buildExplicitScopeRetryGateError(
   return null;
 }
 
+function buildExplicitScopeSurfaceGateError(
+  options: Pick<CliOptions, 'base' | 'commit' | 'uncommitted'>,
+  reviewSurface: ReviewSurface
+): string | null {
+  if (reviewSurface === 'diff') {
+    return null;
+  }
+  if (!(options.base || options.commit || options.uncommitted)) {
+    return null;
+  }
+  return `explicit scoped review cannot honor --surface ${reviewSurface} because current Codex CLI rejects all prompt transport under --base/--commit/--uncommitted; rerun with the default diff surface or drop the explicit scope if you need ${reviewSurface} prompt context.`;
+}
+
 function installStdioErrorGuards(): void {
   const guard = (error: NodeJS.ErrnoException) => {
     const code = typeof error?.code === 'string' ? error.code : '';
@@ -358,6 +371,10 @@ async function main(): Promise<void> {
   const taskKey = options.task ?? envTask ?? manifestTask;
   const taskLabel = taskKey ?? 'unknown-task';
   const reviewSurface = options.surface ?? 'diff';
+  const explicitScopeSurfaceGateError = buildExplicitScopeSurfaceGateError(options, reviewSurface);
+  if (explicitScopeSurfaceGateError) {
+    throw new Error(explicitScopeSurfaceGateError);
+  }
   const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
   const scopeMode = resolveEffectiveScopeMode(options);
   const allowHeavyCommands = allowHeavyReviewCommands();
@@ -666,6 +683,7 @@ Environment:
 Behavior:
   Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt
                                 but launch codex review without any prompt argument because current CLI still treats stdin (\`-\`) as [PROMPT].
+  Explicit scoped wrapper runs  Support only the default diff surface; audit/architecture require prompt-capable unscoped review.
   Unscoped wrapper runs         Pass the saved prompt/context inline to codex review.
 `);
 }
