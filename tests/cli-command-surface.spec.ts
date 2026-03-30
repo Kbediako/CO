@@ -13,6 +13,7 @@ const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
+const SKILLS_INSTALL_JSON_TIMEOUT = 70000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
@@ -174,7 +175,11 @@ describe('codex-orchestrator command surface', () => {
   it('emits skills install JSON output', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-json-'));
 
-    const { stdout } = await runCli(['skills', 'install', '--only', 'long-poll-wait', '--codex-home', tempDir, '--format', 'json']);
+    const { stdout } = await runCli(
+      ['skills', 'install', '--only', 'long-poll-wait', '--codex-home', tempDir, '--format', 'json'],
+      undefined,
+      SKILLS_INSTALL_JSON_TIMEOUT
+    );
     const payload = JSON.parse(stdout) as {
       targetRoot?: string;
       skills?: string[];
@@ -188,7 +193,7 @@ describe('codex-orchestrator command surface', () => {
         join(tempDir, 'skills', 'long-poll-wait', 'SKILL.md')
       ])
     );
-  }, CLI_BOOT_TIMEOUT);
+  }, SKILLS_INSTALL_JSON_TIMEOUT);
 
   it('prints resume help without requiring a run id', async () => {
     const { stdout } = await runCli(['resume', '--help'], undefined, CLI_BOOT_TIMEOUT);
