@@ -6,6 +6,7 @@ import type { EffectiveDelegationConfig } from '../src/config/delegationConfig.j
 import type { RunPaths } from '../src/run/runPaths.js';
 import type { ControlRequestSharedContext } from '../src/cli/control/controlRequestContext.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
+import type { ProviderIssueHandoffPollInput } from '../src/cli/control/providerIssueHandoff.js';
 import {
   closeControlServerOwnedRuntime,
   startControlServerReadyInstanceLifecycle,
@@ -1133,6 +1134,75 @@ describe('startControlServerPublicLifecycle', () => {
       reason: 'provider_refresh_lifecycle_stuck'
     });
     await expect(inFlightRefresh).resolves.toMatchObject({
+      queued: true,
+      coalesced: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+
+    resolveRefresh?.();
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('signals stuck waiters when the trigger attaches after the refresh is already over budget', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-30T01:00:00.000Z'));
+
+    let resolveRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => {
+        await firstRefresh;
+      })
+    };
+
+    const waitingRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(45_001);
+
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(waitingRefresh).resolves.toMatchObject({
       queued: true,
       coalesced: true,
       stuck: true,

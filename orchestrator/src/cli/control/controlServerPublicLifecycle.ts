@@ -306,6 +306,7 @@ function createProviderRefreshCoordinator(
       return;
     }
     if (isProviderPollingStuck(providerIssueHandoff)) {
+      resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
       scheduleNextTrigger();
       return;
     }
