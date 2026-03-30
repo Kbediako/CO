@@ -1683,6 +1683,7 @@ describe('ControlRuntime', () => {
       interval_ms: 30000,
       checking: true,
       stuck: false,
+      restart_required: false,
       stalled_after_ms: null
     });
   });
