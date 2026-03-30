@@ -56,7 +56,10 @@ import { resolveCodexHome } from './utils/codexPaths.js';
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-worker-child-streams.json';
+export const PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME = 'provider-linear-worker-child-lanes.json';
+const PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_PROOF_FILENAME}.lock`;
 const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME}.lock`;
+const PROVIDER_LINEAR_WORKER_CHILD_LANES_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME}.lock`;
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
 const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
 const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
@@ -89,6 +92,17 @@ const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
   // lossy concurrent ledger rewrites.
   maxDelayMs: 250
 };
+const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
+  maxAttempts: 50,
+  initialDelayMs: 10,
+  backoffFactor: 1.5,
+  // The proof sidecar is shared by the parent worker and child refresh paths;
+  // prefer a short wait over allowing stale snapshots to overwrite newer state.
+  maxDelayMs: 250
+};
+const PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS = new Set<string>([
+  'max_turns_reached_issue_still_active'
+]);
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
@@ -137,6 +151,58 @@ export interface ProviderLinearWorkerChildStreamRecord {
   launched_at: string;
 }
 
+export interface ProviderLinearWorkerChildLaneScope {
+  files: string[];
+  phases: string[];
+}
+
+export interface ProviderLinearWorkerChildLaneParentSnapshot {
+  base_sha: string | null;
+  issue_updated_at: string | null;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  captured_at: string;
+}
+
+export type ProviderLinearWorkerChildLaneDecision =
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'invalidated';
+
+export type ProviderLinearWorkerChildLaneInFlightAction =
+  | 'accept'
+  | 'reject'
+  | 'invalidate';
+
+export interface ProviderLinearWorkerChildLaneRecord {
+  stream: string;
+  pipeline_id: string;
+  task_id: string;
+  run_id: string;
+  status: string;
+  manifest_path: string;
+  artifact_root: string;
+  log_path: string | null;
+  summary: string | null;
+  issue_id: string;
+  issue_identifier: string;
+  workspace_path: string | null;
+  source_setup: DispatchPilotSourceSetup | null;
+  launched_at: string;
+  purpose: string;
+  instructions: string | null;
+  scope: ProviderLinearWorkerChildLaneScope;
+  parent_snapshot: ProviderLinearWorkerChildLaneParentSnapshot;
+  lane_workspace_path: string | null;
+  patch_artifact_path: string | null;
+  patch_bytes: number | null;
+  decision: ProviderLinearWorkerChildLaneDecision;
+  in_flight_action?: ProviderLinearWorkerChildLaneInFlightAction | null;
+  decision_at: string | null;
+  decision_reason: string | null;
+}
+
 export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
@@ -156,6 +222,7 @@ export interface ProviderLinearWorkerProof {
   source_setup?: DispatchPilotSourceSetup | null;
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
+  child_lanes?: ProviderLinearWorkerChildLaneRecord[];
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
   end_reason: string | null;
   updated_at: string;
@@ -224,7 +291,7 @@ export interface ProviderLinearWorkerDependencies {
   log: Pick<typeof logger, 'info' | 'warn' | 'error'>;
 }
 
-function buildEmptyProviderLinearWorkerTokenUsage(): ProviderLinearWorkerTokenUsage {
+export function buildEmptyProviderLinearWorkerTokenUsage(): ProviderLinearWorkerTokenUsage {
   return {
     input_tokens: null,
     output_tokens: null,
@@ -305,6 +372,26 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalInteger(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && /^\d+$/u.test(value.trim())) {
+    return Number.parseInt(value.trim(), 10);
+  }
+  return null;
+}
+
+function normalizeStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const normalized = value
+    .map((entry) => normalizeOptionalString(entry))
+    .filter((entry): entry is string => entry !== null);
+  return normalized.length === value.length ? normalized : null;
 }
 
 function parsePositiveInteger(value: unknown, source: string): number | null {
@@ -610,6 +697,7 @@ export function buildProviderWorkerPrompt(
       '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
       buildRuntimeProofGuidance(helperCommand, issue.id),
       `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
+      `- When the issue benefits from bounded same-issue implementation help, use parent-owned child lanes via \`${helperCommand} child-lane --action launch --stream <name> --purpose <goal> --files <csv> --phases <csv>\`, then accept, reject, or invalidate the resulting patch artifact from the parent lane.`,
       ...buildPreReviewHandoffGateSection(),
       '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
       '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
@@ -644,6 +732,7 @@ export function buildProviderWorkerPrompt(
     '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
     buildRuntimeProofGuidance(helperCommand, issue.id),
     `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
+    `- When the issue benefits from bounded same-issue implementation help, use parent-owned child lanes via \`${helperCommand} child-lane --action launch --stream <name> --purpose <goal> --files <csv> --phases <csv>\`, then accept, reject, or invalidate the resulting patch artifact from the parent lane.`,
     ...buildPreReviewHandoffGateSection(),
     '- Review handoff states are `Human Review` and `In Review`; treat `In Review` as the review alias when the team exposes it.',
     '- Standalone-review policy for this provider-worker lane: before handing off to `Human Review` or `In Review`, run manifest-backed `codex-orchestrator review` / `npm run review` in this non-interactive worker session and let it execute under `FORCE_CODEX_REVIEW=1`; do not treat a printed handoff prompt as sufficient evidence.',
@@ -1093,12 +1182,24 @@ function buildProofPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
 }
 
+function buildProofLockPath(runDir: string): string {
+  return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME);
+}
+
 function buildChildStreamsPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME);
 }
 
 function buildChildStreamsLockPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME);
+}
+
+function buildChildLanesPath(runDir: string): string {
+  return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME);
+}
+
+function buildChildLanesLockPath(runDir: string): string {
+  return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_LOCK_FILENAME);
 }
 
 export async function readProviderLinearWorkerChildStreams(
@@ -1141,6 +1242,85 @@ export async function appendProviderLinearWorkerChildStreamRecord(
   });
 }
 
+export async function readProviderLinearWorkerChildLanes(
+  runDir: string
+): Promise<ProviderLinearWorkerChildLaneRecord[]> {
+  let raw: string;
+  try {
+    raw = await readFile(buildChildLanesPath(runDir), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error('provider-linear-worker child-lane ledger is not an array.');
+  }
+  const normalized = parsed.map((entry) => normalizeProviderLinearWorkerChildLaneRecord(entry));
+  if (normalized.some((entry) => entry === null)) {
+    throw new Error('provider-linear-worker child-lane ledger contains invalid records.');
+  }
+  return normalized as ProviderLinearWorkerChildLaneRecord[];
+}
+
+export async function appendProviderLinearWorkerChildLaneRecord(
+  runDir: string,
+  record: ProviderLinearWorkerChildLaneRecord,
+  writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
+): Promise<ProviderLinearWorkerChildLaneRecord[]> {
+  return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
+    const existing = await readProviderLinearWorkerChildLanes(runDir);
+    const next = existing.filter(
+      (entry) => !(entry.task_id === record.task_id && entry.run_id === record.run_id)
+    );
+    next.push(record);
+    await writeJson(buildChildLanesPath(runDir), next);
+    return next;
+  });
+}
+
+export async function updateProviderLinearWorkerChildLaneRecord(
+  runDir: string,
+  matcher: (record: ProviderLinearWorkerChildLaneRecord) => boolean,
+  updater: (record: ProviderLinearWorkerChildLaneRecord) => ProviderLinearWorkerChildLaneRecord,
+  writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
+): Promise<ProviderLinearWorkerChildLaneRecord | null> {
+  return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
+    const existing = await readProviderLinearWorkerChildLanes(runDir);
+    let updatedRecord: ProviderLinearWorkerChildLaneRecord | null = null;
+    const next = existing.map((entry) => {
+      if (updatedRecord || !matcher(entry)) {
+        return entry;
+      }
+      updatedRecord = updater(entry);
+      return updatedRecord;
+    });
+    if (!updatedRecord) {
+      return null;
+    }
+    await writeJson(buildChildLanesPath(runDir), next);
+    return updatedRecord;
+  });
+}
+
+export async function transactProviderLinearWorkerChildLanes<T>(
+  runDir: string,
+  action: (
+    records: ProviderLinearWorkerChildLaneRecord[]
+  ) => Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; result: T }> | { records: ProviderLinearWorkerChildLaneRecord[]; result: T },
+  writeJson: (path: string, value: unknown) => Promise<void> = async (path, value) => await writeJsonAtomic(path, value)
+): Promise<T> {
+  return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
+    const existing = await readProviderLinearWorkerChildLanes(runDir);
+    const next = await action(existing);
+    await writeJson(buildChildLanesPath(runDir), next.records);
+    return next.result;
+  });
+}
+
 async function withProviderLinearWorkerChildStreamsLock<T>(
   runDir: string,
   action: () => Promise<T>
@@ -1155,6 +1335,50 @@ async function withProviderLinearWorkerChildStreamsLock<T>(
     },
     createError: (_taskId, attempts) =>
       new Error(`Failed to acquire provider-linear-worker child-stream ledger lock after ${attempts} attempts.`)
+  });
+  try {
+    return await action();
+  } finally {
+    await rm(lockPath, { force: true });
+  }
+}
+
+async function withProviderLinearWorkerProofLock<T>(
+  runDir: string,
+  action: () => Promise<T>
+): Promise<T> {
+  const lockPath = buildProofLockPath(runDir);
+  await acquireLockWithRetry({
+    taskId: runDir,
+    lockPath,
+    retry: PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY,
+    ensureDirectory: async () => {
+      await mkdir(dirname(lockPath), { recursive: true });
+    },
+    createError: (_taskId, attempts) =>
+      new Error(`Failed to acquire provider-linear-worker proof lock after ${attempts} attempts.`)
+  });
+  try {
+    return await action();
+  } finally {
+    await rm(lockPath, { force: true });
+  }
+}
+
+async function withProviderLinearWorkerChildLanesLock<T>(
+  runDir: string,
+  action: () => Promise<T>
+): Promise<T> {
+  const lockPath = buildChildLanesLockPath(runDir);
+  await acquireLockWithRetry({
+    taskId: runDir,
+    lockPath,
+    retry: PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY,
+    ensureDirectory: async () => {
+      await mkdir(dirname(lockPath), { recursive: true });
+    },
+    createError: (_taskId, attempts) =>
+      new Error(`Failed to acquire provider-linear-worker child-lane ledger lock after ${attempts} attempts.`)
   });
   try {
     return await action();
@@ -1216,6 +1440,130 @@ function normalizeProviderLinearWorkerChildStreamRecord(
       : null,
     launched_at: launchedAt
   };
+}
+
+function normalizeProviderLinearWorkerChildLaneRecord(
+  value: unknown
+): ProviderLinearWorkerChildLaneRecord | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const stream = normalizeOptionalString(value.stream);
+  const pipelineId = normalizeOptionalString(value.pipeline_id);
+  const taskId = normalizeOptionalString(value.task_id);
+  const runId = normalizeOptionalString(value.run_id);
+  const status = normalizeOptionalString(value.status);
+  const manifestPath = normalizeOptionalString(value.manifest_path);
+  const artifactRoot = normalizeOptionalString(value.artifact_root);
+  const issueId = normalizeOptionalString(value.issue_id);
+  const issueIdentifier = normalizeOptionalString(value.issue_identifier);
+  const launchedAt = normalizeOptionalString(value.launched_at);
+  const purpose = normalizeOptionalString(value.purpose);
+  const decision = normalizeChildLaneDecision(value.decision);
+  const inFlightAction = normalizeChildLaneInFlightAction(value.in_flight_action);
+  const scope = normalizeProviderLinearWorkerChildLaneScope(value.scope);
+  const parentSnapshot = normalizeProviderLinearWorkerChildLaneParentSnapshot(value.parent_snapshot);
+  if (
+    !stream ||
+    !pipelineId ||
+    !taskId ||
+    !runId ||
+    !status ||
+    !manifestPath ||
+    !artifactRoot ||
+    !issueId ||
+    !issueIdentifier ||
+    !launchedAt ||
+    !purpose ||
+    !decision ||
+    !scope ||
+    !parentSnapshot
+  ) {
+    return null;
+  }
+  return {
+    stream,
+    pipeline_id: pipelineId,
+    task_id: taskId,
+    run_id: runId,
+    status,
+    manifest_path: manifestPath,
+    artifact_root: artifactRoot,
+    log_path: normalizeOptionalString(value.log_path),
+    summary: normalizeOptionalString(value.summary),
+    issue_id: issueId,
+    issue_identifier: issueIdentifier,
+    workspace_path: normalizeOptionalString(value.workspace_path),
+    source_setup: isRecord(value.source_setup) && value.source_setup.provider === 'linear'
+      ? {
+          provider: 'linear',
+          workspace_id: normalizeOptionalString(value.source_setup.workspace_id),
+          team_id: normalizeOptionalString(value.source_setup.team_id),
+          project_id: normalizeOptionalString(value.source_setup.project_id)
+        }
+      : null,
+    launched_at: launchedAt,
+    purpose,
+    instructions: normalizeOptionalString(value.instructions),
+    scope,
+    parent_snapshot: parentSnapshot,
+    lane_workspace_path: normalizeOptionalString(value.lane_workspace_path),
+    patch_artifact_path: normalizeOptionalString(value.patch_artifact_path),
+    patch_bytes: normalizeOptionalInteger(value.patch_bytes),
+    decision,
+    in_flight_action: inFlightAction,
+    decision_at: normalizeOptionalString(value.decision_at),
+    decision_reason: normalizeOptionalString(value.decision_reason)
+  };
+}
+
+function normalizeProviderLinearWorkerChildLaneScope(
+  value: unknown
+): ProviderLinearWorkerChildLaneScope | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const files = normalizeStringArray(value.files);
+  const phases = normalizeStringArray(value.phases);
+  if (!files || !phases || (files.length === 0 && phases.length === 0)) {
+    return null;
+  }
+  return { files, phases };
+}
+
+function normalizeProviderLinearWorkerChildLaneParentSnapshot(
+  value: unknown
+): ProviderLinearWorkerChildLaneParentSnapshot | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const capturedAt = normalizeOptionalString(value.captured_at);
+  if (!capturedAt) {
+    return null;
+  }
+  return {
+    base_sha: normalizeOptionalString(value.base_sha),
+    issue_updated_at: normalizeOptionalString(value.issue_updated_at),
+    issue_state: normalizeOptionalString(value.issue_state),
+    issue_state_type: normalizeOptionalString(value.issue_state_type),
+    captured_at: capturedAt
+  };
+}
+
+function normalizeChildLaneDecision(
+  value: unknown
+): ProviderLinearWorkerChildLaneDecision | null {
+  return value === 'pending' || value === 'accepted' || value === 'rejected' || value === 'invalidated'
+    ? value
+    : null;
+}
+
+function normalizeChildLaneInFlightAction(
+  value: unknown
+): ProviderLinearWorkerChildLaneInFlightAction | null {
+  return value === 'accept' || value === 'reject' || value === 'invalidate'
+    ? value
+    : null;
 }
 async function resolveProviderWorkerRunLocation(
   currentManifestPath: string,
@@ -1466,7 +1814,17 @@ async function requestProviderControlHostRefresh(input: {
   repoRoot: string;
   log: Pick<typeof logger, 'warn'>;
 }): Promise<void> {
-  if (input.proof.owner_phase !== 'ended' || input.proof.owner_status !== 'failed') {
+  const shouldRefresh =
+    input.proof.owner_phase === 'ended' &&
+    (
+      input.proof.owner_status === 'failed' ||
+      (
+        input.proof.owner_status === 'succeeded' &&
+        typeof input.proof.end_reason === 'string' &&
+        PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS.has(input.proof.end_reason)
+      )
+    );
+  if (!shouldRefresh) {
     return;
   }
   try {
@@ -1565,13 +1923,47 @@ async function writeProofSnapshot(
   auditPath: string,
   proof: ProviderLinearWorkerProof
 ): Promise<ProviderLinearWorkerProof> {
-  const hydratedProof = {
-    ...proof,
-    linear_audit: await summarizeProviderLinearAuditPath(auditPath),
-    child_streams: await readProviderLinearWorkerChildStreams(runDir)
-  };
-  await deps.writeProof(buildProofPath(runDir), hydratedProof);
-  return hydratedProof;
+  return await withProviderLinearWorkerProofLock(runDir, async () => {
+    const hydratedProof = {
+      ...proof,
+      linear_audit: await summarizeProviderLinearAuditPath(auditPath),
+      child_streams: await readProviderLinearWorkerChildStreams(runDir),
+      child_lanes: await readProviderLinearWorkerChildLanes(runDir)
+    };
+    await deps.writeProof(buildProofPath(runDir), hydratedProof);
+    return hydratedProof;
+  });
+}
+
+export async function refreshProviderLinearWorkerProofSnapshot(
+  runDir: string,
+  auditPath: string | null,
+  now: () => string = () => new Date().toISOString(),
+  writeProof: (path: string, proof: ProviderLinearWorkerProof) => Promise<void> = async (path, proof) =>
+    await writeJsonAtomic(path, proof)
+): Promise<ProviderLinearWorkerProof | null> {
+  return await withProviderLinearWorkerProofLock(runDir, async () => {
+    const proofPath = buildProofPath(runDir);
+    let raw: string;
+    try {
+      raw = await readFile(proofPath, 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return null;
+      }
+      throw error;
+    }
+    const parsed = JSON.parse(raw) as ProviderLinearWorkerProof;
+    const hydrated: ProviderLinearWorkerProof = {
+      ...parsed,
+      linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
+      child_streams: await readProviderLinearWorkerChildStreams(runDir),
+      child_lanes: await readProviderLinearWorkerChildLanes(runDir),
+      updated_at: now()
+    };
+    await writeProof(proofPath, hydrated);
+    return hydrated;
+  });
 }
 
 export async function runProviderLinearWorker(
@@ -1630,6 +2022,7 @@ export async function runProviderLinearWorker(
     source_setup: context.sourceSetup,
     linear_audit: null,
     child_streams: [],
+    child_lanes: [],
     tracked_issue_error: null,
     end_reason: null,
     updated_at: deps.now()

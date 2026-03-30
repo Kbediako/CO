@@ -8,9 +8,10 @@ import {
   loadUserConfig,
   REPO_CONFIG_PATH_ENV_KEY
 } from '../src/cli/config/userConfig.js';
+import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 
 let workspaceRoot: string;
-const initialRepoConfigPathEnv = process.env[REPO_CONFIG_PATH_ENV_KEY];
+const ORIGINAL_REPO_CONFIG_PATH = process.env[REPO_CONFIG_PATH_ENV_KEY];
 
 beforeEach(async () => {
   workspaceRoot = await mkdtemp(join(tmpdir(), 'user-config-stagesets-'));
@@ -18,10 +19,10 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  if (initialRepoConfigPathEnv === undefined) {
+  if (ORIGINAL_REPO_CONFIG_PATH === undefined) {
     delete process.env[REPO_CONFIG_PATH_ENV_KEY];
   } else {
-    process.env[REPO_CONFIG_PATH_ENV_KEY] = initialRepoConfigPathEnv;
+    process.env[REPO_CONFIG_PATH_ENV_KEY] = ORIGINAL_REPO_CONFIG_PATH;
   }
   await rm(workspaceRoot, { recursive: true, force: true });
 });
@@ -89,7 +90,9 @@ describe('loadUserConfig stage sets', () => {
       taskId: 'task-stagesets'
     };
 
-    const loaded = await loadUserConfig(env);
+    const loaded = await loadUserConfig(env, {
+      processEnv: sanitizeProviderOverrideEnv(process.env)
+    });
     const stages = loaded?.pipelines?.[0]?.stages ?? [];
 
     expect(stages).toHaveLength(5);

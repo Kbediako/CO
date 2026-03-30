@@ -5,10 +5,10 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
-import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
 import * as orchestratorControlPlaneLifecycle from '../orchestrator/src/cli/services/orchestratorControlPlaneLifecycle.js';
 import { getTelemetrySchemas, validateCliManifest } from '../orchestrator/src/cli/telemetry/schema.js';
 import { formatPlanPreview } from '../orchestrator/src/cli/utils/planFormatter.js';
+import { PROVIDER_OVERRIDE_ENV_KEYS } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
 import { resolveRunPaths } from '../orchestrator/src/cli/run/runPaths.js';
 import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
 import { normalizeEnvironmentPaths } from '../orchestrator/src/cli/run/environment.js';
@@ -77,7 +77,9 @@ const ORIGINAL_ENV = {
   configOverrides: process.env.CODEX_CONFIG_OVERRIDES,
   mcpConfigOverrides: process.env.CODEX_MCP_CONFIG_OVERRIDES,
   repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
-  repoConfigPath: process.env[REPO_CONFIG_PATH_ENV_KEY]
+  providerOverrides: Object.fromEntries(
+    PROVIDER_OVERRIDE_ENV_KEYS.map((key) => [key, process.env[key]])
+  ) as Partial<NodeJS.ProcessEnv>
 };
 
 describe('CodexOrchestrator CLI', () => {
@@ -94,7 +96,9 @@ describe('CodexOrchestrator CLI', () => {
     process.env.CODEX_CONFIG_OVERRIDES = 'ui.control_enabled=false';
     delete process.env.CODEX_MCP_CONFIG_OVERRIDES;
     delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
-    delete process.env[REPO_CONFIG_PATH_ENV_KEY];
+    for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
+      delete process.env[key];
+    }
 
     await fs.writeFile(
       path.join(tempDir, 'codex.orchestrator.json'),
@@ -126,10 +130,13 @@ describe('CodexOrchestrator CLI', () => {
     } else {
       process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = ORIGINAL_ENV.repoConfigRequired;
     }
-    if (ORIGINAL_ENV.repoConfigPath === undefined) {
-      delete process.env[REPO_CONFIG_PATH_ENV_KEY];
-    } else {
-      process.env[REPO_CONFIG_PATH_ENV_KEY] = ORIGINAL_ENV.repoConfigPath;
+    for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
+      const value = ORIGINAL_ENV.providerOverrides[key];
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
     }
     await fs.rm(tempDir, { recursive: true, force: true });
   });
