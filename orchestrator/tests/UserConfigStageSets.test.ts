@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import { loadUserConfig } from '../src/cli/config/userConfig.js';
+import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 
 let workspaceRoot: string;
 
@@ -79,7 +80,9 @@ describe('loadUserConfig stage sets', () => {
       taskId: 'task-stagesets'
     };
 
-    const loaded = await loadUserConfig(env);
+    const loaded = await loadUserConfig(env, {
+      processEnv: sanitizeProviderOverrideEnv(process.env)
+    });
     const stages = loaded?.pipelines?.[0]?.stages ?? [];
 
     expect(stages).toHaveLength(5);

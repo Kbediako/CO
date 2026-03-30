@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
+import { sanitizeProviderOverrideEnv } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -42,6 +43,26 @@ afterEach(async () => {
 });
 
 function buildIsolatedFrontendTestEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const mergedEnv = sanitizeProviderOverrideEnv({
+    ...process.env,
+    ...extraEnv,
+    CODEX_ORCHESTRATOR_ROOT: tempDir as string,
+    CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir as string, '.runs'),
+    CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir as string, 'out'),
+    MCP_RUNNER_TASK_ID: 'frontend-test'
+  });
+  for (const key of RUNTIME_TEST_ENV_KEYS) {
+    delete mergedEnv[key];
+  }
+  return {
+    // Keep the spawned CLI run deterministic even when neighboring tests mutate
+    // runtime-mode env vars in the shared Vitest process.
+    ...mergedEnv,
+    ...ISOLATED_RUNTIME_TEST_ENV
+  };
+}
+
+function buildRawFrontendTestEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const mergedEnv: NodeJS.ProcessEnv = {
     ...process.env,
     ...extraEnv,
@@ -54,8 +75,6 @@ function buildIsolatedFrontendTestEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.
     delete mergedEnv[key];
   }
   return {
-    // Keep the spawned CLI run deterministic even when neighboring tests mutate
-    // runtime-mode env vars in the shared Vitest process.
     ...mergedEnv,
     ...ISOLATED_RUNTIME_TEST_ENV
   };
@@ -65,11 +84,25 @@ async function runFrontendTest(
   extraArgs: string[],
   extraEnv: NodeJS.ProcessEnv = {}
 ): Promise<{ manifestPath: string; runtimeMode: string | null; runtimeProvider: string | null }> {
+  return await runFrontendTestWithEnv(buildIsolatedFrontendTestEnv(extraEnv), extraArgs);
+}
+
+async function runFrontendTestWithRawEnv(
+  extraArgs: string[],
+  extraEnv: NodeJS.ProcessEnv = {}
+): Promise<{ manifestPath: string; runtimeMode: string | null; runtimeProvider: string | null }> {
+  return await runFrontendTestWithEnv(buildRawFrontendTestEnv(extraEnv), extraArgs);
+}
+
+async function runFrontendTestWithEnv(
+  env: NodeJS.ProcessEnv,
+  extraArgs: string[]
+): Promise<{ manifestPath: string; runtimeMode: string | null; runtimeProvider: string | null }> {
   const { stdout } = await execFileAsync(
     process.execPath,
     ['--loader', 'ts-node/esm', CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs],
     {
-      env: buildIsolatedFrontendTestEnv(extraEnv),
+      env,
       timeout: TEST_TIMEOUT
     }
   );
@@ -176,5 +209,60 @@ describe('codex-orchestrator frontend-test', () => {
 
     expect(result.runtimeMode).toBe('cli');
     expect(result.runtimeProvider).toBe('CliRuntimeProvider');
+  }, TEST_TIMEOUT);
+
+  it('sanitizes ambient provider config env in the real frontend-test CLI', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-cli-'));
+    const providerConfigPath = join(tempDir, 'provider.json');
+    const workspaceConfig = {
+      pipelines: [
+        {
+          id: 'frontend-testing',
+          title: 'Frontend Testing',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'echo',
+              title: 'echo',
+              command: "node -e \"console.log('ok')\""
+            }
+          ]
+        }
+      ]
+    };
+    const providerConfig = {
+      defaultPipeline: 'provider-linear-worker',
+      pipelines: [
+        {
+          id: 'provider-linear-worker',
+          title: 'Provider Worker',
+          guardrailsRequired: false,
+          stages: [
+            {
+              kind: 'command',
+              id: 'provider-only',
+              title: 'provider-only',
+              command: "node -e \"console.log('provider')\""
+            }
+          ]
+        }
+      ]
+    };
+    await writeFile(join(tempDir, 'codex.orchestrator.json'), `${JSON.stringify(workspaceConfig, null, 2)}\n`);
+    await writeFile(providerConfigPath, `${JSON.stringify(providerConfig, null, 2)}\n`);
+
+    const { manifestPath } = await runFrontendTestWithRawEnv([], {
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host',
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+      CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH: providerConfigPath,
+      CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT: '/tmp/provider-package-root',
+      CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: providerConfigPath,
+      CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1',
+      CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/provider-package-root'
+    });
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { pipeline_id?: string };
+    expect(manifest.pipeline_id).toBe('frontend-testing');
   }, TEST_TIMEOUT);
 });

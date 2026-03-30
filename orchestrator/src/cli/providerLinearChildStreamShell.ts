@@ -18,6 +18,7 @@ import {
   type ProviderLinearWorkerExecResult
 } from './providerLinearWorkerRunner.js';
 import { slugify } from './utils/strings.js';
+import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 const ALLOWED_PROVIDER_CHILD_PIPELINES = ['docs-review', 'implementation-gate', 'docs-relevance-advisory'] as const;
 const PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE = [
   'MCP_RUNNER_TASK_ID',
@@ -309,7 +310,7 @@ function normalizeProviderChildPipelineId(value: string): ProviderLinearChildStr
 function normalizeChildStreamName(value: string): string | null { const normalized = slugify(value, '').toLowerCase(); return normalized.length > 0 ? normalized : null; }
 function normalizeRuntimeMode(value: string | undefined): 'cli' | 'appserver' | null { if (typeof value !== 'string') return null; const normalized = value.trim().toLowerCase(); return normalized === 'cli' || normalized === 'appserver' ? normalized : null; }
 function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string, sourceSetup: DispatchPilotSourceSetup | null): NodeJS.ProcessEnv {
-  const sanitized: NodeJS.ProcessEnv = { ...process.env, ...env };
+  const sanitized = sanitizeProviderOverrideEnv({ ...process.env, ...env });
   for (const key of PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE) {
     delete sanitized[key];
   }

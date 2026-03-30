@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260330-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3",
+      "title": "CO: Prevent provider-worker env override leakage into repo validation",
+      "relates_to": "tasks/tasks-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "paths": {
+        "spec": "tasks/specs/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "task": "tasks/tasks-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "agent_task": ".agent/task/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "docs": "docs/TECH_SPEC-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md"
+      }
+    },
+    {
       "id": "20260330-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2",
       "title": "CO: Fix stale merge-handoff after successful provider-worker review handoff",
       "relates_to": "tasks/tasks-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",

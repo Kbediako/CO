@@ -2,8 +2,9 @@
 
 import { spawn } from 'node:child_process';
 import { mkdir, readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 import {
   PROVIDER_CONTROL_HOST_RUN_ID_ENV,
@@ -25,6 +26,11 @@ import { resolveRunPaths } from './run/runPaths.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import { normalizeEnvironmentPaths, normalizeTaskId } from './run/environment.js';
 import { loadManifest } from './run/manifest.js';
+import {
+  PROVIDER_PACKAGE_ROOT_ENV_KEY,
+  PROVIDER_REPO_CONFIG_PATH_ENV_KEY
+} from './utils/providerOverrideEnv.js';
+import { findPackageRoot } from './utils/packageInfo.js';
 import {
   ensureProviderWorkspace,
   resolveProviderResumeWorkspacePath
@@ -220,6 +226,7 @@ export async function runControlHostCliShell(
               input.taskId,
               {
                 ...launchSpec.envOverrides,
+                ...buildProviderOverrideOwnershipEnv(cliEntrypoint, launchSpec.envOverrides),
                 ...buildProviderLinearSourceEnvOverrides(input),
                 [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
                 [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
@@ -252,6 +259,7 @@ export async function runControlHostCliShell(
               input.reason
             ], {
               ...launchSpec.envOverrides,
+              ...buildProviderOverrideOwnershipEnv(cliEntrypoint, launchSpec.envOverrides),
               [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
               [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
               [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
@@ -359,6 +367,30 @@ async function spawnBackgroundCli(
       resolve();
     });
   });
+}
+
+function buildProviderOverrideOwnershipEnv(
+  cliEntrypoint: string,
+  envOverrides: Record<string, string>
+): Record<string, string> {
+  const repoConfigPath = envOverrides[REPO_CONFIG_PATH_ENV_KEY];
+  const packageRoot = resolveProviderOverridePackageRoot(cliEntrypoint);
+  return {
+    ...(repoConfigPath ? { [PROVIDER_REPO_CONFIG_PATH_ENV_KEY]: repoConfigPath } : {}),
+    ...(packageRoot ? { [PROVIDER_PACKAGE_ROOT_ENV_KEY]: packageRoot } : {})
+  };
+}
+
+function resolveProviderOverridePackageRoot(cliEntrypoint: string): string | null {
+  const configured = normalizeProviderLinearSourceValue(process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT);
+  if (configured) {
+    return configured;
+  }
+  try {
+    return findPackageRoot(pathToFileURL(cliEntrypoint).href);
+  } catch {
+    return normalizeProviderLinearSourceValue(resolve(dirname(cliEntrypoint), '..'));
+  }
 }
 
 async function snapshotRunManifests(taskRunsRoot: string): Promise<Set<string>> {

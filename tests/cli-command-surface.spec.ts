@@ -5,6 +5,7 @@ import { isAbsolute, join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { sanitizeProviderOverrideEnv } from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
@@ -38,10 +39,10 @@ async function runCli(
   env?: NodeJS.ProcessEnv,
   timeoutMs: number = CLI_EXEC_TIMEOUT_MS
 ): Promise<{ stdout: string; stderr: string }> {
-  const mergedEnv: NodeJS.ProcessEnv = {
+  const mergedEnv = sanitizeProviderOverrideEnv({
     ...process.env,
     ...(env ?? {})
-  };
+  });
   const explicitRuntimeOverrides = Object.fromEntries(
     RUNTIME_TEST_ENV_KEYS.flatMap((key) => {
       if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
