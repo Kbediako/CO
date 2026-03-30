@@ -115,6 +115,8 @@ describe('runProviderLinearChildStreamShell', () => {
     expect(request?.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBeUndefined();
     expect(request?.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
     expect(request?.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBeUndefined();
+    expect(request?.env.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH).toBeUndefined();
+    expect(request?.env.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT).toBeUndefined();
     expect(request?.env.MCP_RUNNER_TASK_ID).toBe(`${TASK_ID}-docs-review`);
     for (const key of [
       'CODEX_ORCHESTRATOR_MANIFEST_PATH',
