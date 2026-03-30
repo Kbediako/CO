@@ -74,7 +74,8 @@ const diagnosticsConfig = {
 const TEST_TIMEOUT_MS = 15000;
 const ORIGINAL_ENV = {
   configOverrides: process.env.CODEX_CONFIG_OVERRIDES,
-  mcpConfigOverrides: process.env.CODEX_MCP_CONFIG_OVERRIDES
+  mcpConfigOverrides: process.env.CODEX_MCP_CONFIG_OVERRIDES,
+  repoConfigPath: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH
 };
 
 describe('CodexOrchestrator CLI', () => {
@@ -90,6 +91,7 @@ describe('CodexOrchestrator CLI', () => {
     process.env.MCP_RUNNER_TASK_ID = '0101';
     process.env.CODEX_CONFIG_OVERRIDES = 'ui.control_enabled=false';
     delete process.env.CODEX_MCP_CONFIG_OVERRIDES;
+    delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH;
 
     await fs.writeFile(
       path.join(tempDir, 'codex.orchestrator.json'),
@@ -115,6 +117,11 @@ describe('CodexOrchestrator CLI', () => {
       delete process.env.CODEX_MCP_CONFIG_OVERRIDES;
     } else {
       process.env.CODEX_MCP_CONFIG_OVERRIDES = ORIGINAL_ENV.mcpConfigOverrides;
+    }
+    if (ORIGINAL_ENV.repoConfigPath === undefined) {
+      delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH;
+    } else {
+      process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH = ORIGINAL_ENV.repoConfigPath;
     }
     await fs.rm(tempDir, { recursive: true, force: true });
   });

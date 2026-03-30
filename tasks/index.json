@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260330-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa",
+      "title": "CO: Auto-resume or fail explicitly after interrupted Merging-stage merge drain",
+      "relates_to": "tasks/tasks-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa-docs-review/cli/2026-03-30T09-32-57-435Z-ab077912/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",
+        "task": "tasks/tasks-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",
+        "agent_task": ".agent/task/linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",
+        "docs": "docs/TECH_SPEC-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md"
+      }
+    },
+    {
       "id": "20260330-linear-97aef5e3-dadb-4909-9b00-68c698f10f93",
       "title": "CO Make Linear Child-Stream JSON Parsing Robust to Wrapper Prelude Logs",
       "relates_to": "tasks/tasks-linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md",

@@ -89,6 +89,9 @@ const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
   // lossy concurrent ledger rewrites.
   maxDelayMs: 250
 };
+const PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS = new Set<string>([
+  'max_turns_reached_issue_still_active'
+]);
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
@@ -1466,7 +1469,17 @@ async function requestProviderControlHostRefresh(input: {
   repoRoot: string;
   log: Pick<typeof logger, 'warn'>;
 }): Promise<void> {
-  if (input.proof.owner_phase !== 'ended' || input.proof.owner_status !== 'failed') {
+  const shouldRefresh =
+    input.proof.owner_phase === 'ended' &&
+    (
+      input.proof.owner_status === 'failed' ||
+      (
+        input.proof.owner_status === 'succeeded' &&
+        typeof input.proof.end_reason === 'string' &&
+        PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS.has(input.proof.end_reason)
+      )
+    );
+  if (!shouldRefresh) {
     return;
   }
   try {
