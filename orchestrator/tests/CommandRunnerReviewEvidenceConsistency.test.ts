@@ -381,6 +381,46 @@ describe('runCommandStage review evidence consistency', () => {
     expect(elapsedMs).toBeLessThan(1_500);
   });
 
+  it('treats piped stdin without isTTY as non-interactive for prompt-only review stages', async () => {
+    mockState.runImpl = async () => buildSuccessfulExecResult();
+
+    const stdinDescriptor = Object.getOwnPropertyDescriptor(process, 'stdin');
+    const pipedStdin = Object.create(process.stdin) as NodeJS.ReadStream & { isTTY?: boolean };
+    Object.defineProperty(pipedStdin, 'isTTY', {
+      value: undefined,
+      configurable: true
+    });
+    Object.defineProperty(process, 'stdin', {
+      value: pipedStdin,
+      configurable: true
+    });
+
+    try {
+      const { manifest, stage, ...context } = await bootstrapCommandStage(
+        {
+          id: 'review',
+          title: 'npm run review',
+          command: 'npm run review'
+        },
+        { FORCE_CODEX_REVIEW: '0' }
+      );
+      const startedAtMs = Date.now();
+      const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+      const elapsedMs = Date.now() - startedAtMs;
+
+      expect(result.exitCode).toBe(0);
+      expect(result.summary).toBe('review ok');
+      expect(manifest.commands[0]?.summary).toBe('review ok');
+      expect(elapsedMs).toBeLessThan(1_500);
+    } finally {
+      if (stdinDescriptor) {
+        Object.defineProperty(process, 'stdin', stdinDescriptor);
+      } else {
+        delete (process as NodeJS.Process & { stdin?: NodeJS.ReadStream }).stdin;
+      }
+    }
+  });
+
   it('waits for review telemetry when FORCE_CODEX_REVIEW is supplied via envOverrides', async () => {
     mockState.runImpl = async (input) => {
       setTimeout(() => {

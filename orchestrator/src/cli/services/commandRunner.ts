@@ -551,7 +551,7 @@ function shouldAwaitReviewTelemetryEvidence(
   }
   const forced = parseBooleanEnvFlag(execEnv.FORCE_CODEX_REVIEW);
   const nonInteractive =
-    process.stdin.isTTY === false ||
+    process.stdin.isTTY !== true ||
     parseBooleanEnvFlag(execEnv.CODEX_REVIEW_NON_INTERACTIVE) ||
     parseBooleanEnvFlag(execEnv.CODEX_NON_INTERACTIVE) ||
     parseBooleanEnvFlag(execEnv.CODEX_NO_INTERACTIVE);
