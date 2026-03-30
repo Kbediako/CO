@@ -2722,10 +2722,7 @@ function resolveProviderIssueRunStatus(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
   const manifestStatus = readStringValue(manifest, 'status');
-  if (manifestStatus && manifestStatus !== 'in_progress') {
-    return manifestStatus;
-  }
-  const proofTerminalStatus = shouldUseProviderLinearWorkerTerminalProof(manifest, proof)
+  const proofTerminalStatus = shouldUseProviderLinearWorkerTerminalProofForStatusOverride(manifest, proof)
     ? resolveProviderLinearWorkerTerminalStatus(proof)
     : null;
   return proofTerminalStatus ?? manifestStatus;
@@ -2737,7 +2734,7 @@ function resolveProviderIssueRunSummary(
 ): string | null {
   const manifestSummary = readStringValue(manifest, 'summary');
   const manifestStatus = readStringValue(manifest, 'status');
-  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProof(manifest, proof);
+  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProofForSummary(manifest, proof);
   const proofTerminalStatus = proofIsAuthoritative
     ? resolveProviderLinearWorkerTerminalStatus(proof)
     : null;
@@ -2759,8 +2756,7 @@ function resolveProviderIssueRunUpdatedAt(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
   const manifestUpdatedAt = readStringValue(manifest, 'updated_at', 'started_at');
-  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProof(manifest, proof)
-    && resolveProviderLinearWorkerTerminalStatus(proof) !== null;
+  const proofIsAuthoritative = shouldUseProviderLinearWorkerTerminalProofForSummary(manifest, proof);
   const proofUpdatedAt = proofIsAuthoritative
     ? readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at')
     : null;
@@ -2819,6 +2815,36 @@ function shouldUseProviderLinearWorkerTerminalProof(
     return true;
   }
   return proofTimestamp >= manifestTimestamp;
+}
+
+function shouldUseProviderLinearWorkerTerminalProofForStatusOverride(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): boolean {
+  const manifestStatus = readStringValue(manifest, 'status');
+  if (manifestStatus && manifestStatus !== 'in_progress') {
+    return false;
+  }
+  return shouldUseProviderLinearWorkerTerminalProof(manifest, proof);
+}
+
+function shouldUseProviderLinearWorkerTerminalProofForSummary(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): boolean {
+  const proofTerminalStatus = resolveProviderLinearWorkerTerminalStatus(proof);
+  if (!proofTerminalStatus) {
+    return false;
+  }
+  const manifestStatus = readStringValue(manifest, 'status');
+  if (
+    manifestStatus &&
+    manifestStatus !== 'in_progress' &&
+    manifestStatus !== proofTerminalStatus
+  ) {
+    return false;
+  }
+  return shouldUseProviderLinearWorkerTerminalProof(manifest, proof);
 }
 
 function resolveProviderLinearWorkerTerminalReason(
