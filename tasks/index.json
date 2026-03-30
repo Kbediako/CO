@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260330-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2",
+      "title": "CO: Fix stale merge-handoff after successful provider-worker review handoff",
+      "relates_to": "tasks/tasks-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2-co-40-docs-review/cli/2026-03-30T00-51-39-696Z-5b6b4a29/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
+        "task": "tasks/tasks-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
+        "agent_task": ".agent/task/linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md",
+        "docs": "docs/TECH_SPEC-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md"
+      }
+    },
+    {
       "id": "20260330-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6",
       "title": "CO Add Terminal Observability Dashboard as CO STATUS",
       "relates_to": "tasks/tasks-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md",
