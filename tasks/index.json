@@ -9,11 +9,90 @@
         "Codex"
       ],
       "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-98ba135e-832e-4bec-bf4a-58acb3803f08-docs-review/cli/2026-03-30T06-54-06-198Z-cd3a0182/manifest.json"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md",
         "task": "tasks/tasks-linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md",
         "agent_task": ".agent/task/linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md",
         "docs": "docs/TECH_SPEC-linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md"
+      }
+    },
+    {
+      "id": "20260330-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa",
+      "title": "CO: Auto-resume or fail explicitly after interrupted Merging-stage merge drain",
+      "relates_to": "tasks/tasks-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa-docs-review/cli/2026-03-30T09-32-57-435Z-ab077912/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",
+        "task": "tasks/tasks-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",
+        "agent_task": ".agent/task/linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",
+        "docs": "docs/TECH_SPEC-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md"
+      }
+    },
+    {
+      "id": "20260330-linear-9553982c-6360-4c9c-83a4-674702701158",
+      "title": "CO: Restore baseline doctor and stage-set tests blocking review handoff",
+      "relates_to": "tasks/tasks-linear-9553982c-6360-4c9c-83a4-674702701158.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-9553982c-6360-4c9c-83a4-674702701158-docs-review/cli/2026-03-30T08-24-59-533Z-f3defab8/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, and the forced review stage stalled in low-signal repo reinspection after docs:check/docs:freshness passed; manual fallback review recorded no findings in out/linear-9553982c-6360-4c9c-83a4-674702701158/manual/20260330T083228Z-docs-review-fallback.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9553982c-6360-4c9c-83a4-674702701158.md",
+        "task": "tasks/tasks-linear-9553982c-6360-4c9c-83a4-674702701158.md",
+        "agent_task": ".agent/task/linear-9553982c-6360-4c9c-83a4-674702701158.md",
+        "docs": "docs/TECH_SPEC-linear-9553982c-6360-4c9c-83a4-674702701158.md"
+      }
+    },
+    {
+      "id": "20260330-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3",
+      "title": "CO: Prevent provider-worker env override leakage into repo validation",
+      "relates_to": "tasks/tasks-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3-co-42-docs-review-final-4/cli/2026-03-30T08-47-15-708Z-b66bf956/manifest.json",
+          "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "task": "tasks/tasks-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "agent_task": ".agent/task/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
+        "docs": "docs/TECH_SPEC-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md"
       }
     },
     {
@@ -38,6 +117,29 @@
         "task": "tasks/tasks-linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md",
         "agent_task": ".agent/task/linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md",
         "docs": "docs/TECH_SPEC-linear-97aef5e3-dadb-4909-9b00-68c698f10f93.md"
+      }
+    },
+    {
+      "id": "20260330-linear-271cbab4-de28-4847-a468-128df007c4a0",
+      "title": "CO: Implement parent-owned same-issue multi-worker runtime end to end",
+      "relates_to": "tasks/tasks-linear-271cbab4-de28-4847-a468-128df007c4a0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-271cbab4-de28-4847-a468-128df007c4a0-co-35-docs-review-rerun/cli/2026-03-30T07-04-16-131Z-88752c3e/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-271cbab4-de28-4847-a468-128df007c4a0.md",
+        "task": "tasks/tasks-linear-271cbab4-de28-4847-a468-128df007c4a0.md",
+        "agent_task": ".agent/task/linear-271cbab4-de28-4847-a468-128df007c4a0.md",
+        "docs": "docs/TECH_SPEC-linear-271cbab4-de28-4847-a468-128df007c4a0.md"
       }
     },
     {

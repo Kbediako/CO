@@ -9,6 +9,7 @@ import {
 } from '../src/cli/control/observabilityApiController.js';
 import type { ControlState } from '../src/cli/control/controlState.js';
 import type { ControlCompatibilitySourceContext } from '../src/cli/control/observabilityReadModel.js';
+import type { ProviderLinearWorkerChildLaneRecord } from '../src/cli/providerLinearWorkerRunner.js';
 
 const CONTROL_STATE: ControlState = {
   run_id: 'run-1',
@@ -550,6 +551,106 @@ describe('ObservabilityApiController', () => {
           input_tokens: 12,
           output_tokens: 8,
           total_tokens: 20
+        }
+      })
+    ]);
+  });
+
+  it('preserves nested child lane proof details on compatibility issue payloads', () => {
+    const childLane: ProviderLinearWorkerChildLaneRecord = {
+      stream: 'api-proof',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: 'task-1311-running-api-proof',
+      run_id: 'child-run-1',
+      status: 'succeeded',
+      manifest_path: '/tmp/task-1311-running/.runs/task-1311-running-api-proof/cli/child-run-1/manifest.json',
+      artifact_root: '/tmp/task-1311-running/.runs/task-1311-running-api-proof/cli/child-run-1',
+      log_path: null,
+      summary: 'Compatibility projection API proof lane completed',
+      issue_id: 'task-1311-running-id',
+      issue_identifier: 'task-1311-running',
+      workspace_path: '/tmp/task-1311-running',
+      source_setup: null,
+      launched_at: '2026-03-20T00:01:20.000Z',
+      purpose: 'Add observability projection child-lane proof coverage',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/tests/ObservabilityApiController.test.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-20T00:01:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-20T00:01:10.000Z'
+      },
+      lane_workspace_path: '/tmp/task-1311-running/.child-lanes/api-proof-child-run-1',
+      patch_artifact_path:
+        '/tmp/task-1311-running/.runs/task-1311-running-api-proof/cli/child-run-1/provider-linear-child-lane.patch',
+      patch_bytes: 188,
+      decision: 'accepted',
+      decision_at: '2026-03-20T00:01:30.000Z',
+      decision_reason: 'Parent accepted the API proof lane.'
+    };
+    const providerLinearWorkerProof = {
+      issue_id: 'task-1311-running-id',
+      issue_identifier: 'task-1311-running',
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      turn_count: 1,
+      last_event: 'task_complete',
+      last_message: 'done',
+      last_event_at: '2026-03-20T00:01:00.000Z',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: null,
+      owner_phase: 'turn_completed',
+      owner_status: 'in_progress',
+      workspace_path: '/tmp/task-1311-running',
+      linear_audit: null,
+      child_streams: [],
+      child_lanes: [childLane],
+      end_reason: null,
+      updated_at: '2026-03-20T00:01:00.000Z'
+    } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>;
+
+    const runningSource = buildCompatibilitySource('task-1311-running', {
+      compatibilityState: 'In Progress',
+      providerLinearWorkerProof
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: runningSource,
+      running: [runningSource],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20,
+        seconds_running: 120
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null
+    });
+
+    expect(
+      projection.issues.find((issue) => issue.issueIdentifier === 'task-1311-running')?.payload
+        .provider_linear_worker_proof?.child_lanes
+    ).toEqual([
+      expect.objectContaining({
+        stream: 'api-proof',
+        decision: 'accepted',
+        scope: {
+          files: ['orchestrator/tests/ObservabilityApiController.test.ts'],
+          phases: []
         }
       })
     ]);

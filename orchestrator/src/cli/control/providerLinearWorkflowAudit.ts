@@ -13,7 +13,8 @@ export type ProviderLinearAuditOperation =
   | 'attach-pr'
   | 'runtime-proof'
   | 'create-follow-up'
-  | 'child-stream';
+  | 'child-stream'
+  | 'child-lane';
 
 export interface ProviderLinearAuditEntry {
   recorded_at: string;
@@ -124,6 +125,7 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
     && operation !== 'runtime-proof'
     && operation !== 'create-follow-up'
     && operation !== 'child-stream'
+    && operation !== 'child-lane'
   ) {
     return null;
   }

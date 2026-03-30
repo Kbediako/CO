@@ -13,11 +13,14 @@ import {
   appendProviderLinearWorkerChildStreamRecord,
   defaultExecRunner,
   loadProviderLinearWorkerContext,
+  refreshProviderLinearWorkerProofSnapshot,
   type ProviderLinearWorkerChildStreamRecord,
   type ProviderLinearWorkerExecRequest,
   type ProviderLinearWorkerExecResult
 } from './providerLinearWorkerRunner.js';
+import { logger } from '../logger.js';
 import { slugify } from './utils/strings.js';
+import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 const ALLOWED_PROVIDER_CHILD_PIPELINES = ['docs-review', 'implementation-gate', 'docs-relevance-advisory'] as const;
 const PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE = [
   'MCP_RUNNER_TASK_ID',
@@ -80,12 +83,20 @@ export interface RunProviderLinearChildStreamShellParams {
 interface ProviderLinearChildStreamShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
   appendChildStreamRecord: (runDir: string, record: ProviderLinearWorkerChildStreamRecord) => Promise<ProviderLinearWorkerChildStreamRecord[]>;
+  refreshProofSnapshot: (runDir: string, auditPath: string | null) => Promise<void>;
   now: () => string;
+  warn: (message: string) => void;
 }
 const DEFAULT_DEPENDENCIES: ProviderLinearChildStreamShellDependencies = {
   execRunner: defaultExecRunner,
   appendChildStreamRecord: async (runDir, record) => await appendProviderLinearWorkerChildStreamRecord(runDir, record),
-  now: () => new Date().toISOString()
+  refreshProofSnapshot: async (runDir, auditPath) => {
+    await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath);
+  },
+  now: () => new Date().toISOString(),
+  warn: (message) => {
+    logger.warn(message);
+  }
 };
 export async function runProviderLinearChildStreamShell(
   params: RunProviderLinearChildStreamShellParams,
@@ -211,13 +222,20 @@ export async function runProviderLinearChildStreamShell(
   if (runtimeMode) {
     args.push('--runtime-mode', runtimeMode);
   }
+  const childStartEnv = buildProviderLinearChildStartEnv(
+    env,
+    context.repoRoot,
+    pipelineId,
+    childTaskId,
+    sourceSetup
+  );
   let execResult: ProviderLinearWorkerExecResult;
   try {
     execResult = await deps.execRunner({
       command: invocation.command,
       args,
       cwd: context.repoRoot,
-      env: buildProviderLinearChildStartEnv(env, context.repoRoot, pipelineId, childTaskId, sourceSetup),
+      env: childStartEnv,
       mirrorOutput: false
     });
   } catch (error) {
@@ -233,7 +251,13 @@ export async function runProviderLinearChildStreamShell(
       status: 502
     });
   }
-  const childRun = parseProviderChildRunResult(execResult.stdout, context.repoRoot, context.runDir, pipelineId, childTaskId);
+  const childRun = parseProviderChildRunResult(
+    execResult.stdout,
+    context.repoRoot,
+    childStartEnv.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(context.repoRoot, '.runs'),
+    pipelineId,
+    childTaskId
+  );
   if (!childRun) {
     const detail = [execResult.stderr.trim(), execResult.stdout.trim()].filter(Boolean)[0] ?? 'unknown child-stream output';
     return failureResult({
@@ -278,6 +302,13 @@ export async function runProviderLinearChildStreamShell(
       status: 502
     });
   }
+  try {
+    await deps.refreshProofSnapshot(context.runDir, env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
+  } catch (error) {
+    deps.warn(
+      `provider-linear-child-stream warning: failed to refresh proof snapshot after recording child stream ${stream}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   if (execResult.exitCode !== 0 || childRun.status !== 'succeeded') {
     return failureResult({
       issueId: context.issueId,
@@ -309,7 +340,7 @@ function normalizeProviderChildPipelineId(value: string): ProviderLinearChildStr
 function normalizeChildStreamName(value: string): string | null { const normalized = slugify(value, '').toLowerCase(); return normalized.length > 0 ? normalized : null; }
 function normalizeRuntimeMode(value: string | undefined): 'cli' | 'appserver' | null { if (typeof value !== 'string') return null; const normalized = value.trim().toLowerCase(); return normalized === 'cli' || normalized === 'appserver' ? normalized : null; }
 function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string, sourceSetup: DispatchPilotSourceSetup | null): NodeJS.ProcessEnv {
-  const sanitized: NodeJS.ProcessEnv = { ...process.env, ...env };
+  const sanitized = sanitizeProviderOverrideEnv({ ...process.env, ...env });
   for (const key of PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE) {
     delete sanitized[key];
   }
@@ -318,6 +349,18 @@ function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: stri
     delete sanitized.FORCE_CODEX_REVIEW;
   }
   sanitized.CODEX_ORCHESTRATOR_ROOT = repoRoot;
+  sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH =
+    normalizeOptionalString(sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH) ?? join(repoRoot, 'codex.orchestrator.json');
+  sanitized.CODEX_ORCHESTRATOR_RUNS_DIR = resolveWorkspaceScopedArtifactDir(
+    repoRoot,
+    sanitized.CODEX_ORCHESTRATOR_RUNS_DIR,
+    '.runs'
+  );
+  sanitized.CODEX_ORCHESTRATOR_OUT_DIR = resolveWorkspaceScopedArtifactDir(
+    repoRoot,
+    sanitized.CODEX_ORCHESTRATOR_OUT_DIR,
+    'out'
+  );
   sanitized.MCP_RUNNER_TASK_ID = taskId;
   if (sourceSetup?.provider === 'linear') Object.assign(sanitized, { CO_LINEAR_WORKSPACE_ID: sourceSetup.workspace_id ?? '', CO_LINEAR_TEAM_ID: sourceSetup.team_id ?? '', CO_LINEAR_PROJECT_ID: sourceSetup.project_id ?? '' });
   return sanitized;
@@ -340,7 +383,7 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
     argsPrefix: []
   };
 }
-function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
+function parseProviderChildRunResult(raw: string, repoRoot: string, runsRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
   const parsed = parseTrailingJsonObject(raw);
   if (!parsed) {
     return null;
@@ -357,7 +400,7 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir
   if (!safeRunId) {
     return null;
   }
-  const expectedRunRoot = resolve(parentRunDir, '..', '..', '..', taskId, 'cli', safeRunId);
+  const expectedRunRoot = resolve(runsRoot, taskId, 'cli', safeRunId);
   const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
   const resolvedManifestPath = resolveRunPath(repoRoot, manifestPath);
   const resolvedLogPath = normalizeOptionalString(record.log_path);
@@ -383,9 +426,6 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, parentRunDir
     runtime_provider: normalizeOptionalString(record.runtime_provider)
   };
 }
-function resolveRunPath(repoRoot: string, value: string): string {
-  return isAbsolute(value) ? resolve(value) : resolve(repoRoot, value);
-}
 function parseTrailingJsonObject(raw: string): Record<string, unknown> | null {
   const trimmed = raw.trim();
   if (!trimmed.endsWith('}')) {
@@ -395,9 +435,9 @@ function parseTrailingJsonObject(raw: string): Record<string, unknown> | null {
   if (direct) {
     return direct;
   }
-  const lines = trimmed.split(/\r?\n/);
+  const lines = trimmed.split(/\r?\n/u);
   for (let index = 0; index < lines.length; index += 1) {
-    if (!lines[index].trimStart().startsWith('{')) {
+    if (!lines[index]?.trimStart().startsWith('{')) {
       continue;
     }
     const parsed = safeJsonObjectParse(lines.slice(index).join('\n'));
@@ -406,6 +446,18 @@ function parseTrailingJsonObject(raw: string): Record<string, unknown> | null {
     }
   }
   return null;
+}
+function resolveRunPath(repoRoot: string, value: string): string {
+  return isAbsolute(value) ? resolve(value) : resolve(repoRoot, value);
+}
+function resolveWorkspaceScopedArtifactDir(repoRoot: string, value: string | undefined, fallbackDirname: string): string {
+  const normalized = normalizeOptionalString(value);
+  const fallback = join(repoRoot, fallbackDirname);
+  if (!normalized) {
+    return fallback;
+  }
+  const candidate = isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
+  return isPathWithinRoot(repoRoot, candidate) ? candidate : fallback;
 }
 function safeJsonObjectParse(value: string): Record<string, unknown> | null {
   try {

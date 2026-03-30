@@ -1544,6 +1544,18 @@ Subcommands:
     --pipeline <id>       Allowlisted child pipeline: docs-review, implementation-gate, or docs-relevance-advisory.
     --stream <name>       Optional task-id suffix for the child stream (defaults to the pipeline id).
     --format json         Emit machine-readable output.
+
+  child-lane
+    --action <mode>       launch, accept, reject, or invalidate.
+    --stream <name>       Lane stream name / task-id suffix.
+    --purpose <text>      Required for launch: bounded lane objective.
+    --files <csv>         Optional comma-separated file ownership scope.
+    --phases <csv>        Optional comma-separated phase ownership scope.
+    --instructions <text> Optional extra bounded instructions for launch.
+    --instructions-file <path>
+                         Optional file containing extra bounded instructions for launch.
+    --reason <text>       Optional parent decision rationale for accept/reject/invalidate.
+    --format json         Emit machine-readable output.
 `);
 }
 

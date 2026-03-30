@@ -1159,4 +1159,239 @@ describe('runLinearCliShell', () => {
     });
     expect(setExitCode).toHaveBeenCalledWith(1);
   });
+
+  it('routes child-lane launches into the parent-owned child-lane shell', async () => {
+    const log = vi.fn();
+    const runProviderLinearChildLaneShellMock =
+      vi.fn<typeof import('../src/cli/providerLinearChildLaneShell.js').runProviderLinearChildLaneShell>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'child-lane',
+          action: 'launched',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-35'
+          },
+          source_setup: null,
+          stream: 'impl-a',
+          child_run: {
+            run_id: 'child-run-1',
+            task_id: 'linear-lin-issue-1-impl-a',
+            pipeline_id: 'provider-linear-child-lane',
+            status: 'succeeded',
+            artifact_root: '/repo/.runs/linear-lin-issue-1-impl-a/cli/child-run-1',
+            manifest_path: '/repo/.runs/linear-lin-issue-1-impl-a/cli/child-run-1/manifest.json',
+            log_path: null,
+            summary: 'child lane finished',
+            runtime_mode_requested: 'appserver',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider'
+          },
+          child_lane: {
+            stream: 'impl-a',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-lin-issue-1-impl-a',
+            run_id: 'child-run-1',
+            status: 'succeeded',
+            manifest_path: '/repo/.runs/linear-lin-issue-1-impl-a/cli/child-run-1/manifest.json',
+            artifact_root: '/repo/.runs/linear-lin-issue-1-impl-a/cli/child-run-1',
+            log_path: null,
+            summary: 'child lane finished',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-35',
+            workspace_path: '/repo/.workspaces/linear-lin-issue-1',
+            source_setup: null,
+            launched_at: '2026-03-30T08:00:00.000Z',
+            purpose: 'Implement the bounded child lane shell',
+            instructions: 'Stay inside the declared files.',
+            scope: {
+              files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+              phases: []
+            },
+            parent_snapshot: {
+              base_sha: 'parent-base-sha',
+              issue_updated_at: '2026-03-30T07:58:00.000Z',
+              issue_state: 'In Progress',
+              issue_state_type: 'started',
+              captured_at: '2026-03-30T07:59:00.000Z'
+            },
+            lane_workspace_path: '/repo/.workspaces/linear-lin-issue-1/.child-lanes/impl-a-child-run-1',
+            patch_artifact_path: '/repo/.runs/linear-lin-issue-1-impl-a/cli/child-run-1/provider-linear-child-lane.patch',
+            patch_bytes: 256,
+            decision: 'pending',
+            decision_at: null,
+            decision_reason: null
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['child-lane'],
+        flags: {
+          format: 'json',
+          action: 'launch',
+          stream: 'impl-a',
+          purpose: 'Implement the bounded child lane shell',
+          files: 'orchestrator/src/cli/providerLinearChildLaneShell.ts',
+          phases: 'implementation',
+          instructions: 'Stay inside the declared files.'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        runProviderLinearChildLaneShell: runProviderLinearChildLaneShellMock,
+        getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        log
+      }
+    );
+
+    expect(runProviderLinearChildLaneShellMock).toHaveBeenCalledWith({
+      action: 'launch',
+      streamName: 'impl-a',
+      purpose: 'Implement the bounded child lane shell',
+      files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+      phases: ['implementation'],
+      instructions: 'Stay inside the declared files.',
+      reason: null,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      }
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'child-lane',
+      action: 'launched',
+      stream: 'impl-a'
+    });
+  });
+
+  it('blocks Linear mutation commands from subordinate same-issue child lanes', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-child-lane-guard-'));
+    tempDirs.push(repoRoot);
+    const manifestPath = join(repoRoot, 'manifest.json');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        pipeline_id: 'provider-linear-child-lane',
+        parent_run_id: 'provider-run-1'
+      }),
+      'utf8'
+    );
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['transition'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          state: 'In Review'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        readTextFile: vi.fn(async (path: string) =>
+          await import('node:fs/promises').then((fs) => fs.readFile(path, 'utf8'))
+        ),
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+        }),
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'provider_worker_parent_mutation_required',
+        message: 'transition is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.',
+        status: 409
+      }
+    });
+  });
+
+  it('blocks Linear mutation commands from subordinate same-issue child lanes when only the pipeline env is present', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['transition'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          state: 'In Review'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_ORCHESTRATOR_PIPELINE_ID: 'provider-linear-child-lane'
+        }),
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'provider_worker_parent_mutation_required',
+        message: 'transition is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.',
+        status: 409
+      }
+    });
+  });
+
+  it('blocks mutation commands when child-lane manifests use camelCase lineage fields', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-child-lane-guard-camel-'));
+    tempDirs.push(repoRoot);
+    const manifestPath = join(repoRoot, 'manifest.json');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        pipelineId: 'provider-linear-child-lane',
+        parentRunId: 'provider-run-1'
+      }),
+      'utf8'
+    );
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['transition'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          state: 'In Review'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        readTextFile: vi.fn(async (path: string) =>
+          await import('node:fs/promises').then((fs) => fs.readFile(path, 'utf8'))
+        ),
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+        }),
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'provider_worker_parent_mutation_required',
+        message: 'transition is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.',
+        status: 409
+      }
+    });
+  });
 });
