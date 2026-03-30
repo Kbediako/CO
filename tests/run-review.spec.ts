@@ -163,6 +163,8 @@ has_inline_prompt() {
     case "$arg" in
       review|--uncommitted)
         ;;
+      -)
+        ;;
       --base|--commit|--title)
         index=$((index + 1))
         ;;
@@ -176,6 +178,15 @@ has_inline_prompt() {
   done
   return 1
 }
+record_stdin_payload() {
+  if has_arg "-" "$@"; then
+    local stdin_payload
+    stdin_payload="$(cat)"
+    if [[ -n "\${RUN_REVIEW_STDIN_LOG:-}" ]]; then
+      printf '%s' "$stdin_payload" > "\${RUN_REVIEW_STDIN_LOG}"
+    fi
+  fi
+}
 if [[ "\${1:-}" == "--help" ]]; then
   if [[ "\${RUN_REVIEW_MODE:-ok}" == "delete-after-help" ]]; then
     rm -f "$0"
@@ -186,6 +197,7 @@ if [[ "\${1:-}" == "--help" ]]; then
 fi
   if [[ "\${1:-}" == "review" ]]; then
     mode="\${RUN_REVIEW_MODE:-ok}"
+    record_stdin_payload "$@"
     if [[ "$mode" == "hang" ]]; then
       while true; do sleep 1; done
     fi
@@ -2528,13 +2540,15 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     });
     const baseRef = baseStdout.trim();
     const argsLogPath = join(sandbox, 'review-args.log');
+    const stdinLogPath = join(sandbox, 'review-stdin.log');
 
     const result = await runReviewCommand(
       manifestPath,
       {
         ...baseEnv(sandbox, codexBin),
         RUN_REVIEW_MODE: 'reject-scoped-prompt',
-        RUN_REVIEW_ARGS_LOG: argsLogPath
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        RUN_REVIEW_STDIN_LOG: stdinLogPath
       },
       ['--base', baseRef]
     );
@@ -2547,21 +2561,22 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toBe(`argv=review --base ${baseRef}`);
+    expect(reviewInvocations[0]).toBe(`argv=review --base ${baseRef} -`);
+    await expect(readFile(stdinLogPath, 'utf8')).resolves.toContain('Review task:');
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
-        prompt_delivery: 'inline' | 'artifact-only';
+        prompt_delivery: 'inline' | 'stdin';
       } | null;
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.error).toBeNull();
     expect(telemetry.launch_context).toEqual({
       scope_flag_mode: 'base',
-      prompt_delivery: 'artifact-only'
+      prompt_delivery: 'stdin'
     });
   });
 
@@ -2601,7 +2616,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       error: string | null;
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
-        prompt_delivery: 'inline' | 'artifact-only';
+        prompt_delivery: 'inline' | 'stdin';
       } | null;
     };
     expect(telemetry.status).toBe('failed');
@@ -2609,7 +2624,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
     expect(telemetry.launch_context).toEqual({
       scope_flag_mode: 'base',
-      prompt_delivery: 'artifact-only'
+      prompt_delivery: 'stdin'
     });
   });
 
@@ -2652,7 +2667,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       error: string | null;
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
-        prompt_delivery: 'inline' | 'artifact-only';
+        prompt_delivery: 'inline' | 'stdin';
       } | null;
     };
     expect(telemetry.status).toBe('failed');
@@ -2660,7 +2675,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
     expect(telemetry.launch_context).toEqual({
       scope_flag_mode: 'base',
-      prompt_delivery: 'artifact-only'
+      prompt_delivery: 'stdin'
     });
   });
 
@@ -2676,6 +2691,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     });
     const commitSha = commitStdout.trim();
     const argsLogPath = join(sandbox, 'review-args.log');
+    const stdinLogPath = join(sandbox, 'review-stdin.log');
 
     const result = await runReviewCommand(
       manifestPath,
@@ -2683,6 +2699,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         ...baseEnv(sandbox, codexBin),
         RUN_REVIEW_MODE: 'reject-scoped-prompt-usage-footer',
         RUN_REVIEW_ARGS_LOG: argsLogPath,
+        RUN_REVIEW_STDIN_LOG: stdinLogPath,
         CODEX_REVIEW_DEBUG_TELEMETRY: '1'
       },
       ['--commit', commitSha]
@@ -2696,21 +2713,22 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toBe(`argv=review --commit ${commitSha}`);
+    expect(reviewInvocations[0]).toBe(`argv=review --commit ${commitSha} -`);
+    await expect(readFile(stdinLogPath, 'utf8')).resolves.toContain('Review task:');
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
-        prompt_delivery: 'inline' | 'artifact-only';
+        prompt_delivery: 'inline' | 'stdin';
       } | null;
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.error).toBeNull();
     expect(telemetry.launch_context).toEqual({
       scope_flag_mode: 'commit',
-      prompt_delivery: 'artifact-only'
+      prompt_delivery: 'stdin'
     });
   });
 
@@ -2721,6 +2739,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     await initGitRepoWithCommittedFiles(sandbox, 1);
     await writeFile(join(sandbox, 'file-1.txt'), 'updated-file-1.txt\n', 'utf8');
     const argsLogPath = join(sandbox, 'review-args.log');
+    const stdinLogPath = join(sandbox, 'review-stdin.log');
 
     const result = await runReviewCommand(
       manifestPath,
@@ -2728,6 +2747,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         ...baseEnv(sandbox, codexBin),
         RUN_REVIEW_MODE: 'reject-scoped-prompt-generic-diff-scoping',
         RUN_REVIEW_ARGS_LOG: argsLogPath,
+        RUN_REVIEW_STDIN_LOG: stdinLogPath,
         CODEX_REVIEW_DEBUG_TELEMETRY: '1'
       },
       ['--uncommitted']
@@ -2741,21 +2761,22 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toBe('argv=review --uncommitted');
+    expect(reviewInvocations[0]).toBe('argv=review --uncommitted -');
+    await expect(readFile(stdinLogPath, 'utf8')).resolves.toContain('Review task:');
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       error: string | null;
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
-        prompt_delivery: 'inline' | 'artifact-only';
+        prompt_delivery: 'inline' | 'stdin';
       } | null;
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.error).toBeNull();
     expect(telemetry.launch_context).toEqual({
       scope_flag_mode: 'uncommitted',
-      prompt_delivery: 'artifact-only'
+      prompt_delivery: 'stdin'
     });
   });
 
@@ -2767,7 +2788,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
     expect(normalizedHelp).toContain(
-      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without an inline prompt argument.'
+      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and stream it to codex review via stdin (`-`) instead of an inline prompt argument.'
     );
     expect(normalizedHelp).toContain(
       'Unscoped wrapper runs Pass the saved prompt/context inline to codex review.'

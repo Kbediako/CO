@@ -61,7 +61,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - `codex-orchestrator review` does not enforce runtime limits by default (reviews can run as long as needed).
 - `codex-orchestrator review` uses bounded review guidance by default (default `diff` reviews stay on changed files, `audit` reviews stay on the requested evidence surfaces, and `architecture` reviews stay on the requested task-doc and architecture surfaces; all avoid full-suite validation commands).
 - `codex-orchestrator review` now defaults to the `diff` review surface, which keeps the prompt focused on changed code and nearby dependencies instead of checklist/docs/evidence audit surfaces.
-- Explicit wrapper scope flags (`--uncommitted`, `--base`, `--commit`) now keep the saved prompt/context in `review/prompt.txt` but launch `codex review` without an inline prompt argument, because current Codex CLI rejects prompt-plus-scope. Unscoped wrapper runs still pass the saved prompt/context inline.
+- Explicit wrapper scope flags (`--uncommitted`, `--base`, `--commit`) now keep the saved prompt/context in `review/prompt.txt` and stream it to `codex review` via stdin (`-`), because current Codex CLI rejects prompt-plus-scope argv combinations. Unscoped wrapper runs still pass the saved prompt/context inline.
 - Prompt-side scope notes now stay path-only; the wrapper no longer injects raw branch-history / commit-metadata git summaries into the review prompt.
 - Use `--surface audit` (or `CODEX_REVIEW_SURFACE=audit`) when you explicitly want checklist/manifest/canonical task-doc path/evidence validation in the prompt.
 - Use `--surface architecture` (or `CODEX_REVIEW_SURFACE=architecture`) when you explicitly want broader design/context review against the canonical docs-first inputs: task checklist, PRD, TECH_SPEC, ACTION_PLAN, and `.agent/system/architecture.md`. This surface does not add manifest/runner-log evidence lines by default.
@@ -107,4 +107,4 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 
 ## Expected outputs
 - `codex review`: prioritized findings; no working tree edits.
-- `codex-orchestrator review`: writes task-scoped manifest evidence into the saved review prompt artifact, applies diff-budget checks when `scripts/diff-budget.mjs` exists in the target repo root (auto-skips in downstream npm installs that do not ship that helper), passes that prompt inline only for unscoped launches, and may emit a handoff prompt in non-interactive mode (see above).
+- `codex-orchestrator review`: writes task-scoped manifest evidence into the saved review prompt artifact, applies diff-budget checks when `scripts/diff-budget.mjs` exists in the target repo root (auto-skips in downstream npm installs that do not ship that helper), passes that prompt inline for unscoped launches and via stdin (`-`) for explicit scoped launches, and may emit a handoff prompt in non-interactive mode (see above).

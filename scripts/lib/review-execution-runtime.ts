@@ -56,6 +56,7 @@ export class CodexReviewError extends Error {
 export interface RunCodexReviewOptions {
   command: string;
   args: string[];
+  stdinText?: string | null;
   env: Record<string, string | undefined>;
   stdio: StdioOptions;
   activeCloseoutBundleRoots?: string[];
@@ -137,6 +138,44 @@ function writeToStreamSafely(target: NodeJS.WriteStream, chunk: Buffer): void {
   }
 }
 
+async function writeInputToChildStdin(
+  target: NodeJS.WritableStream | null | undefined,
+  input: string | null | undefined
+): Promise<void> {
+  if (!target || input == null) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finalize = (error?: Error | null) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      target.off('error', onError);
+      if (!error) {
+        resolve();
+        return;
+      }
+      const code = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (typeof code === 'string' && BENIGN_STDIO_ERROR_CODES.has(code)) {
+        resolve();
+        return;
+      }
+      reject(error);
+    };
+    const onError = (error: Error) => finalize(error);
+
+    target.once('error', onError);
+    try {
+      target.end(input, 'utf8', () => finalize());
+    } catch (error) {
+      finalize(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
 export async function runCodexReview(
   options: RunCodexReviewOptions
 ): Promise<{
@@ -195,6 +234,7 @@ export async function runCodexReview(
     waitForReadableClosure(child.stdout),
     waitForReadableClosure(child.stderr)
   ]).then(() => undefined);
+  await writeInputToChildStdin(child.stdin, options.stdinText ?? null);
 
   let cleanedUp = false;
   const cleanup = () => {
