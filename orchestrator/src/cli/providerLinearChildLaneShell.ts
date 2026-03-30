@@ -673,7 +673,22 @@ async function resolveChildLaneDecision(
         status: 409
       });
     }
-    const patchArtifactPath = resolveAcceptedPatchArtifactPath(context.repoRoot, target);
+    const artifactRoot = resolveAcceptedChildLaneArtifactRoot(context.repoRoot, target);
+    if (!artifactRoot) {
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_patch_invalid',
+        message: 'Child lane artifact root must stay anchored to the expected workspace-local child run directory before parent acceptance.',
+        status: 409
+      });
+    }
+    const patchArtifactPath = resolveAcceptedPatchArtifactPath(context.repoRoot, target, artifactRoot);
     if (!patchArtifactPath) {
       return failureResult({
         action: 'accept',
@@ -685,6 +700,38 @@ async function resolveChildLaneDecision(
         childLane: target,
         code: 'provider_worker_child_lane_patch_invalid',
         message: 'Child lane patch artifact must stay within the child lane artifact root before parent acceptance.',
+        status: 409
+      });
+    }
+    let patchChangedPaths: string[];
+    try {
+      patchChangedPaths = await readPatchChangedPaths(patchArtifactPath);
+    } catch (error) {
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_patch_invalid',
+        message: `Child lane patch artifact could not be inspected before parent acceptance: ${error instanceof Error ? error.message : String(error)}`,
+        status: 409
+      });
+    }
+    const patchScopeViolation = resolveAcceptedPatchScopeViolation(target.scope, patchChangedPaths);
+    if (patchScopeViolation) {
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_patch_scope_invalid',
+        message: patchScopeViolation,
         status: 409
       });
     }
@@ -779,16 +826,81 @@ function defaultDecisionReason(
 
 function resolveAcceptedPatchArtifactPath(
   repoRoot: string,
-  childLane: ProviderLinearWorkerChildLaneRecord
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  artifactRoot: string
 ): string | null {
   const patchArtifactPath = normalizeOptionalString(childLane.patch_artifact_path);
-  const artifactRoot = normalizeOptionalString(childLane.artifact_root);
-  if (!patchArtifactPath || !artifactRoot) {
+  if (!patchArtifactPath) {
     return null;
   }
-  const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
   const resolvedPatchArtifactPath = resolveRunPath(repoRoot, patchArtifactPath);
-  return isPathWithinRoot(resolvedArtifactRoot, resolvedPatchArtifactPath) ? resolvedPatchArtifactPath : null;
+  return isPathWithinRoot(artifactRoot, resolvedPatchArtifactPath) ? resolvedPatchArtifactPath : null;
+}
+
+function resolveAcceptedChildLaneArtifactRoot(
+  repoRoot: string,
+  childLane: ProviderLinearWorkerChildLaneRecord
+): string | null {
+  const taskId = normalizeOptionalString(childLane.task_id);
+  const artifactRoot = normalizeOptionalString(childLane.artifact_root);
+  const manifestPath = normalizeOptionalString(childLane.manifest_path);
+  const runId = normalizeOptionalString(childLane.run_id);
+  if (!taskId || !artifactRoot || !runId) {
+    return null;
+  }
+  let safeRunId: string;
+  try {
+    safeRunId = sanitizeRunId(runId);
+  } catch {
+    return null;
+  }
+  const expectedArtifactRoot = resolve(repoRoot, '.runs', taskId, 'cli', safeRunId);
+  const resolvedArtifactRoot = resolveRunPath(repoRoot, artifactRoot);
+  if (resolvedArtifactRoot !== expectedArtifactRoot) {
+    return null;
+  }
+  if (manifestPath) {
+    const resolvedManifestPath = resolveRunPath(repoRoot, manifestPath);
+    if (resolvedManifestPath !== join(expectedArtifactRoot, 'manifest.json')) {
+      return null;
+    }
+  }
+  return expectedArtifactRoot;
+}
+
+async function readPatchChangedPaths(patchPath: string): Promise<string[]> {
+  const rawPatch = await readFile(patchPath, 'utf8');
+  const changedPaths = new Set<string>();
+  for (const line of rawPatch.split(/\r?\n/u)) {
+    const match = /^diff --git a\/(.+?) b\/(.+)$/u.exec(line);
+    if (!match) {
+      continue;
+    }
+    const candidate = match[2] === '/dev/null' ? match[1] : match[2];
+    const normalized = normalizeScopeFileEntry(candidate);
+    if (normalized) {
+      changedPaths.add(normalized);
+    }
+  }
+  return [...changedPaths];
+}
+
+function resolveAcceptedPatchScopeViolation(
+  scope: ProviderLinearWorkerChildLaneScope,
+  patchChangedPaths: string[]
+): string | null {
+  if (patchChangedPaths.length === 0) {
+    return 'Child lane patch does not declare any repo-relative file targets, so parent acceptance cannot verify the bounded scope.';
+  }
+  if (scope.files.length === 0) {
+    return `Child lane acceptance currently requires explicit file scope so patch paths can be machine-checked; this lane only declared phases (${scope.phases.join(', ')}). Relaunch with --files or reject/invalidate the lane output instead.`;
+  }
+  const declaredFiles = normalizeScopeEntries(scope.files, 'file');
+  const outOfScopePaths = patchChangedPaths.filter((entry) => !declaredFiles.includes(entry));
+  if (outOfScopePaths.length === 0) {
+    return null;
+  }
+  return `Child lane patch touches files outside the declared file scope (${outOfScopePaths.join(', ')}). Declared scope: ${declaredFiles.join(', ')}.`;
 }
 
 async function resolveParentSnapshot(

@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -118,6 +118,15 @@ function createLaneRecord(overrides: Partial<ProviderLinearWorkerChildLaneRecord
     decision_reason: null,
     ...overrides
   };
+}
+
+async function writePatchArtifact(patchPath: string, filePath: string): Promise<void> {
+  await mkdir(dirname(patchPath), { recursive: true });
+  await writeFile(
+    patchPath,
+    `diff --git a/${filePath} b/${filePath}\n`,
+    'utf8'
+  );
 }
 
 describe('runProviderLinearChildLaneShell', () => {
@@ -754,6 +763,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
     const applyPatchArtifact = vi.fn(async () => undefined);
 
     const result = await runProviderLinearChildLaneShell(
@@ -831,6 +841,136 @@ describe('runProviderLinearChildLaneShell', () => {
       action: 'accept',
       error: {
         code: 'provider_worker_child_lane_patch_invalid',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('rejects acceptance when the persisted artifact root is not the expected child run directory', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      artifact_root: join(tempRoot ?? '', 'tampered', `${TASK_ID}-impl-a`, 'cli', 'child-run-1'),
+      patch_artifact_path: join(tempRoot ?? '', 'tampered', `${TASK_ID}-impl-a`, 'cli', 'child-run-1', 'provider-linear-child-lane.patch')
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_patch_invalid',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('rejects acceptance when the patch touches files outside the declared file scope', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writePatchArtifact(
+      childLane.patch_artifact_path ?? '',
+      'orchestrator/src/cli/providerLinearChildLaneShell.ts'
+    );
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_patch_scope_invalid',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('rejects acceptance for phase-only lanes until the patch can be machine-checked against explicit files', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      scope: {
+        files: [],
+        phases: ['implementation']
+      }
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writePatchArtifact(
+      childLane.patch_artifact_path ?? '',
+      'orchestrator/src/cli/providerLinearChildLaneShell.ts'
+    );
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_patch_scope_invalid',
         status: 409
       }
     });
