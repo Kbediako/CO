@@ -18,28 +18,28 @@
 - [x] docs-review approval captured for `linear-cd3020f3-b6be-4adb-ae00-1a15497de036`. Evidence: `.runs/linear-cd3020f3-b6be-4adb-ae00-1a15497de036-docs-review/cli/2026-03-31T08-32-40-711Z-9badba58/manifest.json`.
 
 ## Implementation
-- [ ] Add dashboard controls for pause/resume, compact inspect, and snapshot export. Evidence: pending implementation.
-- [ ] Suppress timer-triggered and runtime-triggered redraw while the dashboard is frozen. Evidence: pending implementation.
-- [ ] Provide a supported compact inspect path for shorter terminal heights. Evidence: pending implementation.
-- [ ] Add a dedicated `co-status` launch surface, with any repo-local alias kept additive only if it stays cheap. Evidence: pending implementation.
-- [ ] Document the new operator controls and easier launch path. Evidence: pending implementation.
+- [x] Add dashboard controls for pause/resume, compact inspect, and snapshot export. Evidence: `orchestrator/src/cli/control/controlStatusDashboard.ts`, `orchestrator/tests/ControlStatusDashboard.test.ts`.
+- [x] Suppress timer-triggered and runtime-triggered redraw while the dashboard is frozen. Evidence: `orchestrator/src/cli/control/controlStatusDashboard.ts`, `orchestrator/tests/ControlStatusDashboard.test.ts`.
+- [x] Provide a supported compact inspect path for shorter terminal heights. Evidence: `orchestrator/src/cli/control/controlStatusDashboard.ts`, `orchestrator/tests/ControlStatusDashboard.test.ts`.
+- [x] Add a dedicated `co-status` launch surface, with any repo-local alias kept additive only if it stays cheap. Evidence: `bin/codex-orchestrator.ts`, `orchestrator/tests/CodexOrchestratorCli.test.ts`.
+- [x] Document the new operator controls and easier launch path. Evidence: `README.md`, `docs/TASKS.md`.
 
 ## Validation
-- [ ] Capture screenshot proof showing `CO STATUS` in normal live mode. Evidence: pending.
-- [ ] Capture screenshot proof showing the paused/frozen inspect state with redraw suppression visible in operator use. Evidence: pending.
-- [ ] Capture screenshot proof of the constrained-height inspect path. Evidence: pending.
-- [ ] Capture proof of the snapshot/export inspection path itself. Evidence: pending.
-- [ ] Capture proof of the simple launch surface. Evidence: pending.
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: pending.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: pending.
-- [ ] `npm run build`. Evidence: pending.
-- [ ] `npm run lint`. Evidence: pending.
-- [ ] `npm run test`. Evidence: pending.
-- [ ] `npm run docs:check`. Evidence: pending.
-- [ ] `npm run docs:freshness`. Evidence: pending.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: pending.
-- [ ] `FORCE_CODEX_REVIEW=1 npm run review`. Evidence: pending.
-- [ ] `npm run pack:smoke`. Evidence: pending.
+- [x] Capture screenshot proof showing `CO STATUS` in normal live mode. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/01-co-status-live.png`.
+- [x] Capture screenshot proof showing the paused/frozen inspect state with redraw suppression visible in operator use. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/02-co-status-paused-frozen.png`.
+- [x] Capture screenshot proof of the constrained-height inspect path. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/03-co-status-short-terminal-compact.png`.
+- [x] Capture proof of the snapshot/export inspection path itself. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/04-co-status-snapshot-view.png`, `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/run-dir/co-status-snapshots/co-status-20260331T091859Z.txt`.
+- [x] Capture proof of the simple launch surface. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/05-co-status-launch-help.png`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
+- [x] `npm run build`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
+- [x] `npm run lint`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
+- [x] `npm run test`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
+- [x] `npm run docs:check`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
+- [x] `npm run docs:freshness`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
+- [x] Manifest-backed standalone review wrapper executed, and the fallback was recorded after an explicit boundary failure. Evidence: `/Users/kbediako/Code/CO/.runs/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/cli/2026-03-31T08-12-50-173Z-239443da/review/telemetry.json`, `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/06-manual-review.md`, `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/07-elegance-review.md`.
+- [x] `npm run pack:smoke`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
 
 ## Handoff
 - [x] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: Linear comment `acede6bd-bf0d-4c97-91c9-6f25b0bb64cb`.

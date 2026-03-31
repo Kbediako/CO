@@ -583,6 +583,28 @@ describe('control status dashboard', () => {
     expect(plainFrame.split('\n')).toHaveLength(10);
   });
 
+  it('keeps the active polling state visible in compact inspect mode', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        polling: {
+          ...buildDataset().polling,
+          checking: true,
+          next_poll_in_ms: 15000
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      terminalRows: 10,
+      viewMode: 'compact'
+    });
+
+    expect(stripAnsi(frame)).toContain('│ Status: 1/2 tracked | 15m 12s | checking now...');
+  });
+
   it('renders absolute rate-limit reset timestamps against the dashboard snapshot time', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-30T02:00:00.000Z'));
@@ -1179,6 +1201,70 @@ describe('control status dashboard', () => {
       input.emitText('p');
       await handle.flush();
       expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+
+      handle.stop();
+    } finally {
+      await rm(runDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses unique snapshot filenames for rapid exports in the same second', async () => {
+    vi.useFakeTimers();
+
+    const runDir = await mkdtemp(join(tmpdir(), 'co-status-dashboard-'));
+    let currentTime = new Date('2026-03-30T01:15:30.001Z');
+    try {
+      const input = new MockDashboardInput();
+      const runtime = {
+        requestRefresh: vi.fn(async () => undefined),
+        subscribe: vi.fn(() => () => undefined),
+        snapshot: vi.fn(() => ({
+          readCompatibilityProjection: vi.fn(async () => {
+            throw new Error('unexpected readCompatibilityProjection call in test');
+          })
+        }))
+      } as unknown as ControlRuntime;
+
+      const handle = startControlStatusDashboard(
+        {
+          runtime,
+          baseUrl: 'http://127.0.0.1:4100',
+          taskId: 'local-mcp',
+          runId: 'control-host',
+          runDir,
+          startPipelineId: 'provider-linear-worker',
+          input,
+          output: {
+            write() {
+              return true;
+            },
+            columns: 220,
+            rows: 10,
+            isTTY: true
+          }
+        },
+        {
+          readDataset: async () => buildDataset(),
+          setTimeout,
+          clearTimeout,
+          now: () => new Date(currentTime)
+        }
+      );
+
+      await handle.flush();
+      input.emitText('s');
+      await handle.flush();
+
+      currentTime = new Date('2026-03-30T01:15:30.002Z');
+      input.emitText('s');
+      await handle.flush();
+
+      const snapshotDir = join(runDir, 'co-status-snapshots');
+      const snapshotFiles = (await readdir(snapshotDir)).sort();
+      expect(snapshotFiles).toHaveLength(2);
+      expect(snapshotFiles[0]).not.toBe(snapshotFiles[1]);
+      expect(snapshotFiles[0]).toContain('20260330T011530001Z');
+      expect(snapshotFiles[1]).toContain('20260330T011530002Z');
 
       handle.stop();
     } finally {

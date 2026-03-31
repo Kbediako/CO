@@ -723,10 +723,11 @@ function renderCompactStatusLine(
   referenceTime: Date,
   terminalColumns: number
 ): string {
-  const refreshSeconds =
-    typeof dataset.polling?.next_poll_in_ms === 'number' && Number.isFinite(dataset.polling.next_poll_in_ms)
-      ? `${Math.max(0, Math.ceil(dataset.polling.next_poll_in_ms / 1000))}s`
-      : 'n/a';
+  const refreshText = dataset.polling?.checking
+    ? 'checking now...'
+    : typeof dataset.polling?.next_poll_in_ms === 'number' && Number.isFinite(dataset.polling.next_poll_in_ms)
+      ? `next ${Math.max(0, Math.ceil(dataset.polling.next_poll_in_ms / 1000))}s`
+      : 'next n/a';
   return renderSummaryLine(
     'Status',
     [
@@ -734,7 +735,7 @@ function renderCompactStatusLine(
       { text: ' | ', color: ANSI_GRAY },
       { text: formatRuntimeSeconds(dataset.totals.seconds_running), color: ANSI_MAGENTA },
       { text: ' | ', color: ANSI_GRAY },
-      { text: `next ${refreshSeconds}`, color: ANSI_CYAN }
+      { text: refreshText, color: ANSI_CYAN }
     ],
     terminalColumns
   );
@@ -1517,5 +1518,5 @@ function stripAnsiSequences(value: string): string {
 }
 
 function formatSnapshotTimestamp(value: Date): string {
-  return value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  return value.toISOString().replace(/[-:.]/g, '');
 }

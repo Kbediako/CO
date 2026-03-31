@@ -743,7 +743,11 @@ async function handleControlHost(rawArgs: string[]): Promise<void> {
 }
 
 async function handleCoStatus(rawArgs: string[]): Promise<void> {
-  const { flags } = parseArgs(rawArgs);
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printCoStatusHelp();
+    return;
+  }
   await runControlHostCliShell({
     flags,
     printHelp: printCoStatusHelp

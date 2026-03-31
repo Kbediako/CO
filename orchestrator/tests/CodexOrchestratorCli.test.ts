@@ -32,4 +32,17 @@ describe('codex-orchestrator CLI monitor alias', () => {
     expect(stdout).toContain('Dedicated monitor alias for the live CO STATUS dashboard.');
     expect(stdout).toContain('This reuses the same host/runtime path as `control-host`.');
   }, cliHelpTimeoutMs);
+
+  for (const helpArg of ['help', '-h']) {
+    it(`treats co-status ${helpArg} as a help request`, async () => {
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', helpArg],
+        { cwd: repoRoot }
+      );
+
+      expect(stdout).toContain('Usage: codex-orchestrator co-status [options]');
+      expect(stdout).toContain('Dedicated monitor alias for the live CO STATUS dashboard.');
+    }, cliHelpTimeoutMs);
+  }
 });
