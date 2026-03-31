@@ -901,25 +901,25 @@ async function resolveChildLaneDecision(
       status: 409
     });
   }
+  const proofPath = join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
+  const acceptedProof = await deps.readChildLaneProof(proofPath).catch(() => null);
   let acceptedProofScope: ProviderLinearWorkerChildLaneScope | null = null;
-  if (target.scope.phases.length > 0) {
-    const proofPath = join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
-    const acceptedProof = await deps.readChildLaneProof(proofPath).catch(() => null);
-    if (!acceptedProof) {
-      await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
-      return failureResult({
-        action: 'accept',
-        issueId: context.issueId,
-        issueIdentifier: context.issueIdentifier,
-        sourceSetup,
-        stream,
-        childRun: null,
-        childLane: target,
-        code: 'provider_worker_child_lane_proof_missing',
-        message: 'Phase-scoped child lane acceptance requires a readable proof bundle before parent apply.',
-        status: 409
-      });
-    }
+  if (!acceptedProof && target.scope.phases.length > 0) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_proof_missing',
+      message: 'Phase-scoped child lane acceptance requires a readable proof bundle before parent apply.',
+      status: 409
+    });
+  }
+  if (acceptedProof) {
     if (!acceptedProof.scope) {
       await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
       return failureResult({
@@ -931,7 +931,7 @@ async function resolveChildLaneDecision(
         childRun: null,
         childLane: target,
         code: 'provider_worker_child_lane_proof_invalid',
-        message: 'Phase-scoped child lane proof is missing scope contract metadata.',
+        message: 'Child lane proof is missing scope contract metadata.',
         status: 409
       });
     }
