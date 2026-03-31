@@ -11,8 +11,7 @@ const execFileAsync = promisify(execFile);
 
 const WORKSPACE_ROOT = process.cwd();
 const CLI_ENTRY = join(WORKSPACE_ROOT, 'bin', 'codex-orchestrator.ts');
-const SHIPPED_FRONTEND_TESTING_STAGE_COMMAND =
-  'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/frontendTestingRunner.js"';
+const SHIPPED_ORCHESTRATOR_CONFIG_PATH = join(WORKSPACE_ROOT, 'codex.orchestrator.json');
 const TEST_TIMEOUT = 30000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
@@ -133,23 +132,29 @@ async function runFrontendTestWithEnv(
 }
 
 async function writeFrontendTestingFixtureConfig(rootDir: string): Promise<void> {
+  const shippedConfig = JSON.parse(await readFile(SHIPPED_ORCHESTRATOR_CONFIG_PATH, 'utf8')) as {
+    pipelines?: Array<{
+      id?: string;
+      title?: string;
+      description?: string;
+      tags?: string[];
+      guardrailsRequired?: boolean;
+      stages?: Array<Record<string, unknown>>;
+    }>;
+  };
+  const frontendTestingPipeline = shippedConfig.pipelines?.find((pipeline) => pipeline.id === 'frontend-testing');
+  if (!frontendTestingPipeline) {
+    throw new Error('Unable to locate shipped frontend-testing pipeline in codex.orchestrator.json');
+  }
   const config = {
     pipelines: [
-      {
-        id: 'frontend-testing',
-        title: 'Frontend Testing',
-        guardrailsRequired: false,
-        stages: [
-          {
-            kind: 'command',
-            id: 'frontend-testing',
-            title: 'Run frontend testing',
-            command: SHIPPED_FRONTEND_TESTING_STAGE_COMMAND,
-            env: {
-              CODEX_NON_INTERACTIVE: '1'
-            }
-          }
-        ]
+      JSON.parse(JSON.stringify(frontendTestingPipeline)) as {
+        id?: string;
+        title?: string;
+        description?: string;
+        tags?: string[];
+        guardrailsRequired?: boolean;
+        stages?: Array<Record<string, unknown>>;
       }
     ]
   };
