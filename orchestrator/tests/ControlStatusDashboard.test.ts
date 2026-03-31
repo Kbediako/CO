@@ -673,6 +673,53 @@ describe('control status dashboard', () => {
     expect(requestRefresh).toHaveBeenCalledTimes(2);
   });
 
+  it('anchors live frame timing to the dataset snapshot timestamp', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120
+        }
+      },
+      {
+        readDataset: async () => buildDataset(),
+        setTimeout,
+        clearTimeout,
+        now: () => new Date('2026-03-30T01:15:30.000Z')
+      }
+    );
+
+    await handle.flush();
+
+    const plainFrame = stripAnsi(writes[0] ?? '');
+    expect(plainFrame).toContain('│ ● CO-26      running      15m 0s / 4');
+    expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded');
+
+    handle.stop();
+  });
+
   it('does not queue follow-up renders after stop when a render is already in flight', async () => {
     vi.useFakeTimers();
 

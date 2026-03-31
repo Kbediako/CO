@@ -211,8 +211,9 @@ export function startControlStatusDashboard(
       if (stopped) {
         return;
       }
-      const referenceTime = deps.now();
-      tokenSamples = appendTokenSample(tokenSamples, referenceTime.getTime(), dataset.totals.total_tokens);
+      const now = deps.now();
+      const referenceTime = resolveReferenceTime(undefined, dataset.generated_at, now);
+      tokenSamples = appendTokenSample(tokenSamples, now.getTime(), dataset.totals.total_tokens);
       output.write(`${ANSI_CLEAR_HOME}${renderControlStatusFrame({
         dataset,
         baseUrl: options.baseUrl,
@@ -807,12 +808,16 @@ function sanitizeTerminalText(value: string): string {
     .trim();
 }
 
-function resolveReferenceTime(referenceTime: Date | undefined, generatedAt: string): Date {
+function resolveReferenceTime(
+  referenceTime: Date | undefined,
+  generatedAt: string,
+  fallbackTime: Date = new Date(0)
+): Date {
   if (referenceTime instanceof Date && Number.isFinite(referenceTime.getTime())) {
     return referenceTime;
   }
   const parsed = parseTimestamp(generatedAt);
-  return parsed === null ? new Date(0) : new Date(parsed);
+  return parsed === null ? fallbackTime : new Date(parsed);
 }
 
 function resolveTerminalColumns(value: number | null | undefined): number {
