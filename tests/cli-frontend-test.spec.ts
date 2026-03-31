@@ -9,7 +9,11 @@ import { sanitizeProviderOverrideEnv } from '../orchestrator/src/cli/utils/provi
 
 const execFileAsync = promisify(execFile);
 
-const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
+const WORKSPACE_ROOT = process.cwd();
+const CLI_ENTRY = join(WORKSPACE_ROOT, 'bin', 'codex-orchestrator.ts');
+const FRONTEND_TESTING_RUNNER_SOURCE = join(WORKSPACE_ROOT, 'orchestrator', 'src', 'cli', 'frontendTestingRunner.ts');
+const SHIPPED_FRONTEND_TESTING_STAGE_COMMAND =
+  'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/frontendTestingRunner.js"';
 const TEST_TIMEOUT = 30000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
@@ -129,7 +133,55 @@ async function runFrontendTestWithEnv(
   };
 }
 
-async function writeFakeCodexBinary(dir: string, logPath: string): Promise<string> {
+async function writeFrontendTestingFixtureConfig(rootDir: string): Promise<void> {
+  const runnerPath = join(rootDir, 'dist', 'orchestrator', 'src', 'cli', 'frontendTestingRunner.js');
+  const config = {
+    pipelines: [
+      {
+        id: 'frontend-testing',
+        title: 'Frontend Testing',
+        guardrailsRequired: false,
+        stages: [
+          {
+            kind: 'command',
+            id: 'frontend-testing',
+            title: 'Run frontend testing',
+            command: SHIPPED_FRONTEND_TESTING_STAGE_COMMAND,
+            env: {
+              CODEX_NON_INTERACTIVE: '1',
+              CODEX_ORCHESTRATOR_PACKAGE_ROOT: rootDir
+            }
+          }
+        ]
+      }
+    ]
+  };
+  await mkdir(join(rootDir, 'dist', 'orchestrator', 'src', 'cli'), { recursive: true });
+  await writeFile(
+    runnerPath,
+    [
+      "const { spawn } = require('node:child_process');",
+      `const runnerSource = ${JSON.stringify(FRONTEND_TESTING_RUNNER_SOURCE)};`,
+      `const workspaceRoot = ${JSON.stringify(WORKSPACE_ROOT)};`,
+      "const child = spawn(process.execPath, ['--loader', 'ts-node/esm', runnerSource], {",
+      "  stdio: 'inherit',",
+      '  env: process.env,',
+      '  cwd: workspaceRoot',
+      '});',
+      "child.once('error', (error) => {",
+      "  console.error(error instanceof Error ? error.message : String(error));",
+      '  process.exitCode = 1;',
+      '});',
+      "child.once('exit', (code) => {",
+      '  process.exitCode = code ?? 1;',
+      '});'
+    ].join('\n'),
+    'utf8'
+  );
+  await writeFile(join(rootDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+}
+
+async function writeFakeCodexBinary(dir: string): Promise<string> {
   const binPath = join(dir, 'codex');
   await writeFile(
     binPath,
@@ -156,11 +208,9 @@ async function provisionDevtoolsCodexHome(rootDir: string): Promise<string> {
   await writeFile(join(skillDir, 'SKILL.md'), '# devtools skill\n', 'utf8');
   await writeFile(
     join(codexHome, 'config.toml'),
-    [
-      '[mcp_servers.chrome-devtools]',
-      'command = "npx"',
-      'args = ["-y", "chrome-devtools-mcp@latest"]'
-    ].join('\n'),
+    ['[mcp_servers.chrome-devtools]', 'command = "npx"', 'args = ["-y", "chrome-devtools-mcp@latest"]'].join(
+      '\n'
+    ),
     'utf8'
   );
   return codexHome;
@@ -169,8 +219,9 @@ async function provisionDevtoolsCodexHome(rootDir: string): Promise<string> {
 describe('codex-orchestrator frontend-test', () => {
   it('selects the default frontend-testing pipeline', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-cli-'));
+    await writeFrontendTestingFixtureConfig(tempDir);
     const codexLogPath = join(tempDir, 'codex.log');
-    const fakeCodex = await writeFakeCodexBinary(tempDir, codexLogPath);
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
 
     const { manifestPath } = await runFrontendTest([], {
       CODEX_CLI_BIN: fakeCodex,
@@ -187,12 +238,14 @@ describe('codex-orchestrator frontend-test', () => {
 
     const codexLog = await readFile(codexLogPath, 'utf8');
     expect(codexLog).toContain('args=exec You are running frontend testing for the current project.');
+    expect(codexLog).toContain('devtools=');
   }, TEST_TIMEOUT);
 
   it('selects the devtools pipeline when requested', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-cli-'));
+    await writeFrontendTestingFixtureConfig(tempDir);
     const codexLogPath = join(tempDir, 'codex.log');
-    const fakeCodex = await writeFakeCodexBinary(tempDir, codexLogPath);
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
     const codexHome = await provisionDevtoolsCodexHome(tempDir);
 
     const { manifestPath } = await runFrontendTest(['--devtools'], {
@@ -214,8 +267,9 @@ describe('codex-orchestrator frontend-test', () => {
 
   it('sanitizes ambient appserver runtime env before launching the frontend-testing CLI in-suite', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'frontend-test-cli-'));
+    await writeFrontendTestingFixtureConfig(tempDir);
     const codexLogPath = join(tempDir, 'codex.log');
-    const fakeCodex = await writeFakeCodexBinary(tempDir, codexLogPath);
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
 
     process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE = 'appserver';
     process.env.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE = 'appserver';
