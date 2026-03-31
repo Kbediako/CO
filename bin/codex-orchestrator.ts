@@ -122,6 +122,9 @@ async function main(): Promise<void> {
       case 'control-host':
         await handleControlHost(args);
         break;
+      case 'co-status':
+        await handleCoStatus(args);
+        break;
       case 'exec':
         await handleExec(args);
         break;
@@ -736,6 +739,14 @@ async function handleControlHost(rawArgs: string[]): Promise<void> {
   await runControlHostCliShell({
     flags,
     printHelp: printControlHostHelp
+  });
+}
+
+async function handleCoStatus(rawArgs: string[]): Promise<void> {
+  const { flags } = parseArgs(rawArgs);
+  await runControlHostCliShell({
+    flags,
+    printHelp: printCoStatusHelp
   });
 }
 
@@ -1355,6 +1366,10 @@ Commands:
     --pipeline <id>         Pipeline used for provider-driven starts (default: diagnostics).
     --format json           Emit machine-readable readiness output.
 
+  co-status [options]
+    Dedicated monitor alias for launching the live CO STATUS dashboard.
+    Uses the same host/runtime path and options as control-host.
+
   status --run <id> [--watch] [--interval N] [--format json]
 
   self-check [--format json]
@@ -1430,6 +1445,7 @@ Commands:
     --mode <full|question_only|status_only>  Limit tool surface for child runs.
     --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   control-host            Run the persistent provider intake + oversight host.
+  co-status               Launch the live CO STATUS dashboard through the control-host path.
   version | --version
 
   help                      Show this message.
@@ -1601,6 +1617,21 @@ Options:
 
 function printControlHostHelp(): void {
   console.log(`Usage: codex-orchestrator control-host [options]
+
+Options:
+  --task <id>           Artifact task id for the host state (default: local-mcp).
+  --run <id>            Host run id for persisted state files (default: control-host).
+  --pipeline <id>       Pipeline used for provider-driven starts (default: diagnostics).
+  --format json         Emit machine-readable readiness output.
+  --help                Show this message.
+`);
+}
+
+function printCoStatusHelp(): void {
+  console.log(`Usage: codex-orchestrator co-status [options]
+
+Dedicated monitor alias for the live CO STATUS dashboard.
+This reuses the same host/runtime path as \`control-host\`.
 
 Options:
   --task <id>           Artifact task id for the host state (default: local-mcp).

@@ -39,6 +39,27 @@ Node.js >= 20 is required.
    > Tip: if you prefer `npx`, replace `codex-orch` with `npx @kbediako/codex-orchestrator`.
    > Tip: for multiple commands, you can also `export MCP_RUNNER_TASK_ID=<task-id>` once.
 
+## CO STATUS Monitoring
+
+Launch the live terminal monitor with the dedicated monitor alias:
+
+```bash
+codex-orchestrator co-status
+```
+
+This reuses the existing `control-host` runtime path, but gives operators a monitor-first command surface.
+
+Interactive TTY controls:
+- `p` freezes or resumes live redraw so the current frame stays inspectable.
+- `c` toggles compact inspect mode for shorter terminal heights.
+- `s` exports the current frame to `.runs/<task-id>/cli/<run-id>/co-status-snapshots/` for pager or scrollback inspection.
+
+Machine-readable readiness remains available with:
+
+```bash
+codex-orchestrator co-status --format json
+```
+
 ## Runtime + Execution Modes
 
 - Mode semantics are orthogonal:

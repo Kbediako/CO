@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import process from 'node:process';
 
 import { logger } from '../../logger.js';
@@ -12,7 +14,12 @@ import {
 
 type DashboardOutput = Pick<NodeJS.WriteStream, 'write'> & {
   columns?: number;
+  rows?: number;
   isTTY?: boolean;
+};
+
+type DashboardInput = Pick<NodeJS.ReadStream, 'isTTY' | 'on' | 'off' | 'pause' | 'resume'> & {
+  setRawMode?: (mode: boolean) => void;
 };
 
 interface ControlStatusDashboardDependencies {
@@ -40,6 +47,23 @@ interface SummarySegment {
   truncateMode?: 'end' | 'middle';
 }
 
+type DashboardViewMode = 'full' | 'compact';
+
+interface DashboardFrameState {
+  paused: boolean;
+  viewMode: DashboardViewMode;
+  pendingUpdate: boolean;
+  snapshotStatus: 'idle' | 'saved' | 'failed';
+  snapshotPath: string | null;
+  snapshotMessage: string | null;
+}
+
+interface RenderedDashboardState {
+  dataset: OperatorDashboardDataset;
+  referenceTime: Date;
+  throughputTps: number;
+}
+
 export interface StartControlStatusDashboardOptions {
   runtime: ControlRuntime;
   baseUrl: string;
@@ -49,6 +73,7 @@ export interface StartControlStatusDashboardOptions {
   startPipelineId: string;
   refreshIntervalMs?: number;
   output?: DashboardOutput;
+  input?: DashboardInput;
 }
 
 export interface ControlStatusDashboardHandle {
@@ -64,8 +89,15 @@ export interface RenderControlStatusFrameInput {
   runDir: string;
   startPipelineId: string;
   terminalColumns?: number | null;
+  terminalRows?: number | null;
   throughputTps?: number | null;
   referenceTime?: Date;
+  paused?: boolean;
+  viewMode?: DashboardViewMode;
+  pendingUpdate?: boolean;
+  snapshotStatus?: 'idle' | 'saved' | 'failed';
+  snapshotPath?: string | null;
+  snapshotMessage?: string | null;
 }
 
 export interface ControlStatusDashboardGateInput {
@@ -99,7 +131,9 @@ const DEFAULT_REFRESH_INTERVAL_MS = 1_000;
 const DEFAULT_TERMINAL_COLUMNS = 115;
 const THROUGHPUT_WINDOW_MS = 5_000;
 const DEFAULT_OUTPUT: DashboardOutput = process.stdout;
+const DEFAULT_INPUT: DashboardInput = process.stdin;
 const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
+const DASHBOARD_SNAPSHOT_DIRNAME = 'co-status-snapshots';
 
 const DEFAULT_DEPENDENCIES: ControlStatusDashboardDependencies = {
   readDataset: async (runtime) =>
@@ -139,28 +173,72 @@ export function startControlStatusDashboard(
   const deps = { ...DEFAULT_DEPENDENCIES, ...overrides };
   const refreshIntervalMs = Math.max(250, options.refreshIntervalMs ?? DEFAULT_REFRESH_INTERVAL_MS);
   const output = options.output ?? DEFAULT_OUTPUT;
+  const input = options.input ?? DEFAULT_INPUT;
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
   let activeRender: Promise<void> | null = null;
   let queuedRender = false;
   let queuedForceRefresh = false;
+  let queuedUseCachedFrame = false;
   let tokenSamples: TokenSample[] = [];
+  let renderedState: RenderedDashboardState | null = null;
+  let escapeSequenceState: 'idle' | 'escape' | 'control' = 'idle';
+  let frameState: DashboardFrameState = {
+    paused: false,
+    viewMode: 'full',
+    pendingUpdate: false,
+    snapshotStatus: 'idle',
+    snapshotPath: null,
+    snapshotMessage: null
+  };
+  let snapshotWrite: Promise<void> | null = null;
+
+  const queueRender = (forceRefresh: boolean, useCachedFrame: boolean): void => {
+    if (stopped) {
+      return;
+    }
+    queuedForceRefresh = queuedForceRefresh || forceRefresh;
+    queuedUseCachedFrame = queuedUseCachedFrame || useCachedFrame;
+    if (activeRender) {
+      queuedRender = true;
+      return;
+    }
+    startQueuedRender();
+  };
 
   const requestRender = (forceRefresh: boolean): void => {
     if (stopped) {
       return;
     }
-    queuedForceRefresh = queuedForceRefresh || forceRefresh;
-    if (activeRender) {
-      queuedRender = true;
+    if (frameState.paused) {
+      frameState = {
+        ...frameState,
+        pendingUpdate: true
+      };
       return;
     }
-    activeRender = renderFrame().finally(() => {
+    queueRender(forceRefresh, false);
+  };
+
+  const requestCachedFrameRender = (): void => {
+    if (stopped) {
+      return;
+    }
+    queueRender(false, true);
+  };
+
+  const startQueuedRender = (): void => {
+    const forceRefresh = queuedForceRefresh;
+    const useCachedFrame = queuedUseCachedFrame;
+    queuedRender = false;
+    queuedForceRefresh = false;
+    queuedUseCachedFrame = false;
+    activeRender = renderFrame(forceRefresh, useCachedFrame).finally(() => {
       activeRender = null;
       if (stopped || !queuedRender) {
         return;
       }
-      requestRender(queuedForceRefresh);
+      startQueuedRender();
     });
   };
 
@@ -186,6 +264,7 @@ export function startControlStatusDashboard(
     requestRender(false);
   });
 
+  const detachInput = attachInteractiveInput();
   requestRender(true);
   scheduleTick();
 
@@ -198,18 +277,178 @@ export function startControlStatusDashboard(
         deps.clearTimeout(timer);
         timer = null;
       }
+      detachInput();
       unsubscribe();
     },
     async flush() {
       await activeRender;
+      await snapshotWrite;
+      await activeRender;
     }
   };
 
-  async function renderFrame(): Promise<void> {
-    const forceRefresh = queuedForceRefresh;
-    queuedForceRefresh = false;
-    queuedRender = false;
+  function attachInteractiveInput(): () => void {
+    if (input.isTTY !== true || typeof input.on !== 'function' || typeof input.off !== 'function') {
+      return () => undefined;
+    }
+    let rawModeEnabled = false;
+    const onData = (chunk: Buffer | string): void => {
+      void handleInputChunk(chunk);
+    };
     try {
+      input.setRawMode?.(true);
+      rawModeEnabled = true;
+    } catch {
+      return () => undefined;
+    }
+    input.resume?.();
+    input.on('data', onData);
+    return () => {
+      input.off('data', onData);
+      if (rawModeEnabled) {
+        try {
+          input.setRawMode?.(false);
+        } catch {
+          // Ignore TTY restore failures during shutdown.
+        }
+      }
+      input.pause?.();
+    };
+  }
+
+  async function handleInputChunk(chunk: Buffer | string): Promise<void> {
+    const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+    for (const character of text) {
+      if (escapeSequenceState === 'escape') {
+        if (character === '[' || character === 'O') {
+          escapeSequenceState = 'control';
+          continue;
+        }
+        escapeSequenceState = 'idle';
+        continue;
+      }
+      if (escapeSequenceState === 'control') {
+        if (character >= '@' && character <= '~') {
+          escapeSequenceState = 'idle';
+        }
+        continue;
+      }
+      if (character === '\u001b') {
+        escapeSequenceState = 'escape';
+        continue;
+      }
+      if (character === '\u0003') {
+        process.kill(process.pid, 'SIGINT');
+        return;
+      }
+      if (isControlCharacter(character)) {
+        continue;
+      }
+      const key = character.toLowerCase();
+      if (key === 'p') {
+        frameState = {
+          ...frameState,
+          paused: !frameState.paused
+        };
+        if (frameState.paused) {
+          requestCachedFrameRender();
+        } else {
+          const shouldForceRefresh = frameState.pendingUpdate;
+          frameState = {
+            ...frameState,
+            pendingUpdate: false
+          };
+          queueRender(shouldForceRefresh, false);
+        }
+        continue;
+      }
+      if (key === 'c') {
+        frameState = {
+          ...frameState,
+          viewMode: frameState.viewMode === 'full' ? 'compact' : 'full'
+        };
+        requestCachedFrameRender();
+        continue;
+      }
+      if (key === 's') {
+        if (!snapshotWrite) {
+          snapshotWrite = exportSnapshot().finally(() => {
+            snapshotWrite = null;
+          });
+        }
+      }
+    }
+  }
+
+  async function exportSnapshot(): Promise<void> {
+    if (!renderedState) {
+      return;
+    }
+    const timestamp = formatSnapshotTimestamp(deps.now());
+    const snapshotDir = join(options.runDir, DASHBOARD_SNAPSHOT_DIRNAME);
+    const snapshotPath = join(snapshotDir, `co-status-${timestamp}.txt`);
+    try {
+      await mkdir(snapshotDir, { recursive: true });
+      const frame = renderControlStatusFrame({
+        dataset: renderedState.dataset,
+        baseUrl: options.baseUrl,
+        taskId: options.taskId,
+        runId: options.runId,
+        runDir: options.runDir,
+        startPipelineId: options.startPipelineId,
+        terminalColumns: output.columns ?? null,
+        terminalRows: output.rows ?? null,
+        throughputTps: renderedState.throughputTps,
+        referenceTime: renderedState.referenceTime,
+        paused: frameState.paused,
+        viewMode: frameState.viewMode,
+        pendingUpdate: frameState.pendingUpdate,
+        snapshotStatus: 'saved',
+        snapshotPath,
+        snapshotMessage: 'saved'
+      });
+      await writeFile(snapshotPath, `${stripAnsiSequences(frame)}\n`, 'utf8');
+      frameState = {
+        ...frameState,
+        snapshotStatus: 'saved',
+        snapshotPath,
+        snapshotMessage: 'saved'
+      };
+    } catch (error) {
+      frameState = {
+        ...frameState,
+        snapshotStatus: 'failed',
+        snapshotMessage: sanitizeDisplayValue((error as Error)?.message ?? String(error))
+      };
+    }
+    requestCachedFrameRender();
+  }
+
+  async function renderFrame(forceRefresh: boolean, useCachedFrame: boolean): Promise<void> {
+    try {
+      if (useCachedFrame && renderedState && !forceRefresh) {
+        output.write(
+          `${ANSI_CLEAR_HOME}${renderControlStatusFrame({
+            dataset: renderedState.dataset,
+            baseUrl: options.baseUrl,
+            taskId: options.taskId,
+            runId: options.runId,
+            runDir: options.runDir,
+            startPipelineId: options.startPipelineId,
+            terminalColumns: output.columns ?? null,
+            terminalRows: output.rows ?? null,
+            throughputTps: renderedState.throughputTps,
+            referenceTime: renderedState.referenceTime,
+            paused: frameState.paused,
+            viewMode: frameState.viewMode,
+            pendingUpdate: frameState.pendingUpdate,
+            snapshotStatus: frameState.snapshotStatus,
+            snapshotPath: frameState.snapshotPath,
+            snapshotMessage: frameState.snapshotMessage
+          })}`
+        );
+        return;
+      }
       if (forceRefresh) {
         await options.runtime.requestRefresh();
       }
@@ -220,6 +459,16 @@ export function startControlStatusDashboard(
       const now = deps.now();
       const referenceTime = resolveReferenceTime(undefined, dataset.generated_at, now);
       tokenSamples = appendTokenSample(tokenSamples, now.getTime(), dataset.totals.total_tokens);
+      const throughputTps = rollingTokensPerSecond(tokenSamples);
+      renderedState = {
+        dataset,
+        referenceTime,
+        throughputTps
+      };
+      frameState = {
+        ...frameState,
+        pendingUpdate: false
+      };
       output.write(`${ANSI_CLEAR_HOME}${renderControlStatusFrame({
         dataset,
         baseUrl: options.baseUrl,
@@ -228,9 +477,16 @@ export function startControlStatusDashboard(
         runDir: options.runDir,
         startPipelineId: options.startPipelineId,
         terminalColumns: output.columns ?? null,
-        throughputTps: rollingTokensPerSecond(tokenSamples),
-        referenceTime
-      })}\n`);
+        terminalRows: output.rows ?? null,
+        throughputTps,
+        referenceTime,
+        paused: frameState.paused,
+        viewMode: frameState.viewMode,
+        pendingUpdate: frameState.pendingUpdate,
+        snapshotStatus: frameState.snapshotStatus,
+        snapshotPath: frameState.snapshotPath,
+        snapshotMessage: frameState.snapshotMessage
+      })}`);
     } catch (error) {
       const message = (error as Error)?.message ?? String(error);
       logger.warn(`Failed rendering CO STATUS dashboard frame: ${message}`);
@@ -243,7 +499,7 @@ export function startControlStatusDashboard(
           deps.now(),
           message,
           output.columns ?? null
-        )}\n`
+        )}`
       );
     }
   }
@@ -252,6 +508,18 @@ export function startControlStatusDashboard(
 export function renderControlStatusFrame(input: RenderControlStatusFrameInput): string {
   const referenceTime = resolveReferenceTime(input.referenceTime, input.dataset.generated_at);
   const terminalColumns = resolveTerminalColumns(input.terminalColumns);
+  const terminalRows = resolveTerminalRows(input.terminalRows);
+  const frameState: DashboardFrameState = {
+    paused: input.paused === true,
+    viewMode: input.viewMode ?? 'full',
+    pendingUpdate: input.pendingUpdate === true,
+    snapshotStatus: input.snapshotStatus ?? 'idle',
+    snapshotPath: input.snapshotPath ?? null,
+    snapshotMessage: input.snapshotMessage ?? null
+  };
+  if (frameState.viewMode === 'compact') {
+    return renderCompactControlStatusFrame(input, referenceTime, terminalColumns, terminalRows, frameState);
+  }
   const runningColumns = selectRunningColumns(terminalColumns);
   const lines: string[] = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
@@ -274,8 +542,44 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
   lines.push(colorize('├─ Backoff queue', ANSI_BOLD));
   lines.push('│');
   lines.push(...renderRetryRows(input.dataset.retrying, referenceTime, terminalColumns));
+  lines.push('│');
+  lines.push(renderControlsLine(terminalColumns, frameState));
+  lines.push(
+    renderInspectLine(
+      terminalColumns,
+      frameState,
+      linesWillExceedTerminalHeight(terminalRows, lines.length + 3) && frameState.viewMode === 'full'
+    )
+  );
+  lines.push(renderSnapshotLine(terminalColumns, frameState));
   lines.push('╰─');
 
+  return lines.join('\n');
+}
+
+function renderCompactControlStatusFrame(
+  input: RenderControlStatusFrameInput,
+  referenceTime: Date,
+  terminalColumns: number,
+  terminalRows: number,
+  frameState: DashboardFrameState
+): string {
+  const lines: string[] = [
+    colorize('╭─ CO STATUS', ANSI_BOLD),
+    renderCompactStatusLine(input.dataset, referenceTime, terminalColumns),
+    renderTokensLine(input.dataset, terminalColumns),
+    renderRateLimitsLine(input.dataset, referenceTime, terminalColumns),
+    renderCompactRunningLine(input.dataset.running, referenceTime, terminalColumns),
+    renderCompactRetryLine(input.dataset.retrying, referenceTime, terminalColumns),
+    renderControlsLine(terminalColumns, frameState),
+    renderInspectLine(
+      terminalColumns,
+      frameState,
+      linesWillExceedTerminalHeight(terminalRows, 10)
+    ),
+    renderSnapshotLine(terminalColumns, frameState),
+    '╰─'
+  ];
   return lines.join('\n');
 }
 
@@ -412,6 +716,137 @@ function renderNextRefreshLine(dataset: OperatorDashboardDataset, terminalColumn
     );
   }
   return renderSummaryLine('Next refresh', [{ text: 'n/a', color: ANSI_GRAY }], terminalColumns);
+}
+
+function renderCompactStatusLine(
+  dataset: OperatorDashboardDataset,
+  referenceTime: Date,
+  terminalColumns: number
+): string {
+  const refreshSeconds =
+    typeof dataset.polling?.next_poll_in_ms === 'number' && Number.isFinite(dataset.polling.next_poll_in_ms)
+      ? `${Math.max(0, Math.ceil(dataset.polling.next_poll_in_ms / 1000))}s`
+      : 'n/a';
+  return renderSummaryLine(
+    'Status',
+    [
+      { text: `${formatCount(dataset.counts.running)}/${formatCount(dataset.counts.issues)} tracked`, color: ANSI_GREEN },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: formatRuntimeSeconds(dataset.totals.seconds_running), color: ANSI_MAGENTA },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: `next ${refreshSeconds}`, color: ANSI_CYAN }
+    ],
+    terminalColumns
+  );
+}
+
+function renderCompactRunningLine(
+  entries: OperatorDashboardSessionPayload[],
+  referenceTime: Date,
+  terminalColumns: number
+): string {
+  if (entries.length === 0) {
+    return renderSummaryLine('Running', [{ text: 'No active agents', color: ANSI_GRAY }], terminalColumns);
+  }
+  const [entry] = [...entries].sort((left, right) => left.issue_identifier.localeCompare(right.issue_identifier));
+  return renderSummaryLine(
+    'Running',
+    [
+      { text: sanitizeDisplayValue(entry.issue_identifier), color: ANSI_CYAN },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: sanitizeDisplayValue(entry.display_state), color: resolveRunningAccent(entry) },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: summarizeRunningEvent(entry), color: ANSI_GRAY, truncateMode: 'end' }
+    ],
+    terminalColumns
+  );
+}
+
+function renderCompactRetryLine(
+  entries: OperatorDashboardRetryPayload[],
+  referenceTime: Date,
+  terminalColumns: number
+): string {
+  if (entries.length === 0) {
+    return renderSummaryLine('Retry', [{ text: 'No queued retries', color: ANSI_GRAY }], terminalColumns);
+  }
+  const [entry] = [...entries].sort((left, right) => compareDueAt(left.due_at, right.due_at));
+  return renderSummaryLine(
+    'Retry',
+    [
+      { text: sanitizeDisplayValue(entry.issue_identifier), color: ANSI_RED },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: `in ${formatRelativeDue(entry.due_at, referenceTime)}`, color: ANSI_CYAN },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: sanitizeDisplayValue(entry.error ?? entry.status_reason ?? 'n/a'), color: ANSI_GRAY, truncateMode: 'end' }
+    ],
+    terminalColumns
+  );
+}
+
+function renderControlsLine(terminalColumns: number, frameState: DashboardFrameState): string {
+  return renderSummaryLine(
+    'Controls',
+    [
+      { text: `p ${frameState.paused ? 'resume live redraw' : 'freeze live redraw'}`, color: ANSI_CYAN },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: `c ${frameState.viewMode === 'full' ? 'compact inspect' : 'full frame'}`, color: ANSI_CYAN },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: 's snapshot export', color: ANSI_CYAN }
+    ],
+    terminalColumns
+  );
+}
+
+function renderInspectLine(
+  terminalColumns: number,
+  frameState: DashboardFrameState,
+  frameExceedsTerminalHeight: boolean
+): string {
+  const segments: SummarySegment[] = [
+    { text: frameState.paused ? 'paused' : 'live', color: frameState.paused ? ANSI_YELLOW : ANSI_GREEN },
+    { text: ' | ', color: ANSI_GRAY },
+    { text: frameState.viewMode === 'compact' ? 'compact inspect' : 'full frame', color: ANSI_CYAN }
+  ];
+  if (frameState.pendingUpdate) {
+    segments.push({ text: ' | ', color: ANSI_GRAY });
+    segments.push({ text: 'updates waiting', color: ANSI_YELLOW });
+  }
+  if (frameExceedsTerminalHeight && frameState.viewMode === 'full') {
+    segments.push({ text: ' | ', color: ANSI_GRAY });
+    segments.push({ text: 'short terminal: pause then compact', color: ANSI_RED });
+  }
+  return renderSummaryLine('Inspect', segments, terminalColumns);
+}
+
+function renderSnapshotLine(terminalColumns: number, frameState: DashboardFrameState): string {
+  if (frameState.snapshotStatus === 'saved' && frameState.snapshotPath) {
+    return renderSummaryLine(
+      'Snapshot',
+      [
+        { text: 'saved', color: ANSI_GREEN },
+        { text: ' | ', color: ANSI_GRAY },
+        { text: frameState.snapshotPath, color: ANSI_CYAN, truncateMode: 'middle' }
+      ],
+      terminalColumns
+    );
+  }
+  if (frameState.snapshotStatus === 'failed') {
+    return renderSummaryLine(
+      'Snapshot',
+      [
+        { text: 'save failed', color: ANSI_RED },
+        { text: ' | ', color: ANSI_GRAY },
+        { text: frameState.snapshotMessage ?? 'unknown error', color: ANSI_GRAY, truncateMode: 'end' }
+      ],
+      terminalColumns
+    );
+  }
+  return renderSummaryLine(
+    'Snapshot',
+    [{ text: 'press s to export a stable frame under run dir', color: ANSI_GRAY, truncateMode: 'end' }],
+    terminalColumns
+  );
 }
 
 function renderRunningHeaderRow(columns: RunningColumn[]): string {
@@ -985,6 +1420,25 @@ function resolveTerminalColumns(value: number | null | undefined): number {
   return DEFAULT_TERMINAL_COLUMNS;
 }
 
+function resolveTerminalRows(value: number | null | undefined): number {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+function linesWillExceedTerminalHeight(terminalRows: number, lineCount: number): boolean {
+  return Number.isFinite(terminalRows) && lineCount > terminalRows;
+}
+
+function isControlCharacter(value: string): boolean {
+  if (value.length === 0) {
+    return false;
+  }
+  const codePoint = value.charCodeAt(0);
+  return (codePoint >= 0x00 && codePoint <= 0x1f) || (codePoint >= 0x7f && codePoint <= 0x9f);
+}
+
 function parseTimestamp(value: string | null | undefined): number | null {
   if (typeof value !== 'string' || value.trim().length === 0) {
     return null;
@@ -1056,4 +1510,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function colorize(value: string, ansiCode: string): string {
   return `${ansiCode}${value}${ANSI_RESET}`;
+}
+
+function stripAnsiSequences(value: string): string {
+  return value.replace(ANSI_CONTROL_SEQUENCE_PATTERN, '');
+}
+
+function formatSnapshotTimestamp(value: Date): string {
+  return value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }

@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260331-linear-cd3020f3-b6be-4adb-ae00-1a15497de036",
+      "title": "CO: Make CO STATUS inspectable in smaller terminals and easy to launch",
+      "relates_to": "tasks/tasks-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-31",
+      "paths": {
+        "spec": "tasks/specs/linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
+        "task": "tasks/tasks-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
+        "agent_task": ".agent/task/linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
+        "docs": "docs/TECH_SPEC-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md"
+      }
+    },
+    {
       "id": "20260331-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277",
       "title": "CO Strengthen Autonomous Issue Understanding and Intent Capture for Follow-Up Work",
       "relates_to": "tasks/tasks-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
