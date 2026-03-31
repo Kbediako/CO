@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 806a25b479e7105f518e32247137687bfdf91fa2aee089bd4ab5e7e8fd30fb88 -->
+<!-- codex:instruction-stamp 5c0250b02f54b0263c50226c5ff9cdce8a4542412d6251be3f31ee3002e823fd -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -92,6 +92,9 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use `.agent/task/templates/tech-spec-template.md` for TECH_SPECs and `.agent/task/templates/action-plan-template.md` for ACTION_PLANs.
 - Prefer the bundled `docs-first` skill for consistent steps.
 - Translate the user request into the PRD and update it as you learn new constraints or scope changes.
+- For autonomy-facing backlog or follow-up lanes, the docs packet must preserve the issue-shaping contract before implementation starts: user-request translation, protected terms / exact artifact and surface names, nearby wrong interpretations to reject, explicit non-goals, `Not done if`, and a current/reference/target parity matrix when the lane is about parity or alignment.
+- Before implementation, record a lightweight issue-quality review in the spec/task notes confirming the issue is not still plausibly narrower than the user's request.
+- The micro-task path is unavailable for parity/alignment lanes or work whose correctness depends on exact naming, exact surfaces, or protected wording.
 - For low-risk tiny changes, use the bounded micro-task path in `docs/micro-task-path.md` (still requires task/spec evidence).
 
 ## Standalone Reviews (Ad-hoc)

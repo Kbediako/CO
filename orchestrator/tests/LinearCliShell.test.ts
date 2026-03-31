@@ -210,6 +210,9 @@ describe('runLinearCliShell', () => {
           'issue-id': 'lin-issue-1',
           title: 'Follow-up',
           description: 'Investigate',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
           'acceptance-criteria': '- [ ] Captured',
           'blocked-by-source': 'true'
         },
@@ -226,7 +229,12 @@ describe('runLinearCliShell', () => {
       issueId: 'lin-issue-1',
       title: 'Follow-up',
       description: 'Investigate',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
       acceptanceCriteria: '- [ ] Captured',
+      parityLane: false,
+      parityMatrix: null,
       blockedBySource: true,
       sourceSetup: null,
       env: {
@@ -650,7 +658,12 @@ describe('runLinearCliShell', () => {
           'issue-id': 'lin-issue-1',
           title: 'Follow-up',
           description: 'Investigate the remaining improvement',
+          'intent-checksum-file': '/tmp/intent.md',
+          'non-goals-file': '/tmp/non-goals.md',
+          'not-done-if-file': '/tmp/not-done-if.md',
           'acceptance-criteria-file': '/tmp/acceptance.md',
+          'parity-lane': true,
+          'parity-matrix-file': '/tmp/parity.md',
           'blocked-by-source': true,
           'workspace-id': 'lin-workspace-1',
           'team-id': 'lin-team-1',
@@ -660,7 +673,21 @@ describe('runLinearCliShell', () => {
       },
       {
         createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
-        readTextFile: vi.fn(async () => '- [ ] Captured'),
+        readTextFile: vi.fn(async (path: string) => {
+          if (path === '/tmp/intent.md') {
+            return '- Preserve exact `CO STATUS` wording.';
+          }
+          if (path === '/tmp/non-goals.md') {
+            return '- [ ] Do not reopen the browser surface.';
+          }
+          if (path === '/tmp/not-done-if.md') {
+            return '- [ ] The issue still allows browser-first parity.';
+          }
+          if (path === '/tmp/parity.md') {
+            return '- Current: browser-first\n- Reference: Symphony terminal parity\n- Target: exact terminal parity\n- Out of scope: unrelated UI additions';
+          }
+          return '- [ ] Captured';
+        }),
         getEnv: () => ({
           CO_LINEAR_API_TOKEN: 'lin-api-token',
           CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
@@ -675,7 +702,13 @@ describe('runLinearCliShell', () => {
       issueId: 'lin-issue-1',
       title: 'Follow-up',
       description: 'Investigate the remaining improvement',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
       acceptanceCriteria: '- [ ] Captured',
+      parityLane: true,
+      parityMatrix:
+        '- Current: browser-first\n- Reference: Symphony terminal parity\n- Target: exact terminal parity\n- Out of scope: unrelated UI additions',
       blockedBySource: true,
       sourceSetup: {
         provider: 'linear',
@@ -753,6 +786,9 @@ describe('runLinearCliShell', () => {
           'issue-id': 'lin-issue-1',
           title: 'Follow-up',
           description: 'Investigate the remaining improvement',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
           'acceptance-criteria': '- [ ] Captured'
         },
         printHelp: vi.fn()
@@ -805,6 +841,79 @@ describe('runLinearCliShell', () => {
       attachment_id: null,
       error_code: 'linear_graphql_error',
       error_message: 'Linear GraphQL returned operation errors.'
+    });
+  });
+
+  it('fails closed when create-follow-up omits the required intent checksum', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      error: {
+        code: 'linear_intent_checksum_missing',
+        message: '--intent-checksum or --intent-checksum-file is required.',
+        status: 422
+      }
+    });
+  });
+
+  it('fails closed when create-follow-up marks a parity lane without a parity matrix', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Parity follow-up',
+          description: 'Close the remaining parity gap.',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured',
+          'parity-lane': true
+        },
+        printHelp: vi.fn()
+      },
+      {
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_parity_matrix_missing',
+        message: 'Parity/alignment follow-up issues require a parity matrix.',
+        status: 422
+      }
     });
   });
 

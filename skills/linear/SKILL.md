@@ -139,13 +139,24 @@ codex-orchestrator pr ready-review \
 
 When you discover a meaningful out-of-scope improvement, create a separate same-project follow-up issue in `Backlog` instead of expanding the current issue.
 The helper always adds a `related` relation to the source issue and can also add blocker linkage when the follow-up depends on the source issue landing first.
+The stronger contract also preserves:
+- `Intent Checksum`: exact wording, protected terms, and nearby wrong interpretations to reject
+- `Non-Goals`
+- `Not Done If`
+- required `Parity / Alignment Matrix` when `--parity-lane` marks a parity/alignment follow-up
+- deterministic `Immediate Traceability` back to the repo packet expected before the follow-up leaves `Backlog`
 
 ```bash
 codex-orchestrator linear create-follow-up \
   --issue-id "$ISSUE_ID" \
   --title "Follow-up title" \
   --description-file /tmp/follow-up-description.md \
+  --intent-checksum-file /tmp/follow-up-intent-checksum.md \
+  --non-goals-file /tmp/follow-up-non-goals.md \
+  --not-done-if-file /tmp/follow-up-not-done-if.md \
   --acceptance-criteria-file /tmp/follow-up-acceptance.md \
+  --parity-lane \
+  --parity-matrix-file /tmp/follow-up-parity-matrix.md \
   --blocked-by-source \
   --format json
 ```
@@ -154,7 +165,7 @@ codex-orchestrator linear create-follow-up \
 
 - Move `Todo` or the live team's equivalent queued state (for CO, `Ready`) to the actual started state before active coding when the issue is unblocked.
 - Use the Linear issue id, not the human identifier, for helper commands.
-- When you discover a meaningful out-of-scope improvement, use `create-follow-up` so the new issue stays in the same project, starts in `Backlog`, and returns the created follow-up identifier/URL for workpad references.
+- When you discover a meaningful out-of-scope improvement, use `create-follow-up` so the new issue stays in the same project, starts in `Backlog`, records intent checksum/non-goals/not-done-if, requires a parity matrix for parity/alignment lanes, and returns the created follow-up identifier/URL for workpad references.
 - Treat `CODEX_ORCHESTRATOR_REPO_CONFIG_PATH` and `CODEX_ORCHESTRATOR_PACKAGE_ROOT` as provider-lane-only overrides. Child streams and repo-local validation/test subprocesses should strip them unless the subprocess explicitly needs provider snapshot/package-root behavior.
 - Prefer an installed global `linear` skill when available, and fall back to this bundled `skills/linear/SKILL.md` copy only when no global skill is installed.
 - Keep exactly one active `## Codex Workpad` comment current. Refresh it after each meaningful milestone, immediately before review or merge handoffs, after rework, and after merge completion. Final closeout stays in the same workpad comment. Do not create duplicate progress or terminal summary comments.

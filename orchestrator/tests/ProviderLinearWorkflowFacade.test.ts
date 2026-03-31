@@ -121,6 +121,34 @@ function buildIssueContextBody(overrides: Record<string, unknown> = {}): unknown
   };
 }
 
+function buildExpectedFollowUpDescription(options: {
+  includeTraceability?: boolean;
+  includeParityMatrix?: boolean;
+} = {}): string {
+  const sections = [
+    'Investigate the remaining improvement.',
+    '## Intent Checksum\n- Preserve exact `CO STATUS` wording.',
+    '## Non-Goals\n- [ ] Do not reopen the browser surface.',
+    options.includeParityMatrix === true
+      ? '## Parity / Alignment Matrix\n- Current: browser-first\n- Reference: Symphony terminal parity\n- Target: exact terminal parity\n- Out of scope: unrelated UI additions'
+      : null,
+    '## Not Done If\n- [ ] The issue still allows browser-first parity.',
+    options.includeTraceability === true
+      ? [
+          '## Immediate Traceability',
+          '- Source issue: `CO-1` / `lin-issue-1` (https://linear.app/example/issue/CO-1)',
+          '- Follow-up issue: `CO-2` / `lin-issue-2` (https://linear.app/example/issue/CO-2)',
+          '- Follow-up packet prefix: `linear-lin-issue-2`',
+          '- Canonical registry task id: see `tasks/index.json` (format `YYYYMMDD-linear-<linear-issue-id>`)',
+          '- Create before active work: `docs/PRD-linear-lin-issue-2.md`, `docs/TECH_SPEC-linear-lin-issue-2.md`, `docs/ACTION_PLAN-linear-lin-issue-2.md`, `tasks/specs/linear-lin-issue-2.md`, `tasks/tasks-linear-lin-issue-2.md`, `.agent/task/linear-lin-issue-2.md`',
+          '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
+        ].join('\n')
+      : null,
+    '## Acceptance Criteria\n- [ ] Captured'
+  ].filter((section): section is string => Boolean(section));
+  return sections.join('\n\n');
+}
+
 function buildCachedIssueContext(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'lin-issue-1',
@@ -7071,6 +7099,13 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('creates a same-project Backlog follow-up issue with related and blocker linkage', async () => {
+    const initialDescription = buildExpectedFollowUpDescription({
+      includeParityMatrix: true
+    });
+    const finalDescription = buildExpectedFollowUpDescription({
+      includeParityMatrix: true,
+      includeTraceability: true
+    });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -7088,12 +7123,7 @@ describe('providerLinearWorkflowFacade', () => {
             projectId: 'lin-project-1',
             stateId: 'state-backlog',
             title: 'Follow-up issue',
-            description: [
-              'Investigate the remaining improvement.',
-              '',
-              '## Acceptance Criteria',
-              '- [ ] Captured'
-            ].join('\n')
+            description: initialDescription
           }
         });
         return jsonResponse({
@@ -7104,7 +7134,41 @@ describe('providerLinearWorkflowFacade', () => {
                 id: 'lin-issue-2',
                 identifier: 'CO-2',
                 title: 'Follow-up issue',
-                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                description: initialDescription,
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: finalDescription
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: finalDescription,
                 url: 'https://linear.app/example/issue/CO-2',
                 state: {
                   id: 'state-backlog',
@@ -7172,7 +7236,13 @@ describe('providerLinearWorkflowFacade', () => {
       issueId: 'lin-issue-1',
       title: 'Follow-up issue',
       description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
       acceptanceCriteria: '- [ ] Captured',
+      parityLane: true,
+      parityMatrix:
+        '- Current: browser-first\n- Reference: Symphony terminal parity\n- Target: exact terminal parity\n- Out of scope: unrelated UI additions',
       blockedBySource: true,
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
@@ -7192,7 +7262,7 @@ describe('providerLinearWorkflowFacade', () => {
         id: 'lin-issue-2',
         identifier: 'CO-2',
         title: 'Follow-up issue',
-        description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+        description: finalDescription,
         url: 'https://linear.app/example/issue/CO-2',
         state: {
           id: 'state-backlog',
@@ -7230,6 +7300,9 @@ describe('providerLinearWorkflowFacade', () => {
       issueId: 'lin-issue-1',
       title: 'Follow-up issue',
       description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
       acceptanceCriteria: '- [ ] Captured',
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
@@ -7289,6 +7362,9 @@ describe('providerLinearWorkflowFacade', () => {
       issueId: 'lin-issue-1',
       title: 'Follow-up issue',
       description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
       acceptanceCriteria: '- [ ] Captured',
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
@@ -7307,10 +7383,39 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('surfaces the created follow-up issue when relation creation fails after issue creation', async () => {
+  it('fails closed when a parity follow-up omits the parity matrix', async () => {
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Parity follow-up',
+      description: 'Close the remaining parity gap.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      parityLane: true,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl: vi.fn()
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_parity_matrix_missing',
+        message: 'Parity/alignment follow-up issues require a parity matrix.',
+        status: 422
+      }
+    });
+  });
+
+  it('surfaces the created follow-up issue when the traceability description update fails after issue creation', async () => {
+    const initialDescription = buildExpectedFollowUpDescription();
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
+        variables?: Record<string, unknown>;
       };
       if (body.query?.includes('ProviderLinearIssueSummary')) {
         return jsonResponse(buildIssueContextBody());
@@ -7324,7 +7429,149 @@ describe('providerLinearWorkflowFacade', () => {
                 id: 'lin-issue-2',
                 identifier: 'CO-2',
                 title: 'Follow-up issue',
-                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                description: initialDescription,
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: buildExpectedFollowUpDescription({
+            includeTraceability: true
+          })
+        });
+        return jsonResponse({
+          errors: [{ message: 'description update failed' }]
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_graphql_error',
+        message: 'Linear GraphQL returned operation errors.',
+        status: 409,
+        retryable: false,
+        details: {
+          errors: [{ message: 'description update failed' }],
+          created_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up issue',
+            description: initialDescription,
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            },
+            team: {
+              id: 'lin-team-1',
+              key: 'CO',
+              name: 'Codex Orchestrator'
+            },
+            project: {
+              id: 'lin-project-1',
+              name: 'CO'
+            }
+          },
+          failed_step: 'description_update'
+        }
+      }
+    });
+  });
+
+  it('surfaces the created follow-up issue when relation creation fails after issue creation', async () => {
+    const initialDescription = buildExpectedFollowUpDescription();
+    const finalDescription = buildExpectedFollowUpDescription({
+      includeTraceability: true
+    });
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: initialDescription,
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: finalDescription
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: finalDescription,
                 url: 'https://linear.app/example/issue/CO-2',
                 state: {
                   id: 'state-backlog',
@@ -7357,6 +7604,9 @@ describe('providerLinearWorkflowFacade', () => {
       issueId: 'lin-issue-1',
       title: 'Follow-up issue',
       description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
       acceptanceCriteria: '- [ ] Captured',
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
@@ -7378,7 +7628,7 @@ describe('providerLinearWorkflowFacade', () => {
             id: 'lin-issue-2',
             identifier: 'CO-2',
             title: 'Follow-up issue',
-            description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+            description: finalDescription,
             url: 'https://linear.app/example/issue/CO-2',
             state: {
               id: 'state-backlog',
@@ -7402,6 +7652,10 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('surfaces the created follow-up issue when blocker relation creation fails after related succeeds', async () => {
+    const initialDescription = buildExpectedFollowUpDescription();
+    const finalDescription = buildExpectedFollowUpDescription({
+      includeTraceability: true
+    });
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -7423,7 +7677,41 @@ describe('providerLinearWorkflowFacade', () => {
                 id: 'lin-issue-2',
                 identifier: 'CO-2',
                 title: 'Follow-up issue',
-                description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+                description: initialDescription,
+                url: 'https://linear.app/example/issue/CO-2',
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                },
+                team: {
+                  id: 'lin-team-1',
+                  key: 'CO',
+                  name: 'Codex Orchestrator'
+                },
+                project: {
+                  id: 'lin-project-1',
+                  name: 'CO'
+                }
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: finalDescription
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: finalDescription,
                 url: 'https://linear.app/example/issue/CO-2',
                 state: {
                   id: 'state-backlog',
@@ -7467,6 +7755,9 @@ describe('providerLinearWorkflowFacade', () => {
       issueId: 'lin-issue-1',
       title: 'Follow-up issue',
       description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
       acceptanceCriteria: '- [ ] Captured',
       blockedBySource: true,
       env: {
@@ -7489,7 +7780,7 @@ describe('providerLinearWorkflowFacade', () => {
             id: 'lin-issue-2',
             identifier: 'CO-2',
             title: 'Follow-up issue',
-            description: 'Investigate the remaining improvement.\n\n## Acceptance Criteria\n- [ ] Captured',
+            description: finalDescription,
             url: 'https://linear.app/example/issue/CO-2',
             state: {
               id: 'state-backlog',

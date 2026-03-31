@@ -1518,8 +1518,17 @@ Subcommands:
     --title <title>                   Follow-up issue title.
     --description <text>              Follow-up issue description.
     --description-file <path>         Read follow-up issue description from a file.
+    --intent-checksum <text>          Exact wording, protected terms, and wrong interpretations to reject.
+    --intent-checksum-file <path>     Read the intent checksum from a file.
+    --non-goals <text>                Explicit follow-up non-goals.
+    --non-goals-file <path>           Read follow-up non-goals from a file.
+    --not-done-if <text>              Readiness blockers / false-done conditions.
+    --not-done-if-file <path>         Read the false-done block from a file.
     --acceptance-criteria <text>      Follow-up acceptance criteria.
     --acceptance-criteria-file <path> Read follow-up acceptance criteria from a file.
+    --parity-lane                     Require a parity/alignment matrix for this follow-up.
+    --parity-matrix <text>            Current/reference/target matrix (required when --parity-lane is set).
+    --parity-matrix-file <path>       Read the parity/alignment matrix from a file (required when --parity-lane is set).
     --blocked-by-source               Add blocker linkage when the follow-up depends on the source issue.
     --workspace-id <id>               Optional workspace scope check.
     --team-id <id>                    Optional team scope check.

@@ -15,6 +15,24 @@ last_review: <YYYY-MM-DD>
 - Scope:
 - Constraints:
 
+## Issue-Shaping Contract
+- User-request translation carried forward:
+- Protected terms / exact artifact and surface names:
+- Nearby wrong interpretations to reject:
+- Explicit non-goals carried forward:
+
+## Parity / Alignment Matrix
+- Required for parity/alignment lanes; otherwise state `Not applicable`.
+- Current truth:
+- Reference truth:
+- Target truth / intended delta:
+- Explicitly out-of-scope differences:
+
+## Readiness Gate
+- Not done if:
+- Pre-implementation issue-quality review evidence:
+- Safeguard ownership split:
+
 ## Technical Requirements
 - Functional requirements:
 - Non-functional requirements (performance, reliability, security):

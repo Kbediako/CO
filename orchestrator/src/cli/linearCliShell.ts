@@ -269,8 +269,17 @@ export async function runLinearCliShell(
           'title',
           'description',
           'description-file',
+          'intent-checksum',
+          'intent-checksum-file',
+          'non-goals',
+          'non-goals-file',
+          'not-done-if',
+          'not-done-if-file',
           'acceptance-criteria',
           'acceptance-criteria-file',
+          'parity-lane',
+          'parity-matrix',
+          'parity-matrix-file',
           'blocked-by-source'
         ]);
         const result = await dependencies.createProviderLinearFollowUpIssue({
@@ -282,11 +291,36 @@ export async function runLinearCliShell(
             'description',
             'description-file'
           ),
+          intentChecksum: await resolveRequiredText(
+            params.flags,
+            dependencies.readTextFile,
+            'intent-checksum',
+            'intent-checksum-file'
+          ),
+          nonGoals: await resolveRequiredText(
+            params.flags,
+            dependencies.readTextFile,
+            'non-goals',
+            'non-goals-file'
+          ),
+          notDoneIf: await resolveRequiredText(
+            params.flags,
+            dependencies.readTextFile,
+            'not-done-if',
+            'not-done-if-file'
+          ),
           acceptanceCriteria: await resolveRequiredText(
             params.flags,
             dependencies.readTextFile,
             'acceptance-criteria',
             'acceptance-criteria-file'
+          ),
+          parityLane: readBooleanFlag(params.flags, 'parity-lane'),
+          parityMatrix: await resolveOptionalText(
+            params.flags,
+            dependencies.readTextFile,
+            'parity-matrix',
+            'parity-matrix-file'
           ),
           blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
           sourceSetup: readSourceSetup(params.flags),
