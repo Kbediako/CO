@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 7240a946013cfefb9b56fe8e522df41d4fa0dff44f871ddca134a6ae83753faf -->
+<!-- codex:instruction-stamp 7b1de58be91ca44e55fd376412c967b519eaa19b70e9c4857e6b35a1e6ab383d -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -31,6 +31,9 @@
 - Use `.agent/task/templates/tech-spec-template.md` for TECH_SPECs and `.agent/task/templates/action-plan-template.md` for ACTION_PLANs.
 - Prefer the global `docs-first` skill when installed; bundled skills ship for downstream release packaging.
 - Translate the user request into the PRD and update it as you learn new constraints or scope changes.
+- For autonomy-facing backlog or follow-up lanes, capture the issue-shaping contract before implementation starts: user-request translation, protected terms / exact artifact and surface names, nearby wrong interpretations to reject, explicit non-goals, `Not done if`, and a current/reference/target parity matrix when the lane is about parity or alignment.
+- Record a lightweight issue-quality review in the spec/task notes before implementation so work does not start while the issue is still plausibly narrower than the user request.
+- Do not use the micro-task shortcut for parity/alignment lanes or work whose correctness depends on exact naming, exact surfaces, or protected wording.
 - For low-risk tiny changes, apply the bounded micro-task path in `docs/micro-task-path.md` instead of full-length collateral rewrites (still requires task/spec evidence).
 
 ## Orchestrator-First Default

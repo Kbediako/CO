@@ -303,7 +303,7 @@ export interface ProviderLinearIssueContext {
 
 type ProviderLinearIssueSummary = Pick<
   ProviderLinearIssueContext,
-  'id' | 'identifier' | 'workspace_id' | 'state' | 'team' | 'project'
+  'id' | 'identifier' | 'url' | 'workspace_id' | 'state' | 'team' | 'project'
 >;
 
 export type ProviderLinearIssueContextResult =
@@ -503,6 +503,7 @@ interface LinearIssueSummaryQueryResponse {
   issue?: {
     id?: string | null;
     identifier?: string | null;
+    url?: string | null;
     state?: {
       id?: string | null;
       name?: string | null;
@@ -596,6 +597,33 @@ interface AttachmentMutationResponse {
 
 interface IssueCreateMutationResponse {
   issueCreate?: {
+    success?: boolean | null;
+    issue?: {
+      id?: string | null;
+      identifier?: string | null;
+      title?: string | null;
+      description?: string | null;
+      url?: string | null;
+      state?: {
+        id?: string | null;
+        name?: string | null;
+        type?: string | null;
+      } | null;
+      team?: {
+        id?: string | null;
+        key?: string | null;
+        name?: string | null;
+      } | null;
+      project?: {
+        id?: string | null;
+        name?: string | null;
+      } | null;
+    } | null;
+  } | null;
+}
+
+interface IssueDescriptionUpdateMutationResponse {
+  issueUpdate?: {
     success?: boolean | null;
     issue?: {
       id?: string | null;
@@ -1268,7 +1296,12 @@ export async function createProviderLinearFollowUpIssue(input: {
   issueId: string;
   title: string;
   description: string;
+  intentChecksum: string;
+  nonGoals: string;
+  notDoneIf: string;
   acceptanceCriteria: string;
+  parityLane?: boolean;
+  parityMatrix?: string | null;
   blockedBySource?: boolean;
   sourceSetup?: DispatchPilotSourceSetup | null;
   env?: NodeJS.ProcessEnv;
@@ -1291,12 +1324,49 @@ export async function createProviderLinearFollowUpIssue(input: {
       422
     );
   }
+  const intentChecksum = normalizeRequiredString(input.intentChecksum);
+  if (!intentChecksum) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_intent_checksum_missing',
+      'Follow-up issue intent checksum is required.',
+      422
+    );
+  }
+  const nonGoals = normalizeRequiredString(input.nonGoals);
+  if (!nonGoals) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_non_goals_missing',
+      'Follow-up issue non-goals are required.',
+      422
+    );
+  }
+  const notDoneIf = normalizeRequiredString(input.notDoneIf);
+  if (!notDoneIf) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_not_done_if_missing',
+      'Follow-up issue Not Done If block is required.',
+      422
+    );
+  }
   const acceptanceCriteria = normalizeRequiredString(input.acceptanceCriteria);
   if (!acceptanceCriteria) {
     return failure(
       'create-follow-up',
       'linear_follow_up_acceptance_criteria_missing',
       'Follow-up issue acceptance criteria are required.',
+      422
+    );
+  }
+  const parityLane = input.parityLane === true;
+  const parityMatrix = normalizeOptionalString(input.parityMatrix ?? null);
+  if (parityLane && !parityMatrix) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_parity_matrix_missing',
+      'Parity/alignment follow-up issues require a parity matrix.',
       422
     );
   }
@@ -1352,7 +1422,14 @@ export async function createProviderLinearFollowUpIssue(input: {
         projectId,
         stateId: backlogState.id,
         title,
-        description: buildFollowUpIssueDescription(description, acceptanceCriteria)
+        description: buildFollowUpIssueDescription({
+          description,
+          intentChecksum,
+          nonGoals,
+          notDoneIf,
+          acceptanceCriteria,
+          parityMatrix
+        })
       }
     }
   });
@@ -1360,7 +1437,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     return failureFromGraphql('create-follow-up', createdIssueResult.failure);
   }
 
-  const createdIssue = parseCreatedIssue(createdIssueResult.payload.data?.issueCreate?.issue ?? null);
+  let createdIssue = parseCreatedIssue(createdIssueResult.payload.data?.issueCreate?.issue ?? null);
   if (createdIssueResult.payload.data?.issueCreate?.success !== true || !createdIssue) {
     return failure(
       'create-follow-up',
@@ -1368,6 +1445,61 @@ export async function createProviderLinearFollowUpIssue(input: {
       'Linear follow-up issue creation did not succeed.',
       503
     );
+  }
+
+  const finalizedDescription = buildFollowUpIssueDescription({
+    description,
+    intentChecksum,
+    nonGoals,
+    notDoneIf,
+    acceptanceCriteria,
+    parityMatrix,
+    traceability: buildFollowUpTraceabilitySection({
+      sourceIssue: issueSummary.issue,
+      followUpIssue: createdIssue
+    })
+  });
+  if (createdIssue.description !== finalizedDescription) {
+    const updateDescriptionResult = await executeLinearGraphql<IssueDescriptionUpdateMutationResponse>({
+      token: session.session.token,
+      timeoutMs: session.session.timeoutMs,
+      fetchImpl: session.session.fetchImpl,
+      query: buildIssueDescriptionUpdateMutation(),
+      variables: {
+        id: createdIssue.id,
+        description: finalizedDescription
+      }
+    });
+    if (!updateDescriptionResult.ok) {
+      const mapped = mapGraphqlFailure(updateDescriptionResult.failure);
+      return failure(
+        'create-follow-up',
+        mapped.code,
+        mapped.message,
+        409,
+        {
+          ...(mapped.details ?? {}),
+          created_issue: createdIssue,
+          failed_step: 'description_update'
+        },
+        false
+      );
+    }
+    const updatedIssue = parseCreatedIssue(updateDescriptionResult.payload.data?.issueUpdate?.issue ?? null);
+    if (updateDescriptionResult.payload.data?.issueUpdate?.success !== true || !updatedIssue) {
+      return failure(
+        'create-follow-up',
+        'linear_follow_up_description_update_failed',
+        'Linear follow-up issue description update did not succeed.',
+        409,
+        {
+          created_issue: createdIssue,
+          failed_step: 'description_update'
+        },
+        false
+      );
+    }
+    createdIssue = updatedIssue;
   }
 
   const relatedRelationResult = await executeLinearGraphql<IssueRelationMutationResponse>({
@@ -1515,6 +1647,7 @@ function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinea
   return {
     id: issue.id,
     identifier: issue.identifier,
+    url: issue.url,
     workspace_id: issue.workspace_id,
     state: issue.state,
     team: issue.team,
@@ -1528,6 +1661,7 @@ function mergeCachedIssueContextSummary(
 ): ProviderLinearIssueContext {
   return {
     ...issue,
+    url: summary.url,
     workspace_id: summary.workspace_id,
     state: summary.state,
     team: summary.team,
@@ -2091,6 +2225,7 @@ function parseIssueSummary(
     issue: {
       id,
       identifier,
+      url: normalizeOptionalString(issueNode.url),
       workspace_id: normalizedWorkspaceId,
       state: parseWorkflowState(issueNode.state ?? null),
       team: issueNode.team
@@ -2285,6 +2420,7 @@ function buildIssueSummaryQuery(): string {
     issue(id: $issueId) {
       id
       identifier
+      url
       state {
         id
         name
@@ -2376,6 +2512,35 @@ function buildIssueTransitionMutation(): string {
           id
           name
           type
+        }
+      }
+    }
+  }`;
+}
+
+function buildIssueDescriptionUpdateMutation(): string {
+  return `mutation ProviderLinearUpdateIssueDescription($id: String!, $description: String!) {
+    issueUpdate(id: $id, input: { description: $description }) {
+      success
+      issue {
+        id
+        identifier
+        title
+        description
+        url
+        state {
+          id
+          name
+          type
+        }
+        team {
+          id
+          key
+          name
+        }
+        project {
+          id
+          name
         }
       }
     }
@@ -4037,14 +4202,61 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
   return normalizeRequiredString(value);
 }
 
-function buildFollowUpIssueDescription(description: string, acceptanceCriteria: string): string {
-  const normalizedDescription = description.trim();
-  const normalizedAcceptanceCriteria = acceptanceCriteria.trim();
-  const acceptanceSection =
-    /^#{1,6}\s+Acceptance Criteria\b/imu.test(normalizedAcceptanceCriteria)
-      ? normalizedAcceptanceCriteria
-      : `## Acceptance Criteria\n${normalizedAcceptanceCriteria}`;
-  return `${normalizedDescription}\n\n${acceptanceSection}`;
+function buildFollowUpIssueDescription(input: {
+  description: string;
+  intentChecksum: string;
+  nonGoals: string;
+  notDoneIf: string;
+  acceptanceCriteria: string;
+  parityMatrix?: string | null;
+  traceability?: string | null;
+}): string {
+  const sections = [
+    input.description.trim(),
+    renderMarkdownSection('Intent Checksum', input.intentChecksum),
+    renderMarkdownSection('Non-Goals', input.nonGoals),
+    input.parityMatrix ? renderMarkdownSection('Parity / Alignment Matrix', input.parityMatrix) : null,
+    renderMarkdownSection('Not Done If', input.notDoneIf),
+    input.traceability ? renderMarkdownSection('Immediate Traceability', input.traceability) : null,
+    renderMarkdownSection('Acceptance Criteria', input.acceptanceCriteria)
+  ].filter((section): section is string => Boolean(section));
+  return sections.join('\n\n');
+}
+
+function renderMarkdownSection(title: string, body: string): string {
+  const normalizedBody = body.trim();
+  if (new RegExp(`^#{1,6}\\s+${escapeRegExp(title)}\\b`, 'imu').test(normalizedBody)) {
+    return normalizedBody;
+  }
+  return `## ${title}\n${normalizedBody}`;
+}
+
+function buildFollowUpTraceabilitySection(input: {
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+}): string {
+  const followUpTaskId = `linear-${input.followUpIssue.id}`;
+  const repoPacketPaths = [
+    `docs/PRD-${followUpTaskId}.md`,
+    `docs/TECH_SPEC-${followUpTaskId}.md`,
+    `docs/ACTION_PLAN-${followUpTaskId}.md`,
+    `tasks/specs/${followUpTaskId}.md`,
+    `tasks/tasks-${followUpTaskId}.md`,
+    `.agent/task/${followUpTaskId}.md`
+  ];
+  const formatIssueReference = (identifier: string, id: string, url: string | null | undefined): string =>
+    url ? `\`${identifier}\` / \`${id}\` (${url})` : `\`${identifier}\` / \`${id}\``;
+  return [
+    `- Source issue: ${formatIssueReference(input.sourceIssue.identifier, input.sourceIssue.id, input.sourceIssue.url)}`,
+    `- Follow-up issue: ${formatIssueReference(input.followUpIssue.identifier, input.followUpIssue.id, input.followUpIssue.url)}`,
+    `- Follow-up task id / packet prefix: \`${followUpTaskId}\``,
+    `- Create before active work: ${repoPacketPaths.map((path) => `\`${path}\``).join(', ')}`,
+    '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
+  ].join('\n');
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function normalizeIso(value: string | null | undefined): string | null {
