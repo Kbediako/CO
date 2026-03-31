@@ -211,33 +211,38 @@ async function resolveFrontendTestingPackageRoot(): Promise<string> {
 
 async function buildFrontendTestingPackageRoot(): Promise<string> {
   const packageRoot = await realpath(await mkdtemp(join(tmpdir(), 'frontend-test-package-root-')));
-  const runnerPath = join(packageRoot, SHIPPED_FRONTEND_TESTING_RUNNER_RELATIVE_PATH);
-  await mkdir(dirname(runnerPath), { recursive: true });
-  await writeFile(
-    runnerPath,
-    [
-      'const { spawn } = require("node:child_process");',
-      'const process = require("node:process");',
-      `const sourceRunner = ${JSON.stringify(join(WORKSPACE_ROOT, 'orchestrator', 'src', 'cli', 'frontendTestingRunner.ts'))};`,
-      `const tsNodeLoader = ${JSON.stringify(TS_NODE_ESM_LOADER_PATH)};`,
-      'const childEnv = { ...process.env, CODEX_FRONTEND_TEST_RUNNER_ENTRY: __filename };',
-      'const child = spawn(process.execPath, ["--loader", tsNodeLoader, sourceRunner], {',
-      `  cwd: ${JSON.stringify(WORKSPACE_ROOT)},`,
-      '  env: childEnv,',
-      "  stdio: 'inherit'",
-      '});',
-      'child.once("error", (error) => {',
-      '  console.error(error instanceof Error ? error.message : String(error));',
-      '  process.exit(1);',
-      '});',
-      'child.once("exit", (code) => {',
-      '  process.exit(code ?? 1);',
-      '});'
-    ].join('\n'),
-    'utf8'
-  );
-  compiledFrontendTestingPackageRoot = packageRoot;
-  return packageRoot;
+  try {
+    const runnerPath = join(packageRoot, SHIPPED_FRONTEND_TESTING_RUNNER_RELATIVE_PATH);
+    await mkdir(dirname(runnerPath), { recursive: true });
+    await writeFile(
+      runnerPath,
+      [
+        'const { spawn } = require("node:child_process");',
+        'const process = require("node:process");',
+        `const sourceRunner = ${JSON.stringify(join(WORKSPACE_ROOT, 'orchestrator', 'src', 'cli', 'frontendTestingRunner.ts'))};`,
+        `const tsNodeLoader = ${JSON.stringify(TS_NODE_ESM_LOADER_PATH)};`,
+        'const childEnv = { ...process.env, CODEX_FRONTEND_TEST_RUNNER_ENTRY: __filename };',
+        'const child = spawn(process.execPath, ["--loader", tsNodeLoader, sourceRunner], {',
+        `  cwd: ${JSON.stringify(WORKSPACE_ROOT)},`,
+        '  env: childEnv,',
+        "  stdio: 'inherit'",
+        '});',
+        'child.once("error", (error) => {',
+        '  console.error(error instanceof Error ? error.message : String(error));',
+        '  process.exit(1);',
+        '});',
+        'child.once("exit", (code) => {',
+        '  process.exit(code ?? 1);',
+        '});'
+      ].join('\n'),
+      'utf8'
+    );
+    compiledFrontendTestingPackageRoot = packageRoot;
+    return packageRoot;
+  } catch (error) {
+    await rm(packageRoot, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, string> {

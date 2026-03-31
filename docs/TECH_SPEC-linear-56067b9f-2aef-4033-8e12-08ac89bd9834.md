@@ -73,5 +73,6 @@ last_review: 2026-04-01
 - The focused reproduction is complete: only `cli-frontend-test.spec.ts` was still broken here. Final handoff still depends on the separate `CO-57` quiet-tail ownership clearing or remaining explicitly recorded.
 
 ## Approvals
-- Reviewer: Pending docs-review and implementation validation
+- Reviewer: docs-review approved; implementation validation completed; standalone review completed clean
+- Remaining: PR checks and the separate `CO-57` quiet-tail still gate review handoff
 - Date: 2026-04-01
