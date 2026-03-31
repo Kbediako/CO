@@ -800,7 +800,6 @@ function truncateMiddle(value: string, maxLength: number): string {
 
 function sanitizeTerminalText(value: string): string {
   return value
-    .replace(/\\r\\n|\\n|\\r/g, ' ')
     .replace(/\r\n|\n|\r/g, ' ')
     .replace(ANSI_CONTROL_SEQUENCE_PATTERN, ' ')
     .replace(CONTROL_CHARACTER_PATTERN, ' ')

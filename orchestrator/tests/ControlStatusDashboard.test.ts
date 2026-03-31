@@ -427,7 +427,7 @@ describe('control status dashboard', () => {
       '│',
       '├─ Backoff queue',
       '│',
-      '│  ↻ CO-30 attempt=1 in 1.500s error=error with newline',
+      '│  ↻ CO-30 attempt=1 in 1.500s error=error with \\nnewline',
       '│  ↻ CO-31 attempt=4 in 4.250s error=network timeout',
       '│  ↻ CO-32 attempt=2 in 9.000s error=worker crashed restarting cleanly',
       '╰─'
@@ -537,6 +537,28 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('│ ● CO-26      running');
     expect(plainFrame).toContain('worker link active');
     expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=oops red next line');
+  });
+
+  it('preserves literal backslashes while normalizing real newlines', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        retrying: [
+          {
+            ...buildDataset().retrying[0],
+            error: 'C:\\runs\\retry\nnext line'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    expect(stripAnsi(frame)).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=C:\\runs\\retry next line');
   });
 
   it('enables the dashboard only for text-mode tty output', () => {
