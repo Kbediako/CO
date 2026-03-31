@@ -309,20 +309,20 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['setup', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator setup');
     expect(stdout).toContain('--refresh-skills');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints frontend-test help', async () => {
     const { stdout } = await runCli(['frontend-test', '--help']);
     expect(stdout).toContain('Usage: codex-orchestrator frontend-test [options]');
     expect(stdout).toContain('Runs the frontend-testing pipeline.');
     expect(stdout).toContain('--devtools');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints frontend-test help via positional help', async () => {
     const { stdout } = await runCli(['frontend-test', 'help']);
     expect(stdout).toContain('Usage: codex-orchestrator frontend-test [options]');
     expect(stdout).toContain('--format json');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints codex subcommand help', async () => {
     const { stdout } = await runCli(['codex', '--help']);
