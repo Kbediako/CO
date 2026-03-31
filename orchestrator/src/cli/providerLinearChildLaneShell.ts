@@ -44,6 +44,13 @@ import {
   PROVIDER_LINEAR_CHILD_LANE_STREAM_ENV,
   type ProviderLinearChildLaneProof
 } from './providerLinearChildLaneRunner.js';
+import {
+  formatProviderLinearChildLanePathSelectors,
+  providerLinearChildLanePathMatchesSelectors,
+  providerLinearChildLanePathSelectorsEqual,
+  providerLinearChildLanePathSelectorsOverlap,
+  resolveProviderLinearChildLaneScopeContract
+} from './providerLinearChildLanePhaseContract.js';
 import { slugify } from './utils/strings.js';
 
 const execFileAsync = promisify(execFile);
@@ -347,8 +354,10 @@ async function launchChildLane(
     });
   }
   const purpose = normalizeOptionalString(params.purpose);
-  const scope = normalizeChildLaneScope(params.files ?? [], params.phases ?? [], context.repoRoot);
-  if (!purpose || !scope || scope.files.length === 0) {
+  let scope: ProviderLinearWorkerChildLaneScope | null;
+  try {
+    scope = normalizeChildLaneScope(params.files ?? [], params.phases ?? [], context.repoRoot);
+  } catch (error) {
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -358,7 +367,21 @@ async function launchChildLane(
       childRun: null,
       childLane: null,
       code: 'provider_worker_child_lane_scope_missing',
-      message: 'Provider worker child lanes require --purpose and at least one declared file scope; phases remain optional.',
+      message: error instanceof Error ? error.message : String(error),
+      status: 422
+    });
+  }
+  if (!purpose || !scope) {
+    return failureResult({
+      action: 'launch',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: null,
+      code: 'provider_worker_child_lane_scope_missing',
+      message: 'Provider worker child lanes require --purpose and at least one declared file or supported phase scope.',
       status: 422
     });
   }
@@ -556,6 +579,43 @@ async function launchChildLane(
       status: 502
     });
   }
+  let recordedScope = scope;
+  if (childProof?.scope) {
+    try {
+      const proofScope = resolveProviderLinearChildLaneScopeContract(childProof.scope);
+      if (!areChildLaneScopesEquivalent(scope, proofScope)) {
+        await removeReservedChildLane(context.runDir, launchReservation, deps);
+        return failureResult({
+          action: 'launch',
+          issueId: context.issueId,
+          issueIdentifier: context.issueIdentifier,
+          sourceSetup,
+          stream,
+          childRun,
+          childLane: null,
+          code: 'provider_worker_child_lane_proof_invalid',
+          message: 'Child lane proof scope does not match the parent-launched scope contract.',
+          status: 409
+        });
+      }
+      recordedScope = proofScope;
+    } catch (error) {
+      await removeReservedChildLane(context.runDir, launchReservation, deps);
+      return failureResult({
+        action: 'launch',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun,
+        childLane: null,
+        code: 'provider_worker_child_lane_proof_invalid',
+        message: `Child lane ${stream} wrote an invalid proof scope contract: ${error instanceof Error ? error.message : String(error)}`,
+        status: 409
+      });
+    }
+  }
+
   const childLane: ProviderLinearWorkerChildLaneRecord = {
     stream,
     pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
@@ -573,7 +633,7 @@ async function launchChildLane(
     launched_at: launchReservation.launched_at,
     purpose,
     instructions: normalizeOptionalString(params.instructions),
-    scope,
+    scope: recordedScope,
     parent_snapshot: childProof?.parent_snapshot ?? {
       ...parentSnapshot,
       base_sha: baseSha,
@@ -841,6 +901,65 @@ async function resolveChildLaneDecision(
       status: 409
     });
   }
+  const proofPath = join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
+  const acceptedProof = await deps.readChildLaneProof(proofPath).catch(() => null);
+  let acceptedProofScope: ProviderLinearWorkerChildLaneScope | null = null;
+  if (!acceptedProof) {
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: target,
+      code: 'provider_worker_child_lane_proof_missing',
+      message: 'Child lane acceptance requires a readable proof bundle before parent apply.',
+      status: 409
+    });
+  }
+  if (acceptedProof) {
+    if (!acceptedProof.scope) {
+      await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_proof_invalid',
+        message: 'Child lane proof is missing scope contract metadata.',
+        status: 409
+      });
+    }
+    const proofViolation = resolveAcceptedChildLaneProofViolation(
+      context.runId,
+      target,
+      acceptedProof,
+      context.repoRoot,
+      artifactRoot,
+      patchArtifactPath
+    );
+    if (proofViolation) {
+      await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_proof_invalid',
+        message: proofViolation,
+        status: 409
+      });
+    }
+    acceptedProofScope = acceptedProof.scope;
+  }
   let patchChangedPaths: string[];
   try {
     patchChangedPaths = await readPatchChangedPaths(patchArtifactPath);
@@ -859,7 +978,11 @@ async function resolveChildLaneDecision(
       status: 409
     });
   }
-  const patchScopeViolation = resolveAcceptedPatchScopeViolation(target.scope, patchChangedPaths);
+  const patchScopeViolation = resolveAcceptedPatchScopeViolation(
+    target.scope,
+    patchChangedPaths,
+    acceptedProofScope
+  );
   if (patchScopeViolation) {
     await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
     return failureResult({
@@ -870,7 +993,9 @@ async function resolveChildLaneDecision(
       stream,
       childRun: null,
       childLane: target,
-      code: 'provider_worker_child_lane_patch_scope_invalid',
+      code: isProofScopeViolation(patchScopeViolation)
+        ? 'provider_worker_child_lane_proof_invalid'
+        : 'provider_worker_child_lane_patch_scope_invalid',
       message: patchScopeViolation,
       status: 409
     });
@@ -1518,20 +1643,52 @@ function decodeGitDiffPathToken(token: string): string {
 
 function resolveAcceptedPatchScopeViolation(
   scope: ProviderLinearWorkerChildLaneScope,
-  patchChangedPaths: string[]
+  patchChangedPaths: string[],
+  proofScope: ProviderLinearWorkerChildLaneScope | null = null
 ): string | null {
+  let expectedScope: ProviderLinearWorkerChildLaneScope;
+  try {
+    expectedScope = resolveProviderLinearChildLaneScopeContract(scope);
+  } catch (error) {
+    return `Child lane parent ledger recorded an invalid scope contract: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  const persistedScopeViolation = resolvePersistedScopeContractViolation(
+    'Child lane parent ledger',
+    scope,
+    expectedScope
+  );
+  if (persistedScopeViolation) {
+    return persistedScopeViolation;
+  }
+  if (proofScope) {
+    let expectedProofScope: ProviderLinearWorkerChildLaneScope;
+    try {
+      expectedProofScope = resolveProviderLinearChildLaneScopeContract(proofScope);
+    } catch (error) {
+      return `Child lane proof bundle recorded an invalid scope contract: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    const persistedProofViolation = resolvePersistedScopeContractViolation(
+      'Child lane proof bundle',
+      proofScope,
+      expectedProofScope
+    );
+    if (persistedProofViolation) {
+      return persistedProofViolation;
+    }
+    if (!areChildLaneScopesEquivalent(expectedScope, expectedProofScope)) {
+      return 'Child lane proof scope contract does not match the parent ledger scope contract.';
+    }
+  }
   if (patchChangedPaths.length === 0) {
     return 'Child lane patch does not declare any repo-relative file targets, so parent acceptance cannot verify the bounded scope.';
   }
-  if (scope.files.length === 0) {
-    return `Child lane acceptance currently requires explicit file scope so patch paths can be machine-checked; this lane only declared phases (${scope.phases.join(', ')}). Relaunch with --files or reject/invalidate the lane output instead.`;
-  }
-  const declaredFiles = normalizeScopeEntries(scope.files, 'file');
-  const outOfScopePaths = patchChangedPaths.filter((entry) => !declaredFiles.includes(entry));
+  const outOfScopePaths = patchChangedPaths.filter(
+    (entry) => !providerLinearChildLanePathMatchesSelectors(entry, expectedScope.allowed_path_selectors ?? [])
+  );
   if (outOfScopePaths.length === 0) {
     return null;
   }
-  return `Child lane patch touches files outside the declared file scope (${outOfScopePaths.join(', ')}). Declared scope: ${declaredFiles.join(', ')}.`;
+  return `Child lane patch touches files outside the declared scope contract (${outOfScopePaths.join(', ')}). Allowed selectors: ${formatProviderLinearChildLanePathSelectors(expectedScope.allowed_path_selectors ?? [])}.`;
 }
 
 async function resolveAcceptedPatchDirtyConflict(
@@ -1613,10 +1770,10 @@ function normalizeChildLaneScope(
   if (normalizedFiles.length === 0 && normalizedPhases.length === 0) {
     return null;
   }
-  return {
+  return resolveProviderLinearChildLaneScopeContract({
     files: normalizedFiles,
     phases: normalizedPhases
-  };
+  });
 }
 
 function normalizeScopeEntries(values: string[], kind: 'file' | 'phase' = 'file', repoRoot?: string): string[] {
@@ -1628,11 +1785,20 @@ function normalizeScopeEntries(values: string[], kind: 'file' | 'phase' = 'file'
           if (!value) {
             return null;
           }
-          return kind === 'file' ? normalizeScopeFileEntry(value, repoRoot) : value;
+          return kind === 'file' ? normalizeScopeFileEntry(value, repoRoot) : normalizeScopePhaseEntry(value);
         })
         .filter((value): value is string => value !== null)
     )
   ];
+}
+
+function normalizeScopePhaseEntry(value: string): string | null {
+  const normalizedInput = normalizeOptionalString(value);
+  if (!normalizedInput) {
+    return null;
+  }
+  const normalized = normalizedInput.toLowerCase();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function normalizeScopeFileEntry(value: string, repoRoot?: string): string | null {
@@ -1690,9 +1856,107 @@ function scopesOverlap(
   left: ProviderLinearWorkerChildLaneScope,
   right: ProviderLinearWorkerChildLaneScope
 ): boolean {
+  try {
+    const resolvedLeft = resolveProviderLinearChildLaneScopeContract(left);
+    const resolvedRight = resolveProviderLinearChildLaneScopeContract(right);
+    return providerLinearChildLanePathSelectorsOverlap(
+      resolvedLeft.allowed_path_selectors ?? [],
+      resolvedRight.allowed_path_selectors ?? []
+    );
+  } catch {
+    return (
+      left.files.some((entry) => right.files.includes(entry)) ||
+      left.phases.length > 0 ||
+      right.phases.length > 0
+    );
+  }
+}
+
+function compareStringSets(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
+function areChildLaneScopesEquivalent(
+  left: ProviderLinearWorkerChildLaneScope,
+  right: ProviderLinearWorkerChildLaneScope
+): boolean {
   return (
-    left.files.some((entry) => right.files.includes(entry)) ||
-    left.phases.some((entry) => right.phases.includes(entry))
+    compareStringSets(left.files, right.files) &&
+    compareStringSets(left.phases, right.phases) &&
+    normalizeOptionalString(left.phase_contract_version) === normalizeOptionalString(right.phase_contract_version) &&
+    providerLinearChildLanePathSelectorsEqual(
+      left.allowed_path_selectors ?? [],
+      right.allowed_path_selectors ?? []
+    )
+  );
+}
+
+function resolvePersistedScopeContractViolation(
+  sourceLabel: string,
+  persistedScope: ProviderLinearWorkerChildLaneScope,
+  expectedScope: ProviderLinearWorkerChildLaneScope
+): string | null {
+  const persistedVersion = normalizeOptionalString(persistedScope.phase_contract_version);
+  const persistedSelectors = persistedScope.allowed_path_selectors ?? null;
+  if (persistedScope.phases.length > 0 && (!persistedVersion || !persistedSelectors || persistedSelectors.length === 0)) {
+    return `${sourceLabel} is missing persisted phase-scope contract metadata for phases (${expectedScope.phases.join(', ')}).`;
+  }
+  if (persistedVersion && persistedVersion !== expectedScope.phase_contract_version) {
+    return `${sourceLabel} recorded scope contract version ${persistedVersion} but expected ${expectedScope.phase_contract_version}.`;
+  }
+  if (
+    persistedSelectors &&
+    !providerLinearChildLanePathSelectorsEqual(
+      persistedSelectors,
+      expectedScope.allowed_path_selectors ?? []
+    )
+  ) {
+    return `${sourceLabel} recorded path selectors (${formatProviderLinearChildLanePathSelectors(persistedSelectors)}) that do not match the expected selectors (${formatProviderLinearChildLanePathSelectors(expectedScope.allowed_path_selectors ?? [])}).`;
+  }
+  return null;
+}
+
+function resolveAcceptedChildLaneProofViolation(
+  parentRunId: string,
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  proof: ProviderLinearChildLaneProof,
+  repoRoot: string,
+  artifactRoot: string,
+  patchArtifactPath: string
+): string | null {
+  if (
+    proof.task_id !== childLane.task_id ||
+    proof.run_id !== childLane.run_id ||
+    proof.parent_run_id !== parentRunId ||
+    proof.stream !== childLane.stream ||
+    proof.issue_id !== childLane.issue_id ||
+    proof.issue_identifier !== childLane.issue_identifier
+  ) {
+    return 'Child lane proof lineage does not match the parent ledger record.';
+  }
+  const proofPatchArtifactPath = resolveAcceptedPatchArtifactPath(
+    repoRoot,
+    {
+      ...childLane,
+      patch_artifact_path: proof.patch_artifact_path
+    },
+    artifactRoot
+  );
+  if (!proofPatchArtifactPath || proofPatchArtifactPath !== patchArtifactPath) {
+    return 'Child lane proof patch artifact path does not match the parent-anchored patch artifact path.';
+  }
+  return null;
+}
+
+function isProofScopeViolation(message: string): boolean {
+  return (
+    message.startsWith('Child lane proof bundle') ||
+    message.startsWith('Child lane proof scope contract')
   );
 }
 
