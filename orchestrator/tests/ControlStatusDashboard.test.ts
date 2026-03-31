@@ -1050,6 +1050,88 @@ describe('control status dashboard', () => {
     handle.stop();
   });
 
+  it('does not let cached inspect rerenders swallow queued runtime updates', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let listener: (() => void) | null = null;
+    let resolveFirstDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const firstDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveFirstDataset = resolve;
+    });
+    let readCount = 0;
+    const updatedDataset = buildDataset({
+      running: [
+        {
+          ...buildDataset().running[0],
+          last_message: 'Worker turn updated'
+        }
+      ]
+    });
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn((callback: () => void) => {
+        listener = callback;
+        return () => {
+          listener = null;
+        };
+      }),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => {
+          readCount += 1;
+          if (readCount === 1) {
+            return await firstDataset;
+          }
+          return updatedDataset;
+        },
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    listener?.();
+    await Promise.resolve();
+    input.emitText('c');
+    await Promise.resolve();
+
+    resolveFirstDataset?.(buildDataset());
+    await handle.flush();
+
+    expect(readCount).toBe(2);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Running: CO-26 | running | Worker turn updated');
+
+    handle.stop();
+  });
+
   it('preserves pending updates that arrive while paused during an in-flight render', async () => {
     vi.useFakeTimers();
 

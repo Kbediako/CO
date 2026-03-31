@@ -179,6 +179,7 @@ export function startControlStatusDashboard(
   let activeRender: Promise<void> | null = null;
   let queuedRender = false;
   let queuedForceRefresh = false;
+  let queuedReadDataset = false;
   let queuedUseCachedFrame = false;
   let tokenSamples: TokenSample[] = [];
   let renderedState: RenderedDashboardState | null = null;
@@ -198,6 +199,7 @@ export function startControlStatusDashboard(
       return;
     }
     queuedForceRefresh = queuedForceRefresh || forceRefresh;
+    queuedReadDataset = queuedReadDataset || forceRefresh || !useCachedFrame;
     queuedUseCachedFrame = queuedUseCachedFrame || useCachedFrame;
     if (activeRender) {
       queuedRender = true;
@@ -229,9 +231,10 @@ export function startControlStatusDashboard(
 
   const startQueuedRender = (): void => {
     const forceRefresh = queuedForceRefresh;
-    const useCachedFrame = queuedUseCachedFrame;
+    const useCachedFrame = queuedUseCachedFrame && !queuedReadDataset && !forceRefresh;
     queuedRender = false;
     queuedForceRefresh = false;
+    queuedReadDataset = false;
     queuedUseCachedFrame = false;
     activeRender = renderFrame(forceRefresh, useCachedFrame).finally(() => {
       activeRender = null;
