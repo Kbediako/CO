@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { access, readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { normalizeTaskKey } from './lib/docs-helpers.js';
@@ -12,7 +12,7 @@ import {
   readProviderControlHostLocatorFromEnv,
   readProviderControlHostLocatorFromManifest
 } from './lib/provider-run-contract.js';
-import { findSubagentManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
+import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const PROVIDER_INTAKE_STATE_FILE = 'provider-intake-state.json';
 const LINEAR_ADVISORY_STATE_FILE = 'linear-advisory-state.json';
@@ -43,6 +43,7 @@ Requirements:
   - tasks/index.json must include the top-level task, unless the active manifest matches a control-host provider-intake claim for a sanctioned provider-started fallback run
   - A sanctioned provider-started fallback run is treated as an already-delegated control-host child run, so that matched provider contract replaces the need for a pre-existing <task-id>-* subagent manifest for that run itself
   - Subagent runs must be prefixed with <task-id>- and have .runs/<task-id>-*/cli/<run-id>/manifest.json
+  - Provider-worker issue workspaces may satisfy the guard with audited child manifests under the workspace-scoped artifact root recorded by the active manifest/workspace contract
 
 Escape hatch:
   Set DELEGATION_GUARD_OVERRIDE_REASON="<why delegation is not possible>" to bypass.
@@ -118,6 +119,158 @@ async function collectSubagentCandidates(runsDir, taskId) {
     }
   }
   return candidates;
+}
+
+async function findSubagentManifestsInRunsDir(runsDir, taskId) {
+  let entries;
+  try {
+    entries = await readdir(runsDir, { withFileTypes: true });
+  } catch (error) {
+    if (error && typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
+      return { found: [], error: null };
+    }
+    return { found: [], error: `Unable to read runs directory '${runsDir}' (${describeError(error)})` };
+  }
+
+  const prefix = `${taskId}-`;
+  const found = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith(prefix)) {
+      continue;
+    }
+    const cliDir = join(runsDir, entry.name, 'cli');
+    let runDirs;
+    try {
+      runDirs = await readdir(cliDir, { withFileTypes: true });
+    } catch (error) {
+      if (error && typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
+        continue;
+      }
+      return { found: [], error: `Unable to read child run directory '${cliDir}' (${describeError(error)})` };
+    }
+
+    for (const runDir of runDirs) {
+      if (!runDir.isDirectory()) {
+        continue;
+      }
+      const manifestPath = join(cliDir, runDir.name, 'manifest.json');
+      try {
+        await access(manifestPath);
+        found.push(manifestPath);
+      } catch {
+        // ignore missing manifest
+      }
+    }
+  }
+
+  return { found, error: null };
+}
+
+function dedupeStrings(values) {
+  return [...new Set(values.filter((value) => typeof value === 'string' && value.trim().length > 0))];
+}
+
+async function findSubagentManifestsAcrossRunsDirs(runsDirs, taskId) {
+  const found = [];
+  const errors = [];
+
+  for (const runsDir of dedupeStrings(runsDirs)) {
+    const result = await findSubagentManifestsInRunsDir(runsDir, taskId);
+    if (result.error) {
+      errors.push(result.error);
+      continue;
+    }
+    found.push(...result.found);
+  }
+
+  return {
+    found: dedupeStrings(found),
+    errors: dedupeStrings(errors)
+  };
+}
+
+async function collectSubagentCandidatesAcrossRunsDirs(runsDirs, taskId) {
+  const candidates = [];
+
+  for (const runsDir of dedupeStrings(runsDirs)) {
+    const results = await collectSubagentCandidates(runsDir, taskId);
+    candidates.push(...results);
+  }
+
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    const key = `${candidate.path}::${candidate.reason}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function readManifestString(manifest, ...keys) {
+  for (const key of keys) {
+    const value = readNonEmptyString(manifest, key);
+    if (value) {
+      return value;
+    }
+  }
+  return '';
+}
+
+function isPathWithinRoot(root, candidate) {
+  const relativePath = relative(root, candidate);
+  return (
+    relativePath === '' ||
+    (!relativePath.startsWith('..') &&
+      !relativePath.startsWith(`..${sep}`) &&
+      !isAbsolute(relativePath))
+  );
+}
+
+function resolveWorkspaceScopedArtifactDir(repoRoot, value, fallbackDirname) {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  const fallback = join(repoRoot, fallbackDirname);
+  if (!normalized) {
+    return fallback;
+  }
+  const candidate = isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
+  return isPathWithinRoot(repoRoot, candidate) ? candidate : fallback;
+}
+
+async function resolveDelegatedManifestSearchRoots(taskId, defaultRunsDir, env) {
+  const searchRoots = [defaultRunsDir];
+  const manifestPath = readNonEmptyString(env, 'CODEX_ORCHESTRATOR_MANIFEST_PATH');
+  if (!manifestPath) {
+    return searchRoots;
+  }
+
+  let manifest;
+  try {
+    manifest = await loadJson(manifestPath);
+  } catch {
+    return searchRoots;
+  }
+
+  const manifestTaskId = readManifestString(manifest, 'task_id', 'taskId');
+  const pipelineId = readManifestString(manifest, 'pipeline_id', 'pipelineId');
+  const workspacePath = readManifestString(manifest, 'workspace_path', 'workspacePath');
+  if (manifestTaskId !== taskId || pipelineId !== 'provider-linear-worker' || !workspacePath) {
+    return searchRoots;
+  }
+
+  const workspaceRunsDir = resolveWorkspaceScopedArtifactDir(
+    resolve(workspacePath),
+    env.CODEX_ORCHESTRATOR_RUNS_DIR,
+    '.runs'
+  );
+  searchRoots.push(workspaceRunsDir);
+  return dedupeStrings(searchRoots);
+}
+
+function buildExpectedSubagentManifestPatterns(runsDirs, taskId) {
+  return dedupeStrings(runsDirs).map((runsDir) => `${runsDir}/${taskId}-*/cli/<run-id>/manifest.json`);
 }
 
 function readNonEmptyString(record, key) {
@@ -802,14 +955,14 @@ async function main() {
         return;
       }
     } else {
-      const { found, error } = await findSubagentManifests(runsDir, taskId);
-      if (error) {
-        failures.push(error);
-      }
+      const searchRoots = await resolveDelegatedManifestSearchRoots(taskId, runsDir, process.env);
+      const expectedPatterns = buildExpectedSubagentManifestPatterns(searchRoots, taskId);
+      const { found, errors } = await findSubagentManifestsAcrossRunsDirs(searchRoots, taskId);
+      failures.push(...errors);
       if (found.length === 0) {
-        candidateManifests = await collectSubagentCandidates(runsDir, taskId);
+        candidateManifests = await collectSubagentCandidatesAcrossRunsDirs(searchRoots, taskId);
         failures.push(
-          `No subagent manifests found for '${taskId}'. Expected at least one under ${runsDir}/${taskId}-*/cli/<run-id>/manifest.json`
+          `No subagent manifests found for '${taskId}'. Expected at least one under ${expectedPatterns.join(' or ')}`
         );
       } else {
         console.log(`Delegation guard: OK (${found.length} subagent manifest(s) found).`);
@@ -831,8 +984,16 @@ async function main() {
     }
     if (taskId || taskIndexReadable) {
       const expectedTaskId = taskId || exampleTaskId;
+      const expectedPatterns = taskId
+        ? buildExpectedSubagentManifestPatterns(
+            await resolveDelegatedManifestSearchRoots(expectedTaskId, runsDir, process.env),
+            expectedTaskId
+          )
+        : [`${runsDir}/${expectedTaskId}-*/cli/<run-id>/manifest.json`];
       console.log('Expected subagent manifests:');
-      console.log(` - ${runsDir}/${expectedTaskId}-*/cli/<run-id>/manifest.json`);
+      for (const pattern of expectedPatterns) {
+        console.log(` - ${pattern}`);
+      }
     }
     console.log('Fix guidance:');
     if (!taskId) {
