@@ -192,6 +192,49 @@ describe('runOrchestratorExecutionLifecycle', () => {
     expect(manifest.status_detail).toBe('pipeline-failed');
   });
 
+  it('persists manifest heartbeats while a long-running body is still active', async () => {
+    vi.useFakeTimers();
+    try {
+      const manifest = createManifest();
+      manifest.heartbeat_interval_seconds = 5;
+      const persister = {
+        schedule: vi.fn(async () => undefined)
+      } as never;
+
+      let finishBody: ((value: boolean) => void) | null = null;
+      const bodyPromise = new Promise<boolean>((resolve) => {
+        finishBody = resolve;
+      });
+
+      const lifecyclePromise = runOrchestratorExecutionLifecycle({
+        env: { repoRoot: '/tmp/repo' } as never,
+        pipeline: { id: 'simple', title: 'Simple', stages: [] } as never,
+        manifest,
+        paths: createPaths(),
+        mode: 'mcp',
+        target: { id: 'target-1', description: 'Target', metadata: {} } as never,
+        task: { id: 'task-1', title: 'Task', metadata: {} } as never,
+        persister,
+        advancedDecisionEnv: {} as never,
+        executeBody: async () => await bodyPromise,
+        runAutoScout: vi.fn(async () => ({ status: 'error' as const, message: 'unused' })),
+        defaultFailureStatusDetail: 'pipeline-failed'
+      });
+
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const heartbeatPersistCalls = vi
+        .mocked(persister.schedule)
+        .mock.calls.filter(([options]) => options?.manifest === true && options?.heartbeat === true && !options?.force);
+      expect(heartbeatPersistCalls).toHaveLength(1);
+
+      finishBody?.(true);
+      await lifecyclePromise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('finalizes as cancelled when the control watcher reports cancellation after the body', async () => {
     controlWatcher.isCanceled.mockReturnValue(true);
     const manifest = createManifest();

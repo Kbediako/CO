@@ -79,7 +79,10 @@ export async function runOrchestratorExecutionLifecycle(
 
   const pushHeartbeat = (forceManifest = false): Promise<void> => {
     updateHeartbeat(manifest);
-    return schedulePersist({ manifest: forceManifest, heartbeat: true, force: forceManifest });
+    // Keep manifest.json current during long-running stages so raw manifest
+    // readers do not misclassify active runs as stale while only the sidecar
+    // heartbeat file advances.
+    return schedulePersist({ manifest: true, heartbeat: true, force: forceManifest });
   };
 
   const controlWatcher = new ControlWatcher({
