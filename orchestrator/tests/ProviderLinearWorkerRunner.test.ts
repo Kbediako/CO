@@ -444,6 +444,8 @@ describe('provider linear worker runner', () => {
       'add `--reachability-mode dns-public` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.'
     );
     expect(firstPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
+    expect(firstPrompt).toContain('workspace-scoped artifact root');
+    expect(firstPrompt).toContain('do not use blanket `DELEGATION_GUARD_OVERRIDE_REASON` text when they exist');
     expect(firstPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
     expect(firstPrompt).toContain('`codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>`');
     expect(firstPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
@@ -499,6 +501,8 @@ describe('provider linear worker runner', () => {
       'add `--reachability-mode dns-public` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.'
     );
     expect(continuationPrompt).toContain(`launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\``);
+    expect(continuationPrompt).toContain('workspace-scoped artifact root');
+    expect(continuationPrompt).toContain('do not use blanket `DELEGATION_GUARD_OVERRIDE_REASON` text when they exist');
     expect(continuationPrompt).not.toContain('subagent spawning unavailable in-session for this provider worker');
     expect(continuationPrompt).toContain('Review handoff states are `Human Review` and `In Review`');
     expect(continuationPrompt).toContain('Standalone-review policy for this provider-worker lane');

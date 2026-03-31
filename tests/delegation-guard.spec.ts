@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -211,6 +211,188 @@ describe('delegation-guard script', () => {
         process.env[key] = value;
       }
     }
+  });
+
+  it('accepts provider-worker workspace-scoped child manifests even when the parent env still points runsDir at the shared root', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'delegation-guard-provider-worker-'));
+    const taskId = 'linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be';
+    const workspacePath = join(tempDir, '.workspaces', taskId);
+    await mkdir(join(workspacePath, 'tasks'), { recursive: true });
+    await writeTaskIndex(workspacePath, [
+      {
+        id: `20260331-${taskId}`,
+        title: 'CO: Reconcile provider-worker child-stream delegation evidence with delegation guard',
+        relates_to: `tasks/tasks-${taskId}.md`
+      }
+    ]);
+
+    const sharedRunsDir = join(tempDir, '.runs');
+    const parentRunId = '2026-03-31T08-12-50-673Z-86806a3a';
+    const parentManifestPath = join(sharedRunsDir, taskId, 'cli', parentRunId, 'manifest.json');
+    await mkdir(dirname(parentManifestPath), { recursive: true });
+    await mkdir(workspacePath, { recursive: true });
+    await writeJson(parentManifestPath, {
+      task_id: taskId,
+      run_id: parentRunId,
+      pipeline_id: 'provider-linear-worker',
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'fabdf855-dd07-4f8d-8ffa-f02d22cb27be',
+      issue_identifier: 'CO-56',
+      workspace_path: workspacePath
+    });
+
+    const docsReviewManifestPath = join(
+      workspacePath,
+      '.runs',
+      `${taskId}-docs-review`,
+      'cli',
+      '2026-03-31T08-23-01-823Z-0c86b6cb',
+      'manifest.json'
+    );
+    await mkdir(dirname(docsReviewManifestPath), { recursive: true });
+    await writeJson(docsReviewManifestPath, {
+      task_id: `${taskId}-docs-review`,
+      run_id: '2026-03-31T08-23-01-823Z-0c86b6cb',
+      parent_run_id: parentRunId,
+      status: 'succeeded'
+    });
+
+    const childLaneManifestPath = join(
+      workspacePath,
+      '.runs',
+      `${taskId}-impl-a`,
+      'cli',
+      'child-run-1',
+      'manifest.json'
+    );
+    await mkdir(dirname(childLaneManifestPath), { recursive: true });
+    await writeJson(childLaneManifestPath, {
+      task_id: `${taskId}-impl-a`,
+      run_id: 'child-run-1',
+      parent_run_id: parentRunId,
+      pipeline_id: 'provider-linear-child-lane',
+      status: 'succeeded'
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: workspacePath,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_ROOT: workspacePath,
+        CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsDir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: parentManifestPath
+      })
+    });
+
+    expect(stdout).toContain('Delegation guard: OK (2 subagent manifest(s) found).');
+  });
+
+  it('keeps provider-worker workspace-scoped searches fail-closed when no delegated child manifests exist', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'delegation-guard-provider-worker-missing-'));
+    const taskId = 'linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be';
+    const workspacePath = join(tempDir, '.workspaces', taskId);
+    await mkdir(join(workspacePath, 'tasks'), { recursive: true });
+    await writeTaskIndex(workspacePath, [
+      {
+        id: `20260331-${taskId}`,
+        title: 'CO: Reconcile provider-worker child-stream delegation evidence with delegation guard',
+        relates_to: `tasks/tasks-${taskId}.md`
+      }
+    ]);
+
+    const sharedRunsDir = join(tempDir, '.runs');
+    const parentRunId = '2026-03-31T08-12-50-673Z-86806a3a';
+    const parentManifestPath = join(sharedRunsDir, taskId, 'cli', parentRunId, 'manifest.json');
+    await mkdir(dirname(parentManifestPath), { recursive: true });
+    await mkdir(workspacePath, { recursive: true });
+    await writeJson(parentManifestPath, {
+      task_id: taskId,
+      run_id: parentRunId,
+      pipeline_id: 'provider-linear-worker',
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'fabdf855-dd07-4f8d-8ffa-f02d22cb27be',
+      issue_identifier: 'CO-56',
+      workspace_path: workspacePath
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: workspacePath,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_ROOT: workspacePath,
+        CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsDir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: parentManifestPath
+      })
+    });
+
+    expect(stdout).toContain(`No subagent manifests found for '${taskId}'.`);
+    expect(stdout).toContain(`${sharedRunsDir}/${taskId}-*/cli/<run-id>/manifest.json`);
+    expect(stdout).toContain(`${workspacePath}/.runs/${taskId}-*/cli/<run-id>/manifest.json`);
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('ignores a provider-worker manifest whose workspace_path does not match the current workspace', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'delegation-guard-provider-worker-foreign-'));
+    const taskId = 'linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be';
+    const workspacePath = join(tempDir, '.workspaces', taskId);
+    const foreignWorkspacePath = join(tempDir, '.workspaces', `${taskId}-foreign`);
+    await mkdir(join(workspacePath, 'tasks'), { recursive: true });
+    await writeTaskIndex(workspacePath, [
+      {
+        id: `20260331-${taskId}`,
+        title: 'CO: Reconcile provider-worker child-stream delegation evidence with delegation guard',
+        relates_to: `tasks/tasks-${taskId}.md`
+      }
+    ]);
+
+    const sharedRunsDir = join(tempDir, '.runs');
+    const parentRunId = '2026-03-31T08-12-50-673Z-86806a3a';
+    const foreignManifestPath = join(sharedRunsDir, taskId, 'cli', parentRunId, 'manifest.json');
+    await mkdir(dirname(foreignManifestPath), { recursive: true });
+    await mkdir(foreignWorkspacePath, { recursive: true });
+    await writeJson(foreignManifestPath, {
+      task_id: taskId,
+      run_id: parentRunId,
+      pipeline_id: 'provider-linear-worker',
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'fabdf855-dd07-4f8d-8ffa-f02d22cb27be',
+      issue_identifier: 'CO-56',
+      workspace_path: foreignWorkspacePath
+    });
+
+    const foreignChildManifestPath = join(
+      foreignWorkspacePath,
+      '.runs',
+      `${taskId}-docs-review`,
+      'cli',
+      '2026-03-31T08-23-01-823Z-0c86b6cb',
+      'manifest.json'
+    );
+    await mkdir(dirname(foreignChildManifestPath), { recursive: true });
+    await writeJson(foreignChildManifestPath, {
+      task_id: `${taskId}-docs-review`,
+      run_id: '2026-03-31T08-23-01-823Z-0c86b6cb',
+      parent_run_id: parentRunId,
+      status: 'succeeded'
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: workspacePath,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: taskId,
+        CODEX_ORCHESTRATOR_ROOT: workspacePath,
+        CODEX_ORCHESTRATOR_RUNS_DIR: sharedRunsDir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: foreignManifestPath
+      })
+    });
+
+    expect(stdout).toContain(`No subagent manifests found for '${taskId}'.`);
+    expect(stdout).toContain(`${sharedRunsDir}/${taskId}-*/cli/<run-id>/manifest.json`);
+    expect(stdout).not.toContain(`${foreignWorkspacePath}/.runs/${taskId}-*/cli/<run-id>/manifest.json`);
+    expect(stdout).not.toContain('Delegation guard: OK (1 subagent manifest(s) found).');
   });
 
   it('accepts provider-started fallback runs when the active manifest matches control-host intake state', async () => {
