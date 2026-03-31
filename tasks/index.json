@@ -24,6 +24,29 @@
       }
     },
     {
+      "id": "20260331-linear-06732957-908a-4f3e-96b5-bebb33fc612e",
+      "title": "CO: Make validation tests hermetic to host config and temp-workspace guardrails",
+      "relates_to": "tasks/tasks-linear-06732957-908a-4f3e-96b5-bebb33fc612e.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-31",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-31",
+          "manifest": ".runs/linear-06732957-908a-4f3e-96b5-bebb33fc612e-co-54-docs-review/cli/2026-03-31T08-25-28-926Z-ced6037e/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-06732957-908a-4f3e-96b5-bebb33fc612e.md",
+        "task": "tasks/tasks-linear-06732957-908a-4f3e-96b5-bebb33fc612e.md",
+        "agent_task": ".agent/task/linear-06732957-908a-4f3e-96b5-bebb33fc612e.md",
+        "docs": "docs/TECH_SPEC-linear-06732957-908a-4f3e-96b5-bebb33fc612e.md"
+      }
+    },
+    {
       "id": "20260331-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277",
       "title": "CO Strengthen Autonomous Issue Understanding and Intent Capture for Follow-Up Work",
       "relates_to": "tasks/tasks-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
