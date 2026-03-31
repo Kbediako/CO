@@ -27,9 +27,10 @@ Keep `docs/TASKS.md` below a configured line-count threshold by archiving comple
   - `archive_file_pattern` (string, uses `YYYY`)
 
 ### Archive selection rules
-- Only tasks with `status: succeeded` and a non-empty `completed_at` are eligible.
+- Tasks with `status: succeeded` (or `gate.status: succeeded`) and a non-empty completion date are eligible. If `completed_at` is missing, the script falls back to the gate `run_id` date.
 - Preserve all active/in-progress/approved tasks on main.
 - When `docs/TASKS.md` exceeds `max_lines`, archive the oldest eligible tasks until the file is under the threshold.
+- If a snapshot lacks a `docs-sync` block, the script archives the header-delimited snapshot section instead.
 
 ### Archive file format
 - File location (archive branch): docs/TASKS-archive-YYYY.md (not present on main).
@@ -63,7 +64,7 @@ Keep `docs/TASKS.md` below a configured line-count threshold by archiving comple
 
 ## Assumptions
 - Archive branch name: `task-archives`.
-- `docs/TASKS.md` line-count threshold: 950 lines.
+- `docs/TASKS.md` line-count threshold: 450 lines.
 
 ## Open Questions (for review agent)
 - None.

@@ -18,7 +18,7 @@
    - Capture docs-review manifest (`docs-review` pipeline) and update mirrors.
    - Update `tasks/index.json` gate metadata after approvals.
 2. Implementation (core behavior)
-   - Add `frontend-testing` and `frontend-testing-devtools` pipelines in `codex.orchestrator.json`.
+   - Add the `frontend-testing` pipeline in `codex.orchestrator.json` with explicit DevTools enablement via `CODEX_REVIEW_DEVTOOLS=1`.
    - Add frontend testing CLI entrypoint compiled into `dist/**`.
    - Move DevTools enablement logic into a runtime module (no `scripts/` dependency).
    - Extend `doctor` with DevTools readiness checks and install guidance.

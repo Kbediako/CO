@@ -22,8 +22,8 @@
 
 ## Metrics & Guardrails
 - Primary Success Metrics:
-  - `codex-orchestrator start frontend-testing` runs with DevTools disabled by default; devtools state is inferred from the pipeline id (`frontend-testing` vs `frontend-testing-devtools`).
-  - `codex-orchestrator start frontend-testing-devtools` enables DevTools MCP and completes without stdout protocol violations.
+  - `codex-orchestrator start frontend-testing` runs with DevTools disabled by default; devtools state is explicit via `CODEX_REVIEW_DEVTOOLS=1` or `frontend-test --devtools`.
+  - `CODEX_REVIEW_DEVTOOLS=1 codex-orchestrator start frontend-testing` enables DevTools MCP and completes without stdout protocol violations.
   - `codex-orchestrator doctor` reports DevTools readiness with actionable steps when missing.
 - Guardrails / Error Budgets:
   - DevTools MCP remains opt-in only.
@@ -36,14 +36,14 @@
   - CI operators requiring deterministic frontend testing evidence.
 - User Journeys:
   - Run `npx codex-orchestrator start frontend-testing --format json` for non-DevTools checks.
-  - Run `npx codex-orchestrator start frontend-testing-devtools --format json` to enable DevTools MCP for browser-based tests.
+  - Run `CODEX_REVIEW_DEVTOOLS=1 npx codex-orchestrator start frontend-testing --format json` to enable DevTools MCP for browser-based tests.
   - Run `codex-orchestrator frontend-test` (add `--devtools` when browser automation is required).
   - Run `codex-orchestrator doctor --format json` to confirm DevTools readiness.
 
 ## Technical Considerations
 - DevTools MCP/skills live outside this repo and must stay optional.
-- Enablement must be explicit (pipeline id or CLI flag) to keep default behavior unchanged.
-- Existing `implementation-gate-devtools` behavior must remain intact; frontend testing should follow the same opt-in model.
+- Enablement must be explicit (env flag or CLI flag) to keep default behavior unchanged.
+- Existing DevTools review behavior must remain intact; frontend testing should follow the same opt-in model via `CODEX_REVIEW_DEVTOOLS=1`.
 
 ## Documentation & Evidence
 - Tech Spec: `docs/TECH_SPEC-frontend-testing-core.md`
@@ -58,7 +58,7 @@
 - DevTools MCP stays off by default; enable only via explicit frontend testing runs.
 
 ## Open Questions
-- What is the minimum DevTools skill bundle required for a `frontend-testing-devtools` run?
+- What is the minimum DevTools skill bundle required for a devtools-enabled frontend testing run?
 
 ## Approvals
 - Product: approved (2025-12-29)

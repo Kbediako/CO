@@ -40,7 +40,7 @@ Source of truth for requirements: `tasks/specs/0917-devtools-readiness-orchestra
   - Example command: `codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --categoryEmulation --categoryPerformance --categoryNetwork`.
 
 #### DevTools pipeline preflight
-- Add a preflight check for devtools-enabled pipelines (`frontend-testing-devtools`, `implementation-gate-devtools`) that:
+- Add a preflight check for devtools-enabled runs (`CODEX_REVIEW_DEVTOOLS=1`, `frontend-test --devtools`) that:
   - Fails fast with an actionable error if DevTools readiness is missing.
   - Avoids attempting to spawn Codex with an invalid MCP config.
   - Does not fall back to non-DevTools runs.

@@ -86,7 +86,7 @@
 
 #### F4) Atomic write utilities (Needs Verification)
 - Approach: unify `writeJsonAtomic` and `writeAtomicFile` behind a shared implementation with explicit options for `ensureDir`, encoding, and temp naming. Preserve current behavior where directories are or are not created.
-- Affected files: `orchestrator/src/cli/utils/fs.ts`, `orchestrator/src/persistence/writeAtomicFile.ts`, new shared helper in `orchestrator/src/utils/`.
+- Affected files: `orchestrator/src/cli/utils/fs.ts`, `orchestrator/src/utils/atomicWrite.ts`, new shared helper in `orchestrator/src/utils/`.
 - Steps: (1) verify current behavior differences (directory creation, temp file naming); (2) add shared helper with explicit options; (3) update wrappers to match current behavior; (4) add tests for both modes.
 - Validation: `npm run test`.
 - Risks/Mitigations: silent behavior change when directories are missing; lock this with tests before refactor.

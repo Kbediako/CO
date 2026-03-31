@@ -9,7 +9,7 @@ Source of truth: `tasks/0917-prd-devtools-readiness-orchestrator-usage.md`.
 ## Goals
 - Make DevTools readiness explicit and actionable for npm users (skill + MCP config checks, clear setup instructions).
 - Provide an explicit, opt-in setup helper for DevTools that never writes config without confirmation.
-- Keep DevTools opt-in for runs (`--devtools` or devtools pipeline) and preserve stdout/stderr protocol rules.
+- Keep DevTools opt-in for runs (`--devtools` or `CODEX_REVIEW_DEVTOOLS=1`) and preserve stdout/stderr protocol rules.
 - Standardize top-level orchestrator behavior: use orchestrator pipelines for planning/implementation/review and spawn subagents for scoped exploration to conserve context.
 - Document the standard in SOPs and agent docs with acceptance criteria and evidence expectations.
 
@@ -41,7 +41,7 @@ Source of truth: `tasks/0917-prd-devtools-readiness-orchestrator-usage.md`.
 - User Journeys:
   - Run `codex-orchestrator doctor --format json` and see DevTools readiness + setup steps.
   - Run `codex-orchestrator devtools setup` (or equivalent) to install/configure DevTools only after explicit confirmation.
-  - Run `codex-orchestrator frontend-test --devtools` or `start frontend-testing-devtools` with clear guidance if DevTools is missing.
+  - Run `codex-orchestrator frontend-test --devtools` or `CODEX_REVIEW_DEVTOOLS=1 start frontend-testing` with clear guidance if DevTools is missing.
   - Use orchestrator pipelines for docs-review, implementation-gate, and review; spawn subagents for investigation work.
 
 ## Technical Considerations
