@@ -171,7 +171,7 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
 
 describe('codex-orchestrator command surface', () => {
   it('prints root help with quickstart guidance', async () => {
-    const { stdout } = await runCli(['--help']);
+    const { stdout } = await runCli(['--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
     expect(stdout).toContain('codex defaults');
@@ -179,7 +179,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
     expect(stdout).toContain('codex-orchestrator doctor --usage --window-days 30');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
     await expect(runCli(['unknown-command'])).rejects.toMatchObject({
@@ -189,9 +189,9 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints status help without requiring a run id', async () => {
-    const { stdout } = await runCli(['status', '--help']);
+    const { stdout } = await runCli(['status', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator status --run <id>');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('requires a run id for status', async () => {
     await expect(runCli(['status'])).rejects.toMatchObject({
@@ -325,11 +325,11 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints codex subcommand help', async () => {
-    const { stdout } = await runCli(['codex', '--help']);
+    const { stdout } = await runCli(['codex', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator codex <subcommand> [options]');
     expect(stdout).toContain('defaults');
     expect(stdout).toContain('--force');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('emits codex setup plan json', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-codex-setup-json-'));
@@ -371,7 +371,7 @@ describe('codex-orchestrator command surface', () => {
   }, TEST_TIMEOUT);
 
   it('prints flow help', async () => {
-    const { stdout } = await runCli(['flow', '--help']);
+    const { stdout } = await runCli(['flow', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator flow');
     expect(stdout).toContain('docs-review');
     expect(stdout).toContain('implementation-gate');
@@ -380,15 +380,15 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Examples:');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('Post-run check:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints review help without invoking run-review', async () => {
-    const { stdout } = await runCli(['review', '--help']);
+    const { stdout } = await runCli(['review', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator review');
     expect(stdout).toContain('Runs the standalone review wrapper');
     expect(stdout).toContain('--manifest <path>');
     expect(stdout).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('launches review via the CLI shell in non-interactive handoff mode', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-review-launch-'));
@@ -427,7 +427,7 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints start help without preparing a run', async () => {
-    const { stdout } = await runCli(['start', '--help']);
+    const { stdout } = await runCli(['start', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator start');
     expect(stdout).toContain('Start a new run');
     expect(stdout).toContain('--auto-issue-log [true|false]');
@@ -436,7 +436,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('codex-orchestrator start docs-review --task <task-id>');
     expect(stdout).toContain('Post-run check:');
     expect(stdout).not.toContain('Run started:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('fails fast when --runtime-mode is provided without a value', async () => {
     await expect(runCli(['start', 'docs-review', '--runtime-mode'])).rejects.toMatchObject({
@@ -805,16 +805,16 @@ describe('codex-orchestrator command surface', () => {
   }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('prints plan help', async () => {
-    const { stdout } = await runCli(['plan', '--help']);
+    const { stdout } = await runCli(['plan', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator plan');
     expect(stdout).toContain('Preview pipeline stages without executing.');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints init help without executing init', async () => {
-    const { stdout } = await runCli(['init', '--help']);
+    const { stdout } = await runCli(['init', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator init codex');
     expect(stdout).toContain('codex.orchestrator.json');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects init without a template', async () => {
     await expect(runCli(['init'])).rejects.toMatchObject({
@@ -946,24 +946,24 @@ describe('codex-orchestrator command surface', () => {
   }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('prints rlm help without running when help flag is passed before goal', async () => {
-    const { stdout } = await runCli(['rlm', '--help']);
+    const { stdout } = await runCli(['rlm', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
     expect(stdout).toContain('--multi-agent [auto|true|false]');
     expect(stdout).toContain('--collab [auto|true|false]  Legacy alias for --multi-agent.');
     expect(stdout).not.toContain('Task:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints rlm help without running when help flag is accidentally given a value', async () => {
-    const { stdout } = await runCli(['rlm', '--help', 'write tests']);
+    const { stdout } = await runCli(['rlm', '--help', 'write tests'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
     expect(stdout).not.toContain('Task:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints rlm help without running when help flag follows the goal', async () => {
-    const { stdout } = await runCli(['rlm', 'write tests', '--help']);
+    const { stdout } = await runCli(['rlm', 'write tests', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
     expect(stdout).not.toContain('Task:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects conflicting multi-agent and collab flag values', async () => {
     await expect(
