@@ -1,9 +1,11 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { spawn } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { mkdir, readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 import {
   PROVIDER_CONTROL_HOST_RUN_ID_ENV,
@@ -25,6 +27,11 @@ import { resolveRunPaths } from './run/runPaths.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import { normalizeEnvironmentPaths, normalizeTaskId } from './run/environment.js';
 import { loadManifest } from './run/manifest.js';
+import {
+  PROVIDER_PACKAGE_ROOT_ENV_KEY,
+  PROVIDER_REPO_CONFIG_PATH_ENV_KEY
+} from './utils/providerOverrideEnv.js';
+import { findPackageRoot } from './utils/packageInfo.js';
 import {
   ensureProviderWorkspace,
   resolveProviderResumeWorkspacePath
@@ -67,7 +74,7 @@ type OutputFormat = 'json' | 'text';
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 5_000;
 const SPAWN_MANIFEST_WAIT_INTERVAL_MS = 100;
-const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
+export const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
 
 interface SpawnedRunManifestInfo {
   runId: string;
@@ -220,6 +227,7 @@ export async function runControlHostCliShell(
               input.taskId,
               {
                 ...launchSpec.envOverrides,
+                ...buildProviderOverrideOwnershipEnv(cliEntrypoint, launchSpec.envOverrides),
                 ...buildProviderLinearSourceEnvOverrides(input),
                 [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
                 [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
@@ -252,6 +260,7 @@ export async function runControlHostCliShell(
               input.reason
             ], {
               ...launchSpec.envOverrides,
+              ...buildProviderOverrideOwnershipEnv(cliEntrypoint, launchSpec.envOverrides),
               [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
               [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
               [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
@@ -359,6 +368,45 @@ async function spawnBackgroundCli(
       resolve();
     });
   });
+}
+
+function buildProviderOverrideOwnershipEnv(
+  cliEntrypoint: string,
+  envOverrides: Record<string, string>
+): Record<string, string> {
+  const repoConfigPath = normalizeProviderLinearSourceValue(envOverrides[REPO_CONFIG_PATH_ENV_KEY]);
+  const packageRoot =
+    normalizeProviderLinearSourceValue(envOverrides.CODEX_ORCHESTRATOR_PACKAGE_ROOT) ??
+    resolveProviderOverridePackageRoot(cliEntrypoint);
+  return {
+    ...(repoConfigPath ? { [PROVIDER_REPO_CONFIG_PATH_ENV_KEY]: repoConfigPath } : {}),
+    ...(packageRoot ? { [PROVIDER_PACKAGE_ROOT_ENV_KEY]: packageRoot } : {})
+  };
+}
+
+function resolveProviderOverridePackageRoot(cliEntrypoint: string): string | null {
+  const configured = normalizeProviderLinearSourceValue(process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT);
+  if (configured) {
+    return configured;
+  }
+  const resolvedCliEntrypoint = (() => {
+    try {
+      return realpathSync(cliEntrypoint);
+    } catch {
+      return cliEntrypoint;
+    }
+  })();
+  try {
+    return findPackageRoot(pathToFileURL(resolvedCliEntrypoint).href);
+  } catch {
+    const cliDir = dirname(resolvedCliEntrypoint);
+    const parentDir = dirname(cliDir);
+    const fallbackRoot =
+      basename(cliDir) === 'bin' && basename(parentDir) === 'dist'
+        ? dirname(parentDir)
+        : parentDir;
+    return normalizeProviderLinearSourceValue(fallbackRoot);
+  }
 }
 
 async function snapshotRunManifests(taskRunsRoot: string): Promise<Set<string>> {
@@ -581,12 +629,14 @@ export const __test__ = {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
   buildProviderLinearSourceEnvOverrides,
+  buildProviderOverrideOwnershipEnv,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
   rehydrateProviderIssueHandoffOnStartup,
   refreshProviderIssueHandoffOnStartup,
   resolveProviderResumeLaunchSpec,
   resolveProviderResumeTaskId,
+  resolveProviderOverridePackageRoot,
   snapshotRunManifests
 };
 

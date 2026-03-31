@@ -4,16 +4,30 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
-import { loadUserConfig } from '../src/cli/config/userConfig.js';
+import {
+  loadUserConfig,
+  REPO_CONFIG_PATH_ENV_KEY
+} from '../src/cli/config/userConfig.js';
+import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 
 let workspaceRoot: string;
+let snapshotRoot: string;
+const ORIGINAL_REPO_CONFIG_PATH = process.env[REPO_CONFIG_PATH_ENV_KEY];
 
 beforeEach(async () => {
   workspaceRoot = await mkdtemp(join(tmpdir(), 'user-config-stagesets-'));
+  snapshotRoot = await mkdtemp(join(tmpdir(), 'user-config-snapshot-'));
+  delete process.env[REPO_CONFIG_PATH_ENV_KEY];
 });
 
 afterEach(async () => {
+  if (ORIGINAL_REPO_CONFIG_PATH === undefined) {
+    delete process.env[REPO_CONFIG_PATH_ENV_KEY];
+  } else {
+    process.env[REPO_CONFIG_PATH_ENV_KEY] = ORIGINAL_REPO_CONFIG_PATH;
+  }
   await rm(workspaceRoot, { recursive: true, force: true });
+  await rm(snapshotRoot, { recursive: true, force: true });
 });
 
 describe('loadUserConfig stage sets', () => {
@@ -79,7 +93,9 @@ describe('loadUserConfig stage sets', () => {
       taskId: 'task-stagesets'
     };
 
-    const loaded = await loadUserConfig(env);
+    const loaded = await loadUserConfig(env, {
+      processEnv: sanitizeProviderOverrideEnv(process.env)
+    });
     const stages = loaded?.pipelines?.[0]?.stages ?? [];
 
     expect(stages).toHaveLength(5);
@@ -91,5 +107,79 @@ describe('loadUserConfig stage sets', () => {
       'command'
     ]);
     expect(stages.map((stage) => stage.id)).toEqual(['guard', 'build', 'lint', 'test', 'spec']);
+  });
+
+  it('keeps the temp-fixture config authoritative when provider-style host snapshot env is present', async () => {
+    const fixtureConfig = {
+      stageSets: {
+        'build-lint-test': [
+          {
+            kind: 'command',
+            id: 'build',
+            title: 'npm run build',
+            command: 'npm run build'
+          }
+        ]
+      },
+      pipelines: [
+        {
+          id: 'diagnostics',
+          title: 'Diagnostics',
+          stages: [
+            {
+              kind: 'stage-set',
+              ref: 'build-lint-test'
+            }
+          ]
+        }
+      ]
+    };
+    const hostSnapshotConfig = {
+      pipelines: [
+        {
+          id: 'provider-linear-worker',
+          title: 'Host provider snapshot',
+          stages: [
+            {
+              kind: 'command',
+              id: 'provider-only',
+              title: 'provider-only',
+              command: "node -e \"console.log('provider')\""
+            }
+          ]
+        }
+      ]
+    };
+    const hostSnapshotPath = join(snapshotRoot, 'provider-workflow.last-known-good.json');
+    await writeFile(
+      join(workspaceRoot, 'codex.orchestrator.json'),
+      `${JSON.stringify(fixtureConfig, null, 2)}\n`,
+      'utf8'
+    );
+    await writeFile(hostSnapshotPath, `${JSON.stringify(hostSnapshotConfig, null, 2)}\n`, 'utf8');
+
+    const env: EnvironmentPaths = {
+      repoRoot: workspaceRoot,
+      runsRoot: join(workspaceRoot, '.runs'),
+      outRoot: join(workspaceRoot, 'out'),
+      taskId: 'task-stagesets-provider-env'
+    };
+
+    const loaded = await loadUserConfig(env, {
+      processEnv: sanitizeProviderOverrideEnv({
+        ...process.env,
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host',
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+        CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH: hostSnapshotPath,
+        CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: hostSnapshotPath,
+        CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+      })
+    });
+
+    expect(loaded?.source).toBe('repo');
+    expect(loaded?.pipelines?.[0]?.id).toBe('diagnostics');
+    expect(loaded?.pipelines?.[0]?.title).toBe('Diagnostics');
+    expect(loaded?.pipelines?.[0]?.stages?.[0]?.id).toBe('build');
   });
 });

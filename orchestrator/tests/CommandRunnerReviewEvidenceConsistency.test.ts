@@ -52,6 +52,7 @@ vi.mock('../src/cli/services/execRuntime.js', () => {
 });
 
 import { resolveEnvironmentPaths } from '../../scripts/lib/run-manifests.js';
+import { deriveReviewOutcomeDisposition } from '../../scripts/lib/review-execution-telemetry.js';
 import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import { bootstrapManifest } from '../src/cli/run/manifest.js';
 import { runCommandStage } from '../src/cli/services/commandRunner.js';
@@ -210,6 +211,304 @@ describe('runCommandStage review evidence consistency', () => {
     expect(commandLog).toContain('"warning":"review-evidence-inconsistent"');
   });
 
+  it('annotates succeeded review summaries with bounded-success review outcomes', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'bounded-success',
+        termination_boundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'post-startup-anchor',
+          reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('review ok');
+    expect(result.summary).toContain(
+      'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+    );
+    expect(manifest.commands[0]?.summary).toContain(
+      'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+    );
+  });
+
+  it('annotates failed review summaries with classified review-wrapper failures', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'failed-boundary',
+        error: 'review crossed command-intent boundary',
+        termination_boundary: {
+          kind: 'command-intent',
+          provenance: 'validation-suite',
+          reason: 'review crossed command-intent boundary',
+          sample: 'npm run test'
+        }
+      });
+      return buildFailedExecResult('review crossed command-intent boundary\n');
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Exited with code 1');
+    expect(result.summary).toContain('review outcome: review-wrapper failure via command-intent');
+    expect(manifest.commands[0]?.summary).toContain(
+      'review outcome: review-wrapper failure via command-intent'
+    );
+  });
+
+  it('describes failed-other review outcomes without calling them wrapper failures', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'failed-other',
+        error: 'codex review exited with code 1',
+        termination_boundary: null
+      });
+      return buildFailedExecResult('codex review exited with code 1\n');
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Exited with code 1');
+    expect(result.summary).toContain(
+      'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
+    );
+    expect(result.summary).not.toContain('review-wrapper failure without termination-boundary classification');
+    expect(manifest.commands[0]?.summary).toContain(
+      'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
+    );
+  });
+
+  it('falls back to failed-other when telemetry carries an inconsistent explicit review outcome', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'clean-success',
+        error: 'codex review exited with code 1',
+        termination_boundary: null
+      });
+      return buildFailedExecResult('codex review exited with code 1\n');
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
+    );
+    expect(result.summary).not.toContain('review outcome: clean success');
+  });
+
+  it('skips review-outcome summary annotation when telemetry is stale and evidence consistency is not enforced', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        generated_at: '1970-01-01T00:00:00.000Z',
+        review_outcome: 'bounded-success',
+        termination_boundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'post-startup-anchor',
+          reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toBe('review ok');
+    expect(result.summary).not.toContain('review outcome:');
+    expect(manifest.commands[0]?.summary).toBe('review ok');
+  });
+
+  it('does not wait for missing telemetry on prompt-only review stages when evidence consistency is not enforced', async () => {
+    mockState.runImpl = async () => buildSuccessfulExecResult();
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage(
+      {
+        id: 'review',
+        title: 'npm run review',
+        command: 'npm run review'
+      },
+      {
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        FORCE_CODEX_REVIEW: '0'
+      }
+    );
+    const startedAtMs = Date.now();
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+    const elapsedMs = Date.now() - startedAtMs;
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toBe('review ok');
+    expect(manifest.commands[0]?.summary).toBe('review ok');
+    expect(elapsedMs).toBeLessThan(1_500);
+  });
+
+  it('treats piped stdin without isTTY as non-interactive for prompt-only review stages', async () => {
+    mockState.runImpl = async () => buildSuccessfulExecResult();
+
+    const stdinDescriptor = Object.getOwnPropertyDescriptor(process, 'stdin');
+    const pipedStdin = Object.create(process.stdin) as NodeJS.ReadStream & { isTTY?: boolean };
+    Object.defineProperty(pipedStdin, 'isTTY', {
+      value: undefined,
+      configurable: true
+    });
+    Object.defineProperty(process, 'stdin', {
+      value: pipedStdin,
+      configurable: true
+    });
+
+    try {
+      const { manifest, stage, ...context } = await bootstrapCommandStage(
+        {
+          id: 'review',
+          title: 'npm run review',
+          command: 'npm run review'
+        },
+        { FORCE_CODEX_REVIEW: '0' }
+      );
+      const startedAtMs = Date.now();
+      const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+      const elapsedMs = Date.now() - startedAtMs;
+
+      expect(result.exitCode).toBe(0);
+      expect(result.summary).toBe('review ok');
+      expect(manifest.commands[0]?.summary).toBe('review ok');
+      expect(elapsedMs).toBeLessThan(1_500);
+    } finally {
+      if (stdinDescriptor) {
+        Object.defineProperty(process, 'stdin', stdinDescriptor);
+      } else {
+        delete (process as NodeJS.Process & { stdin?: NodeJS.ReadStream }).stdin;
+      }
+    }
+  });
+
+  it('waits for review telemetry when FORCE_CODEX_REVIEW is supplied via envOverrides', async () => {
+    mockState.runImpl = async (input) => {
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          status: 'succeeded',
+          review_outcome: 'bounded-success',
+          termination_boundary: {
+            kind: 'relevant-reinspection-dwell',
+            provenance: 'post-startup-anchor',
+            reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+            sample: null
+          }
+        });
+      }, 50);
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({
+      ...context,
+      manifest,
+      stage,
+      index: 1,
+      envOverrides: {
+        FORCE_CODEX_REVIEW: '1'
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain(
+      'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+    );
+    expect(manifest.commands[0]?.summary).toContain(
+      'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+    );
+  });
+
+  it('waits for delayed review telemetry on interactive runs without FORCE_CODEX_REVIEW', async () => {
+    const isTTYDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true
+    });
+
+    mockState.runImpl = async (input) => {
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          status: 'succeeded',
+          review_outcome: 'bounded-success',
+          termination_boundary: {
+            kind: 'relevant-reinspection-dwell',
+            provenance: 'post-startup-anchor',
+            reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+            sample: null
+          }
+        });
+      }, 50);
+      return buildSuccessfulExecResult();
+    };
+
+    try {
+      const { manifest, stage, ...context } = await bootstrapCommandStage({
+        id: 'review',
+        title: 'npm run review',
+        command: 'npm run review'
+      });
+      const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.summary).toContain(
+        'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+      );
+      expect(manifest.commands[0]?.summary).toContain(
+        'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+      );
+    } finally {
+      if (isTTYDescriptor) {
+        Object.defineProperty(process.stdin, 'isTTY', isTTYDescriptor);
+      } else {
+        delete (process.stdin as NodeJS.ReadStream & { isTTY?: boolean }).isTTY;
+      }
+    }
+  });
+
   it('does not enforce review telemetry consistency for non-review command stages even when the env leaks in globally', async () => {
     mockState.runImpl = async () => buildSuccessfulExecResult();
 
@@ -253,6 +552,31 @@ describe('runCommandStage review evidence consistency', () => {
         process.env.CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY = previous;
       }
     }
+  });
+
+  it('falls back to failed-other when telemetry carries a malformed termination boundary payload', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'failed-boundary',
+        error: 'codex review exited with code 1',
+        termination_boundary: {} as Record<string, unknown>
+      });
+      return buildFailedExecResult('codex review exited with code 1\n');
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
+    );
+    expect(result.summary).not.toContain('review outcome: review-wrapper failure');
   });
 });
 
@@ -365,8 +689,10 @@ async function writeReviewArtifacts(
   overrides: Partial<{
     generated_at: string;
     status: 'succeeded' | 'failed';
+    review_outcome: 'clean-success' | 'bounded-success' | 'failed-boundary' | 'failed-other';
     error: string | null;
     output_log_path: string;
+    termination_boundary: Record<string, unknown> | null;
   }>
 ): Promise<void> {
   const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;
@@ -376,16 +702,25 @@ async function writeReviewArtifacts(
   const outputLogPath = join(reviewDir, 'output.log');
   await mkdir(reviewDir, { recursive: true });
   await writeFile(outputLogPath, 'review output\n', 'utf8');
+  const status = overrides.status ?? 'succeeded';
+  const terminationBoundary = overrides.termination_boundary ?? null;
+  const reviewOutcome =
+    overrides.review_outcome ??
+    deriveReviewOutcomeDisposition({
+      status,
+      terminationBoundary
+    });
   await writeFile(
     join(reviewDir, 'telemetry.json'),
     `${JSON.stringify(
       {
         version: 1,
         generated_at: new Date().toISOString(),
-        status: 'succeeded',
+        status,
+        review_outcome: reviewOutcome,
         error: null,
         output_log_path: relative(repoRoot, outputLogPath),
-        termination_boundary: null,
+        termination_boundary: terminationBoundary,
         summary: {
           lineCount: 1,
           commandStarts: [],

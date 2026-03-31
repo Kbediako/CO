@@ -13,6 +13,7 @@
 - Start every task/subtask with `[ ]` and flip it to `[x]` when the acceptance criteria are met, citing evidence (manifest or log when required; standalone review approvals can cite spec/task notes).
 
 ### Evidence Gates
+- [ ] Issue-quality review captured (pre-implementation) - Evidence: spec/task notes confirming intent checksum, protected terms, `Not done if`, and parity-matrix status when applicable.
 - [ ] Standalone review approval captured (pre-implementation) - Evidence: spec/task notes (no manifest).
 - [ ] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
 - [ ] Implementation review manifest captured (post-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
@@ -64,6 +65,7 @@
 
 ## Notes
 - PRD/TECH_SPEC/ACTION_PLAN Requirements:
+- Intent checksum / parity matrix status:
 - Approvals Needed:
 - Links:
 - Subagent usage (required): task ids + manifest paths (use `<task-id>-<stream>` naming).

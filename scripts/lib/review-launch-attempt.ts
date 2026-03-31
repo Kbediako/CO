@@ -23,6 +23,7 @@ import {
   CodexReviewError,
   signalChildProcess
 } from './review-execution-runtime.js';
+import { formatReviewOutcomeSummary } from './review-execution-telemetry.js';
 import type {
   ReviewLaunchContext,
   ReviewTelemetryPayload
@@ -227,6 +228,7 @@ export async function runReviewLaunchAttemptShell(
     );
     console.log(`Review output saved to: ${path.relative(options.repoRoot, options.artifactPaths.outputLogPath)}`);
     if (telemetryPayload) {
+      console.log(`[run-review] review outcome: ${formatReviewOutcomeSummary(telemetryPayload)}.`);
       console.log(
         `Review telemetry saved to: ${path.relative(options.repoRoot, options.artifactPaths.telemetryPath)}`
       );

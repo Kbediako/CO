@@ -6,6 +6,7 @@ import type {
   ControlCompatibilityProjectionSnapshot,
   ControlIssuePayload
 } from '../src/cli/control/observabilityReadModel.js';
+import type { ProviderLinearWorkerChildLaneRecord } from '../src/cli/providerLinearWorkerRunner.js';
 
 function buildIssueRecord(
   payload: Partial<ControlIssuePayload> & Pick<ControlIssuePayload, 'issue_identifier'>
@@ -54,6 +55,43 @@ function buildIssueRecord(
 function buildProjection(
   overrides: Partial<ControlCompatibilityProjectionSnapshot> = {}
 ): ControlCompatibilityProjectionSnapshot {
+  const providerProofChildLanes: ProviderLinearWorkerChildLaneRecord[] = [
+    {
+      stream: 'presenter-proof',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: 'linear-e52-presenter-proof',
+      run_id: 'child-run-1',
+      status: 'succeeded',
+      manifest_path: '/repo/.runs/linear-e52-presenter-proof/cli/child-run-1/manifest.json',
+      artifact_root: '/repo/.runs/linear-e52-presenter-proof/cli/child-run-1',
+      log_path: null,
+      summary: 'Selected-run presenter proof lane completed',
+      issue_id: 'issue-7',
+      issue_identifier: 'CO-7',
+      workspace_path: '/repo/.workspaces/co-7',
+      source_setup: null,
+      launched_at: '2026-03-27T04:05:30.000Z',
+      purpose: 'Add selected-run presenter child-lane proof coverage',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/tests/SelectedRunPresenter.test.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-27T04:05:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-27T04:05:20.000Z'
+      },
+      lane_workspace_path: '/repo/.workspaces/co-7/.child-lanes/presenter-proof-child-run-1',
+      patch_artifact_path: '/repo/.runs/linear-e52-presenter-proof/cli/child-run-1/provider-linear-child-lane.patch',
+      patch_bytes: 144,
+      decision: 'accepted',
+      decision_at: '2026-03-27T04:05:40.000Z',
+      decision_reason: 'Parent accepted the presenter proof lane.'
+    }
+  ];
   const runningIssue = buildIssueRecord({
     issue_identifier: 'CO-7',
     issue_id: 'issue-7',
@@ -145,6 +183,7 @@ function buildProjection(
       owner_phase: 'active',
       owner_status: 'paused',
       workspace_path: '/repo/.workspaces/co-7',
+      child_lanes: providerProofChildLanes,
       end_reason: null,
       updated_at: '2026-03-27T04:05:00.000Z'
     }
@@ -376,6 +415,22 @@ describe('OperatorDashboardPresenter', () => {
         })
       ])
     );
+    expect(dataset.selected?.provider_linear_worker_proof?.child_lanes).toEqual([
+      expect.objectContaining({
+        stream: 'presenter-proof',
+        decision: 'accepted',
+        scope: {
+          files: ['orchestrator/tests/SelectedRunPresenter.test.ts'],
+          phases: []
+        }
+      })
+    ]);
+    expect(dataset.issues.find((issue) => issue.issue_identifier === 'CO-7')?.provider_linear_worker_proof?.child_lanes).toEqual([
+      expect.objectContaining({
+        stream: 'presenter-proof',
+        patch_artifact_path: '/repo/.runs/linear-e52-presenter-proof/cli/child-run-1/provider-linear-child-lane.patch'
+      })
+    ]);
   });
 
   it('falls back to the latest event when no recent agent-activity list exists', () => {

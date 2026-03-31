@@ -37,6 +37,10 @@ import {
   runProviderLinearChildStreamShell,
   type ProviderLinearChildStreamResult
 } from './providerLinearChildStreamShell.js';
+import {
+  runProviderLinearChildLaneShell,
+  type ProviderLinearChildLaneResult
+} from './providerLinearChildLaneShell.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -54,6 +58,7 @@ interface LinearCliShellDependencies {
   transitionProviderLinearIssueState: typeof transitionProviderLinearIssueState;
   attachProviderLinearIssuePr: typeof attachProviderLinearIssuePr;
   runProviderLinearChildStreamShell: typeof runProviderLinearChildStreamShell;
+  runProviderLinearChildLaneShell: typeof runProviderLinearChildLaneShell;
   createProviderLinearFollowUpIssue: typeof createProviderLinearFollowUpIssue;
   resolveProviderLinearRuntimeProof: typeof resolveProviderLinearRuntimeProof;
   appendAuditEntry: typeof appendProviderLinearAuditEntry;
@@ -119,6 +124,7 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   transitionProviderLinearIssueState,
   attachProviderLinearIssuePr,
   runProviderLinearChildStreamShell,
+  runProviderLinearChildLaneShell,
   createProviderLinearFollowUpIssue,
   resolveProviderLinearRuntimeProof,
   appendAuditEntry: appendProviderLinearAuditEntry,
@@ -132,6 +138,16 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
     process.exitCode = code;
   }
 };
+
+const LINEAR_MUTATING_SUBCOMMANDS = new Set([
+  'upsert-workpad',
+  'delete-workpad',
+  'transition',
+  'attach-pr',
+  'create-follow-up',
+  'child-stream',
+  'child-lane'
+]);
 
 export async function runLinearCliShell(
   params: RunLinearCliShellParams,
@@ -162,6 +178,8 @@ export async function runLinearCliShell(
         `linear does not accept extra positional arguments: ${positionals.join(' ')}`
       );
     }
+
+    await assertLinearMutationAllowed(subcommand, params.flags, env, dependencies.readTextFile);
 
     switch (subcommand) {
       case 'issue-context': {
@@ -251,8 +269,17 @@ export async function runLinearCliShell(
           'title',
           'description',
           'description-file',
+          'intent-checksum',
+          'intent-checksum-file',
+          'non-goals',
+          'non-goals-file',
+          'not-done-if',
+          'not-done-if-file',
           'acceptance-criteria',
           'acceptance-criteria-file',
+          'parity-lane',
+          'parity-matrix',
+          'parity-matrix-file',
           'blocked-by-source'
         ]);
         const result = await dependencies.createProviderLinearFollowUpIssue({
@@ -264,11 +291,36 @@ export async function runLinearCliShell(
             'description',
             'description-file'
           ),
+          intentChecksum: await resolveRequiredText(
+            params.flags,
+            dependencies.readTextFile,
+            'intent-checksum',
+            'intent-checksum-file'
+          ),
+          nonGoals: await resolveRequiredText(
+            params.flags,
+            dependencies.readTextFile,
+            'non-goals',
+            'non-goals-file'
+          ),
+          notDoneIf: await resolveRequiredText(
+            params.flags,
+            dependencies.readTextFile,
+            'not-done-if',
+            'not-done-if-file'
+          ),
           acceptanceCriteria: await resolveRequiredText(
             params.flags,
             dependencies.readTextFile,
             'acceptance-criteria',
             'acceptance-criteria-file'
+          ),
+          parityLane: readBooleanFlag(params.flags, 'parity-lane'),
+          parityMatrix: await resolveOptionalText(
+            params.flags,
+            dependencies.readTextFile,
+            'parity-matrix',
+            'parity-matrix-file'
           ),
           blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
           sourceSetup: readSourceSetup(params.flags),
@@ -331,6 +383,37 @@ export async function runLinearCliShell(
         const result = await dependencies.runProviderLinearChildStreamShell({
           pipelineId: requireFlag(params.flags, 'pipeline'),
           streamName: readStringFlag(params.flags, 'stream') ?? null,
+          env
+        });
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'child-lane': {
+        assertAllowedFlags(params.flags, [
+          'format',
+          'action',
+          'stream',
+          'purpose',
+          'files',
+          'phases',
+          'instructions',
+          'instructions-file',
+          'reason'
+        ]);
+        const result = await dependencies.runProviderLinearChildLaneShell({
+          action: requireFlag(params.flags, 'action'),
+          streamName: readStringFlag(params.flags, 'stream') ?? null,
+          purpose: readRawStringFlag(params.flags, 'purpose') ?? null,
+          files: readCommaSeparatedFlag(params.flags, 'files'),
+          phases: readCommaSeparatedFlag(params.flags, 'phases'),
+          instructions: await resolveOptionalText(
+            params.flags,
+            dependencies.readTextFile,
+            'instructions',
+            'instructions-file'
+          ),
+          reason: readRawStringFlag(params.flags, 'reason') ?? null,
           env
         });
         await recordAuditResult(result, params.flags, env, dependencies);
@@ -405,6 +488,17 @@ function readBooleanFlag(flags: ArgMap, key: string): boolean {
   return ['1', 'true', 'yes', 'on'].includes(normalized);
 }
 
+function readCommaSeparatedFlag(flags: ArgMap, key: string): string[] {
+  const value = readRawStringFlag(flags, key);
+  if (!value) {
+    return [];
+  }
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
 function readSourceSetup(flags: ArgMap): DispatchPilotSourceSetup | null {
   const workspaceId = readStringFlag(flags, 'workspace-id') ?? null;
   const teamId = readStringFlag(flags, 'team-id') ?? null;
@@ -425,6 +519,39 @@ async function resolveBody(
   readTextFile: (path: string) => Promise<string>
 ): Promise<string> {
   return await resolveRequiredText(flags, readTextFile, 'body', 'body-file');
+}
+
+async function resolveOptionalText(
+  flags: ArgMap,
+  readTextFile: (path: string) => Promise<string>,
+  inlineFlag: string,
+  fileFlag: string
+): Promise<string | null> {
+  const inlineValue = readRawStringFlag(flags, inlineFlag);
+  const fileValue = readStringFlag(flags, fileFlag);
+  const hasInlineValue = typeof inlineValue === 'string' && inlineValue.trim().length > 0;
+  if (hasInlineValue && fileValue) {
+    throw usageError(
+      `linear_${inlineFlag.replace(/-/gu, '_')}_conflict`,
+      `Use either --${inlineFlag} or --${fileFlag}, not both.`
+    );
+  }
+  if (hasInlineValue) {
+    return inlineValue;
+  }
+  if (!fileValue) {
+    return null;
+  }
+  let fileText: string;
+  try {
+    fileText = await readTextFile(fileValue);
+  } catch {
+    throw usageError(
+      `linear_${fileFlag.replace(/-/gu, '_')}_unreadable`,
+      `--${fileFlag} must reference a readable file.`
+    );
+  }
+  return fileText.trim().length > 0 ? fileText : null;
 }
 
 async function resolveRequiredText(
@@ -470,8 +597,12 @@ async function resolveRequiredText(
 }
 
 function usageError(code: string, message: string): LinearCliUsageError {
+  return cliError(code, message, 422);
+}
+
+function cliError(code: string, message: string, status: number): LinearCliUsageError {
   const error = new Error(message) as LinearCliUsageError;
-  error.result = failureResult(code, message, 422);
+  error.result = failureResult(code, message, status);
   return error;
 }
 
@@ -495,8 +626,60 @@ function failureResult(code: string, message: string, status: number): LinearCli
   };
 }
 
+async function assertLinearMutationAllowed(
+  subcommand: string,
+  flags: ArgMap,
+  env: NodeJS.ProcessEnv,
+  readTextFile: (path: string) => Promise<string>
+): Promise<void> {
+  if (!LINEAR_MUTATING_SUBCOMMANDS.has(subcommand)) {
+    return;
+  }
+  const pipelineIdFromEnv = readStringEnv(env, 'CODEX_ORCHESTRATOR_PIPELINE_ID');
+  const isChildLane = pipelineIdFromEnv === 'provider-linear-child-lane';
+  const manifestPath = readStringEnv(env, 'CODEX_ORCHESTRATOR_MANIFEST_PATH');
+  if (!manifestPath) {
+    if (isChildLane) {
+      throw cliError(
+        'provider_worker_parent_mutation_required',
+        `${subcommand} is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.`,
+        409
+      );
+    }
+    return;
+  }
+  let manifestRecord: Record<string, unknown>;
+  try {
+    manifestRecord = JSON.parse(await readTextFile(manifestPath)) as Record<string, unknown>;
+  } catch {
+    if (isChildLane) {
+      throw cliError(
+        'provider_worker_parent_mutation_required',
+        `${subcommand} is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.`,
+        409
+      );
+    }
+    return;
+  }
+  const pipelineId = readUnknownString(manifestRecord.pipeline_id) ?? readUnknownString(manifestRecord.pipelineId);
+  const parentRunId = readUnknownString(manifestRecord.parent_run_id) ?? readUnknownString(manifestRecord.parentRunId);
+  if (pipelineId !== 'provider-linear-child-lane' || !parentRunId) {
+    return;
+  }
+  throw cliError(
+    'provider_worker_parent_mutation_required',
+    `${subcommand} is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.`,
+    409
+  );
+}
+
 function resolveErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function readStringEnv(env: NodeJS.ProcessEnv, key: string): string | null {
+  const value = env[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
 type LinearCliResult =
@@ -507,7 +690,8 @@ type LinearCliResult =
   | ProviderLinearAttachPrResult
   | ProviderLinearCreateFollowUpResult
   | ProviderLinearRuntimeProofResult
-  | ProviderLinearChildStreamResult;
+  | ProviderLinearChildStreamResult
+  | ProviderLinearChildLaneResult;
 
 async function recordAuditResult(
   result: LinearCliResult,
@@ -548,6 +732,26 @@ function buildAuditEntry(
         action: result.stream ? `stream:${result.stream}` : null,
         via: result.pipeline_id ? `pipeline:${result.pipeline_id}` : null,
         state: result.child_run?.status ?? null,
+        follow_up_issue_id: null,
+        follow_up_issue_identifier: null,
+        failed_relation_type: null,
+        comment_id: null,
+        attachment_id: null,
+        error_code: result.error.code,
+        error_message: result.error.message
+      };
+    }
+    if (result.operation === 'child-lane') {
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: false,
+        issue_id: result.issue_id ?? requestedIssueId,
+        issue_identifier: result.issue_identifier,
+        source_setup: result.source_setup ?? sourceSetup,
+        action: result.stream ? `${result.action}:${result.stream}` : result.action,
+        via: result.child_lane ? `pipeline:${result.child_lane.pipeline_id}` : null,
+        state: result.child_lane?.decision ?? result.child_run?.status ?? null,
         follow_up_issue_id: null,
         follow_up_issue_identifier: null,
         failed_relation_type: null,
@@ -706,6 +910,25 @@ function buildAuditEntry(
         action: `stream:${result.stream}`,
         via: `pipeline:${result.pipeline_id}`,
         state: result.child_run.status,
+        follow_up_issue_id: null,
+        follow_up_issue_identifier: null,
+        failed_relation_type: null,
+        comment_id: null,
+        attachment_id: null,
+        error_code: null,
+        error_message: null
+      };
+    case 'child-lane':
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: true,
+        issue_id: result.issue.id,
+        issue_identifier: result.issue.identifier,
+        source_setup: result.source_setup,
+        action: `${result.action}:${result.stream}`,
+        via: `pipeline:${result.child_lane.pipeline_id}`,
+        state: result.child_lane.decision,
         follow_up_issue_id: null,
         follow_up_issue_identifier: null,
         failed_relation_type: null,

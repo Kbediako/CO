@@ -11,12 +11,19 @@ export interface ReviewTelemetryPayload {
   version: number;
   generated_at: string;
   status: 'succeeded' | 'failed';
+  review_outcome: ReviewOutcomeDisposition;
   error: string | null;
   output_log_path: string;
   launch_context: ReviewLaunchContext | null;
   termination_boundary: ReviewTerminationBoundaryRecord | null;
   summary: ReviewOutputSummary;
 }
+
+export type ReviewOutcomeDisposition =
+  | 'clean-success'
+  | 'bounded-success'
+  | 'failed-boundary'
+  | 'failed-other';
 
 export interface ReviewLaunchContext {
   scope_flag_mode: 'commit' | 'base' | 'uncommitted' | null;
@@ -74,13 +81,82 @@ export interface LogReviewTelemetryOptions {
   telemetryDebugEnvKey: string;
 }
 
+export function deriveReviewOutcomeDisposition(options: {
+  status: 'succeeded' | 'failed';
+  terminationBoundary: ReviewTerminationBoundaryRecord | null;
+}): ReviewOutcomeDisposition {
+  if (options.status === 'succeeded') {
+    return options.terminationBoundary ? 'bounded-success' : 'clean-success';
+  }
+  return options.terminationBoundary ? 'failed-boundary' : 'failed-other';
+}
+
+export function coerceReviewOutcomeDisposition(
+  value: unknown
+): ReviewOutcomeDisposition | null {
+  switch (value) {
+    case 'clean-success':
+    case 'bounded-success':
+    case 'failed-boundary':
+    case 'failed-other':
+      return value;
+    default:
+      return null;
+  }
+}
+
+export function resolveReviewOutcomeDisposition(payload: {
+  status: 'succeeded' | 'failed';
+  review_outcome?: ReviewOutcomeDisposition | null;
+  termination_boundary: ReviewTerminationBoundaryRecord | null;
+}): ReviewOutcomeDisposition {
+  const derivedDisposition = deriveReviewOutcomeDisposition({
+    status: payload.status,
+    terminationBoundary: payload.termination_boundary
+  });
+  const explicitDisposition = coerceReviewOutcomeDisposition(payload.review_outcome ?? null);
+  return explicitDisposition === derivedDisposition ? explicitDisposition : derivedDisposition;
+}
+
+export function formatReviewOutcomeSummary(payload: {
+  status: 'succeeded' | 'failed';
+  review_outcome?: ReviewOutcomeDisposition | null;
+  termination_boundary: ReviewTerminationBoundaryRecord | null;
+}): string {
+  const disposition = resolveReviewOutcomeDisposition(payload);
+  const boundaryKind = payload.termination_boundary?.kind ?? null;
+  switch (disposition) {
+    case 'clean-success':
+      return 'clean success';
+    case 'bounded-success':
+      return boundaryKind
+        ? `bounded success via ${boundaryKind}; not a wrapper failure`
+        : 'bounded success with preserved termination boundary; not a wrapper failure';
+    case 'failed-boundary':
+      return boundaryKind
+        ? `review-wrapper failure via ${boundaryKind}`
+        : 'review-wrapper failure via explicit termination boundary';
+    case 'failed-other':
+      return 'review command failed without termination-boundary classification; not an explicit wrapper-boundary failure';
+  }
+}
+
 export function buildReviewTelemetryPayload(
   options: BuildReviewTelemetryPayloadOptions
 ): ReviewTelemetryPayload {
+  const terminationBoundary = sanitizeTerminationBoundaryForPersistence(
+    options.terminationBoundary ?? null,
+    options.includeRawTelemetry,
+    options.telemetryDebugEnvKey
+  );
   return {
     version: 1,
     generated_at: new Date().toISOString(),
     status: options.status,
+    review_outcome: deriveReviewOutcomeDisposition({
+      status: options.status,
+      terminationBoundary
+    }),
     error: sanitizeTelemetryErrorForPersistence(
       options.error ?? null,
       options.includeRawTelemetry,
@@ -88,11 +164,7 @@ export function buildReviewTelemetryPayload(
     ),
     output_log_path: path.relative(options.repoRoot, options.outputLogPath),
     launch_context: options.launchContext ?? null,
-    termination_boundary: sanitizeTerminationBoundaryForPersistence(
-      options.terminationBoundary ?? null,
-      options.includeRawTelemetry,
-      options.telemetryDebugEnvKey
-    ),
+    termination_boundary: terminationBoundary,
     summary: sanitizeTelemetrySummaryForPersistence(
       options.summary,
       options.includeRawTelemetry,
@@ -148,6 +220,7 @@ export function logReviewTelemetrySummary(
   options: LogReviewTelemetryOptions
 ): void {
   const summary = payload.summary;
+  console.error(`[run-review] review outcome: ${formatReviewOutcomeSummary(payload)}.`);
   console.error(
     `[run-review] review telemetry: ${summary.commandStarts.length} command start(s), ${summary.heavyCommandStarts.length} heavy command start(s), ${summary.startupEvents} delegation startup event(s), ${summary.reviewProgressSignals} review progress signal(s).`
   );

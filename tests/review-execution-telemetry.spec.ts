@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ReviewExecutionState } from '../scripts/lib/review-execution-state.js';
 import {
+  formatReviewOutcomeSummary,
   writeReviewExecutionTelemetry
 } from '../scripts/lib/review-execution-telemetry.js';
 
@@ -44,6 +45,7 @@ describe('review-execution-telemetry', () => {
 
     expect(payload).not.toBeNull();
     expect(payload?.status).toBe('succeeded');
+    expect(payload?.review_outcome).toBe('clean-success');
     expect(payload?.termination_boundary).toBeNull();
     await expect(readFile(telemetryPath, 'utf8')).resolves.toContain('"status": "succeeded"');
   });
@@ -72,6 +74,7 @@ describe('review-execution-telemetry', () => {
       telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
     });
 
+    expect(payload?.review_outcome).toBe('bounded-success');
     expect(payload?.termination_boundary).toEqual({
       kind: 'relevant-reinspection-dwell',
       provenance: 'post-startup-anchor',
@@ -109,6 +112,7 @@ describe('review-execution-telemetry', () => {
       telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
     });
 
+    expect(payload?.review_outcome).toBe('failed-boundary');
     expect(payload?.termination_boundary).toEqual(terminationBoundary);
     await expect(readFile(telemetryPath, 'utf8')).resolves.toContain('"kind": "stall"');
   });
@@ -131,6 +135,7 @@ describe('review-execution-telemetry', () => {
       telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
     });
 
+    expect(payload?.review_outcome).toBe('failed-boundary');
     expect(payload?.termination_boundary?.kind).toBe('timeout');
     await expect(readFile(telemetryPath, 'utf8')).resolves.toContain('"kind": "timeout"');
   });
@@ -153,6 +158,30 @@ describe('review-execution-telemetry', () => {
     expect(payload).toBeNull();
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('[run-review] failed to persist review telemetry:')
+    );
+  });
+
+  it('describes failed-other telemetry as an unclassified review-command failure', () => {
+    expect(
+      formatReviewOutcomeSummary({
+        status: 'failed',
+        review_outcome: 'failed-other',
+        termination_boundary: null
+      })
+    ).toBe(
+      'review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
+    );
+  });
+
+  it('ignores inconsistent explicit review outcomes and falls back to the status-plus-boundary contract', () => {
+    expect(
+      formatReviewOutcomeSummary({
+        status: 'failed',
+        review_outcome: 'clean-success',
+        termination_boundary: null
+      })
+    ).toBe(
+      'review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
     );
   });
 });

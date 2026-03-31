@@ -8,12 +8,16 @@ import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import { PipelineResolver } from '../src/cli/services/pipelineResolver.js';
 import { loadUserConfig } from '../src/cli/config/userConfig.js';
 import type { PipelineDefinition } from '../src/cli/types.js';
+import { PROVIDER_OVERRIDE_ENV_KEYS } from '../src/cli/utils/providerOverrideEnv.js';
 import { logger } from '../src/logger.js';
 
 const ORIGINAL_ENV = {
   designPipeline: process.env.DESIGN_PIPELINE,
   designConfigPath: process.env.DESIGN_CONFIG_PATH,
-  repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED
+  repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
+  providerOverrides: Object.fromEntries(
+    PROVIDER_OVERRIDE_ENV_KEYS.map((key) => [key, process.env[key]])
+  ) as Partial<NodeJS.ProcessEnv>
 };
 
 let workspaceRoot: string;
@@ -23,6 +27,9 @@ beforeEach(async () => {
   delete process.env.DESIGN_PIPELINE;
   delete process.env.DESIGN_CONFIG_PATH;
   delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+  for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
+    delete process.env[key];
+  }
 });
 
 afterEach(async () => {
@@ -41,6 +48,14 @@ afterEach(async () => {
     delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
   } else {
     process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = ORIGINAL_ENV.repoConfigRequired;
+  }
+  for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
+    const value = ORIGINAL_ENV.providerOverrides[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
   }
   await rm(workspaceRoot, { recursive: true, force: true });
 });

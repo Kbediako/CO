@@ -7,6 +7,11 @@
 - Scope:
 - Assumptions:
 
+## Issue Readiness Gate
+- Intent checksum / protected terms carried forward:
+- Not done if:
+- Pre-implementation issue-quality review:
+
 ## Milestones & Sequencing
 1) 
 2) 

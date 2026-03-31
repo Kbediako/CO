@@ -47,7 +47,10 @@ import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 import { runMcpEnableCliShell } from '../orchestrator/src/cli/mcpEnableCliShell.js';
 import { runDelegationServerCliShell } from '../orchestrator/src/cli/delegationServerCliShell.js';
-import { runControlHostCliShell } from '../orchestrator/src/cli/controlHostCliShell.js';
+import {
+  DEFAULT_PROVIDER_START_PIPELINE_ID,
+  runControlHostCliShell
+} from '../orchestrator/src/cli/controlHostCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -121,6 +124,9 @@ async function main(): Promise<void> {
         break;
       case 'control-host':
         await handleControlHost(args);
+        break;
+      case 'co-status':
+        await handleCoStatus(args);
         break;
       case 'exec':
         await handleExec(args);
@@ -736,6 +742,18 @@ async function handleControlHost(rawArgs: string[]): Promise<void> {
   await runControlHostCliShell({
     flags,
     printHelp: printControlHostHelp
+  });
+}
+
+async function handleCoStatus(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printCoStatusHelp();
+    return;
+  }
+  await runControlHostCliShell({
+    flags,
+    printHelp: printCoStatusHelp
   });
 }
 
@@ -1355,6 +1373,10 @@ Commands:
     --pipeline <id>         Pipeline used for provider-driven starts (default: diagnostics).
     --format json           Emit machine-readable readiness output.
 
+  co-status [options]
+    Dedicated monitor alias for launching the live CO STATUS dashboard.
+    Uses the same host/runtime path and options as control-host.
+
   status --run <id> [--watch] [--interval N] [--format json]
 
   self-check [--format json]
@@ -1430,6 +1452,7 @@ Commands:
     --mode <full|question_only|status_only>  Limit tool surface for child runs.
     --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   control-host            Run the persistent provider intake + oversight host.
+  co-status               Launch the live CO STATUS dashboard through the control-host path.
   version | --version
 
   help                      Show this message.
@@ -1518,8 +1541,17 @@ Subcommands:
     --title <title>                   Follow-up issue title.
     --description <text>              Follow-up issue description.
     --description-file <path>         Read follow-up issue description from a file.
+    --intent-checksum <text>          Exact wording, protected terms, and wrong interpretations to reject.
+    --intent-checksum-file <path>     Read the intent checksum from a file.
+    --non-goals <text>                Explicit follow-up non-goals.
+    --non-goals-file <path>           Read follow-up non-goals from a file.
+    --not-done-if <text>              Readiness blockers / false-done conditions.
+    --not-done-if-file <path>         Read the false-done block from a file.
     --acceptance-criteria <text>      Follow-up acceptance criteria.
     --acceptance-criteria-file <path> Read follow-up acceptance criteria from a file.
+    --parity-lane                     Require a parity/alignment matrix for this follow-up.
+    --parity-matrix <text>            Current/reference/target matrix (required when --parity-lane is set).
+    --parity-matrix-file <path>       Read the parity/alignment matrix from a file (required when --parity-lane is set).
     --blocked-by-source               Add blocker linkage when the follow-up depends on the source issue.
     --workspace-id <id>               Optional workspace scope check.
     --team-id <id>                    Optional team scope check.
@@ -1543,6 +1575,18 @@ Subcommands:
   child-stream
     --pipeline <id>       Allowlisted child pipeline: docs-review, implementation-gate, or docs-relevance-advisory.
     --stream <name>       Optional task-id suffix for the child stream (defaults to the pipeline id).
+    --format json         Emit machine-readable output.
+
+  child-lane
+    --action <mode>       launch, accept, reject, or invalidate.
+    --stream <name>       Lane stream name / task-id suffix.
+    --purpose <text>      Required for launch: bounded lane objective.
+    --files <csv>         Optional comma-separated file ownership scope.
+    --phases <csv>        Optional comma-separated phase ownership scope.
+    --instructions <text> Optional extra bounded instructions for launch.
+    --instructions-file <path>
+                         Optional file containing extra bounded instructions for launch.
+    --reason <text>       Optional parent decision rationale for accept/reject/invalidate.
     --format json         Emit machine-readable output.
 `);
 }
@@ -1584,7 +1628,22 @@ function printControlHostHelp(): void {
 Options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
-  --pipeline <id>       Pipeline used for provider-driven starts (default: diagnostics).
+  --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
+  --format json         Emit machine-readable readiness output.
+  --help                Show this message.
+`);
+}
+
+function printCoStatusHelp(): void {
+  console.log(`Usage: codex-orchestrator co-status [options]
+
+Dedicated monitor alias for the live CO STATUS dashboard.
+This reuses the same host/runtime path as \`control-host\`.
+
+Options:
+  --task <id>           Artifact task id for the host state (default: local-mcp).
+  --run <id>            Host run id for persisted state files (default: control-host).
+  --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
   --format json         Emit machine-readable readiness output.
   --help                Show this message.
 `);

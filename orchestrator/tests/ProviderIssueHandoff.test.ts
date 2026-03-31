@@ -202,12 +202,14 @@ function getLatestScheduledTimeoutCallback(
 }
 
 describe('createProviderIssueHandoffService', () => {
-  it('ignores child-stream manifests without dropping provider workers that carry parent lineage', async () => {
+  it('ignores child-stream and child-lane manifests without dropping provider workers that carry parent lineage', async () => {
     const { root, paths } = await createHostPaths();
     const providerRunDir = join(root, '.runs', 'linear-lin-issue-1', 'cli', 'provider-run-1');
     const providerChildDir = join(root, '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1');
+    const providerChildLaneDir = join(root, '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1');
     await mkdir(providerRunDir, { recursive: true });
     await mkdir(providerChildDir, { recursive: true });
+    await mkdir(providerChildLaneDir, { recursive: true });
     await writeFile(join(providerRunDir, 'manifest.json'), JSON.stringify({
       run_id: 'provider-run-1',
       task_id: 'linear-lin-issue-1',
@@ -225,6 +227,15 @@ describe('createProviderIssueHandoffService', () => {
       issue_provider: 'linear',
       issue_id: 'lin-issue-1',
       updated_at: '2026-03-27T01:01:00.000Z'
+    }), 'utf8');
+    await writeFile(join(providerChildLaneDir, 'manifest.json'), JSON.stringify({
+      run_id: 'child-run-1',
+      task_id: 'linear-lin-issue-1-impl-a',
+      pipeline_id: 'provider-linear-child-lane',
+      parent_run_id: 'provider-run-1',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      updated_at: '2026-03-27T01:02:00.000Z'
     }), 'utf8');
 
     await expect(
@@ -422,6 +433,72 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_start_launched',
       last_event: 'poll_tick',
       last_action: 'reconcile'
+    });
+  });
+
+  it('preserves newer polling state when claim persistence rolls back after a concurrent polling update', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    let persistCallCount = 0;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      if (persistCallCount === 2) {
+        state.polling = {
+          checking: true,
+          stuck: true,
+          restart_required: true,
+          reason: 'provider_refresh_lifecycle_stuck',
+          updated_at: '2026-03-19T04:00:10.000Z'
+        };
+        state.updated_at = '2026-03-19T04:00:10.000Z';
+        throw new Error('pre-launch persist failed');
+      }
+    });
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await expect(
+      service.poll?.({
+        trackedIssues: [createTrackedIssue()]
+      })
+    ).resolves.toBeUndefined();
+
+    expect(state.claims).toEqual([]);
+    expect(state.polling).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      updated_at: '2026-03-19T04:00:10.000Z'
+    });
+    expect(state.updated_at).toBe('2026-03-19T04:00:10.000Z');
+
+    await expect(
+      service.poll?.({
+        trackedIssues: [createTrackedIssue()]
+      })
+    ).resolves.toBeUndefined();
+
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(state.polling).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      updated_at: '2026-03-19T04:00:10.000Z'
     });
   });
 
@@ -11332,6 +11409,168 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'linear-lin-issue-1',
       run_id: 'run-continuation',
       run_manifest_path: '/tmp/provider-run/continuation-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      retry_queued: false,
+      retry_attempt: 1,
+      retry_due_at: null,
+      retry_error: null
+    });
+  });
+
+  it('reclassifies a completed Merging-stage worker run and queues an automatic retry when the proof shows issue_still_active exhaustion', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-merge-drain'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-merge-drain');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-merge-drain',
+        task_id: 'task-1303-merge-drain',
+        status: 'in_progress',
+        summary: 'worker still running',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:29:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'max_turns_reached_issue_still_active',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-merge-drain',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-merge-drain',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-merge-drain',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-merge-drain-retry',
+        manifestPath: '/tmp/provider-run/merge-drain-retry-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:30:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    const expectedCompletedClaim = {
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-merge-drain',
+      run_id: 'run-merge-drain',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:01.000Z',
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedCompletedClaim);
+    expect(getPersistedState().claims[0]).toMatchObject(expectedCompletedClaim);
+
+    const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
+    expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
+    const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
+    expect(delayMs).toBeGreaterThanOrEqual(999);
+    expect(delayMs).toBeLessThanOrEqual(1_000);
+    vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
+    const startCallsBeforeRetry = launcher.start.mock.calls.length;
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.start, startCallsBeforeRetry + 1, 1_024);
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:30:30.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_post_worker_exit_start_launched',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-merge-drain-retry',
+      run_manifest_path: '/tmp/provider-run/merge-drain-retry-manifest.json',
       launch_source: 'control-host',
       launch_token: expect.any(String),
       retry_queued: false,

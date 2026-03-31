@@ -5,6 +5,11 @@ import { isAbsolute, join, relative } from 'node:path';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
+import {
+  PROVIDER_OVERRIDE_ENV_KEYS,
+  sanitizeProviderOverrideEnv
+} from '../orchestrator/src/cli/utils/providerOverrideEnv.js';
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
@@ -12,15 +17,25 @@ const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
+const SKILLS_INSTALL_JSON_TIMEOUT = 70000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
   'CODEX_RUNTIME_MODE'
 ] as const;
+const REPO_CONFIG_TEST_ENV_KEYS = [
+  'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
+  REPO_CONFIG_PATH_ENV_KEY
+] as const;
+const CLI_SANITIZED_ENV_KEYS = [...RUNTIME_TEST_ENV_KEYS, ...REPO_CONFIG_TEST_ENV_KEYS] as const;
 const DEFAULT_RUNTIME_TEST_ENV = {
   CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
   CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
   CODEX_RUNTIME_MODE: 'cli'
+} satisfies NodeJS.ProcessEnv;
+const DEFAULT_REPO_CONFIG_TEST_ENV = {
+  [REPO_CONFIG_PATH_ENV_KEY]: '',
+  CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: ''
 } satisfies NodeJS.ProcessEnv;
 
 let tempDir: string | null = null;
@@ -36,12 +51,13 @@ afterEach(async () => {
 async function runCli(
   args: string[],
   env?: NodeJS.ProcessEnv,
-  timeoutMs: number = CLI_EXEC_TIMEOUT_MS
+  timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
-  const mergedEnv: NodeJS.ProcessEnv = {
+  const mergedEnv = sanitizeProviderOverrideEnv({
     ...process.env,
     ...(env ?? {})
-  };
+  });
   const explicitRuntimeOverrides = Object.fromEntries(
     RUNTIME_TEST_ENV_KEYS.flatMap((key) => {
       if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
@@ -53,13 +69,33 @@ async function runCli(
       return [[key, env[key]]];
     })
   ) as NodeJS.ProcessEnv;
-  for (const key of RUNTIME_TEST_ENV_KEYS) {
+  const explicitProviderOverrides = Object.fromEntries(
+    REPO_CONFIG_TEST_ENV_KEYS.flatMap((key) => {
+      if (!env || !Object.prototype.hasOwnProperty.call(env, key)) {
+        return [];
+      }
+      if (
+        !explicitProviderOverrideKeys.has(key) &&
+        env[key] === process.env[key] &&
+        Object.prototype.hasOwnProperty.call(process.env, key)
+      ) {
+        return [];
+      }
+      return [[key, env[key]]];
+    })
+  ) as NodeJS.ProcessEnv;
+  for (const key of CLI_SANITIZED_ENV_KEYS) {
+    delete mergedEnv[key];
+  }
+  for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
     delete mergedEnv[key];
   }
   return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
     env: {
       ...mergedEnv,
       ...DEFAULT_RUNTIME_TEST_ENV,
+      ...DEFAULT_REPO_CONFIG_TEST_ENV,
+      ...explicitProviderOverrides,
       ...explicitRuntimeOverrides
     },
     timeout: timeoutMs
@@ -135,7 +171,7 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
 
 describe('codex-orchestrator command surface', () => {
   it('prints root help with quickstart guidance', async () => {
-    const { stdout } = await runCli(['--help']);
+    const { stdout } = await runCli(['--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
     expect(stdout).toContain('codex defaults');
@@ -143,7 +179,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
     expect(stdout).toContain('codex-orchestrator doctor --usage --window-days 30');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
     await expect(runCli(['unknown-command'])).rejects.toMatchObject({
@@ -153,27 +189,37 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints status help without requiring a run id', async () => {
-    const { stdout } = await runCli(['status', '--help']);
+    const { stdout } = await runCli(['status', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator status --run <id>');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('requires a run id for status', async () => {
-    await expect(runCli(['status'])).rejects.toMatchObject({
+    await expect(runCli(['status'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('status requires --run <run-id>.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects skills install --only when no skill list is provided', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-only-'));
-    await expect(runCli(['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'])).rejects.toMatchObject({
+    await expect(
+      runCli(
+        ['skills', 'install', '--only', '--codex-home', tempDir, '--format', 'json'],
+        undefined,
+        CLI_BOOT_TIMEOUT
+      )
+    ).rejects.toMatchObject({
       stderr: expect.stringContaining('--only requires a comma-separated list of skill names.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('emits skills install JSON output', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-skills-json-'));
 
-    const { stdout } = await runCli(['skills', 'install', '--only', 'long-poll-wait', '--codex-home', tempDir, '--format', 'json']);
+    const { stdout } = await runCli(
+      ['skills', 'install', '--only', 'long-poll-wait', '--codex-home', tempDir, '--format', 'json'],
+      undefined,
+      SKILLS_INSTALL_JSON_TIMEOUT
+    );
     const payload = JSON.parse(stdout) as {
       targetRoot?: string;
       skills?: string[];
@@ -187,7 +233,7 @@ describe('codex-orchestrator command surface', () => {
         join(tempDir, 'skills', 'long-poll-wait', 'SKILL.md')
       ])
     );
-  }, TEST_TIMEOUT);
+  }, SKILLS_INSTALL_JSON_TIMEOUT);
 
   it('prints resume help without requiring a run id', async () => {
     const { stdout } = await runCli(['resume', '--help'], undefined, CLI_BOOT_TIMEOUT);
@@ -213,33 +259,33 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints pr help', async () => {
-    const { stdout } = await runCli(['pr', '--help']);
+    const { stdout } = await runCli(['pr', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('resolve-merge');
     expect(stdout).toContain('ready-review');
     expect(stdout).toContain('docs/guides/review-artifacts.md');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr help when no subcommand is provided', async () => {
-    const { stdout } = await runCli(['pr']);
+    const { stdout } = await runCli(['pr'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('watch-merge');
     expect(stdout).toContain('ready-review');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr watch-merge help', async () => {
-    const { stdout } = await runCli(['pr', 'watch-merge', '--help']);
+    const { stdout } = await runCli(['pr', 'watch-merge', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr watch-merge');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr resolve-merge help', async () => {
-    const { stdout } = await runCli(['pr', 'resolve-merge', '--help']);
+    const { stdout } = await runCli(['pr', 'resolve-merge', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr resolve-merge');
     expect(stdout).toContain('--exit-on-action-required');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr ready-review help', async () => {
-    const { stdout } = await runCli(['pr', 'ready-review', '--help']);
+    const { stdout } = await runCli(['pr', 'ready-review', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr ready-review');
     expect(stdout).toContain('review handoff is safe after a bounded automated-feedback drain');
     expect(stdout).not.toContain('--auto-merge');
@@ -260,30 +306,30 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints setup help', async () => {
-    const { stdout } = await runCli(['setup', '--help']);
+    const { stdout } = await runCli(['setup', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator setup');
     expect(stdout).toContain('--refresh-skills');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints frontend-test help', async () => {
-    const { stdout } = await runCli(['frontend-test', '--help']);
+    const { stdout } = await runCli(['frontend-test', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator frontend-test [options]');
     expect(stdout).toContain('Runs the frontend-testing pipeline.');
     expect(stdout).toContain('--devtools');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints frontend-test help via positional help', async () => {
-    const { stdout } = await runCli(['frontend-test', 'help']);
+    const { stdout } = await runCli(['frontend-test', 'help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator frontend-test [options]');
     expect(stdout).toContain('--format json');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints codex subcommand help', async () => {
-    const { stdout } = await runCli(['codex', '--help']);
+    const { stdout } = await runCli(['codex', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator codex <subcommand> [options]');
     expect(stdout).toContain('defaults');
     expect(stdout).toContain('--force');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('emits codex setup plan json', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-codex-setup-json-'));
@@ -325,7 +371,7 @@ describe('codex-orchestrator command surface', () => {
   }, TEST_TIMEOUT);
 
   it('prints flow help', async () => {
-    const { stdout } = await runCli(['flow', '--help']);
+    const { stdout } = await runCli(['flow', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator flow');
     expect(stdout).toContain('docs-review');
     expect(stdout).toContain('implementation-gate');
@@ -334,15 +380,15 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Examples:');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('Post-run check:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints review help without invoking run-review', async () => {
-    const { stdout } = await runCli(['review', '--help']);
+    const { stdout } = await runCli(['review', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator review');
     expect(stdout).toContain('Runs the standalone review wrapper');
     expect(stdout).toContain('--manifest <path>');
     expect(stdout).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('launches review via the CLI shell in non-interactive handoff mode', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-review-launch-'));
@@ -381,7 +427,7 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints start help without preparing a run', async () => {
-    const { stdout } = await runCli(['start', '--help']);
+    const { stdout } = await runCli(['start', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator start');
     expect(stdout).toContain('Start a new run');
     expect(stdout).toContain('--auto-issue-log [true|false]');
@@ -390,7 +436,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('codex-orchestrator start docs-review --task <task-id>');
     expect(stdout).toContain('Post-run check:');
     expect(stdout).not.toContain('Run started:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('fails fast when --runtime-mode is provided without a value', async () => {
     await expect(runCli(['start', 'docs-review', '--runtime-mode'])).rejects.toMatchObject({
@@ -759,16 +805,16 @@ describe('codex-orchestrator command surface', () => {
   }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('prints plan help', async () => {
-    const { stdout } = await runCli(['plan', '--help']);
+    const { stdout } = await runCli(['plan', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator plan');
     expect(stdout).toContain('Preview pipeline stages without executing.');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints init help without executing init', async () => {
-    const { stdout } = await runCli(['init', '--help']);
+    const { stdout } = await runCli(['init', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator init codex');
     expect(stdout).toContain('codex.orchestrator.json');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects init without a template', async () => {
     await expect(runCli(['init'])).rejects.toMatchObject({
@@ -900,24 +946,24 @@ describe('codex-orchestrator command surface', () => {
   }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('prints rlm help without running when help flag is passed before goal', async () => {
-    const { stdout } = await runCli(['rlm', '--help']);
+    const { stdout } = await runCli(['rlm', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
     expect(stdout).toContain('--multi-agent [auto|true|false]');
     expect(stdout).toContain('--collab [auto|true|false]  Legacy alias for --multi-agent.');
     expect(stdout).not.toContain('Task:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints rlm help without running when help flag is accidentally given a value', async () => {
-    const { stdout } = await runCli(['rlm', '--help', 'write tests']);
+    const { stdout } = await runCli(['rlm', '--help', 'write tests'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
     expect(stdout).not.toContain('Task:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints rlm help without running when help flag follows the goal', async () => {
-    const { stdout } = await runCli(['rlm', 'write tests', '--help']);
+    const { stdout } = await runCli(['rlm', 'write tests', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator rlm');
     expect(stdout).not.toContain('Task:');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects conflicting multi-agent and collab flag values', async () => {
     await expect(
@@ -1464,6 +1510,37 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('preserves explicit strict repo config env when it matches the ambient provider-worker value', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-ambient-match-'));
+    const originalStrictRepoConfig = process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+    process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = '1';
+    try {
+      const env = {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: tempDir,
+        CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+        CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+        CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
+      };
+      await expect(
+        runCli(
+          ['plan', 'docs-review'],
+          env,
+          CLI_EXEC_TIMEOUT_MS,
+          new Set(['CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'])
+        )
+      ).rejects.toMatchObject({
+        stderr: expect.stringContaining('Repo-local codex.orchestrator.json is required')
+      });
+    } finally {
+      if (originalStrictRepoConfig === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = originalStrictRepoConfig;
+      }
+    }
+  }, TEST_TIMEOUT);
+
   it('allows disabling strict repo config mode per command with --repo-config-required=false', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-override-'));
     const env = {
@@ -1473,7 +1550,12 @@ describe('codex-orchestrator command surface', () => {
       CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
       CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
     };
-    const { stdout } = await runCli(['plan', 'docs-review', '--format', 'json', '--repo-config-required=false'], env);
+    const { stdout } = await runCli(
+      ['plan', 'docs-review', '--format', 'json', '--repo-config-required=false'],
+      env,
+      CLI_EXEC_TIMEOUT_MS,
+      new Set(['CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED'])
+    );
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
       pipeline?: { id?: string };

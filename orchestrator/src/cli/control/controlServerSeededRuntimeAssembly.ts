@@ -1,8 +1,10 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { writeJsonAtomic } from '../utils/fs.js';
+import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { EffectiveDelegationConfig } from '../config/delegationConfig.js';
 import type { RunEventStream } from '../events/runEventStream.js';
@@ -31,6 +33,7 @@ import {
 } from './linearWebhookController.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import {
+  isRecordLike,
   normalizeProviderIntakeState,
   type ProviderIntakeState
 } from './providerIntakeState.js';
@@ -160,6 +163,27 @@ export function createControlServerSeededRuntimeAssembly(
   });
   const linearAdvisoryStatePath = join(options.paths.runDir, LINEAR_ADVISORY_STATE_FILE);
   const providerIntakeStatePath = join(options.paths.runDir, PROVIDER_INTAKE_STATE_FILE);
+  let providerIntakePersistChain = Promise.resolve();
+  const queueProviderIntakePersist = async <T>(operation: () => Promise<T>): Promise<T> => {
+    const nextOperation = providerIntakePersistChain.then(operation, operation);
+    providerIntakePersistChain = nextOperation.then(
+      () => undefined,
+      () => undefined
+    );
+    return await nextOperation;
+  };
+  const readPersistedProviderIntakeState = async (): Promise<ProviderIntakeState | null> => {
+    try {
+      return normalizeProviderIntakeState(
+        JSON.parse(await readFile(providerIntakeStatePath, 'utf8')) as ProviderIntakeState
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return null;
+      }
+      throw error;
+    }
+  };
   const persist = {
     control: async () => writeJsonAtomic(options.paths.controlPath, controlStore.snapshot()),
     confirmations: async () => writeJsonAtomic(options.paths.confirmationsPath, confirmationStore.snapshot()),
@@ -167,7 +191,24 @@ export function createControlServerSeededRuntimeAssembly(
     delegationTokens: async () =>
       writeJsonAtomic(options.paths.delegationTokensPath, { tokens: delegationTokens.list() }),
     linearAdvisory: async () => writeJsonAtomic(linearAdvisoryStatePath, linearAdvisoryState),
-    providerIntake: async () => writeJsonAtomic(providerIntakeStatePath, providerIntakeState)
+    providerIntake: async () =>
+      await queueProviderIntakePersist(async () => {
+        await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
+      }),
+    providerIntakePolling: async (polling, updatedAt) =>
+      await queueProviderIntakePersist(async () => {
+        const nextState = (await readPersistedProviderIntakeState()) ?? normalizeProviderIntakeState(null);
+        const nextPolling = isRecordLike(polling) ? { ...polling } : null;
+        nextState.polling = nextPolling;
+        const nextPollingUpdatedAt =
+          typeof nextPolling?.updated_at === 'string' && nextPolling.updated_at.trim().length > 0
+            ? nextPolling.updated_at
+            : isoTimestamp();
+        const nextStateUpdatedAt =
+          typeof updatedAt === 'string' && updatedAt.trim().length > 0 ? updatedAt : nextPollingUpdatedAt;
+        nextState.updated_at = pickLatestTimestamp(nextState.updated_at, nextStateUpdatedAt);
+        await writeJsonAtomic(providerIntakeStatePath, nextState);
+      })
   } satisfies ControlRequestPersist;
   providerIssueHandoff =
     options.createProviderIssueHandoff?.({
@@ -197,4 +238,16 @@ export function createControlServerSeededRuntimeAssembly(
   return {
     requestContextShared
   };
+}
+
+function pickLatestTimestamp(currentIso: string | null | undefined, candidateIso: string): string {
+  const currentMs = Date.parse(currentIso ?? '');
+  const candidateMs = Date.parse(candidateIso);
+  if (!Number.isFinite(currentMs)) {
+    return candidateIso;
+  }
+  if (!Number.isFinite(candidateMs)) {
+    return currentIso ?? candidateIso;
+  }
+  return candidateMs >= currentMs ? candidateIso : currentIso ?? candidateIso;
 }

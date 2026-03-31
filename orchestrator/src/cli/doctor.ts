@@ -24,6 +24,7 @@ import {
   runCloudPreflight,
   type CloudPreflightIssue
 } from './utils/cloudPreflight.js';
+import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 import {
   BASELINE_AGENTS,
   BASELINE_MODEL,
@@ -320,7 +321,7 @@ export async function runDoctorCloudPreflight(options: {
   branch?: string | null;
   taskId?: string | null;
 } = {}): Promise<DoctorCloudPreflightResult> {
-  const env = options.env ?? process.env;
+  const env = sanitizeProviderOverrideEnv(options.env ?? process.env);
   const explicitCwd = normalizeOptionalString(options.cwd);
   const cwd = explicitCwd ? resolve(explicitCwd) : process.cwd();
   // An explicit cwd is the caller's repo hint; only fall back to the ambient root override when cwd is implicit.
