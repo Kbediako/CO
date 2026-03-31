@@ -11,7 +11,6 @@ const execFileAsync = promisify(execFile);
 
 const WORKSPACE_ROOT = process.cwd();
 const CLI_ENTRY = join(WORKSPACE_ROOT, 'bin', 'codex-orchestrator.ts');
-const FRONTEND_TESTING_RUNNER_SOURCE = join(WORKSPACE_ROOT, 'orchestrator', 'src', 'cli', 'frontendTestingRunner.ts');
 const SHIPPED_FRONTEND_TESTING_STAGE_COMMAND =
   'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/frontendTestingRunner.js"';
 const TEST_TIMEOUT = 30000;
@@ -134,7 +133,6 @@ async function runFrontendTestWithEnv(
 }
 
 async function writeFrontendTestingFixtureConfig(rootDir: string): Promise<void> {
-  const runnerPath = join(rootDir, 'dist', 'orchestrator', 'src', 'cli', 'frontendTestingRunner.js');
   const config = {
     pipelines: [
       {
@@ -148,36 +146,13 @@ async function writeFrontendTestingFixtureConfig(rootDir: string): Promise<void>
             title: 'Run frontend testing',
             command: SHIPPED_FRONTEND_TESTING_STAGE_COMMAND,
             env: {
-              CODEX_NON_INTERACTIVE: '1',
-              CODEX_ORCHESTRATOR_PACKAGE_ROOT: rootDir
+              CODEX_NON_INTERACTIVE: '1'
             }
           }
         ]
       }
     ]
   };
-  await mkdir(join(rootDir, 'dist', 'orchestrator', 'src', 'cli'), { recursive: true });
-  await writeFile(
-    runnerPath,
-    [
-      "const { spawn } = require('node:child_process');",
-      `const runnerSource = ${JSON.stringify(FRONTEND_TESTING_RUNNER_SOURCE)};`,
-      `const workspaceRoot = ${JSON.stringify(WORKSPACE_ROOT)};`,
-      "const child = spawn(process.execPath, ['--loader', 'ts-node/esm', runnerSource], {",
-      "  stdio: 'inherit',",
-      '  env: process.env,',
-      '  cwd: workspaceRoot',
-      '});',
-      "child.once('error', (error) => {",
-      "  console.error(error instanceof Error ? error.message : String(error));",
-      '  process.exitCode = 1;',
-      '});',
-      "child.once('exit', (code) => {",
-      '  process.exitCode = code ?? 1;',
-      '});'
-    ].join('\n'),
-    'utf8'
-  );
   await writeFile(join(rootDir, 'codex.orchestrator.json'), `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 }
 
