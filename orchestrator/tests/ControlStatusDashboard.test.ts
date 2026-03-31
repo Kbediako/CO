@@ -434,6 +434,34 @@ describe('control status dashboard', () => {
     ].join('\n'));
   });
 
+  it('clamps retry error text to the available row width on narrow terminals', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        retrying: [
+          {
+            ...buildDataset().retrying[0],
+            error:
+              'provider timeout while streaming a very long recovery payload that should not wrap the retry queue row on narrow terminals'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 68,
+      throughputTps: 0
+    });
+
+    const retryLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.includes('↻ CO-27'));
+    expect(retryLine).toBeDefined();
+    expect(retryLine).toContain('error=');
+    expect(retryLine?.length ?? 0).toBeLessThanOrEqual(68);
+  });
+
   it('renders empty sections cleanly', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
@@ -505,6 +533,10 @@ describe('control status dashboard', () => {
   it('sanitizes terminal control characters before rendering text fields', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
+        rate_limits: {
+          ...buildDataset().rate_limits,
+          limit_id: 'gpt-5\u001b[31m'
+        },
         tracked: { linear: null },
         running: [
           {
@@ -534,6 +566,7 @@ describe('control status dashboard', () => {
     const plainFrame = stripAnsi(frame);
     expect(plainFrame).not.toContain('\u0007');
     expect(plainFrame).toContain('│ Dashboard: http://127.0.0.1:4100');
+    expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50');
     expect(plainFrame).toContain('│ ● CO-26      running');
     expect(plainFrame).toContain('worker link active');
     expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=oops red next line');

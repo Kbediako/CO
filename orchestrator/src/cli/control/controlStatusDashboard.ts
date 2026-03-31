@@ -262,7 +262,7 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
   lines.push('│');
   lines.push(colorize('├─ Backoff queue', ANSI_BOLD));
   lines.push('│');
-  lines.push(...renderRetryRows(input.dataset.retrying, referenceTime));
+  lines.push(...renderRetryRows(input.dataset.retrying, referenceTime, terminalColumns));
   lines.push('╰─');
 
   return lines.join('\n');
@@ -407,20 +407,30 @@ function renderRunningRow(
   return `│ ${colorize('●', accent)} ${cells.join(' ')}`;
 }
 
-function renderRetryRows(entries: OperatorDashboardRetryPayload[], referenceTime: Date): string[] {
+function renderRetryRows(
+  entries: OperatorDashboardRetryPayload[],
+  referenceTime: Date,
+  terminalColumns: number
+): string[] {
   if (entries.length === 0) {
     return [`│  ${colorize('No queued retries', ANSI_GRAY)}`];
   }
   return [...entries]
     .sort((left, right) => compareDueAt(left.due_at, right.due_at))
-    .map((entry) => renderRetryRow(entry, referenceTime));
+    .map((entry) => renderRetryRow(entry, referenceTime, terminalColumns));
 }
 
-function renderRetryRow(entry: OperatorDashboardRetryPayload, referenceTime: Date): string {
+function renderRetryRow(
+  entry: OperatorDashboardRetryPayload,
+  referenceTime: Date,
+  terminalColumns: number
+): string {
   const issueIdentifier = sanitizeDisplayValue(entry.issue_identifier);
   const attempt = formatNullable(entry.attempt);
   const relativeDue = formatRelativeDue(entry.due_at, referenceTime);
-  const error = formatRetryError(entry.error);
+  const prefixText = `${issueIdentifier} attempt=${attempt} in ${relativeDue}`;
+  const availableErrorWidth = Math.max(0, terminalColumns - 5 - prefixText.length);
+  const error = formatRetryError(entry.error, availableErrorWidth);
   return (
     `│  ${colorize('↻', ANSI_YELLOW)} ` +
     colorize(issueIdentifier, ANSI_RED) +
@@ -600,12 +610,12 @@ function formatRelativeDue(dueAt: string | null | undefined, referenceTime: Date
   return `${seconds}.${String(milliseconds).padStart(3, '0')}s`;
 }
 
-function formatRetryError(error: string | null | undefined): string {
+function formatRetryError(error: string | null | undefined, maxWidth = 96): string {
   const sanitized = sanitizeDisplayValue(error);
-  if (sanitized === '-') {
+  if (sanitized === '-' || maxWidth <= 0) {
     return '';
   }
-  return ` ${colorize(`error=${truncate(sanitized, 96)}`, ANSI_DIM)}`;
+  return colorize(truncatePlain(` error=${sanitized}`, maxWidth), ANSI_DIM);
 }
 
 function formatRuntimeAndTurns(
@@ -666,7 +676,7 @@ function formatRateLimits(
   const credits = asRecord(value.credits);
   if (limitId || primary || secondary || credits) {
     const pieces: string[] = [];
-    pieces.push(colorize(limitId ?? 'unknown', ANSI_YELLOW));
+    pieces.push(colorize(sanitizeDisplayValue(limitId ?? 'unknown'), ANSI_YELLOW));
     if (primary) {
       pieces.push(colorize(`primary ${formatRateLimitBucket(primary, referenceTime)}`, ANSI_CYAN));
     }
