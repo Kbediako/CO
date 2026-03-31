@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260331-linear-cd3020f3-b6be-4adb-ae00-1a15497de036",
+      "title": "CO: Make CO STATUS inspectable in smaller terminals and easy to launch",
+      "relates_to": "tasks/tasks-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-31",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-31",
+          "manifest": ".runs/linear-cd3020f3-b6be-4adb-ae00-1a15497de036-docs-review/cli/2026-03-31T08-32-40-711Z-9badba58/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
+        "task": "tasks/tasks-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
+        "agent_task": ".agent/task/linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
+        "docs": "docs/TECH_SPEC-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md"
+      }
+    },
+    {
       "id": "20260331-linear-50228784-e908-4b2f-81b5-d94dbcf6707c",
       "title": "CO: Machine-verify phase-scoped child-lane acceptance",
       "relates_to": "tasks/tasks-linear-50228784-e908-4b2f-81b5-d94dbcf6707c.md",

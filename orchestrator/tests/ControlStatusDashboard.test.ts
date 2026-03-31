@@ -1,3 +1,8 @@
+import { EventEmitter } from 'node:events';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ControlRuntime } from '../src/cli/control/controlRuntime.js';
@@ -292,6 +297,29 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
   };
 }
 
+class MockDashboardInput extends EventEmitter {
+  readonly isTTY = true;
+  readonly rawModes: boolean[] = [];
+  pauseCalls = 0;
+  resumeCalls = 0;
+
+  setRawMode(mode: boolean): void {
+    this.rawModes.push(mode);
+  }
+
+  pause(): void {
+    this.pauseCalls += 1;
+  }
+
+  resume(): void {
+    this.resumeCalls += 1;
+  }
+
+  emitText(value: string): void {
+    this.emit('data', Buffer.from(value, 'utf8'));
+  }
+}
+
 describe('control status dashboard', () => {
   it('renders a wide full-frame snapshot with Symphony-style terminal chrome', () => {
     const frame = renderControlStatusFrame({
@@ -325,6 +353,10 @@ describe('control status dashboard', () => {
       '├─ Backoff queue',
       '│',
       '│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded',
+      '│',
+      '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
+      '│ Inspect: live | full frame',
+      '│ Snapshot: press s to export a stable frame under run dir',
       '╰─'
     ].join('\n'));
   });
@@ -431,6 +463,10 @@ describe('control status dashboard', () => {
       '│  ↻ CO-30 attempt=1 in 1.500s error=error with \\nnewline',
       '│  ↻ CO-31 attempt=4 in 4.250s error=network timeout',
       '│  ↻ CO-32 attempt=2 in 9.000s error=worker crashed restarting cleanly',
+      '│',
+      '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
+      '│ Inspect: live | full frame',
+      '│ Snapshot: press s to export a stable frame under run dir',
       '╰─'
     ].join('\n'));
     for (const line of plainFrame.split('\n')) {
@@ -503,8 +539,70 @@ describe('control status dashboard', () => {
       '├─ Backoff queue',
       '│',
       '│  No queued retries',
+      '│',
+      '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
+      '│ Inspect: live | full frame',
+      '│ Snapshot: press s to export a stable frame under run dir',
       '╰─'
     ].join('\n'));
+  });
+
+  it('renders compact inspect mode as a short-terminal summary frame', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset(),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      terminalRows: 10,
+      throughputTps: 1842.7,
+      paused: true,
+      viewMode: 'compact',
+      pendingUpdate: true,
+      snapshotStatus: 'saved',
+      snapshotPath:
+        '/repo/.runs/local-mcp/cli/control-host/co-status-snapshots/co-status-20260331T093000Z.txt',
+      snapshotMessage: 'saved'
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toBe([
+      '╭─ CO STATUS',
+      '│ Status: 1/2 tracked | 15m 12s | next 15s',
+      '│ Tokens: in 100 | out 117 | total 217',
+      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
+      '│ Running: CO-26 | running | Worker turn active',
+      '│ Retry: CO-27 | in 60.000s | rate limit exceeded',
+      '│ Controls: p resume live redraw | c full frame | s snapshot export',
+      '│ Inspect: paused | compact inspect | updates waiting',
+      '│ Snapshot: saved | /repo/.runs/local-mcp/cli/control-host/co-status-snapshots/co-status-20260331T093000Z.txt',
+      '╰─'
+    ].join('\n'));
+    expect(plainFrame.split('\n')).toHaveLength(10);
+  });
+
+  it('keeps the active polling state visible in compact inspect mode', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        polling: {
+          ...buildDataset().polling,
+          checking: true,
+          next_poll_in_ms: 15000
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      terminalRows: 10,
+      viewMode: 'compact'
+    });
+
+    expect(stripAnsi(frame)).toContain('│ Status: 1/2 tracked | 15m 12s | checking now...');
   });
 
   it('renders absolute rate-limit reset timestamps against the dashboard snapshot time', () => {
@@ -796,6 +894,545 @@ describe('control status dashboard', () => {
     handle.stop();
     await vi.advanceTimersByTimeAsync(5000);
     expect(requestRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('suppresses timed and runtime-triggered rerenders while paused until resumed', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let listener: (() => void) | null = null;
+    const requestRefresh = vi.fn(async () => undefined);
+    const runtime = {
+      requestRefresh,
+      subscribe: vi.fn((callback: () => void) => {
+        listener = callback;
+        return () => {
+          listener = null;
+        };
+      }),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => buildDataset(),
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+    expect(writes[0]?.endsWith('\n')).toBe(false);
+
+    input.emitText('p');
+    await handle.flush();
+    const pausedWriteCount = writes.length;
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | full frame');
+
+    listener?.();
+    await handle.flush();
+    expect(writes).toHaveLength(pausedWriteCount);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+    expect(writes).toHaveLength(pausedWriteCount);
+
+    input.emitText('c');
+    await handle.flush();
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain(
+      '│ Inspect: paused | compact inspect | updates waiting'
+    );
+    expect(writes).toHaveLength(pausedWriteCount + 1);
+
+    input.emitText('p');
+    await handle.flush();
+    expect(requestRefresh).toHaveBeenCalledTimes(2);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+
+    handle.stop();
+    expect(input.rawModes).toEqual([true, false]);
+  });
+
+  it('preserves queued force refreshes when an inspect rerender is requested mid-render', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let resolveFirstDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const firstDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveFirstDataset = resolve;
+    });
+    let readCount = 0;
+    const requestRefresh = vi.fn(async () => undefined);
+    const runtime = {
+      requestRefresh,
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => {
+          readCount += 1;
+          if (readCount === 1) {
+            return await firstDataset;
+          }
+          return buildDataset();
+        },
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+
+    input.emitText('c');
+    await Promise.resolve();
+
+    resolveFirstDataset?.(buildDataset());
+    await handle.flush();
+
+    expect(requestRefresh).toHaveBeenCalledTimes(2);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+
+    handle.stop();
+  });
+
+  it('does not let cached inspect rerenders swallow queued runtime updates', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let listener: (() => void) | null = null;
+    let resolveFirstDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const firstDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveFirstDataset = resolve;
+    });
+    let readCount = 0;
+    const updatedDataset = buildDataset({
+      running: [
+        {
+          ...buildDataset().running[0],
+          last_message: 'Worker turn updated'
+        }
+      ]
+    });
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn((callback: () => void) => {
+        listener = callback;
+        return () => {
+          listener = null;
+        };
+      }),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => {
+          readCount += 1;
+          if (readCount === 1) {
+            return await firstDataset;
+          }
+          return updatedDataset;
+        },
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    listener?.();
+    await Promise.resolve();
+    input.emitText('c');
+    await Promise.resolve();
+
+    resolveFirstDataset?.(buildDataset());
+    await handle.flush();
+
+    expect(readCount).toBe(2);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Running: CO-26 | running | Worker turn updated');
+
+    handle.stop();
+  });
+
+  it('preserves pending updates that arrive while paused during an in-flight render', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let listener: (() => void) | null = null;
+    let resolveFirstDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const firstDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveFirstDataset = resolve;
+    });
+    let readCount = 0;
+    const requestRefresh = vi.fn(async () => undefined);
+    const runtime = {
+      requestRefresh,
+      subscribe: vi.fn((callback: () => void) => {
+        listener = callback;
+        return () => {
+          listener = null;
+        };
+      }),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => {
+          readCount += 1;
+          if (readCount === 1) {
+            return await firstDataset;
+          }
+          return buildDataset();
+        },
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+
+    input.emitText('p');
+    await Promise.resolve();
+    listener?.();
+    await Promise.resolve();
+
+    resolveFirstDataset?.(buildDataset());
+    await handle.flush();
+
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | full frame | updates waiting');
+
+    input.emitText('p');
+    await handle.flush();
+
+    expect(requestRefresh).toHaveBeenCalledTimes(2);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | full frame');
+
+    handle.stop();
+  });
+
+  it('warns when the rendered full frame exceeds the visible terminal height by a single row', () => {
+    const unconstrainedFrame = stripAnsi(
+      renderControlStatusFrame({
+        dataset: buildDataset(),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        terminalColumns: 120,
+        terminalRows: Number.POSITIVE_INFINITY
+      })
+    );
+    const fullFrameLineCount = unconstrainedFrame.split('\n').length;
+
+    const constrainedFrame = stripAnsi(
+      renderControlStatusFrame({
+        dataset: buildDataset(),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        terminalColumns: 120,
+        terminalRows: fullFrameLineCount - 1
+      })
+    );
+
+    expect(constrainedFrame).toContain('│ Inspect: live | full frame | short terminal: pause then compact');
+  });
+
+  it('ignores terminal escape sequences so arrow keys do not trigger compact inspect', async () => {
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => buildDataset(),
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    const initialWriteCount = writes.length;
+
+    input.emitText('\u001b[');
+    await handle.flush();
+    input.emitText('C');
+    await handle.flush();
+    expect(writes).toHaveLength(initialWriteCount);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | full frame');
+
+    input.emitText('c');
+    await handle.flush();
+    expect(writes).toHaveLength(initialWriteCount + 1);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+
+    handle.stop();
+  });
+
+  it('exports the current inspect frame under the host run directory and keeps the live dashboard available', async () => {
+    vi.useFakeTimers();
+
+    const runDir = await mkdtemp(join(tmpdir(), 'co-status-dashboard-'));
+    try {
+      const writes: string[] = [];
+      const input = new MockDashboardInput();
+      const runtime = {
+        requestRefresh: vi.fn(async () => undefined),
+        subscribe: vi.fn(() => () => undefined),
+        snapshot: vi.fn(() => ({
+          readCompatibilityProjection: vi.fn(async () => {
+            throw new Error('unexpected readCompatibilityProjection call in test');
+          })
+        }))
+      } as unknown as ControlRuntime;
+
+      const handle = startControlStatusDashboard(
+        {
+          runtime,
+          baseUrl: 'http://127.0.0.1:4100',
+          taskId: 'local-mcp',
+          runId: 'control-host',
+          runDir,
+          startPipelineId: 'provider-linear-worker',
+          input,
+          output: {
+            write(chunk: string) {
+              writes.push(chunk);
+              return true;
+            },
+            columns: 220,
+            rows: 10,
+            isTTY: true
+          }
+        },
+        {
+          readDataset: async () => buildDataset(),
+          setTimeout,
+          clearTimeout
+        }
+      );
+
+      await handle.flush();
+      input.emitText('p');
+      await handle.flush();
+      input.emitText('c');
+      await handle.flush();
+      input.emitText('s');
+      await handle.flush();
+
+      const snapshotDir = join(runDir, 'co-status-snapshots');
+      const [snapshotFile] = await readdir(snapshotDir);
+      expect(snapshotFile).toBeDefined();
+      const snapshotPath = join(snapshotDir, snapshotFile as string);
+      const snapshotText = await readFile(snapshotPath, 'utf8');
+      expect(snapshotText).toContain('╭─ CO STATUS');
+      expect(snapshotText).toContain('│ Inspect: paused | compact inspect');
+      expect(stripAnsi(writes.at(-1) ?? '')).toContain(`│ Snapshot: saved | ${snapshotPath}`);
+
+      input.emitText('p');
+      await handle.flush();
+      expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+
+      handle.stop();
+    } finally {
+      await rm(runDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses unique snapshot filenames for rapid exports in the same second', async () => {
+    vi.useFakeTimers();
+
+    const runDir = await mkdtemp(join(tmpdir(), 'co-status-dashboard-'));
+    let currentTime = new Date('2026-03-30T01:15:30.001Z');
+    try {
+      const input = new MockDashboardInput();
+      const runtime = {
+        requestRefresh: vi.fn(async () => undefined),
+        subscribe: vi.fn(() => () => undefined),
+        snapshot: vi.fn(() => ({
+          readCompatibilityProjection: vi.fn(async () => {
+            throw new Error('unexpected readCompatibilityProjection call in test');
+          })
+        }))
+      } as unknown as ControlRuntime;
+
+      const handle = startControlStatusDashboard(
+        {
+          runtime,
+          baseUrl: 'http://127.0.0.1:4100',
+          taskId: 'local-mcp',
+          runId: 'control-host',
+          runDir,
+          startPipelineId: 'provider-linear-worker',
+          input,
+          output: {
+            write() {
+              return true;
+            },
+            columns: 220,
+            rows: 10,
+            isTTY: true
+          }
+        },
+        {
+          readDataset: async () => buildDataset(),
+          setTimeout,
+          clearTimeout,
+          now: () => new Date(currentTime)
+        }
+      );
+
+      await handle.flush();
+      input.emitText('s');
+      await handle.flush();
+
+      currentTime = new Date('2026-03-30T01:15:30.002Z');
+      input.emitText('s');
+      await handle.flush();
+
+      const snapshotDir = join(runDir, 'co-status-snapshots');
+      const snapshotFiles = (await readdir(snapshotDir)).sort();
+      expect(snapshotFiles).toHaveLength(2);
+      expect(snapshotFiles[0]).not.toBe(snapshotFiles[1]);
+      expect(snapshotFiles[0]).toContain('20260330T011530001Z');
+      expect(snapshotFiles[1]).toContain('20260330T011530002Z');
+
+      handle.stop();
+    } finally {
+      await rm(runDir, { recursive: true, force: true });
+    }
   });
 
   it('anchors live frame timing to the dataset snapshot timestamp', async () => {
