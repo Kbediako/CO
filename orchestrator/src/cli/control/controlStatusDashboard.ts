@@ -355,11 +355,11 @@ function renderTokensLine(dataset: OperatorDashboardDataset, terminalColumns: nu
   return renderSummaryLine(
     'Tokens',
     [
-      { text: `in ${formatCount(dataset.totals.input_tokens)}`, color: ANSI_YELLOW },
+      { text: `in ${formatOptionalCount(dataset.totals.input_tokens)}`, color: ANSI_YELLOW },
       { text: ' | ', color: ANSI_GRAY },
-      { text: `out ${formatCount(dataset.totals.output_tokens)}`, color: ANSI_YELLOW },
+      { text: `out ${formatOptionalCount(dataset.totals.output_tokens)}`, color: ANSI_YELLOW },
       { text: ' | ', color: ANSI_GRAY },
-      { text: `total ${formatCount(dataset.totals.total_tokens)}`, color: ANSI_YELLOW }
+      { text: `total ${formatOptionalCount(dataset.totals.total_tokens)}`, color: ANSI_YELLOW }
     ],
     terminalColumns
   );
@@ -535,7 +535,7 @@ function formatRunningColumnValue(
     case 'age':
       return formatRuntimeAndTurns(entry.started_at, referenceTime, entry.turn_count);
     case 'tokens':
-      return formatCount(entry.tokens.total_tokens);
+      return formatOptionalCount(entry.tokens.total_tokens);
     case 'session':
       return compactSessionId(entry.session_id);
     case 'event':
@@ -721,6 +721,27 @@ function formatCount(value: number | string | null | undefined): string {
     return NUMBER_FORMAT.format(Math.trunc(value));
   }
   return '0';
+}
+
+function formatOptionalCount(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return '-';
+    }
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed)) {
+      return NUMBER_FORMAT.format(Math.trunc(parsed));
+    }
+    return sanitizeDisplayValue(trimmed);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return NUMBER_FORMAT.format(Math.trunc(value));
+  }
+  return '-';
 }
 
 function formatRateLimitSegments(

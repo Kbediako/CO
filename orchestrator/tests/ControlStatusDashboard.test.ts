@@ -598,6 +598,40 @@ describe('control status dashboard', () => {
     expect(stripAnsi(frame)).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=C:\\runs\\retry next line');
   });
 
+  it('renders unknown token usage as unavailable instead of numeric zero', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        totals: {
+          ...buildDataset().totals,
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        },
+        running: [
+          {
+            ...buildDataset().running[0],
+            tokens: {
+              input_tokens: null,
+              output_tokens: null,
+              total_tokens: null
+            }
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Tokens: in - | out - | total -');
+    expect(plainFrame).toContain('│ ● CO-26      running      15m 0s / 4            - session-26');
+  });
+
   it('clamps dashboard error frames to the active terminal width', async () => {
     const writes: string[] = [];
     const runtime = {
