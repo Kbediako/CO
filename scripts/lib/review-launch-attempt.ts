@@ -34,6 +34,7 @@ const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enable
 const REVIEW_PARTIAL_OUTPUT_HINT_BOUNDARY_KINDS = new Set(['timeout', 'stall', 'startup-loop']);
 
 type ScopeFlagMode = 'commit' | 'base' | 'uncommitted';
+type ReviewTitleSource = 'user' | 'notes-surface';
 
 export interface ReviewLaunchCliOptions {
   task?: string;
@@ -41,6 +42,7 @@ export interface ReviewLaunchCliOptions {
   base?: string;
   commit?: string;
   title?: string;
+  titleSource?: ReviewTitleSource;
   uncommitted?: boolean;
   enableDelegationMcp?: boolean;
   disableDelegationMcp?: boolean;
@@ -197,9 +199,19 @@ export async function runReviewLaunchAttemptShell(
     scopedLaunchContext.prompt_delivery === 'artifact-only' &&
     scopedLaunchContext.scope_flag_mode !== null
   ) {
-    console.log(
-      `[run-review] explicit ${scopedLaunchContext.scope_flag_mode} scope keeps prompt context in the saved artifact only; current codex review still treats stdin ("-") as [PROMPT], so this launch omits any prompt argument.`
-    );
+    if (scopedLaunchContext.reviewer_visible_context_transport === 'scoped-title') {
+      const titleSourceLabel =
+        scopedLaunchContext.reviewer_visible_title_source === 'user'
+          ? 'user-provided --title'
+          : 'bounded NOTES+surface title';
+      console.log(
+        `[run-review] explicit ${scopedLaunchContext.scope_flag_mode} scope keeps full prompt context in the saved artifact; current codex review still rejects inline prompt transport under scope flags, so this launch omits any prompt argument and uses ${titleSourceLabel} for reviewer-visible context.`
+      );
+    } else {
+      console.log(
+        `[run-review] explicit ${scopedLaunchContext.scope_flag_mode} scope keeps prompt context in the saved artifact only; current codex review still treats stdin ("-") as [PROMPT], so this launch omits any prompt argument.`
+      );
+    }
   }
 
   const reportSuccess = async (
@@ -435,7 +447,7 @@ function resolveScopeFlag(
 }
 
 function buildReviewArgs(
-  options: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'title' | 'uncommitted'>,
+  options: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'title' | 'titleSource' | 'uncommitted'>,
   prompt: string,
   opts: ReviewArgsOptions
 ): string[] {
@@ -444,8 +456,9 @@ function buildReviewArgs(
     args.push('-c', REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE);
   }
   args.push('review');
-  if (options.title) {
-    args.push('--title', options.title);
+  const reviewTitle = resolveReviewTitle(options);
+  if (reviewTitle.title) {
+    args.push('--title', reviewTitle.title);
   }
 
   const scopeFlag = resolveScopeFlag(options);
@@ -461,13 +474,34 @@ function buildReviewArgs(
 }
 
 function buildReviewLaunchContext(
-  options: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'uncommitted'>,
+  options: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'title' | 'titleSource' | 'uncommitted'>,
   opts: Pick<ReviewArgsOptions, 'includeScopeFlags'>
 ): ReviewLaunchContext {
   const scopedFlag = opts.includeScopeFlags ? resolveScopeFlag(options) : null;
+  const reviewTitle = resolveReviewTitle(options);
   return {
     scope_flag_mode: scopedFlag?.mode ?? null,
-    prompt_delivery: scopedFlag ? 'artifact-only' : 'inline'
+    prompt_delivery: scopedFlag ? 'artifact-only' : 'inline',
+    reviewer_visible_context_transport: scopedFlag
+      ? reviewTitle.source
+        ? 'scoped-title'
+        : 'artifact-only'
+      : 'inline-prompt',
+    reviewer_visible_title_source: scopedFlag ? reviewTitle.source : null
+  };
+}
+
+function resolveReviewTitle(
+  options: Pick<ReviewLaunchCliOptions, 'title' | 'titleSource'>
+): { title: string | null; source: ReviewTitleSource | null } {
+  const rawTitle = typeof options.title === 'string' ? options.title.trim() : '';
+  if (rawTitle.length === 0) {
+    return { title: null, source: null };
+  }
+
+  return {
+    title: rawTitle,
+    source: options.titleSource ?? 'user'
   };
 }
 

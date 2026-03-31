@@ -1217,6 +1217,24 @@ function parseArgsLogInvocations(argsLog: string): string[] {
     .filter((entry) => entry.length > 0);
 }
 
+function reviewLaunchContext(
+  scopeFlagMode: 'commit' | 'base' | 'uncommitted' | null,
+  promptDelivery: 'inline' | 'artifact-only' = scopeFlagMode === null ? 'inline' : 'artifact-only',
+  options: {
+    reviewerVisibleContextTransport?: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+    reviewerVisibleTitleSource?: 'user' | 'notes-surface' | null;
+  } = {}
+) {
+  return {
+    scope_flag_mode: scopeFlagMode,
+    prompt_delivery: promptDelivery,
+    reviewer_visible_context_transport:
+      options.reviewerVisibleContextTransport ??
+      (scopeFlagMode === null ? 'inline-prompt' : 'artifact-only'),
+    reviewer_visible_title_source: options.reviewerVisibleTitleSource ?? null
+  } as const;
+}
+
 function baseEnv(sandbox: string, codexBin: string): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -2523,7 +2541,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).not.toContain('R100\t');
   });
 
-  it('executes explicit base-scoped review without an inline prompt argument', async () => {
+  it('executes explicit base-scoped review with synthesized title transport and no inline prompt argument', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
@@ -2552,7 +2570,10 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toBe(`argv=review --base ${baseRef}`);
+    expect(reviewInvocations[0]).toContain(
+      'argv=review --title Surface: diff | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
+    );
+    expect(reviewInvocations[0]).toContain(`--base ${baseRef}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2560,14 +2581,18 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
         prompt_delivery: 'inline' | 'artifact-only';
+        reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+        reviewer_visible_title_source: 'user' | 'notes-surface' | null;
       } | null;
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.error).toBeNull();
-    expect(telemetry.launch_context).toEqual({
-      scope_flag_mode: 'base',
-      prompt_delivery: 'artifact-only'
-    });
+    expect(telemetry.launch_context).toEqual(
+      reviewLaunchContext('base', 'artifact-only', {
+        reviewerVisibleContextTransport: 'scoped-title',
+        reviewerVisibleTitleSource: 'notes-surface'
+      })
+    );
   });
 
   it('treats later review positional tokens as inline prompt content in the fake codex harness', async () => {
@@ -2671,15 +2696,19 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
         prompt_delivery: 'inline' | 'artifact-only';
+        reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+        reviewer_visible_title_source: 'user' | 'notes-surface' | null;
       } | null;
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toBeTruthy();
     expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
-    expect(telemetry.launch_context).toEqual({
-      scope_flag_mode: 'base',
-      prompt_delivery: 'artifact-only'
-    });
+    expect(telemetry.launch_context).toEqual(
+      reviewLaunchContext('base', 'artifact-only', {
+        reviewerVisibleContextTransport: 'scoped-title',
+        reviewerVisibleTitleSource: 'notes-surface'
+      })
+    );
   });
 
   it('still blocks dropping explicit base scope when a pipeline-owned large-scope override is set', async () => {
@@ -2722,18 +2751,22 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
         prompt_delivery: 'inline' | 'artifact-only';
+        reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+        reviewer_visible_title_source: 'user' | 'notes-surface' | null;
       } | null;
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.error).toBeTruthy();
     expect(telemetry.error).toContain('explicit `--base` review scope must remain auditable');
-    expect(telemetry.launch_context).toEqual({
-      scope_flag_mode: 'base',
-      prompt_delivery: 'artifact-only'
-    });
+    expect(telemetry.launch_context).toEqual(
+      reviewLaunchContext('base', 'artifact-only', {
+        reviewerVisibleContextTransport: 'scoped-title',
+        reviewerVisibleTitleSource: 'notes-surface'
+      })
+    );
   });
 
-  it('executes explicit commit-scoped review without an inline prompt argument', async () => {
+  it('executes explicit commit-scoped review with synthesized title transport and no inline prompt argument', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
@@ -2765,7 +2798,10 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toBe(`argv=review --commit ${commitSha}`);
+    expect(reviewInvocations[0]).toContain(
+      'argv=review --title Surface: diff | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
+    );
+    expect(reviewInvocations[0]).toContain(`--commit ${commitSha}`);
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2773,17 +2809,21 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
         prompt_delivery: 'inline' | 'artifact-only';
+        reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+        reviewer_visible_title_source: 'user' | 'notes-surface' | null;
       } | null;
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.error).toBeNull();
-    expect(telemetry.launch_context).toEqual({
-      scope_flag_mode: 'commit',
-      prompt_delivery: 'artifact-only'
-    });
+    expect(telemetry.launch_context).toEqual(
+      reviewLaunchContext('commit', 'artifact-only', {
+        reviewerVisibleContextTransport: 'scoped-title',
+        reviewerVisibleTitleSource: 'notes-surface'
+      })
+    );
   });
 
-  it('executes explicit uncommitted review without an inline prompt argument', async () => {
+  it('executes explicit uncommitted review with synthesized title transport and no inline prompt argument', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
@@ -2810,7 +2850,10 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       entry.includes('argv=review')
     );
     expect(reviewInvocations).toHaveLength(1);
-    expect(reviewInvocations[0]).toBe('argv=review --uncommitted');
+    expect(reviewInvocations[0]).toContain(
+      'argv=review --title Surface: diff | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none'
+    );
+    expect(reviewInvocations[0]).toContain('--uncommitted');
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
@@ -2818,14 +2861,65 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       launch_context: {
         scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
         prompt_delivery: 'inline' | 'artifact-only';
+        reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+        reviewer_visible_title_source: 'user' | 'notes-surface' | null;
       } | null;
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.error).toBeNull();
-    expect(telemetry.launch_context).toEqual({
-      scope_flag_mode: 'uncommitted',
-      prompt_delivery: 'artifact-only'
+    expect(telemetry.launch_context).toEqual(
+      reviewLaunchContext('uncommitted', 'artifact-only', {
+        reviewerVisibleContextTransport: 'scoped-title',
+        reviewerVisibleTitleSource: 'notes-surface'
+      })
+    );
+  });
+
+  it('preserves explicit scoped titles instead of replacing them with synthesized NOTES transport', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
     });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-scoped-prompt',
+        RUN_REVIEW_ARGS_LOG: argsLogPath
+      },
+      ['--base', baseRef, '--title', 'Sample review']
+    );
+
+    expect(result.exitCode).toBe(0);
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toHaveLength(1);
+    expect(reviewInvocations[0]).toContain('--title Sample review');
+    expect(reviewInvocations[0]).not.toContain('Surface: diff | Goal: run-review regression tests');
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      launch_context: {
+        scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
+        prompt_delivery: 'inline' | 'artifact-only';
+        reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+        reviewer_visible_title_source: 'user' | 'notes-surface' | null;
+      } | null;
+    };
+    expect(telemetry.launch_context).toEqual(
+      reviewLaunchContext('base', 'artifact-only', {
+        reviewerVisibleContextTransport: 'scoped-title',
+        reviewerVisibleTitleSource: 'user'
+      })
+    );
   });
 
   it('documents scoped launch prompt handling in the wrapper help output', async () => {
@@ -2836,10 +2930,10 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
     expect(normalizedHelp).toContain(
-      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt but launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT].'
+      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context rides on --title (user-provided when present, otherwise synthesized from NOTES + surface).'
     );
     expect(normalizedHelp).toContain(
-      'Explicit scoped wrapper runs Support only the default diff surface; audit/architecture require prompt-capable unscoped review.'
+      'Explicit scoped wrapper runs Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.'
     );
     expect(normalizedHelp).toContain(
       'Unscoped wrapper runs Pass the saved prompt/context inline to codex review.'

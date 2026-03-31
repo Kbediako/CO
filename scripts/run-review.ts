@@ -5,9 +5,10 @@
  *
  * Note: some codex CLI versions reject combining diff-scoping flags
  * (`--uncommitted`, `--base`, `--commit`) with a custom prompt. This wrapper
- * still writes the prompt artifact for audit continuity, but explicit scoped
+ * still writes the full prompt artifact for audit continuity. Explicit scoped
  * launches omit any prompt argument because the current Codex CLI still treats
- * stdin (`-`) as `[PROMPT]` and rejects it when scope flags are present.
+ * stdin (`-`) as `[PROMPT]` and rejects it when scope flags are present, so the
+ * bounded live context transport for scoped runs is `--title` instead.
  */
 
 import { spawn } from 'node:child_process';
@@ -117,7 +118,7 @@ function buildExplicitScopeSurfaceGateError(
   if (!(options.base || options.commit || options.uncommitted)) {
     return null;
   }
-  return `explicit scoped review cannot honor --surface ${reviewSurface} because current Codex CLI rejects all prompt transport under --base/--commit/--uncommitted; rerun with the default diff surface or drop the explicit scope if you need ${reviewSurface} prompt context.`;
+  return `explicit scoped review cannot honor --surface ${reviewSurface} because current Codex CLI rejects inline prompt transport under --base/--commit/--uncommitted; the wrapper only has bounded --title transport there, so rerun with the default diff surface or drop the explicit scope if you need ${reviewSurface} prompt context.`;
 }
 
 function installStdioErrorGuards(): void {
@@ -381,7 +382,8 @@ async function main(): Promise<void> {
   const {
     promptLines,
     reviewTaskContext,
-    activeCloseoutBundleRoots
+    activeCloseoutBundleRoots,
+    scopedReviewerVisibleTitle
   } = await buildReviewPromptContext({
     repoRoot,
     taskKey,
@@ -394,6 +396,16 @@ async function main(): Promise<void> {
     scopeMode,
     includeBoundedReviewConstraints: !allowHeavyCommands
   });
+  const explicitScopedReview = Boolean(options.base || options.commit || options.uncommitted);
+  const explicitReviewTitle =
+    typeof options.title === 'string' && options.title.trim().length > 0 ? options.title.trim() : null;
+  const effectiveReviewTitle =
+    explicitReviewTitle ?? (explicitScopedReview ? scopedReviewerVisibleTitle : null);
+  const effectiveTitleSource = explicitReviewTitle
+    ? 'user'
+    : explicitScopedReview
+      ? 'notes-surface'
+      : undefined;
   const enforceBoundedMode = !allowHeavyCommands && enforceBoundedReviewMode();
   if (allowHeavyCommands) {
     console.log(
@@ -571,7 +583,11 @@ async function main(): Promise<void> {
     });
 
   await runReviewLaunchAttemptShell({
-    cliOptions: options,
+    cliOptions: {
+      ...options,
+      title: effectiveReviewTitle ?? undefined,
+      titleSource: effectiveTitleSource
+    },
     prompt,
     retryWithoutScopeFlagsGateError,
     runtimeContext,
@@ -682,8 +698,8 @@ Environment:
 
 Behavior:
   Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt
-                                but launch codex review without any prompt argument because current CLI still treats stdin (\`-\`) as [PROMPT].
-  Explicit scoped wrapper runs  Support only the default diff surface; audit/architecture require prompt-capable unscoped review.
+                                and launch codex review without any prompt argument because current CLI still treats stdin (\`-\`) as [PROMPT]; reviewer-visible scoped context rides on --title (user-provided when present, otherwise synthesized from NOTES + surface).
+  Explicit scoped wrapper runs  Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.
   Unscoped wrapper runs         Pass the saved prompt/context inline to codex review.
 `);
 }
