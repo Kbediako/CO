@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp e91d682599210c74d102ce4b079ab54331e789f9f712c0ee4c92bc7ef675bcfb -->
+<!-- codex:instruction-stamp 71b851f6b39516cfb7f6bc39909e546b714bb1439b8f4d4b2c9db681037537a0 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
