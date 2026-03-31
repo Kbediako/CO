@@ -50,7 +50,7 @@
 
 ## Handoff
 - [ ] Workpad refreshed after docs, after implementation, and immediately before any review or merge handoff. Evidence: pending.
-- [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: `linear issue-context` now shows GitHub attachment `CO-54: make validation fixtures hermetic` at `https://github.com/Kbediako/CO/pull/335`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: `git fetch origin refs/heads/main:refs/remotes/origin/main` completed and `git merge-base --is-ancestor origin/main HEAD` returned `up_to_date`.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [x] Issue remains active until review handoff prerequisites are complete. Evidence: issue remains `In Progress`.
