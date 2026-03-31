@@ -52,6 +52,10 @@ import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
+import {
+  normalizeProviderLinearChildLanePathSelectors,
+  type ProviderLinearChildLanePathSelector
+} from './providerLinearChildLanePhaseContract.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
@@ -154,6 +158,8 @@ export interface ProviderLinearWorkerChildStreamRecord {
 export interface ProviderLinearWorkerChildLaneScope {
   files: string[];
   phases: string[];
+  phase_contract_version?: string | null;
+  allowed_path_selectors?: ProviderLinearChildLanePathSelector[] | null;
 }
 
 export interface ProviderLinearWorkerChildLaneParentSnapshot {
@@ -1537,7 +1543,12 @@ function normalizeProviderLinearWorkerChildLaneScope(
   if (!files || !phases || (files.length === 0 && phases.length === 0)) {
     return null;
   }
-  return { files, phases };
+  return {
+    files,
+    phases,
+    phase_contract_version: normalizeOptionalString(value.phase_contract_version),
+    allowed_path_selectors: normalizeProviderLinearChildLanePathSelectors(value.allowed_path_selectors)
+  };
 }
 
 function normalizeProviderLinearWorkerChildLaneParentSnapshot(
