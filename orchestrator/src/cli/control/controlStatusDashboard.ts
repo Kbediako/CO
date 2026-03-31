@@ -565,7 +565,9 @@ function appendTokenSample(
   totalTokens: number | null | undefined
 ): TokenSample[] {
   const normalizedTotal = normalizeFiniteNumber(totalTokens);
-  return [{ timestampMs, totalTokens: normalizedTotal }, ...samples].filter(
+  const baselineSamples =
+    samples.length > 0 && normalizedTotal < samples[0].totalTokens ? [] : samples;
+  return [{ timestampMs, totalTokens: normalizedTotal }, ...baselineSamples].filter(
     (sample) => sample.timestampMs >= timestampMs - THROUGHPUT_WINDOW_MS
   );
 }
