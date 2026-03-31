@@ -171,6 +171,9 @@ codex-orchestrator linear create-follow-up \
 - Keep exactly one active `## Codex Workpad` comment current. Refresh it after each meaningful milestone, immediately before review or merge handoffs, after rework, and after merge completion. Final closeout stays in the same workpad comment. Do not create duplicate progress or terminal summary comments.
 - Always read `issue-context` before any transition so you use the team's actual workflow state names.
 - Attach the PR before handing off to `Human Review` or the live-team alias `In Review`.
+- In provider-worker issue workspaces, audited `linear child-stream` and `linear child-lane` runs record manifests under the workspace-scoped artifact root for that issue workspace, for example `.runs/linear-<uuid>/cli/<runId>/manifest.json`.
+- Treat those workspace-scoped manifests as the intended delegation evidence path.
+- Do not reach for blanket `DELEGATION_GUARD_OVERRIDE_REASON` text when valid child evidence already exists in the workspace artifact tree.
 - If a PR is already attached, run a full PR feedback sweep before any new implementation work:
   - check top-level PR comments
   - check inline review comments and unresolved review threads

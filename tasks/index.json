@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260331-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be",
+      "title": "CO: Reconcile provider-worker child-stream delegation evidence with delegation guard",
+      "relates_to": "tasks/tasks-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-31",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-31",
+          "manifest": ".runs/linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be-docs-review/cli/2026-03-31T08-23-01-823Z-0c86b6cb/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md",
+        "task": "tasks/tasks-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md",
+        "agent_task": ".agent/task/linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md",
+        "docs": "docs/TECH_SPEC-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md"
+      }
+    },
+    {
       "id": "20260331-linear-06732957-908a-4f3e-96b5-bebb33fc612e",
       "title": "CO: Make validation tests hermetic to host config and temp-workspace guardrails",
       "relates_to": "tasks/tasks-linear-06732957-908a-4f3e-96b5-bebb33fc612e.md",
