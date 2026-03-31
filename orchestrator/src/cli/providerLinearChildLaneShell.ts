@@ -920,6 +920,21 @@ async function resolveChildLaneDecision(
         status: 409
       });
     }
+    if (!acceptedProof.scope) {
+      await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+      return failureResult({
+        action: 'accept',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: target,
+        code: 'provider_worker_child_lane_proof_invalid',
+        message: 'Phase-scoped child lane proof is missing scope contract metadata.',
+        status: 409
+      });
+    }
     const proofViolation = resolveAcceptedChildLaneProofViolation(
       context.runId,
       target,
