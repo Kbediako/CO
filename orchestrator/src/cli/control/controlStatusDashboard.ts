@@ -467,7 +467,7 @@ export function startControlStatusDashboard(
       };
       frameState = {
         ...frameState,
-        pendingUpdate: false
+        pendingUpdate: frameState.paused ? frameState.pendingUpdate : false
       };
       output.write(`${ANSI_CLEAR_HOME}${renderControlStatusFrame({
         dataset,

@@ -1050,6 +1050,87 @@ describe('control status dashboard', () => {
     handle.stop();
   });
 
+  it('preserves pending updates that arrive while paused during an in-flight render', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let listener: (() => void) | null = null;
+    let resolveFirstDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const firstDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveFirstDataset = resolve;
+    });
+    let readCount = 0;
+    const requestRefresh = vi.fn(async () => undefined);
+    const runtime = {
+      requestRefresh,
+      subscribe: vi.fn((callback: () => void) => {
+        listener = callback;
+        return () => {
+          listener = null;
+        };
+      }),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => {
+          readCount += 1;
+          if (readCount === 1) {
+            return await firstDataset;
+          }
+          return buildDataset();
+        },
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+
+    input.emitText('p');
+    await Promise.resolve();
+    listener?.();
+    await Promise.resolve();
+
+    resolveFirstDataset?.(buildDataset());
+    await handle.flush();
+
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | full frame | updates waiting');
+
+    input.emitText('p');
+    await handle.flush();
+
+    expect(requestRefresh).toHaveBeenCalledTimes(2);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | full frame');
+
+    handle.stop();
+  });
+
   it('warns when the rendered full frame exceeds the visible terminal height by a single row', () => {
     const unconstrainedFrame = stripAnsi(
       renderControlStatusFrame({
