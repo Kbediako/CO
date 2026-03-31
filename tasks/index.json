@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260330-linear-98ba135e-832e-4bec-bf4a-58acb3803f08",
+      "title": "CO: Clarify bounded-success vs failed review-wrapper outcomes for operators",
+      "relates_to": "tasks/tasks-linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-98ba135e-832e-4bec-bf4a-58acb3803f08-docs-review/cli/2026-03-30T06-54-06-198Z-cd3a0182/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md",
+        "task": "tasks/tasks-linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md",
+        "agent_task": ".agent/task/linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md",
+        "docs": "docs/TECH_SPEC-linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md"
+      }
+    },
+    {
       "id": "20260330-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa",
       "title": "CO: Auto-resume or fail explicitly after interrupted Merging-stage merge drain",
       "relates_to": "tasks/tasks-linear-d223e9f3-3708-40d9-abfe-14c305a8c3aa.md",

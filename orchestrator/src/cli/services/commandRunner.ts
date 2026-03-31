@@ -21,6 +21,10 @@ import { persistManifest, type ManifestPersister } from '../run/manifestPersiste
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
+import {
+  deriveReviewOutcomeDisposition,
+  type ReviewOutcomeDisposition
+} from '../../../../scripts/lib/review-execution-telemetry.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
 
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
@@ -32,6 +36,12 @@ const REVIEW_EVIDENCE_CONSISTENCY_ENV_KEY = 'CODEX_REVIEW_ENFORCE_EVIDENCE_CONSI
 const REVIEW_EVIDENCE_WAIVER_REASON_ENV_KEY = 'CODEX_REVIEW_EVIDENCE_WAIVER_REASON';
 const REVIEW_TELEMETRY_POLL_INTERVAL_MS = 50;
 const REVIEW_TELEMETRY_WAIT_TIMEOUT_MS = 2_000;
+const REVIEW_OUTCOME_BOUNDARY_PRESENCE_SENTINEL = {
+  kind: 'timeout',
+  provenance: 'review-timeout',
+  reason: '',
+  sample: null
+} as const;
 
 export interface CommandRunnerContext {
   env: EnvironmentPaths;
@@ -63,6 +73,8 @@ interface ReviewTelemetryEvidencePayload {
   generated_at?: unknown;
   output_log_path?: unknown;
   status?: unknown;
+  review_outcome?: unknown;
+  termination_boundary?: unknown;
 }
 
 interface ReviewEvidenceMismatch {
@@ -324,19 +336,33 @@ export async function runCommandStage(
       timedOut,
       timeoutMs: timeoutBoundMs
     });
-    const reviewEvidenceMismatch = shouldEnforceReviewEvidenceConsistency(stage)
+    const enforceReviewEvidenceConsistency = shouldEnforceReviewEvidenceConsistency(stage);
+    const reviewTelemetryPath = join(paths.runDir, 'review', 'telemetry.json');
+    const shouldAwaitReviewTelemetry =
+      isReviewCommandStage(stage) &&
+      shouldAwaitReviewTelemetryEvidence(execEnv, enforceReviewEvidenceConsistency);
+    const reviewTelemetry = isReviewCommandStage(stage)
+      ? await loadReviewTelemetryEvidence(reviewTelemetryPath, {
+          waitForEvidence: shouldAwaitReviewTelemetry
+        })
+      : null;
+    const reviewEvidenceMismatch =
+      isReviewCommandStage(stage) && (enforceReviewEvidenceConsistency || reviewTelemetry !== null)
       ? await verifyReviewEvidenceConsistency({
           env,
           paths,
           expectedStatus: result.status === 'succeeded' ? 'succeeded' : 'failed',
-          startedAt: entry.started_at
+          startedAt: entry.started_at,
+          telemetry: reviewTelemetry,
+          telemetryPreloaded: shouldAwaitReviewTelemetry,
+          telemetryPath: reviewTelemetryPath
         })
       : null;
     const reviewEvidenceWaiverReason = resolveReviewEvidenceWaiverReason(stage.env);
     let effectiveSummary = summary;
     let forceReviewEvidenceFailure = false;
 
-    if (reviewEvidenceMismatch) {
+    if (reviewEvidenceMismatch && enforceReviewEvidenceConsistency) {
       if (reviewEvidenceWaiverReason) {
         effectiveSummary = `${summary} (review evidence waiver: ${reviewEvidenceWaiverReason}; ${reviewEvidenceMismatch.message})`;
         writeEvent({
@@ -359,6 +385,12 @@ export async function runCommandStage(
             ? `Review evidence mismatch: ${reviewEvidenceMismatch.message}`
             : `Review evidence mismatch after command failure: ${reviewEvidenceMismatch.message} Command result: ${summary}`;
         forceReviewEvidenceFailure = true;
+      }
+    }
+    if (!reviewEvidenceMismatch) {
+      const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(reviewTelemetry);
+      if (reviewOutcomeSummary) {
+        effectiveSummary = `${effectiveSummary} (${reviewOutcomeSummary})`;
       }
     }
     const effectiveExitCode =
@@ -510,6 +542,22 @@ function shouldEnforceReviewEvidenceConsistency(stage: CommandStage): boolean {
   );
 }
 
+function shouldAwaitReviewTelemetryEvidence(
+  execEnv: NodeJS.ProcessEnv,
+  enforceReviewEvidenceConsistency: boolean
+): boolean {
+  if (enforceReviewEvidenceConsistency) {
+    return true;
+  }
+  const forced = parseBooleanEnvFlag(execEnv.FORCE_CODEX_REVIEW);
+  const nonInteractive =
+    process.stdin.isTTY !== true ||
+    parseBooleanEnvFlag(execEnv.CODEX_REVIEW_NON_INTERACTIVE) ||
+    parseBooleanEnvFlag(execEnv.CODEX_NON_INTERACTIVE) ||
+    parseBooleanEnvFlag(execEnv.CODEX_NO_INTERACTIVE);
+  return forced || !nonInteractive;
+}
+
 function isReviewCommandStage(stage: CommandStage): boolean {
   const stageId = stage.id.trim().toLowerCase();
   if (stageId === 'review') {
@@ -545,9 +593,15 @@ async function verifyReviewEvidenceConsistency(options: {
   paths: RunPaths;
   expectedStatus: 'succeeded' | 'failed';
   startedAt: string | null | undefined;
+  telemetry?: ReviewTelemetryEvidencePayload | null;
+  telemetryPreloaded?: boolean;
+  telemetryPath?: string;
 }): Promise<ReviewEvidenceMismatch | null> {
-  const telemetryPath = join(options.paths.runDir, 'review', 'telemetry.json');
-  const telemetry = await waitForReviewTelemetryEvidence(telemetryPath);
+  const telemetryPath = options.telemetryPath ?? join(options.paths.runDir, 'review', 'telemetry.json');
+  const telemetry =
+    options.telemetryPreloaded === true
+      ? options.telemetry ?? null
+      : options.telemetry ?? (await waitForReviewTelemetryEvidence(telemetryPath));
   if (!telemetry) {
     return {
       message: 'review telemetry is missing, unreadable, or incomplete at terminal stage closeout.',
@@ -622,24 +676,41 @@ async function verifyReviewEvidenceConsistency(options: {
   return null;
 }
 
+async function loadReviewTelemetryEvidence(
+  telemetryPath: string,
+  options: { waitForEvidence: boolean }
+): Promise<ReviewTelemetryEvidencePayload | null> {
+  if (options.waitForEvidence) {
+    return await waitForReviewTelemetryEvidence(telemetryPath);
+  }
+  return await readReviewTelemetryEvidence(telemetryPath);
+}
+
 async function waitForReviewTelemetryEvidence(
   telemetryPath: string
 ): Promise<ReviewTelemetryEvidencePayload | null> {
   const deadline = Date.now() + REVIEW_TELEMETRY_WAIT_TIMEOUT_MS;
   for (;;) {
-    try {
-      const raw = await readFile(telemetryPath, 'utf8');
-      const parsed = JSON.parse(raw) as ReviewTelemetryEvidencePayload | null;
-      if (parsed && typeof parsed === 'object') {
-        return parsed;
-      }
-    } catch {
-      // Best-effort polling only; keep waiting until the short deadline expires.
+    const telemetry = await readReviewTelemetryEvidence(telemetryPath);
+    if (telemetry) {
+      return telemetry;
     }
     if (Date.now() >= deadline) {
       return null;
     }
     await delay(REVIEW_TELEMETRY_POLL_INTERVAL_MS);
+  }
+}
+
+async function readReviewTelemetryEvidence(
+  telemetryPath: string
+): Promise<ReviewTelemetryEvidencePayload | null> {
+  try {
+    const raw = await readFile(telemetryPath, 'utf8');
+    const parsed = JSON.parse(raw) as ReviewTelemetryEvidencePayload | null;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
   }
 }
 
@@ -649,6 +720,88 @@ function coerceTelemetryString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function coerceTelemetryStatusValue(value: unknown): 'succeeded' | 'failed' | null {
+  if (value === 'succeeded' || value === 'failed') {
+    return value;
+  }
+  return null;
+}
+
+function coerceReviewOutcomeDisposition(value: unknown): ReviewOutcomeDisposition | null {
+  switch (value) {
+    case 'clean-success':
+    case 'bounded-success':
+    case 'failed-boundary':
+    case 'failed-other':
+      return value;
+    default:
+      return null;
+  }
+}
+
+function hasTelemetryTerminationBoundary(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): boolean {
+  return coerceTelemetryTerminationBoundaryKind(telemetry) !== null;
+}
+
+function coerceTelemetryTerminationBoundaryKind(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): string | null {
+  if (!telemetry) {
+    return null;
+  }
+  const boundary = telemetry.termination_boundary;
+  if (boundary === null || typeof boundary !== 'object' || Array.isArray(boundary)) {
+    return null;
+  }
+  return coerceTelemetryString((boundary as Record<string, unknown>).kind);
+}
+
+function resolveReviewTelemetryOutcomeDisposition(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): ReviewOutcomeDisposition | null {
+  if (!telemetry) {
+    return null;
+  }
+  const explicitDisposition = coerceReviewOutcomeDisposition(telemetry.review_outcome);
+  const telemetryStatus = coerceTelemetryStatusValue(telemetry.status);
+  if (!telemetryStatus) {
+    return null;
+  }
+  const derivedDisposition = deriveReviewOutcomeDisposition({
+    status: telemetryStatus,
+    terminationBoundary: hasTelemetryTerminationBoundary(telemetry)
+      ? REVIEW_OUTCOME_BOUNDARY_PRESENCE_SENTINEL
+      : null
+  });
+  return explicitDisposition === derivedDisposition ? explicitDisposition : derivedDisposition;
+}
+
+function formatReviewTelemetryOutcomeSummary(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): string | null {
+  const disposition = resolveReviewTelemetryOutcomeDisposition(telemetry);
+  if (!disposition) {
+    return null;
+  }
+  const boundaryKind = coerceTelemetryTerminationBoundaryKind(telemetry);
+  switch (disposition) {
+    case 'clean-success':
+      return 'review outcome: clean success';
+    case 'bounded-success':
+      return boundaryKind
+        ? `review outcome: bounded success via ${boundaryKind}; not a wrapper failure`
+        : 'review outcome: bounded success with preserved termination boundary; not a wrapper failure';
+    case 'failed-boundary':
+      return boundaryKind
+        ? `review outcome: review-wrapper failure via ${boundaryKind}`
+        : 'review outcome: review-wrapper failure via explicit termination boundary';
+    case 'failed-other':
+      return 'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure';
+  }
 }
 
 function delay(ms: number): Promise<void> {
