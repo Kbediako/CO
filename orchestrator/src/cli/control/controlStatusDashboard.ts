@@ -34,6 +34,12 @@ interface RunningColumn {
   align?: 'left' | 'right';
 }
 
+interface SummarySegment {
+  text: string;
+  color: string;
+  truncateMode?: 'end' | 'middle';
+}
+
 export interface StartControlStatusDashboardOptions {
   runtime: ControlRuntime;
   baseUrl: string;
@@ -232,7 +238,12 @@ export function startControlStatusDashboard(
         return;
       }
       output.write(
-        `${ANSI_CLEAR_HOME}${renderControlStatusErrorFrame(options, deps.now(), message)}\n`
+        `${ANSI_CLEAR_HOME}${renderControlStatusErrorFrame(
+          options,
+          deps.now(),
+          message,
+          output.columns ?? null
+        )}\n`
       );
     }
   }
@@ -244,14 +255,14 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
   const runningColumns = selectRunningColumns(terminalColumns);
   const lines: string[] = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
-    renderAgentsLine(input.dataset),
-    renderThroughputLine(input.throughputTps ?? 0),
-    renderRuntimeLine(input.dataset),
-    renderTokensLine(input.dataset),
-    renderRateLimitsLine(input.dataset, referenceTime),
-    renderProjectLine(input.dataset),
-    renderDashboardLine(input.baseUrl),
-    renderNextRefreshLine(input.dataset),
+    renderAgentsLine(input.dataset, terminalColumns),
+    renderThroughputLine(input.throughputTps ?? 0, terminalColumns),
+    renderRuntimeLine(input.dataset, terminalColumns),
+    renderTokensLine(input.dataset, terminalColumns),
+    renderRateLimitsLine(input.dataset, referenceTime, terminalColumns),
+    renderProjectLine(input.dataset, terminalColumns),
+    renderDashboardLine(input.baseUrl, terminalColumns),
+    renderNextRefreshLine(input.dataset, terminalColumns),
     colorize('├─ Running', ANSI_BOLD),
     '│',
     renderRunningHeaderRow(runningColumns),
@@ -274,85 +285,133 @@ function renderControlStatusErrorFrame(
     'baseUrl' | 'taskId' | 'runId' | 'runDir' | 'startPipelineId'
   >,
   now: Date,
-  message: string
+  message: string,
+  terminalColumns?: number | null
 ): string {
   const safe = (value: unknown): string => sanitizeDisplayValue(value);
+  const columns = resolveTerminalColumns(terminalColumns);
   return [
     colorize('╭─ CO STATUS', ANSI_BOLD),
-    colorize('│ Generated: ', ANSI_BOLD) + colorize(now.toISOString(), ANSI_CYAN),
-    colorize('│ Dashboard: ', ANSI_BOLD) + colorize(truncateMiddle(safe(input.baseUrl), 72), ANSI_CYAN),
-    colorize('│ Task: ', ANSI_BOLD) +
-      colorize(safe(input.taskId), ANSI_CYAN) +
-      colorize(' | ', ANSI_GRAY) +
-      colorize('Run: ', ANSI_BOLD) +
-      colorize(safe(input.runId), ANSI_CYAN),
-    colorize('│ Pipeline: ', ANSI_BOLD) +
-      colorize(safe(input.startPipelineId), ANSI_CYAN) +
-      colorize(' | ', ANSI_GRAY) +
-      colorize('Run dir: ', ANSI_BOLD) +
-      colorize(truncateMiddle(safe(input.runDir), 56), ANSI_CYAN),
-    colorize('│ Dashboard error: ', ANSI_BOLD) + colorize(safe(message), ANSI_RED),
+    renderSummaryLine('Generated', [{ text: now.toISOString(), color: ANSI_CYAN }], columns),
+    renderSummaryLine(
+      'Dashboard',
+      [{ text: safe(input.baseUrl), color: ANSI_CYAN, truncateMode: 'middle' }],
+      columns
+    ),
+    renderSummaryLine(
+      'Task',
+      [
+        { text: safe(input.taskId), color: ANSI_CYAN },
+        { text: ' | ', color: ANSI_GRAY },
+        { text: 'Run: ', color: ANSI_BOLD },
+        { text: safe(input.runId), color: ANSI_CYAN }
+      ],
+      columns
+    ),
+    renderSummaryLine(
+      'Pipeline',
+      [
+        { text: safe(input.startPipelineId), color: ANSI_CYAN },
+        { text: ' | ', color: ANSI_GRAY },
+        { text: 'Run dir: ', color: ANSI_BOLD },
+        { text: safe(input.runDir), color: ANSI_CYAN, truncateMode: 'middle' }
+      ],
+      columns
+    ),
+    renderSummaryLine('Dashboard error', [{ text: safe(message), color: ANSI_RED }], columns),
     '╰─'
   ].join('\n');
 }
 
-function renderAgentsLine(dataset: OperatorDashboardDataset): string {
-  return (
-    colorize('│ Agents: ', ANSI_BOLD) +
-    colorize(formatCount(dataset.counts.running), ANSI_GREEN) +
-    colorize('/', ANSI_GRAY) +
-    colorize(`${formatCount(dataset.counts.issues)} tracked`, ANSI_GRAY)
+function renderAgentsLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
+  return renderSummaryLine(
+    'Agents',
+    [
+      { text: formatCount(dataset.counts.running), color: ANSI_GREEN },
+      { text: '/', color: ANSI_GRAY },
+      { text: `${formatCount(dataset.counts.issues)} tracked`, color: ANSI_GRAY }
+    ],
+    terminalColumns
   );
 }
 
-function renderThroughputLine(throughputTps: number): string {
-  return (
-    colorize('│ Throughput: ', ANSI_BOLD) +
-    colorize(`${formatTps(throughputTps)} tps`, ANSI_CYAN)
+function renderThroughputLine(throughputTps: number, terminalColumns: number): string {
+  return renderSummaryLine(
+    'Throughput',
+    [{ text: `${formatTps(throughputTps)} tps`, color: ANSI_CYAN }],
+    terminalColumns
   );
 }
 
-function renderRuntimeLine(dataset: OperatorDashboardDataset): string {
-  return (
-    colorize('│ Runtime: ', ANSI_BOLD) +
-    colorize(formatRuntimeSeconds(dataset.totals.seconds_running), ANSI_MAGENTA)
+function renderRuntimeLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
+  return renderSummaryLine(
+    'Runtime',
+    [{ text: formatRuntimeSeconds(dataset.totals.seconds_running), color: ANSI_MAGENTA }],
+    terminalColumns
   );
 }
 
-function renderTokensLine(dataset: OperatorDashboardDataset): string {
-  return (
-    colorize('│ Tokens: ', ANSI_BOLD) +
-    colorize(`in ${formatCount(dataset.totals.input_tokens)}`, ANSI_YELLOW) +
-    colorize(' | ', ANSI_GRAY) +
-    colorize(`out ${formatCount(dataset.totals.output_tokens)}`, ANSI_YELLOW) +
-    colorize(' | ', ANSI_GRAY) +
-    colorize(`total ${formatCount(dataset.totals.total_tokens)}`, ANSI_YELLOW)
+function renderTokensLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
+  return renderSummaryLine(
+    'Tokens',
+    [
+      { text: `in ${formatCount(dataset.totals.input_tokens)}`, color: ANSI_YELLOW },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: `out ${formatCount(dataset.totals.output_tokens)}`, color: ANSI_YELLOW },
+      { text: ' | ', color: ANSI_GRAY },
+      { text: `total ${formatCount(dataset.totals.total_tokens)}`, color: ANSI_YELLOW }
+    ],
+    terminalColumns
   );
 }
 
-function renderRateLimitsLine(dataset: OperatorDashboardDataset, referenceTime: Date): string {
-  return colorize('│ Rate Limits: ', ANSI_BOLD) + formatRateLimits(dataset.rate_limits, referenceTime);
+function renderRateLimitsLine(
+  dataset: OperatorDashboardDataset,
+  referenceTime: Date,
+  terminalColumns: number
+): string {
+  return renderSummaryLine(
+    'Rate Limits',
+    formatRateLimitSegments(dataset.rate_limits, referenceTime),
+    terminalColumns
+  );
 }
 
-function renderProjectLine(dataset: OperatorDashboardDataset): string {
+function renderProjectLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
   const project = resolveProjectLabel(dataset);
-  return colorize('│ Project: ', ANSI_BOLD) + colorize(project, project === 'n/a' ? ANSI_GRAY : ANSI_CYAN);
+  return renderSummaryLine(
+    'Project',
+    [{ text: project, color: project === 'n/a' ? ANSI_GRAY : ANSI_CYAN }],
+    terminalColumns
+  );
 }
 
-function renderDashboardLine(baseUrl: string): string {
-  return colorize('│ Dashboard: ', ANSI_BOLD) + colorize(truncateMiddle(sanitizeDisplayValue(baseUrl), 72), ANSI_CYAN);
+function renderDashboardLine(baseUrl: string, terminalColumns: number): string {
+  return renderSummaryLine(
+    'Dashboard',
+    [{ text: sanitizeDisplayValue(baseUrl), color: ANSI_CYAN, truncateMode: 'middle' }],
+    terminalColumns
+  );
 }
 
-function renderNextRefreshLine(dataset: OperatorDashboardDataset): string {
+function renderNextRefreshLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
   const polling = dataset.polling;
   if (polling?.checking) {
-    return colorize('│ Next refresh: ', ANSI_BOLD) + colorize('checking now...', ANSI_CYAN);
+    return renderSummaryLine(
+      'Next refresh',
+      [{ text: 'checking now...', color: ANSI_CYAN }],
+      terminalColumns
+    );
   }
   if (typeof polling?.next_poll_in_ms === 'number' && Number.isFinite(polling.next_poll_in_ms)) {
     const seconds = Math.max(0, Math.ceil(polling.next_poll_in_ms / 1000));
-    return colorize('│ Next refresh: ', ANSI_BOLD) + colorize(`${seconds}s`, ANSI_CYAN);
+    return renderSummaryLine(
+      'Next refresh',
+      [{ text: `${seconds}s`, color: ANSI_CYAN }],
+      terminalColumns
+    );
   }
-  return colorize('│ Next refresh: ', ANSI_BOLD) + colorize('n/a', ANSI_GRAY);
+  return renderSummaryLine('Next refresh', [{ text: 'n/a', color: ANSI_GRAY }], terminalColumns);
 }
 
 function renderRunningHeaderRow(columns: RunningColumn[]): string {
@@ -556,7 +615,7 @@ function resolveProjectLabel(dataset: OperatorDashboardDataset): string {
   if (!projectName) {
     return 'n/a';
   }
-  return truncate(sanitizeDisplayValue(projectName), 72);
+  return sanitizeDisplayValue(projectName);
 }
 
 function appendTokenSample(
@@ -664,12 +723,12 @@ function formatCount(value: number | string | null | undefined): string {
   return '0';
 }
 
-function formatRateLimits(
+function formatRateLimitSegments(
   value: Record<string, unknown> | null | undefined,
   referenceTime: Date
-): string {
+): SummarySegment[] {
   if (!value || Object.keys(value).length === 0) {
-    return colorize('unavailable', ANSI_GRAY);
+    return [{ text: 'unavailable', color: ANSI_GRAY }];
   }
 
   const limitId = readRecordString(value, ['limit_id', 'limitId', 'limit_name', 'limitName']);
@@ -677,21 +736,31 @@ function formatRateLimits(
   const secondary = asRecord(value.secondary);
   const credits = asRecord(value.credits);
   if (limitId || primary || secondary || credits) {
-    const pieces: string[] = [];
-    pieces.push(colorize(sanitizeDisplayValue(limitId ?? 'unknown'), ANSI_YELLOW));
+    const pieces: SummarySegment[] = [
+      { text: sanitizeDisplayValue(limitId ?? 'unknown'), color: ANSI_YELLOW }
+    ];
     if (primary) {
-      pieces.push(colorize(`primary ${formatRateLimitBucket(primary, referenceTime)}`, ANSI_CYAN));
+      pieces.push({ text: ' | ', color: ANSI_GRAY });
+      pieces.push({
+        text: `primary ${formatRateLimitBucket(primary, referenceTime)}`,
+        color: ANSI_CYAN
+      });
     }
     if (secondary) {
-      pieces.push(colorize(`secondary ${formatRateLimitBucket(secondary, referenceTime)}`, ANSI_CYAN));
+      pieces.push({ text: ' | ', color: ANSI_GRAY });
+      pieces.push({
+        text: `secondary ${formatRateLimitBucket(secondary, referenceTime)}`,
+        color: ANSI_CYAN
+      });
     }
     if (credits) {
-      pieces.push(colorize(formatRateLimitCredits(credits), ANSI_GREEN));
+      pieces.push({ text: ' | ', color: ANSI_GRAY });
+      pieces.push({ text: formatRateLimitCredits(credits), color: ANSI_GREEN });
     }
-    return pieces.join(colorize(' | ', ANSI_GRAY));
+    return pieces;
   }
 
-  return colorize(formatRecord(value), ANSI_GRAY);
+  return [{ text: formatRecord(value), color: ANSI_GRAY }];
 }
 
 function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
@@ -765,6 +834,62 @@ function compactSessionId(sessionId: string | null | undefined): string {
     return sanitized;
   }
   return `${sanitized.slice(0, 4)}...${sanitized.slice(-6)}`;
+}
+
+function renderSummaryLine(
+  label: string,
+  segments: SummarySegment[],
+  terminalColumns: number
+): string {
+  const prefix = `│ ${label}: `;
+  const maxWidth = Math.max(0, terminalColumns - prefix.length);
+  return colorize(prefix, ANSI_BOLD) + colorizeSummarySegments(segments, maxWidth);
+}
+
+function colorizeSummarySegments(segments: SummarySegment[], maxWidth: number): string {
+  if (maxWidth <= 0 || segments.length === 0) {
+    return '';
+  }
+  if (segments.length === 1 && segments[0]?.truncateMode === 'middle') {
+    return colorize(truncateMiddle(segments[0].text, maxWidth), segments[0].color);
+  }
+
+  const totalWidth = segments.reduce((sum, segment) => sum + segment.text.length, 0);
+  if (totalWidth <= maxWidth) {
+    return segments.map((segment) => colorize(segment.text, segment.color)).join('');
+  }
+
+  if (maxWidth <= 3) {
+    return colorize(
+      segments
+        .map((segment) => segment.text)
+        .join('')
+        .slice(0, maxWidth),
+      segments[0]?.color ?? ANSI_GRAY
+    );
+  }
+
+  let remaining = maxWidth - 3;
+  let ellipsisColor = segments[0]?.color ?? ANSI_GRAY;
+  const rendered: string[] = [];
+  for (const segment of segments) {
+    if (remaining <= 0) {
+      ellipsisColor = segment.color;
+      break;
+    }
+    if (segment.text.length <= remaining) {
+      rendered.push(colorize(segment.text, segment.color));
+      remaining -= segment.text.length;
+      ellipsisColor = segment.color;
+      continue;
+    }
+    rendered.push(colorize(segment.text.slice(0, remaining), segment.color));
+    ellipsisColor = segment.color;
+    remaining = 0;
+    break;
+  }
+  rendered.push(colorize('...', ellipsisColor));
+  return rendered.join('');
 }
 
 function formatCell(value: string, width: number, align: 'left' | 'right' = 'left'): string {

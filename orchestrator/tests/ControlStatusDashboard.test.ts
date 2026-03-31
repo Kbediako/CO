@@ -409,13 +409,14 @@ describe('control status dashboard', () => {
       throughputTps: 15.4
     });
 
-    expect(stripAnsi(frame)).toBe([
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toBe([
       '╭─ CO STATUS',
       '│ Agents: 1/4 tracked',
       '│ Throughput: 15 tps',
       '│ Runtime: 15m 12s',
       '│ Tokens: in 100 | out 117 | total 217',
-      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
+      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits...',
       '│ Project: CO Control and Advisory',
       '│ Dashboard: http://127.0.0.1:4100',
       '│ Next refresh: 15s',
@@ -432,6 +433,9 @@ describe('control status dashboard', () => {
       '│  ↻ CO-32 attempt=2 in 9.000s error=worker crashed restarting cleanly',
       '╰─'
     ].join('\n'));
+    for (const line of plainFrame.split('\n')) {
+      expect(line.length).toBeLessThanOrEqual(84);
+    }
   });
 
   it('clamps retry error text to the available row width on narrow terminals', () => {
@@ -592,6 +596,60 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=C:\\runs\\retry next line');
+  });
+
+  it('clamps dashboard error frames to the active terminal width', async () => {
+    const writes: string[] = [];
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl:
+          'https://control.example.internal/operators/dashboard/with/a/very/long/path/that/needs/clamping',
+        taskId: 'local-mcp-very-long-task-id',
+        runId: 'control-host-very-long-run-id',
+        runDir: '/repo/.runs/local-mcp/cli/control-host/with/a/very/long/path/for/error-frame-tests',
+        startPipelineId: 'provider-linear-worker-with-extra-suffix',
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 60
+        }
+      },
+      {
+        readDataset: async () => {
+          throw new Error(
+            'provider returned an extremely verbose diagnostic payload while refreshing the dashboard'
+          );
+        },
+        setTimeout,
+        clearTimeout,
+        now: () => new Date('2026-03-30T01:15:30.000Z')
+      }
+    );
+
+    await handle.flush();
+
+    const plainFrame = stripAnsi(writes[0] ?? '');
+    expect(plainFrame).toContain('│ Dashboard: ');
+    expect(plainFrame).toContain('│ Pipeline: ');
+    expect(plainFrame).toContain('│ Dashboard error: ');
+    for (const line of plainFrame.split('\n')) {
+      expect(line.length).toBeLessThanOrEqual(60);
+    }
+
+    handle.stop();
   });
 
   it('enables the dashboard only for text-mode tty output', () => {
