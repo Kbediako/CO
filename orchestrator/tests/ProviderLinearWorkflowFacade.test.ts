@@ -7415,6 +7415,7 @@ describe('providerLinearWorkflowFacade', () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
+        variables?: Record<string, unknown>;
       };
       if (body.query?.includes('ProviderLinearIssueSummary')) {
         return jsonResponse(buildIssueContextBody());
@@ -7450,6 +7451,12 @@ describe('providerLinearWorkflowFacade', () => {
         });
       }
       if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: buildExpectedFollowUpDescription({
+            includeTraceability: true
+          })
+        });
         return jsonResponse({
           errors: [{ message: 'description update failed' }]
         });
@@ -7516,6 +7523,7 @@ describe('providerLinearWorkflowFacade', () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
+        variables?: Record<string, unknown>;
       };
       if (body.query?.includes('ProviderLinearIssueSummary')) {
         return jsonResponse(buildIssueContextBody());
@@ -7551,6 +7559,10 @@ describe('providerLinearWorkflowFacade', () => {
         });
       }
       if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: finalDescription
+        });
         return jsonResponse({
           data: {
             issueUpdate: {
@@ -7687,6 +7699,10 @@ describe('providerLinearWorkflowFacade', () => {
         });
       }
       if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: finalDescription
+        });
         return jsonResponse({
           data: {
             issueUpdate: {

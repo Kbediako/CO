@@ -4225,7 +4225,11 @@ function buildFollowUpIssueDescription(input: {
 
 function renderMarkdownSection(title: string, body: string): string {
   const normalizedBody = body.trim();
-  if (new RegExp(`^#{1,6}\\s+${escapeRegExp(title)}\\b`, 'imu').test(normalizedBody)) {
+  const firstNonEmptyLine = normalizedBody
+    .split(/\r?\n/u)
+    .find((line) => line.trim().length > 0)
+    ?.trim() ?? '';
+  if (new RegExp(`^#{1,6}\\s+${escapeRegExp(title)}\\s*#*\\s*$`, 'iu').test(firstNonEmptyLine)) {
     return normalizedBody;
   }
   return `## ${title}\n${normalizedBody}`;
