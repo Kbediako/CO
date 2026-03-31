@@ -8,6 +8,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    setupFiles: ['tests/vitest.setup.ts'],
     include: [
       'orchestrator/tests/**/*.test.ts',
       'packages/orchestrator/tests/**/*.test.ts',

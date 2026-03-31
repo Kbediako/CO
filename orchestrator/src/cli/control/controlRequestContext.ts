@@ -24,6 +24,10 @@ export interface ControlRequestPersist {
   delegationTokens(): Promise<void>;
   linearAdvisory(): Promise<void>;
   providerIntake?(): Promise<void>;
+  providerIntakePolling?(
+    polling: Record<string, unknown> | null,
+    updatedAt?: string | null
+  ): Promise<void>;
 }
 
 export interface ControlSessionTokens {

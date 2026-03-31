@@ -550,6 +550,7 @@ describe('ReviewExecutionState', () => {
       telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
     });
 
+    expect(payload.review_outcome).toBe('bounded-success');
     expect(payload.termination_boundary).toEqual({
       kind: 'relevant-reinspection-dwell',
       provenance: 'post-startup-anchor',
@@ -594,6 +595,7 @@ describe('ReviewExecutionState', () => {
       telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
     });
 
+    expect(payload.review_outcome).toBe('failed-boundary');
     expect(payload.termination_boundary).toEqual({
       kind: 'command-intent',
       provenance: 'validation-suite',
@@ -626,6 +628,8 @@ describe('ReviewExecutionState', () => {
       telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
     });
 
+    expect(inferredPayload.review_outcome).toBe('failed-boundary');
+    expect(suppressedPayload.review_outcome).toBe('failed-other');
     expect(inferredPayload.termination_boundary).toEqual({
       kind: 'command-intent',
       provenance: 'validation-suite',
