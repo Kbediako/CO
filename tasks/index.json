@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260401-linear-56067b9f-2aef-4033-8e12-08ac89bd9834",
+      "title": "CO: Restore unrelated full-suite baseline blocking CO-43 handoff",
+      "relates_to": "tasks/tasks-linear-56067b9f-2aef-4033-8e12-08ac89bd9834.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-01",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-01",
+          "manifest": ".runs/linear-56067b9f-2aef-4033-8e12-08ac89bd9834-co-46-docs-review/cli/2026-03-31T14-34-19-787Z-aa1a35a9/manifest.json",
+          "override_reason": "guard and docs stages passed, but the forced review telemetry was failed-other with null termination_boundary and the output log ended with the selected model at capacity; docs approval uses the recorded fallback in out/linear-56067b9f-2aef-4033-8e12-08ac89bd9834/manual/20260401T000000Z-baseline-repair/05-docs-review-override.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-56067b9f-2aef-4033-8e12-08ac89bd9834.md",
+        "task": "tasks/tasks-linear-56067b9f-2aef-4033-8e12-08ac89bd9834.md",
+        "agent_task": ".agent/task/linear-56067b9f-2aef-4033-8e12-08ac89bd9834.md",
+        "docs": "docs/TECH_SPEC-linear-56067b9f-2aef-4033-8e12-08ac89bd9834.md"
+      }
+    },
+    {
       "id": "20260331-linear-cd3020f3-b6be-4adb-ae00-1a15497de036",
       "title": "CO: Make CO STATUS inspectable in smaller terminals and easy to launch",
       "relates_to": "tasks/tasks-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
