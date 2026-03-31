@@ -118,7 +118,7 @@ function buildExplicitScopeSurfaceGateError(
   if (!(options.base || options.commit || options.uncommitted)) {
     return null;
   }
-  return `explicit scoped review cannot honor --surface ${reviewSurface} because current Codex CLI rejects inline prompt transport under --base/--commit/--uncommitted; the wrapper only has bounded --title transport there, so rerun with the default diff surface or drop the explicit scope if you need ${reviewSurface} prompt context.`;
+  return `explicit scoped review cannot honor --surface ${reviewSurface} because current Codex CLI rejects inline prompt transport under --base/--commit/--uncommitted; the wrapper only has bounded --title transport there when supported and otherwise falls back to artifact-only scoped context, so rerun with the default diff surface or drop the explicit scope if you need ${reviewSurface} prompt context.`;
 }
 
 function installStdioErrorGuards(): void {
@@ -698,7 +698,7 @@ Environment:
 
 Behavior:
   Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt
-                                and launch codex review without any prompt argument because current CLI still treats stdin (\`-\`) as [PROMPT]; reviewer-visible scoped context rides on --title (user-provided when present, otherwise synthesized from NOTES + surface).
+                                and launch codex review without any prompt argument because current CLI still treats stdin (\`-\`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface), and if Codex rejects a synthesized scoped title the wrapper retries the same explicit scope without \`--title\` and falls back to artifact-only context.
   Explicit scoped wrapper runs  Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.
   Unscoped wrapper runs         Pass the saved prompt/context inline to codex review.
 `);

@@ -73,7 +73,7 @@
   - `docs/AGENTS.md`
 
 ## Open Questions
-- None. Pre-implementation review approves the bounded title-plus-artifact transport path: keep full prompt context in `review/prompt.txt`, synthesize reviewer-visible scoped title context from resolved `NOTES` plus review surface when `--title` is absent, and make telemetry/docs/tests state that contract explicitly.
+- None. Pre-implementation review approves the bounded title-plus-artifact transport path: keep full prompt context in `review/prompt.txt`, synthesize reviewer-visible scoped title context from resolved `NOTES` plus review surface when `--title` is absent, and if Codex rejects that synthesized scoped title retry the same explicit scope without `--title` so telemetry/docs/tests still report the fallback artifact-only contract truthfully.
 
 ## Approvals
 - Product: Self-approved from Linear issue scope and acceptance criteria

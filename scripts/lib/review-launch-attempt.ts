@@ -296,6 +296,39 @@ export async function runReviewLaunchAttemptShell(
     await reportSuccess(execution, scopedLaunchContext);
     return;
   } catch (error) {
+    if (shouldRetryScopedWithoutSynthesizedTitle(error, options.cliOptions)) {
+      const scopedArtifactOnlyOptions = {
+        ...options.cliOptions,
+        title: undefined,
+        titleSource: undefined
+      };
+      const scopedArtifactOnlyArgs = buildReviewArgs(scopedArtifactOnlyOptions, options.prompt, {
+        includeScopeFlags: true,
+        disableDelegationMcp
+      });
+      const scopedArtifactOnlyLaunchContext = buildReviewLaunchContext(scopedArtifactOnlyOptions, {
+        includeScopeFlags: true
+      });
+      const resolvedScopedArtifactOnly = resolveCommand(
+        scopedArtifactOnlyArgs,
+        options.runtimeContext
+      );
+      if (resolvedReviewCommandsEqual(resolvedScoped, resolvedScopedArtifactOnly)) {
+        await reportFailure(error, scopedLaunchContext);
+        throw error;
+      }
+      console.log(
+        '[run-review] codex CLI rejected synthesized scoped --title transport; retrying the same explicit scope without --title and falling back to artifact-only reviewer-visible context.'
+      );
+      try {
+        const retryExecution = await options.runReview(resolvedScopedArtifactOnly);
+        await reportSuccess(retryExecution, scopedArtifactOnlyLaunchContext);
+        return;
+      } catch (retryError) {
+        await reportFailure(retryError, scopedArtifactOnlyLaunchContext);
+        throw retryError;
+      }
+    }
     if (
       scopedLaunchContext.prompt_delivery !== 'inline' &&
       isPromptScopeIncompatibility(error)
@@ -597,6 +630,32 @@ function shouldRetryWithoutScopeFlags(error: unknown): boolean {
     combined.includes('prompt cannot') ||
     combined.includes('custom prompt') ||
     combined.includes('with a prompt')
+  );
+}
+
+function shouldRetryScopedWithoutSynthesizedTitle(
+  error: unknown,
+  cliOptions: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'titleSource' | 'uncommitted'>
+): boolean {
+  if (cliOptions.titleSource !== 'notes-surface') {
+    return false;
+  }
+  if (!resolveScopeFlag(cliOptions)) {
+    return false;
+  }
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const preview = 'outputPreview' in error ? String((error as any).outputPreview ?? '') : '';
+  const message = 'message' in error ? String((error as any).message ?? '') : '';
+  const combined = `${message}\n${preview}`.toLowerCase();
+  const lines = combined
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return (
+    hasExplicitScopeFlagRejectionSignal(lines, '--title') ||
+    lines.some((line) => line.includes('--title') && hasPromptScopeFlagRejectionSignal(line))
   );
 }
 

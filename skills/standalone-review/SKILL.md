@@ -27,7 +27,7 @@ If review execution is blocked, record why in task notes, then do manual diff re
 Compatibility guard (current Codex CLI behavior):
 - Do not combine `--uncommitted`, `--base`, or `--commit` with a custom prompt argument.
 - Use diff-scoped review without prompt, or prompt-only review without scope flags.
-- Wrapper note: `codex-orchestrator review` / `npm run review` still saves the full review prompt artifact for scoped runs, but explicit wrapper scope flags launch `codex review` without any prompt argument because current Codex CLI still treats stdin (`-`) as `[PROMPT]`; reviewer-visible scoped context rides on bounded `--title` transport instead.
+- Wrapper note: `codex-orchestrator review` / `npm run review` still saves the full review prompt artifact for scoped runs, but explicit wrapper scope flags launch `codex review` without any prompt argument because current Codex CLI still treats stdin (`-`) as `[PROMPT]`; reviewer-visible scoped context first rides on bounded `--title` transport, and if Codex rejects a synthesized scoped title the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context.
 - Scoped surface limit: explicit wrapper scope flags support only the default `diff` surface at the actual Codex layer; `--surface audit|architecture` requires an unscoped prompt-capable review.
 
 Uncommitted diff:

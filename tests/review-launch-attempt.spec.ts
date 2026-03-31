@@ -244,6 +244,70 @@ describe('review-launch-attempt', () => {
     expect(logTerminationBoundaryFallback).not.toHaveBeenCalled();
   });
 
+  it('retries explicit base scope without synthesized title when codex rejects generated title transport', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
+    const launchArgs: string[][] = [];
+    const failureState = makeState(sandbox);
+    const successState = makeState(sandbox);
+    const writeTelemetry = vi.fn().mockResolvedValue(null);
+    const logTerminationBoundaryFallback = vi.fn();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await runReviewLaunchAttemptShell({
+      cliOptions: {
+        task: 'sample-task',
+        base: 'origin/main',
+        title: 'Surface: diff | Goal: scoped transport',
+        titleSource: 'notes-surface'
+      },
+      prompt: 'Prompt body',
+      retryWithoutScopeFlagsGateError:
+        'explicit `--base` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.',
+      runtimeContext: {} as any,
+      repoRoot: sandbox,
+      manifestPath,
+      artifactPaths,
+      autoIssueLogEnabled: false,
+      telemetryDebugEnabled: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+      ensureReviewCommandAvailableFn: async () => {},
+      resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
+      runReview: async (resolved) => {
+        launchArgs.push(resolved.args);
+        if (launchArgs.length === 1) {
+          throw new CodexReviewError('unknown option --title', {
+            exitCode: 1,
+            signal: null,
+            timedOut: false,
+            outputPreview: 'unknown option --title',
+            reviewState: failureState
+          });
+        }
+        return {
+          preview: 'stdout-ok',
+          state: successState,
+          terminationBoundary: null
+        };
+      },
+      writeTelemetry,
+      logTelemetrySummary: () => {
+        throw new Error('telemetry summary should not run when telemetry persistence returns null');
+      },
+      logTerminationBoundaryFallback
+    });
+
+    expect(launchArgs).toEqual([
+      ['review', '--title', 'Surface: diff | Goal: scoped transport', '--base', 'origin/main'],
+      ['review', '--base', 'origin/main']
+    ]);
+    expect(writeTelemetry).toHaveBeenCalledTimes(1);
+    expect(writeTelemetry).toHaveBeenCalledWith(successState, 'succeeded', null, null, reviewLaunchContext('base'));
+    expect(logTerminationBoundaryFallback).not.toHaveBeenCalled();
+  });
+
   it('launches explicit uncommitted scope without an inline prompt argument', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);

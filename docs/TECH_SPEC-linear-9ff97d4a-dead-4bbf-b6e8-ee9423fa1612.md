@@ -36,6 +36,7 @@ last_review: 2026-03-30
 - Functional requirements:
   - explicit `--base`, `--commit`, and `--uncommitted` review runs must still launch without inline prompt arguments
   - when explicit scoped review lacks a user-provided `--title`, the wrapper must synthesize a bounded reviewer-visible title from resolved `NOTES` plus the requested review surface
+  - if Codex rejects a synthesized scoped `--title`, the wrapper must retry the same explicit scope without `--title` and surface artifact-only reviewer-visible context truthfully instead of failing the scope outright
   - when a user already supplied `--title`, scoped review must keep that explicit title rather than silently replacing it
   - persisted telemetry and docs must state whether the live reviewer received inline prompt context, bounded title context, or artifact-only context
   - explicit scoped review must continue failing fast for non-`diff` surfaces
@@ -74,7 +75,7 @@ last_review: 2026-03-30
   - use saved review telemetry plus wrapper tests as the primary context-transport evidence surface
 
 ## Open Questions
-- None. The live title probe reduced the design to the bounded title-plus-artifact path.
+- None. The live title probe reduced the design to the bounded title-plus-artifact path, with a same-scope artifact-only fallback when synthesized scoped `--title` transport is unsupported.
 
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review`

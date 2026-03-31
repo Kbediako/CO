@@ -2597,6 +2597,54 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     );
   });
 
+  it('retries explicit base-scoped review without synthesized title when codex rejects --title', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    const { stdout: baseStdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+      cwd: sandbox
+    });
+    const baseRef = baseStdout.trim();
+    const argsLogPath = join(sandbox, 'review-args.log');
+
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'reject-title',
+        RUN_REVIEW_ARGS_LOG: argsLogPath
+      },
+      ['--base', baseRef]
+    );
+
+    expect(result.exitCode).toBe(0);
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    const reviewInvocations = parseArgsLogInvocations(argsLog).filter((entry) =>
+      entry.includes('argv=review')
+    );
+    expect(reviewInvocations).toEqual([
+      'argv=review --title Surface: diff | Goal: run-review regression tests | Summary: verify timeout/stall handling | Risks: none --base ' +
+        baseRef,
+      `argv=review --base ${baseRef}`
+    ]);
+
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      error: string | null;
+      launch_context: {
+        scope_flag_mode: 'base' | 'commit' | 'uncommitted' | null;
+        prompt_delivery: 'inline' | 'artifact-only';
+        reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+        reviewer_visible_title_source: 'user' | 'notes-surface' | null;
+      } | null;
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.error).toBeNull();
+    expect(telemetry.launch_context).toEqual(reviewLaunchContext('base'));
+  });
+
   it('treats later review positional tokens as inline prompt content in the fake codex harness', async () => {
     const sandbox = await makeSandbox();
     const codexBin = await makeFakeCodex(sandbox);
@@ -2932,7 +2980,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
     expect(normalizedHelp).toContain(
-      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context rides on --title (user-provided when present, otherwise synthesized from NOTES + surface).'
+      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface), and if Codex rejects a synthesized scoped title the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context.'
     );
     expect(normalizedHelp).toContain(
       'Explicit scoped wrapper runs Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.'
