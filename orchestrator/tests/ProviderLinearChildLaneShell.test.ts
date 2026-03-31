@@ -2136,7 +2136,10 @@ describe('runProviderLinearChildLaneShell', () => {
     });
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
     await writeChildLaneProof(childLane, {
-      scope: undefined as unknown as ProviderLinearChildLaneProof['scope']
+      scope: {
+        files: [],
+        phases: ['implementation']
+      } as unknown as ProviderLinearChildLaneProof['scope']
     });
     await writePatchArtifact(
       childLane.patch_artifact_path ?? '',
