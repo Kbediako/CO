@@ -21,6 +21,7 @@ import {
   resolveRuntimeCodexCommand,
   type RuntimeCodexCommandContext
 } from './runtime/index.js';
+import { resolveProviderLinearChildLaneScopeContract } from './providerLinearChildLanePhaseContract.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -195,10 +196,18 @@ async function loadProviderLinearChildLaneContext(
   const stream = normalizeOptionalString(env[PROVIDER_LINEAR_CHILD_LANE_STREAM_ENV]);
   const purpose = normalizeOptionalString(env[PROVIDER_LINEAR_CHILD_LANE_PURPOSE_ENV]);
   const parentWorkspacePath = normalizeOptionalString(env[PROVIDER_LINEAR_CHILD_LANE_PARENT_WORKSPACE_PATH_ENV]);
-  const scope: ProviderLinearWorkerChildLaneScope = {
+  const rawScope: ProviderLinearWorkerChildLaneScope = {
     files: normalizeStringArrayFromEnv(env[PROVIDER_LINEAR_CHILD_LANE_FILES_ENV]),
     phases: normalizeStringArrayFromEnv(env[PROVIDER_LINEAR_CHILD_LANE_PHASES_ENV])
   };
+  let scope: ProviderLinearWorkerChildLaneScope;
+  try {
+    scope = resolveProviderLinearChildLaneScopeContract(rawScope);
+  } catch (error) {
+    throw new Error(
+      `provider-linear-child-lane scope is invalid: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   if (
     !runId ||
     !taskId ||
@@ -208,7 +217,7 @@ async function loadProviderLinearChildLaneContext(
     !stream ||
     !purpose ||
     !parentWorkspacePath ||
-    (scope.files.length === 0 && scope.phases.length === 0)
+    (rawScope.files.length === 0 && rawScope.phases.length === 0)
   ) {
     throw new Error('provider-linear-child-lane context is missing required manifest or env fields.');
   }

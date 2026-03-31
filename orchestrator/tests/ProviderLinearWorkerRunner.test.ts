@@ -28,6 +28,7 @@ import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   appendProviderLinearAuditEntry
 } from '../src/cli/control/providerLinearWorkflowAudit.js';
+import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/providerLinearChildLanePhaseContract.js';
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
@@ -663,6 +664,10 @@ describe('provider linear worker runner', () => {
       launched_at: '2026-03-21T09:00:00.050Z'
     };
     const secondChildStreamRecord = { ...childStreamRecord, task_id: 'linear-lin-issue-1-docs-review-alt', manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review-alt', 'cli', 'docs-run-1', 'manifest.json'), artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' };
+    const childLaneScope = resolveProviderLinearChildLaneScopeContract({
+      files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+      phases: []
+    });
     const childLaneRecord = {
       stream: 'impl-a',
       pipeline_id: 'provider-linear-child-lane',
@@ -680,10 +685,7 @@ describe('provider linear worker runner', () => {
       launched_at: '2026-03-21T09:00:00.075Z',
       purpose: 'Implement bounded same-issue child lanes',
       instructions: null,
-      scope: {
-        files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
-        phases: []
-      },
+      scope: childLaneScope,
       parent_snapshot: {
         base_sha: 'parent-base-sha',
         issue_updated_at: '2026-03-21T09:00:00.000Z',
@@ -894,7 +896,26 @@ describe('provider linear worker runner', () => {
         latest_recorded_at: '2026-03-21T09:00:01.200Z'
       },
       child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded' })]),
-      child_lanes: expect.arrayContaining([expect.objectContaining({ stream: 'impl-a', task_id: 'linear-lin-issue-1-impl-a', run_id: 'child-run-1', decision: 'pending', patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch') })]),
+      child_lanes: expect.arrayContaining([expect.objectContaining({
+        stream: 'impl-a',
+        task_id: 'linear-lin-issue-1-impl-a',
+        run_id: 'child-run-1',
+        decision: 'pending',
+        patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch'),
+        scope: expect.objectContaining({
+          files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+          phases: [],
+          phase_contract_version: 'phase-path-selectors-v1',
+          allowed_path_selectors: [
+            expect.objectContaining({
+              kind: 'exact',
+              value: 'orchestrator/src/cli/providerLinearChildLaneShell.ts',
+              source: 'file',
+              phase: null
+            })
+          ]
+        })
+      })]),
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -946,7 +967,26 @@ describe('provider linear worker runner', () => {
         }
       },
       child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded', artifact_root: '.runs/linear-lin-issue-1-docs-review-alt/cli/docs-run-1' })]),
-      child_lanes: expect.arrayContaining([expect.objectContaining({ stream: 'impl-a', task_id: 'linear-lin-issue-1-impl-a', run_id: 'child-run-1', decision: 'pending', patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch') })]),
+      child_lanes: expect.arrayContaining([expect.objectContaining({
+        stream: 'impl-a',
+        task_id: 'linear-lin-issue-1-impl-a',
+        run_id: 'child-run-1',
+        decision: 'pending',
+        patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch'),
+        scope: expect.objectContaining({
+          files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+          phases: [],
+          phase_contract_version: 'phase-path-selectors-v1',
+          allowed_path_selectors: [
+            expect.objectContaining({
+              kind: 'exact',
+              value: 'orchestrator/src/cli/providerLinearChildLaneShell.ts',
+              source: 'file',
+              phase: null
+            })
+          ]
+        })
+      })]),
       end_reason: 'issue_inactive'
     });
   });
