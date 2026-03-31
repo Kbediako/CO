@@ -1376,6 +1376,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane);
     await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
     const applyPatchArtifact = vi.fn(async () => {
       const claimed = await readProviderLinearWorkerChildLanes(runDir);
@@ -1440,6 +1441,7 @@ describe('runProviderLinearChildLaneShell', () => {
       patch_artifact_path: join(tempRoot ?? '', 'artifacts', 'runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1', 'provider-linear-child-lane.patch')
     });
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane);
     await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
     const applyPatchArtifact = vi.fn(async () => undefined);
 
@@ -1571,6 +1573,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane);
     await writePatchArtifact(
       childLane.patch_artifact_path ?? '',
       'orchestrator/src/cli/providerLinearChildLaneShell.ts'
@@ -1614,6 +1617,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane);
     await mkdir(dirname(childLane.patch_artifact_path ?? ''), { recursive: true });
     await writeFile(
       childLane.patch_artifact_path ?? '',
@@ -1664,6 +1668,7 @@ describe('runProviderLinearChildLaneShell', () => {
       }
     });
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane);
     await mkdir(dirname(childLane.patch_artifact_path ?? ''), { recursive: true });
     await writeFile(
       childLane.patch_artifact_path ?? '',
@@ -1709,6 +1714,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane);
     await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
     const applyPatchArtifact = vi.fn(async () => undefined);
 
@@ -1757,6 +1763,7 @@ describe('runProviderLinearChildLaneShell', () => {
       }
     });
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane);
     await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
     const applyPatchArtifact = vi.fn(async () => undefined);
 
@@ -1797,6 +1804,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane);
     await writePatchArtifact(childLane.patch_artifact_path ?? '', childLane.scope.files[0] ?? '');
     const warn = vi.fn();
 
@@ -2284,6 +2292,60 @@ describe('runProviderLinearChildLaneShell', () => {
       action: 'accept',
       error: {
         code: 'provider_worker_child_lane_proof_invalid',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+  });
+
+  it('rejects acceptance when stripped phase metadata is paired with a missing proof bundle', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      scope: {
+        files: [],
+        phases: ['implementation']
+      }
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      ...childLane,
+      scope: resolveProviderLinearChildLaneScopeContract({
+        files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+        phases: []
+      })
+    });
+    await writePatchArtifact(
+      childLane.patch_artifact_path ?? '',
+      'orchestrator/src/cli/providerLinearChildLaneShell.ts'
+    );
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_proof_missing',
         status: 409
       }
     });

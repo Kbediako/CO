@@ -112,27 +112,48 @@ export function normalizeProviderLinearChildLanePathSelectors(
     return null;
   }
   const normalized: ProviderLinearChildLanePathSelector[] = [];
+  const seen = new Set<string>();
   for (const entry of value) {
     if (!isRecord(entry)) {
       return null;
     }
     const kind = entry.kind === 'exact' || entry.kind === 'prefix' ? entry.kind : null;
     const source = entry.source === 'file' || entry.source === 'phase' ? entry.source : null;
-    const normalizedValue = kind ? normalizeScopeContractPath(String(entry.value ?? ''), kind) : null;
-    const phase = source === 'phase'
-      ? normalizePhaseName(String(entry.phase ?? ''))
-      : normalizeOptionalString(entry.phase) ?? null;
-    if (!kind || !source || !normalizedValue || (source === 'phase' && !phase)) {
+    const rawValue = typeof entry.value === 'string' ? entry.value : null;
+    const normalizedValue = kind && rawValue ? normalizeScopeContractPath(rawValue, kind) : null;
+    if (!kind || !source || !rawValue || !normalizedValue || rawValue !== normalizedValue) {
+      return null;
+    }
+    const signature = selectorPathSignature({ kind, value: normalizedValue });
+    if (seen.has(signature)) {
+      return null;
+    }
+    seen.add(signature);
+    if (source === 'file') {
+      if (entry.phase !== undefined && entry.phase !== null) {
+        return null;
+      }
+      normalized.push({
+        kind,
+        value: normalizedValue,
+        source,
+        phase: null
+      });
+      continue;
+    }
+    const rawPhase = typeof entry.phase === 'string' ? entry.phase : null;
+    const phase = rawPhase ? normalizePhaseName(rawPhase) : null;
+    if (!rawPhase || !phase || rawPhase !== phase) {
       return null;
     }
     normalized.push({
       kind,
       value: normalizedValue,
       source,
-      phase: source === 'phase' ? phase : null
+      phase
     });
   }
-  return dedupeSelectors(normalized);
+  return normalized;
 }
 
 export function resolveProviderLinearChildLaneSupportedPhases(): string[] {
@@ -166,7 +187,7 @@ export function resolveProviderLinearChildLaneScopeContract<T extends ProviderLi
   }
 
   const unsupportedPhases = normalizedPhases.filter(
-    (phase) => !(phase in PROVIDER_LINEAR_CHILD_LANE_PHASE_SELECTOR_DEFINITIONS)
+    (phase) => !Object.prototype.hasOwnProperty.call(PROVIDER_LINEAR_CHILD_LANE_PHASE_SELECTOR_DEFINITIONS, phase)
   );
   if (unsupportedPhases.length > 0) {
     throw new Error(

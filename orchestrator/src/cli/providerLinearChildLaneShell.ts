@@ -904,7 +904,7 @@ async function resolveChildLaneDecision(
   const proofPath = join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
   const acceptedProof = await deps.readChildLaneProof(proofPath).catch(() => null);
   let acceptedProofScope: ProviderLinearWorkerChildLaneScope | null = null;
-  if (!acceptedProof && target.scope.phases.length > 0) {
+  if (!acceptedProof) {
     await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
     return failureResult({
       action: 'accept',
@@ -915,7 +915,7 @@ async function resolveChildLaneDecision(
       childRun: null,
       childLane: target,
       code: 'provider_worker_child_lane_proof_missing',
-      message: 'Phase-scoped child lane acceptance requires a readable proof bundle before parent apply.',
+      message: 'Child lane acceptance requires a readable proof bundle before parent apply.',
       status: 409
     });
   }
