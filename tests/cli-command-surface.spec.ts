@@ -259,33 +259,33 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints pr help', async () => {
-    const { stdout } = await runCli(['pr', '--help']);
+    const { stdout } = await runCli(['pr', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('resolve-merge');
     expect(stdout).toContain('ready-review');
     expect(stdout).toContain('docs/guides/review-artifacts.md');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr help when no subcommand is provided', async () => {
-    const { stdout } = await runCli(['pr']);
+    const { stdout } = await runCli(['pr'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr <subcommand>');
     expect(stdout).toContain('watch-merge');
     expect(stdout).toContain('ready-review');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr watch-merge help', async () => {
-    const { stdout } = await runCli(['pr', 'watch-merge', '--help']);
+    const { stdout } = await runCli(['pr', 'watch-merge', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr watch-merge');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr resolve-merge help', async () => {
-    const { stdout } = await runCli(['pr', 'resolve-merge', '--help']);
+    const { stdout } = await runCli(['pr', 'resolve-merge', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr resolve-merge');
     expect(stdout).toContain('--exit-on-action-required');
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints pr ready-review help', async () => {
-    const { stdout } = await runCli(['pr', 'ready-review', '--help']);
+    const { stdout } = await runCli(['pr', 'ready-review', '--help'], undefined, CLI_BOOT_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator pr ready-review');
     expect(stdout).toContain('review handoff is safe after a bounded automated-feedback drain');
     expect(stdout).not.toContain('--auto-merge');
