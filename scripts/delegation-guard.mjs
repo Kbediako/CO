@@ -239,7 +239,7 @@ function resolveWorkspaceScopedArtifactDir(repoRoot, value, fallbackDirname) {
   return isPathWithinRoot(repoRoot, candidate) ? candidate : fallback;
 }
 
-async function resolveDelegatedManifestSearchRoots(taskId, defaultRunsDir, env) {
+async function resolveDelegatedManifestSearchRoots(taskId, repoRoot, defaultRunsDir, env) {
   const searchRoots = [defaultRunsDir];
   const manifestPath = readNonEmptyString(env, 'CODEX_ORCHESTRATOR_MANIFEST_PATH');
   if (!manifestPath) {
@@ -260,8 +260,14 @@ async function resolveDelegatedManifestSearchRoots(taskId, defaultRunsDir, env) 
     return searchRoots;
   }
 
+  const resolvedRepoRoot = resolve(repoRoot);
+  const resolvedWorkspacePath = resolve(workspacePath);
+  if (resolvedWorkspacePath !== resolvedRepoRoot) {
+    return searchRoots;
+  }
+
   const workspaceRunsDir = resolveWorkspaceScopedArtifactDir(
-    resolve(workspacePath),
+    resolvedWorkspacePath,
     env.CODEX_ORCHESTRATOR_RUNS_DIR,
     '.runs'
   );
@@ -955,7 +961,7 @@ async function main() {
         return;
       }
     } else {
-      const searchRoots = await resolveDelegatedManifestSearchRoots(taskId, runsDir, process.env);
+      const searchRoots = await resolveDelegatedManifestSearchRoots(taskId, repoRoot, runsDir, process.env);
       const expectedPatterns = buildExpectedSubagentManifestPatterns(searchRoots, taskId);
       const { found, errors } = await findSubagentManifestsAcrossRunsDirs(searchRoots, taskId);
       failures.push(...errors);
@@ -986,7 +992,7 @@ async function main() {
       const expectedTaskId = taskId || exampleTaskId;
       const expectedPatterns = taskId
         ? buildExpectedSubagentManifestPatterns(
-            await resolveDelegatedManifestSearchRoots(expectedTaskId, runsDir, process.env),
+            await resolveDelegatedManifestSearchRoots(expectedTaskId, repoRoot, runsDir, process.env),
             expectedTaskId
           )
         : [`${runsDir}/${expectedTaskId}-*/cli/<run-id>/manifest.json`];
