@@ -31,6 +31,18 @@ describe('codex-orchestrator CLI monitor alias', () => {
     expect(stdout).toContain('Usage: codex-orchestrator co-status [options]');
     expect(stdout).toContain('Dedicated monitor alias for the live CO STATUS dashboard.');
     expect(stdout).toContain('This reuses the same host/runtime path as `control-host`.');
+    expect(stdout).toContain('Pipeline used for provider-driven starts (default: provider-linear-worker).');
+  }, cliHelpTimeoutMs);
+
+  it('prints control-host help with the provider worker default pipeline', async () => {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ['--loader', 'ts-node/esm', cliEntrypoint, 'control-host', '--help'],
+      { cwd: repoRoot }
+    );
+
+    expect(stdout).toContain('Usage: codex-orchestrator control-host [options]');
+    expect(stdout).toContain('Pipeline used for provider-driven starts (default: provider-linear-worker).');
   }, cliHelpTimeoutMs);
 
   for (const helpArg of ['help', '-h']) {

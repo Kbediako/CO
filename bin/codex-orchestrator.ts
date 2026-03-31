@@ -47,7 +47,10 @@ import { slugify } from '../orchestrator/src/cli/utils/strings.js';
 import { serveMcp } from '../orchestrator/src/cli/mcp.js';
 import { runMcpEnableCliShell } from '../orchestrator/src/cli/mcpEnableCliShell.js';
 import { runDelegationServerCliShell } from '../orchestrator/src/cli/delegationServerCliShell.js';
-import { runControlHostCliShell } from '../orchestrator/src/cli/controlHostCliShell.js';
+import {
+  DEFAULT_PROVIDER_START_PIPELINE_ID,
+  runControlHostCliShell
+} from '../orchestrator/src/cli/controlHostCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -1625,7 +1628,7 @@ function printControlHostHelp(): void {
 Options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
-  --pipeline <id>       Pipeline used for provider-driven starts (default: diagnostics).
+  --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
   --format json         Emit machine-readable readiness output.
   --help                Show this message.
 `);
@@ -1640,7 +1643,7 @@ This reuses the same host/runtime path as \`control-host\`.
 Options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
-  --pipeline <id>       Pipeline used for provider-driven starts (default: diagnostics).
+  --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
   --format json         Emit machine-readable readiness output.
   --help                Show this message.
 `);

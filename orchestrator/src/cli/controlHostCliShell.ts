@@ -74,7 +74,7 @@ type OutputFormat = 'json' | 'text';
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 5_000;
 const SPAWN_MANIFEST_WAIT_INTERVAL_MS = 100;
-const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
+export const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
 
 interface SpawnedRunManifestInfo {
   runId: string;
