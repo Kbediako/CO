@@ -36,7 +36,7 @@
 
 ## Validation
 - Checks / tests:
-  - `node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --format json`
+  - `node dist/bin/codex-orchestrator.js linear child-stream --pipeline docs-review --format json`
   - `node scripts/delegation-guard.mjs`
   - `node scripts/spec-guard.mjs --dry-run`
   - `npm run build`
@@ -46,7 +46,7 @@
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`
-  - `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612 npm run review -- --base origin/main`
+  - `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 TASK=linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612 NOTES="Goal: bounded standalone review for CO-43 scoped context transport | Summary: verify scoped --title transport on explicit --base review | Risks: scope/title incompatibility or telemetry drift" npm run review -- --base origin/main`
   - `npm run pack:smoke`
 - Rollback plan:
   - revert scoped context transport changes if they reintroduce scope/title incompatibility or silently over-claim reviewer-visible context
@@ -61,7 +61,7 @@
   - Mitigation: record the manifest-backed approval directly if the child run succeeds but the wrapper output remains malformed.
 
 ## Approvals
-- Reviewer: Pending docs-review
+- Reviewer: `codex-orchestrator docs-review` approved for implementation via the successful initial child-stream manifest `.runs/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612-docs-review/cli/2026-03-30T06-52-40-070Z-7b90108a/manifest.json` plus the recorded fallback closeout in `out/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612/manual/20260330T070418Z-docs-review-fallback.md`
 - Date: 2026-03-30
 
 ## Manifest Evidence
