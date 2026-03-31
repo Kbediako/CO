@@ -138,7 +138,8 @@ function buildExpectedFollowUpDescription(options: {
           '## Immediate Traceability',
           '- Source issue: `CO-1` / `lin-issue-1` (https://linear.app/example/issue/CO-1)',
           '- Follow-up issue: `CO-2` / `lin-issue-2` (https://linear.app/example/issue/CO-2)',
-          '- Follow-up task id / packet prefix: `linear-lin-issue-2`',
+          '- Follow-up packet prefix: `linear-lin-issue-2`',
+          '- Canonical registry task id: see `tasks/index.json` (format `YYYYMMDD-linear-<linear-issue-id>`)',
           '- Create before active work: `docs/PRD-linear-lin-issue-2.md`, `docs/TECH_SPEC-linear-lin-issue-2.md`, `docs/ACTION_PLAN-linear-lin-issue-2.md`, `tasks/specs/linear-lin-issue-2.md`, `tasks/tasks-linear-lin-issue-2.md`, `.agent/task/linear-lin-issue-2.md`',
           '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
         ].join('\n')

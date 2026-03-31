@@ -4249,7 +4249,8 @@ function buildFollowUpTraceabilitySection(input: {
   return [
     `- Source issue: ${formatIssueReference(input.sourceIssue.identifier, input.sourceIssue.id, input.sourceIssue.url)}`,
     `- Follow-up issue: ${formatIssueReference(input.followUpIssue.identifier, input.followUpIssue.id, input.followUpIssue.url)}`,
-    `- Follow-up task id / packet prefix: \`${followUpTaskId}\``,
+    `- Follow-up packet prefix: \`${followUpTaskId}\``,
+    '- Canonical registry task id: see `tasks/index.json` (format `YYYYMMDD-linear-<linear-issue-id>`)',
     `- Create before active work: ${repoPacketPaths.map((path) => `\`${path}\``).join(', ')}`,
     '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
   ].join('\n');

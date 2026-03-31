@@ -16,7 +16,7 @@
   - explain concretely how `CO-7`, `CO-26`, and `CO-44` drifted relative to the original intent
   - define an issue-shaping contract that preserves user-request translation, protected terms, explicit non-goals, readiness checks, and nearby wrong interpretations to reject
   - require a parity/alignment matrix for parity work
-  - add an `intent checksum` and `Not done if` gate so issues fail readiness review before implementation when ambiguity remains
+  - add an `intent checksum` and `Not Done If` gate so issues fail readiness review before implementation when ambiguity remains
   - define how follow-up issues become traceable immediately through repo artifacts or an explicit artifact contract
   - record the safeguard split across templates, follow-up tooling, review gate, and checklist surfaces
 - Constraints / non-goals:
@@ -32,7 +32,7 @@
 
 ## Goals
 - Define a stronger issue-shaping contract for autonomy-facing backlog issues and follow-up issues.
-- Require an explicit `intent checksum` and `Not done if` readiness gate before work starts.
+- Require an explicit `intent checksum` and `Not Done If` readiness gate before work starts.
 - Require a current-vs-reference-vs-target parity/alignment matrix for parity or alignment work.
 - Improve follow-up issue creation so same-project backlog issues leave immediate traceability instructions instead of freeform descriptions only.
 - Record which safeguard belongs in guidance/templates, helper/tooling, review gate, and task checklist surfaces.
@@ -85,7 +85,7 @@
   - `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`
 
 ## Open Questions
-- Keep the first issue-quality gate lightweight and docs-first-backed in this lane: checklist + docs-review + explicit `Not done if` review. If later evidence shows that is still too weak, open a narrower follow-up for pipeline-level enforcement instead of over-expanding `CO-45`.
+- Keep the first issue-quality gate lightweight and docs-first-backed in this lane: checklist + docs-review + explicit `Not Done If` review. If later evidence shows that is still too weak, open a narrower follow-up for pipeline-level enforcement instead of over-expanding `CO-45`.
 
 ## Approvals
 - Product: Self-approved from the Linear issue scope and required `CO STATUS` case-study evidence

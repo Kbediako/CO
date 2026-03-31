@@ -29,7 +29,7 @@
 
 ## Implementation
 - [x] Follow-up issue helper hardening landed with deterministic traceability and the stronger issue-shaping contract. Evidence: `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`, `orchestrator/src/cli/linearCliShell.ts`, `out/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277/manual/20260331T180500Z-follow-up-description-combined.md`.
-- [x] Docs-first templates and workflow guidance now preserve protected terms, parity matrices, `Not done if`, and issue-quality review expectations. Evidence: `AGENTS.md`, `docs/AGENTS.md`, `docs/micro-task-path.md`, `.agent/task/templates/prd-template.md`, `.agent/task/templates/tech-spec-template.md`, `.agent/task/templates/action-plan-template.md`, `.agent/task/templates/tasks-template.md`.
+- [x] Docs-first templates and workflow guidance now preserve protected terms, parity matrices, `Not Done If`, and issue-quality review expectations. Evidence: `AGENTS.md`, `docs/AGENTS.md`, `docs/micro-task-path.md`, `.agent/task/templates/prd-template.md`, `.agent/task/templates/tech-spec-template.md`, `.agent/task/templates/action-plan-template.md`, `.agent/task/templates/tasks-template.md`.
 - [x] Provider-worker prompt/help text matches the stronger follow-up issue contract. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `bin/codex-orchestrator.ts`, `skills/linear/SKILL.md`.
 - [x] Focused regressions cover the new helper/CLI behavior. Evidence: `orchestrator/tests/LinearCliShell.test.ts`, `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
 

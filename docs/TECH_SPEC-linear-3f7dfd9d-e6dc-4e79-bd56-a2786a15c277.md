@@ -39,7 +39,7 @@ last_review: 2026-03-31
     - protected terms and exact artifact/surface names
     - explicit non-goals
     - nearby wrong interpretations to reject
-    - `Not done if` readiness blockers
+    - `Not Done If` readiness blockers
   - parity/alignment issues must include a required matrix covering:
     - current CO truth
     - reference truth
@@ -64,6 +64,7 @@ last_review: 2026-03-31
 - Architecture / design adjustments:
   - add a structured follow-up contract to `linear create-follow-up` with dedicated sections for `Intent Checksum`, `Non-Goals`, parity-matrix enforcement behind an explicit parity/alignment lane toggle, `Not Done If`, and `Immediate Traceability`
   - make `Immediate Traceability` deterministic from the created follow-up issue id so the issue body itself points to the exact repo packet paths required before the issue moves into active work
+  - document the post-create partial-success contract explicitly: `createProviderLinearFollowUpIssue` in `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts` performs `issueCreate` first, then description/relation writes; if the initial create succeeds and a later write fails, the helper does not retry or reconcile the first mutation idempotently and must surface `created_issue` recovery metadata so callers can recover manually
   - strengthen PRD/TECH_SPEC/ACTION_PLAN/task templates so the docs packet carries the same guardrails instead of collapsing back into a smaller interpretation
   - record a lightweight issue-quality review gate in guidance/checklists before implementation starts
 - Data model changes / migrations:
@@ -99,5 +100,7 @@ last_review: 2026-03-31
 - Resolved in planning: issue-quality review is a lightweight checklist/guidance/docs-review gate in this slice, not a new standalone pipeline.
 
 ## Approvals
-- Reviewer: pending docs-review
+- Reviewer: Codex self-review plus delegated docs-review fallback
+- Status: approved with comments; no blocking docs issues after fallback review
 - Date: 2026-03-31
+- Evidence: `.runs/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277-co-45-docs-review/cli/2026-03-31T05-38-11-020Z-51bac25e/manifest.json`, `.runs/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277-co-45-docs-review/cli/2026-03-31T05-38-11-020Z-51bac25e/review/telemetry.json`, `out/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277/manual/20260331T165600Z-docs-review-fallback.md`

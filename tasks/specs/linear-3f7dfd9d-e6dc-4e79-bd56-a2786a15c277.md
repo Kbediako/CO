@@ -16,7 +16,7 @@ review_notes:
   - 2026-03-31: Live `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`), showed no attached PR and no existing workpad, and the issue was transitioned from `Ready` to `In Progress` before active work.
   - 2026-03-31: Root-cause audit confirms the issue text: `CO-7` allowed a web-first interpretation, `CO-26` restored the exact `CO STATUS` name and terminal medium but still narrowed parity to one renderer over existing data, and `CO-44` had to reopen the chain to recover true Symphony terminal parity scope.
   - 2026-03-31: The sanctioned autonomy follow-up seam is `linear create-follow-up`, which currently accepts only title + description + acceptance criteria and therefore does not enforce intent checksum, wrong-interpretation rejection, or immediate repo traceability.
-  - 2026-03-31: Current docs-first templates capture generic translation but do not strongly require protected terms, parity matrices, or `Not done if` readiness failure language.
+  - 2026-03-31: Current docs-first templates capture generic translation but do not strongly require protected terms, parity matrices, or `Not Done If` readiness failure language.
   - 2026-03-31: Pre-implementation approval: proceed with a bounded workflow/tooling lane touching guidance/templates plus the follow-up helper/tests; do not widen into `CO STATUS` runtime implementation.
   - 2026-03-31: Delegated docs-review evidence landed via `.runs/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277-co-45-docs-review/cli/2026-03-31T05-38-11-020Z-51bac25e/manifest.json`; the review wrapper hit `review_outcome=failed-boundary` with `termination_boundary.kind=startup-anchor`, so docs approval used the recorded fallback in `out/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277/manual/20260331T165600Z-docs-review-fallback.md`.
   - 2026-03-31: Implementation hardening now requires intent checksum, non-goals, `Not Done If`, and a parity matrix whenever `--parity-lane` marks parity/alignment follow-up work; the helper also appends deterministic `Immediate Traceability` after Linear returns the created issue id/url.
@@ -37,7 +37,7 @@ This issue exists because the current autonomy-facing issue path lets a smaller 
    - protected terms / exact artifact and surface names
    - explicit non-goals
    - nearby wrong interpretations to reject
-   - `Not done if` readiness failures
+   - `Not Done If` readiness failures
 2. Define a required parity/alignment matrix for parity or alignment lanes covering:
    - current CO truth
    - reference truth
@@ -55,7 +55,7 @@ This issue exists because the current autonomy-facing issue path lets a smaller 
 - `docs/PRD-linear-e52a7254-f277-4121-b9f9-bf4084c4a473.md` explicitly treated the richer surface as web-first-acceptable and therefore did not protect the requested terminal medium.
 - `docs/PRD-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md`, `docs/TECH_SPEC-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md`, and `docs/ACTION_PLAN-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md` restored exact `CO STATUS` naming and terminal medium, but the packet still scoped the lane as one terminal renderer over the existing operator dataset instead of an explicit current/reference/target parity matrix.
 - `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts` currently builds follow-up descriptions from only `description` + `Acceptance Criteria`.
-- `.agent/task/templates/prd-template.md`, `.agent/task/templates/tech-spec-template.md`, `.agent/task/templates/action-plan-template.md`, and `.agent/task/templates/tasks-template.md` do not yet force protected terms, wrong-interpretation rejection, parity matrices, or `Not done if` readiness checks strongly enough.
+- `.agent/task/templates/prd-template.md`, `.agent/task/templates/tech-spec-template.md`, `.agent/task/templates/action-plan-template.md`, and `.agent/task/templates/tasks-template.md` do not yet force protected terms, wrong-interpretation rejection, parity matrices, or `Not Done If` readiness checks strongly enough.
 - `docs/micro-task-path.md` currently allows very small wording/guardrail changes but does not explicitly exclude parity/alignment or exact-name/exact-surface preservation lanes.
 
 ## Validation Plan

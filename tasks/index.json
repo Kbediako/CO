@@ -9,7 +9,14 @@
         "Codex"
       ],
       "last_review": "2026-03-31",
-      "approvals": {},
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-31",
+          "manifest": ".runs/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277-co-45-docs-review/cli/2026-03-31T05-38-11-020Z-51bac25e/manifest.json",
+          "override_reason": "review telemetry classified the wrapper result as failed-boundary/startup-anchor; docs approval used the recorded fallback in out/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277/manual/20260331T165600Z-docs-review-fallback.md after delegation-guard, spec-guard, docs:check, and docs:freshness passed"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
         "task": "tasks/tasks-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
