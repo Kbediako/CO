@@ -2068,6 +2068,64 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(applyPatchArtifact).not.toHaveBeenCalled();
   });
 
+  it('rejects acceptance when the proof selector provenance is tampered after launch', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      scope: {
+        files: [],
+        phases: ['docs']
+      }
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    await writeChildLaneProof(childLane, {
+      scope: {
+        ...childLane.scope,
+        allowed_path_selectors: (childLane.scope.allowed_path_selectors ?? []).map((selector) =>
+          selector.kind === 'prefix' && selector.value === 'docs/' && selector.source === 'phase'
+            ? { ...selector, phase: 'implementation' }
+            : selector
+        )
+      }
+    });
+    await writePatchArtifact(
+      childLane.patch_artifact_path ?? '',
+      'docs/PRD-linear-50228784-e908-4b2f-81b5-d94dbcf6707c.md'
+    );
+    const applyPatchArtifact = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        applyPatchArtifact,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_proof_invalid',
+        status: 409
+      }
+    });
+    expect(applyPatchArtifact).not.toHaveBeenCalled();
+  });
+
   it('rejects acceptance when a phase-scoped proof omits scope contract metadata', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord({

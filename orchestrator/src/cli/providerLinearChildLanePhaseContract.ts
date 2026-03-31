@@ -79,8 +79,14 @@ function normalizePhaseName(value: string): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function selectorSignature(selector: Pick<ProviderLinearChildLanePathSelector, 'kind' | 'value'>): string {
+function selectorPathSignature(selector: Pick<ProviderLinearChildLanePathSelector, 'kind' | 'value'>): string {
   return `${selector.kind}:${selector.value}`;
+}
+
+function selectorIdentitySignature(
+  selector: Pick<ProviderLinearChildLanePathSelector, 'kind' | 'value' | 'source' | 'phase'>
+): string {
+  return `${selector.kind}:${selector.value}:${selector.source}:${selector.phase ?? ''}`;
 }
 
 function dedupeSelectors(
@@ -89,7 +95,7 @@ function dedupeSelectors(
   const seen = new Set<string>();
   const deduped: ProviderLinearChildLanePathSelector[] = [];
   for (const selector of selectors) {
-    const signature = selectorSignature(selector);
+    const signature = selectorPathSignature(selector);
     if (seen.has(signature)) {
       continue;
     }
@@ -201,8 +207,8 @@ export function providerLinearChildLanePathSelectorsEqual(
   if (left.length !== right.length) {
     return false;
   }
-  const leftSignatures = left.map((selector) => selectorSignature(selector)).sort();
-  const rightSignatures = right.map((selector) => selectorSignature(selector)).sort();
+  const leftSignatures = left.map((selector) => selectorIdentitySignature(selector)).sort();
+  const rightSignatures = right.map((selector) => selectorIdentitySignature(selector)).sort();
   return leftSignatures.every((signature, index) => signature === rightSignatures[index]);
 }
 

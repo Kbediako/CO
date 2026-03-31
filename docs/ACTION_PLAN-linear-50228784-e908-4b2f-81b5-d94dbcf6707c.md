@@ -50,8 +50,8 @@
   - `MCP_RUNNER_TASK_ID=linear-50228784-e908-4b2f-81b5-d94dbcf6707c npm run test`
   - `MCP_RUNNER_TASK_ID=linear-50228784-e908-4b2f-81b5-d94dbcf6707c npm run docs:check`
   - `MCP_RUNNER_TASK_ID=linear-50228784-e908-4b2f-81b5-d94dbcf6707c npm run docs:freshness`
-  - `MCP_RUNNER_TASK_ID=linear-50228784-e908-4b2f-81b5-d94dbcf6707c node scripts/diff-budget.mjs`
-  - `MCP_RUNNER_TASK_ID=linear-50228784-e908-4b2f-81b5-d94dbcf6707c FORCE_CODEX_REVIEW=1 npm run review`
+  - `MCP_RUNNER_TASK_ID=linear-50228784-e908-4b2f-81b5-d94dbcf6707c DIFF_BUDGET_OVERRIDE_REASON="CO-52 needs the required docs-first packet plus the smallest safe implementation slice for phase-scoped child-lane acceptance: one new phase-contract helper, parent acceptance changes, proof snapshot updates, and focused regressions." node scripts/diff-budget.mjs`
+  - `TASK="linear-50228784-e908-4b2f-81b5-d94dbcf6707c" NOTES="Goal: validate CO-52 phase-scoped child-lane acceptance before handoff | Summary: add a machine-checkable phase-to-selector contract, enforce it in parent acceptance, persist scope-contract metadata in proof and ledger snapshots, and cover valid/rejected/tampered phase-scope cases | Risks: phase selector mapping could be too narrow or proof/ledger contract drift could still be misclassified" MANIFEST="$CODEX_ORCHESTRATOR_MANIFEST_PATH" FORCE_CODEX_REVIEW=1 DIFF_BUDGET_OVERRIDE_REASON="CO-52 needs the required docs-first packet plus the smallest safe implementation slice for phase-scoped child-lane acceptance: one new phase-contract helper, parent acceptance changes, proof snapshot updates, and focused regressions." npm run review -- --manifest "$CODEX_ORCHESTRATOR_MANIFEST_PATH" --base origin/main`
   - `MCP_RUNNER_TASK_ID=linear-50228784-e908-4b2f-81b5-d94dbcf6707c npm run pack:smoke`
 - Rollback plan:
   - remove the phase-contract helper plus scope-metadata changes if selector verification proves incorrect
