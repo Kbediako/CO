@@ -38,7 +38,7 @@
 - [x] `npm run docs:check`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
 - [x] `npm run docs:freshness`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
 - [x] `node scripts/diff-budget.mjs`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
-- [x] Manifest-backed standalone review wrapper executed, and the fallback was recorded after an explicit boundary failure. Evidence: `/Users/kbediako/Code/CO/.runs/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/cli/2026-03-31T08-12-50-173Z-239443da/review/telemetry.json`, `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/06-manual-review.md`, `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/07-elegance-review.md`.
+- [x] Manifest-backed standalone review wrapper executed, and the fallback was recorded after an explicit boundary failure. Evidence: `.runs/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/cli/2026-03-31T08-12-50-173Z-239443da/review/telemetry.json`, `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/06-manual-review.md`, `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/07-elegance-review.md`.
 - [x] `npm run pack:smoke`. Evidence: `out/linear-cd3020f3-b6be-4adb-ae00-1a15497de036/manual/20260331T091859Z-closeout-proof/00-validation-summary.md`.
 
 ## Handoff
