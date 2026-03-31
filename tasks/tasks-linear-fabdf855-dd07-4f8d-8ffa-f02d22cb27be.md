@@ -28,10 +28,10 @@
 - [x] The narrow fix seam is defined before implementation. Evidence: `tasks/specs/linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md`.
 
 ## Implementation
-- [ ] Reconcile top-level delegated-manifest discovery so provider-worker tasks search the audited workspace-scoped runs root in addition to the inherited shared root when appropriate. Evidence: pending implementation.
-- [ ] Preserve fail-closed behavior when no delegated child manifest exists. Evidence: pending focused regression.
-- [ ] Update provider-worker delegation guidance so valid child-stream / child-lane evidence is treated as the intended answer instead of override text. Evidence: pending docs/prompt update.
-- [ ] Add focused mixed-root regressions for the workspace-path success case and the fail-closed absence case. Evidence: pending tests.
+- [x] Reconcile top-level delegated-manifest discovery so provider-worker tasks search the audited workspace-scoped runs root in addition to the inherited shared root when appropriate. Evidence: `scripts/delegation-guard.mjs` now derives provider-worker workspace search roots from the active manifest/workspace contract and rejects foreign-workspace manifests.
+- [x] Preserve fail-closed behavior when no delegated child manifest exists. Evidence: `tests/delegation-guard.spec.ts` covers both the workspace-root miss case and the foreign-workspace stale-manifest case.
+- [x] Update provider-worker delegation guidance so valid child-stream / child-lane evidence is treated as the intended answer instead of override text. Evidence: `skills/linear/SKILL.md` and `orchestrator/src/cli/providerLinearWorkerRunner.ts`.
+- [x] Add focused mixed-root regressions for the workspace-path success case and the fail-closed absence case. Evidence: `tests/delegation-guard.spec.ts` adds success, absence, and foreign-workspace regressions; `orchestrator/tests/ProviderLinearWorkerRunner.test.ts` covers prompt guidance.
 
 ## Validation
 - [ ] `MCP_RUNNER_TASK_ID=linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --format json`. Evidence: pending.
