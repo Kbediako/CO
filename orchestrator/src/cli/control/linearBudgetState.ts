@@ -13,6 +13,7 @@ const LINEAR_BUDGET_STATE_SCHEMA_VERSION = 1;
 const LINEAR_BUDGET_STATE_DIRNAME = 'linear-budget';
 const LINEAR_BUDGET_DEFAULT_CONSTRAINED_POLL_INTERVAL_MS = 30_000;
 const LINEAR_BUDGET_DEFAULT_LOW_POLL_INTERVAL_MS = 60_000;
+const LINEAR_BUDGET_UNKNOWN_RESET_EXHAUSTED_GRACE_MS = LINEAR_BUDGET_DEFAULT_LOW_POLL_INTERVAL_MS;
 const LINEAR_BUDGET_LOCK_RETRY: LockRetryOptions = {
   maxAttempts: 25,
   initialDelayMs: 10,
@@ -360,21 +361,41 @@ function stripPersistedLinearBudgetStatus(
     request_id: persisted.request_id,
     retry_after_seconds: persisted.retry_after_seconds,
     cooldown_until: persisted.cooldown_until,
-    requests: normalizeExpiredLinearBudgetBucket(persisted.requests),
-    endpoint_requests: normalizeExpiredLinearBudgetBucket(persisted.endpoint_requests),
-    complexity: normalizeExpiredLinearBudgetBucket(persisted.complexity),
-    endpoint_complexity: normalizeExpiredLinearBudgetBucket(persisted.endpoint_complexity)
+    requests: normalizeExpiredLinearBudgetBucket(persisted.requests, persisted.observed_at),
+    endpoint_requests: normalizeExpiredLinearBudgetBucket(persisted.endpoint_requests, persisted.observed_at),
+    complexity: normalizeExpiredLinearBudgetBucket(persisted.complexity, persisted.observed_at),
+    endpoint_complexity: normalizeExpiredLinearBudgetBucket(persisted.endpoint_complexity, persisted.observed_at)
   };
 }
 
 function normalizeExpiredLinearBudgetBucket(
-  bucket: LinearBudgetBucketPayload | null
+  bucket: LinearBudgetBucketPayload | null,
+  observedAt: string
 ): LinearBudgetBucketPayload | null {
   if (!bucket) {
     return null;
   }
   const resetAtMs = parseIsoToMs(bucket.reset_at);
-  if (resetAtMs === null || resetAtMs > Date.now()) {
+  if (resetAtMs === null) {
+    const observedAtMs = parseIsoToMs(observedAt);
+    if (
+      observedAtMs !== null &&
+      bucket.remaining !== null &&
+      bucket.remaining <= 0 &&
+      observedAtMs + LINEAR_BUDGET_UNKNOWN_RESET_EXHAUSTED_GRACE_MS <= Date.now()
+    ) {
+      if (bucket.limit === null) {
+        return null;
+      }
+      return {
+        limit: bucket.limit,
+        remaining: null,
+        reset_at: null
+      };
+    }
+    return bucket;
+  }
+  if (resetAtMs > Date.now()) {
     return bucket;
   }
   if (bucket.limit === null) {

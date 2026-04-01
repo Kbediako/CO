@@ -81,6 +81,100 @@ describe('linearBudgetState', () => {
     });
   });
 
+  it('preserves fresh exhausted buckets when reset metadata is missing', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '0'
+      }
+    });
+
+    const budget = await readSharedLinearBudgetStatus(env);
+    expect(budget).toMatchObject({
+      cooldown_active: false,
+      suppression: 'exhausted',
+      requests: {
+        limit: 100,
+        remaining: 0,
+        reset_at: null
+      }
+    });
+    expect(
+      resolveLinearBudgetPreflight({
+        budget,
+        operation: 'provider-linear:issue-context',
+        minimum_requests_remaining: 1
+      })
+    ).toMatchObject({
+      ok: false,
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          required_requests_remaining: 1,
+          shortfall_bucket: 'requests',
+          shortfall_remaining: 0,
+          requests_remaining: 0
+        }
+      }
+    });
+    expect(
+      resolveLinearPollingInterval({
+        budget,
+        default_interval_ms: 15_000
+      })
+    ).toMatchObject({
+      interval_ms: 60_000,
+      reason: 'linear_budget_requests_exhausted'
+    });
+  });
+
+  it('expires exhausted buckets without reset metadata after the fallback grace window', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      observedAt: new Date(Date.now() - 61_000).toISOString(),
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '0'
+      }
+    });
+
+    const budget = await readSharedLinearBudgetStatus(env);
+    expect(budget).toMatchObject({
+      cooldown_active: false,
+      suppression: 'none',
+      requests: {
+        limit: 100,
+        remaining: null,
+        reset_at: null
+      }
+    });
+    expect(
+      resolveLinearBudgetPreflight({
+        budget,
+        operation: 'provider-linear:issue-context',
+        minimum_requests_remaining: 1
+      })
+    ).toEqual({ ok: true });
+  });
+
   it('fails helper preflight when the remaining request budget is clearly insufficient', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
