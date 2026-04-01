@@ -12,6 +12,10 @@ import {
   transitionProviderLinearIssueState,
   upsertProviderLinearWorkpadComment
 } from '../src/cli/control/providerLinearWorkflowFacade.js';
+import {
+  readSharedLinearBudgetStatus,
+  recordLinearBudgetHeadersObservation
+} from '../src/cli/control/linearBudgetState.js';
 
 const scopedSourceSetup = {
   provider: 'linear' as const,
@@ -32,10 +36,10 @@ afterEach(async () => {
   );
 });
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json', ...headers }
   });
 }
 
@@ -454,6 +458,49 @@ async function writeCachedIssueContext(
 }
 
 describe('providerLinearWorkflowFacade', () => {
+  it('fails issue-context reads fast when shared cooldown is already active', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '0',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () => {
+      throw new Error('shared cooldown should fail closed before fetch');
+    });
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'issue-context',
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          shared_budget_fail_fast: true,
+          shared_budget_cooldown_active: true
+        }
+      }
+    });
+  });
+
   it('returns issue context with comments, team states, attachments, and resolved workpad comment', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
@@ -1105,6 +1152,83 @@ describe('providerLinearWorkflowFacade', () => {
       comment: {
         id: 'comment-workpad',
         body: updatedWorkpadBody
+      }
+    });
+  });
+
+  it('allows upsert-workpad to noop after a truthful single read when one shared request remains', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+    const desiredWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Reuse the current live workpad when only one request remains.'],
+      notesLines: ['- A single truthful read should still allow an idempotent noop result.']
+    });
+    const resetAt = String(Date.now() + 60_000);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueContext');
+      expect(body.query).toContain('comments(first:');
+      expect(body.query).not.toContain('attachments(first:');
+      return jsonResponse(
+        buildIssueContextBody({
+          comments: {
+            nodes: [
+              {
+                id: 'comment-workpad',
+                body: desiredWorkpadBody,
+                url: 'https://linear.app/comment/workpad',
+                createdAt: '2026-03-22T09:00:00.000Z',
+                updatedAt: '2026-03-22T09:30:00.000Z',
+                resolvedAt: null
+              }
+            ]
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: desiredWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'noop',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-workpad',
+        body: desiredWorkpadBody
       }
     });
   });
@@ -6379,6 +6503,8 @@ describe('providerLinearWorkflowFacade', () => {
         variables?: Record<string, string>;
       };
       if (body.query?.includes('ProviderLinearIssueContext')) {
+        expect(body.query).toContain('comments(first:');
+        expect(body.query).not.toContain('attachments(first:');
         return jsonResponse(buildIssueContextBody());
       }
       if (body.query?.includes('ProviderLinearDeleteComment')) {
@@ -6418,6 +6544,76 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('allows delete-workpad to noop after a truthful single read when one shared request remains', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+    const resetAt = String(Date.now() + 60_000);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueContext');
+      expect(body.query).toContain('comments(first:');
+      expect(body.query).not.toContain('attachments(first:');
+      return jsonResponse(
+        buildIssueContextBody({
+          comments: {
+            nodes: [
+              {
+                id: 'comment-note',
+                body: 'Unrelated note',
+                url: 'https://linear.app/comment/note',
+                createdAt: '2026-03-22T08:00:00.000Z',
+                updatedAt: '2026-03-22T08:30:00.000Z',
+                resolvedAt: null
+              }
+            ]
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await deleteProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      ok: true,
+      operation: 'delete-workpad',
+      action: 'noop',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment_id: null,
+      source_setup: null
+    });
+  });
+
   it('treats an already-removed workpad comment as an idempotent delete success', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -6425,6 +6621,8 @@ describe('providerLinearWorkflowFacade', () => {
         variables?: Record<string, string>;
       };
       if (body.query?.includes('ProviderLinearIssueContext')) {
+        expect(body.query).toContain('comments(first:');
+        expect(body.query).not.toContain('attachments(first:');
         return jsonResponse(buildIssueContextBody());
       }
       if (body.query?.includes('ProviderLinearDeleteComment')) {
@@ -6722,6 +6920,72 @@ describe('providerLinearWorkflowFacade', () => {
 
     expect(noopFetch).toHaveBeenCalledTimes(1);
     expect(noopResult).toMatchObject({
+      ok: true,
+      operation: 'transition',
+      action: 'noop',
+      issue: {
+        state: {
+          id: 'state-human-review',
+          name: 'Human Review'
+        }
+      },
+      previous_state: {
+        id: 'state-human-review',
+        name: 'Human Review'
+      }
+    });
+  });
+
+  it('allows transition to noop after a truthful live summary read when one shared request remains', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+    const resetAt = String(Date.now() + 60_000);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueSummary');
+      return jsonResponse(
+        buildIssueContextBody({
+          state: {
+            id: 'state-human-review',
+            name: 'Human Review',
+            type: 'started'
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'Human Review',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
       ok: true,
       operation: 'transition',
       action: 'noop',
@@ -7287,6 +7551,57 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('fails follow-up creation fast when the shared request budget is clearly insufficient', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '2',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () => {
+      throw new Error('insufficient shared budget should fail before fetch');
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          shared_budget_fail_fast: true,
+          required_requests_remaining: 4,
+          shortfall_bucket: 'requests',
+          shortfall_remaining: 2
+        }
+      }
+    });
+  });
+
   it('fails closed when the source issue is not assigned to a project', async () => {
     const fetchImpl: typeof fetch = vi.fn(async () =>
       jsonResponse(
@@ -7487,6 +7802,7 @@ describe('providerLinearWorkflowFacade', () => {
         status: 409,
         retryable: false,
         details: {
+          http_status: 200,
           errors: [{ message: 'description update failed' }],
           created_issue: {
             id: 'lin-issue-2',
@@ -7623,6 +7939,7 @@ describe('providerLinearWorkflowFacade', () => {
         status: 409,
         retryable: false,
         details: {
+          http_status: 200,
           errors: [{ message: 'relation failed' }],
           created_issue: {
             id: 'lin-issue-2',
@@ -7775,6 +8092,7 @@ describe('providerLinearWorkflowFacade', () => {
         status: 409,
         retryable: false,
         details: {
+          http_status: 200,
           errors: [{ message: 'block relation failed' }],
           created_issue: {
             id: 'lin-issue-2',
@@ -7804,6 +8122,12 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('falls back to a plain URL attachment when the GitHub-specific mutation errors', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -7818,9 +8142,17 @@ describe('providerLinearWorkflowFacade', () => {
           url: 'https://github.com/openai/codex-orchestrator/pull/123',
           title: 'PR 123'
         });
-        return jsonResponse({
-          errors: [{ message: 'GitHub attachment mutation unavailable.' }]
-        });
+        return jsonResponse(
+          {
+            errors: [{ message: 'GitHub attachment mutation unavailable.' }]
+          },
+          200,
+          {
+            'x-ratelimit-requests-limit': '100',
+            'x-ratelimit-requests-remaining': '7',
+            'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+          }
+        );
       }
       if (body.query?.includes('ProviderLinearAttachUrl')) {
         expect(body.variables).toEqual({
@@ -7849,9 +8181,7 @@ describe('providerLinearWorkflowFacade', () => {
       issueId: 'lin-issue-1',
       url: 'https://github.com/openai/codex-orchestrator/pull/123',
       title: 'PR 123',
-      env: {
-        CO_LINEAR_API_TOKEN: 'lin-api-token'
-      },
+      env,
       fetchImpl
     });
 
@@ -7871,6 +8201,13 @@ describe('providerLinearWorkflowFacade', () => {
         source_type: 'url'
       },
       source_setup: null
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
+      requests: {
+        limit: 100,
+        remaining: 7
+      }
     });
   });
 
@@ -7959,6 +8296,64 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it('fails attach-pr after a truthful context read when the shared request budget cannot cover the supported fallback path', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+    const resetAt = String(Date.now() + 60_000);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '2',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueContext');
+      expect(body.query).not.toContain('comments(first:');
+      expect(body.query).toContain('attachments(first:');
+      return jsonResponse(buildIssueContextBody(), 200, {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      });
+    });
+
+    const result = await attachProviderLinearIssuePr({
+      issueId: 'lin-issue-1',
+      url: 'https://github.com/openai/codex-orchestrator/pull/123',
+      title: 'PR 123',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'attach-pr',
+      error: {
+        code: 'linear_rate_limited',
+        status: 429,
+        details: {
+          shared_budget_fail_fast: true,
+          required_requests_remaining: 2,
+          shortfall_bucket: 'requests',
+          shortfall_remaining: 1
+        }
+      }
+    });
+  });
+
   it('normalizes 2xx GraphQL errors to an upstream-safe status code', async () => {
     const fetchImpl: typeof fetch = vi.fn(async () =>
       jsonResponse({
@@ -7990,6 +8385,7 @@ describe('providerLinearWorkflowFacade', () => {
         message: 'Linear GraphQL returned operation errors.',
         status: 502,
         details: {
+          http_status: 200,
           errors: [
             {
               message: 'Linear returned operation errors.',
@@ -8005,6 +8401,24 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it('dedupes existing PR attachments using canonicalized GitHub URLs', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+    const resetAt = String(Date.now() + 60_000);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
@@ -8022,7 +8436,13 @@ describe('providerLinearWorkflowFacade', () => {
                 }
               ]
             }
-          })
+          }),
+          200,
+          {
+            'x-ratelimit-requests-limit': '100',
+            'x-ratelimit-requests-remaining': '0',
+            'x-ratelimit-requests-reset': resetAt
+          }
         );
       }
       if (body.query?.includes('ProviderLinearAttachGitHubPr') || body.query?.includes('ProviderLinearAttachUrl')) {
@@ -8035,12 +8455,11 @@ describe('providerLinearWorkflowFacade', () => {
       issueId: 'lin-issue-1',
       url: 'https://www.github.com/openai/codex-orchestrator/pull/123/files?utm_source=test#discussion_r1',
       title: 'PR 123',
-      env: {
-        CO_LINEAR_API_TOKEN: 'lin-api-token'
-      },
+      env,
       fetchImpl
     });
 
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       ok: true,
       operation: 'attach-pr',

@@ -1,7 +1,7 @@
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { RunSummary } from '../types.js';
-import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
+import { acquireLockWithRetry, type AcquiredLock, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
 import { writeAtomicFile } from '../utils/atomicWrite.js';
 
@@ -56,7 +56,7 @@ export class TaskStateStore {
   async recordRun(summary: RunSummary): Promise<void> {
     const safeTaskId = sanitizeTaskId(summary.taskId);
     const lockPath = this.buildLockPath(safeTaskId);
-    await this.acquireLock(safeTaskId, lockPath);
+    const lock = await this.acquireLock(safeTaskId, lockPath);
     try {
       await this.ensureDirectory(this.outDir);
       const taskOutDir = join(this.outDir, safeTaskId);
@@ -67,7 +67,7 @@ export class TaskStateStore {
       const updated = this.mergeSnapshot(snapshot, { ...summary, taskId: safeTaskId });
       await writeAtomicFile(snapshotPath, JSON.stringify(updated, null, 2));
     } finally {
-      await this.releaseLock(lockPath);
+      await this.releaseLock(lock);
     }
   }
 
@@ -76,8 +76,8 @@ export class TaskStateStore {
     return join(this.runsDir, `${safeTaskId}.lock`);
   }
 
-  private async acquireLock(taskId: string, lockPath: string): Promise<void> {
-    await acquireLockWithRetry({
+  private async acquireLock(taskId: string, lockPath: string): Promise<AcquiredLock> {
+    return await acquireLockWithRetry({
       taskId,
       lockPath,
       retry: this.lockRetry,
@@ -90,8 +90,8 @@ export class TaskStateStore {
     });
   }
 
-  private async releaseLock(lockPath: string): Promise<void> {
-    await rm(lockPath, { force: true });
+  private async releaseLock(lock: AcquiredLock): Promise<void> {
+    await lock.release();
   }
 
   private async ensureDirectory(path: string): Promise<void> {

@@ -153,7 +153,7 @@ interface ProviderLinearChildLaneShellDependencies {
       records: ProviderLinearWorkerChildLaneRecord[]
     ) => Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; result: T }> | { records: ProviderLinearWorkerChildLaneRecord[]; result: T }
   ) => Promise<T>;
-  refreshProofSnapshot: (runDir: string, auditPath: string | null) => Promise<void>;
+  refreshProofSnapshot: (runDir: string, auditPath: string | null, env?: NodeJS.ProcessEnv) => Promise<void>;
   readTrackedIssue: (input: {
     issueId: string;
     sourceSetup?: DispatchPilotSourceSetup | null;
@@ -178,8 +178,8 @@ const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
     });
     return normalizeScopeEntries([...modified.stdout.split(/\r?\n/u), ...untracked.stdout.split(/\r?\n/u)]);
   },
-  refreshProofSnapshot: async (runDir, auditPath) => {
-    await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath);
+  refreshProofSnapshot: async (runDir, auditPath, env) => {
+    await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath, undefined, undefined, env);
   },
   readTrackedIssue: async ({ issueId, sourceSetup, env }) => {
     const resolution = await resolveLiveLinearTrackedIssueById({
@@ -208,10 +208,11 @@ async function refreshProviderLinearChildLaneProofSnapshotBestEffort(input: {
   deps: Pick<ProviderLinearChildLaneShellDependencies, 'refreshProofSnapshot' | 'warn'>;
   runDir: string;
   auditPath: string | null;
+  env: NodeJS.ProcessEnv;
   warningContext: string;
 }): Promise<void> {
   try {
-    await input.deps.refreshProofSnapshot(input.runDir, input.auditPath);
+    await input.deps.refreshProofSnapshot(input.runDir, input.auditPath, input.env);
   } catch (error) {
     input.deps.warn(
       `provider-linear-child-lane warning: failed to refresh proof snapshot ${input.warningContext}: ${error instanceof Error ? error.message : String(error)}`
@@ -696,6 +697,7 @@ async function launchChildLane(
     deps,
     runDir: context.runDir,
     auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+    env: params.env,
     warningContext: `after recording child lane ${stream}`
   });
   if (execResult.exitCode !== 0 || childRun.status !== 'succeeded') {
@@ -773,6 +775,7 @@ async function resolveChildLaneDecision(
       deps,
       runDir: context.runDir,
       auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+      env: params.env,
       warningContext: `after finalizing ${finalized.decision} child lane ${stream}`
     });
     return {
@@ -835,6 +838,7 @@ async function resolveChildLaneDecision(
       deps,
       runDir: context.runDir,
       auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+      env: params.env,
       warningContext: `after invalidating stale child lane ${stream}`
     });
     return failureResult({
@@ -1077,6 +1081,7 @@ async function resolveChildLaneDecision(
     deps,
     runDir: context.runDir,
     auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+    env: params.env,
     warningContext: `after accepting child lane ${stream}`
   });
   return {

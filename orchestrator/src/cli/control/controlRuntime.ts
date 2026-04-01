@@ -3,6 +3,7 @@ import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
+import type { LinearBudgetStatus } from './linearBudgetState.js';
 import { readProviderPollingHealth } from './providerPollingHealth.js';
 import {
   buildProviderIntakeSummary,
@@ -328,7 +329,58 @@ function normalizePersistedProviderPollingSnapshot(
     stuck: polling.stuck === true,
     stuck_since_at: typeof polling.stuck_since_at === 'string' ? polling.stuck_since_at : null,
     restart_required: polling.restart_required === true,
-    reason: typeof polling.reason === 'string' ? polling.reason : null
+    reason: typeof polling.reason === 'string' ? polling.reason : null,
+    linear_budget: normalizeLinearBudgetSnapshot(polling.linear_budget)
+  };
+}
+
+function normalizeLinearBudgetSnapshot(value: unknown): LinearBudgetStatus | null {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+  if (typeof value.observed_at !== 'string') {
+    return null;
+  }
+  return {
+    observed_at: value.observed_at,
+    source: typeof value.source === 'string' ? value.source : 'unknown',
+    request_id: typeof value.request_id === 'string' ? value.request_id : null,
+    retry_after_seconds:
+      typeof value.retry_after_seconds === 'number' && Number.isFinite(value.retry_after_seconds)
+        ? value.retry_after_seconds
+        : null,
+    cooldown_until: typeof value.cooldown_until === 'string' ? value.cooldown_until : null,
+    cooldown_active: value.cooldown_active === true,
+    suppression:
+      value.suppression === 'cooldown' ||
+      value.suppression === 'exhausted' ||
+      value.suppression === 'low' ||
+      value.suppression === 'constrained'
+        ? value.suppression
+        : 'none',
+    suppression_reason: typeof value.suppression_reason === 'string' ? value.suppression_reason : null,
+    requests: normalizeLinearBudgetBucketSnapshot(value.requests),
+    endpoint_requests: normalizeLinearBudgetBucketSnapshot(value.endpoint_requests),
+    complexity: normalizeLinearBudgetBucketSnapshot(value.complexity),
+    endpoint_complexity: normalizeLinearBudgetBucketSnapshot(value.endpoint_complexity)
+  };
+}
+
+function normalizeLinearBudgetBucketSnapshot(value: unknown): LinearBudgetStatus['requests'] {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+  const limit = typeof value.limit === 'number' && Number.isFinite(value.limit) ? value.limit : null;
+  const remaining =
+    typeof value.remaining === 'number' && Number.isFinite(value.remaining) ? value.remaining : null;
+  const resetAt = typeof value.reset_at === 'string' ? value.reset_at : null;
+  if (limit === null && remaining === null && resetAt === null) {
+    return null;
+  }
+  return {
+    limit,
+    remaining,
+    reset_at: resetAt
   };
 }
 

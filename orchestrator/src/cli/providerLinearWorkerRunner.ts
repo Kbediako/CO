@@ -4,7 +4,7 @@ import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { mkdir, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdir, readFile, realpath } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
@@ -27,6 +27,7 @@ import {
   type LiveLinearTrackedIssue,
   type LiveLinearTrackedIssueResolution
 } from './control/linearDispatchSource.js';
+import { readSharedLinearBudgetStatus, type LinearBudgetStatus } from './control/linearBudgetState.js';
 import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
@@ -229,6 +230,7 @@ export interface ProviderLinearWorkerProof {
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
   child_lanes?: ProviderLinearWorkerChildLaneRecord[];
+  linear_budget?: LinearBudgetStatus | null;
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
   end_reason: string | null;
   updated_at: string;
@@ -1343,7 +1345,7 @@ async function withProviderLinearWorkerChildStreamsLock<T>(
   action: () => Promise<T>
 ): Promise<T> {
   const lockPath = buildChildStreamsLockPath(runDir);
-  await acquireLockWithRetry({
+  const lock = await acquireLockWithRetry({
     taskId: runDir,
     lockPath,
     retry: PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY,
@@ -1356,7 +1358,7 @@ async function withProviderLinearWorkerChildStreamsLock<T>(
   try {
     return await action();
   } finally {
-    await rm(lockPath, { force: true });
+    await lock.release();
   }
 }
 
@@ -1365,7 +1367,7 @@ async function withProviderLinearWorkerProofLock<T>(
   action: () => Promise<T>
 ): Promise<T> {
   const lockPath = buildProofLockPath(runDir);
-  await acquireLockWithRetry({
+  const lock = await acquireLockWithRetry({
     taskId: runDir,
     lockPath,
     retry: PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY,
@@ -1378,7 +1380,7 @@ async function withProviderLinearWorkerProofLock<T>(
   try {
     return await action();
   } finally {
-    await rm(lockPath, { force: true });
+    await lock.release();
   }
 }
 
@@ -1387,7 +1389,7 @@ async function withProviderLinearWorkerChildLanesLock<T>(
   action: () => Promise<T>
 ): Promise<T> {
   const lockPath = buildChildLanesLockPath(runDir);
-  await acquireLockWithRetry({
+  const lock = await acquireLockWithRetry({
     taskId: runDir,
     lockPath,
     retry: PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY,
@@ -1400,7 +1402,7 @@ async function withProviderLinearWorkerChildLanesLock<T>(
   try {
     return await action();
   } finally {
-    await rm(lockPath, { force: true });
+    await lock.release();
   }
 }
 
@@ -1943,14 +1945,17 @@ async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,
   runDir: string,
   auditPath: string,
-  proof: ProviderLinearWorkerProof
+  proof: ProviderLinearWorkerProof,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<ProviderLinearWorkerProof> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
+    const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
     const hydratedProof = {
       ...proof,
       linear_audit: await summarizeProviderLinearAuditPath(auditPath),
       child_streams: await readProviderLinearWorkerChildStreams(runDir),
-      child_lanes: await readProviderLinearWorkerChildLanes(runDir)
+      child_lanes: await readProviderLinearWorkerChildLanes(runDir),
+      linear_budget: linearBudget
     };
     await deps.writeProof(buildProofPath(runDir), hydratedProof);
     return hydratedProof;
@@ -1962,7 +1967,8 @@ export async function refreshProviderLinearWorkerProofSnapshot(
   auditPath: string | null,
   now: () => string = () => new Date().toISOString(),
   writeProof: (path: string, proof: ProviderLinearWorkerProof) => Promise<void> = async (path, proof) =>
-    await writeJsonAtomic(path, proof)
+    await writeJsonAtomic(path, proof),
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<ProviderLinearWorkerProof | null> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
     const proofPath = buildProofPath(runDir);
@@ -1976,11 +1982,13 @@ export async function refreshProviderLinearWorkerProofSnapshot(
       throw error;
     }
     const parsed = JSON.parse(raw) as ProviderLinearWorkerProof;
+    const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
     const hydrated: ProviderLinearWorkerProof = {
       ...parsed,
       linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
       child_streams: await readProviderLinearWorkerChildStreams(runDir),
       child_lanes: await readProviderLinearWorkerChildLanes(runDir),
+      linear_budget: linearBudget,
       updated_at: now()
     };
     await writeProof(proofPath, hydrated);
@@ -2046,12 +2054,13 @@ export async function runProviderLinearWorker(
     child_streams: [],
     child_lanes: [],
     tracked_issue_error: null,
+    linear_budget: null,
     end_reason: null,
     updated_at: deps.now()
   };
 
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
-    const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof);
+    const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
     await requestProviderControlHostRefresh({
       currentManifestPath: context.manifestPath,
       env,

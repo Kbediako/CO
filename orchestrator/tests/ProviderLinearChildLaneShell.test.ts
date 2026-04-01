@@ -185,6 +185,12 @@ describe('runProviderLinearChildLaneShell', () => {
   it('launches a same-issue child lane and records parent-owned lineage', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
+    const env = buildProviderWorkerEnv(manifestPath, {
+      CODEX_ORCHESTRATOR_RUNS_DIR: join('/tmp', 'shared-runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join('/tmp', 'shared-out'),
+      CODEX_HOME: join(tempRoot ?? '', 'codex-home'),
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    });
     const childProof: ProviderLinearChildLaneProof = {
       issue_id: ISSUE.issue_id,
       issue_identifier: ISSUE.issue_identifier,
@@ -248,6 +254,7 @@ describe('runProviderLinearChildLaneShell', () => {
         stderr: ''
       };
     });
+    const refreshProofSnapshot = vi.fn(async () => undefined);
 
     const result = await runProviderLinearChildLaneShell(
       {
@@ -255,10 +262,7 @@ describe('runProviderLinearChildLaneShell', () => {
         streamName: 'impl-a',
         purpose: 'Implement bounded child lane support',
         files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
-        env: buildProviderWorkerEnv(manifestPath, {
-          CODEX_ORCHESTRATOR_RUNS_DIR: join('/tmp', 'shared-runs'),
-          CODEX_ORCHESTRATOR_OUT_DIR: join('/tmp', 'shared-out')
-        })
+        env
       },
       {
         execRunner,
@@ -271,7 +275,7 @@ describe('runProviderLinearChildLaneShell', () => {
         })) as never,
         readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
-        refreshProofSnapshot: vi.fn(async () => undefined)
+        refreshProofSnapshot
       }
     );
 
@@ -306,6 +310,7 @@ describe('runProviderLinearChildLaneShell', () => {
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
     expect(request?.env.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot ?? '', 'out'));
+    expect(refreshProofSnapshot).toHaveBeenCalledWith(runDir, null, env);
     expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
       expect.objectContaining({
         stream: 'impl-a',

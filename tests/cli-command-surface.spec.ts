@@ -346,7 +346,7 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.status).toBe('planned');
     expect(payload.plan?.method).toBe('build');
     expect(payload.plan?.installRoot).toBe(join(tempDir, 'orchestrator', 'codex-cli'));
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('emits codex defaults plan json', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-codex-defaults-json-'));
@@ -368,7 +368,7 @@ describe('codex-orchestrator command surface', () => {
         expect.objectContaining({ target: 'config', status: 'pending' })
       ])
     );
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints flow help', async () => {
     const { stdout } = await runCli(['flow', '--help'], undefined, CLI_BOOT_TIMEOUT);

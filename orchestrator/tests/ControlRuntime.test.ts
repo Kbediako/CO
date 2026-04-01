@@ -1706,6 +1706,26 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('drops persisted polling linear budget snapshots that do not include an observation timestamp', async () => {
+    const fixture = await createFixture({
+      providerIntakeState: {
+        ...createProviderIntakeState([]),
+        polling: {
+          enabled: true,
+          interval_ms: 15000,
+          checking: false,
+          queued: false,
+          last_mode: 'poll',
+          updated_at: '2026-03-07T00:00:45.000Z',
+          linear_budget: {}
+        }
+      }
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    expect(compatibilityProjection.polling?.linear_budget ?? null).toBeNull();
+  });
+
   it('honors explicit null when reinitializing provider polling health state', async () => {
     const providerIssueHandoff = {
       handleAcceptedTrackedIssue: vi.fn(),

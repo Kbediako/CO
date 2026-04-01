@@ -20,9 +20,16 @@ import {
   startControlServerPublicLifecycle,
   type ControlServerPublicLifecycleState
 } from '../src/cli/control/controlServerPublicLifecycle.js';
+import {
+  readSharedLinearBudgetStatus,
+  resolveLinearPollingInterval
+} from '../src/cli/control/linearBudgetState.js';
 import { resolveLiveLinearTrackedIssues } from '../src/cli/control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from '../src/cli/control/linearWebhookController.js';
-import { readProviderPollingHealth } from '../src/cli/control/providerPollingHealth.js';
+import {
+  readProviderPollingHealth,
+  scheduleProviderPolling
+} from '../src/cli/control/providerPollingHealth.js';
 import {
   prepareControlServerStartupInputs,
   type PreparedControlServerStartupInputs
@@ -39,6 +46,15 @@ vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
 
 vi.mock('../src/cli/control/linearDispatchSource.js', () => ({
   resolveLiveLinearTrackedIssues: vi.fn()
+}));
+
+vi.mock('../src/cli/control/linearBudgetState.js', () => ({
+  readSharedLinearBudgetStatus: vi.fn(async () => null),
+  resolveLinearPollingInterval: vi.fn(({ default_interval_ms }: { default_interval_ms: number }) => ({
+    interval_ms: default_interval_ms,
+    reason: null,
+    linear_budget: null
+  }))
 }));
 
 vi.mock('../src/cli/control/linearWebhookController.js', () => ({
@@ -80,6 +96,12 @@ describe('startControlServerPublicLifecycle', () => {
     vi.mocked(resolveLinearWebhookSourceSetup).mockReturnValue({
       sourceSetup: {} as never
     });
+    vi.mocked(readSharedLinearBudgetStatus).mockResolvedValue(null);
+    vi.mocked(resolveLinearPollingInterval).mockImplementation(({ default_interval_ms }) => ({
+      interval_ms: default_interval_ms,
+      reason: null,
+      linear_budget: null
+    }));
     vi.mocked(resolveLiveLinearTrackedIssues).mockResolvedValue({
       kind: 'ready',
       tracked_issues: [buildTrackedIssue('issue-1')]
@@ -188,6 +210,73 @@ describe('startControlServerPublicLifecycle', () => {
     await closeControlServerPublicLifecycle(started);
     await vi.advanceTimersByTimeAsync(15_000);
     expect(requestContextShared.providerIssueHandoff?.refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not recreate the provider refresh timer when shutdown lands during async schedule resolution', async () => {
+    vi.useFakeTimers();
+
+    const defaultSchedule = {
+      interval_ms: 15_000,
+      reason: null,
+      linear_budget: null
+    } as const;
+    let resolveSchedule:
+      | ((value: {
+          interval_ms: number;
+          reason: string | null;
+          linear_budget: null;
+        }) => void)
+      | null = null;
+    vi.mocked(resolveLinearPollingInterval)
+      .mockImplementationOnce(() => defaultSchedule)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSchedule = resolve;
+          })
+      );
+
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff: {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: vi.fn(async () => undefined)
+      }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+    expect(requestContextShared.providerIssueHandoff?.refresh).toHaveBeenCalledTimes(1);
+
+    await closeControlServerPublicLifecycle(started);
+    resolveSchedule?.(defaultSchedule);
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(requestContextShared.providerIssueHandoff?.refresh).toHaveBeenCalledTimes(1);
   });
 
   it('does not overlap provider refresh cycles when one interval run is still in flight', async () => {
@@ -742,6 +831,119 @@ describe('startControlServerPublicLifecycle', () => {
     });
 
     await closeControlServerPublicLifecycle(started);
+  });
+
+  it('skips refresh fallback and widens the next polling interval when the shared budget is already rate limited', async () => {
+    vi.useFakeTimers();
+
+    vi.mocked(resolveLiveLinearTrackedIssues).mockResolvedValueOnce({
+      kind: 'skip',
+      reason: 'dispatch_source_provider_rate_limited'
+    } as Awaited<ReturnType<typeof resolveLiveLinearTrackedIssues>>);
+    vi.mocked(resolveLinearPollingInterval).mockReturnValue({
+      interval_ms: 60_000,
+      reason: 'linear_budget_requests_low',
+      linear_budget: {
+        observed_at: new Date().toISOString(),
+        source: 'dispatch_source_tracked_issues',
+        request_id: null,
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        suppression: 'low',
+        suppression_reason: 'linear_budget_requests_low',
+        requests: {
+          limit: 100,
+          remaining: 1,
+          reset_at: new Date(Date.now() + 60_000).toISOString()
+        },
+        endpoint_requests: null,
+        complexity: null,
+        endpoint_complexity: null
+      }
+    });
+
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      poll: vi.fn(async () => undefined),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      controlStore: {
+        snapshot: () => ({ feature_toggles: {} })
+      },
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+
+    expect(providerIssueHandoff.poll).not.toHaveBeenCalled();
+    expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      interval_ms: 60_000,
+      reason: 'linear_budget_requests_low',
+      linear_budget: {
+        suppression: 'low'
+      }
+    });
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
+
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('reuses the last valid interval when scheduled polling receives an invalid interval', () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      poll: vi.fn(async () => undefined),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+
+    const atMs = Date.parse('2026-03-22T09:00:00.000Z');
+    scheduleProviderPolling(providerIssueHandoff, {
+      intervalMs: 15_000,
+      reason: 'linear_budget_requests_low',
+      atMs
+    });
+    scheduleProviderPolling(providerIssueHandoff, {
+      intervalMs: Number.NaN,
+      reason: 'linear_budget_requests_low',
+      atMs: atMs + 5_000
+    });
+
+    expect(readProviderPollingHealth(providerIssueHandoff, atMs + 5_000)).toMatchObject({
+      interval_ms: 15_000,
+      next_poll_at: '2026-03-22T09:00:20.000Z',
+      reason: 'linear_budget_requests_low'
+    });
   });
 
   it('preserves the active refresh mode when a non-queued poll request coalesces behind it', async () => {

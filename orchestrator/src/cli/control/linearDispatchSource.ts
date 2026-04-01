@@ -6,6 +6,12 @@ import {
   type LinearGraphqlFailure,
   type LinearGraphqlPayload
 } from './linearGraphqlClient.js';
+import {
+  recordLinearBudgetHeadersObservation,
+  recordLinearBudgetRateLimitObservation,
+  readSharedLinearBudgetStatus,
+  resolveLinearBudgetPreflight
+} from './linearBudgetState.js';
 import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
 import { isProviderLinearTrackedIssueEligibleForExecution } from './providerLinearWorkflowStates.js';
 
@@ -257,9 +263,11 @@ export async function resolveLiveLinearTrackedIssueById(input: {
 
   const query = buildLinearIssueByIdQuery(issueId);
   const queryResult = await executeLinearQuery({
+    env,
     token,
     timeoutMs,
     fetchImpl,
+    source: 'dispatch_source_issue_by_id',
     query: query.query,
     variables: query.variables
   });
@@ -334,9 +342,11 @@ export async function resolveLiveLinearTrackedIssues(input: {
   while (hasNextPage) {
     const query = buildLinearTrackedIssuesQuery(sourceSetup, input.limit, afterCursor);
     const queryResult = await executeLinearQuery({
+      env,
       token,
       timeoutMs,
       fetchImpl,
+      source: 'dispatch_source_tracked_issues',
       query: query.query,
       variables: query.variables
     });
@@ -648,9 +658,11 @@ function buildLinearIssueByIdQuery(issueId: string): {
 }
 
 async function executeLinearQuery(input: {
+  env: NodeJS.ProcessEnv;
   token: string;
   timeoutMs: number;
   fetchImpl: typeof fetch;
+  source: string;
   query: string;
   variables: Record<string, string | number | null>;
 }): Promise<
@@ -663,6 +675,26 @@ async function executeLinearQuery(input: {
       resolution: LiveLinearFailureResolution;
     }
 > {
+  const sharedBudget = await readSharedLinearBudgetStatus(input.env);
+  const preflight = resolveLinearBudgetPreflight({
+    budget: sharedBudget,
+    operation: input.source
+  });
+  if (!preflight.ok) {
+    return {
+      ok: false,
+      resolution: unavailable('dispatch_source_provider_rate_limited', {
+        status: preflight.error.status,
+        message: preflight.error.message,
+        retryable: preflight.error.retryable,
+        details: {
+          error_code: preflight.error.code,
+          ...preflight.error.details
+        }
+      })
+    };
+  }
+
   const result = await executeLinearGraphql<LinearIssueQueryResponse>({
     token: input.token,
     timeoutMs: input.timeoutMs,
@@ -672,11 +704,30 @@ async function executeLinearQuery(input: {
   });
 
   if (!result.ok) {
+    await recordLinearBudgetHeadersObservation({
+      env: input.env,
+      headers: result.failure.headers ?? null,
+      source: input.source
+    }).catch(() => undefined);
+    const rateLimitFailure = mapLinearRateLimitedFailure(result.failure);
+    if (rateLimitFailure) {
+      await recordLinearBudgetRateLimitObservation({
+        env: input.env,
+        rateLimit: rateLimitFailure,
+        source: input.source
+      }).catch(() => undefined);
+    }
     return {
       ok: false,
       resolution: mapLinearGraphqlFailureToDispatchResolution(result.failure)
     };
   }
+
+  await recordLinearBudgetHeadersObservation({
+    env: input.env,
+    headers: result.headers ?? null,
+    source: input.source
+  }).catch(() => undefined);
 
   return {
     ok: true,

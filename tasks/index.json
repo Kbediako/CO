@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260401-linear-95b040bc-b150-4c39-bc56-64b13f55579f",
+      "title": "CO: Reduce steady-state Linear request burn across control-host and provider-worker flows",
+      "relates_to": "tasks/tasks-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-01",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-01",
+          "manifest": ".runs/linear-95b040bc-b150-4c39-bc56-64b13f55579f-co-62-docs-review/cli/2026-04-01T04-52-41-514Z-8b1ba74f/manifest.json",
+          "override_reason": "The child docs-review manifest is recorded and the original fallback was only needed because repo-wide docs:freshness debt on main was unrelated to the CO-62 packet; CO-63 cleared that baseline on main before this lane resumed handoff work."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "task": "tasks/tasks-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "agent_task": ".agent/task/linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "docs": "docs/TECH_SPEC-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md"
+      }
+    },
+    {
       "id": "20260401-linear-a34ce3f3-8e78-40f7-aabd-9e510572323e",
       "title": "CO: clear repo-wide docs:freshness baseline blocking review handoffs",
       "relates_to": "tasks/tasks-linear-a34ce3f3-8e78-40f7-aabd-9e510572323e.md",
@@ -9,6 +33,14 @@
         "Codex"
       ],
       "last_review": "2026-04-01",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-01",
+          "manifest": ".runs/linear-a34ce3f3-8e78-40f7-aabd-9e510572323e-co-63-docs-review-final/cli/2026-04-01T07-51-27-509Z-b1c52299/manifest.json",
+          "override_reason": "The final child rerun proved docs:check and docs:freshness green, but the nested review stage did not return a clean terminal verdict; approval uses the recorded fallback in out/linear-a34ce3f3-8e78-40f7-aabd-9e510572323e/manual/20260401T072517Z-baseline-classification/00-classification.md."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-a34ce3f3-8e78-40f7-aabd-9e510572323e.md",
         "task": "tasks/tasks-linear-a34ce3f3-8e78-40f7-aabd-9e510572323e.md",
