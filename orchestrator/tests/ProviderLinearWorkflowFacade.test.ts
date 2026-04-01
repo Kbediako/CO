@@ -6426,6 +6426,8 @@ describe('providerLinearWorkflowFacade', () => {
         variables?: Record<string, string>;
       };
       if (body.query?.includes('ProviderLinearIssueContext')) {
+        expect(body.query).toContain('comments(first:');
+        expect(body.query).not.toContain('attachments(first:');
         return jsonResponse(buildIssueContextBody());
       }
       if (body.query?.includes('ProviderLinearDeleteComment')) {
@@ -6489,6 +6491,8 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
       };
       expect(body.query).toContain('ProviderLinearIssueContext');
+      expect(body.query).toContain('comments(first:');
+      expect(body.query).not.toContain('attachments(first:');
       return jsonResponse(
         buildIssueContextBody({
           comments: {
@@ -6540,6 +6544,8 @@ describe('providerLinearWorkflowFacade', () => {
         variables?: Record<string, string>;
       };
       if (body.query?.includes('ProviderLinearIssueContext')) {
+        expect(body.query).toContain('comments(first:');
+        expect(body.query).not.toContain('attachments(first:');
         return jsonResponse(buildIssueContextBody());
       }
       if (body.query?.includes('ProviderLinearDeleteComment')) {
@@ -8119,6 +8125,7 @@ describe('providerLinearWorkflowFacade', () => {
       },
       source_setup: null
     });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
     await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
       requests: {
         limit: 100,
@@ -8236,6 +8243,8 @@ describe('providerLinearWorkflowFacade', () => {
         query?: string;
       };
       expect(body.query).toContain('ProviderLinearIssueContext');
+      expect(body.query).not.toContain('comments(first:');
+      expect(body.query).toContain('attachments(first:');
       return jsonResponse(buildIssueContextBody(), 200, {
         'x-ratelimit-requests-limit': '100',
         'x-ratelimit-requests-remaining': '1',

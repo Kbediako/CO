@@ -223,7 +223,7 @@ function buildProviderPollingHealthPayload(
       ? Math.max(0, nowMs - state.operationStartedAtMs)
       : null;
   const stuck = state.stuckAtMs !== null;
-  const reason = stuck ? state.reason ?? buildProviderPollingStuckReason(state) : null;
+  const reason = state.reason ?? (stuck ? buildProviderPollingStuckReason(state) : null);
   return {
     enabled: true,
     interval_ms: state.intervalMs,

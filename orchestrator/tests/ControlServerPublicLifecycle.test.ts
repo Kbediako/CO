@@ -837,6 +837,7 @@ describe('startControlServerPublicLifecycle', () => {
     expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
       checking: false,
       interval_ms: 60_000,
+      reason: 'linear_budget_requests_low',
       linear_budget: {
         suppression: 'low'
       }

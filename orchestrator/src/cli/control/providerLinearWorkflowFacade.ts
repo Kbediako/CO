@@ -768,7 +768,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
         ok: true as const,
         issue: cachedContext
       }
-    : await readIssueContext(session.session, 'upsert-workpad', issueId);
+    : await readIssueContext(session.session, 'upsert-workpad', issueId, {
+        includeAttachments: false
+      });
   if (!context.ok) {
     return failureFromWorkflowError('upsert-workpad', context.error);
   }
@@ -777,7 +779,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
   if (cachedContext && !canTrustCachedMutationContext) {
     // Re-read live comment state before any mutation so cached workpad ids cannot
     // cause duplicate comments or updates against deleted/replaced workpads.
-    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId);
+    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
+      includeAttachments: false
+    });
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
@@ -824,7 +828,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
   let selectedComment = selectedCommentResult.comment;
 
   if (selectedComment && selectedComment.body === body && cachedContext && canTrustCachedMutationContext) {
-    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId);
+    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
+      includeAttachments: false
+    });
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
@@ -955,7 +961,9 @@ export async function deleteProviderLinearWorkpadComment(input: {
     return failureFromWorkflowError('delete-workpad', budgetError);
   }
 
-  const context = await readIssueContext(session.session, 'delete-workpad', issueId);
+  const context = await readIssueContext(session.session, 'delete-workpad', issueId, {
+    includeAttachments: false
+  });
   if (!context.ok) {
     return failureFromWorkflowError('delete-workpad', context.error);
   }
@@ -1270,7 +1278,9 @@ export async function attachProviderLinearIssuePr(input: {
     return failureFromWorkflowError('attach-pr', budgetError);
   }
 
-  const context = await readIssueContext(session.session, 'attach-pr', issueId);
+  const context = await readIssueContext(session.session, 'attach-pr', issueId, {
+    includeComments: false
+  });
   if (!context.ok) {
     return failureFromWorkflowError('attach-pr', context.error);
   }
@@ -2220,7 +2230,11 @@ async function readIssueSummary(
 async function readIssueContext(
   session: ResolvedLinearWorkflowSession,
   operation: ProviderLinearOperation,
-  issueId: string
+  issueId: string,
+  options: {
+    includeComments?: boolean;
+    includeAttachments?: boolean;
+  } = {}
 ):
   Promise<
     | {
@@ -2232,6 +2246,8 @@ async function readIssueContext(
         error: ProviderLinearWorkflowError;
       }
   > {
+  const includeComments = options.includeComments !== false;
+  const includeAttachments = options.includeAttachments !== false;
   let issueNode: NonNullable<LinearIssueContextQueryResponse['issue']> | null = null;
   let workspaceId: string | null = null;
   const comments: ProviderLinearWorkflowComment[] = [];
@@ -2240,18 +2256,27 @@ async function readIssueContext(
   const seenAttachmentIds = new Set<string>();
   const seenCursors = new Set<string>();
   let commentsAfter: string | null = null;
-  let hasNextCommentPage = true;
+  let hasNextCommentPage = includeComments;
+  let firstPage = true;
 
-  while (hasNextCommentPage) {
+  while (firstPage || hasNextCommentPage) {
     const result = await executeProviderLinearGraphql<LinearIssueContextQueryResponse>({
       session,
       operation,
       step: commentsAfter ? 'read-issue-context-page' : 'read-issue-context',
-      query: buildIssueContextQuery(),
-      variables: {
-        issueId,
-        commentsAfter
-      }
+      query: buildIssueContextQuery({
+        includeComments,
+        includeAttachments
+      }),
+      variables:
+        includeComments
+          ? {
+              issueId,
+              commentsAfter
+            }
+          : {
+              issueId
+            }
     });
     if (!result.ok) {
       return {
@@ -2274,31 +2299,40 @@ async function readIssueContext(
 
     issueNode = nextIssueNode;
     workspaceId = normalizeOptionalString(result.payload.data?.viewer?.organization?.id ?? null);
-    const nextComments = Array.isArray(nextIssueNode.comments?.nodes)
-      ? nextIssueNode.comments.nodes
-          .map((entry) => parseComment(entry))
-          .filter((entry): entry is ProviderLinearWorkflowComment => entry !== null)
-      : [];
-    for (const entry of nextComments) {
-      if (seenCommentIds.has(entry.id)) {
-        continue;
+    if (includeComments) {
+      const nextComments = Array.isArray(nextIssueNode.comments?.nodes)
+        ? nextIssueNode.comments.nodes
+            .map((entry) => parseComment(entry))
+            .filter((entry): entry is ProviderLinearWorkflowComment => entry !== null)
+        : [];
+      for (const entry of nextComments) {
+        if (seenCommentIds.has(entry.id)) {
+          continue;
+        }
+        seenCommentIds.add(entry.id);
+        comments.push(entry);
       }
-      seenCommentIds.add(entry.id);
-      comments.push(entry);
     }
-    const nextAttachments = Array.isArray(nextIssueNode.attachments?.nodes)
-      ? nextIssueNode.attachments.nodes
-          .map((entry) => parseAttachment(entry))
-          .filter((entry): entry is ProviderLinearWorkflowAttachment => entry !== null)
-      : [];
-    for (const entry of nextAttachments) {
-      if (seenAttachmentIds.has(entry.id)) {
-        continue;
+    if (includeAttachments) {
+      const nextAttachments = Array.isArray(nextIssueNode.attachments?.nodes)
+        ? nextIssueNode.attachments.nodes
+            .map((entry) => parseAttachment(entry))
+            .filter((entry): entry is ProviderLinearWorkflowAttachment => entry !== null)
+        : [];
+      for (const entry of nextAttachments) {
+        if (seenAttachmentIds.has(entry.id)) {
+          continue;
+        }
+        seenAttachmentIds.add(entry.id);
+        attachments.push(entry);
       }
-      seenAttachmentIds.add(entry.id);
-      attachments.push(entry);
     }
 
+    firstPage = false;
+    if (!includeComments) {
+      hasNextCommentPage = false;
+      continue;
+    }
     const pageInfo = nextIssueNode.comments?.pageInfo ?? null;
     hasNextCommentPage = pageInfo?.hasNextPage === true;
     if (!hasNextCommentPage) {
@@ -2330,14 +2364,19 @@ async function readIssueContext(
     };
   }
 
-  const attachmentResult = await readIssueAttachmentPages(
-    session,
-    operation,
-    issueId,
-    issueNode.attachments?.pageInfo ?? null,
-    attachments,
-    seenAttachmentIds
-  );
+  const attachmentResult = includeAttachments
+    ? await readIssueAttachmentPages(
+        session,
+        operation,
+        issueId,
+        issueNode.attachments?.pageInfo ?? null,
+        attachments,
+        seenAttachmentIds
+      )
+    : {
+        ok: true as const,
+        attachments
+      };
   if (!attachmentResult.ok) {
     return attachmentResult;
   }
@@ -2520,8 +2559,44 @@ function parseIssueContext(
   };
 }
 
-function buildIssueContextQuery(): string {
-  return `query ProviderLinearIssueContext($issueId: String!, $commentsAfter: String) {
+function buildIssueContextQuery(options: {
+  includeComments: boolean;
+  includeAttachments: boolean;
+}): string {
+  const commentsVariable = options.includeComments ? ', $commentsAfter: String' : '';
+  const commentsSection = options.includeComments
+    ? `
+      comments(first: ${LINEAR_WORKFLOW_COMMENT_LIMIT}, after: $commentsAfter) {
+        nodes {
+          id
+          body
+          url
+          createdAt
+          updatedAt
+          resolvedAt
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }`
+    : '';
+  const attachmentsSection = options.includeAttachments
+    ? `
+      attachments(first: ${LINEAR_WORKFLOW_ATTACHMENT_LIMIT}) {
+        nodes {
+          id
+          title
+          url
+          sourceType
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }`
+    : '';
+  return `query ProviderLinearIssueContext($issueId: String!${commentsVariable}) {
     viewer {
       organization {
         id
@@ -2555,32 +2630,8 @@ function buildIssueContextQuery(): string {
         id
         name
       }
-      comments(first: ${LINEAR_WORKFLOW_COMMENT_LIMIT}, after: $commentsAfter) {
-        nodes {
-          id
-          body
-          url
-          createdAt
-          updatedAt
-          resolvedAt
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-      }
-      attachments(first: ${LINEAR_WORKFLOW_ATTACHMENT_LIMIT}) {
-        nodes {
-          id
-          title
-          url
-          sourceType
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-      }
+${commentsSection}
+${attachmentsSection}
     }
   }`;
 }
