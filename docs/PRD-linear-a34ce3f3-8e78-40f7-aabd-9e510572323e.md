@@ -71,7 +71,7 @@
 ## Metrics & Guardrails
 - Primary Success Metrics:
   - `npm run docs:freshness` exits `0`
-  - stale active docs are either freshly reviewed or intentionally reclassified with explicit rationale
+  - stale active docs are either freshly reviewed or intentionally reclassified with explicit rationale recorded in the archive/classification report or equivalent audit artifact, without adding per-entry rationale fields to `docs/docs-freshness-registry.json`
   - `CO-62` and future worker lanes can hand off without inheriting this unrelated baseline debt
 - Guardrails / Error Budgets:
   - keep the repair bounded to docs packets, registry metadata, archive policy use, and supporting docs evidence

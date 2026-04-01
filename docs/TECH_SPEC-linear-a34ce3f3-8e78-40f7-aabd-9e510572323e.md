@@ -76,10 +76,10 @@ last_review: 2026-04-01
     - `npm run docs:freshness`
     - `node scripts/diff-budget.mjs`
     - `FORCE_CODEX_REVIEW=1 npm run review`
-    - `npm run pack:smoke`
+    - `npm run pack:smoke` when the final diff is not docs-only (skip it for docs-only closeouts like this lane)
 - Rollout verification:
   - confirm the final stale-entry count is `0`
-  - confirm the final registry reflects the new active/archive truth instead of a blanket date bump
+  - confirm that the final registry reflects the new active/archive truth instead of a blanket date bump
   - confirm the issue workpad and mirrors explain the distinction between refreshed active docs and reclassified non-active docs
 - Monitoring / alerts:
   - if the stale set reveals a larger archive-policy/tooling gap that this lane cannot truthfully finish, create a follow-up rather than diluting the acceptance contract

@@ -76,7 +76,7 @@
   - `MCP_RUNNER_TASK_ID=linear-a34ce3f3-8e78-40f7-aabd-9e510572323e npm run docs:freshness`
   - `MCP_RUNNER_TASK_ID=linear-a34ce3f3-8e78-40f7-aabd-9e510572323e node scripts/diff-budget.mjs`
   - `MCP_RUNNER_TASK_ID=linear-a34ce3f3-8e78-40f7-aabd-9e510572323e FORCE_CODEX_REVIEW=1 npm run review`
-  - `MCP_RUNNER_TASK_ID=linear-a34ce3f3-8e78-40f7-aabd-9e510572323e npm run pack:smoke`
+  - `MCP_RUNNER_TASK_ID=linear-a34ce3f3-8e78-40f7-aabd-9e510572323e npm run pack:smoke` when the final diff is not docs-only (skip it for docs-only closeouts like this lane)
 - Rollback plan:
   - revert any registry or archive change that incorrectly downgrades a still-active doc
   - keep the issue active and file a follow-up rather than claiming a truthful green baseline when classification remains ambiguous
