@@ -291,9 +291,8 @@ See `docs/ACTION_PLAN-slimdown.md` for the step-by-step execution plan. Summary:
 - Remove scripts/run-parallel-goals.ts + `parallel:goals` npm script if still unused.
 - Phase 3 doc update list (primary references):
   - `README.md`, `.agent/AGENTS.md`, `.agent/SOPs/review-loop.md`, `.agent/SOPs/agent-autonomy-defaults.md`
-  - `docs/AGENTS.md`, `docs/PRD-frontend-testing-core.md`, `docs/TECH_SPEC-frontend-testing-core.md`
-  - `docs/PRD-devtools-readiness-orchestrator-usage.md`, `docs/TECH_SPEC-devtools-readiness-orchestrator-usage.md`, `docs/ACTION_PLAN-frontend-testing-core.md`
-  - `.agent/task/0912-review-loop-devtools-gate.md`, `.agent/task/0915-frontend-testing-core.md`
+  - `docs/AGENTS.md`, `.agent/task/0912-review-loop-devtools-gate.md`, `.agent/task/0915-frontend-testing-core.md`
+  - Historical frontend-testing and devtools implementation docs were archived after Phase 3 closeout; use `docs/findings/slimdown-audit.md` as the retained reference map before reopening that lane.
 
 ### Phase 4 checklist
 - Introduce a reusable archive automation workflow and update the existing archive workflows to call it.
@@ -428,14 +427,9 @@ See `docs/ACTION_PLAN-slimdown.md` for the step-by-step execution plan. Summary:
 - `.agent/SOPs/review-loop.md`: remove mentions of `implementation-gate-devtools`.
 - `.agent/SOPs/agent-autonomy-defaults.md`: replace `implementation-gate-devtools` references.
 - `docs/AGENTS.md`: update devtools command examples.
-- `docs/PRD-frontend-testing-core.md`: remove devtools pipeline ID references; document new enablement path.
-- `docs/TECH_SPEC-frontend-testing-core.md`: replace pipeline ID references; update validation notes.
-- `docs/PRD-devtools-readiness-orchestrator-usage.md`: swap to new devtools path.
-- `docs/TECH_SPEC-devtools-readiness-orchestrator-usage.md`: update preflight guidance to new path.
-- `docs/ACTION_PLAN-frontend-testing-core.md`: remove devtools pipeline ID in the plan.
 - `.agent/task/0912-review-loop-devtools-gate.md`: update evidence notes if the pipeline ID changes.
 - `.agent/task/0915-frontend-testing-core.md`: update references to devtools pipeline creation.
-  - `docs/findings/slimdown-audit.md`: refresh the devtools reference map after consolidation.
+- `docs/findings/slimdown-audit.md`: refresh the devtools reference map after consolidation.
   - Edit notes:
     - `README.md`: update the DevTools gate section and frontend-testing examples to use `CODEX_REVIEW_DEVTOOLS=1` or `--devtools`.
     - `.agent/AGENTS.md` + `docs/AGENTS.md`: replace devtools pipeline IDs in the “DevTools-enabled” command examples.
