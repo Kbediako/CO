@@ -1156,6 +1156,83 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('allows upsert-workpad to noop after a truthful single read when one shared request remains', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+    const desiredWorkpadBody = buildStructuredWorkpadBody({
+      planLines: ['- Reuse the current live workpad when only one request remains.'],
+      notesLines: ['- A single truthful read should still allow an idempotent noop result.']
+    });
+    const resetAt = String(Date.now() + 60_000);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      expect(body.query).toContain('ProviderLinearIssueContext');
+      expect(body.query).toContain('comments(first:');
+      expect(body.query).not.toContain('attachments(first:');
+      return jsonResponse(
+        buildIssueContextBody({
+          comments: {
+            nodes: [
+              {
+                id: 'comment-workpad',
+                body: desiredWorkpadBody,
+                url: 'https://linear.app/comment/workpad',
+                createdAt: '2026-03-22T09:00:00.000Z',
+                updatedAt: '2026-03-22T09:30:00.000Z',
+                resolvedAt: null
+              }
+            ]
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: desiredWorkpadBody,
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'noop',
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      comment: {
+        id: 'comment-workpad',
+        body: desiredWorkpadBody
+      }
+    });
+  });
+
   it('revalidates cached workpad noop decisions before skipping the mutation', async () => {
     const env = await createRunScopedEnv();
     const desiredWorkpadBody = buildStructuredWorkpadBody({

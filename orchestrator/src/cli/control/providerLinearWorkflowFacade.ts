@@ -758,7 +758,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'upsert-workpad',
-    minimumRequestsRemaining: canTrustCachedMutationContext ? 1 : 2
+    minimumRequestsRemaining: 1
   });
   if (budgetError) {
     return failureFromWorkflowError('upsert-workpad', budgetError);
