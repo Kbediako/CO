@@ -1,16 +1,12 @@
 # Action Plan Overview — Codex Orchestrator Projects
 
+> Active overview only. Closed lanes whose action plans were archived on 2026-04-01 remain discoverable via `docs/TASKS.md` and the `doc-archives` branch.
+
 ## Task 0940 — Codex Delegation Autonomy Platform
 - Primary Doc: `docs/ACTION_PLAN-delegation-autonomy-platform.md`
 - Run Manifest Link: `.runs/0940-delegation-autonomy-platform/cli/2026-01-07T16-22-23-363Z-a6f5b94f/manifest.json`.
 - Metrics / State Snapshots: `.runs/0940-delegation-autonomy-platform/metrics.json`, `out/0940-delegation-autonomy-platform/state.json`.
 - Checklist Mirror: `tasks/tasks-0940-delegation-autonomy-platform.md`, `docs/TASKS.md` (0940 section), `.agent/task/0940-delegation-autonomy-platform.md`.
-
-## Task 0918 — Subagent Delegation Enforcement
-- Primary Doc: `docs/ACTION_PLAN-subagent-delegation-enforcement.md`
-- Run Manifest Link: `.runs/0918-subagent-delegation-enforcement/cli/2025-12-30T16-53-35-423Z-88c50e5f/manifest.json`.
-- Metrics / State Snapshots: `.runs/0918-subagent-delegation-enforcement/metrics.json`, `out/0918-subagent-delegation-enforcement/state.json`.
-- Checklist Mirror: `tasks/tasks-0918-subagent-delegation-enforcement.md`, `docs/TASKS.md` (0918 section), `.agent/task/0918-subagent-delegation-enforcement.md`.
 
 ## Task 0303 — Codex Orchestrator Autonomy Enhancements
 - Primary Doc: `docs/ACTION_PLAN-codex-orchestrator-autonomy.md`
@@ -30,29 +26,11 @@
 - Metrics / State Snapshots: `.runs/0909-orchestrator-run-reporting-consistency/metrics.json`, `out/0909-orchestrator-run-reporting-consistency/state.json`.
 - Checklist Mirror: `tasks/tasks-0909-orchestrator-run-reporting-consistency.md`, `docs/TASKS.md` (0909 section), `.agent/task/0909-orchestrator-run-reporting-consistency.md`.
 
-## Task 0910 — Docs Review Gate (Pre/Post Implementation)
-- Primary Doc: `docs/ACTION_PLAN-docs-review-gate.md`
-- Run Manifest Link: _(pending — capture docs-review run under `.runs/0910-docs-review-gate/cli/<run-id>/manifest.json`)._
-- Metrics / State Snapshots: _(pending — populate `.runs/0910-docs-review-gate/metrics.json` and `out/0910-docs-review-gate/state.json`)._
-- Checklist Mirror: `tasks/tasks-0910-docs-review-gate.md`, `docs/TASKS.md` (0910 section), `.agent/task/0910-docs-review-gate.md`.
-
 ## Task 0913 — Orchestrator Refactor Roadmap (Robustness + Performance)
 - Primary Doc: `docs/ACTION_PLAN-orchestrator-refactor-roadmap.md`
 - Run Manifest Link: `.runs/0913-orchestrator-refactor-roadmap/cli/2025-12-26T08-11-25-461Z-6ba85057/manifest.json` _(status: `succeeded`)._
 - Metrics / State Snapshots: `.runs/0913-orchestrator-refactor-roadmap/metrics.json` (JSONL; one entry per run), `out/0913-orchestrator-refactor-roadmap/state.json` (latest snapshot)
 - Checklist Mirror: `tasks/tasks-0913-orchestrator-refactor-roadmap.md`, `docs/TASKS.md` (0913 section), `.agent/task/0913-orchestrator-refactor-roadmap.md`.
-
-## Task 0904 — README vs Codebase Alignment
-- Primary Doc: `docs/ACTION_PLAN-readme-codebase-alignment.md`
-- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0904-readme-codebase-alignment/cli/<run-id>/manifest.json`)._
-- Metrics / State Snapshots: _(pending — populate `.runs/0904-readme-codebase-alignment/metrics.json` and `out/0904-readme-codebase-alignment/state.json`)._
-- Checklist Mirror: `tasks/tasks-0904-readme-codebase-alignment.md`, `docs/TASKS.md` (0904 section), `.agent/task/0904-readme-codebase-alignment.md`.
-
-## Task 0905 — Agentic Coding Readiness & Onboarding Hygiene
-- Primary Doc: `docs/ACTION_PLAN-agentic-coding-readiness.md`
-- Run Manifest Link: _(pending — capture first diagnostics run under `.runs/0905-agentic-coding-readiness/cli/<run-id>/manifest.json`)._
-- Metrics / State Snapshots: _(pending — populate `.runs/0905-agentic-coding-readiness/metrics.json` and `out/0905-agentic-coding-readiness/state.json`)._
-- Checklist Mirror: `tasks/tasks-0905-agentic-coding-readiness.md`, `docs/TASKS.md` (0905 section), `.agent/task/0905-agentic-coding-readiness.md`.
 
 ## Task 0505 — More Nutrition Pixel Archive
 - Primary Doc: `tasks/0505-more-nutrition-pixel.md`

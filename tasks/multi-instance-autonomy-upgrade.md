@@ -68,7 +68,7 @@
 
 [x] TASK-502 Build dashboards and alerts for utilization, MTTR, and guard violations.  
     Owner: @telemetry-lead  
-    Acceptance: Dashboard URL captured in out-state snapshot; alert thresholds documented in `/docs/TECH_SPEC_AUTONOMY_UPGRADE.md`.  
+    Acceptance: Dashboard URL captured in out-state snapshot; alert thresholds documented in the autonomy-upgrade technical spec.  
     Manifest: `out/autonomy-upgrade/metrics/mttr-delta.json`  
 
 ## Success Metrics Validation

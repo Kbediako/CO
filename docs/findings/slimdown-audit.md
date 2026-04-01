@@ -48,4 +48,4 @@ Phase 20 consolidation executed:
 - Guardrail summary detection now matches spec-guard runner commands across ID/title/command strings.
 
 ## Usage signals (still referenced)
-- `scripts/status-ui-build.mjs` is referenced by `scripts/status-ui-serve.mjs` and `docs/TECH_SPEC-orchestrator-status-ui.md` (do not remove; only consolidate helpers).
+- `scripts/status-ui-build.mjs` is still referenced by `scripts/status-ui-serve.mjs` (do not remove; only consolidate helpers).
