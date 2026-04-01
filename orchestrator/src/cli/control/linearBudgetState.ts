@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import process from 'node:process';
 
@@ -612,7 +612,7 @@ async function withLinearBudgetStateLock<T>(
   paths: LinearBudgetStatePaths,
   callback: () => Promise<T>
 ): Promise<T> {
-  await acquireLockWithRetry({
+  const lock = await acquireLockWithRetry({
     taskId: `linear-budget-${paths.tokenFingerprint.slice(0, 12)}`,
     lockPath: paths.lockPath,
     retry: LINEAR_BUDGET_LOCK_RETRY,
@@ -625,7 +625,7 @@ async function withLinearBudgetStateLock<T>(
   try {
     return await callback();
   } finally {
-    await rm(paths.lockPath, { force: true });
+    await lock.release();
   }
 }
 

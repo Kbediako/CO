@@ -4,7 +4,7 @@ import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { mkdir, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdir, readFile, realpath } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
@@ -1345,7 +1345,7 @@ async function withProviderLinearWorkerChildStreamsLock<T>(
   action: () => Promise<T>
 ): Promise<T> {
   const lockPath = buildChildStreamsLockPath(runDir);
-  await acquireLockWithRetry({
+  const lock = await acquireLockWithRetry({
     taskId: runDir,
     lockPath,
     retry: PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY,
@@ -1358,7 +1358,7 @@ async function withProviderLinearWorkerChildStreamsLock<T>(
   try {
     return await action();
   } finally {
-    await rm(lockPath, { force: true });
+    await lock.release();
   }
 }
 
@@ -1367,7 +1367,7 @@ async function withProviderLinearWorkerProofLock<T>(
   action: () => Promise<T>
 ): Promise<T> {
   const lockPath = buildProofLockPath(runDir);
-  await acquireLockWithRetry({
+  const lock = await acquireLockWithRetry({
     taskId: runDir,
     lockPath,
     retry: PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY,
@@ -1380,7 +1380,7 @@ async function withProviderLinearWorkerProofLock<T>(
   try {
     return await action();
   } finally {
-    await rm(lockPath, { force: true });
+    await lock.release();
   }
 }
 
@@ -1389,7 +1389,7 @@ async function withProviderLinearWorkerChildLanesLock<T>(
   action: () => Promise<T>
 ): Promise<T> {
   const lockPath = buildChildLanesLockPath(runDir);
-  await acquireLockWithRetry({
+  const lock = await acquireLockWithRetry({
     taskId: runDir,
     lockPath,
     retry: PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY,
@@ -1402,7 +1402,7 @@ async function withProviderLinearWorkerChildLanesLock<T>(
   try {
     return await action();
   } finally {
-    await rm(lockPath, { force: true });
+    await lock.release();
   }
 }
 

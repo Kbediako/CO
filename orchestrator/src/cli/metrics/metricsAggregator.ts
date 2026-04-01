@@ -438,8 +438,9 @@ export async function withMetricsLock<T>(
 
   await cleanupStaleMetricsLock(lockPath, staleMs);
 
+  let lock: Awaited<ReturnType<typeof acquireLockWithRetry>> | null = null;
   try {
-    await acquireLockWithRetry({
+    lock = await acquireLockWithRetry({
       taskId: env.taskId,
       lockPath,
       retry: lockRetry,
@@ -463,7 +464,7 @@ export async function withMetricsLock<T>(
     const result = await action();
     return { acquired: true, result };
   } finally {
-    await rm(lockPath, { force: true });
+    await lock?.release();
   }
 }
 

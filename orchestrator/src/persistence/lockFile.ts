@@ -1,4 +1,5 @@
-import { open, rm, stat } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { open, readFile, rm, stat } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export interface LockRetryOptions {
@@ -17,7 +18,13 @@ export interface LockRetryParams {
   createError: (taskId: string, attempts: number) => Error;
 }
 
-export async function acquireLockWithRetry(params: LockRetryParams): Promise<void> {
+export interface AcquiredLock {
+  lockPath: string;
+  ownerToken: string;
+  release(): Promise<void>;
+}
+
+export async function acquireLockWithRetry(params: LockRetryParams): Promise<AcquiredLock> {
   await params.ensureDirectory();
   const { maxAttempts, initialDelayMs, backoffFactor, maxDelayMs } = params.retry;
   const staleMs = params.retry.staleMs ?? 0;
@@ -27,9 +34,17 @@ export async function acquireLockWithRetry(params: LockRetryParams): Promise<voi
   while (attempt < maxAttempts) {
     attempt += 1;
     try {
+      const ownerToken = randomUUID();
       const handle = await open(params.lockPath, 'wx');
+      try {
+        await handle.writeFile(ownerToken, 'utf8');
+      } catch (error) {
+        await handle.close();
+        await rm(params.lockPath, { force: true });
+        throw error;
+      }
       await handle.close();
-      return;
+      return createAcquiredLock(params.lockPath, ownerToken);
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
         throw error;
@@ -47,6 +62,38 @@ export async function acquireLockWithRetry(params: LockRetryParams): Promise<voi
       await delay(Math.min(delayMs, maxDelayMs));
       delayMs = Math.min(delayMs * backoffFactor, maxDelayMs);
     }
+  }
+
+  throw params.createError(params.taskId, attempt);
+}
+
+function createAcquiredLock(lockPath: string, ownerToken: string): AcquiredLock {
+  let released = false;
+  return {
+    lockPath,
+    ownerToken,
+    async release(): Promise<void> {
+      if (released) {
+        return;
+      }
+      released = true;
+      await releaseLockIfOwned(lockPath, ownerToken);
+    }
+  };
+}
+
+async function releaseLockIfOwned(lockPath: string, ownerToken: string): Promise<void> {
+  try {
+    const currentOwner = (await readFile(lockPath, 'utf8')).trim();
+    if (currentOwner !== ownerToken) {
+      return;
+    }
+    await rm(lockPath, { force: true });
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw error;
   }
 }
 

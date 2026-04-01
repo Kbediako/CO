@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { appendFile, mkdir, open, rm } from 'node:fs/promises';
+import { appendFile, mkdir, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
 import { listDirectories, resolveEnvironmentPaths } from '../../../scripts/lib/run-manifests.js';
-import { acquireLockWithRetry, type LockRetryOptions } from './lockFile.js';
+import { acquireLockWithRetry, type AcquiredLock, type LockRetryOptions } from './lockFile.js';
 import { sanitizeTaskId } from './sanitizeTaskId.js';
 
 export interface ExperienceStoreOptions {
@@ -102,7 +102,7 @@ export class ExperienceStore {
     }
     const taskId = sanitizeTaskId(inputs[0]!.taskId);
     const lockPath = this.buildLockPath(taskId);
-    await this.acquireLock(taskId, lockPath);
+    const lock = await this.acquireLock(taskId, lockPath);
     try {
       const targetDir = join(this.outDir, taskId);
       await mkdir(targetDir, { recursive: true });
@@ -113,7 +113,7 @@ export class ExperienceStore {
       await appendFile(filePath, `${payload}\n`, 'utf8');
       return nextRecords;
     } finally {
-      await this.releaseLock(lockPath);
+      await this.releaseLock(lock);
     }
   }
 
@@ -192,8 +192,8 @@ export class ExperienceStore {
     return join(this.runsDir, `${taskId}.experiences.lock`);
   }
 
-  private async acquireLock(taskId: string, lockPath: string): Promise<void> {
-    await acquireLockWithRetry({
+  private async acquireLock(taskId: string, lockPath: string): Promise<AcquiredLock> {
+    return await acquireLockWithRetry({
       taskId,
       lockPath,
       retry: this.lockRetry,
@@ -208,8 +208,8 @@ export class ExperienceStore {
     });
   }
 
-  private async releaseLock(lockPath: string): Promise<void> {
-    await rm(lockPath, { force: true });
+  private async releaseLock(lock: AcquiredLock): Promise<void> {
+    await lock.release();
   }
 
   private async scanRecords(

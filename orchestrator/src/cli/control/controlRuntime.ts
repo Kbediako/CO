@@ -338,8 +338,11 @@ function normalizeLinearBudgetSnapshot(value: unknown): LinearBudgetStatus | nul
   if (!isRecordLike(value)) {
     return null;
   }
+  if (typeof value.observed_at !== 'string') {
+    return null;
+  }
   return {
-    observed_at: typeof value.observed_at === 'string' ? value.observed_at : new Date(0).toISOString(),
+    observed_at: value.observed_at,
     source: typeof value.source === 'string' ? value.source : 'unknown',
     request_id: typeof value.request_id === 'string' ? value.request_id : null,
     retry_after_seconds:
