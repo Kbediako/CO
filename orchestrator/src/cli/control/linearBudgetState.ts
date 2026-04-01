@@ -118,6 +118,9 @@ export async function recordLinearBudgetRateLimitObservation(input: {
   source: string;
   observedAt?: string;
 }): Promise<LinearBudgetStatus | null> {
+  if (!hasRecordableLinearBudgetDetails(input.rateLimit.details)) {
+    return await readSharedLinearBudgetStatus(input.env ?? process.env);
+  }
   return await recordLinearBudgetObservation({
     env: input.env,
     source: input.source,
@@ -726,5 +729,5 @@ function normalizeOptionalString(value: unknown): string | null {
 }
 
 function hasRecordableLinearBudgetDetails(details: LinearRateLimitDetails): boolean {
-  return Object.keys(details).some((key) => key !== 'request_id');
+  return Object.keys(details).some((key) => key !== 'request_id' && key !== 'errors');
 }

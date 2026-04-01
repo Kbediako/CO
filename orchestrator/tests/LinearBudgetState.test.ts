@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   readSharedLinearBudgetStatus,
   recordLinearBudgetHeadersObservation,
+  recordLinearBudgetRateLimitObservation,
   resolveLinearBudgetPreflight,
   resolveLinearPollingInterval
 } from '../src/cli/control/linearBudgetState.js';
@@ -77,6 +78,52 @@ describe('linearBudgetState', () => {
       source: 'provider-linear:issue-context',
       headers: {
         'x-request-id': 'req-456'
+      }
+    });
+
+    await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
+      source: 'dispatch_source_issue_by_id',
+      request_id: 'req-123',
+      cooldown_active: true,
+      suppression: 'cooldown',
+      requests: {
+        limit: 100,
+        remaining: 0
+      }
+    });
+  });
+
+  it('ignores headerless rate-limit observations so they cannot clear shared budget state', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const resetAtMs = Date.now() + 60_000;
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '0',
+        'x-ratelimit-requests-reset': String(resetAtMs),
+        'x-request-id': 'req-123'
+      }
+    });
+
+    await recordLinearBudgetRateLimitObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      rateLimit: {
+        code: 'linear_rate_limited',
+        message: 'Linear API rate limit exceeded.',
+        status: 429,
+        retryable: true,
+        details: {
+          errors: [{ message: 'Rate limit exceeded' }]
+        }
       }
     });
 
