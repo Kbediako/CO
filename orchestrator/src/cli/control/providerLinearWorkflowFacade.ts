@@ -949,7 +949,7 @@ export async function deleteProviderLinearWorkpadComment(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'delete-workpad',
-    minimumRequestsRemaining: 2
+    minimumRequestsRemaining: 1
   });
   if (budgetError) {
     return failureFromWorkflowError('delete-workpad', budgetError);
@@ -1010,6 +1010,15 @@ export async function deleteProviderLinearWorkpadComment(input: {
       comment_id: null,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  const deleteBudgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'delete-workpad',
+    minimumRequestsRemaining: 1
+  });
+  if (deleteBudgetError) {
+    return failureFromWorkflowError('delete-workpad', deleteBudgetError);
   }
 
   const deleteResult = await executeProviderLinearGraphql<DeleteMutationResponse>({
@@ -1084,7 +1093,7 @@ export async function transitionProviderLinearIssueState(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'transition',
-    minimumRequestsRemaining: canTrustCachedMutationContext ? 1 : 2
+    minimumRequestsRemaining: 1
   });
   if (budgetError) {
     return failureFromWorkflowError('transition', budgetError);
@@ -1161,6 +1170,15 @@ export async function transitionProviderLinearIssueState(input: {
       target_state: targetState,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  const transitionBudgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'transition',
+    minimumRequestsRemaining: 1
+  });
+  if (transitionBudgetError) {
+    return failureFromWorkflowError('transition', transitionBudgetError);
   }
 
   const transitionResult = await executeProviderLinearGraphql<IssueTransitionMutationResponse>({
@@ -1246,7 +1264,7 @@ export async function attachProviderLinearIssuePr(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'attach-pr',
-    minimumRequestsRemaining: 3
+    minimumRequestsRemaining: 1
   });
   if (budgetError) {
     return failureFromWorkflowError('attach-pr', budgetError);
@@ -1274,6 +1292,15 @@ export async function attachProviderLinearIssuePr(input: {
       attachment: existingAttachment,
       source_setup: session.session.sourceSetup
     };
+  }
+
+  const attachBudgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'attach-pr',
+    minimumRequestsRemaining: 2
+  });
+  if (attachBudgetError) {
+    return failureFromWorkflowError('attach-pr', attachBudgetError);
   }
 
   const title = normalizeOptionalString(input.title ?? null);
