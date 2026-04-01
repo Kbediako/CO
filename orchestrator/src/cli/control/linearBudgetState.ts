@@ -100,7 +100,7 @@ export async function recordLinearBudgetHeadersObservation(input: {
   observedAt?: string;
 }): Promise<LinearBudgetStatus | null> {
   const details = extractLinearRateLimitDetailsFromHeaders(input.headers);
-  if (Object.keys(details).length === 0) {
+  if (!hasRecordableLinearBudgetDetails(details)) {
     return await readSharedLinearBudgetStatus(input.env ?? process.env);
   }
   return await recordLinearBudgetObservation({
@@ -723,4 +723,8 @@ function isFutureIsoTimestamp(value: string | null | undefined): boolean {
 
 function normalizeOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function hasRecordableLinearBudgetDetails(details: LinearRateLimitDetails): boolean {
+  return Object.keys(details).some((key) => key !== 'request_id');
 }
