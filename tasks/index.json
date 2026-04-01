@@ -164,6 +164,30 @@
       }
     },
     {
+      "id": "20260330-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612",
+      "title": "CO Preserve Scoped Standalone-Review Context Without Inline Prompt",
+      "relates_to": "tasks/tasks-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-03-30",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-03-30",
+          "manifest": ".runs/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612-docs-review/cli/2026-03-30T06-52-40-070Z-7b90108a/manifest.json",
+          "override_reason": "initial docs-review surfaced a concrete 0967 archive continuity issue that was fixed; the rerun stalled without a concrete terminal verdict, so final approval uses the successful first manifest plus the manual fallback note at out/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612/manual/20260330T070418Z-docs-review-fallback.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md",
+        "task": "tasks/tasks-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md",
+        "agent_task": ".agent/task/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md",
+        "docs": "docs/TECH_SPEC-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md"
+      }
+    },
+    {
       "id": "20260330-linear-272bf586-a2e9-451f-bedc-746679070785",
       "title": "CO Bring CO STATUS to True Symphony Terminal Parity",
       "relates_to": "tasks/tasks-linear-272bf586-a2e9-451f-bedc-746679070785.md",

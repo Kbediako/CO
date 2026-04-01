@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 7b1de58be91ca44e55fd376412c967b519eaa19b70e9c4857e6b35a1e6ab383d -->
+<!-- codex:instruction-stamp 71b851f6b39516cfb7f6bc39909e546b714bb1439b8f4d4b2c9db681037537a0 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -80,8 +80,8 @@
 - Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed.
 - In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `codex-orchestrator review`/`npm run review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
 - Non-interactive lane policy: direct/manual wrapper runs stay handoff-only unless `FORCE_CODEX_REVIEW=1`; `docs-review` and `implementation-gate` explicitly force review execution; `docs-relevance-advisory` explicitly clears `FORCE_CODEX_REVIEW` and remains prompt-only/advisory; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1`, so its pre-handoff standalone review executes before `Human Review` / `In Review`.
-- Current Codex CLI behavior: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review.
-- Wrapper truthfulness: explicit `npm run review -- --uncommitted|--base|--commit` runs keep prompt/context in the saved `review/prompt.txt` artifact but launch `codex review` without any prompt argument, because current Codex CLI still treats stdin (`-`) as `[PROMPT]` under scope flags.
+- Current Codex CLI behavior: do not combine inline prompt arguments with `--uncommitted`, `--base`, or `--commit`; scoped runs must use bounded `--title` transport or prompt-only review without scope flags.
+- Wrapper truthfulness: explicit `npm run review -- --uncommitted|--base|--commit` runs keep the full prompt/context in the saved `review/prompt.txt`, launch `codex review` without any prompt argument, and carry reviewer-visible scoped context via `--title` (user-provided when present, otherwise synthesized from `NOTES` + `--surface`); if Codex rejects a synthesized scoped `--title`, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only reviewer-visible context.
 - Scoped surface limit: explicit `--uncommitted|--base|--commit` wrapper runs support only the default `diff` surface at the actual Codex layer; `--surface audit|architecture` requires an unscoped prompt-capable review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <path>` (repo alias: `npm run review -- --manifest <path>`).

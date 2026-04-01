@@ -5,6 +5,7 @@ import { normalizeTaskKey, pathExists } from './docs-helpers.js';
 
 export type ReviewSurface = 'diff' | 'audit' | 'architecture';
 export type ReviewScopeMode = 'uncommitted' | 'base' | 'commit';
+const DEFAULT_SCOPED_REVIEW_TITLE_MAX_LENGTH = 180;
 
 interface TaskIndexEntry {
   id?: string;
@@ -38,6 +39,8 @@ export interface BuildReviewPromptContextResult {
   promptLines: string[];
   reviewTaskContext: ReviewTaskContext;
   activeCloseoutBundleRoots: string[];
+  resolvedNotes: string;
+  scopedReviewerVisibleTitle: string;
 }
 
 async function readTaskIndexEntries(repoRoot: string): Promise<TaskIndexEntry[]> {
@@ -324,6 +327,36 @@ export function resolveReviewNotes(options: {
   return fallback;
 }
 
+function normalizeScopedReviewTitleSegment(value: string): string {
+  return value.replace(/\s+/g, ' ').replace(/\s*\|\s*/g, ' | ').trim();
+}
+
+function truncateScopedReviewTitle(title: string, maxLength: number): string {
+  const normalizedMax = Number.isFinite(maxLength) ? Math.max(1, Math.trunc(maxLength)) : 1;
+  if (title.length <= normalizedMax) {
+    return title;
+  }
+  if (normalizedMax === 1) {
+    return '…';
+  }
+  return `${title.slice(0, normalizedMax - 1).trimEnd()}…`;
+}
+
+export function buildScopedReviewTitle(options: {
+  notes: string;
+  reviewSurface: ReviewSurface;
+  maxLength?: number;
+}): string {
+  const normalizedNotes = normalizeScopedReviewTitleSegment(options.notes);
+  const title = [`Surface: ${options.reviewSurface}`, normalizedNotes]
+    .filter((segment) => segment.length > 0)
+    .join(' | ');
+  return truncateScopedReviewTitle(
+    title,
+    options.maxLength ?? DEFAULT_SCOPED_REVIEW_TITLE_MAX_LENGTH
+  );
+}
+
 export async function buildReviewPromptContext(
   options: BuildReviewPromptContextOptions
 ): Promise<BuildReviewPromptContextResult> {
@@ -331,6 +364,10 @@ export async function buildReviewPromptContext(
     notes: options.notes?.trim(),
     taskLabel: options.taskLabel,
     surface: options.reviewSurface
+  });
+  const scopedReviewerVisibleTitle = buildScopedReviewTitle({
+    notes,
+    reviewSurface: options.reviewSurface
   });
   const activeCloseoutBundleRoots =
     options.reviewSurface === 'diff'
@@ -423,6 +460,8 @@ export async function buildReviewPromptContext(
   return {
     promptLines,
     reviewTaskContext,
-    activeCloseoutBundleRoots
+    activeCloseoutBundleRoots,
+    resolvedNotes: notes,
+    scopedReviewerVisibleTitle
   };
 }

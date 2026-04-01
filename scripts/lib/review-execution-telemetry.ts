@@ -28,6 +28,8 @@ export type ReviewOutcomeDisposition =
 export interface ReviewLaunchContext {
   scope_flag_mode: 'commit' | 'base' | 'uncommitted' | null;
   prompt_delivery: 'inline' | 'artifact-only';
+  reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+  reviewer_visible_title_source: 'user' | 'notes-surface' | null;
 }
 
 export interface BuildReviewTelemetryPayloadOptions {

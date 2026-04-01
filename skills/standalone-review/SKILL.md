@@ -27,7 +27,7 @@ If review execution is blocked, record why in task notes, then do manual diff re
 Compatibility guard (current Codex CLI behavior):
 - Do not combine `--uncommitted`, `--base`, or `--commit` with a custom prompt argument.
 - Use diff-scoped review without prompt, or prompt-only review without scope flags.
-- Wrapper note: `codex-orchestrator review` / `npm run review` still saves the review prompt artifact for scoped runs, but explicit wrapper scope flags launch `codex review` without any prompt argument because current Codex CLI still treats stdin (`-`) as `[PROMPT]`.
+- Wrapper note: `codex-orchestrator review` / `npm run review` still saves the full review prompt artifact for scoped runs, but explicit wrapper scope flags launch `codex review` without any prompt argument because current Codex CLI still treats stdin (`-`) as `[PROMPT]`; reviewer-visible scoped context first rides on bounded `--title` transport, and if Codex rejects a synthesized scoped title the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context.
 - Scoped surface limit: explicit wrapper scope flags support only the default `diff` surface at the actual Codex layer; `--surface audit|architecture` requires an unscoped prompt-capable review.
 
 Uncommitted diff:
@@ -75,8 +75,8 @@ codex review "Focus on correctness, regressions, edge cases; list missing tests.
 - In non-interactive environments, direct/manual wrapper runs stay handoff-only unless you add `FORCE_CODEX_REVIEW=1`.
 - `docs-review` and `implementation-gate` already set `FORCE_CODEX_REVIEW=1`; `docs-relevance-advisory` intentionally keeps it cleared; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1`, so its closeout review executes before `Human Review` / `In Review`.
 - In non-interactive environments, prefer the wrapper over raw `codex review`; it preserves evidence paths, delegation toggles, and optional runtime guardrails (`CODEX_REVIEW_TIMEOUT_SECONDS`, `CODEX_REVIEW_STALL_TIMEOUT_SECONDS`).
-- For explicit wrapper scope flags (`--uncommitted`, `--base`, `--commit`), the saved prompt artifact remains available under `review/prompt.txt`, but the actual Codex launch stays scope-only because current Codex CLI still treats stdin (`-`) as `[PROMPT]` and rejects it with those flags.
-- For those explicit scoped runs, `--surface audit` and `--surface architecture` must fail fast and be rerun without explicit scope flags, because the requested prompt context cannot reach Codex.
+- For explicit wrapper scope flags (`--uncommitted`, `--base`, `--commit`), the saved prompt artifact remains available under `review/prompt.txt`, but the actual Codex launch still omits any prompt argument because current Codex CLI treats stdin (`-`) as `[PROMPT]`; reviewer-visible scoped context therefore rides on bounded `--title` transport.
+- For those explicit scoped runs, `--surface audit` and `--surface architecture` must fail fast and be rerun without explicit scope flags, because the requested full prompt context cannot reach Codex.
 
 ## Expected outputs
 - A prioritized list of findings.
