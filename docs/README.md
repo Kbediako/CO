@@ -305,7 +305,7 @@ Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions
    python3 -m http.server 4173
    ```
    The build now mirrors all `/assets/...` content and adds root shortcuts (`wp-content`, `wp-includes`, etc.) so even absolute WordPress paths work offline. A lightweight `codex-scroll-fallback` script only unlocks scrolling if the captured page never enables it.
-6. **Document learnings:** Drop run evidence into `docs/findings/<slug>.md` (see `docs/findings/ethical-life.md` for the latest example) so reviewers know which manifest, artifacts, and diffs back each finding.
+6. **Document learnings:** Drop run evidence into `docs/findings/<slug>.md` (see `docs/findings/slimdown-audit.md` for a current example) so reviewers know which manifest, artifacts, and diffs back each finding.
 
 ## Extending the Orchestrator
 - Add new agent strategies by implementing the planner/builder/tester/reviewer interfaces and wiring them into `TaskManager`.
