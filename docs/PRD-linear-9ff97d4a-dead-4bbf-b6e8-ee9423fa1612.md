@@ -77,5 +77,5 @@
 
 ## Approvals
 - Product: Self-approved from Linear issue scope and acceptance criteria
-- Engineering: Pre-implementation review approved for the bounded scoped-context transport repair; docs-review pending
+- Engineering: Pre-implementation review approved for the bounded scoped-context transport repair; docs-review approved via `.runs/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612-docs-review/cli/2026-03-30T06-52-40-070Z-7b90108a/manifest.json` and `out/linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612/manual/20260330T070418Z-docs-review-fallback.md`
 - Design: N/A
