@@ -76,6 +76,50 @@ describe('linearGraphqlClient', () => {
     });
   });
 
+  it('preserves relevant rate-limit headers on successful responses', async () => {
+    const result = await executeLinearGraphql({
+      token: 'lin-api-token',
+      timeoutMs: 30_000,
+      fetchImpl: vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                id: 'viewer-1'
+              }
+            }
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-ratelimit-requests-limit': '100',
+              'x-ratelimit-requests-remaining': '42',
+              'x-ratelimit-requests-reset': '1774701380970'
+            }
+          }
+        )
+      ),
+      query: 'query Viewer { viewer { id } }'
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      payload: {
+        data: {
+          viewer: {
+            id: 'viewer-1'
+          }
+        }
+      },
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '42',
+        'x-ratelimit-requests-reset': '1774701380970'
+      }
+    });
+  });
+
   it('parses GraphQL errors from non-ok JSON responses before falling back to request failures', async () => {
     const result = await executeLinearGraphql({
       token: 'lin-api-token',
@@ -126,6 +170,39 @@ describe('linearGraphqlClient', () => {
       }
     });
     expect(text).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves relevant rate-limit headers on response-invalid failures', async () => {
+    const result = await executeLinearGraphql({
+      token: 'lin-api-token',
+      timeoutMs: 30_000,
+      fetchImpl: vi.fn(async () =>
+        new Response('not json', {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/plain',
+            'x-ratelimit-requests-limit': '100',
+            'x-ratelimit-requests-remaining': '41',
+            'x-ratelimit-requests-reset': '1774701380970'
+          }
+        })
+      ),
+      query: 'query Viewer { viewer { id } }'
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      failure: {
+        kind: 'response_invalid',
+        status: 200,
+        errors: [],
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '41',
+          'x-ratelimit-requests-reset': '1774701380970'
+        }
+      }
+    });
   });
 
   it('resolves auth and timeout from the Linear env keys with the expected precedence', () => {

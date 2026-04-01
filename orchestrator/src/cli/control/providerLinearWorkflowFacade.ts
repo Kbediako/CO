@@ -5,8 +5,15 @@ import {
   executeLinearGraphql,
   resolveLinearApiToken,
   resolveLinearRequestTimeoutMs,
+  type LinearGraphqlPayload,
   type LinearGraphqlFailure
 } from './linearGraphqlClient.js';
+import {
+  recordLinearBudgetHeadersObservation,
+  recordLinearBudgetRateLimitObservation,
+  readSharedLinearBudgetStatus,
+  resolveLinearBudgetPreflight
+} from './linearBudgetState.js';
 import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
 import { resolveLinearSourceSetup } from './linearDispatchSource.js';
 import { resolveProviderLinearAuditPath } from './providerLinearWorkflowAudit.js';
@@ -660,6 +667,7 @@ interface IssueRelationMutationResponse {
 }
 
 interface ResolvedLinearWorkflowSession {
+  env: NodeJS.ProcessEnv;
   token: string;
   timeoutMs: number;
   fetchImpl: typeof fetch;
@@ -690,7 +698,16 @@ export async function getProviderLinearIssueContext(input: {
     return failureFromWorkflowError('issue-context', session.error);
   }
 
-  const context = await readIssueContext(session.session, issueId);
+  const budgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'issue-context',
+    minimumRequestsRemaining: 1
+  });
+  if (budgetError) {
+    return failureFromWorkflowError('issue-context', budgetError);
+  }
+
+  const context = await readIssueContext(session.session, 'issue-context', issueId);
   if (!context.ok) {
     return failureFromWorkflowError('issue-context', context.error);
   }
@@ -737,22 +754,30 @@ export async function upsertProviderLinearWorkpadComment(input: {
 
   const cachedRecord = await readCachedIssueContextRecord(input.env, issueId, session.session.sourceSetup);
   const cachedContext = cachedRecord?.issue ?? null;
+  const canTrustCachedMutationContext = cachedRecord !== null && isIssueContextCacheRecordFresh(cachedRecord);
+  const budgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'upsert-workpad',
+    minimumRequestsRemaining: canTrustCachedMutationContext ? 1 : 2
+  });
+  if (budgetError) {
+    return failureFromWorkflowError('upsert-workpad', budgetError);
+  }
   const context = cachedContext
     ? {
         ok: true as const,
         issue: cachedContext
       }
-    : await readIssueContext(session.session, issueId);
+    : await readIssueContext(session.session, 'upsert-workpad', issueId);
   if (!context.ok) {
     return failureFromWorkflowError('upsert-workpad', context.error);
   }
 
   let issueContext = context.issue;
-  const canTrustCachedMutationContext = cachedRecord !== null && isIssueContextCacheRecordFresh(cachedRecord);
   if (cachedContext && !canTrustCachedMutationContext) {
     // Re-read live comment state before any mutation so cached workpad ids cannot
     // cause duplicate comments or updates against deleted/replaced workpads.
-    const liveContext = await readIssueContext(session.session, issueId);
+    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId);
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
@@ -799,7 +824,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
   let selectedComment = selectedCommentResult.comment;
 
   if (selectedComment && selectedComment.body === body && cachedContext && canTrustCachedMutationContext) {
-    const liveContext = await readIssueContext(session.session, issueId);
+    const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId);
     if (!liveContext.ok) {
       return failureFromWorkflowError('upsert-workpad', liveContext.error);
     }
@@ -833,10 +858,10 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   if (selectedComment) {
-    const updateResult = await executeLinearGraphql<CommentMutationResponse>({
-      token: session.session.token,
-      timeoutMs: session.session.timeoutMs,
-      fetchImpl: session.session.fetchImpl,
+    const updateResult = await executeProviderLinearGraphql<CommentMutationResponse>({
+      session: session.session,
+      operation: 'upsert-workpad',
+      step: 'update-comment',
       query: buildUpdateCommentMutation(),
       variables: {
         id: selectedComment.id,
@@ -844,7 +869,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
       }
     });
     if (!updateResult.ok) {
-      return failureFromGraphql('upsert-workpad', updateResult.failure);
+      return failureFromWorkflowError('upsert-workpad', updateResult.error);
     }
     const updatedComment = parseMutatedComment(updateResult.payload.data?.commentUpdate?.comment ?? null, body);
     if (updateResult.payload.data?.commentUpdate?.success !== true || !updatedComment) {
@@ -868,10 +893,10 @@ export async function upsertProviderLinearWorkpadComment(input: {
     };
   }
 
-  const createResult = await executeLinearGraphql<CommentMutationResponse>({
-    token: session.session.token,
-    timeoutMs: session.session.timeoutMs,
-    fetchImpl: session.session.fetchImpl,
+  const createResult = await executeProviderLinearGraphql<CommentMutationResponse>({
+    session: session.session,
+    operation: 'upsert-workpad',
+    step: 'create-comment',
     query: buildCreateCommentMutation(),
     variables: {
       issueId: issueContext.id,
@@ -879,7 +904,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
     }
   });
   if (!createResult.ok) {
-    return failureFromGraphql('upsert-workpad', createResult.failure);
+    return failureFromWorkflowError('upsert-workpad', createResult.error);
   }
   const createdComment = parseMutatedComment(createResult.payload.data?.commentCreate?.comment ?? null, body);
   if (createResult.payload.data?.commentCreate?.success !== true || !createdComment) {
@@ -921,7 +946,16 @@ export async function deleteProviderLinearWorkpadComment(input: {
     return failureFromWorkflowError('delete-workpad', session.error);
   }
 
-  const context = await readIssueContext(session.session, issueId);
+  const budgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'delete-workpad',
+    minimumRequestsRemaining: 2
+  });
+  if (budgetError) {
+    return failureFromWorkflowError('delete-workpad', budgetError);
+  }
+
+  const context = await readIssueContext(session.session, 'delete-workpad', issueId);
   if (!context.ok) {
     return failureFromWorkflowError('delete-workpad', context.error);
   }
@@ -978,17 +1012,17 @@ export async function deleteProviderLinearWorkpadComment(input: {
     };
   }
 
-  const deleteResult = await executeLinearGraphql<DeleteMutationResponse>({
-    token: session.session.token,
-    timeoutMs: session.session.timeoutMs,
-    fetchImpl: session.session.fetchImpl,
+  const deleteResult = await executeProviderLinearGraphql<DeleteMutationResponse>({
+    session: session.session,
+    operation: 'delete-workpad',
+    step: 'delete-comment',
     query: buildDeleteCommentMutation(),
     variables: {
       id: selectedComment.id
     }
   });
   if (!deleteResult.ok) {
-    return failureFromGraphql('delete-workpad', deleteResult.failure);
+    return failureFromWorkflowError('delete-workpad', deleteResult.error);
   }
 
   const rawDeletedCommentId = normalizeRequiredString(deleteResult.payload.data?.commentDelete?.entityId);
@@ -1046,21 +1080,29 @@ export async function transitionProviderLinearIssueState(input: {
 
   const cachedRecord = await readCachedIssueContextRecord(input.env, issueId, session.session.sourceSetup);
   const cachedContext = cachedRecord?.issue ?? null;
+  const canTrustCachedMutationContext = cachedRecord !== null && isIssueContextCacheRecordFresh(cachedRecord);
+  const budgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'transition',
+    minimumRequestsRemaining: canTrustCachedMutationContext ? 1 : 2
+  });
+  if (budgetError) {
+    return failureFromWorkflowError('transition', budgetError);
+  }
   const initialSummary = cachedContext
     ? {
         ok: true as const,
         issue: summarizeIssueContext(cachedContext)
       }
-    : await readIssueSummary(session.session, issueId);
+    : await readIssueSummary(session.session, 'transition', issueId);
   if (!initialSummary.ok) {
     return failureFromWorkflowError('transition', initialSummary.error);
   }
 
   let summary = initialSummary.issue;
   let cacheContext = cachedContext;
-  const canTrustCachedMutationContext = cachedRecord !== null && isIssueContextCacheRecordFresh(cachedRecord);
   if (cachedContext && !canTrustCachedMutationContext) {
-    const liveSummary = await readIssueSummary(session.session, issueId);
+    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
@@ -1070,7 +1112,7 @@ export async function transitionProviderLinearIssueState(input: {
 
   let targetState = resolveWorkflowStateByName(summary.team?.states ?? [], stateName);
   if (!targetState && cachedContext && canTrustCachedMutationContext) {
-    const liveSummary = await readIssueSummary(session.session, issueId);
+    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
@@ -1088,7 +1130,7 @@ export async function transitionProviderLinearIssueState(input: {
   }
 
   if (sameWorkflowState(summary.state, targetState) && cachedContext && canTrustCachedMutationContext) {
-    const liveSummary = await readIssueSummary(session.session, issueId);
+    const liveSummary = await readIssueSummary(session.session, 'transition', issueId);
     if (!liveSummary.ok) {
       return failureFromWorkflowError('transition', liveSummary.error);
     }
@@ -1121,10 +1163,10 @@ export async function transitionProviderLinearIssueState(input: {
     };
   }
 
-  const transitionResult = await executeLinearGraphql<IssueTransitionMutationResponse>({
-    token: session.session.token,
-    timeoutMs: session.session.timeoutMs,
-    fetchImpl: session.session.fetchImpl,
+  const transitionResult = await executeProviderLinearGraphql<IssueTransitionMutationResponse>({
+    session: session.session,
+    operation: 'transition',
+    step: 'update-state',
     query: buildIssueTransitionMutation(),
     variables: {
       id: summary.id,
@@ -1132,7 +1174,7 @@ export async function transitionProviderLinearIssueState(input: {
     }
   });
   if (!transitionResult.ok) {
-    return failureFromGraphql('transition', transitionResult.failure);
+    return failureFromWorkflowError('transition', transitionResult.error);
   }
 
   const issue = transitionResult.payload.data?.issueUpdate?.issue ?? null;
@@ -1201,7 +1243,16 @@ export async function attachProviderLinearIssuePr(input: {
     return failureFromWorkflowError('attach-pr', session.error);
   }
 
-  const context = await readIssueContext(session.session, issueId);
+  const budgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'attach-pr',
+    minimumRequestsRemaining: 3
+  });
+  if (budgetError) {
+    return failureFromWorkflowError('attach-pr', budgetError);
+  }
+
+  const context = await readIssueContext(session.session, 'attach-pr', issueId);
   if (!context.ok) {
     return failureFromWorkflowError('attach-pr', context.error);
   }
@@ -1226,10 +1277,10 @@ export async function attachProviderLinearIssuePr(input: {
   }
 
   const title = normalizeOptionalString(input.title ?? null);
-  const githubResult = await executeLinearGraphql<AttachmentMutationResponse>({
-    token: session.session.token,
-    timeoutMs: session.session.timeoutMs,
-    fetchImpl: session.session.fetchImpl,
+  const githubResult = await executeProviderLinearGraphql<AttachmentMutationResponse>({
+    session: session.session,
+    operation: 'attach-pr',
+    step: 'attach-github-pr',
     query: buildAttachGithubPrMutation(),
     variables: {
       issueId: context.issue.id,
@@ -1254,14 +1305,16 @@ export async function attachProviderLinearIssuePr(input: {
         source_setup: session.session.sourceSetup
       };
     }
-  } else if (!shouldFallbackToUrlAttachment(githubResult.failure)) {
-    return failureFromGraphql('attach-pr', githubResult.failure);
+  } else if (githubResult.error.code !== 'linear_rate_limited' && !shouldFallbackToUrlAttachmentFromWorkflowError(githubResult.error)) {
+    return failureFromWorkflowError('attach-pr', githubResult.error);
+  } else if (githubResult.error.code === 'linear_rate_limited') {
+    return failureFromWorkflowError('attach-pr', githubResult.error);
   }
 
-  const urlResult = await executeLinearGraphql<AttachmentMutationResponse>({
-    token: session.session.token,
-    timeoutMs: session.session.timeoutMs,
-    fetchImpl: session.session.fetchImpl,
+  const urlResult = await executeProviderLinearGraphql<AttachmentMutationResponse>({
+    session: session.session,
+    operation: 'attach-pr',
+    step: 'attach-url',
     query: buildAttachUrlMutation(),
     variables: {
       issueId: context.issue.id,
@@ -1270,7 +1323,7 @@ export async function attachProviderLinearIssuePr(input: {
     }
   });
   if (!urlResult.ok) {
-    return failureFromGraphql('attach-pr', urlResult.failure);
+    return failureFromWorkflowError('attach-pr', urlResult.error);
   }
 
   const attachment = parseAttachment(urlResult.payload.data?.attachmentLinkURL?.attachment ?? null);
@@ -1376,7 +1429,16 @@ export async function createProviderLinearFollowUpIssue(input: {
     return failureFromWorkflowError('create-follow-up', session.error);
   }
 
-  const issueSummary = await readIssueSummary(session.session, issueId);
+  const budgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'create-follow-up',
+    minimumRequestsRemaining: input.blockedBySource === true ? 5 : 4
+  });
+  if (budgetError) {
+    return failureFromWorkflowError('create-follow-up', budgetError);
+  }
+
+  const issueSummary = await readIssueSummary(session.session, 'create-follow-up', issueId);
   if (!issueSummary.ok) {
     return failureFromWorkflowError('create-follow-up', issueSummary.error);
   }
@@ -1411,10 +1473,10 @@ export async function createProviderLinearFollowUpIssue(input: {
     );
   }
 
-  const createdIssueResult = await executeLinearGraphql<IssueCreateMutationResponse>({
-    token: session.session.token,
-    timeoutMs: session.session.timeoutMs,
-    fetchImpl: session.session.fetchImpl,
+  const createdIssueResult = await executeProviderLinearGraphql<IssueCreateMutationResponse>({
+    session: session.session,
+    operation: 'create-follow-up',
+    step: 'create-issue',
     query: buildCreateFollowUpIssueMutation(),
     variables: {
       input: {
@@ -1434,7 +1496,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     }
   });
   if (!createdIssueResult.ok) {
-    return failureFromGraphql('create-follow-up', createdIssueResult.failure);
+    return failureFromWorkflowError('create-follow-up', createdIssueResult.error);
   }
 
   let createdIssue = parseCreatedIssue(createdIssueResult.payload.data?.issueCreate?.issue ?? null);
@@ -1460,10 +1522,10 @@ export async function createProviderLinearFollowUpIssue(input: {
     })
   });
   if (createdIssue.description !== finalizedDescription) {
-    const updateDescriptionResult = await executeLinearGraphql<IssueDescriptionUpdateMutationResponse>({
-      token: session.session.token,
-      timeoutMs: session.session.timeoutMs,
-      fetchImpl: session.session.fetchImpl,
+    const updateDescriptionResult = await executeProviderLinearGraphql<IssueDescriptionUpdateMutationResponse>({
+      session: session.session,
+      operation: 'create-follow-up',
+      step: 'update-description',
       query: buildIssueDescriptionUpdateMutation(),
       variables: {
         id: createdIssue.id,
@@ -1471,14 +1533,13 @@ export async function createProviderLinearFollowUpIssue(input: {
       }
     });
     if (!updateDescriptionResult.ok) {
-      const mapped = mapGraphqlFailure(updateDescriptionResult.failure);
       return failure(
         'create-follow-up',
-        mapped.code,
-        mapped.message,
+        updateDescriptionResult.error.code,
+        updateDescriptionResult.error.message,
         409,
         {
-          ...(mapped.details ?? {}),
+          ...(updateDescriptionResult.error.details ?? {}),
           created_issue: createdIssue,
           failed_step: 'description_update'
         },
@@ -1502,10 +1563,10 @@ export async function createProviderLinearFollowUpIssue(input: {
     createdIssue = updatedIssue;
   }
 
-  const relatedRelationResult = await executeLinearGraphql<IssueRelationMutationResponse>({
-    token: session.session.token,
-    timeoutMs: session.session.timeoutMs,
-    fetchImpl: session.session.fetchImpl,
+  const relatedRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
+    session: session.session,
+    operation: 'create-follow-up',
+    step: 'create-related-relation',
     query: buildCreateIssueRelationMutation(),
     variables: {
       input: {
@@ -1516,14 +1577,13 @@ export async function createProviderLinearFollowUpIssue(input: {
     }
   });
   if (!relatedRelationResult.ok) {
-    const mapped = mapGraphqlFailure(relatedRelationResult.failure);
     return failure(
       'create-follow-up',
-      mapped.code,
-      mapped.message,
+      relatedRelationResult.error.code,
+      relatedRelationResult.error.message,
       409,
       {
-        ...(mapped.details ?? {}),
+        ...(relatedRelationResult.error.details ?? {}),
         created_issue: createdIssue,
         failed_relation_type: 'related'
       },
@@ -1546,10 +1606,10 @@ export async function createProviderLinearFollowUpIssue(input: {
 
   const blockedBySource = input.blockedBySource === true;
   if (blockedBySource) {
-    const blockingRelationResult = await executeLinearGraphql<IssueRelationMutationResponse>({
-      token: session.session.token,
-      timeoutMs: session.session.timeoutMs,
-      fetchImpl: session.session.fetchImpl,
+    const blockingRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
+      session: session.session,
+      operation: 'create-follow-up',
+      step: 'create-blocks-relation',
       query: buildCreateIssueRelationMutation(),
       variables: {
         input: {
@@ -1560,14 +1620,13 @@ export async function createProviderLinearFollowUpIssue(input: {
       }
     });
     if (!blockingRelationResult.ok) {
-      const mapped = mapGraphqlFailure(blockingRelationResult.failure);
       return failure(
         'create-follow-up',
-        mapped.code,
-        mapped.message,
+        blockingRelationResult.error.code,
+        blockingRelationResult.error.message,
         409,
         {
-          ...(mapped.details ?? {}),
+          ...(blockingRelationResult.error.details ?? {}),
           created_issue: createdIssue,
           failed_relation_type: 'blocks'
         },
@@ -1635,11 +1694,97 @@ function resolveLinearWorkflowSession(
   return {
     ok: true,
     session: {
+      env: resolvedEnv,
       token,
       timeoutMs: resolveLinearRequestTimeoutMs(resolvedEnv),
       fetchImpl: fetchImpl ?? fetch,
       sourceSetup: resolveWorkflowSourceSetup(sourceSetup, resolvedEnv)
     }
+  };
+}
+
+async function preflightProviderLinearBudget(input: {
+  session: ResolvedLinearWorkflowSession;
+  operation: ProviderLinearOperation;
+  minimumRequestsRemaining?: number;
+}): Promise<ProviderLinearWorkflowError | null> {
+  const budget = await readSharedLinearBudgetStatus(input.session.env).catch(() => null);
+  const preflight = resolveLinearBudgetPreflight({
+    budget,
+    operation: `provider-linear:${input.operation}`,
+    minimum_requests_remaining: input.minimumRequestsRemaining
+  });
+  return preflight.ok ? null : preflight.error;
+}
+
+async function executeProviderLinearGraphql<TData>(input: {
+  session: ResolvedLinearWorkflowSession;
+  operation: ProviderLinearOperation;
+  step: string;
+  query: string;
+  variables?: Record<string, unknown>;
+}):
+  Promise<
+    | {
+        ok: true;
+        payload: LinearGraphqlPayload<TData>;
+        headers?: Record<string, string>;
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      }
+  > {
+  const budget = await readSharedLinearBudgetStatus(input.session.env).catch(() => null);
+  const preflight = resolveLinearBudgetPreflight({
+    budget,
+    operation: `provider-linear:${input.operation}:${input.step}`
+  });
+  if (!preflight.ok) {
+    return {
+      ok: false,
+      error: preflight.error
+    };
+  }
+
+  const result = await executeLinearGraphql<TData>({
+    token: input.session.token,
+    timeoutMs: input.session.timeoutMs,
+    fetchImpl: input.session.fetchImpl,
+    query: input.query,
+    variables: input.variables
+  });
+
+  if (!result.ok) {
+    await recordLinearBudgetHeadersObservation({
+      env: input.session.env,
+      headers: result.failure.headers ?? null,
+      source: `provider-linear:${input.operation}:${input.step}`
+    }).catch(() => undefined);
+    const rateLimitFailure = mapLinearRateLimitedFailure(result.failure);
+    if (rateLimitFailure) {
+      await recordLinearBudgetRateLimitObservation({
+        env: input.session.env,
+        rateLimit: rateLimitFailure,
+        source: `provider-linear:${input.operation}:${input.step}`
+      }).catch(() => undefined);
+    }
+    return {
+      ok: false,
+      error: mapGraphqlFailure(result.failure)
+    };
+  }
+
+  await recordLinearBudgetHeadersObservation({
+    env: input.session.env,
+    headers: result.headers ?? null,
+    source: `provider-linear:${input.operation}:${input.step}`
+  }).catch(() => undefined);
+
+  return {
+    ok: true,
+    payload: result.payload,
+    ...(result.headers ? { headers: result.headers } : {})
   };
 }
 
@@ -1986,6 +2131,7 @@ function removeIssueContextComment(issue: ProviderLinearIssueContext, commentId:
 
 async function readIssueSummary(
   session: ResolvedLinearWorkflowSession,
+  operation: ProviderLinearOperation,
   issueId: string
 ):
   Promise<
@@ -1998,10 +2144,10 @@ async function readIssueSummary(
         error: ProviderLinearWorkflowError;
       }
   > {
-  const result = await executeLinearGraphql<LinearIssueSummaryQueryResponse>({
-    token: session.token,
-    timeoutMs: session.timeoutMs,
-    fetchImpl: session.fetchImpl,
+  const result = await executeProviderLinearGraphql<LinearIssueSummaryQueryResponse>({
+    session,
+    operation,
+    step: 'read-issue-summary',
     query: buildIssueSummaryQuery(),
     variables: {
       issueId
@@ -2010,7 +2156,7 @@ async function readIssueSummary(
   if (!result.ok) {
     return {
       ok: false,
-      error: mapGraphqlFailure(result.failure)
+      error: result.error
     };
   }
 
@@ -2046,6 +2192,7 @@ async function readIssueSummary(
 
 async function readIssueContext(
   session: ResolvedLinearWorkflowSession,
+  operation: ProviderLinearOperation,
   issueId: string
 ):
   Promise<
@@ -2069,10 +2216,10 @@ async function readIssueContext(
   let hasNextCommentPage = true;
 
   while (hasNextCommentPage) {
-    const result = await executeLinearGraphql<LinearIssueContextQueryResponse>({
-      token: session.token,
-      timeoutMs: session.timeoutMs,
-      fetchImpl: session.fetchImpl,
+    const result = await executeProviderLinearGraphql<LinearIssueContextQueryResponse>({
+      session,
+      operation,
+      step: commentsAfter ? 'read-issue-context-page' : 'read-issue-context',
       query: buildIssueContextQuery(),
       variables: {
         issueId,
@@ -2082,7 +2229,7 @@ async function readIssueContext(
     if (!result.ok) {
       return {
         ok: false,
-        error: mapGraphqlFailure(result.failure)
+        error: result.error
       };
     }
 
@@ -2158,6 +2305,7 @@ async function readIssueContext(
 
   const attachmentResult = await readIssueAttachmentPages(
     session,
+    operation,
     issueId,
     issueNode.attachments?.pageInfo ?? null,
     attachments,
@@ -2755,13 +2903,12 @@ function resolveSelectedWorkpadComment(
   };
 }
 
-function shouldFallbackToUrlAttachment(failureValue: LinearGraphqlFailure): boolean {
-  return (
-    failureValue.kind === 'graphql_error' &&
-    failureValue.status !== null &&
-    failureValue.status >= 200 &&
-    failureValue.status < 300
-  );
+function shouldFallbackToUrlAttachmentFromWorkflowError(error: ProviderLinearWorkflowError): boolean {
+  const httpStatus =
+    error.details && typeof error.details.http_status === 'number' && Number.isFinite(error.details.http_status)
+      ? error.details.http_status
+      : null;
+  return error.code === 'linear_graphql_error' && httpStatus !== null && httpStatus >= 200 && httpStatus < 300;
 }
 
 function parseAttachment(
@@ -4018,14 +4165,6 @@ function failure<T extends ProviderLinearOperation>(
   };
 }
 
-function failureFromGraphql<T extends ProviderLinearOperation>(
-  operation: T,
-  failureValue: LinearGraphqlFailure
-): ProviderLinearOperationFailure<T> {
-  const mapped = mapGraphqlFailure(failureValue);
-  return failure(operation, mapped.code, mapped.message, mapped.status, mapped.details, mapped.retryable);
-}
-
 function failureFromWorkflowError<T extends ProviderLinearOperation>(
   operation: T,
   error: ProviderLinearWorkflowError
@@ -4051,6 +4190,9 @@ function mapGraphqlFailure(failureValue: LinearGraphqlFailure): ProviderLinearWo
       message: 'Linear GraphQL returned operation errors.',
       status: normalizeGraphqlFailureStatus(failureValue.status),
       details: {
+        ...(typeof failureValue.status === 'number' && Number.isFinite(failureValue.status)
+          ? { http_status: failureValue.status }
+          : {}),
         errors: serializeLinearGraphqlErrors(failureValue.errors)
       }
     };
@@ -4108,6 +4250,7 @@ function scopeMismatchError(
 
 async function readIssueAttachmentPages(
   session: ResolvedLinearWorkflowSession,
+  operation: ProviderLinearOperation,
   issueId: string,
   initialPageInfo: LinearConnectionPageInfo | null,
   attachments: ProviderLinearWorkflowAttachment[],
@@ -4141,10 +4284,10 @@ async function readIssueAttachmentPages(
     }
     seenAttachmentCursors.add(attachmentsAfter);
 
-    const result = await executeLinearGraphql<LinearIssueAttachmentsQueryResponse>({
-      token: session.token,
-      timeoutMs: session.timeoutMs,
-      fetchImpl: session.fetchImpl,
+    const result = await executeProviderLinearGraphql<LinearIssueAttachmentsQueryResponse>({
+      session,
+      operation,
+      step: 'read-issue-attachment-page',
       query: buildIssueAttachmentPageQuery(),
       variables: {
         issueId,
@@ -4154,7 +4297,7 @@ async function readIssueAttachmentPages(
     if (!result.ok) {
       return {
         ok: false,
-        error: mapGraphqlFailure(result.failure)
+        error: result.error
       };
     }
 

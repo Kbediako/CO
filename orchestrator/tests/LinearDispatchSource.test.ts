@@ -1,10 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   resolveLiveLinearDispatchRecommendation,
   resolveLiveLinearTrackedIssueById,
   resolveLiveLinearTrackedIssues
 } from '../src/cli/control/linearDispatchSource.js';
+import {
+  readSharedLinearBudgetStatus,
+  recordLinearBudgetRateLimitObservation
+} from '../src/cli/control/linearBudgetState.js';
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -14,6 +28,56 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('resolveLiveLinearTrackedIssueById', () => {
+  it('fails fast from shared cooldown state before issuing another tracked-issue request', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-dispatch-source-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    await recordLinearBudgetRateLimitObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      rateLimit: {
+        code: 'linear_rate_limited',
+        message: 'Linear API rate limit exceeded.',
+        status: 429,
+        retryable: true,
+        details: {
+          retry_after_seconds: 60,
+          requests_remaining: 0,
+          requests_limit: 100,
+          requests_reset_at: new Date(Date.now() + 60_000).toISOString()
+        }
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () => {
+      throw new Error('shared cooldown should fail closed before fetch');
+    });
+
+    const result = await resolveLiveLinearTrackedIssueById({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      kind: 'unavailable',
+      reason: 'dispatch_source_provider_rate_limited',
+      status: 429,
+      retryable: true,
+      details: {
+        error_code: 'linear_rate_limited',
+        shared_budget_fail_fast: true,
+        shared_budget_cooldown_active: true,
+        requests_remaining: 0
+      }
+    });
+  });
+
   it('resolves a specific Linear issue by id and preserves the normalized tracked shape', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
@@ -281,6 +345,49 @@ describe('resolveLiveLinearTrackedIssueById', () => {
         requests_limit: 5000,
         requests_reset_at: '2026-03-28T12:36:20.970Z',
         request_id: 'req-by-id-1'
+      }
+    });
+  });
+
+  it('records shared budget headers from non-rate-limit GraphQL failures for by-id rereads', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-dispatch-source-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+
+    const result = await resolveLiveLinearTrackedIssueById({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl: vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            errors: [{ message: 'Issue query unavailable.' }]
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-ratelimit-requests-limit': '100',
+              'x-ratelimit-requests-remaining': '9',
+              'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+            }
+          }
+        )
+      )
+    });
+
+    expect(result).toEqual({
+      kind: 'unavailable',
+      status: 503,
+      code: 'dispatch_source_unavailable',
+      reason: 'dispatch_source_provider_request_failed'
+    });
+    await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
+      requests: {
+        limit: 100,
+        remaining: 9
       }
     });
   });

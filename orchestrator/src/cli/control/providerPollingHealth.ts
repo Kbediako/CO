@@ -1,5 +1,6 @@
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import { logger } from '../../logger.js';
+import type { LinearBudgetStatus } from './linearBudgetState.js';
 
 export type ControlPollingMode = 'poll' | 'refresh';
 
@@ -24,6 +25,7 @@ export interface ControlPollingHealthPayload {
   stuck_since_at: string | null;
   restart_required: boolean;
   reason: string | null;
+  linear_budget: LinearBudgetStatus | null;
 }
 
 interface MutableProviderPollingHealthState {
@@ -42,6 +44,7 @@ interface MutableProviderPollingHealthState {
   operationStartedAtMs: number | null;
   stuckAtMs: number | null;
   reason: string | null;
+  linearBudget: LinearBudgetStatus | null;
   onUpdate: ((payload: ControlPollingHealthPayload) => Promise<void> | void) | null;
   updateChain: Promise<void>;
 }
@@ -147,6 +150,25 @@ export function markProviderPollingCompleted(
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
+export function scheduleProviderPolling(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  input: {
+    intervalMs: number;
+    reason?: string | null;
+    linearBudget?: LinearBudgetStatus | null;
+    atMs?: number;
+  }
+): void {
+  const atMs = input.atMs ?? Date.now();
+  const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
+  state.intervalMs = input.intervalMs;
+  state.nextPollAtMs = atMs + input.intervalMs;
+  state.updatedAtMs = atMs;
+  state.reason = normalizeOptionalString(input.reason) ?? null;
+  state.linearBudget = input.linearBudget ?? null;
+  queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
+}
+
 export function isProviderPollingStuck(
   providerIssueHandoff: ProviderIssueHandoffService | null | undefined,
   nowMs: number = Date.now()
@@ -223,7 +245,8 @@ function buildProviderPollingHealthPayload(
     stuck,
     stuck_since_at: toIsoTimestamp(state.stuckAtMs),
     restart_required: stuck,
-    reason
+    reason,
+    linear_budget: state.linearBudget
   };
 }
 
@@ -254,6 +277,7 @@ function getOrCreateProviderPollingHealthState(
     operationStartedAtMs: null,
     stuckAtMs: null,
     reason: null,
+    linearBudget: null,
     onUpdate: null,
     updateChain: Promise.resolve()
   };
@@ -335,4 +359,8 @@ function normalizePollingError(error: unknown): string {
     return error;
   }
   return String(error);
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }

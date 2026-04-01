@@ -28,6 +28,7 @@ import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   appendProviderLinearAuditEntry
 } from '../src/cli/control/providerLinearWorkflowAudit.js';
+import { recordLinearBudgetHeadersObservation } from '../src/cli/control/linearBudgetState.js';
 import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/providerLinearChildLanePhaseContract.js';
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
@@ -1273,6 +1274,70 @@ describe('provider linear worker runner', () => {
     expect(refreshed).toMatchObject({
       issue_identifier: 'CO-2',
       updated_at: '2026-03-21T09:00:10.000Z'
+    });
+  });
+
+  it('hydrates shared Linear budget metadata into refreshed provider proofs', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'task_complete',
+        last_message: 'done',
+        last_event_at: '2026-03-21T09:00:00.000Z',
+        tokens: {
+          input_tokens: 1,
+          output_tokens: 2,
+          total_tokens: 3
+        },
+        rate_limits: null,
+        owner_phase: 'implementation',
+        owner_status: 'in_progress',
+        workspace_path: tempRoot,
+        linear_audit: null,
+        end_reason: null,
+        updated_at: '2026-03-21T09:00:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const env = {
+      CODEX_HOME: tempRoot!,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_issue_by_id',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      async (path, proof) => writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      env
+    );
+
+    expect(refreshed).toMatchObject({
+      linear_budget: {
+        suppression: 'low',
+        requests: {
+          remaining: 1
+        }
+      }
     });
   });
 

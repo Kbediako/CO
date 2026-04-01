@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260401-linear-95b040bc-b150-4c39-bc56-64b13f55579f",
+      "title": "CO: Reduce steady-state Linear request burn across control-host and provider-worker flows",
+      "relates_to": "tasks/tasks-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-01",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "pending docs-review",
+          "date": "2026-04-01",
+          "manifest": "pending"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "task": "tasks/tasks-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "agent_task": ".agent/task/linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
+        "docs": "docs/TECH_SPEC-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md"
+      }
+    },
+    {
       "id": "20260401-linear-fdefaeca-8c14-4dc3-980e-cdc6cfa6d955",
       "title": "CO: Stabilize implementation-gate when nested npm run test hangs after green tail",
       "relates_to": "tasks/tasks-linear-fdefaeca-8c14-4dc3-980e-cdc6cfa6d955.md",

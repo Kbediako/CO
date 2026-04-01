@@ -7,6 +7,10 @@ import { isoTimestamp } from '../utils/time.js';
 import type { ControlState } from './controlState.js';
 import type { ControlRequestSharedContext } from './controlRequestContext.js';
 import {
+  readSharedLinearBudgetStatus,
+  resolveLinearPollingInterval
+} from './linearBudgetState.js';
+import {
   resolveLiveLinearTrackedIssues,
   type LiveLinearTrackedIssue,
 } from './linearDispatchSource.js';
@@ -26,6 +30,7 @@ import {
   markProviderPollingStarted,
   noteProviderPollingRequest,
   readProviderPollingHealth,
+  scheduleProviderPolling,
   type ControlPollingMode
 } from './providerPollingHealth.js';
 import {
@@ -305,16 +310,36 @@ function createProviderRefreshCoordinator(
     timer = null;
   };
 
-  const scheduleNextTrigger = (): void => {
+  const scheduleNextTriggerAsync = async (): Promise<void> => {
     if (stopped || timer) {
       return;
     }
+    const schedule = await resolveProviderRefreshSchedule().catch(() => ({
+      interval_ms: PROVIDER_REFRESH_INTERVAL_MS,
+      reason: null,
+      linear_budget: null
+    }));
+    scheduleProviderPolling(providerIssueHandoff, {
+      intervalMs: schedule.interval_ms,
+      reason: schedule.reason,
+      linearBudget: schedule.linear_budget
+    });
     timer = setTimeout(() => {
       timer = null;
       void trigger();
-    }, PROVIDER_REFRESH_INTERVAL_MS);
+    }, schedule.interval_ms);
     timer.unref?.();
   };
+
+  const resolveProviderRefreshSchedule = async (): Promise<{
+    interval_ms: number;
+    reason: string | null;
+    linear_budget: Awaited<ReturnType<typeof readSharedLinearBudgetStatus>>;
+  }> =>
+    resolveLinearPollingInterval({
+      budget: await readSharedLinearBudgetStatus(process.env).catch(() => null),
+      default_interval_ms: PROVIDER_REFRESH_INTERVAL_MS
+    });
 
   const resolveWatchdogDelayMs = (): number => {
     const health = readProviderPollingHealth(providerIssueHandoff);
@@ -328,9 +353,15 @@ function createProviderRefreshCoordinator(
     if (stopped) {
       return;
     }
+    const preflightSchedule = await resolveProviderRefreshSchedule().catch(() => null);
+    if (preflightSchedule?.linear_budget?.cooldown_active) {
+      clearScheduledTrigger();
+      await scheduleNextTriggerAsync();
+      return;
+    }
     if (isProviderPollingStuck(providerIssueHandoff)) {
       await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
-      scheduleNextTrigger();
+      await scheduleNextTriggerAsync();
       return;
     }
     clearScheduledTrigger();
@@ -352,6 +383,9 @@ function createProviderRefreshCoordinator(
               trackedIssues: pollResolution.trackedIssues,
               refetchTrackedIssues
             });
+            return;
+          }
+          if (pollResolution.reason === 'dispatch_source_provider_rate_limited') {
             return;
           }
           noteProviderPollingRequest(providerIssueHandoff, {
@@ -378,7 +412,7 @@ function createProviderRefreshCoordinator(
     if (stopped || generation !== rescheduleGeneration) {
       return;
     }
-    scheduleNextTrigger();
+    await scheduleNextTriggerAsync();
   };
   return {
     timer: {

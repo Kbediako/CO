@@ -83,15 +83,15 @@ export interface RunProviderLinearChildStreamShellParams {
 interface ProviderLinearChildStreamShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
   appendChildStreamRecord: (runDir: string, record: ProviderLinearWorkerChildStreamRecord) => Promise<ProviderLinearWorkerChildStreamRecord[]>;
-  refreshProofSnapshot: (runDir: string, auditPath: string | null) => Promise<void>;
+  refreshProofSnapshot: (runDir: string, auditPath: string | null, env?: NodeJS.ProcessEnv) => Promise<void>;
   now: () => string;
   warn: (message: string) => void;
 }
 const DEFAULT_DEPENDENCIES: ProviderLinearChildStreamShellDependencies = {
   execRunner: defaultExecRunner,
   appendChildStreamRecord: async (runDir, record) => await appendProviderLinearWorkerChildStreamRecord(runDir, record),
-  refreshProofSnapshot: async (runDir, auditPath) => {
-    await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath);
+  refreshProofSnapshot: async (runDir, auditPath, env) => {
+    await refreshProviderLinearWorkerProofSnapshot(runDir, auditPath, undefined, undefined, env);
   },
   now: () => new Date().toISOString(),
   warn: (message) => {
@@ -303,7 +303,7 @@ export async function runProviderLinearChildStreamShell(
     });
   }
   try {
-    await deps.refreshProofSnapshot(context.runDir, env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null);
+    await deps.refreshProofSnapshot(context.runDir, env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null, env);
   } catch (error) {
     deps.warn(
       `provider-linear-child-stream warning: failed to refresh proof snapshot after recording child stream ${stream}: ${error instanceof Error ? error.message : String(error)}`

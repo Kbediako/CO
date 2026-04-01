@@ -41,6 +41,7 @@ export type LinearGraphqlExecutionResult<TData> =
   | {
       ok: true;
       payload: LinearGraphqlPayload<TData>;
+      headers?: Record<string, string>;
     }
   | {
       ok: false;
@@ -115,7 +116,8 @@ export async function executeLinearGraphql<TData>(input: {
       failure: {
         kind: 'response_invalid',
         status: response.status,
-        errors: []
+        errors: [],
+        ...(headers ? { headers } : {})
       }
     };
   }
@@ -134,7 +136,8 @@ export async function executeLinearGraphql<TData>(input: {
 
   return {
     ok: true,
-    payload
+    payload,
+    ...(headers ? { headers } : {})
   };
 }
 

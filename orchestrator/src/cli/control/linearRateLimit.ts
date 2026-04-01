@@ -8,39 +8,14 @@ export interface LinearRateLimitErrorLike {
   details: Record<string, unknown>;
 }
 
+export type LinearRateLimitDetails = LinearRateLimitErrorLike['details'];
+
 export function mapLinearRateLimitedFailure(
   failureValue: LinearGraphqlFailure
 ): LinearRateLimitErrorLike | null {
   if (!isLinearRateLimitedFailure(failureValue)) {
     return null;
   }
-
-  const retryAfterSeconds = parsePositiveIntegerHeader(failureValue.headers?.['retry-after']);
-  const requestsRemaining = parseIntegerHeader(failureValue.headers?.['x-ratelimit-requests-remaining']);
-  const requestsLimit = parsePositiveIntegerHeader(failureValue.headers?.['x-ratelimit-requests-limit']);
-  const requestsResetAt = parseLinearRateLimitResetHeader(failureValue.headers?.['x-ratelimit-requests-reset']);
-  const endpointRequestsRemaining = parseIntegerHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-requests-remaining']
-  );
-  const endpointRequestsLimit = parsePositiveIntegerHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-requests-limit']
-  );
-  const endpointRequestsResetAt = parseLinearRateLimitResetHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-requests-reset']
-  );
-  const complexityRemaining = parseIntegerHeader(failureValue.headers?.['x-ratelimit-complexity-remaining']);
-  const complexityLimit = parsePositiveIntegerHeader(failureValue.headers?.['x-ratelimit-complexity-limit']);
-  const complexityResetAt = parseLinearRateLimitResetHeader(failureValue.headers?.['x-ratelimit-complexity-reset']);
-  const endpointComplexityRemaining = parseIntegerHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-complexity-remaining']
-  );
-  const endpointComplexityLimit = parsePositiveIntegerHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-complexity-limit']
-  );
-  const endpointComplexityResetAt = parseLinearRateLimitResetHeader(
-    failureValue.headers?.['x-ratelimit-endpoint-complexity-reset']
-  );
-  const requestId = normalizeOptionalString(failureValue.headers?.['x-request-id']);
   return {
     code: 'linear_rate_limited',
     message: 'Linear API rate limit exceeded.',
@@ -48,23 +23,49 @@ export function mapLinearRateLimitedFailure(
     retryable: true,
     details: {
       errors: serializeLinearGraphqlErrors(failureValue.errors),
-      ...(retryAfterSeconds !== null ? { retry_after_seconds: retryAfterSeconds } : {}),
-      ...(requestsRemaining !== null ? { requests_remaining: requestsRemaining } : {}),
-      ...(requestsLimit !== null ? { requests_limit: requestsLimit } : {}),
-      ...(requestsResetAt !== null ? { requests_reset_at: requestsResetAt } : {}),
-      ...(endpointRequestsRemaining !== null ? { endpoint_requests_remaining: endpointRequestsRemaining } : {}),
-      ...(endpointRequestsLimit !== null ? { endpoint_requests_limit: endpointRequestsLimit } : {}),
-      ...(endpointRequestsResetAt !== null ? { endpoint_requests_reset_at: endpointRequestsResetAt } : {}),
-      ...(complexityRemaining !== null ? { complexity_remaining: complexityRemaining } : {}),
-      ...(complexityLimit !== null ? { complexity_limit: complexityLimit } : {}),
-      ...(complexityResetAt !== null ? { complexity_reset_at: complexityResetAt } : {}),
-      ...(endpointComplexityRemaining !== null
-        ? { endpoint_complexity_remaining: endpointComplexityRemaining }
-        : {}),
-      ...(endpointComplexityLimit !== null ? { endpoint_complexity_limit: endpointComplexityLimit } : {}),
-      ...(endpointComplexityResetAt !== null ? { endpoint_complexity_reset_at: endpointComplexityResetAt } : {}),
-      ...(requestId ? { request_id: requestId } : {})
+      ...extractLinearRateLimitDetailsFromHeaders(failureValue.headers)
     }
+  };
+}
+
+export function extractLinearRateLimitDetailsFromHeaders(
+  headers: Record<string, string> | null | undefined
+): LinearRateLimitDetails {
+  const retryAfterSeconds = parsePositiveIntegerHeader(headers?.['retry-after']);
+  const requestsRemaining = parseIntegerHeader(headers?.['x-ratelimit-requests-remaining']);
+  const requestsLimit = parsePositiveIntegerHeader(headers?.['x-ratelimit-requests-limit']);
+  const requestsResetAt = parseLinearRateLimitResetHeader(headers?.['x-ratelimit-requests-reset']);
+  const endpointRequestsRemaining = parseIntegerHeader(headers?.['x-ratelimit-endpoint-requests-remaining']);
+  const endpointRequestsLimit = parsePositiveIntegerHeader(headers?.['x-ratelimit-endpoint-requests-limit']);
+  const endpointRequestsResetAt = parseLinearRateLimitResetHeader(
+    headers?.['x-ratelimit-endpoint-requests-reset']
+  );
+  const complexityRemaining = parseIntegerHeader(headers?.['x-ratelimit-complexity-remaining']);
+  const complexityLimit = parsePositiveIntegerHeader(headers?.['x-ratelimit-complexity-limit']);
+  const complexityResetAt = parseLinearRateLimitResetHeader(headers?.['x-ratelimit-complexity-reset']);
+  const endpointComplexityRemaining = parseIntegerHeader(headers?.['x-ratelimit-endpoint-complexity-remaining']);
+  const endpointComplexityLimit = parsePositiveIntegerHeader(headers?.['x-ratelimit-endpoint-complexity-limit']);
+  const endpointComplexityResetAt = parseLinearRateLimitResetHeader(
+    headers?.['x-ratelimit-endpoint-complexity-reset']
+  );
+  const requestId = normalizeOptionalString(headers?.['x-request-id']);
+  return {
+    ...(retryAfterSeconds !== null ? { retry_after_seconds: retryAfterSeconds } : {}),
+    ...(requestsRemaining !== null ? { requests_remaining: requestsRemaining } : {}),
+    ...(requestsLimit !== null ? { requests_limit: requestsLimit } : {}),
+    ...(requestsResetAt !== null ? { requests_reset_at: requestsResetAt } : {}),
+    ...(endpointRequestsRemaining !== null ? { endpoint_requests_remaining: endpointRequestsRemaining } : {}),
+    ...(endpointRequestsLimit !== null ? { endpoint_requests_limit: endpointRequestsLimit } : {}),
+    ...(endpointRequestsResetAt !== null ? { endpoint_requests_reset_at: endpointRequestsResetAt } : {}),
+    ...(complexityRemaining !== null ? { complexity_remaining: complexityRemaining } : {}),
+    ...(complexityLimit !== null ? { complexity_limit: complexityLimit } : {}),
+    ...(complexityResetAt !== null ? { complexity_reset_at: complexityResetAt } : {}),
+    ...(endpointComplexityRemaining !== null
+      ? { endpoint_complexity_remaining: endpointComplexityRemaining }
+      : {}),
+    ...(endpointComplexityLimit !== null ? { endpoint_complexity_limit: endpointComplexityLimit } : {}),
+    ...(endpointComplexityResetAt !== null ? { endpoint_complexity_reset_at: endpointComplexityResetAt } : {}),
+    ...(requestId ? { request_id: requestId } : {})
   };
 }
 

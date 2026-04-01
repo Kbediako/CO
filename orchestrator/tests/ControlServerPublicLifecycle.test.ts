@@ -20,6 +20,10 @@ import {
   startControlServerPublicLifecycle,
   type ControlServerPublicLifecycleState
 } from '../src/cli/control/controlServerPublicLifecycle.js';
+import {
+  readSharedLinearBudgetStatus,
+  resolveLinearPollingInterval
+} from '../src/cli/control/linearBudgetState.js';
 import { resolveLiveLinearTrackedIssues } from '../src/cli/control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from '../src/cli/control/linearWebhookController.js';
 import { readProviderPollingHealth } from '../src/cli/control/providerPollingHealth.js';
@@ -39,6 +43,15 @@ vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
 
 vi.mock('../src/cli/control/linearDispatchSource.js', () => ({
   resolveLiveLinearTrackedIssues: vi.fn()
+}));
+
+vi.mock('../src/cli/control/linearBudgetState.js', () => ({
+  readSharedLinearBudgetStatus: vi.fn(async () => null),
+  resolveLinearPollingInterval: vi.fn(({ default_interval_ms }: { default_interval_ms: number }) => ({
+    interval_ms: default_interval_ms,
+    reason: null,
+    linear_budget: null
+  }))
 }));
 
 vi.mock('../src/cli/control/linearWebhookController.js', () => ({
@@ -80,6 +93,12 @@ describe('startControlServerPublicLifecycle', () => {
     vi.mocked(resolveLinearWebhookSourceSetup).mockReturnValue({
       sourceSetup: {} as never
     });
+    vi.mocked(readSharedLinearBudgetStatus).mockResolvedValue(null);
+    vi.mocked(resolveLinearPollingInterval).mockImplementation(({ default_interval_ms }) => ({
+      interval_ms: default_interval_ms,
+      reason: null,
+      linear_budget: null
+    }));
     vi.mocked(resolveLiveLinearTrackedIssues).mockResolvedValue({
       kind: 'ready',
       tracked_issues: [buildTrackedIssue('issue-1')]
@@ -740,6 +759,91 @@ describe('startControlServerPublicLifecycle', () => {
       last_mode: 'refresh',
       last_error: null
     });
+
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('skips refresh fallback and widens the next polling interval when the shared budget is already rate limited', async () => {
+    vi.useFakeTimers();
+
+    vi.mocked(resolveLiveLinearTrackedIssues).mockResolvedValueOnce({
+      kind: 'skip',
+      reason: 'dispatch_source_provider_rate_limited'
+    } as Awaited<ReturnType<typeof resolveLiveLinearTrackedIssues>>);
+    vi.mocked(resolveLinearPollingInterval).mockReturnValue({
+      interval_ms: 60_000,
+      reason: 'linear_budget_requests_low',
+      linear_budget: {
+        observed_at: new Date().toISOString(),
+        source: 'dispatch_source_tracked_issues',
+        request_id: null,
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        suppression: 'low',
+        suppression_reason: 'linear_budget_requests_low',
+        requests: {
+          limit: 100,
+          remaining: 1,
+          reset_at: new Date(Date.now() + 60_000).toISOString()
+        },
+        endpoint_requests: null,
+        complexity: null,
+        endpoint_complexity: null
+      }
+    });
+
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      poll: vi.fn(async () => undefined),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      controlStore: {
+        snapshot: () => ({ feature_toggles: {} })
+      },
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+
+    expect(providerIssueHandoff.poll).not.toHaveBeenCalled();
+    expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      interval_ms: 60_000,
+      linear_budget: {
+        suppression: 'low'
+      }
+    });
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
 
     await closeControlServerPublicLifecycle(started);
   });

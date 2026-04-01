@@ -224,23 +224,27 @@ describe('runProviderLinearChildStreamShell', () => {
     expect(result).toMatchObject({ ok: true, child_run: { manifest_path: join(tempRoot ?? '', 'alt-runs', `${TASK_ID}-docs-review`, 'cli', 'docs-run-1', 'manifest.json') } });
   });
   it('preserves the parent repo-config override when launching a child stream', async () => {
-    const { manifestPath } = await createProviderWorkerManifest();
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
     const repoConfigOverride = join(tempRoot ?? '', 'custom', 'codex.orchestrator.json');
+    const env = buildProviderWorkerEnv(manifestPath, {
+      CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: repoConfigOverride,
+      CODEX_HOME: join(tempRoot ?? '', 'codex-home'),
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    });
     const execRunner = vi.fn(async (request) => {
       expect(request.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBe(repoConfigOverride);
       return createExecResult('docs-review', 'docs-run-1', 'docs-review passed');
     });
+    const refreshProofSnapshot = vi.fn(async () => undefined);
 
     const result = await runProviderLinearChildStreamShell(
       {
         pipelineId: 'docs-review',
-        env: buildProviderWorkerEnv(manifestPath, {
-          CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: repoConfigOverride
-        })
+        env
       },
       {
         execRunner,
-        refreshProofSnapshot: vi.fn(async () => undefined)
+        refreshProofSnapshot
       }
     );
 
@@ -253,6 +257,7 @@ describe('runProviderLinearChildStreamShell', () => {
         task_id: `${TASK_ID}-docs-review`
       }
     });
+    expect(refreshProofSnapshot).toHaveBeenCalledWith(runDir, null, env);
   });
   it('accepts workspace-local child output when the parent manifest lives under an external shared runs root', async () => {
     externalRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-stream-shared-'));
