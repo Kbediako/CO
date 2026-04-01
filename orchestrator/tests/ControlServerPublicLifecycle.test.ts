@@ -26,7 +26,10 @@ import {
 } from '../src/cli/control/linearBudgetState.js';
 import { resolveLiveLinearTrackedIssues } from '../src/cli/control/linearDispatchSource.js';
 import { resolveLinearWebhookSourceSetup } from '../src/cli/control/linearWebhookController.js';
-import { readProviderPollingHealth } from '../src/cli/control/providerPollingHealth.js';
+import {
+  readProviderPollingHealth,
+  scheduleProviderPolling
+} from '../src/cli/control/providerPollingHealth.js';
 import {
   prepareControlServerStartupInputs,
   type PreparedControlServerStartupInputs
@@ -207,6 +210,73 @@ describe('startControlServerPublicLifecycle', () => {
     await closeControlServerPublicLifecycle(started);
     await vi.advanceTimersByTimeAsync(15_000);
     expect(requestContextShared.providerIssueHandoff?.refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not recreate the provider refresh timer when shutdown lands during async schedule resolution', async () => {
+    vi.useFakeTimers();
+
+    const defaultSchedule = {
+      interval_ms: 15_000,
+      reason: null,
+      linear_budget: null
+    } as const;
+    let resolveSchedule:
+      | ((value: {
+          interval_ms: number;
+          reason: string | null;
+          linear_budget: null;
+        }) => void)
+      | null = null;
+    vi.mocked(resolveLinearPollingInterval)
+      .mockImplementationOnce(() => defaultSchedule)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSchedule = resolve;
+          })
+      );
+
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff: {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => undefined),
+        refresh: vi.fn(async () => undefined)
+      }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+    expect(requestContextShared.providerIssueHandoff?.refresh).toHaveBeenCalledTimes(1);
+
+    await closeControlServerPublicLifecycle(started);
+    resolveSchedule?.(defaultSchedule);
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(requestContextShared.providerIssueHandoff?.refresh).toHaveBeenCalledTimes(1);
   });
 
   it('does not overlap provider refresh cycles when one interval run is still in flight', async () => {
@@ -847,6 +917,33 @@ describe('startControlServerPublicLifecycle', () => {
     expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
 
     await closeControlServerPublicLifecycle(started);
+  });
+
+  it('reuses the last valid interval when scheduled polling receives an invalid interval', () => {
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      poll: vi.fn(async () => undefined),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined)
+    };
+
+    const atMs = Date.parse('2026-03-22T09:00:00.000Z');
+    scheduleProviderPolling(providerIssueHandoff, {
+      intervalMs: 15_000,
+      reason: 'linear_budget_requests_low',
+      atMs
+    });
+    scheduleProviderPolling(providerIssueHandoff, {
+      intervalMs: Number.NaN,
+      reason: 'linear_budget_requests_low',
+      atMs: atMs + 5_000
+    });
+
+    expect(readProviderPollingHealth(providerIssueHandoff, atMs + 5_000)).toMatchObject({
+      interval_ms: 15_000,
+      next_poll_at: '2026-03-22T09:00:20.000Z',
+      reason: 'linear_budget_requests_low'
+    });
   });
 
   it('preserves the active refresh mode when a non-queued poll request coalesces behind it', async () => {

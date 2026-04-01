@@ -319,6 +319,9 @@ function createProviderRefreshCoordinator(
       reason: null,
       linear_budget: null
     }));
+    if (stopped || timer) {
+      return;
+    }
     scheduleProviderPolling(providerIssueHandoff, {
       intervalMs: schedule.interval_ms,
       reason: schedule.reason,

@@ -49,6 +49,8 @@ interface MutableProviderPollingHealthState {
   updateChain: Promise<void>;
 }
 
+const DEFAULT_PROVIDER_POLLING_INTERVAL_MS = 15_000;
+
 const providerPollingHealthStates = new WeakMap<
   ProviderIssueHandoffService,
   MutableProviderPollingHealthState
@@ -161,8 +163,9 @@ export function scheduleProviderPolling(
 ): void {
   const atMs = input.atMs ?? Date.now();
   const state = getOrCreateProviderPollingHealthState(providerIssueHandoff);
-  state.intervalMs = input.intervalMs;
-  state.nextPollAtMs = atMs + input.intervalMs;
+  const intervalMs = normalizeScheduledPollingIntervalMs(input.intervalMs, state.intervalMs);
+  state.intervalMs = intervalMs;
+  state.nextPollAtMs = atMs + intervalMs;
   state.updatedAtMs = atMs;
   state.reason = normalizeOptionalString(input.reason) ?? null;
   state.linearBudget = input.linearBudget ?? null;
@@ -363,4 +366,17 @@ function normalizePollingError(error: unknown): string {
 
 function normalizeOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function normalizeScheduledPollingIntervalMs(
+  value: number,
+  fallback: number | null
+): number {
+  if (Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof fallback === 'number' && Number.isFinite(fallback) && fallback > 0) {
+    return fallback;
+  }
+  return DEFAULT_PROVIDER_POLLING_INTERVAL_MS;
 }
