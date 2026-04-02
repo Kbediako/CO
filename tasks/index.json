@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260402-linear-dbddac50-c205-4402-a7a5-e2325a9c4373",
+      "title": "CO: Restore clean full-suite Vitest exit for provider-worker validation",
+      "relates_to": "tasks/tasks-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
+        "task": "tasks/tasks-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
+        "agent_task": ".agent/task/linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
+        "docs": "docs/TECH_SPEC-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md"
+      }
+    },
+    {
       "id": "20260402-linear-88b95054-4f55-4d4d-94be-b491d9896b31",
       "title": "CO: Refresh tracked issue metadata for active provider claims",
       "relates_to": "tasks/tasks-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
