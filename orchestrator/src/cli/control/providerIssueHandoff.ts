@@ -455,13 +455,19 @@ export function createProviderIssueHandoffService(
       | 'issue_assignee_name'
       | 'issue_blocked_by'
     >
-  > =>
-    isTrackedIssueStale({
+  > => {
+    const freshness = compareTrackedIssueUpdatedAt({
       existingIssueUpdatedAt: claim.issue_updated_at ?? null,
       nextIssueUpdatedAt: trackedIssue.updated_at
-    })
-      ? {}
-      : buildTrackedIssueClaimFields(trackedIssue);
+    });
+    if (freshness === 'older') {
+      return {};
+    }
+    if (freshness === 'unknown' && claim.issue_updated_at) {
+      return {};
+    }
+    return buildTrackedIssueClaimFields(trackedIssue);
+  };
 
   const resolveFreshTrackedIssueClaimFieldsForActiveClaim = async (
     claim: Pick<ProviderIntakeClaimRecord, 'provider' | 'issue_id' | 'issue_updated_at'>
@@ -2077,6 +2083,39 @@ export function createProviderIssueHandoffService(
           }
 
           if (resolution.kind === 'owned') {
+            if (activeRun) {
+              const trackedIssueFields = buildFreshTrackedIssueClaimFields(
+                claim,
+                resolution.trackedIssue
+              );
+              const transitioned = hasProviderClaimTransitioned(claim, {
+                ...trackedIssueFields,
+                state: 'running',
+                reason: 'provider_issue_rehydrated_active_run',
+                task_id: activeRun.taskId,
+                run_id: activeRun.runId,
+                run_manifest_path: activeRun.manifestPath
+              });
+              const refreshActiveRunSnapshot = captureProviderStateSnapshot();
+              upsertProviderIntakeClaim(options.state, {
+                ...claim,
+                ...trackedIssueFields,
+                launch_source: undefined,
+                launch_token: undefined,
+                task_id: activeRun.taskId,
+                state: 'running',
+                reason: 'provider_issue_rehydrated_active_run',
+                run_id: activeRun.runId,
+                run_manifest_path: activeRun.manifestPath
+              });
+              if (transitioned) {
+                await persistStateOrRollback(refreshActiveRunSnapshot);
+                options.publishRuntime?.('provider-intake.refresh');
+              }
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              continue;
+            }
+
             const currentClaim =
               claim.retry_queued === true
                 ? await ensureQueuedProviderRetryDeadline({
