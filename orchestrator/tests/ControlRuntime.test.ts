@@ -384,7 +384,7 @@ describe('ControlRuntime', () => {
       providerIntakeState
     });
 
-    await createSiblingRun(fixture.root, 'task-1034-running', 'run-2', {
+    const runningPaths = await createSiblingRun(fixture.root, 'task-1034-running', 'run-2', {
       manifest: {
         status: 'in_progress',
         summary: 'sibling run is paused for approval',
@@ -414,6 +414,30 @@ describe('ControlRuntime', () => {
           expiry_fallback: null
         }
       ]
+    });
+    providerIntakeState.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:task-1034-running',
+      issue_id: 'task-1034-running',
+      issue_identifier: 'task-1034-running',
+      issue_title: 'Running sibling issue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-07T00:16:00.000Z',
+      task_id: 'task-1034-running',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-07T00:16:05.000Z',
+      updated_at: '2026-03-07T00:16:10.000Z',
+      last_delivery_id: 'delivery-running',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_010_000,
+      run_id: 'run-2',
+      run_manifest_path: runningPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'running-launch'
     });
 
     const retryPaths = await createSiblingRun(fixture.root, 'task-1034-retrying', 'run-3', {
@@ -1118,6 +1142,286 @@ describe('ControlRuntime', () => {
         primary: {
           remaining: 17
         }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('filters historical in-progress manifests to active intake claims and keeps unavailable token totals null', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:issue-current',
+          issue_id: 'issue-current',
+          issue_identifier: 'ISSUE-CURRENT',
+          issue_title: 'Current selected issue',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-07T00:29:00.000Z',
+          task_id: 'task-telemetry-current',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-07T00:20:00.000Z',
+          updated_at: '2026-03-07T00:29:00.000Z',
+          last_delivery_id: 'delivery-current',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_140_000,
+          run_id: 'run-1',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-current'
+        },
+        {
+          provider: 'linear',
+          provider_key: 'linear:issue-active',
+          issue_id: 'issue-active',
+          issue_identifier: 'ISSUE-ACTIVE',
+          issue_title: 'Other active issue',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-07T00:29:30.000Z',
+          task_id: 'task-telemetry-active',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-07T00:28:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          last_delivery_id: 'delivery-active',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_170_000,
+          run_id: 'run-2',
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-active'
+        }
+      ]);
+      providerIntakeState.polling = {
+        linear_budget: {
+          observed_at: '2026-03-07T00:29:45.000Z',
+          source: 'control-host-polling',
+          suppression: 'none',
+          suppression_reason: null,
+          retry_after_seconds: null,
+          cooldown_until: null,
+          cooldown_active: false,
+          request_id: 'polling-1',
+          requests: {
+            remaining: 17,
+            limit: 30,
+            reset_at: '2026-03-07T00:30:42.000Z'
+          },
+          endpoint_requests: null,
+          complexity: {
+            remaining: 180,
+            limit: 200,
+            reset_at: '2026-03-07T00:30:07.000Z'
+          },
+          endpoint_complexity: null
+        }
+      };
+
+      const fixture = await createFixture({
+        taskId: 'task-telemetry-current',
+        providerIntakeState
+      });
+
+      await seedManifest(fixture.paths, {
+        task_id: 'task-telemetry-current',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:25:00.000Z'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        latest_session_id: 'session-current',
+        turn_count: 2,
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        },
+        rate_limits: {
+          source: 'legacy-proof'
+        },
+        linear_budget: {
+          observed_at: '2026-03-07T00:25:00.000Z',
+          source: 'worker-proof',
+          suppression: 'none',
+          suppression_reason: null,
+          retry_after_seconds: null,
+          cooldown_until: null,
+          cooldown_active: false,
+          request_id: 'worker-1',
+          requests: {
+            remaining: 4,
+            limit: 30,
+            reset_at: '2026-03-07T00:25:42.000Z'
+          },
+          endpoint_requests: null,
+          complexity: null,
+          endpoint_complexity: null
+        },
+        updated_at: '2026-03-07T00:25:00.000Z'
+      });
+
+      const activeSibling = await createSiblingRun(fixture.root, 'task-telemetry-active', 'run-2', {
+        manifest: {
+          task_id: 'task-telemetry-active',
+          issue_id: 'issue-active',
+          issue_identifier: 'ISSUE-ACTIVE',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:28:00.000Z',
+          updated_at: '2026-03-07T00:29:00.000Z'
+        }
+      });
+      await seedProviderLinearWorkerProof(activeSibling, {
+        issue_id: 'issue-active',
+        issue_identifier: 'ISSUE-ACTIVE',
+        latest_session_id: 'session-active',
+        turn_count: 1,
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        },
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      const staleSibling = await createSiblingRun(fixture.root, 'task-telemetry-stale', 'run-3', {
+        manifest: {
+          task_id: 'task-telemetry-stale',
+          issue_id: 'issue-stale',
+          issue_identifier: 'ISSUE-STALE',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:00:00.000Z',
+          updated_at: '2026-03-07T00:05:00.000Z'
+        }
+      });
+      await seedProviderLinearWorkerProof(staleSibling, {
+        issue_id: 'issue-stale',
+        issue_identifier: 'ISSUE-STALE',
+        latest_session_id: 'session-stale',
+        turn_count: 99,
+        tokens: {
+          input_tokens: 500,
+          output_tokens: 400,
+          total_tokens: 900
+        },
+        rate_limits: {
+          source: 'stale-proof'
+        },
+        updated_at: '2026-03-07T00:05:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT',
+        'ISSUE-ACTIVE'
+      ]);
+      expect(compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'ISSUE-STALE')).toBeUndefined();
+      expect(compatibilityProjection.codexTotals).toEqual({
+        input_tokens: null,
+        output_tokens: null,
+        total_tokens: null,
+        seconds_running: 720
+      });
+      expect(compatibilityProjection.rateLimits).toEqual({
+        observed_at: '2026-03-07T00:29:45.000Z',
+        source: 'control-host-polling',
+        suppression: 'none',
+        suppression_reason: null,
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        request_id: 'polling-1',
+        requests: {
+          remaining: 17,
+          limit: 30,
+          reset_at: '2026-03-07T00:30:42.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          remaining: 180,
+          limit: 200,
+          reset_at: '2026-03-07T00:30:07.000Z'
+        },
+        endpoint_complexity: null
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('prefers worker proof linear budget snapshots over legacy proof rate-limit fields', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-telemetry-budget'
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-telemetry-budget',
+        issue_id: 'issue-budget',
+        issue_identifier: 'ISSUE-BUDGET',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-budget',
+        issue_identifier: 'ISSUE-BUDGET',
+        rate_limits: {
+          source: 'legacy-proof'
+        },
+        linear_budget: {
+          observed_at: '2026-03-07T00:29:00.000Z',
+          source: 'worker-proof',
+          suppression: 'none',
+          suppression_reason: null,
+          retry_after_seconds: null,
+          cooldown_until: null,
+          cooldown_active: false,
+          request_id: 'worker-budget-1',
+          requests: {
+            remaining: 8,
+            limit: 30,
+            reset_at: '2026-03-07T00:30:42.000Z'
+          },
+          endpoint_requests: null,
+          complexity: null,
+          endpoint_complexity: null
+        },
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.rateLimits).toEqual({
+        observed_at: '2026-03-07T00:29:00.000Z',
+        source: 'worker-proof',
+        suppression: 'none',
+        suppression_reason: null,
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        request_id: 'worker-budget-1',
+        requests: {
+          remaining: 8,
+          limit: 30,
+          reset_at: '2026-03-07T00:30:42.000Z'
+        },
+        endpoint_requests: null,
+        complexity: null,
+        endpoint_complexity: null
       });
     } finally {
       vi.useRealTimers();

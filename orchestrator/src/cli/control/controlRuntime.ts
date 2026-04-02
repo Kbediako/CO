@@ -187,12 +187,16 @@ function createControlRuntimeSnapshot(
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = selected?.tracked ?? buildTrackedLinearPayload(context.linearAdvisoryState.tracked_issue);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
+      const polling = readProviderPollingSnapshot(context);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await context.providerWorkflowConfigStore.refresh()
         : null;
       const running = [
         ...(selected?.rawStatus === 'in_progress' ? [selected] : []),
-        ...discoveredSources.filter((source) => source.rawStatus === 'in_progress')
+        ...discoveredSources.filter((source) =>
+          source.rawStatus === 'in_progress' &&
+          isAuthoritativeCurrentRunningSource(source, context.providerIntakeState)
+        )
       ].filter((entry, index, collection) =>
         collection.findIndex((candidate) => candidate.runId === entry.runId) === index
       );
@@ -207,7 +211,7 @@ function createControlRuntimeSnapshot(
         running,
         retrying
       });
-      const { codexTotals, rateLimits } = buildCompatibilityTelemetrySnapshot(telemetrySources);
+      const { codexTotals, rateLimits } = buildCompatibilityTelemetrySnapshot(telemetrySources, polling);
       return {
         selected,
         running,
@@ -217,7 +221,8 @@ function createControlRuntimeSnapshot(
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked,
         providerIntake,
-        providerWorkflow
+        providerWorkflow,
+        polling
       };
     })();
     return compatibilityRuntimeSnapshotPromise;
@@ -511,31 +516,73 @@ function compareIsoTimestamp(left: string | null | undefined, right: string | nu
   return leftValue - rightValue;
 }
 
+function isAuthoritativeCurrentRunningSource(
+  source: ControlCompatibilitySourceContext,
+  providerIntakeState: ProviderIntakeState | undefined
+): boolean {
+  if (!providerIntakeState || providerIntakeState.claims.length === 0) {
+    return true;
+  }
+  const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
+  return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
+}
+
+function isProviderIntakeClaimActiveCurrentActivity(
+  claim: Pick<ProviderIntakeClaimRecord, 'state'>
+): boolean {
+  return (
+    claim.state === 'accepted' ||
+    claim.state === 'starting' ||
+    claim.state === 'running' ||
+    claim.state === 'resuming'
+  );
+}
+
 function buildCompatibilityTelemetrySnapshot(
-  sources: Array<NonNullable<ControlCompatibilityRuntimeSnapshot['selected']>>
+  sources: Array<NonNullable<ControlCompatibilityRuntimeSnapshot['selected']>>,
+  polling: ControlPollingHealthPayload | null
 ): {
   codexTotals: ControlCodexTotalsPayload;
   rateLimits: Record<string, unknown> | null;
 } {
   const now = Date.now();
   let inputTokens = 0;
+  let hasInputTokens = false;
   let outputTokens = 0;
+  let hasOutputTokens = false;
   let totalTokens = 0;
+  let hasTotalTokens = false;
   let secondsRunning = 0;
-  let latestRateLimits: Record<string, unknown> | null = null;
+  let latestRateLimits: Record<string, unknown> | null = polling?.linear_budget
+    ? { ...polling.linear_budget }
+    : null;
   let latestRateLimitsAt = Number.NEGATIVE_INFINITY;
+  if (polling?.linear_budget?.observed_at) {
+    latestRateLimitsAt = Date.parse(polling.linear_budget.observed_at) || Number.NEGATIVE_INFINITY;
+  }
 
   for (const source of sources) {
     const proof = source.providerLinearWorkerProof ?? null;
     const tokenUsage = proof?.tokens ?? null;
-    inputTokens += Math.max(0, tokenUsage?.input_tokens ?? 0);
-    outputTokens += Math.max(0, tokenUsage?.output_tokens ?? 0);
-    totalTokens += Math.max(0, tokenUsage?.total_tokens ?? 0);
+    if (typeof tokenUsage?.input_tokens === 'number' && Number.isFinite(tokenUsage.input_tokens)) {
+      inputTokens += Math.max(0, tokenUsage.input_tokens);
+      hasInputTokens = true;
+    }
+    if (typeof tokenUsage?.output_tokens === 'number' && Number.isFinite(tokenUsage.output_tokens)) {
+      outputTokens += Math.max(0, tokenUsage.output_tokens);
+      hasOutputTokens = true;
+    }
+    if (typeof tokenUsage?.total_tokens === 'number' && Number.isFinite(tokenUsage.total_tokens)) {
+      totalTokens += Math.max(0, tokenUsage.total_tokens);
+      hasTotalTokens = true;
+    }
     secondsRunning += computeCompatibilityRuntimeSeconds(source, now);
 
-    const rateLimits = proof?.rate_limits ?? null;
+    const rateLimits = proof?.linear_budget ? { ...proof.linear_budget } : (proof?.rate_limits ?? null);
     if (rateLimits) {
-      const candidateTimestamp = Date.parse(proof?.updated_at ?? source.updatedAt ?? '') || Number.NEGATIVE_INFINITY;
+      const candidateTimestamp =
+        Date.parse(proof?.linear_budget?.observed_at ?? proof?.updated_at ?? source.updatedAt ?? '') ||
+        Number.NEGATIVE_INFINITY;
       if (candidateTimestamp >= latestRateLimitsAt) {
         latestRateLimits = rateLimits;
         latestRateLimitsAt = candidateTimestamp;
@@ -545,9 +592,9 @@ function buildCompatibilityTelemetrySnapshot(
 
   return {
     codexTotals: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      total_tokens: totalTokens,
+      input_tokens: hasInputTokens ? inputTokens : null,
+      output_tokens: hasOutputTokens ? outputTokens : null,
+      total_tokens: hasTotalTokens ? totalTokens : null,
       seconds_running: Number(secondsRunning.toFixed(3))
     },
     rateLimits: latestRateLimits
@@ -564,10 +611,7 @@ function buildCompatibilityTelemetrySources(snapshot: Pick<
     retrying: snapshot.retrying,
     dispatchPilot: null
   });
-  return issueIndex.issues.flatMap((issue) => {
-    const preferredSource = issue.runningSource ?? issue.retrySource;
-    return preferredSource ? [preferredSource] : [];
-  });
+  return issueIndex.issues.flatMap((issue) => (issue.runningSource ? [issue.runningSource] : []));
 }
 
 function computeCompatibilityRuntimeSeconds(
