@@ -13,7 +13,7 @@
 - Scope: docs-first registration, docs-review child stream, narrow helper extraction, focused seam regressions, required validation, and review/elegance handoff gates.
 - Assumptions:
   - the provider-worker helper already reflects the stricter contract the issue wants to preserve
-  - delegation-server can adapt a `null` shared-helper result back to `{}` without altering external behavior
+  - delegation-server can adapt a `null` shared-helper result back to `{}` without altering external behavior only if the shared helper still preserves delegation’s footer-log tolerance
   - focused seam tests are sufficient proof; no broader end-to-end behavior change is required for this follow-up
 
 ## Issue Readiness Gate
@@ -32,7 +32,7 @@
 1) Register the docs-first packet for `CO-50`, update the task registry, and mirror the checklist before code edits.
 2) Run the audited `linear child-stream --pipeline docs-review` lane and record the manifest-backed result or an explicit fallback if the child fails for unrelated repo-wide reasons.
 3) Extract the shared helper and update `providerLinearChildStreamShell.ts` plus `delegationServer.ts` to use it without changing their returned payload shapes.
-4) Update focused seam regressions so both provider-worker and delegation-server paths prove prelude-log success and malformed-output failure.
+4) Update focused seam regressions so both provider-worker and delegation-server paths prove prelude-log success and malformed-output failure, and so delegation-server additionally proves footer-log success without widening the provider-worker seam.
 5) Run the required validation floor, then the standalone review and explicit elegance pass, refresh the workpad, and proceed to PR handoff only once the lane is clean.
 
 ## Dependencies
@@ -61,8 +61,8 @@
   - revert docs/task registry updates together if the implementation is abandoned before review handoff
 
 ## Risks & Mitigations
-- Risk: the shared helper subtly changes delegation-server behavior beyond the intended strict final-tail contract.
-  - Mitigation: keep the helper logic identical to the stricter provider-worker behavior described in the issue acceptance criteria and cover both seams in tests.
+- Risk: the shared helper subtly changes delegation-server behavior by dropping previously tolerated footer log lines after the JSON payload.
+  - Mitigation: keep the shared helper caller-configurable so delegation-server preserves footer-log tolerance while provider-worker remains on the stricter final-tail contract, and cover both seams in tests.
 - Risk: changing the helper location causes import churn or low-signal abstraction growth.
   - Mitigation: use a small shared CLI utility module with no additional policy or wrapper layers.
 - Risk: docs-review or repo validation still hits unrelated baseline debt.

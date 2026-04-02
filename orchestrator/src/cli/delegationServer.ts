@@ -1306,7 +1306,7 @@ function safeJsonParse(text: string): unknown | null {
 }
 
 function parseSpawnOutput(stdout: string): Record<string, unknown> {
-  return parseTrailingJsonObject(stdout) ?? {};
+  return parseTrailingJsonObject(stdout, { allowTrailingTextAfterJson: true }) ?? {};
 }
 
 export const __test__ = {

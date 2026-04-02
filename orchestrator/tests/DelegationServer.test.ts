@@ -2932,6 +2932,24 @@ describe('delegation server spawn output parsing', () => {
     });
   });
 
+  it('extracts JSON payload when footer log lines follow the object', () => {
+    const stdout = [
+      '[Codex-Orchestrator] prepareRun start for pipeline diagnostics',
+      '{',
+      '  "run_id": "run-789",',
+      '  "status": "completed",',
+      '  "manifest": ".runs/task/cli/run-789/manifest.json"',
+      '}',
+      '[Codex-Orchestrator] prepareRun wrote manifest .runs/task/cli/run-789/manifest.json'
+    ].join('\n');
+    const parsed = parseSpawnOutput(stdout);
+    expect(parsed).toMatchObject({
+      run_id: 'run-789',
+      status: 'completed',
+      manifest: '.runs/task/cli/run-789/manifest.json'
+    });
+  });
+
   it('fails closed when prelude logs precede a malformed final JSON payload', () => {
     const stdout = [
       '[Codex-Orchestrator] prepareRun start for pipeline diagnostics',

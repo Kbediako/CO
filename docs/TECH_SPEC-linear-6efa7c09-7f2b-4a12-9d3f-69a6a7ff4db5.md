@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-02
+last_review: 2026-04-03
 ---
 
 ## Canonical Reference
@@ -37,10 +37,11 @@ last_review: 2026-04-02
 ## Technical Requirements
 - Functional requirements:
   - the shared helper must accept raw stdout and return either a parsed object or `null`
-  - the helper must preserve the strict trailing-tail parse contract described in the issue acceptance criteria
+  - the helper must preserve the strict trailing-tail parse contract for the provider-worker child-stream seam
   - provider-worker child-stream parsing must reuse the helper and continue returning `null` on parse failure
   - delegation-server spawn parsing must reuse the helper and continue returning `{}` on parse failure
-  - focused tests must prove prelude-log success and malformed-output failure at both seams
+  - delegation-server spawn parsing must continue tolerating footer log lines that appear after a valid JSON object in stdout
+  - focused tests must prove prelude-log success and malformed-output failure at both seams, plus delegation-server footer-log success
 - Non-functional requirements:
   - fail closed for malformed, truncated, empty, or non-object payloads
   - keep the helper small, local, and auditable
@@ -55,6 +56,7 @@ last_review: 2026-04-02
 - Architecture / design adjustments:
   - move the existing provider-worker helper into a shared utility module
   - keep call-site wrappers thin so each surface still exposes its existing parse-failure shape
+  - keep the shared helper caller-configurable so delegation-server can preserve its existing footer-log tolerance without widening the provider-worker seam
 - Data model changes / migrations:
   - none
 - External dependencies / integrations:
@@ -73,7 +75,7 @@ last_review: 2026-04-02
   - no new runtime monitoring; rely on existing test and review coverage
 
 ## Open Questions
-- Whether the delegation-server seam has any intentional consumers for parsing JSON before trailing logs. The issue acceptance criteria say `final JSON object`, so the shared helper should stay strict unless implementation evidence proves otherwise.
+- Resolved on 2026-04-03: delegated spawn consumers do rely on parsing a valid JSON object before trailing footer logs. The shared helper must therefore preserve delegation-server footer-log tolerance while keeping the stricter provider-worker seam unchanged.
 
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review`

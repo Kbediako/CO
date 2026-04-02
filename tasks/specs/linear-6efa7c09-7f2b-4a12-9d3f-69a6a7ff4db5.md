@@ -4,7 +4,7 @@ title: CO: Deduplicate trailing JSON-tail parsing across child-stream and delega
 status: in_progress
 owner: Codex
 created: 2026-04-02
-last_review: 2026-04-02
+last_review: 2026-04-03
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md
@@ -23,6 +23,7 @@ review_notes:
   - 2026-04-02: Focused parser regressions passed via `npx vitest run orchestrator/tests/ProviderLinearChildStreamShell.test.ts orchestrator/tests/DelegationServer.test.ts`, and the required validation floor passed through `npm run pack:smoke`.
   - 2026-04-02: `npm run test` exited cleanly after a patience-first late-tail watch. The previously recorded "hang" was a false diagnosis caused by silent late-suite files; `tests/run-review.spec.ts` completed in `338818ms`, `tests/cli-command-surface.spec.ts` completed in `376754ms`, and Vitest reported `306` passing files / `2802` passing tests in `378.25s`.
   - 2026-04-02: Manifest-backed standalone review completed with `.runs/linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5/cli/2026-04-02T12-02-41-663Z-eca2eae2/review/telemetry.json` reporting `status: succeeded`, `review_outcome: bounded-success`, and `termination_boundary.kind: relevant-reinspection-dwell`; no concrete findings were recorded before the wrapper's bounded dwell stop.
+  - 2026-04-03: A follow-on PR review on head `935bd1923` identified that delegation-server previously tolerated footer log lines after a valid JSON object, while the shared helper only preserved the stricter provider-worker tail contract. The spec is refreshed so the helper keeps provider strictness but restores delegation footer-log tolerance.
 ---
 
 # Technical Specification
@@ -41,10 +42,12 @@ review_notes:
    - line-suffix scan for the final JSON object only if the full-string parse fails
 3. Keep the provider-worker `parseProviderChildRunResult(...)` contract unchanged: successful parse still feeds the current child-run normalization and path confinement logic, and failed parse still returns `null`.
 4. Keep the delegation-server `parseSpawnOutput(...)` contract unchanged: successful parse still returns a `Record<string, unknown>`, and failed parse still returns `{}`.
-5. Add or update focused regression coverage so both seams prove:
+5. Preserve existing delegation-server compatibility when stdout contains footer log lines after a valid JSON object.
+6. Add or update focused regression coverage so both seams prove:
    - success with prelude logs before a valid final JSON object
    - fail-closed handling for malformed or truncated output
-6. Stay bounded to the parser extraction, the two call sites, tests, and truthful docs/task updates.
+   - delegation-server success when footer log lines follow a valid JSON object
+7. Stay bounded to the parser extraction, the two call sites, tests, and truthful docs/task updates.
 
 ## Planned Interaction Contract
 
@@ -53,9 +56,9 @@ review_notes:
   - output: `Record<string, unknown> | null`
   - behavior:
     - trim input
-    - reject immediately when the trimmed output does not end with `}`
     - try parsing the full trimmed string first
-    - if that fails, scan suffixes that begin on lines whose trimmed content starts with `{`
+    - provider-worker mode stays strict: reject when the trimmed output does not end with `}` and then scan suffixes that begin on lines whose trimmed content starts with `{`
+    - delegation-server mode must additionally tolerate footer log lines after the JSON block by scanning candidate object slices that end before the trailing log lines
     - return the first successfully parsed object suffix, else `null`
 - Call-site adaptations:
   - provider-worker child-stream keeps `null` as parse failure
@@ -64,17 +67,17 @@ review_notes:
 ## Pre-change Baseline
 
 - `orchestrator/src/cli/providerLinearChildStreamShell.ts` already uses `parseTrailingJsonObject(...)` and therefore enforces the trailing-tail posture expected by the issue acceptance criteria.
-- `orchestrator/src/cli/delegationServer.ts` still uses local `safeJsonParse(...)` plus `parseSpawnOutput(...)` logic, which is similar but not sourced from the same helper.
+- `orchestrator/src/cli/delegationServer.ts` still uses local `safeJsonParse(...)` plus `parseSpawnOutput(...)` logic, which is similar but not sourced from the same helper and still tolerates footer log lines after the JSON payload.
 - `orchestrator/tests/ProviderLinearChildStreamShell.test.ts` already covers:
   - valid trailing child-run JSON after prelude logs
   - malformed final JSON failure
-- `orchestrator/tests/DelegationServer.test.ts` currently covers success extraction after prelude logs, but not the malformed-output failure case required by this issue.
+- `orchestrator/tests/DelegationServer.test.ts` currently covers success extraction after prelude logs, but not the malformed-output failure case or footer-log success case required by this issue.
 
 ## Validation Plan
 
 - audited `linear child-stream --pipeline docs-review` before implementation
 - focused `ProviderLinearChildStreamShell.test.ts` coverage for prelude-log success and malformed-output failure
-- focused `DelegationServer.test.ts` coverage for prelude-log success and malformed-output failure
+- focused `DelegationServer.test.ts` coverage for prelude-log success, malformed-output failure, and footer-log success
 - required repo validation floor after implementation
 - manifest-backed standalone review plus explicit elegance/minimality pass before review handoff
 
