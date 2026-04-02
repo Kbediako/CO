@@ -60,7 +60,13 @@ function detectRepoRoot(startDir: string): string | undefined {
               : current;
           }
           if (path.basename(resolvedGitDir) === '.git') {
-            return path.dirname(resolvedGitDir);
+            const parentRepoRoot = path.dirname(resolvedGitDir);
+            return isWithinAncestor(
+              canonicalizeExistingPath(current),
+              canonicalizeExistingPath(parentRepoRoot)
+            )
+              ? parentRepoRoot
+              : current;
           }
         }
         return current;
