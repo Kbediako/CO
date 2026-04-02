@@ -84,6 +84,11 @@ type LinearCliUsageError = Error & {
   result: LinearCliUsageFailureResult;
 };
 
+interface ResolvedTextInput {
+  text: string;
+  filePath: string | null;
+}
+
 type ProviderLinearRuntimeProofResult =
   | {
       ok: true;
@@ -204,9 +209,15 @@ export async function runLinearCliShell(
           'body-file',
           'comment-id'
         ]);
+        const bodyInput = await resolveBodyInput(
+          params.flags,
+          dependencies.readTextFile,
+          dependencies.getCwd()
+        );
         const result = await dependencies.upsertProviderLinearWorkpadComment({
           issueId: requireFlag(params.flags, 'issue-id'),
-          body: await resolveBody(params.flags, dependencies.readTextFile),
+          body: bodyInput.text,
+          bodyFilePath: bodyInput.filePath,
           commentId: readStringFlag(params.flags, 'comment-id') ?? null,
           sourceSetup: readSourceSetup(params.flags),
           env
@@ -514,11 +525,44 @@ function readSourceSetup(flags: ArgMap): DispatchPilotSourceSetup | null {
   };
 }
 
-async function resolveBody(
+async function resolveBodyInput(
   flags: ArgMap,
-  readTextFile: (path: string) => Promise<string>
-): Promise<string> {
-  return await resolveRequiredText(flags, readTextFile, 'body', 'body-file');
+  readTextFile: (path: string) => Promise<string>,
+  cwd: string
+): Promise<ResolvedTextInput> {
+  const inlineValue = readRawStringFlag(flags, 'body');
+  const fileValue = readStringFlag(flags, 'body-file');
+  const hasInlineValue = typeof inlineValue === 'string' && inlineValue.trim().length > 0;
+  if (hasInlineValue && fileValue) {
+    throw usageError('linear_body_conflict', 'Use either --body or --body-file, not both.');
+  }
+  if (hasInlineValue) {
+    return {
+      text: inlineValue,
+      filePath: null
+    };
+  }
+  if (!fileValue) {
+    throw usageError('linear_body_missing', '--body or --body-file is required.');
+  }
+  const resolvedFilePath = resolveInputFilePath(fileValue, cwd);
+  let fileText: string;
+  try {
+    fileText = await readTextFile(resolvedFilePath);
+  } catch {
+    throw usageError('linear_body_file_unreadable', '--body-file must reference a readable file.');
+  }
+  if (fileText.trim().length === 0) {
+    throw usageError('linear_body_missing', '--body or --body-file is required.');
+  }
+  return {
+    text: fileText,
+    filePath: resolvedFilePath
+  };
+}
+
+function resolveInputFilePath(filePath: string, cwd: string): string {
+  return isAbsolute(filePath) ? filePath : resolve(cwd, filePath);
 }
 
 async function resolveOptionalText(
@@ -811,6 +855,11 @@ function buildAuditEntry(
         ...followUpAuditFields,
         comment_id: result.comment.id,
         attachment_id: null,
+        ...(Array.isArray(result.embedded_assets) && result.embedded_assets.length > 0
+          ? {
+              asset_urls: result.embedded_assets.map((entry) => entry.asset_url)
+            }
+          : {}),
         error_code: null,
         error_message: null
       };

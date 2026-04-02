@@ -40,6 +40,8 @@ codex-orchestrator linear upsert-workpad \
 
 The body must contain the `## Codex Workpad` marker.
 
+When a lane requires screenshot proof to be visible directly in Linear, embed the proof in the workpad body as markdown image syntax that points at a local file (prefer `file:///absolute/path/to/proof.png`; use `<file:///absolute/path/to/proof (1).png>` when the path contains spaces or parentheses). The helper uploads local PNG/JPG/JPEG/WEBP/GIF image references to Linear and rewrites them to Linear-hosted asset URLs before the workpad comment mutation lands. Use runtime-proof or external URLs only when reviewer-visible external proof is acceptable.
+
 Keep the workpad body in this exact top-level order, with every section non-empty:
 
 ```md
