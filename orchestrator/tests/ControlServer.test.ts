@@ -1149,9 +1149,9 @@ describe('ControlServer', () => {
         state: 'in_progress'
       });
       expect(statePayload.codex_totals).toMatchObject({
-        input_tokens: 0,
-        output_tokens: 0,
-        total_tokens: 0
+        input_tokens: null,
+        output_tokens: null,
+        total_tokens: null
       });
       expect(statePayload.codex_totals?.seconds_running ?? 0).toBeGreaterThanOrEqual(0);
       expect(statePayload.rate_limits).toBeNull();
@@ -1222,7 +1222,7 @@ describe('ControlServer', () => {
     await seedManifest(paths, {
       task_id: 'task-1034-current'
     });
-    await createSiblingRun(root, 'task-1034-running', 'run-2', {
+    const runningPaths = await createSiblingRun(root, 'task-1034-running', 'run-2', {
       manifest: {
         status: 'in_progress',
         summary: 'sibling run is paused for approval',
@@ -1263,6 +1263,30 @@ describe('ControlServer', () => {
       }
     });
     await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:task-1034-running',
+        issue_id: 'task-1034-running',
+        issue_identifier: 'task-1034-running',
+        issue_title: 'Running sibling issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-07T00:18:00.000Z',
+        task_id: 'task-1034-running',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-03-07T00:18:05.000Z',
+        updated_at: '2026-03-07T00:18:10.000Z',
+        last_delivery_id: 'delivery-running',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_030_000,
+        run_id: 'run-2',
+        run_manifest_path: runningPaths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'running-launch'
+      },
       {
         provider: 'linear',
         provider_key: 'linear:task-1034-retrying',

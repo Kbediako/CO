@@ -238,6 +238,15 @@ export function startControlStatusDashboard(
     queueRender(false, true);
   };
 
+  const clearQueuedRenderState = (): boolean => {
+    const hadQueuedRender = queuedRender || queuedForceRefresh || queuedReadDataset || queuedUseCachedFrame;
+    queuedRender = false;
+    queuedForceRefresh = false;
+    queuedReadDataset = false;
+    queuedUseCachedFrame = false;
+    return hadQueuedRender;
+  };
+
   const startQueuedRender = (): void => {
     const forceRefresh = queuedForceRefresh;
     const useCachedFrame = queuedUseCachedFrame && !queuedReadDataset && !forceRefresh;
@@ -365,12 +374,23 @@ export function startControlStatusDashboard(
       }
       const key = character.toLowerCase();
       if (key === 'p') {
+        const enteringPaused = !frameState.paused;
         frameState = {
           ...frameState,
-          paused: !frameState.paused,
-          surfaceMode: frameState.paused ? liveSurfaceMode : 'primary'
+          paused: enteringPaused,
+          surfaceMode: enteringPaused ? 'primary' : liveSurfaceMode
         };
         if (frameState.paused) {
+          if (activeRender) {
+            const hadQueuedRender = clearQueuedRenderState();
+            if (hadQueuedRender) {
+              frameState = {
+                ...frameState,
+                pendingUpdate: true
+              };
+            }
+            continue;
+          }
           requestCachedFrameRender();
         } else {
           const shouldForceRefresh = frameState.pendingUpdate;
@@ -1109,6 +1129,9 @@ function appendTokenSample(
   totalTokens: number | null | undefined
 ): TokenSample[] {
   const normalizedTotal = normalizeFiniteNumber(totalTokens);
+  if (totalTokens === null || totalTokens === undefined || !Number.isFinite(totalTokens)) {
+    return samples.filter((sample) => sample.timestampMs >= timestampMs - THROUGHPUT_WINDOW_MS);
+  }
   const baselineSamples =
     samples.length > 0 && normalizedTotal < samples[0].totalTokens ? [] : samples;
   return [{ timestampMs, totalTokens: normalizedTotal }, ...baselineSamples].filter(
@@ -1237,6 +1260,11 @@ function formatRateLimitSegments(
     return [{ text: 'unavailable', color: ANSI_GRAY }];
   }
 
+  const linearBudget = formatLinearBudgetSegments(value, referenceTime);
+  if (linearBudget) {
+    return linearBudget;
+  }
+
   const limitId = readRecordString(value, ['limit_id', 'limitId', 'limit_name', 'limitName']);
   const primary = asRecord(value.primary);
   const secondary = asRecord(value.secondary);
@@ -1267,6 +1295,70 @@ function formatRateLimitSegments(
   }
 
   return [{ text: formatRecord(value), color: ANSI_GRAY }];
+}
+
+function formatLinearBudgetSegments(
+  value: Record<string, unknown>,
+  referenceTime: Date
+): SummarySegment[] | null {
+  const buckets: Array<[label: string, bucket: Record<string, unknown>]> = [];
+  const requests = asRecord(value.requests);
+  if (requests) {
+    buckets.push(['requests', requests]);
+  }
+  const endpointRequests = asRecord(value.endpoint_requests);
+  if (endpointRequests) {
+    buckets.push(['ep req', endpointRequests]);
+  }
+  const complexity = asRecord(value.complexity);
+  if (complexity) {
+    buckets.push(['complexity', complexity]);
+  }
+  const endpointComplexity = asRecord(value.endpoint_complexity);
+  if (endpointComplexity) {
+    buckets.push(['ep complexity', endpointComplexity]);
+  }
+  const observedAt = readRecordString(value, ['observed_at', 'observedAt']);
+  const source = readRecordString(value, ['source']);
+  const suppression = readRecordString(value, ['suppression']);
+  const retryAfterSeconds = readRecordNumber(value, ['retry_after_seconds', 'retryAfterSeconds']);
+  const looksLikeLinearBudget =
+    observedAt !== null ||
+    suppression !== null ||
+    retryAfterSeconds !== null ||
+    source?.toLowerCase().startsWith('linear') === true;
+  if (!looksLikeLinearBudget) {
+    return null;
+  }
+
+  const pieces: SummarySegment[] = [
+    {
+      text: sanitizeDisplayValue(source === null ? 'Linear API' : `Linear API (${source})`),
+      color: ANSI_YELLOW
+    }
+  ];
+  for (const [label, bucket] of buckets) {
+    pieces.push({ text: ' | ', color: ANSI_GRAY });
+    pieces.push({
+      text: `${label} ${formatRateLimitBucket(bucket, referenceTime)}`,
+      color: ANSI_CYAN
+    });
+  }
+  if (suppression && suppression !== 'none') {
+    pieces.push({ text: ' | ', color: ANSI_GRAY });
+    pieces.push({
+      text: `state ${sanitizeDisplayValue(suppression)}`,
+      color: suppression === 'cooldown' || suppression === 'exhausted' ? ANSI_RED : ANSI_YELLOW
+    });
+  }
+  if (retryAfterSeconds !== null) {
+    pieces.push({ text: ' | ', color: ANSI_GRAY });
+    pieces.push({
+      text: `retry ${Math.max(0, Math.floor(retryAfterSeconds))}s`,
+      color: ANSI_MAGENTA
+    });
+  }
+  return pieces;
 }
 
 function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
