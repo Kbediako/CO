@@ -2267,6 +2267,9 @@ function extractLocalMarkdownImageReferences(
     if (!rawReference || !fullMatch || typeof matchIndex !== 'number') {
       continue;
     }
+    if (isEscapedMarkdownImageMarker(body, matchIndex)) {
+      continue;
+    }
     const resolvedReference = resolveLocalMarkdownImageReference(rawReference, bodyFilePath);
     if (!resolvedReference) {
       continue;
@@ -2281,6 +2284,14 @@ function extractLocalMarkdownImageReferences(
     });
   }
   return references;
+}
+
+function isEscapedMarkdownImageMarker(body: string, markerIndex: number): boolean {
+  let backslashCount = 0;
+  for (let index = markerIndex - 1; index >= 0 && body[index] === '\\'; index -= 1) {
+    backslashCount += 1;
+  }
+  return backslashCount % 2 === 1;
 }
 
 function maskMarkdownCodeForLocalImageExtraction(body: string): string {
@@ -2498,6 +2509,9 @@ function resolveLocalMarkdownImageReference(
   ) {
     return null;
   }
+  if (normalizedDestination.startsWith('#')) {
+    return null;
+  }
 
   let resolvedPath: string | null = null;
   if (lowerDestination.startsWith('file://')) {
@@ -2510,15 +2524,14 @@ function resolveLocalMarkdownImageReference(
     normalizedDestination.startsWith('./') ||
     normalizedDestination.startsWith('../') ||
     normalizedDestination.startsWith('/') ||
-    /^[A-Za-z]:[\\/]/u.test(normalizedDestination)
+    /^[A-Za-z]:[\\/]/u.test(normalizedDestination) ||
+    !/^[A-Za-z][A-Za-z\d+.-]*:/u.test(normalizedDestination)
   ) {
     const resolvedBodyFilePath = normalizeOptionalString(bodyFilePath);
     if (
       resolvedBodyFilePath &&
-      (
-        normalizedDestination.startsWith('./') ||
-        normalizedDestination.startsWith('../')
-      )
+      !normalizedDestination.startsWith('/') &&
+      !/^[A-Za-z]:[\\/]/u.test(normalizedDestination)
     ) {
       resolvedPath = resolvePath(dirname(resolvedBodyFilePath), normalizedDestination);
     } else {
