@@ -25,6 +25,7 @@ describe('vitest progress reporter config', () => {
   it('leaves the progress reporter disabled when CI is unset', async () => {
     const config = await loadConfigForCiValue(undefined);
     expect(config.test?.reporters).toBeUndefined();
+    expect(config.test ? 'reporters' in config.test : false).toBe(false);
   });
 });
 

@@ -2,7 +2,9 @@ import { defineConfig } from 'vitest/config';
 
 import { createVitestProgressReporter } from './scripts/lib/vitest-progress-reporter.js';
 
-const reporters = envFlagEnabled(process.env.CI) ? ['default', createVitestProgressReporter()] : undefined;
+const reporters = envFlagEnabled(process.env.CI)
+  ? ['default', createVitestProgressReporter()]
+  : null;
 
 export default defineConfig({
   // Vitest runs through Vite middleware mode, which otherwise spins up the
@@ -22,7 +24,7 @@ export default defineConfig({
       'patterns/**/*.test.ts',
       'tests/**/*.spec.ts'
     ],
-    reporters,
+    ...(reporters ? { reporters } : {}),
     coverage: {
       enabled: false
     }
