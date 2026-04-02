@@ -230,6 +230,8 @@ function createControlRuntimeSnapshot(
 
   async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
     const runtimeSnapshot = await readCompatibilityRuntimeSnapshot();
+    // Cache the stable projection shape once, but re-derive polling-backed rate limits on every
+    // read so current Linear budget data is reflected without invalidating the rest of the snapshot.
     compatibilityProjectionPromise ??= Promise.resolve(buildCompatibilityProjectionSnapshot(runtimeSnapshot));
     const polling = readProviderPollingSnapshot(context);
     const telemetrySources = buildCompatibilityTelemetrySources({
@@ -530,14 +532,14 @@ function isAuthoritativeCurrentRunningSource(
   if (!providerIntakeState) {
     return true;
   }
+  if (!isProviderIntakeScopedRunningSource(source)) {
+    return true;
+  }
   if (providerIntakeState.claims.length === 0) {
-    return !isProviderIntakeScopedRunningSource(source);
+    return false;
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
-  if (claim !== null) {
-    return isProviderIntakeClaimActiveCurrentActivity(claim);
-  }
-  return !isProviderIntakeScopedRunningSource(source);
+  return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
 }
 
 function isProviderIntakeScopedRunningSource(

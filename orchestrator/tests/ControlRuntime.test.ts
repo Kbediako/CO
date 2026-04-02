@@ -1053,6 +1053,74 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('does not suppress local running sources when linear claims only match by shared identifiers', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-claim-provider-current',
+        providerIntakeState: createProviderIntakeState([
+          {
+            provider: 'linear',
+            provider_key: 'linear:issue-local',
+            issue_id: 'issue-local',
+            issue_identifier: 'ISSUE-LOCAL',
+            issue_title: 'Linear claim should not suppress a local run',
+            issue_state: 'Done',
+            issue_state_type: 'completed',
+            issue_updated_at: '2026-03-07T00:29:00.000Z',
+            task_id: 'task-shared',
+            mapping_source: 'provider_id_fallback',
+            state: 'completed',
+            reason: 'provider_issue_rehydrated_active_run',
+            accepted_at: '2026-03-07T00:10:00.000Z',
+            updated_at: '2026-03-07T00:29:00.000Z',
+            last_delivery_id: 'delivery-local',
+            last_event: 'Issue',
+            last_action: 'update',
+            last_webhook_timestamp: 1_742_360_140_000,
+            run_id: 'run-linear-claim',
+            run_manifest_path: null,
+            launch_source: 'control-host',
+            launch_token: 'launch-local'
+          }
+        ])
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-claim-provider-current',
+        issue_provider: 'linear',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      await createSiblingRun(fixture.root, 'task-shared', 'run-2', {
+        manifest: {
+          task_id: 'task-shared',
+          issue_provider: 'local',
+          issue_identifier: 'ISSUE-LOCAL',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          summary: 'local active run that shares identifiers with a linear claim'
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT',
+        'ISSUE-LOCAL'
+      ]);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'ISSUE-LOCAL')
+      ).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uses run id as the final same-issue representative tiebreak when timestamps collide', async () => {
     const fixture = await createFixture({
       taskId: 'task-1036-current'
