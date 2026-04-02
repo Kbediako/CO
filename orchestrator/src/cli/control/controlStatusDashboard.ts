@@ -1319,13 +1319,12 @@ function formatLinearBudgetSegments(
   const source = readRecordString(value, ['source']);
   const suppression = readRecordString(value, ['suppression']);
   const retryAfterSeconds = readRecordNumber(value, ['retry_after_seconds', 'retryAfterSeconds']);
-  if (
-    buckets.length === 0 &&
-    observedAt === null &&
-    source === null &&
-    suppression === null &&
-    retryAfterSeconds === null
-  ) {
+  const looksLikeLinearBudget =
+    observedAt !== null ||
+    suppression !== null ||
+    retryAfterSeconds !== null ||
+    source?.toLowerCase().startsWith('linear') === true;
+  if (!looksLikeLinearBudget) {
     return null;
   }
 

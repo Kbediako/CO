@@ -520,11 +520,29 @@ function isAuthoritativeCurrentRunningSource(
   source: ControlCompatibilitySourceContext,
   providerIntakeState: ProviderIntakeState | undefined
 ): boolean {
-  if (!providerIntakeState || providerIntakeState.claims.length === 0) {
+  if (!providerIntakeState) {
     return true;
   }
+  if (providerIntakeState.claims.length === 0) {
+    return false;
+  }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
-  return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
+  if (claim !== null) {
+    return isProviderIntakeClaimActiveCurrentActivity(claim);
+  }
+  return !isProviderIntakeScopedRunningSource(source);
+}
+
+function isProviderIntakeScopedRunningSource(
+  source: Pick<ControlCompatibilitySourceContext, 'issueProvider'>
+): boolean {
+  if (source.issueProvider === 'linear') {
+    return true;
+  }
+  if (source.issueProvider !== null) {
+    return false;
+  }
+  return true;
 }
 
 function isProviderIntakeClaimActiveCurrentActivity(
@@ -553,13 +571,15 @@ function buildCompatibilityTelemetrySnapshot(
   let totalTokens = 0;
   let hasTotalTokens = false;
   let secondsRunning = 0;
-  let latestRateLimits: Record<string, unknown> | null = polling?.linear_budget
+  let latestAuthoritativeRateLimits: Record<string, unknown> | null = polling?.linear_budget
     ? { ...polling.linear_budget }
     : null;
-  let latestRateLimitsAt = Number.NEGATIVE_INFINITY;
+  let latestAuthoritativeRateLimitsAt = Number.NEGATIVE_INFINITY;
   if (polling?.linear_budget?.observed_at) {
-    latestRateLimitsAt = Date.parse(polling.linear_budget.observed_at) || Number.NEGATIVE_INFINITY;
+    latestAuthoritativeRateLimitsAt = Date.parse(polling.linear_budget.observed_at) || Number.NEGATIVE_INFINITY;
   }
+  let latestLegacyRateLimits: Record<string, unknown> | null = null;
+  let latestLegacyRateLimitsAt = Number.NEGATIVE_INFINITY;
 
   for (const source of sources) {
     const proof = source.providerLinearWorkerProof ?? null;
@@ -578,14 +598,24 @@ function buildCompatibilityTelemetrySnapshot(
     }
     secondsRunning += computeCompatibilityRuntimeSeconds(source, now);
 
-    const rateLimits = proof?.linear_budget ? { ...proof.linear_budget } : (proof?.rate_limits ?? null);
-    if (rateLimits) {
+    const linearBudget = proof?.linear_budget ? { ...proof.linear_budget } : null;
+    if (linearBudget) {
       const candidateTimestamp =
-        Date.parse(proof?.linear_budget?.observed_at ?? proof?.updated_at ?? source.updatedAt ?? '') ||
+        Date.parse(linearBudget.observed_at ?? proof?.updated_at ?? source.updatedAt ?? '') ||
         Number.NEGATIVE_INFINITY;
-      if (candidateTimestamp >= latestRateLimitsAt) {
-        latestRateLimits = rateLimits;
-        latestRateLimitsAt = candidateTimestamp;
+      if (candidateTimestamp >= latestAuthoritativeRateLimitsAt) {
+        latestAuthoritativeRateLimits = linearBudget;
+        latestAuthoritativeRateLimitsAt = candidateTimestamp;
+      }
+      continue;
+    }
+
+    if (proof?.rate_limits && latestAuthoritativeRateLimits === null) {
+      const candidateTimestamp =
+        Date.parse(proof.updated_at ?? source.updatedAt ?? '') || Number.NEGATIVE_INFINITY;
+      if (candidateTimestamp >= latestLegacyRateLimitsAt) {
+        latestLegacyRateLimits = proof.rate_limits;
+        latestLegacyRateLimitsAt = candidateTimestamp;
       }
     }
   }
@@ -597,7 +627,7 @@ function buildCompatibilityTelemetrySnapshot(
       total_tokens: hasTotalTokens ? totalTokens : null,
       seconds_running: Number(secondsRunning.toFixed(3))
     },
-    rateLimits: latestRateLimits
+    rateLimits: latestAuthoritativeRateLimits ?? latestLegacyRateLimits
   };
 }
 

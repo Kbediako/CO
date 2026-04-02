@@ -667,6 +667,32 @@ describe('control status dashboard', () => {
     );
   });
 
+  it('falls back to generic summaries for legacy proof rate-limit payloads', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 1,
+            limit: 30,
+            reset_at: '2026-03-30T01:16:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Rate Limits: source=legacy-proof');
+    expect(plainFrame).not.toContain('Linear API (legacy-proof)');
+  });
+
   it('sanitizes terminal control characters before rendering text fields', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
