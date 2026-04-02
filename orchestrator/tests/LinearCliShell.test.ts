@@ -176,6 +176,7 @@ describe('runLinearCliShell', () => {
   });
 
   it('resolves relative body-file paths against the shell cwd before calling the facade', async () => {
+    const readTextFile = vi.fn(async () => '## Codex Workpad\n\nPlan');
     const upsertProviderLinearWorkpadCommentMock =
       vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>()
         .mockResolvedValue({
@@ -207,13 +208,14 @@ describe('runLinearCliShell', () => {
       },
       {
         upsertProviderLinearWorkpadComment: upsertProviderLinearWorkpadCommentMock,
-        readTextFile: vi.fn(async () => '## Codex Workpad\n\nPlan'),
+        readTextFile,
         getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
         getCwd: () => '/tmp/session-root',
         log: vi.fn()
       }
     );
 
+    expect(readTextFile).toHaveBeenCalledWith('/tmp/session-root/packet/workpad.md');
     expect(upsertProviderLinearWorkpadCommentMock).toHaveBeenCalledWith({
       issueId: 'lin-issue-1',
       body: '## Codex Workpad\n\nPlan',
@@ -1585,6 +1587,13 @@ describe('runLinearCliShell', () => {
               asset_url: 'https://assets.linear.test/proof-1',
               content_type: 'image/png',
               size_bytes: 4
+            },
+            {
+              original_reference: 'file:///tmp/proof-2.png',
+              resolved_path: '/tmp/proof-2.png',
+              asset_url: 'https://assets.linear.test/proof-2',
+              content_type: 'image/png',
+              size_bytes: 8
             }
           ],
           source_setup: null
@@ -1627,7 +1636,7 @@ describe('runLinearCliShell', () => {
       failed_relation_type: null,
       comment_id: 'comment-1',
       attachment_id: null,
-      asset_urls: ['https://assets.linear.test/proof-1'],
+      asset_urls: ['https://assets.linear.test/proof-1', 'https://assets.linear.test/proof-2'],
       error_code: null,
       error_message: null
     });
@@ -1637,6 +1646,9 @@ describe('runLinearCliShell', () => {
       embedded_assets: [
         {
           asset_url: 'https://assets.linear.test/proof-1'
+        },
+        {
+          asset_url: 'https://assets.linear.test/proof-2'
         }
       ]
     });
