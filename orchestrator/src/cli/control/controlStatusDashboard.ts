@@ -191,6 +191,7 @@ export function startControlStatusDashboard(
   let escapeSequenceState: 'idle' | 'escape' | 'control' = 'idle';
   const liveSurfaceMode: DashboardSurfaceMode = output.isTTY === true ? 'alternate' : 'primary';
   let activeSurfaceMode: DashboardSurfaceMode = 'primary';
+  let pausedPrimaryPromptNeedsNewline = false;
   let frameState: DashboardFrameState = {
     paused: false,
     viewMode: 'full',
@@ -293,7 +294,10 @@ export function startControlStatusDashboard(
       if (activeSurfaceMode === 'alternate') {
         output.write(ANSI_EXIT_ALT_SCREEN);
         activeSurfaceMode = 'primary';
+      } else if (pausedPrimaryPromptNeedsNewline) {
+        output.write('\n');
       }
+      pausedPrimaryPromptNeedsNewline = false;
     },
     async flush() {
       await activeRender;
@@ -525,6 +529,7 @@ export function startControlStatusDashboard(
 
   function writeFrame(frame: string): void {
     if (frameState.surfaceMode === 'alternate') {
+      pausedPrimaryPromptNeedsNewline = false;
       if (activeSurfaceMode !== 'alternate') {
         activeSurfaceMode = 'alternate';
         output.write(`${ANSI_ENTER_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}`);
@@ -536,11 +541,13 @@ export function startControlStatusDashboard(
 
     if (activeSurfaceMode === 'alternate') {
       activeSurfaceMode = 'primary';
+      pausedPrimaryPromptNeedsNewline = false;
       output.write(`${ANSI_EXIT_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}\n`);
       return;
     }
 
-    output.write(`${ANSI_CLEAR_HOME}${frame}${frameState.paused ? '\n' : ''}`);
+    pausedPrimaryPromptNeedsNewline = frameState.paused;
+    output.write(`${ANSI_CLEAR_HOME}${frame}`);
   }
 }
 

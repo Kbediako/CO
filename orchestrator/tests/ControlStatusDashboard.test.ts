@@ -974,7 +974,7 @@ describe('control status dashboard', () => {
       '│ Inspect: paused | primary snapshot | compact inspect | updates waiting'
     );
     expect(writes.at(-1)?.startsWith('\u001b[H\u001b[2J')).toBe(true);
-    expect(writes.at(-1)?.endsWith('\n')).toBe(true);
+    expect(writes.at(-1)?.endsWith('\n')).toBe(false);
     expect(writes).toHaveLength(pausedWriteCount + 1);
 
     input.emitText('p');
@@ -984,6 +984,72 @@ describe('control status dashboard', () => {
     expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | compact inspect');
 
     handle.stop();
+    expect(input.rawModes).toEqual([true, false]);
+  });
+
+  it('adds a prompt-separating newline when stopping after a paused primary rerender, even if resume was requested first', async () => {
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let listener: (() => void) | null = null;
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn((callback: () => void) => {
+        listener = callback;
+        return () => {
+          listener = null;
+        };
+      }),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => buildDataset(),
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+
+    input.emitText('p');
+    await handle.flush();
+    input.emitText('c');
+    await handle.flush();
+
+    expect(writes.at(-1)?.startsWith('\u001b[H\u001b[2J')).toBe(true);
+    expect(writes.at(-1)?.endsWith('\n')).toBe(false);
+
+    listener?.();
+    await handle.flush();
+    input.emitText('p');
+    await Promise.resolve();
+    handle.stop();
+
+    expect(writes.at(-1)).toBe('\n');
     expect(input.rawModes).toEqual([true, false]);
   });
 
@@ -1217,6 +1283,87 @@ describe('control status dashboard', () => {
 
     expect(requestRefresh).toHaveBeenCalledTimes(2);
     expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | full frame');
+
+    handle.stop();
+  });
+
+  it('keeps the pause handoff scrollback-clean when pausing during an in-flight live refresh', async () => {
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let listener: (() => void) | null = null;
+    let resolveSecondDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const secondDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveSecondDataset = resolve;
+    });
+    let readCount = 0;
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn((callback: () => void) => {
+        listener = callback;
+        return () => {
+          listener = null;
+        };
+      }),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => {
+          readCount += 1;
+          if (readCount === 2) {
+            return await secondDataset;
+          }
+          return buildDataset();
+        },
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    const liveWriteCount = writes.length;
+
+    listener?.();
+    await Promise.resolve();
+    input.emitText('p');
+    await Promise.resolve();
+
+    resolveSecondDataset?.(buildDataset());
+    await handle.flush();
+
+    const pauseWrites = writes.slice(liveWriteCount);
+    expect(pauseWrites).toHaveLength(2);
+    expect(pauseWrites[0]?.startsWith(ANSI_ALT_SCREEN_EXIT)).toBe(true);
+    expect(stripAnsi(pauseWrites[0] ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(pauseWrites[0]?.endsWith('\n')).toBe(true);
+    expect(pauseWrites[1]?.startsWith('\u001b[H\u001b[2J')).toBe(true);
+    expect(stripAnsi(pauseWrites[1] ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(pauseWrites[1]?.endsWith('\n')).toBe(false);
+    expect(pauseWrites.filter((write) => write.endsWith('\n'))).toHaveLength(1);
 
     handle.stop();
   });
