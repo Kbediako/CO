@@ -30,7 +30,7 @@ const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
   'Notes'
 ] as const;
 const LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS = ['Acceptance Criteria', 'Validation'] as const;
-const LINEAR_LOCAL_IMAGE_MARKDOWN_PATTERN = /!\[([^\]]*)\]\((<[^>]+>|[^)]+)\)/gu;
+const LINEAR_LOCAL_IMAGE_MARKDOWN_PATTERN = /!\[([^\]]*)\]\((<[^>]+>(?:\s+[^)]*)?|[^)]+)\)/gu;
 const LINEAR_ISSUE_VALIDATION_SECTION_TITLES = new Set(['validation', 'test plan', 'testing']);
 const LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES = new Set([
   'automated',

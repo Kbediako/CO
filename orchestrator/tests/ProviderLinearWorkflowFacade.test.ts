@@ -8772,7 +8772,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
-  it('uploads angle-bracketed local screenshot refs with spaces and parentheses in the path', async () => {
+  it('uploads angle-bracketed local screenshot refs with spaces, parentheses, and titles', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'linear-workpad-embed-angle-'));
     tempDirs.push(tempDir);
     const proofPath = join(tempDir, 'proof screenshot (1).png');
@@ -8782,10 +8782,10 @@ describe('providerLinearWorkflowFacade', () => {
     const uploadUrl = 'https://uploads.linear.test/proof-angle';
     const assetUrl = 'https://assets.linear.test/proof-angle';
     const inputBody = buildStructuredWorkpadBody({
-      notesLines: ['- Proof screenshot is embedded below.', `![Embedded proof](<file://${proofPath}>)`]
+      notesLines: ['- Proof screenshot is embedded below.', `![Embedded proof](<file://${proofPath}> "caption")`]
     });
     const expectedBody = buildStructuredWorkpadBody({
-      notesLines: ['- Proof screenshot is embedded below.', `![Embedded proof](${assetUrl})`]
+      notesLines: ['- Proof screenshot is embedded below.', `![Embedded proof](${assetUrl} "caption")`]
     });
 
     const fetchImpl: typeof fetch = vi.fn(async (input, init) => {
