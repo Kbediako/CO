@@ -8482,7 +8482,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-02-14",
+      "last_review": "2026-04-02",
       "paths": {
         "spec": "tasks/specs/0964-pr-watch-merge-cli-ship.md",
         "task": "tasks/tasks-0964-pr-watch-merge-cli-ship.md",
