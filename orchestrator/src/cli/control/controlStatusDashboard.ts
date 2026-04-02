@@ -292,7 +292,7 @@ export function startControlStatusDashboard(
       detachInput();
       unsubscribe();
       if (activeSurfaceMode === 'alternate') {
-        output.write(ANSI_EXIT_ALT_SCREEN);
+        output.write(`${ANSI_EXIT_ALT_SCREEN}${pausedPrimaryPromptNeedsNewline ? '\n' : ''}`);
         activeSurfaceMode = 'primary';
       } else if (pausedPrimaryPromptNeedsNewline) {
         output.write('\n');
@@ -529,7 +529,6 @@ export function startControlStatusDashboard(
 
   function writeFrame(frame: string): void {
     if (frameState.surfaceMode === 'alternate') {
-      pausedPrimaryPromptNeedsNewline = false;
       if (activeSurfaceMode !== 'alternate') {
         activeSurfaceMode = 'alternate';
         output.write(`${ANSI_ENTER_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}`);

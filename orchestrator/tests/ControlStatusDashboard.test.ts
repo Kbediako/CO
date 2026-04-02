@@ -987,18 +987,12 @@ describe('control status dashboard', () => {
     expect(input.rawModes).toEqual([true, false]);
   });
 
-  it('adds a prompt-separating newline when stopping after a paused primary rerender, even if resume was requested first', async () => {
+  it('preserves the prompt-separating newline when stopping from alternate mode after resuming a paused primary rerender', async () => {
     const writes: string[] = [];
     const input = new MockDashboardInput();
-    let listener: (() => void) | null = null;
     const runtime = {
       requestRefresh: vi.fn(async () => undefined),
-      subscribe: vi.fn((callback: () => void) => {
-        listener = callback;
-        return () => {
-          listener = null;
-        };
-      }),
+      subscribe: vi.fn(() => () => undefined),
       snapshot: vi.fn(() => ({
         readCompatibilityProjection: vi.fn(async () => {
           throw new Error('unexpected readCompatibilityProjection call in test');
@@ -1043,13 +1037,13 @@ describe('control status dashboard', () => {
     expect(writes.at(-1)?.startsWith('\u001b[H\u001b[2J')).toBe(true);
     expect(writes.at(-1)?.endsWith('\n')).toBe(false);
 
-    listener?.();
-    await handle.flush();
     input.emitText('p');
-    await Promise.resolve();
+    await handle.flush();
+    expect(writes.at(-1)?.startsWith(`${ANSI_ALT_SCREEN_ENTER}\u001b[H\u001b[2J`)).toBe(true);
+
     handle.stop();
 
-    expect(writes.at(-1)).toBe('\n');
+    expect(writes.at(-1)).toBe(`${ANSI_ALT_SCREEN_EXIT}\n`);
     expect(input.rawModes).toEqual([true, false]);
   });
 
