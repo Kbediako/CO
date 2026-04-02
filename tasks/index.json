@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260402-linear-69030f04-cfa5-491b-8928-8f325f00da8d",
+      "title": "CO: Make paused CO STATUS inspection scrollback-clean",
+      "relates_to": "tasks/tasks-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-02",
+          "manifest": ".runs/linear-69030f04-cfa5-491b-8928-8f325f00da8d-co-60-docs-review/cli/2026-04-02T01-07-36-992Z-0dc038b4/manifest.json",
+          "override_reason": "The child docs-review run reached docs:freshness, but the failure came from three unrelated archived 0101 docs that aged past their 90-day cadence on 2026-04-02. The CO-60 packet itself is fully registered, docs:check passed, and the unrelated baseline is recorded in out/linear-69030f04-cfa5-491b-8928-8f325f00da8d/manual/20260402T010738Z-docs-review-fallback.md."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
+        "task": "tasks/tasks-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
+        "agent_task": ".agent/task/linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
+        "docs": "docs/TECH_SPEC-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md"
+      }
+    },
+    {
       "id": "20260401-linear-95b040bc-b150-4c39-bc56-64b13f55579f",
       "title": "CO: Reduce steady-state Linear request burn across control-host and provider-worker flows",
       "relates_to": "tasks/tasks-linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
