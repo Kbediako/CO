@@ -2289,7 +2289,7 @@ function maskMarkdownCodeForLocalImageExtraction(body: string): string {
     return body;
   }
 
-  const characters = [...body];
+  const characters = body.split('');
   for (const range of codeRanges) {
     for (let index = range.start; index < range.end; index += 1) {
       const character = characters[index];

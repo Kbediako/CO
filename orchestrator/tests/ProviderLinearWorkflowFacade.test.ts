@@ -8938,7 +8938,7 @@ describe('providerLinearWorkflowFacade', () => {
     const missingInlinePath = join(tempDir, 'missing inline proof.png');
     const inputBody = buildStructuredWorkpadBody({
       notesLines: [
-        '- Literal markdown examples should stay literal.',
+        '- Literal markdown examples should stay literal. 😀',
         '```md',
         `![Example only](file://${missingFencedPath})`,
         '```',
@@ -8949,7 +8949,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
     const expectedBody = buildStructuredWorkpadBody({
       notesLines: [
-        '- Literal markdown examples should stay literal.',
+        '- Literal markdown examples should stay literal. 😀',
         '```md',
         `![Example only](file://${missingFencedPath})`,
         '```',
