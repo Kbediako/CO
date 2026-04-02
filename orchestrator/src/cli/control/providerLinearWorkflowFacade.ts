@@ -2258,8 +2258,9 @@ function extractLocalMarkdownImageReferences(
   body: string,
   bodyFilePath: string | null = null
 ): LocalMarkdownImageReference[] {
+  const maskedBody = maskMarkdownCodeForLocalImageExtraction(body);
   const references: LocalMarkdownImageReference[] = [];
-  for (const match of body.matchAll(LINEAR_LOCAL_IMAGE_MARKDOWN_PATTERN)) {
+  for (const match of maskedBody.matchAll(LINEAR_LOCAL_IMAGE_MARKDOWN_PATTERN)) {
     const rawReference = normalizeRequiredString(match[2]);
     const fullMatch = match[0];
     const matchIndex = match.index;
@@ -2280,6 +2281,176 @@ function extractLocalMarkdownImageReferences(
     });
   }
   return references;
+}
+
+function maskMarkdownCodeForLocalImageExtraction(body: string): string {
+  const codeRanges = collectMarkdownCodeRanges(body);
+  if (codeRanges.length === 0) {
+    return body;
+  }
+
+  const characters = [...body];
+  for (const range of codeRanges) {
+    for (let index = range.start; index < range.end; index += 1) {
+      const character = characters[index];
+      if (character && character !== '\n' && character !== '\r') {
+        characters[index] = ' ';
+      }
+    }
+  }
+  return characters.join('');
+}
+
+function collectMarkdownCodeRanges(body: string): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = [];
+  let searchIndex = 0;
+  while (searchIndex < body.length) {
+    const fenceRange = findNextMarkdownFenceRange(body, searchIndex);
+    const inlineLimit = fenceRange?.start ?? body.length;
+    collectInlineMarkdownCodeRanges(body, searchIndex, inlineLimit, ranges);
+    if (!fenceRange) {
+      break;
+    }
+    ranges.push(fenceRange);
+    searchIndex = fenceRange.end;
+  }
+  return ranges;
+}
+
+function findNextMarkdownFenceRange(
+  body: string,
+  startIndex: number
+): { start: number; end: number } | null {
+  let lineStart = startIndex;
+  while (lineStart < body.length) {
+    const lineEnd = findMarkdownLineEnd(body, lineStart);
+    const fence = readMarkdownFenceDelimiter(body.slice(lineStart, lineEnd));
+    if (!fence) {
+      lineStart = lineEnd;
+      continue;
+    }
+
+    let searchLineStart = lineEnd;
+    while (searchLineStart < body.length) {
+      const searchLineEnd = findMarkdownLineEnd(body, searchLineStart);
+      if (isMarkdownFenceCloser(body.slice(searchLineStart, searchLineEnd), fence)) {
+        return {
+          start: lineStart,
+          end: searchLineEnd
+        };
+      }
+      searchLineStart = searchLineEnd;
+    }
+    return {
+      start: lineStart,
+      end: body.length
+    };
+  }
+  return null;
+}
+
+function collectInlineMarkdownCodeRanges(
+  body: string,
+  startIndex: number,
+  endIndex: number,
+  target: Array<{ start: number; end: number }>
+): void {
+  let index = startIndex;
+  while (index < endIndex) {
+    if (body[index] !== '`') {
+      index += 1;
+      continue;
+    }
+
+    const delimiterLength = countRepeatedCharacter(body, index, '`');
+    const closingIndex = findClosingInlineMarkdownCodeDelimiter(
+      body,
+      index + delimiterLength,
+      endIndex,
+      delimiterLength
+    );
+    if (closingIndex === null) {
+      index += delimiterLength;
+      continue;
+    }
+
+    target.push({
+      start: index,
+      end: closingIndex + delimiterLength
+    });
+    index = closingIndex + delimiterLength;
+  }
+}
+
+function findClosingInlineMarkdownCodeDelimiter(
+  body: string,
+  startIndex: number,
+  endIndex: number,
+  delimiterLength: number
+): number | null {
+  let index = startIndex;
+  while (index < endIndex) {
+    if (body[index] !== '`') {
+      index += 1;
+      continue;
+    }
+
+    const candidateLength = countRepeatedCharacter(body, index, '`');
+    if (candidateLength === delimiterLength) {
+      return index;
+    }
+    index += candidateLength;
+  }
+  return null;
+}
+
+function findMarkdownLineEnd(body: string, lineStart: number): number {
+  const newlineIndex = body.indexOf('\n', lineStart);
+  return newlineIndex === -1 ? body.length : newlineIndex + 1;
+}
+
+function readMarkdownFenceDelimiter(line: string): { character: '`' | '~'; length: number } | null {
+  const lineWithoutLineEnding = line.replace(/\r?\n$/u, '');
+  const trimmedStart = lineWithoutLineEnding.trimStart();
+  if (trimmedStart.length < 3) {
+    return null;
+  }
+  const fenceCharacter = trimmedStart[0];
+  if (fenceCharacter !== '`' && fenceCharacter !== '~') {
+    return null;
+  }
+  const fenceLength = countRepeatedCharacter(trimmedStart, 0, fenceCharacter);
+  if (fenceLength < 3) {
+    return null;
+  }
+  return {
+    character: fenceCharacter,
+    length: fenceLength
+  };
+}
+
+function isMarkdownFenceCloser(
+  line: string,
+  fence: { character: '`' | '~'; length: number }
+): boolean {
+  const lineWithoutLineEnding = line.replace(/\r?\n$/u, '');
+  const trimmedStart = lineWithoutLineEnding.trimStart();
+  if (!trimmedStart.startsWith(fence.character.repeat(fence.length))) {
+    return false;
+  }
+  const candidateLength = countRepeatedCharacter(trimmedStart, 0, fence.character);
+  if (candidateLength < fence.length) {
+    return false;
+  }
+  return trimmedStart.slice(candidateLength).trim().length === 0;
+}
+
+function countRepeatedCharacter(input: string, startIndex: number, character: string): number {
+  let count = 0;
+  while (input[startIndex + count] === character) {
+    count += 1;
+  }
+  return count;
 }
 
 function resolveLocalMarkdownImageReference(

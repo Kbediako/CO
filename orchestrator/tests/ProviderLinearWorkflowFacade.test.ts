@@ -8925,6 +8925,118 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it('ignores inline and fenced code image examples when extracting local screenshot refs', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'linear-workpad-embed-code-examples-'));
+    tempDirs.push(tempDir);
+    const proofPath = join(tempDir, 'proof.png');
+    const proofBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    await writeFile(proofPath, proofBytes);
+
+    const uploadUrl = 'https://uploads.linear.test/proof-code-examples';
+    const assetUrl = 'https://assets.linear.test/proof-code-examples';
+    const missingFencedPath = join(tempDir, 'missing fenced proof.png');
+    const missingInlinePath = join(tempDir, 'missing inline proof.png');
+    const inputBody = buildStructuredWorkpadBody({
+      notesLines: [
+        '- Literal markdown examples should stay literal.',
+        '```md',
+        `![Example only](file://${missingFencedPath})`,
+        '```',
+        `- Inline example \`![Literal inline](file://${missingInlinePath})\` should not upload.`,
+        '- Real proof follows.',
+        `![Embedded proof](file://${proofPath})`
+      ]
+    });
+    const expectedBody = buildStructuredWorkpadBody({
+      notesLines: [
+        '- Literal markdown examples should stay literal.',
+        '```md',
+        `![Example only](file://${missingFencedPath})`,
+        '```',
+        `- Inline example \`![Literal inline](file://${missingInlinePath})\` should not upload.`,
+        '- Real proof follows.',
+        `![Embedded proof](${assetUrl})`
+      ]
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (input, init) => {
+      if (String(input) === uploadUrl) {
+        expect(init?.method).toBe('PUT');
+        expect(Buffer.from(await (init?.body as Blob).arrayBuffer())).toEqual(proofBytes);
+        return new Response(null, { status: 200 });
+      }
+
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearFileUpload')) {
+        return jsonResponse({
+          data: {
+            fileUpload: {
+              success: true,
+              uploadFile: {
+                uploadUrl,
+                assetUrl,
+                headers: []
+              }
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-proof-code-examples',
+                url: 'https://linear.app/comment/proof-code-examples',
+                body: expectedBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected request: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: inputBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      comment: {
+        id: 'comment-proof-code-examples',
+        body: expectedBody
+      },
+      embedded_assets: [
+        {
+          original_reference: `file://${proofPath}`,
+          resolved_path: proofPath,
+          asset_url: assetUrl
+        }
+      ]
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
   it('noops unchanged embedded workpads instead of reuploading the same local screenshot', async () => {
     const env = await createRunScopedEnv();
     const tempDir = await mkdtemp(join(tmpdir(), 'linear-workpad-embed-noop-'));
