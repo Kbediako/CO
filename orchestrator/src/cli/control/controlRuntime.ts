@@ -532,6 +532,9 @@ function isAuthoritativeCurrentRunningSource(
   if (!providerIntakeState) {
     return true;
   }
+  if (source.issueProvider === null) {
+    return !hasActiveCurrentProviderIntakeClaim(providerIntakeState);
+  }
   if (!isProviderIntakeScopedRunningSource(source)) {
     return true;
   }
@@ -545,13 +548,11 @@ function isAuthoritativeCurrentRunningSource(
 function isProviderIntakeScopedRunningSource(
   source: Pick<ControlCompatibilitySourceContext, 'issueProvider'>
 ): boolean {
-  if (source.issueProvider === 'linear') {
-    return true;
-  }
-  if (source.issueProvider !== null) {
-    return false;
-  }
-  return true;
+  return source.issueProvider === 'linear';
+}
+
+function hasActiveCurrentProviderIntakeClaim(providerIntakeState: ProviderIntakeState): boolean {
+  return providerIntakeState.claims.some((claim) => isProviderIntakeClaimActiveCurrentActivity(claim));
 }
 
 function isProviderIntakeClaimActiveCurrentActivity(

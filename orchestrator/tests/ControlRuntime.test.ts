@@ -942,15 +942,6 @@ describe('ControlRuntime', () => {
           summary: 'linear historical run without a current intake claim'
         }
       });
-      await createSiblingRun(fixture.root, 'task-unknown-stale', 'run-5', {
-        manifest: {
-          status: 'in_progress',
-          started_at: '2026-03-07T00:06:00.000Z',
-          updated_at: '2026-03-07T00:11:00.000Z',
-          summary: 'unknown-provider historical run without a current intake claim'
-        }
-      });
-
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
       expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
@@ -963,9 +954,6 @@ describe('ControlRuntime', () => {
       ).toBeDefined();
       expect(
         compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'task-linear-stale')
-      ).toBeUndefined();
-      expect(
-        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'task-unknown-stale')
       ).toBeUndefined();
     } finally {
       vi.useRealTimers();
@@ -1047,6 +1035,113 @@ describe('ControlRuntime', () => {
       ]);
       expect(
         compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'task-empty-intake-local')
+      ).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps null-provider running sources visible when provider intake state is present but empty', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-empty-intake-current',
+        providerIntakeState: createProviderIntakeState([])
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-empty-intake-current',
+        issue_provider: 'linear',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      await createSiblingRun(fixture.root, 'task-empty-intake-null-provider', 'run-2', {
+        manifest: {
+          issue_identifier: 'ISSUE-NULL-PROVIDER',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          summary: 'active run using the default null issue_provider'
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual(
+        expect.arrayContaining(['ISSUE-CURRENT', 'ISSUE-NULL-PROVIDER'])
+      );
+      expect(compatibilityProjection.running).toHaveLength(2);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'ISSUE-NULL-PROVIDER')
+      ).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps null-provider running sources visible when provider intake state has no active claims', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-completed-intake-current',
+        providerIntakeState: createProviderIntakeState([
+          {
+            provider: 'linear',
+            provider_key: 'linear:issue-completed',
+            issue_id: 'issue-completed',
+            issue_identifier: 'ISSUE-COMPLETED',
+            issue_title: 'Completed Linear issue',
+            issue_state: 'Done',
+            issue_state_type: 'completed',
+            issue_updated_at: '2026-03-07T00:26:00.000Z',
+            task_id: 'task-completed-claim',
+            mapping_source: 'provider_id_fallback',
+            state: 'completed',
+            reason: 'provider_issue_rehydrated_active_run',
+            accepted_at: '2026-03-07T00:15:00.000Z',
+            updated_at: '2026-03-07T00:26:00.000Z',
+            last_delivery_id: 'delivery-completed',
+            last_event: 'Issue',
+            last_action: 'update',
+            last_webhook_timestamp: 1_742_360_160_000,
+            run_id: 'run-completed',
+            run_manifest_path: null,
+            launch_source: 'control-host',
+            launch_token: 'launch-completed'
+          }
+        ])
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-completed-intake-current',
+        issue_provider: 'linear',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      await createSiblingRun(fixture.root, 'task-completed-intake-null-provider', 'run-2', {
+        manifest: {
+          issue_identifier: 'ISSUE-NULL-PROVIDER',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          summary: 'active run using the default null issue_provider'
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual(
+        expect.arrayContaining(['ISSUE-CURRENT', 'ISSUE-NULL-PROVIDER'])
+      );
+      expect(compatibilityProjection.running).toHaveLength(2);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'ISSUE-NULL-PROVIDER')
       ).toBeDefined();
     } finally {
       vi.useRealTimers();
