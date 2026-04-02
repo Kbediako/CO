@@ -8866,6 +8866,65 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
+  it('leaves scheme-relative remote image refs untouched instead of treating them as local files', async () => {
+    const inputBody = buildStructuredWorkpadBody({
+      notesLines: ['- Remote proof stays remote.', '![Embedded proof](//cdn.example.com/proof.png)']
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      if (body.query?.includes('ProviderLinearIssueContext')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            comments: {
+              nodes: []
+            }
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearFileUpload')) {
+        throw new Error('scheme-relative remote image refs must not trigger local upload negotiation');
+      }
+      if (body.query?.includes('ProviderLinearCreateComment')) {
+        return jsonResponse({
+          data: {
+            commentCreate: {
+              success: true,
+              comment: {
+                id: 'comment-remote-scheme-relative',
+                url: 'https://linear.app/comment/remote-scheme-relative',
+                body: inputBody
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected request: ${body.query}`);
+    });
+
+    const result = await upsertProviderLinearWorkpadComment({
+      issueId: 'lin-issue-1',
+      body: inputBody,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'created',
+      comment: {
+        id: 'comment-remote-scheme-relative',
+        body: inputBody
+      }
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it('noops unchanged embedded workpads instead of reuploading the same local screenshot', async () => {
     const env = await createRunScopedEnv();
     const tempDir = await mkdtemp(join(tmpdir(), 'linear-workpad-embed-noop-'));

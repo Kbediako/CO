@@ -2322,6 +2322,7 @@ function resolveLocalMarkdownImageReference(
   if (
     lowerDestination.startsWith('http://') ||
     lowerDestination.startsWith('https://') ||
+    lowerDestination.startsWith('//') ||
     lowerDestination.startsWith('data:')
   ) {
     return null;
