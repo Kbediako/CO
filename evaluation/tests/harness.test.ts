@@ -70,6 +70,7 @@ describe('evaluation harness', () => {
     const workspaceDir = path.join(repoDir, '.workspaces', 'issue-workspace');
     const sourceFixtureDir = path.join(workspaceDir, 'evaluation', 'fixtures', 'typescript-smoke');
     const copiedFixtureDir = path.join(tempFixtureRoot, 'typescript-smoke-copy');
+    const tempParentNodeModules = path.join(tempFixtureRoot, 'node_modules');
 
     await fs.mkdir(workspaceDir, { recursive: true });
     await fs.writeFile(
@@ -78,6 +79,7 @@ describe('evaluation harness', () => {
     );
     await fs.mkdir(path.join(repoDir, '.git', 'worktrees', 'issue-workspace'), { recursive: true });
     await fs.mkdir(path.join(repoDir, 'node_modules', 'ts-node', 'register'), { recursive: true });
+    await fs.mkdir(tempParentNodeModules, { recursive: true });
     await fs.mkdir(path.join(copiedFixtureDir, 'node_modules', '.vite', 'vitest'), { recursive: true });
     await fs.mkdir(sourceFixtureDir, { recursive: true });
 
@@ -92,6 +94,7 @@ describe('evaluation harness', () => {
     expect(nodePathEntries).toContain(repoNodeModules);
     expect(nodePathEntries.indexOf(copiedFixtureNodeModules)).toBeLessThan(nodePathEntries.indexOf(sourceFixtureNodeModules));
     expect(nodePathEntries.indexOf(sourceFixtureNodeModules)).toBeLessThan(nodePathEntries.indexOf(repoNodeModules));
+    expect(nodePathEntries).not.toContain(tempParentNodeModules);
   });
 
   it('runs the TypeScript smoke scenario successfully', async () => {

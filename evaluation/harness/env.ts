@@ -55,6 +55,9 @@ export function collectNodeModulePaths(startDir: string): string[] {
   const resolvedStartDir = path.resolve(startDir);
   const results: string[] = [path.join(resolvedStartDir, 'node_modules')];
   const repoRoot = detectRepoRoot(resolvedStartDir);
+  if (!repoRoot) {
+    return uniqueEntries(results);
+  }
   let current: string | undefined = resolvedStartDir;
 
   while (current) {
