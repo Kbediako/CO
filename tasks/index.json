@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260402-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936",
+      "title": "CO: Embed screenshot proof directly in Linear comments and workpads",
+      "relates_to": "tasks/tasks-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-02",
+          "manifest": ".runs/linear-17c2a486-f5d8-4801-823e-edb8d9ec9936-docs-review/cli/2026-04-02T01-09-25-701Z-8d32f28f/manifest.json",
+          "override_reason": "The child docs-review run failed only on unrelated repo-wide stale docs (`.agent/task/0101-slimdown-audit.md`, `docs/PRD-slimdown.md`, and `tasks/tasks-0101-slimdown-audit.md`) after `docs:check` passed and the child report showed no missing or invalid entries for the new CO-61 packet; see out/linear-17c2a486-f5d8-4801-823e-edb8d9ec9936/manual/20260402T011052Z-docs-review-fallback/00-docs-review-fallback.md."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md",
+        "task": "tasks/tasks-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md",
+        "agent_task": ".agent/task/linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md",
+        "docs": "docs/TECH_SPEC-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md"
+      }
+    },
+    {
       "id": "20260402-linear-69030f04-cfa5-491b-8928-8f325f00da8d",
       "title": "CO: Make paused CO STATUS inspection scrollback-clean",
       "relates_to": "tasks/tasks-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",

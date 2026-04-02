@@ -1503,8 +1503,8 @@ Subcommands:
 
   upsert-workpad
     --issue-id <id>       Linear issue id/key to update.
-    --body <text>         Workpad body to create/update.
-    --body-file <path>    Read workpad body from a file.
+    --body <text>         Workpad body to create/update. Local markdown image refs are uploaded to Linear.
+    --body-file <path>    Read workpad body from a file. Supports local image refs like file:///abs/proof.png or <file:///abs/proof (1).png>.
     --comment-id <id>     Optional persisted workpad comment id.
     --workspace-id <id>   Optional workspace scope check.
     --team-id <id>        Optional team scope check.
