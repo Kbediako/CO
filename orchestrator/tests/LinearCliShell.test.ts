@@ -166,6 +166,58 @@ describe('runLinearCliShell', () => {
     expect(upsertProviderLinearWorkpadCommentMock).toHaveBeenCalledWith({
       issueId: 'lin-issue-1',
       body: '## Codex Workpad\n\nPlan',
+      bodyFilePath: '/tmp/workpad.md',
+      commentId: null,
+      sourceSetup: null,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      }
+    });
+  });
+
+  it('resolves relative body-file paths against the shell cwd before calling the facade', async () => {
+    const upsertProviderLinearWorkpadCommentMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'upsert-workpad',
+          action: 'noop',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          comment: {
+            id: 'comment-1',
+            body: '## Codex Workpad\n\nPlan',
+            url: null,
+            created_at: null,
+            updated_at: null
+          },
+          source_setup: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['upsert-workpad'],
+        flags: {
+          'issue-id': 'lin-issue-1',
+          'body-file': 'packet/workpad.md'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        upsertProviderLinearWorkpadComment: upsertProviderLinearWorkpadCommentMock,
+        readTextFile: vi.fn(async () => '## Codex Workpad\n\nPlan'),
+        getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        getCwd: () => '/tmp/session-root',
+        log: vi.fn()
+      }
+    );
+
+    expect(upsertProviderLinearWorkpadCommentMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      body: '## Codex Workpad\n\nPlan',
+      bodyFilePath: '/tmp/session-root/packet/workpad.md',
       commentId: null,
       sourceSetup: null,
       env: {
@@ -467,6 +519,7 @@ describe('runLinearCliShell', () => {
     expect(upsertProviderLinearWorkpadCommentMock).toHaveBeenCalledWith({
       issueId: 'lin-issue-1',
       body: '\n## Codex Workpad\n\nPlan\n',
+      bodyFilePath: null,
       commentId: null,
       sourceSetup: null,
       env: {
@@ -1501,6 +1554,91 @@ describe('runLinearCliShell', () => {
         message: 'transition is only available to the parent provider-linear-worker; subordinate same-issue child lanes are read-only for Linear mutations.',
         status: 409
       }
+    });
+  });
+
+  it('records embedded asset URLs in audit metadata for upsert-workpad results', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const upsertProviderLinearWorkpadCommentMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').upsertProviderLinearWorkpadComment>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'upsert-workpad',
+          action: 'updated',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          comment: {
+            id: 'comment-1',
+            body: '## Codex Workpad\n\nPlan',
+            url: null,
+            created_at: null,
+            updated_at: null,
+            resolved_at: null
+          },
+          embedded_assets: [
+            {
+              original_reference: 'file:///tmp/proof.png',
+              resolved_path: '/tmp/proof.png',
+              asset_url: 'https://assets.linear.test/proof-1',
+              content_type: 'image/png',
+              size_bytes: 4
+            }
+          ],
+          source_setup: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['upsert-workpad'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          body: '## Codex Workpad\n\nPlan'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        upsertProviderLinearWorkpadComment: upsertProviderLinearWorkpadCommentMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-04-02T01:15:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-04-02T01:15:00.000Z',
+      operation: 'upsert-workpad',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-1',
+      source_setup: null,
+      action: 'updated',
+      via: null,
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: 'comment-1',
+      attachment_id: null,
+      asset_urls: ['https://assets.linear.test/proof-1'],
+      error_code: null,
+      error_message: null
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'upsert-workpad',
+      embedded_assets: [
+        {
+          asset_url: 'https://assets.linear.test/proof-1'
+        }
+      ]
     });
   });
 });

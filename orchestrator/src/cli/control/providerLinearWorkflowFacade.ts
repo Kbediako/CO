@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   executeLinearGraphql,
@@ -29,6 +30,7 @@ const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
   'Notes'
 ] as const;
 const LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS = ['Acceptance Criteria', 'Validation'] as const;
+const LINEAR_LOCAL_IMAGE_MARKDOWN_PATTERN = /!\[([^\]]*)\]\((<[^>]+>|[^)]+)\)/gu;
 const LINEAR_ISSUE_VALIDATION_SECTION_TITLES = new Set(['validation', 'test plan', 'testing']);
 const LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES = new Set([
   'automated',
@@ -229,6 +231,13 @@ const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
 const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
 const PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS = 10_000;
+const LOCAL_IMAGE_CONTENT_TYPE_BY_EXTENSION = new Map<string, string>([
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
+  ['.gif', 'image/gif']
+]);
 
 type ProviderLinearOperation =
   | 'issue-context'
@@ -273,6 +282,28 @@ export interface ProviderLinearWorkflowAttachment {
   source_type: string | null;
 }
 
+export interface ProviderLinearEmbeddedAsset {
+  original_reference: string;
+  resolved_path: string;
+  asset_url: string;
+  content_type: string;
+  size_bytes: number;
+}
+
+interface ProviderLinearEmbeddedWorkpadLocalImageCacheEntry {
+  original_reference: string;
+  resolved_path: string;
+  size_bytes: number;
+  mtime_ms: number;
+}
+
+interface ProviderLinearEmbeddedWorkpadCacheRecord {
+  comment_id: string;
+  original_body: string;
+  resolved_body: string;
+  local_images: ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[];
+}
+
 interface ProviderLinearWorkpadSection {
   title: string;
   body: string;
@@ -282,6 +313,15 @@ interface ProviderLinearIssueValidationRequirement {
   raw: string;
   normalized: string;
   source_section: string;
+}
+
+interface LocalMarkdownImageReference {
+  alt_text: string;
+  original_reference: string;
+  replacement_suffix: string | null;
+  resolved_path: string;
+  match_start: number;
+  match_end: number;
 }
 
 export interface ProviderLinearIssueContext {
@@ -333,6 +373,7 @@ export type ProviderLinearUpsertWorkpadResult =
       action: 'created' | 'updated' | 'noop';
       issue: Pick<ProviderLinearIssueContext, 'id' | 'identifier'>;
       comment: ProviderLinearWorkflowComment;
+      embedded_assets?: ProviderLinearEmbeddedAsset[];
       source_setup: DispatchPilotSourceSetup | null;
     }
   | {
@@ -602,6 +643,20 @@ interface AttachmentMutationResponse {
   } | null;
 }
 
+interface FileUploadMutationResponse {
+  fileUpload?: {
+    success?: boolean | null;
+    uploadFile?: {
+      uploadUrl?: string | null;
+      assetUrl?: string | null;
+      headers?: Array<{
+        key?: string | null;
+        value?: string | null;
+      }> | null;
+    } | null;
+  } | null;
+}
+
 interface IssueCreateMutationResponse {
   issueCreate?: {
     success?: boolean | null;
@@ -675,11 +730,12 @@ interface ResolvedLinearWorkflowSession {
 }
 
 interface ProviderLinearIssueContextCacheRecord {
-  schema_version: 1;
+  schema_version: 1 | 2;
   issue_id: string;
   recorded_at: string;
   source_setup: DispatchPilotSourceSetup | null;
   issue: ProviderLinearIssueContext;
+  embedded_workpad?: ProviderLinearEmbeddedWorkpadCacheRecord | null;
 }
 
 export async function getProviderLinearIssueContext(input: {
@@ -724,6 +780,7 @@ export async function getProviderLinearIssueContext(input: {
 export async function upsertProviderLinearWorkpadComment(input: {
   issueId: string;
   body: string;
+  bodyFilePath?: string | null;
   commentId?: string | null;
   sourceSetup?: DispatchPilotSourceSetup | null;
   env?: NodeJS.ProcessEnv;
@@ -789,6 +846,9 @@ export async function upsertProviderLinearWorkpadComment(input: {
   }
 
   const requestedCommentId = normalizeRequiredString(input.commentId ?? null);
+  const localImageReferences = extractLocalMarkdownImageReferences(body, input.bodyFilePath ?? null);
+  const bodyHasLocalImageReferences = localImageReferences.length > 0;
+  const cachedEmbeddedWorkpad = cachedRecord?.embedded_workpad ?? null;
   const resolveWorkpadMutationContext = (
     currentIssueContext: ProviderLinearIssueContext
   ):
@@ -826,8 +886,34 @@ export async function upsertProviderLinearWorkpadComment(input: {
     );
   }
   let selectedComment = selectedCommentResult.comment;
+  const localImageCacheEntriesResult = bodyHasLocalImageReferences
+    ? await readEmbeddedWorkpadLocalImageCacheEntries({
+        references: localImageReferences
+      })
+    : {
+        ok: true as const,
+        local_images: [] as ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[]
+      };
+  if (!localImageCacheEntriesResult.ok) {
+    return failureFromWorkflowError('upsert-workpad', localImageCacheEntriesResult.error);
+  }
+  const currentLocalImageCacheEntries = localImageCacheEntriesResult.local_images;
+  const shouldRevalidateCachedNoop = Boolean(
+    selectedComment &&
+    cachedContext &&
+    canTrustCachedMutationContext &&
+    (
+      (!bodyHasLocalImageReferences && selectedComment.body === body)
+      || resolveEmbeddedWorkpadNoopCache({
+        cachedWorkpad: cachedEmbeddedWorkpad,
+        comment: selectedComment,
+        originalBody: body,
+        localImages: currentLocalImageCacheEntries
+      }) !== null
+    )
+  );
 
-  if (selectedComment && selectedComment.body === body && cachedContext && canTrustCachedMutationContext) {
+  if (shouldRevalidateCachedNoop) {
     const liveContext = await readIssueContext(session.session, 'upsert-workpad', issueId, {
       includeAttachments: false
     });
@@ -848,8 +934,32 @@ export async function upsertProviderLinearWorkpadComment(input: {
     selectedComment = selectedCommentResult.comment;
   }
 
-  if (selectedComment && selectedComment.body === body) {
-    await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup);
+  if (selectedComment && !bodyHasLocalImageReferences && selectedComment.body === body) {
+    await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
+      embeddedWorkpad: null
+    });
+    return {
+      ok: true,
+      operation: 'upsert-workpad',
+      action: 'noop',
+      issue: {
+        id: issueContext.id,
+        identifier: issueContext.identifier
+      },
+      comment: selectedComment,
+      source_setup: session.session.sourceSetup
+    };
+  }
+  const matchingEmbeddedWorkpadNoopCache = resolveEmbeddedWorkpadNoopCache({
+    cachedWorkpad: cachedEmbeddedWorkpad,
+    comment: selectedComment,
+    originalBody: body,
+    localImages: currentLocalImageCacheEntries
+  });
+  if (selectedComment && matchingEmbeddedWorkpadNoopCache) {
+    await writeCachedIssueContextRecord(input.env, issueContext, session.session.sourceSetup, {
+      embeddedWorkpad: matchingEmbeddedWorkpadNoopCache
+    });
     return {
       ok: true,
       operation: 'upsert-workpad',
@@ -863,6 +973,24 @@ export async function upsertProviderLinearWorkpadComment(input: {
     };
   }
 
+  const resolvedEmbeddedWorkpad = bodyHasLocalImageReferences
+    ? await resolveEmbeddedLinearWorkpadAssets({
+        session: session.session,
+        operation: 'upsert-workpad',
+        body,
+        references: localImageReferences
+      })
+    : {
+        ok: true as const,
+        body,
+        embedded_assets: [] as ProviderLinearEmbeddedAsset[]
+      };
+  if (!resolvedEmbeddedWorkpad.ok) {
+    return failureFromWorkflowError('upsert-workpad', resolvedEmbeddedWorkpad.error);
+  }
+  const resolvedBody = resolvedEmbeddedWorkpad.body;
+  const embeddedAssets = resolvedEmbeddedWorkpad.embedded_assets;
+
   if (selectedComment) {
     const updateResult = await executeProviderLinearGraphql<CommentMutationResponse>({
       session: session.session,
@@ -871,20 +999,31 @@ export async function upsertProviderLinearWorkpadComment(input: {
       query: buildUpdateCommentMutation(),
       variables: {
         id: selectedComment.id,
-        body
+        body: resolvedBody
       }
     });
     if (!updateResult.ok) {
       return failureFromWorkflowError('upsert-workpad', updateResult.error);
     }
-    const updatedComment = parseMutatedComment(updateResult.payload.data?.commentUpdate?.comment ?? null, body);
+    const updatedComment = parseMutatedComment(
+      updateResult.payload.data?.commentUpdate?.comment ?? null,
+      resolvedBody
+    );
     if (updateResult.payload.data?.commentUpdate?.success !== true || !updatedComment) {
       return failure('upsert-workpad', 'comment_update_failed', 'Linear comment update did not succeed.', 503);
     }
     await writeCachedIssueContextRecord(
       input.env,
       upsertIssueContextWorkpadComment(issueContext, updatedComment),
-      session.session.sourceSetup
+      session.session.sourceSetup,
+      {
+        embeddedWorkpad: buildEmbeddedWorkpadCacheRecord({
+          commentId: updatedComment.id,
+          originalBody: body,
+          resolvedBody,
+          localImages: currentLocalImageCacheEntries
+        })
+      }
     );
     return {
       ok: true,
@@ -895,6 +1034,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
         identifier: issueContext.identifier
       },
       comment: updatedComment,
+      ...(embeddedAssets.length > 0 ? { embedded_assets: embeddedAssets } : {}),
       source_setup: session.session.sourceSetup
     };
   }
@@ -906,13 +1046,16 @@ export async function upsertProviderLinearWorkpadComment(input: {
     query: buildCreateCommentMutation(),
     variables: {
       issueId: issueContext.id,
-      body
+      body: resolvedBody
     }
   });
   if (!createResult.ok) {
     return failureFromWorkflowError('upsert-workpad', createResult.error);
   }
-  const createdComment = parseMutatedComment(createResult.payload.data?.commentCreate?.comment ?? null, body);
+  const createdComment = parseMutatedComment(
+    createResult.payload.data?.commentCreate?.comment ?? null,
+    resolvedBody
+  );
   if (createResult.payload.data?.commentCreate?.success !== true || !createdComment) {
     return failure('upsert-workpad', 'comment_create_failed', 'Linear comment creation did not succeed.', 503);
   }
@@ -920,7 +1063,15 @@ export async function upsertProviderLinearWorkpadComment(input: {
   await writeCachedIssueContextRecord(
     input.env,
     upsertIssueContextWorkpadComment(issueContext, createdComment),
-    session.session.sourceSetup
+    session.session.sourceSetup,
+    {
+      embeddedWorkpad: buildEmbeddedWorkpadCacheRecord({
+        commentId: createdComment.id,
+        originalBody: body,
+        resolvedBody,
+        localImages: currentLocalImageCacheEntries
+      })
+    }
   );
   return {
     ok: true,
@@ -931,6 +1082,7 @@ export async function upsertProviderLinearWorkpadComment(input: {
       identifier: issueContext.identifier
     },
     comment: createdComment,
+    ...(embeddedAssets.length > 0 ? { embedded_assets: embeddedAssets } : {}),
     source_setup: session.session.sourceSetup
   };
 }
@@ -1006,7 +1158,9 @@ export async function deleteProviderLinearWorkpadComment(input: {
   }
 
   if (!selectedComment) {
-    await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup);
+    await writeCachedIssueContextRecord(input.env, context.issue, session.session.sourceSetup, {
+      embeddedWorkpad: null
+    });
     return {
       ok: true,
       operation: 'delete-workpad',
@@ -1059,7 +1213,10 @@ export async function deleteProviderLinearWorkpadComment(input: {
   await writeCachedIssueContextRecord(
     input.env,
     removeIssueContextComment(context.issue, deletedCommentId),
-    session.session.sourceSetup
+    session.session.sourceSetup,
+    {
+      embeddedWorkpad: null
+    }
   );
   return {
     ok: true,
@@ -1825,6 +1982,572 @@ async function executeProviderLinearGraphql<TData>(input: {
   };
 }
 
+async function resolveEmbeddedLinearWorkpadAssets(input: {
+  session: ResolvedLinearWorkflowSession;
+  operation: ProviderLinearOperation;
+  body: string;
+  references?: LocalMarkdownImageReference[];
+}):
+  Promise<
+    | {
+        ok: true;
+        body: string;
+        embedded_assets: ProviderLinearEmbeddedAsset[];
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      }
+  > {
+  const references = input.references ?? extractLocalMarkdownImageReferences(input.body);
+  if (references.length === 0) {
+    return {
+      ok: true,
+      body: input.body,
+      embedded_assets: []
+    };
+  }
+
+  const uploadedAssetsByPath = new Map<string, ProviderLinearEmbeddedAsset>();
+  const embeddedAssets: ProviderLinearEmbeddedAsset[] = [];
+  const replacements: Array<{
+    start: number;
+    end: number;
+    value: string;
+  }> = [];
+
+  for (const reference of references) {
+    let uploadedAsset = uploadedAssetsByPath.get(reference.resolved_path) ?? null;
+    if (!uploadedAsset) {
+      const uploadResult = await uploadProviderLinearLocalImage({
+        session: input.session,
+        operation: input.operation,
+        originalReference: reference.original_reference,
+        resolvedPath: reference.resolved_path
+      });
+      if (!uploadResult.ok) {
+        return uploadResult;
+      }
+      uploadedAsset = uploadResult.asset;
+      uploadedAssetsByPath.set(reference.resolved_path, uploadedAsset);
+      embeddedAssets.push(uploadedAsset);
+    }
+
+    const rewrittenReference = reference.replacement_suffix
+      ? `${uploadedAsset.asset_url} ${reference.replacement_suffix}`
+      : uploadedAsset.asset_url;
+    replacements.push({
+      start: reference.match_start,
+      end: reference.match_end,
+      value: `![${reference.alt_text}](${rewrittenReference})`
+    });
+  }
+
+  return {
+    ok: true,
+    body: applyStringReplacements(input.body, replacements),
+    embedded_assets: embeddedAssets
+  };
+}
+
+async function uploadProviderLinearLocalImage(input: {
+  session: ResolvedLinearWorkflowSession;
+  operation: ProviderLinearOperation;
+  originalReference: string;
+  resolvedPath: string;
+}):
+  Promise<
+    | {
+        ok: true;
+        asset: ProviderLinearEmbeddedAsset;
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      }
+  > {
+  const contentType = resolveLocalImageContentType(input.resolvedPath);
+  if (!contentType) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_local_image_content_type_invalid',
+        message: 'Only local PNG, JPG, JPEG, WEBP, and GIF screenshot files can be embedded in Linear.',
+        status: 422,
+        details: {
+          original_reference: input.originalReference,
+          resolved_path: input.resolvedPath
+        }
+      }
+    };
+  }
+
+  let fileStats;
+  try {
+    fileStats = await stat(input.resolvedPath);
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_local_image_unreadable',
+        message: `Local screenshot file "${input.resolvedPath}" is not readable.`,
+        status: 422,
+        details: {
+          original_reference: input.originalReference,
+          resolved_path: input.resolvedPath
+        }
+      }
+    };
+  }
+
+  if (!fileStats.isFile() || fileStats.size <= 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_local_image_unreadable',
+        message: `Local screenshot file "${input.resolvedPath}" must be a non-empty file.`,
+        status: 422,
+        details: {
+          original_reference: input.originalReference,
+          resolved_path: input.resolvedPath
+        }
+      }
+    };
+  }
+
+  let fileBytes: Uint8Array;
+  try {
+    fileBytes = await readFile(input.resolvedPath);
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_local_image_unreadable',
+        message: `Local screenshot file "${input.resolvedPath}" could not be read.`,
+        status: 422,
+        details: {
+          original_reference: input.originalReference,
+          resolved_path: input.resolvedPath
+        }
+      }
+    };
+  }
+
+  const uploadNegotiation = await executeProviderLinearGraphql<FileUploadMutationResponse>({
+    session: input.session,
+    operation: input.operation,
+    step: 'request-file-upload',
+    query: buildFileUploadMutation(),
+    variables: {
+      contentType,
+      filename: basename(input.resolvedPath),
+      size: fileStats.size
+    }
+  });
+  if (!uploadNegotiation.ok) {
+    return {
+      ok: false,
+      error: uploadNegotiation.error
+    };
+  }
+
+  const uploadFile = parseLinearUploadFile(uploadNegotiation.payload.data?.fileUpload?.uploadFile ?? null);
+  if (uploadNegotiation.payload.data?.fileUpload?.success !== true || !uploadFile) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_file_upload_negotiation_failed',
+        message: 'Linear file upload negotiation did not succeed.',
+        status: 503,
+        details: {
+          original_reference: input.originalReference,
+          resolved_path: input.resolvedPath
+        }
+      }
+    };
+  }
+
+  const uploadPutError = await uploadLinearFileToSignedUrl({
+    session: input.session,
+    uploadUrl: uploadFile.upload_url,
+    contentType,
+    uploadHeaders: uploadFile.headers,
+    bytes: fileBytes
+  });
+  if (uploadPutError) {
+    return {
+      ok: false,
+      error: {
+        ...uploadPutError,
+        details: {
+          ...(uploadPutError.details ?? {}),
+          original_reference: input.originalReference,
+          resolved_path: input.resolvedPath,
+          asset_url: uploadFile.asset_url
+        }
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    asset: {
+      original_reference: input.originalReference,
+      resolved_path: input.resolvedPath,
+      asset_url: uploadFile.asset_url,
+      content_type: contentType,
+      size_bytes: fileStats.size
+    }
+  };
+}
+
+async function uploadLinearFileToSignedUrl(input: {
+  session: ResolvedLinearWorkflowSession;
+  uploadUrl: string;
+  contentType: string;
+  uploadHeaders: Record<string, string>;
+  bytes: Uint8Array;
+}): Promise<ProviderLinearWorkflowError | null> {
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), input.session.timeoutMs);
+  const headers = new Headers();
+  headers.set('Content-Type', input.contentType);
+  headers.set('Cache-Control', 'public, max-age=31536000');
+  for (const [key, value] of Object.entries(input.uploadHeaders)) {
+    headers.set(key, value);
+  }
+  const uploadBody = new Uint8Array(input.bytes.byteLength);
+  uploadBody.set(input.bytes);
+
+  const response = await input.session.fetchImpl(input.uploadUrl, {
+    method: 'PUT',
+    headers,
+    body: new Blob([uploadBody], { type: input.contentType }),
+    signal: abortController.signal
+  })
+    .catch(() => null)
+    .finally(() => clearTimeout(timeout));
+
+  if (!response) {
+    return {
+      code: 'linear_file_upload_put_failed',
+      message: 'Linear signed upload request failed before a response was received.',
+      status: 503,
+      details: {
+        upload_url: input.uploadUrl
+      }
+    };
+  }
+
+  if (!response.ok) {
+    return {
+      code: 'linear_file_upload_put_failed',
+      message: `Linear signed upload request returned HTTP ${response.status}.`,
+      status: 503,
+      details: {
+        upload_url: input.uploadUrl,
+        http_status: response.status
+      }
+    };
+  }
+
+  return null;
+}
+
+function extractLocalMarkdownImageReferences(
+  body: string,
+  bodyFilePath: string | null = null
+): LocalMarkdownImageReference[] {
+  const references: LocalMarkdownImageReference[] = [];
+  for (const match of body.matchAll(LINEAR_LOCAL_IMAGE_MARKDOWN_PATTERN)) {
+    const rawReference = normalizeRequiredString(match[2]);
+    const fullMatch = match[0];
+    const matchIndex = match.index;
+    if (!rawReference || !fullMatch || typeof matchIndex !== 'number') {
+      continue;
+    }
+    const resolvedReference = resolveLocalMarkdownImageReference(rawReference, bodyFilePath);
+    if (!resolvedReference) {
+      continue;
+    }
+    references.push({
+      alt_text: match[1] ?? '',
+      original_reference: resolvedReference.original_reference,
+      replacement_suffix: resolvedReference.replacement_suffix,
+      resolved_path: resolvedReference.resolved_path,
+      match_start: matchIndex,
+      match_end: matchIndex + fullMatch.length
+    });
+  }
+  return references;
+}
+
+function resolveLocalMarkdownImageReference(
+  rawReference: string,
+  bodyFilePath: string | null = null
+):
+  | {
+      original_reference: string;
+      replacement_suffix: string | null;
+      resolved_path: string;
+    }
+  | null {
+  const trimmedReference = rawReference.trim();
+  if (trimmedReference.length === 0) {
+    return null;
+  }
+
+  let destination = trimmedReference;
+  let suffix = '';
+  if (trimmedReference.startsWith('<')) {
+    const closingIndex = trimmedReference.indexOf('>');
+    if (closingIndex <= 1) {
+      return null;
+    }
+    destination = trimmedReference.slice(1, closingIndex).trim();
+    suffix = trimmedReference.slice(closingIndex + 1).trim();
+  } else {
+    const whitespaceMatch = trimmedReference.match(/\s/u);
+    if (whitespaceMatch && typeof whitespaceMatch.index === 'number') {
+      destination = trimmedReference.slice(0, whitespaceMatch.index).trim();
+      suffix = trimmedReference.slice(whitespaceMatch.index).trim();
+    }
+  }
+
+  const normalizedDestination = normalizeRequiredString(destination);
+  if (!normalizedDestination) {
+    return null;
+  }
+  const lowerDestination = normalizedDestination.toLowerCase();
+  if (
+    lowerDestination.startsWith('http://') ||
+    lowerDestination.startsWith('https://') ||
+    lowerDestination.startsWith('data:')
+  ) {
+    return null;
+  }
+
+  let resolvedPath: string | null = null;
+  if (lowerDestination.startsWith('file://')) {
+    try {
+      resolvedPath = fileURLToPath(normalizedDestination);
+    } catch {
+      return null;
+    }
+  } else if (
+    normalizedDestination.startsWith('./') ||
+    normalizedDestination.startsWith('../') ||
+    normalizedDestination.startsWith('/') ||
+    /^[A-Za-z]:[\\/]/u.test(normalizedDestination)
+  ) {
+    const resolvedBodyFilePath = normalizeOptionalString(bodyFilePath);
+    if (
+      resolvedBodyFilePath &&
+      (
+        normalizedDestination.startsWith('./') ||
+        normalizedDestination.startsWith('../')
+      )
+    ) {
+      resolvedPath = resolvePath(dirname(resolvedBodyFilePath), normalizedDestination);
+    } else {
+      resolvedPath = resolvePath(normalizedDestination);
+    }
+  }
+
+  if (!resolvedPath) {
+    return null;
+  }
+
+  return {
+    original_reference: normalizedDestination,
+    replacement_suffix: normalizeOptionalString(suffix),
+    resolved_path: resolvedPath
+  };
+}
+
+function resolveLocalImageContentType(filePath: string): string | null {
+  return LOCAL_IMAGE_CONTENT_TYPE_BY_EXTENSION.get(extname(filePath).toLowerCase()) ?? null;
+}
+
+function parseLinearUploadFile(
+  value:
+    | {
+        uploadUrl?: string | null;
+        assetUrl?: string | null;
+        headers?: Array<{
+          key?: string | null;
+          value?: string | null;
+        }> | null;
+      }
+    | null
+):
+  | {
+      upload_url: string;
+      asset_url: string;
+      headers: Record<string, string>;
+    }
+  | null {
+  const uploadUrl = normalizeRequiredString(value?.uploadUrl);
+  const assetUrl = normalizeRequiredString(value?.assetUrl);
+  if (!uploadUrl || !assetUrl) {
+    return null;
+  }
+  const headers: Record<string, string> = {};
+  for (const entry of value?.headers ?? []) {
+    const key = normalizeRequiredString(entry?.key);
+    const headerValue = normalizeRequiredString(entry?.value);
+    if (!key || !headerValue) {
+      continue;
+    }
+    headers[key] = headerValue;
+  }
+  return {
+    upload_url: uploadUrl,
+    asset_url: assetUrl,
+    headers
+  };
+}
+
+function applyStringReplacements(
+  source: string,
+  replacements: Array<{
+    start: number;
+    end: number;
+    value: string;
+  }>
+): string {
+  let nextSource = source;
+  for (const replacement of [...replacements].sort((left, right) => right.start - left.start)) {
+    nextSource =
+      nextSource.slice(0, replacement.start) +
+      replacement.value +
+      nextSource.slice(replacement.end);
+  }
+  return nextSource;
+}
+
+async function readEmbeddedWorkpadLocalImageCacheEntries(input: {
+  references: LocalMarkdownImageReference[];
+}):
+  Promise<
+    | {
+        ok: true;
+        local_images: ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[];
+      }
+    | {
+        ok: false;
+        error: ProviderLinearWorkflowError;
+      }
+  > {
+  const localImages: ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[] = [];
+  for (const reference of input.references) {
+    let fileStats;
+    try {
+      fileStats = await stat(reference.resolved_path);
+    } catch {
+      return {
+        ok: false,
+        error: {
+          code: 'linear_local_image_unreadable',
+          message: `Local screenshot file "${reference.resolved_path}" is not readable.`,
+          status: 422,
+          details: {
+            original_reference: reference.original_reference,
+            resolved_path: reference.resolved_path
+          }
+        }
+      };
+    }
+
+    if (!fileStats.isFile() || fileStats.size <= 0) {
+      return {
+        ok: false,
+        error: {
+          code: 'linear_local_image_unreadable',
+          message: `Local screenshot file "${reference.resolved_path}" must be a non-empty file.`,
+          status: 422,
+          details: {
+            original_reference: reference.original_reference,
+            resolved_path: reference.resolved_path
+          }
+        }
+      };
+    }
+
+    localImages.push({
+      original_reference: reference.original_reference,
+      resolved_path: reference.resolved_path,
+      size_bytes: fileStats.size,
+      mtime_ms: fileStats.mtimeMs
+    });
+  }
+
+  return {
+    ok: true,
+    local_images: localImages
+  };
+}
+
+function buildEmbeddedWorkpadCacheRecord(input: {
+  commentId: string;
+  originalBody: string;
+  resolvedBody: string;
+  localImages: ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[];
+}): ProviderLinearEmbeddedWorkpadCacheRecord | null {
+  if (input.localImages.length === 0) {
+    return null;
+  }
+  return {
+    comment_id: input.commentId,
+    original_body: input.originalBody,
+    resolved_body: input.resolvedBody,
+    local_images: input.localImages
+  };
+}
+
+function resolveEmbeddedWorkpadNoopCache(input: {
+  cachedWorkpad: ProviderLinearEmbeddedWorkpadCacheRecord | null;
+  comment: ProviderLinearWorkflowComment | null;
+  originalBody: string;
+  localImages: ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[];
+}): ProviderLinearEmbeddedWorkpadCacheRecord | null {
+  if (!input.cachedWorkpad || !input.comment) {
+    return null;
+  }
+  if (input.cachedWorkpad.comment_id !== input.comment.id) {
+    return null;
+  }
+  if (input.cachedWorkpad.original_body !== input.originalBody) {
+    return null;
+  }
+  if (input.cachedWorkpad.resolved_body !== input.comment.body) {
+    return null;
+  }
+  if (!sameEmbeddedWorkpadLocalImages(input.cachedWorkpad.local_images, input.localImages)) {
+    return null;
+  }
+  return input.cachedWorkpad;
+}
+
+function sameEmbeddedWorkpadLocalImages(
+  left: ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[],
+  right: ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[]
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((entry, index) => {
+    const other = right[index];
+    return (
+      other !== undefined
+      && entry.original_reference === other.original_reference
+      && entry.resolved_path === other.resolved_path
+      && entry.size_bytes === other.size_bytes
+      && entry.mtime_ms === other.mtime_ms
+    );
+  });
+}
+
 function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinearIssueSummary {
   return {
     id: issue.id,
@@ -1892,18 +2615,26 @@ function isIssueContextCacheRecordFresh(record: ProviderLinearIssueContextCacheR
 async function writeCachedIssueContextRecord(
   env: NodeJS.ProcessEnv | undefined,
   issue: ProviderLinearIssueContext,
-  sourceSetup: DispatchPilotSourceSetup | null
+  sourceSetup: DispatchPilotSourceSetup | null,
+  options?: {
+    embeddedWorkpad?: ProviderLinearEmbeddedWorkpadCacheRecord | null;
+  }
 ): Promise<void> {
   const cachePath = resolveIssueContextCachePath(env);
   if (!cachePath) {
     return;
   }
+  const embeddedWorkpad =
+    options && Object.prototype.hasOwnProperty.call(options, 'embeddedWorkpad')
+      ? options.embeddedWorkpad ?? null
+      : (await readCachedIssueContextRecord(env, issue.id, sourceSetup))?.embedded_workpad ?? null;
   const record: ProviderLinearIssueContextCacheRecord = {
-    schema_version: 1,
+    schema_version: 2,
     issue_id: issue.id,
     recorded_at: new Date().toISOString(),
     source_setup: sourceSetup,
-    issue
+    issue,
+    ...(embeddedWorkpad ? { embedded_workpad: embeddedWorkpad } : {})
   };
   try {
     await mkdir(dirname(cachePath), { recursive: true });
@@ -1919,21 +2650,100 @@ function parseIssueContextCacheRecord(value: unknown): ProviderLinearIssueContex
     return null;
   }
   const record = value as Record<string, unknown>;
-  if (record.schema_version !== 1) {
+  if (record.schema_version !== 1 && record.schema_version !== 2) {
     return null;
   }
   const issueId = normalizeRequiredString(record.issue_id as string | null | undefined);
   const recordedAt = normalizeRequiredString(record.recorded_at as string | null | undefined);
   const issue = parseCachedIssueContext(record.issue);
+  const embeddedWorkpad =
+    record.schema_version === 2
+      ? parseEmbeddedWorkpadCacheRecord(record.embedded_workpad)
+      : null;
+  if (
+    record.schema_version === 2 &&
+    record.embedded_workpad !== undefined &&
+    record.embedded_workpad !== null &&
+    embeddedWorkpad === null
+  ) {
+    return null;
+  }
   if (!issueId || !recordedAt || !issue || issue.id !== issueId) {
     return null;
   }
   return {
-    schema_version: 1,
+    schema_version: record.schema_version,
     issue_id: issueId,
     recorded_at: recordedAt,
     source_setup: parseCachedSourceSetup(record.source_setup),
-    issue
+    issue,
+    ...(embeddedWorkpad ? { embedded_workpad: embeddedWorkpad } : {})
+  };
+}
+
+function parseEmbeddedWorkpadCacheRecord(value: unknown): ProviderLinearEmbeddedWorkpadCacheRecord | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const commentId = normalizeRequiredString(record.comment_id as string | null | undefined);
+  const originalBody = normalizeRequiredString(record.original_body as string | null | undefined);
+  const resolvedBody = normalizeRequiredString(record.resolved_body as string | null | undefined);
+  const localImages = parseEmbeddedWorkpadLocalImageCacheEntries(record.local_images);
+  if (!commentId || !originalBody || !resolvedBody || localImages === null || localImages.length === 0) {
+    return null;
+  }
+  return {
+    comment_id: commentId,
+    original_body: originalBody,
+    resolved_body: resolvedBody,
+    local_images: localImages
+  };
+}
+
+function parseEmbeddedWorkpadLocalImageCacheEntries(
+  value: unknown
+): ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const entries: ProviderLinearEmbeddedWorkpadLocalImageCacheEntry[] = [];
+  for (const entry of value) {
+    const parsedEntry = parseEmbeddedWorkpadLocalImageCacheEntry(entry);
+    if (!parsedEntry) {
+      return null;
+    }
+    entries.push(parsedEntry);
+  }
+  return entries;
+}
+
+function parseEmbeddedWorkpadLocalImageCacheEntry(
+  value: unknown
+): ProviderLinearEmbeddedWorkpadLocalImageCacheEntry | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const entry = value as Record<string, unknown>;
+  const originalReference = normalizeRequiredString(entry.original_reference as string | null | undefined);
+  const resolvedPath = normalizeRequiredString(entry.resolved_path as string | null | undefined);
+  const sizeBytes = typeof entry.size_bytes === 'number' ? entry.size_bytes : Number.NaN;
+  const mtimeMs = typeof entry.mtime_ms === 'number' ? entry.mtime_ms : Number.NaN;
+  if (
+    !originalReference ||
+    !resolvedPath ||
+    !Number.isFinite(sizeBytes) ||
+    sizeBytes <= 0 ||
+    !Number.isFinite(mtimeMs) ||
+    mtimeMs < 0
+  ) {
+    return null;
+  }
+  return {
+    original_reference: originalReference,
+    resolved_path: resolvedPath,
+    size_bytes: sizeBytes,
+    mtime_ms: mtimeMs
   };
 }
 
@@ -2723,6 +3533,22 @@ function buildDeleteCommentMutation(): string {
     commentDelete(id: $id) {
       success
       entityId
+    }
+  }`;
+}
+
+function buildFileUploadMutation(): string {
+  return `mutation ProviderLinearFileUpload($contentType: String!, $filename: String!, $size: Int!) {
+    fileUpload(contentType: $contentType, filename: $filename, size: $size) {
+      success
+      uploadFile {
+        uploadUrl
+        assetUrl
+        headers {
+          key
+          value
+        }
+      }
     }
   }`;
 }

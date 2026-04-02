@@ -31,6 +31,7 @@ export interface ProviderLinearAuditEntry {
   failed_relation_type: string | null;
   comment_id: string | null;
   attachment_id: string | null;
+  asset_urls?: string[] | null;
   error_code: string | null;
   error_message: string | null;
 }
@@ -148,6 +149,13 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
     failed_relation_type: normalizeOptionalString(entry.failed_relation_type),
     comment_id: normalizeOptionalString(entry.comment_id),
     attachment_id: normalizeOptionalString(entry.attachment_id),
+    ...(Array.isArray(entry.asset_urls)
+      ? {
+          asset_urls: entry.asset_urls
+            .map((value) => normalizeOptionalString(value))
+            .filter((value): value is string => value !== null)
+        }
+      : {}),
     error_code: normalizeOptionalString(entry.error_code),
     error_message: normalizeOptionalString(entry.error_message)
   };
