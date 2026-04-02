@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { buildEnvOverrides } from '../harness/env.js';
 import { applyRewarders, loadScenarios, runAllScenarios, runLearningSchedule, runScenario } from '../harness/index.js';
 import type { EvaluationScenario, EvaluationScenarioResult, ScenarioGoalResult } from '../harness/types.js';
 import type { AdapterGoal } from '../../adapters/types.js';
@@ -21,6 +22,76 @@ describe('evaluation harness', () => {
     const scenarios = await loadScenarios();
     expect(scenarios.length).toBeGreaterThanOrEqual(2);
     expect(scenarios.map((s) => s.id)).toContain('typescript-smoke');
+  });
+
+  it('includes ancestor node_modules directories in evaluation NODE_PATH overrides', async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-node-path-'));
+    tempDirs.push(rootDir);
+
+    const repoDir = path.join(rootDir, 'repo');
+    const workspaceDir = path.join(repoDir, '.workspaces', 'issue-workspace');
+    const parentNodeModules = path.join(rootDir, 'node_modules');
+
+    await fs.mkdir(path.join(repoDir, '.git'), { recursive: true });
+    await fs.mkdir(path.join(repoDir, 'node_modules', 'ts-node', 'register'), { recursive: true });
+    await fs.mkdir(path.join(workspaceDir, 'node_modules', '.vite', 'vitest'), { recursive: true });
+    await fs.mkdir(parentNodeModules, { recursive: true });
+
+    const overrides = buildEnvOverrides(undefined, workspaceDir);
+    const nodePathEntries = (overrides.NODE_PATH ?? '').split(path.delimiter).filter(Boolean);
+    const workspaceNodeModules = path.join(workspaceDir, 'node_modules');
+    const repoNodeModules = path.join(repoDir, 'node_modules');
+
+    expect(nodePathEntries).toContain(workspaceNodeModules);
+    expect(nodePathEntries).toContain(repoNodeModules);
+    expect(nodePathEntries.indexOf(workspaceNodeModules)).toBeLessThan(nodePathEntries.indexOf(repoNodeModules));
+    expect(nodePathEntries).not.toContain(parentNodeModules);
+  });
+
+  it('keeps the workspace node_modules path in NODE_PATH even before install artifacts exist', async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-node-path-empty-'));
+    tempDirs.push(rootDir);
+
+    const repoDir = path.join(rootDir, 'repo');
+    const workspaceDir = path.join(repoDir, '.workspaces', 'issue-workspace');
+    await fs.mkdir(path.join(repoDir, '.git'), { recursive: true });
+    const overrides = buildEnvOverrides(undefined, workspaceDir);
+    const nodePathEntries = (overrides.NODE_PATH ?? '').split(path.delimiter).filter(Boolean);
+
+    expect(nodePathEntries).toContain(path.join(workspaceDir, 'node_modules'));
+  });
+
+  it('merges copied-fixture and source-fixture NODE_PATH roots in order', async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-node-path-merged-'));
+    const tempFixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-temp-fixture-'));
+    tempDirs.push(rootDir, tempFixtureRoot);
+
+    const repoDir = path.join(rootDir, 'repo');
+    const workspaceDir = path.join(repoDir, '.workspaces', 'issue-workspace');
+    const sourceFixtureDir = path.join(workspaceDir, 'evaluation', 'fixtures', 'typescript-smoke');
+    const copiedFixtureDir = path.join(tempFixtureRoot, 'typescript-smoke-copy');
+
+    await fs.mkdir(workspaceDir, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceDir, '.git'),
+      `gitdir: ${path.join(repoDir, '.git', 'worktrees', 'issue-workspace')}\n`
+    );
+    await fs.mkdir(path.join(repoDir, '.git', 'worktrees', 'issue-workspace'), { recursive: true });
+    await fs.mkdir(path.join(repoDir, 'node_modules', 'ts-node', 'register'), { recursive: true });
+    await fs.mkdir(path.join(copiedFixtureDir, 'node_modules', '.vite', 'vitest'), { recursive: true });
+    await fs.mkdir(sourceFixtureDir, { recursive: true });
+
+    const overrides = buildEnvOverrides(undefined, [copiedFixtureDir, sourceFixtureDir]);
+    const nodePathEntries = (overrides.NODE_PATH ?? '').split(path.delimiter).filter(Boolean);
+    const copiedFixtureNodeModules = path.join(copiedFixtureDir, 'node_modules');
+    const sourceFixtureNodeModules = path.join(sourceFixtureDir, 'node_modules');
+    const repoNodeModules = path.join(repoDir, 'node_modules');
+
+    expect(nodePathEntries).toContain(copiedFixtureNodeModules);
+    expect(nodePathEntries).toContain(sourceFixtureNodeModules);
+    expect(nodePathEntries).toContain(repoNodeModules);
+    expect(nodePathEntries.indexOf(copiedFixtureNodeModules)).toBeLessThan(nodePathEntries.indexOf(sourceFixtureNodeModules));
+    expect(nodePathEntries.indexOf(sourceFixtureNodeModules)).toBeLessThan(nodePathEntries.indexOf(repoNodeModules));
   });
 
   it('runs the TypeScript smoke scenario successfully', async () => {
