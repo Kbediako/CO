@@ -6,6 +6,7 @@ import process from 'node:process';
 import { createExecutionPlan } from '../../adapters/index.js';
 import type { AdapterCommandOverrides, AdapterExecutionPlan } from '../../adapters/types.js';
 import { loadScenarioById, loadScenarios } from './scenario-loader.js';
+import { buildEnvOverrides } from './env.js';
 import { buildRewarders } from './rewarders/index.js';
 import type {
   EvaluationScenario,
@@ -38,16 +39,6 @@ type FileSnapshot =
   | { status: 'present'; content: string }
   | { status: 'missing' }
   | { status: 'error'; error: string };
-
-function buildEnvOverrides(custom: Record<string, string> | undefined): Record<string, string> {
-  const overrides = { ...(custom ?? {}) };
-  const projectNodeModules = path.resolve(process.cwd(), 'node_modules');
-  const existingNodePath = overrides.NODE_PATH ?? process.env.NODE_PATH;
-  overrides.NODE_PATH = existingNodePath
-    ? `${existingNodePath}${path.delimiter}${projectNodeModules}`
-    : projectNodeModules;
-  return overrides;
-}
 
 function substituteFixture(value: string | undefined, fixturePath: string): string | undefined {
   if (typeof value !== 'string') {
@@ -614,7 +605,7 @@ export async function runScenario(
 
     const startedAt = new Date();
     const goalResults: ScenarioGoalResult[] = [];
-    const envOverrides = buildEnvOverrides(options.env);
+    const envOverrides = buildEnvOverrides(options.env, [workingDir, sourceFixturePath]);
     const baselineSnapshots = await captureDiffBaselines(loaded.patternAssertions, workingDir);
 
     if (loaded.agentTask?.instruction) {
