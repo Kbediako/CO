@@ -2325,7 +2325,50 @@ function collectMarkdownCodeRanges(body: string): Array<{ start: number; end: nu
     ranges.push(fenceRange);
     searchIndex = fenceRange.end;
   }
+  collectIndentedMarkdownCodeRanges(body, ranges);
   return ranges;
+}
+
+function collectIndentedMarkdownCodeRanges(
+  body: string,
+  target: Array<{ start: number; end: number }>
+): void {
+  let lineStart = 0;
+  let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
+
+  while (lineStart < body.length) {
+    const lineEnd = findMarkdownLineEnd(body, lineStart);
+    const line = body.slice(lineStart, lineEnd);
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
+      listContinuationIndents,
+      line,
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
+    );
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
+      lineStart = lineEnd;
+      continue;
+    }
+    if (!activeCodeFenceDelimiter && isIndentedMarkdownCodeBlockStructuralLine(structuralLine)) {
+      target.push({
+        start: lineStart,
+        end: lineEnd
+      });
+    }
+    if (!activeCodeFenceDelimiter) {
+      recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
+    }
+    lineStart = lineEnd;
+  }
+}
+
+function isIndentedMarkdownCodeBlockStructuralLine(line: string): boolean {
+  return normalizeRequiredString(line) !== null && (/^\t/u.test(line) || /^ {4,}/u.test(line));
 }
 
 function findNextMarkdownFenceRange(

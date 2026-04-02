@@ -8925,7 +8925,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores inline and fenced code image examples when extracting local screenshot refs', async () => {
+  it('ignores inline, fenced, and indented code image examples when extracting local screenshot refs', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'linear-workpad-embed-code-examples-'));
     tempDirs.push(tempDir);
     const proofPath = join(tempDir, 'proof.png');
@@ -8936,6 +8936,8 @@ describe('providerLinearWorkflowFacade', () => {
     const assetUrl = 'https://assets.linear.test/proof-code-examples';
     const missingFencedPath = join(tempDir, 'missing fenced proof.png');
     const missingInlinePath = join(tempDir, 'missing inline proof.png');
+    const missingIndentedPath = join(tempDir, 'missing indented proof.png');
+    const missingTabbedPath = join(tempDir, 'missing tabbed proof.png');
     const missingEscapedPath = join(tempDir, 'missing escaped proof.png');
     const inputBody = buildStructuredWorkpadBody({
       notesLines: [
@@ -8944,6 +8946,11 @@ describe('providerLinearWorkflowFacade', () => {
         `![Example only](file://${missingFencedPath})`,
         '```',
         `- Inline example \`![Literal inline](file://${missingInlinePath})\` should not upload.`,
+        'Indented code examples should stay literal:',
+        '',
+        `    ![Indented only](file://${missingIndentedPath})`,
+        `\t![Tabbed only](file://${missingTabbedPath})`,
+        '',
         `- Escaped example \\![Escaped only](file://${missingEscapedPath}) should not upload.`,
         '- Real proof follows.',
         `![Embedded proof](file://${proofPath})`
@@ -8956,6 +8963,11 @@ describe('providerLinearWorkflowFacade', () => {
         `![Example only](file://${missingFencedPath})`,
         '```',
         `- Inline example \`![Literal inline](file://${missingInlinePath})\` should not upload.`,
+        'Indented code examples should stay literal:',
+        '',
+        `    ![Indented only](file://${missingIndentedPath})`,
+        `\t![Tabbed only](file://${missingTabbedPath})`,
+        '',
         `- Escaped example \\![Escaped only](file://${missingEscapedPath}) should not upload.`,
         '- Real proof follows.',
         `![Embedded proof](${assetUrl})`
