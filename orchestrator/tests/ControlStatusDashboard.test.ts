@@ -1751,6 +1751,68 @@ describe('control status dashboard', () => {
     handle.stop();
   });
 
+  it('preserves the throughput baseline when aggregate token totals are temporarily unavailable', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let currentTime = Date.parse('2026-03-30T01:15:00.000Z');
+    const totals: Array<number | null> = [1000, null, 1060];
+    let readCount = 0;
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120
+        }
+      },
+      {
+        readDataset: async () =>
+          buildDataset({
+            totals: {
+              ...buildDataset().totals,
+              output_tokens: totals[Math.min(readCount, totals.length - 1)],
+              total_tokens: totals[Math.min(readCount++, totals.length - 1)]
+            }
+          }),
+        setTimeout,
+        clearTimeout,
+        now: () => new Date(currentTime)
+      }
+    );
+
+    await handle.flush();
+    currentTime += 1000;
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+    currentTime += 1000;
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(stripAnsi(writes[2] ?? '')).toContain('│ Throughput: 30 tps');
+
+    handle.stop();
+  });
+
   it('does not queue follow-up renders after stop when a render is already in flight', async () => {
     vi.useFakeTimers();
 
