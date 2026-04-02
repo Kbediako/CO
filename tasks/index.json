@@ -18,6 +18,22 @@
       }
     },
     {
+      "id": "20260402-linear-88b95054-4f55-4d4d-94be-b491d9896b31",
+      "title": "CO: Refresh tracked issue metadata for active provider claims",
+      "relates_to": "tasks/tasks-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "paths": {
+        "spec": "tasks/specs/linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+        "task": "tasks/tasks-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+        "agent_task": ".agent/task/linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+        "docs": "docs/TECH_SPEC-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md"
+      }
+    },
+    {
       "id": "20260402-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936",
       "title": "CO: Embed screenshot proof directly in Linear comments and workpads",
       "relates_to": "tasks/tasks-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md",
