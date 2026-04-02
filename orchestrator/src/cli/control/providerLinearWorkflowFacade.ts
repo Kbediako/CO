@@ -2378,13 +2378,12 @@ function isIndentedMarkdownCodeBlockStructuralLine(line: string): boolean {
 
 function stripMarkdownBlockquotePrefixes(line: string): string {
   let strippedLine = line;
-  while (true) {
-    const blockquoteMatch = strippedLine.match(/^[ ]{0,3}>\s?/u);
-    if (!blockquoteMatch) {
-      return strippedLine;
-    }
+  let blockquoteMatch = strippedLine.match(/^[ ]{0,3}>\s?/u);
+  while (blockquoteMatch) {
     strippedLine = strippedLine.slice(blockquoteMatch[0].length);
+    blockquoteMatch = strippedLine.match(/^[ ]{0,3}>\s?/u);
   }
+  return strippedLine;
 }
 
 function findNextMarkdownFenceRange(
