@@ -15,7 +15,10 @@ describe('vitest progress reporter config', () => {
   it('enables the progress reporter for standard truthy CI env values', async () => {
     for (const ciValue of ['1', 'true', 'yes']) {
       const config = await loadConfigForCiValue(ciValue);
-      expect(config.test?.reporters).toHaveLength(2);
+      const reporters = config.test?.reporters;
+      expect(reporters).toHaveLength(2);
+      expect(reporters?.[0]).toBe('default');
+      expect(reporters?.[1]).toBeTruthy();
     }
   });
 

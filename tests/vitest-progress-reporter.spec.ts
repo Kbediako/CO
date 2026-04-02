@@ -58,6 +58,28 @@ describe('VitestProgressTracker', () => {
     expect(harness.lines).toHaveLength(1);
   });
 
+  it('falls back to default timing values when invalid delays are provided', () => {
+    const harness = createHarness({
+      announceAfterMs: Number.NaN,
+      repeatAfterMs: Number.POSITIVE_INFINITY,
+      pollIntervalMs: -1
+    });
+
+    harness.collect(['tests/cli-command-surface.spec.ts']);
+    harness.update('file-0', 'run');
+
+    harness.advance(DEFAULT_VITEST_PROGRESS_ANNOUNCE_AFTER_MS);
+    expect(harness.lines).toEqual([
+      '[vitest-progress] still running: tests/cli-command-surface.spec.ts (30s)'
+    ]);
+
+    harness.advance(DEFAULT_VITEST_PROGRESS_REPEAT_AFTER_MS);
+    expect(harness.lines).toEqual([
+      '[vitest-progress] still running: tests/cli-command-surface.spec.ts (30s)',
+      '[vitest-progress] still running: tests/cli-command-surface.spec.ts (1m 30s)'
+    ]);
+  });
+
   it('keeps tracking an active file when Vitest recollects files mid-run', () => {
     const harness = createHarness();
 
@@ -70,7 +92,11 @@ describe('VitestProgressTracker', () => {
   });
 });
 
-function createHarness() {
+function createHarness(options: {
+  announceAfterMs?: number;
+  repeatAfterMs?: number;
+  pollIntervalMs?: number;
+} = {}) {
   let nowMs = 0;
   let nextTimerId = 1;
 
@@ -78,6 +104,9 @@ function createHarness() {
   const timerCallbacks = new Map<number, () => void>();
 
   const tracker = new VitestProgressTracker({
+    announceAfterMs: options.announceAfterMs,
+    repeatAfterMs: options.repeatAfterMs,
+    pollIntervalMs: options.pollIntervalMs,
     cwd: '/repo',
     now: () => nowMs,
     setIntervalFn: ((callback: () => void) => {

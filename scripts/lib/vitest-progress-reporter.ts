@@ -42,9 +42,18 @@ export class VitestProgressTracker {
   private pollHandle: IntervalHandle | null = null;
 
   constructor(options: VitestProgressReporterOptions = {}) {
-    this.announceAfterMs = options.announceAfterMs ?? DEFAULT_VITEST_PROGRESS_ANNOUNCE_AFTER_MS;
-    this.repeatAfterMs = options.repeatAfterMs ?? DEFAULT_VITEST_PROGRESS_REPEAT_AFTER_MS;
-    this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_VITEST_PROGRESS_POLL_INTERVAL_MS;
+    this.announceAfterMs = normalizeDelayMs(
+      options.announceAfterMs,
+      DEFAULT_VITEST_PROGRESS_ANNOUNCE_AFTER_MS
+    );
+    this.repeatAfterMs = normalizeDelayMs(
+      options.repeatAfterMs,
+      DEFAULT_VITEST_PROGRESS_REPEAT_AFTER_MS
+    );
+    this.pollIntervalMs = normalizeDelayMs(
+      options.pollIntervalMs,
+      DEFAULT_VITEST_PROGRESS_POLL_INTERVAL_MS
+    );
     this.cwd = options.cwd ?? process.cwd();
     this.now = options.now ?? Date.now;
     this.setIntervalFn = options.setIntervalFn ?? setInterval;
@@ -210,6 +219,10 @@ function normalizeFilePath(filepath: string, cwd: string): string {
   }
 
   return filepath.split(sep).join('/');
+}
+
+function normalizeDelayMs(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
 function formatElapsed(durationMs: number): string {
