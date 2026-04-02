@@ -27,6 +27,11 @@ function canonicalizeExistingPath(target: string): string {
   }
 }
 
+function isWithinAncestor(target: string, ancestor: string): boolean {
+  const relative = path.relative(ancestor, target);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 function detectRepoRoot(startDir: string): string | undefined {
   let current: string | undefined = path.resolve(startDir);
 
@@ -46,7 +51,13 @@ function detectRepoRoot(startDir: string): string | undefined {
           const worktreeMarker = `${path.sep}.git${path.sep}worktrees${path.sep}`;
           const worktreeMarkerIndex = resolvedGitDir.indexOf(worktreeMarker);
           if (worktreeMarkerIndex !== -1) {
-            return resolvedGitDir.slice(0, worktreeMarkerIndex);
+            const parentRepoRoot = resolvedGitDir.slice(0, worktreeMarkerIndex);
+            return isWithinAncestor(
+              canonicalizeExistingPath(current),
+              canonicalizeExistingPath(parentRepoRoot)
+            )
+              ? parentRepoRoot
+              : current;
           }
           if (path.basename(resolvedGitDir) === '.git') {
             return path.dirname(resolvedGitDir);

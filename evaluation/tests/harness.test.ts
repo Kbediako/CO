@@ -150,6 +150,37 @@ describe('evaluation harness', () => {
     expect(nodePathEntries).not.toContain(repoNodeModules);
   });
 
+  it('stops at the current checkout root for external worktree gitdir files', async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-node-path-external-worktree-'));
+    tempDirs.push(rootDir);
+
+    const repoDir = path.join(rootDir, 'repo');
+    const worktreeDir = path.join(rootDir, 'repo-ci');
+    const fixtureDir = path.join(worktreeDir, 'evaluation', 'fixtures', 'typescript-smoke');
+    const rootNodeModules = path.join(rootDir, 'node_modules');
+    const repoNodeModules = path.join(repoDir, 'node_modules');
+    const worktreeNodeModules = path.join(worktreeDir, 'node_modules');
+    const worktreeGitDir = path.join(repoDir, '.git', 'worktrees', 'repo-ci');
+
+    await fs.mkdir(worktreeGitDir, { recursive: true });
+    await fs.mkdir(fixtureDir, { recursive: true });
+    await fs.mkdir(repoNodeModules, { recursive: true });
+    await fs.mkdir(worktreeNodeModules, { recursive: true });
+    await fs.mkdir(rootNodeModules, { recursive: true });
+    await fs.writeFile(
+      path.join(worktreeDir, '.git'),
+      `gitdir: ${path.relative(worktreeDir, worktreeGitDir)}\n`
+    );
+
+    const overrides = buildEnvOverrides(undefined, fixtureDir);
+    const nodePathEntries = (overrides.NODE_PATH ?? '').split(path.delimiter).filter(Boolean);
+
+    expect(nodePathEntries).toContain(path.join(fixtureDir, 'node_modules'));
+    expect(nodePathEntries).toContain(worktreeNodeModules);
+    expect(nodePathEntries).not.toContain(repoNodeModules);
+    expect(nodePathEntries).not.toContain(rootNodeModules);
+  });
+
   it('runs the TypeScript smoke scenario successfully', async () => {
     const result = await runScenario('typescript-smoke', { mode: 'mcp' });
     const goalStatuses = result.goals.map((goal) => goal.status);
