@@ -21,6 +21,7 @@ import {
 import { logger } from '../logger.js';
 import { slugify } from './utils/strings.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
+import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
 const ALLOWED_PROVIDER_CHILD_PIPELINES = ['docs-review', 'implementation-gate', 'docs-relevance-advisory'] as const;
 const PROVIDER_LINEAR_CHILD_STREAM_ENV_KEYS_TO_REMOVE = [
   'MCP_RUNNER_TASK_ID',
@@ -426,27 +427,6 @@ function parseProviderChildRunResult(raw: string, repoRoot: string, runsRoot: st
     runtime_provider: normalizeOptionalString(record.runtime_provider)
   };
 }
-function parseTrailingJsonObject(raw: string): Record<string, unknown> | null {
-  const trimmed = raw.trim();
-  if (!trimmed.endsWith('}')) {
-    return null;
-  }
-  const direct = safeJsonObjectParse(trimmed);
-  if (direct) {
-    return direct;
-  }
-  const lines = trimmed.split(/\r?\n/u);
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!lines[index]?.trimStart().startsWith('{')) {
-      continue;
-    }
-    const parsed = safeJsonObjectParse(lines.slice(index).join('\n'));
-    if (parsed) {
-      return parsed;
-    }
-  }
-  return null;
-}
 function resolveRunPath(repoRoot: string, value: string): string {
   return isAbsolute(value) ? resolve(value) : resolve(repoRoot, value);
 }
@@ -458,16 +438,6 @@ function resolveWorkspaceScopedArtifactDir(repoRoot: string, value: string | und
   }
   const candidate = isAbsolute(normalized) ? resolve(normalized) : resolve(repoRoot, normalized);
   return isPathWithinRoot(repoRoot, candidate) ? candidate : fallback;
-}
-function safeJsonObjectParse(value: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
 }
 function isPathWithinRoot(root: string, candidate: string): boolean {
   const relativePath = relative(root, candidate);

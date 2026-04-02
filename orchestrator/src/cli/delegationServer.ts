@@ -14,6 +14,7 @@ import {
 } from './config/delegationConfig.js';
 import { logger } from '../logger.js';
 import { writeJsonAtomic } from './utils/fs.js';
+import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
 import {
   evaluateDynamicToolBridgeRequest,
   type DynamicToolBridgeAction
@@ -1305,31 +1306,7 @@ function safeJsonParse(text: string): unknown | null {
 }
 
 function parseSpawnOutput(stdout: string): Record<string, unknown> {
-  const trimmed = stdout.trim();
-  if (!trimmed) {
-    return {};
-  }
-  const direct = safeJsonParse(trimmed);
-  if (direct && typeof direct === 'object' && !Array.isArray(direct)) {
-    return direct as Record<string, unknown>;
-  }
-  const lines = trimmed.split(/\r?\n/);
-  for (let i = lines.length - 1; i >= 0; i -= 1) {
-    if (!lines[i].trim().startsWith('{')) {
-      continue;
-    }
-    for (let j = lines.length - 1; j >= i; j -= 1) {
-      if (!lines[j].includes('}')) {
-        continue;
-      }
-      const candidate = lines.slice(i, j + 1).join('\n');
-      const parsed = safeJsonParse(candidate);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-    }
-  }
-  return {};
+  return parseTrailingJsonObject(stdout, { allowTrailingTextAfterJson: true }) ?? {};
 }
 
 export const __test__ = {
