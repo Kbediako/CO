@@ -1,6 +1,6 @@
 # Archived Document
 
-last_review: 2026-03-02
+last_review: 2026-04-02
 
 <!-- docs-archive:stub -->
 > Archived on 2026-03-02. Full content: https://github.com/Kbediako/CO/blob/doc-archives/tasks/specs/0964-pr-watch-merge-cli-ship.md
