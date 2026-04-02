@@ -1,5 +1,9 @@
 import { defineConfig } from 'vitest/config';
 
+import { createVitestProgressReporter } from './scripts/lib/vitest-progress-reporter.js';
+
+const reporters = envFlagEnabled(process.env.CI) ? ['default', createVitestProgressReporter()] : undefined;
+
 export default defineConfig({
   // Vitest runs through Vite middleware mode, which otherwise spins up the
   // default dev websocket listener on port 24678 and can keep non-tty runs alive.
@@ -18,8 +22,18 @@ export default defineConfig({
       'patterns/**/*.test.ts',
       'tests/**/*.spec.ts'
     ],
+    reporters,
     coverage: {
       enabled: false
     }
   }
 });
+
+function envFlagEnabled(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
