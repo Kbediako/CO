@@ -8772,7 +8772,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
-  it('uploads angle-bracketed local screenshot refs with spaces, parentheses, and titles', async () => {
+  it('uploads local screenshot refs when the title suffix contains parentheses', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'linear-workpad-embed-angle-'));
     tempDirs.push(tempDir);
     const proofPath = join(tempDir, 'proof screenshot (1).png');
@@ -8782,10 +8782,10 @@ describe('providerLinearWorkflowFacade', () => {
     const uploadUrl = 'https://uploads.linear.test/proof-angle';
     const assetUrl = 'https://assets.linear.test/proof-angle';
     const inputBody = buildStructuredWorkpadBody({
-      notesLines: ['- Proof screenshot is embedded below.', `![Embedded proof](<file://${proofPath}> "caption")`]
+      notesLines: ['- Proof screenshot is embedded below.', `![Embedded proof](<file://${proofPath}> "caption (v2)")`]
     });
     const expectedBody = buildStructuredWorkpadBody({
-      notesLines: ['- Proof screenshot is embedded below.', `![Embedded proof](${assetUrl} "caption")`]
+      notesLines: ['- Proof screenshot is embedded below.', `![Embedded proof](${assetUrl} "caption (v2)")`]
     });
 
     const fetchImpl: typeof fetch = vi.fn(async (input, init) => {
@@ -8925,7 +8925,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores inline, fenced, and indented code image examples when extracting local screenshot refs', async () => {
+  it('ignores inline, fenced, indented, and blockquoted code image examples when extracting local screenshot refs', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'linear-workpad-embed-code-examples-'));
     tempDirs.push(tempDir);
     const proofPath = join(tempDir, 'proof.png');
@@ -8938,6 +8938,7 @@ describe('providerLinearWorkflowFacade', () => {
     const missingInlinePath = join(tempDir, 'missing inline proof.png');
     const missingIndentedPath = join(tempDir, 'missing indented proof.png');
     const missingTabbedPath = join(tempDir, 'missing tabbed proof.png');
+    const missingBlockquotedIndentedPath = join(tempDir, 'missing blockquoted indented proof.png');
     const missingEscapedPath = join(tempDir, 'missing escaped proof.png');
     const inputBody = buildStructuredWorkpadBody({
       notesLines: [
@@ -8950,6 +8951,7 @@ describe('providerLinearWorkflowFacade', () => {
         '',
         `    ![Indented only](file://${missingIndentedPath})`,
         `\t![Tabbed only](file://${missingTabbedPath})`,
+        `>     ![Blockquoted indented only](file://${missingBlockquotedIndentedPath})`,
         '',
         `- Escaped example \\![Escaped only](file://${missingEscapedPath}) should not upload.`,
         '- Real proof follows.',
@@ -8967,6 +8969,7 @@ describe('providerLinearWorkflowFacade', () => {
         '',
         `    ![Indented only](file://${missingIndentedPath})`,
         `\t![Tabbed only](file://${missingTabbedPath})`,
+        `>     ![Blockquoted indented only](file://${missingBlockquotedIndentedPath})`,
         '',
         `- Escaped example \\![Escaped only](file://${missingEscapedPath}) should not upload.`,
         '- Real proof follows.',

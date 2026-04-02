@@ -30,7 +30,8 @@ const LINEAR_WORKPAD_REQUIRED_SECTIONS = [
   'Notes'
 ] as const;
 const LINEAR_WORKPAD_CHECKBOX_REQUIRED_SECTIONS = ['Acceptance Criteria', 'Validation'] as const;
-const LINEAR_LOCAL_IMAGE_MARKDOWN_PATTERN = /!\[([^\]]*)\]\((<[^>]+>(?:\s+[^)]*)?|[^)]+)\)/gu;
+const LINEAR_LOCAL_IMAGE_MARKDOWN_PATTERN =
+  /!\[([^\]]*)\]\(((?:<[^>]+>|[^\s)]+)(?:\s+(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\((?:[^)\\]|\\.)*\)))?)\s*\)/gu;
 const LINEAR_ISSUE_VALIDATION_SECTION_TITLES = new Set(['validation', 'test plan', 'testing']);
 const LINEAR_ISSUE_VALIDATION_NESTED_SECTION_TITLES = new Set([
   'automated',
@@ -2368,7 +2369,22 @@ function collectIndentedMarkdownCodeRanges(
 }
 
 function isIndentedMarkdownCodeBlockStructuralLine(line: string): boolean {
-  return normalizeRequiredString(line) !== null && (/^\t/u.test(line) || /^ {4,}/u.test(line));
+  const blockquoteStrippedLine = stripMarkdownBlockquotePrefixes(line);
+  return (
+    normalizeRequiredString(blockquoteStrippedLine) !== null &&
+    (/^\t/u.test(blockquoteStrippedLine) || /^ {4,}/u.test(blockquoteStrippedLine))
+  );
+}
+
+function stripMarkdownBlockquotePrefixes(line: string): string {
+  let strippedLine = line;
+  while (true) {
+    const blockquoteMatch = strippedLine.match(/^[ ]{0,3}>\s?/u);
+    if (!blockquoteMatch) {
+      return strippedLine;
+    }
+    strippedLine = strippedLine.slice(blockquoteMatch[0].length);
+  }
 }
 
 function findNextMarkdownFenceRange(
