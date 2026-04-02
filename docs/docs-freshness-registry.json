@@ -1,7 +1,49 @@
 {
   "version": 1,
-  "generated_at": "2026-04-01",
+  "generated_at": "2026-04-02",
   "entries": [
+    {
+      "path": ".agent/task/linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-02",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-02",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-02",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-02",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-02",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-02",
+      "cadence_days": 30
+    },
     {
       "path": ".agent/task/linear-95b040bc-b150-4c39-bc56-64b13f55579f.md",
       "owner": "Codex (top-level agent), Review agent",
@@ -2239,7 +2281,7 @@
       "path": ".agent/task/0101-slimdown-audit.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-01",
+      "last_review": "2026-04-02",
       "cadence_days": 90
     },
     {
@@ -2358,7 +2400,7 @@
       "path": ".agent/task/0908-diff-budget-followups.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
-      "last_review": "2026-01-01",
+      "last_review": "2026-04-02",
       "cadence_days": 365
     },
     {
@@ -13271,7 +13313,7 @@
       "path": "docs/PRD-slimdown.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-01",
+      "last_review": "2026-04-02",
       "cadence_days": 90
     },
     {
@@ -19284,7 +19326,7 @@
       "path": "tasks/tasks-0101-slimdown-audit.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-01-01",
+      "last_review": "2026-04-02",
       "cadence_days": 90
     },
     {
