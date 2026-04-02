@@ -94,6 +94,7 @@ export interface ControlProviderWorkflowPayload {
 }
 
 interface SharedSelectedProjectionFields {
+  issueProvider: string | null;
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;

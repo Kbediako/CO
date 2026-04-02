@@ -634,6 +634,65 @@ describe('control status dashboard', () => {
     expect(stripAnsi(frame)).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 60s');
   });
 
+  it('renders authoritative Linear budget snapshots instead of falling back to unavailable', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          observed_at: '2026-03-30T01:15:00.000Z',
+          source: 'control-host-polling',
+          suppression: 'low',
+          requests: {
+            remaining: 19,
+            limit: 30,
+            reset_at: '2026-03-30T01:15:42.000Z'
+          },
+          complexity: {
+            remaining: 180,
+            limit: 200,
+            reset_at: '2026-03-30T01:15:07.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    expect(stripAnsi(frame)).toContain(
+      '│ Rate Limits: Linear API (control-host-polling) | requests 19/30 reset 42s | complexity 180/200 reset 7s | state low'
+    );
+  });
+
+  it('falls back to generic summaries for legacy proof rate-limit payloads', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 1,
+            limit: 30,
+            reset_at: '2026-03-30T01:16:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Rate Limits: source=legacy-proof');
+    expect(plainFrame).not.toContain('Linear API (legacy-proof)');
+  });
+
   it('sanitizes terminal control characters before rendering text fields', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
@@ -1350,13 +1409,10 @@ describe('control status dashboard', () => {
     await handle.flush();
 
     const pauseWrites = writes.slice(liveWriteCount);
-    expect(pauseWrites).toHaveLength(2);
+    expect(pauseWrites).toHaveLength(1);
     expect(pauseWrites[0]?.startsWith(ANSI_ALT_SCREEN_EXIT)).toBe(true);
     expect(stripAnsi(pauseWrites[0] ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
     expect(pauseWrites[0]?.endsWith('\n')).toBe(true);
-    expect(pauseWrites[1]?.startsWith('\u001b[H\u001b[2J')).toBe(true);
-    expect(stripAnsi(pauseWrites[1] ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
-    expect(pauseWrites[1]?.endsWith('\n')).toBe(false);
     expect(pauseWrites.filter((write) => write.endsWith('\n'))).toHaveLength(1);
 
     handle.stop();
@@ -1691,6 +1747,68 @@ describe('control status dashboard', () => {
     await handle.flush();
 
     expect(stripAnsi(writes[2] ?? '')).toContain('│ Throughput: 60 tps');
+
+    handle.stop();
+  });
+
+  it('preserves the throughput baseline when aggregate token totals are temporarily unavailable', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let currentTime = Date.parse('2026-03-30T01:15:00.000Z');
+    const totals: Array<number | null> = [1000, null, 1060];
+    let readCount = 0;
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120
+        }
+      },
+      {
+        readDataset: async () =>
+          buildDataset({
+            totals: {
+              ...buildDataset().totals,
+              output_tokens: totals[Math.min(readCount, totals.length - 1)],
+              total_tokens: totals[Math.min(readCount++, totals.length - 1)]
+            }
+          }),
+        setTimeout,
+        clearTimeout,
+        now: () => new Date(currentTime)
+      }
+    );
+
+    await handle.flush();
+    currentTime += 1000;
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+    currentTime += 1000;
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(stripAnsi(writes[2] ?? '')).toContain('│ Throughput: 30 tps');
 
     handle.stop();
   });

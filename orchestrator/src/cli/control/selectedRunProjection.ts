@@ -35,6 +35,7 @@ export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
   manifestPath: string;
   runDir: string;
+  issueProvider: string | null;
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;
@@ -278,6 +279,7 @@ function buildProjectionContextFromParts(
         : null;
 
   return {
+    issueProvider: snapshot.issueProvider ?? providerClaim?.provider ?? null,
     issueIdentifier,
     issueId,
     taskId,
@@ -622,6 +624,8 @@ function buildSelectedRunManifestSnapshot(
   manifestPath: string,
   fallbackRunId: string | null
 ): SelectedRunManifestSnapshot | null {
+  const issueProvider =
+    readStringValue(manifestRecord, 'issue_provider', 'issueProvider') ?? null;
   const taskId = readStringValue(manifestRecord, 'task_id', 'taskId') ?? resolveTaskIdFromManifestPath(manifestPath);
   const runId =
     readStringValue(manifestRecord, 'run_id', 'runId') ??
@@ -637,6 +641,7 @@ function buildSelectedRunManifestSnapshot(
     manifestRecord,
     manifestPath,
     runDir: dirname(manifestPath),
+    issueProvider,
     issueIdentifier,
     issueId,
     taskId,
@@ -824,6 +829,7 @@ async function buildProviderRetryContextFromClaim(
   const controlWorkspacePath = await resolveControlWorkspacePath(context);
   if (!snapshot) {
     return {
+      issueProvider: claim.provider,
       issueIdentifier: claim.issue_identifier,
       issueId: claim.issue_id,
       taskId: claim.task_id,
@@ -873,6 +879,7 @@ async function buildProviderRetryContextFromClaim(
     null;
   if (!base) {
     return {
+      issueProvider: claim.provider,
       issueIdentifier: claim.issue_identifier,
       issueId: claim.issue_id,
       taskId: claim.task_id,

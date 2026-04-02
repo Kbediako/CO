@@ -1,6 +1,52 @@
 {
   "items": [
     {
+      "id": "20260402-linear-f3193657-a549-43a2-8cff-50c5284df986",
+      "title": "CO: Fix CO STATUS paused snapshot duplication and authoritative telemetry",
+      "relates_to": "tasks/tasks-linear-f3193657-a549-43a2-8cff-50c5284df986.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-02",
+          "manifest": ".runs/linear-f3193657-a549-43a2-8cff-50c5284df986-co-67-docs-review/cli/2026-04-02T08-30-13-050Z-ea5f5a1d/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f3193657-a549-43a2-8cff-50c5284df986.md",
+        "task": "tasks/tasks-linear-f3193657-a549-43a2-8cff-50c5284df986.md",
+        "agent_task": ".agent/task/linear-f3193657-a549-43a2-8cff-50c5284df986.md",
+        "docs": "docs/TECH_SPEC-linear-f3193657-a549-43a2-8cff-50c5284df986.md"
+      }
+    },
+    {
+      "id": "20260402-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5",
+      "title": "CO: Deduplicate trailing JSON-tail parsing across child-stream and delegation server",
+      "relates_to": "tasks/tasks-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-02",
+          "manifest": ".runs/linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5-co-50-docs-review/cli/2026-04-02T08-32-47-430Z-05430a37/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md",
+        "task": "tasks/tasks-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md",
+        "agent_task": ".agent/task/linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md",
+        "docs": "docs/TECH_SPEC-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md"
+      }
+    },
+    {
       "id": "20260402-linear-dbddac50-c205-4402-a7a5-e2325a9c4373",
       "title": "CO: Restore clean full-suite Vitest exit for provider-worker validation",
       "relates_to": "tasks/tasks-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
