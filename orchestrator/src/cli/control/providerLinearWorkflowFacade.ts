@@ -2481,7 +2481,7 @@ function findMarkdownLineEnd(body: string, lineStart: number): number {
 
 function readMarkdownFenceDelimiter(line: string): { character: '`' | '~'; length: number } | null {
   const lineWithoutLineEnding = line.replace(/\r?\n$/u, '');
-  const trimmedStart = lineWithoutLineEnding.trimStart();
+  const trimmedStart = stripMarkdownBlockquotePrefixes(lineWithoutLineEnding).trimStart();
   if (trimmedStart.length < 3) {
     return null;
   }
@@ -2504,7 +2504,7 @@ function isMarkdownFenceCloser(
   fence: { character: '`' | '~'; length: number }
 ): boolean {
   const lineWithoutLineEnding = line.replace(/\r?\n$/u, '');
-  const trimmedStart = lineWithoutLineEnding.trimStart();
+  const trimmedStart = stripMarkdownBlockquotePrefixes(lineWithoutLineEnding).trimStart();
   if (!trimmedStart.startsWith(fence.character.repeat(fence.length))) {
     return false;
   }
@@ -5181,7 +5181,7 @@ function parseCodeFenceLine(line: string): {
   delimiter: string;
   trailingText: string;
 } | null {
-  const match = line.match(/^[ ]{0,3}(`{3,}|~{3,})(.*)$/u);
+  const match = stripMarkdownBlockquotePrefixes(line).match(/^[ ]{0,3}(`{3,}|~{3,})(.*)$/u);
   if (!match) {
     return null;
   }

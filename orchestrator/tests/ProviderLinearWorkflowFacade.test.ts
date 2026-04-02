@@ -8936,6 +8936,7 @@ describe('providerLinearWorkflowFacade', () => {
     const assetUrl = 'https://assets.linear.test/proof-code-examples';
     const missingFencedPath = join(tempDir, 'missing fenced proof.png');
     const missingInlinePath = join(tempDir, 'missing inline proof.png');
+    const missingBlockquotedFencedPath = join(tempDir, 'missing blockquoted fenced proof.png');
     const missingIndentedPath = join(tempDir, 'missing indented proof.png');
     const missingTabbedPath = join(tempDir, 'missing tabbed proof.png');
     const missingBlockquotedIndentedPath = join(tempDir, 'missing blockquoted indented proof.png');
@@ -8946,6 +8947,9 @@ describe('providerLinearWorkflowFacade', () => {
         '```md',
         `![Example only](file://${missingFencedPath})`,
         '```',
+        '> ```md',
+        `> ![Blockquoted fenced only](file://${missingBlockquotedFencedPath})`,
+        '> ```',
         `- Inline example \`![Literal inline](file://${missingInlinePath})\` should not upload.`,
         'Indented code examples should stay literal:',
         '',
@@ -8964,6 +8968,9 @@ describe('providerLinearWorkflowFacade', () => {
         '```md',
         `![Example only](file://${missingFencedPath})`,
         '```',
+        '> ```md',
+        `> ![Blockquoted fenced only](file://${missingBlockquotedFencedPath})`,
+        '> ```',
         `- Inline example \`![Literal inline](file://${missingInlinePath})\` should not upload.`,
         'Indented code examples should stay literal:',
         '',
