@@ -532,16 +532,16 @@ function isAuthoritativeCurrentRunningSource(
   if (!providerIntakeState) {
     return true;
   }
+  const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   if (source.issueProvider === null) {
-    return !hasActiveCurrentProviderIntakeClaim(providerIntakeState);
+    if (claim !== null) {
+      return isProviderIntakeClaimActiveCurrentActivity(claim);
+    }
+    return !hasProviderBoundIssueIdentity(source);
   }
   if (!isProviderIntakeScopedRunningSource(source)) {
     return true;
   }
-  if (providerIntakeState.claims.length === 0) {
-    return false;
-  }
-  const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
 }
 
@@ -551,8 +551,16 @@ function isProviderIntakeScopedRunningSource(
   return source.issueProvider === 'linear';
 }
 
-function hasActiveCurrentProviderIntakeClaim(providerIntakeState: ProviderIntakeState): boolean {
-  return providerIntakeState.claims.some((claim) => isProviderIntakeClaimActiveCurrentActivity(claim));
+function hasProviderBoundIssueIdentity(
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'taskId'>
+): boolean {
+  if (!source.issueId) {
+    return false;
+  }
+  if (!source.taskId) {
+    return true;
+  }
+  return source.issueId !== source.taskId;
 }
 
 function isProviderIntakeClaimActiveCurrentActivity(
