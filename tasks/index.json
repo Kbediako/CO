@@ -24,6 +24,62 @@
       }
     },
     {
+      "id": "20260402-linear-dbddac50-c205-4402-a7a5-e2325a9c4373",
+      "title": "CO: Restore clean full-suite Vitest exit for provider-worker validation",
+      "relates_to": "tasks/tasks-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
+        "task": "tasks/tasks-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
+        "agent_task": ".agent/task/linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
+        "docs": "docs/TECH_SPEC-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md"
+      }
+    },
+    {
+      "id": "20260402-linear-88b95054-4f55-4d4d-94be-b491d9896b31",
+      "title": "CO: Refresh tracked issue metadata for active provider claims",
+      "relates_to": "tasks/tasks-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "paths": {
+        "spec": "tasks/specs/linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+        "task": "tasks/tasks-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+        "agent_task": ".agent/task/linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
+        "docs": "docs/TECH_SPEC-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md"
+      }
+    },
+    {
+      "id": "20260402-linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1",
+      "title": "CO: Restore unrelated eval:test baseline failing TypeScript smoke harness",
+      "relates_to": "tasks/tasks-linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-02",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-02",
+          "manifest": ".runs/linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1-co-58-docs-review/cli/2026-04-02T08-28-51-569Z-64402b50/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1.md",
+        "task": "tasks/tasks-linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1.md",
+        "agent_task": ".agent/task/linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1.md",
+        "docs": "docs/TECH_SPEC-linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1.md"
+      }
+    },
+    {
       "id": "20260402-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936",
       "title": "CO: Embed screenshot proof directly in Linear comments and workpads",
       "relates_to": "tasks/tasks-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md",

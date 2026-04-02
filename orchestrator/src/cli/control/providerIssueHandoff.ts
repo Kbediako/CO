@@ -427,6 +427,100 @@ export function createProviderIssueHandoffService(
     ...(trackedIssue.blocked_by === undefined ? {} : { issue_blocked_by: trackedIssue.blocked_by })
   });
 
+  const buildFreshTrackedIssueClaimFields = (
+    claim: Pick<ProviderIntakeClaimRecord, 'issue_updated_at'>,
+    trackedIssue: Pick<
+      LiveLinearTrackedIssue,
+      | 'identifier'
+      | 'title'
+      | 'state'
+      | 'state_type'
+      | 'updated_at'
+      | 'viewer_id'
+      | 'assignee_id'
+      | 'assignee_name'
+      | 'blocked_by'
+    >
+  ): Partial<
+    Pick<
+      ProviderIntakeClaimRecord,
+      | 'issue_identifier'
+      | 'issue_title'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_viewer_id'
+      | 'issue_viewer_auth_fingerprint'
+      | 'issue_assignee_id'
+      | 'issue_assignee_name'
+      | 'issue_blocked_by'
+    >
+  > => {
+    const freshness = compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: claim.issue_updated_at ?? null,
+      nextIssueUpdatedAt: trackedIssue.updated_at
+    });
+    if (freshness === 'older') {
+      return {};
+    }
+    if (freshness === 'unknown' && claim.issue_updated_at) {
+      return {};
+    }
+    return buildTrackedIssueClaimFields(trackedIssue);
+  };
+
+  const resolveFreshTrackedIssueClaimFieldsForActiveClaim = async (
+    claim: Pick<ProviderIntakeClaimRecord, 'provider' | 'issue_id' | 'issue_updated_at'>
+  ): Promise<
+    Partial<
+      Pick<
+        ProviderIntakeClaimRecord,
+        | 'issue_identifier'
+        | 'issue_title'
+        | 'issue_state'
+        | 'issue_state_type'
+        | 'issue_updated_at'
+        | 'issue_viewer_id'
+        | 'issue_viewer_auth_fingerprint'
+        | 'issue_assignee_id'
+        | 'issue_assignee_name'
+        | 'issue_blocked_by'
+      >
+    >
+  > => {
+    if (!options.resolveTrackedIssue) {
+      return {};
+    }
+
+    let resolution: Awaited<ReturnType<NonNullable<typeof options.resolveTrackedIssue>>>;
+    try {
+      resolution = await options.resolveTrackedIssue({
+        provider: claim.provider,
+        issueId: claim.issue_id
+      });
+    } catch (error) {
+      logger.warn(
+        `Provider issue active-run metadata refresh failed for ${buildProviderIssueKey(
+          claim.provider,
+          claim.issue_id
+        )}: ${(error as Error)?.message ?? String(error)}`
+      );
+      return {};
+    }
+    if (resolution.kind !== 'ready') {
+      return {};
+    }
+
+    const eligibility = assessProviderTrackedIssueEligibility(resolution.trackedIssue, {
+      hasExistingClaim: true
+    });
+    if (!eligibility.eligible) {
+      return {};
+    }
+
+    return buildFreshTrackedIssueClaimFields(claim, resolution.trackedIssue);
+  };
+
   const launchResumeForRun = async (input: {
     claim: ProviderIntakeClaimRecord;
     trackedIssue: LiveLinearTrackedIssue;
@@ -726,7 +820,9 @@ export function createProviderIssueHandoffService(
     await cancelState.attempt;
   };
 
-  const rehydrateNow = async (): Promise<{ hasPendingClaims: boolean }> => {
+  const rehydrateNow = async (input?: {
+    refreshTrackedIssueMetadata?: boolean;
+  }): Promise<{ hasPendingClaims: boolean }> => {
     const now = isoTimestamp();
     const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
     const runsByProviderIssue = groupProviderIssueRuns(discoveredRuns);
@@ -789,7 +885,11 @@ export function createProviderIssueHandoffService(
 
       const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
+        const trackedIssueFields = input?.refreshTrackedIssueMetadata
+          ? await resolveFreshTrackedIssueClaimFieldsForActiveClaim(claim)
+          : {};
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
+          ...trackedIssueFields,
           state: 'running',
           reason: 'provider_issue_rehydrated_active_run',
           task_id: activeRun.taskId,
@@ -798,6 +898,7 @@ export function createProviderIssueHandoffService(
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
+          ...trackedIssueFields,
           launch_source: undefined,
           launch_token: undefined,
           task_id: activeRun.taskId,
@@ -1982,6 +2083,39 @@ export function createProviderIssueHandoffService(
           }
 
           if (resolution.kind === 'owned') {
+            if (activeRun) {
+              const trackedIssueFields = buildFreshTrackedIssueClaimFields(
+                claim,
+                resolution.trackedIssue
+              );
+              const transitioned = hasProviderClaimTransitioned(claim, {
+                ...trackedIssueFields,
+                state: 'running',
+                reason: 'provider_issue_rehydrated_active_run',
+                task_id: activeRun.taskId,
+                run_id: activeRun.runId,
+                run_manifest_path: activeRun.manifestPath
+              });
+              const refreshActiveRunSnapshot = captureProviderStateSnapshot();
+              upsertProviderIntakeClaim(options.state, {
+                ...claim,
+                ...trackedIssueFields,
+                launch_source: undefined,
+                launch_token: undefined,
+                task_id: activeRun.taskId,
+                state: 'running',
+                reason: 'provider_issue_rehydrated_active_run',
+                run_id: activeRun.runId,
+                run_manifest_path: activeRun.manifestPath
+              });
+              if (transitioned) {
+                await persistStateOrRollback(refreshActiveRunSnapshot);
+                options.publishRuntime?.('provider-intake.refresh');
+              }
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              continue;
+            }
+
             const currentClaim =
               claim.retry_queued === true
                 ? await ensureQueuedProviderRetryDeadline({
@@ -2002,7 +2136,40 @@ export function createProviderIssueHandoffService(
             continue;
           }
 
-          if (claim.state === 'starting' || claim.state === 'resuming' || activeRun) {
+          if (claim.state === 'starting' || claim.state === 'resuming') {
+            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            continue;
+          }
+
+          if (activeRun) {
+            const trackedIssueFields = buildFreshTrackedIssueClaimFields(
+              claim,
+              resolution.trackedIssue
+            );
+            const transitioned = hasProviderClaimTransitioned(claim, {
+              ...trackedIssueFields,
+              state: 'running',
+              reason: 'provider_issue_rehydrated_active_run',
+              task_id: activeRun.taskId,
+              run_id: activeRun.runId,
+              run_manifest_path: activeRun.manifestPath
+            });
+            const refreshActiveRunSnapshot = captureProviderStateSnapshot();
+            upsertProviderIntakeClaim(options.state, {
+              ...claim,
+              ...trackedIssueFields,
+              launch_source: undefined,
+              launch_token: undefined,
+              task_id: activeRun.taskId,
+              state: 'running',
+              reason: 'provider_issue_rehydrated_active_run',
+              run_id: activeRun.runId,
+              run_manifest_path: activeRun.manifestPath
+            });
+            if (transitioned) {
+              await persistStateOrRollback(refreshActiveRunSnapshot);
+              options.publishRuntime?.('provider-intake.refresh');
+            }
             noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
             continue;
           }
@@ -2162,7 +2329,7 @@ export function createProviderIssueHandoffService(
 
     async rehydrate(): Promise<void> {
       await runWithRefreshLifecycleLock(async () => {
-        const result = await rehydrateNow();
+        const result = await rehydrateNow({ refreshTrackedIssueMetadata: true });
         if (result.hasPendingClaims) {
           scheduleBestEffortRehydrateWithRefreshLock();
         }
