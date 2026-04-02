@@ -8,7 +8,7 @@
 - Assumptions:
   - the current workspace reflects a live reproduction environment for CO-69
   - prior CO-57 work fixed a related but narrower heartbeat problem, not necessarily this exit hang
-  - the initial 240 second reproduction ceiling may be too short for the current late-tail duration profile and must not be treated as proof of a real post-suite linger by itself
+  - the initial 240-second reproduction ceiling may be too short for the current late-tail duration profile and must not be treated as proof of a real post-suite linger by itself
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
