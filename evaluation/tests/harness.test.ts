@@ -97,6 +97,34 @@ describe('evaluation harness', () => {
     expect(nodePathEntries).not.toContain(tempParentNodeModules);
   });
 
+  it('stops at the repo boundary when .git metadata resolves a canonical repo path', async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-node-path-canonical-'));
+    const aliasRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-node-path-alias-'));
+    tempDirs.push(rootDir, aliasRoot);
+
+    const repoDir = path.join(rootDir, 'repo');
+    const aliasRepoDir = path.join(aliasRoot, 'repo-link');
+    const workspaceDir = path.join(aliasRepoDir, '.workspaces', 'issue-workspace');
+    const aliasParentNodeModules = path.join(aliasRoot, 'node_modules');
+
+    await fs.mkdir(path.join(repoDir, '.git', 'worktrees', 'issue-workspace'), { recursive: true });
+    await fs.mkdir(path.join(repoDir, 'node_modules', 'ts-node', 'register'), { recursive: true });
+    await fs.symlink(repoDir, aliasRepoDir, 'dir');
+    await fs.mkdir(workspaceDir, { recursive: true });
+    await fs.writeFile(
+      path.join(workspaceDir, '.git'),
+      `gitdir: ${path.join(repoDir, '.git', 'worktrees', 'issue-workspace')}\n`
+    );
+    await fs.mkdir(aliasParentNodeModules, { recursive: true });
+
+    const overrides = buildEnvOverrides(undefined, workspaceDir);
+    const nodePathEntries = (overrides.NODE_PATH ?? '').split(path.delimiter).filter(Boolean);
+
+    expect(nodePathEntries).toContain(path.join(workspaceDir, 'node_modules'));
+    expect(nodePathEntries).toContain(path.join(aliasRepoDir, 'node_modules'));
+    expect(nodePathEntries).not.toContain(aliasParentNodeModules);
+  });
+
   it('runs the TypeScript smoke scenario successfully', async () => {
     const result = await runScenario('typescript-smoke', { mode: 'mcp' });
     const goalStatuses = result.goals.map((goal) => goal.status);

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 function splitNodePath(value: string | undefined): string[] {
@@ -13,6 +13,18 @@ function splitNodePath(value: string | undefined): string[] {
 
 function uniqueEntries(entries: string[]): string[] {
   return [...new Set(entries)];
+}
+
+function canonicalizeExistingPath(target: string): string {
+  try {
+    return realpathSync.native(target);
+  } catch {
+    try {
+      return realpathSync(target);
+    } catch {
+      return path.resolve(target);
+    }
+  }
 }
 
 function detectRepoRoot(startDir: string): string | undefined {
@@ -58,6 +70,7 @@ export function collectNodeModulePaths(startDir: string): string[] {
   if (!repoRoot) {
     return uniqueEntries(results);
   }
+  const canonicalRepoRoot = canonicalizeExistingPath(repoRoot);
   let current: string | undefined = resolvedStartDir;
 
   while (current) {
@@ -65,7 +78,7 @@ export function collectNodeModulePaths(startDir: string): string[] {
     if (candidate !== results[0] && existsSync(candidate)) {
       results.push(candidate);
     }
-    if (repoRoot && current === repoRoot) {
+    if (canonicalizeExistingPath(current) === canonicalRepoRoot) {
       break;
     }
 
