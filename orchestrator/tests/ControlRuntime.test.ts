@@ -1012,6 +1012,47 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('keeps non-intake running sources visible when provider intake state is present but empty', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-empty-intake-current',
+        providerIntakeState: createProviderIntakeState([])
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-empty-intake-current',
+        issue_provider: 'linear',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      await createSiblingRun(fixture.root, 'task-empty-intake-local', 'run-2', {
+        manifest: {
+          issue_provider: 'local',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          summary: 'local active run without intake scoping'
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT',
+        'task-empty-intake-local'
+      ]);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'task-empty-intake-local')
+      ).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uses run id as the final same-issue representative tiebreak when timestamps collide', async () => {
     const fixture = await createFixture({
       taskId: 'task-1036-current'
@@ -2406,6 +2447,88 @@ describe('ControlRuntime', () => {
       last_success_at: '2026-03-07T00:00:06.000Z',
       last_error_at: '2026-03-07T00:00:11.000Z',
       last_error: 'provider refresh failed'
+    });
+  });
+
+  it('recomputes rate limits on repeated compatibility reads without snapshot invalidation', async () => {
+    const providerIntakeState = createProviderIntakeState();
+    providerIntakeState.polling = {
+      linear_budget: {
+        observed_at: '2026-03-07T00:29:45.000Z',
+        source: 'control-host-polling',
+        suppression: 'none',
+        suppression_reason: null,
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        request_id: 'polling-1',
+        requests: {
+          remaining: 17,
+          limit: 30,
+          reset_at: '2026-03-07T00:30:42.000Z'
+        },
+        endpoint_requests: null,
+        complexity: null,
+        endpoint_complexity: null
+      }
+    };
+    const fixture = await createFixture({
+      taskId: 'task-rate-limit-refresh',
+      providerIntakeState
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'task-rate-limit-refresh',
+      issue_id: 'issue-budget',
+      issue_identifier: 'ISSUE-BUDGET',
+      started_at: '2026-03-07T00:20:00.000Z',
+      updated_at: '2026-03-07T00:29:59.000Z'
+    });
+
+    const snapshot = fixture.runtime.snapshot();
+    const initialProjection = await snapshot.readCompatibilityProjection();
+
+    providerIntakeState.polling = {
+      linear_budget: {
+        observed_at: '2026-03-07T00:29:55.000Z',
+        source: 'control-host-polling',
+        suppression: 'none',
+        suppression_reason: null,
+        retry_after_seconds: 12,
+        cooldown_until: null,
+        cooldown_active: false,
+        request_id: 'polling-2',
+        requests: {
+          remaining: 9,
+          limit: 30,
+          reset_at: '2026-03-07T00:31:12.000Z'
+        },
+        endpoint_requests: null,
+        complexity: null,
+        endpoint_complexity: null
+      }
+    };
+
+    const repeatedProjection = await snapshot.readCompatibilityProjection();
+
+    expect(initialProjection.rateLimits).toMatchObject({
+      observed_at: '2026-03-07T00:29:45.000Z',
+      request_id: 'polling-1',
+      retry_after_seconds: null,
+      requests: {
+        remaining: 17,
+        limit: 30,
+        reset_at: '2026-03-07T00:30:42.000Z'
+      }
+    });
+    expect(repeatedProjection.rateLimits).toMatchObject({
+      observed_at: '2026-03-07T00:29:55.000Z',
+      request_id: 'polling-2',
+      retry_after_seconds: 12,
+      requests: {
+        remaining: 9,
+        limit: 30,
+        reset_at: '2026-03-07T00:31:12.000Z'
+      }
     });
   });
 

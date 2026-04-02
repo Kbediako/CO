@@ -229,12 +229,19 @@ function createControlRuntimeSnapshot(
   }
 
   async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
-    compatibilityProjectionPromise ??= readCompatibilityRuntimeSnapshot().then((snapshot) =>
-      buildCompatibilityProjectionSnapshot(snapshot)
-    );
+    const runtimeSnapshot = await readCompatibilityRuntimeSnapshot();
+    compatibilityProjectionPromise ??= Promise.resolve(buildCompatibilityProjectionSnapshot(runtimeSnapshot));
+    const polling = readProviderPollingSnapshot(context);
+    const telemetrySources = buildCompatibilityTelemetrySources({
+      selected: runtimeSnapshot.selected,
+      running: runtimeSnapshot.running,
+      retrying: runtimeSnapshot.retrying
+    });
+    const { rateLimits } = buildCompatibilityTelemetrySnapshot(telemetrySources, polling);
     return {
       ...(await compatibilityProjectionPromise),
-      polling: readProviderPollingSnapshot(context)
+      rateLimits,
+      polling
     };
   }
 
@@ -524,7 +531,7 @@ function isAuthoritativeCurrentRunningSource(
     return true;
   }
   if (providerIntakeState.claims.length === 0) {
-    return false;
+    return !isProviderIntakeScopedRunningSource(source);
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   if (claim !== null) {
