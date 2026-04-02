@@ -125,6 +125,31 @@ describe('evaluation harness', () => {
     expect(nodePathEntries).not.toContain(aliasParentNodeModules);
   });
 
+  it('keeps .git file repo boundaries scoped to the current submodule directory', async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-node-path-submodule-'));
+    tempDirs.push(rootDir);
+
+    const repoDir = path.join(rootDir, 'repo');
+    const submoduleDir = path.join(repoDir, 'submodule');
+    const submoduleGitDir = path.join(repoDir, '.git', 'modules', 'submodule');
+    const repoNodeModules = path.join(repoDir, 'node_modules');
+    const submoduleNodeModules = path.join(submoduleDir, 'node_modules');
+
+    await fs.mkdir(submoduleGitDir, { recursive: true });
+    await fs.mkdir(submoduleNodeModules, { recursive: true });
+    await fs.mkdir(repoNodeModules, { recursive: true });
+    await fs.writeFile(
+      path.join(submoduleDir, '.git'),
+      `gitdir: ${path.relative(submoduleDir, submoduleGitDir)}\n`
+    );
+
+    const overrides = buildEnvOverrides(undefined, submoduleDir);
+    const nodePathEntries = (overrides.NODE_PATH ?? '').split(path.delimiter).filter(Boolean);
+
+    expect(nodePathEntries).toContain(submoduleNodeModules);
+    expect(nodePathEntries).not.toContain(repoNodeModules);
+  });
+
   it('runs the TypeScript smoke scenario successfully', async () => {
     const result = await runScenario('typescript-smoke', { mode: 'mcp' });
     const goalStatuses = result.goals.map((goal) => goal.status);

@@ -43,10 +43,10 @@ function detectRepoRoot(startDir: string): string | undefined {
         const match = contents.match(/^gitdir:\s*(.+)$/im);
         if (match?.[1]) {
           const resolvedGitDir = path.resolve(current, match[1].trim());
-          const marker = `${path.sep}.git${path.sep}`;
-          const markerIndex = resolvedGitDir.indexOf(marker);
-          if (markerIndex !== -1) {
-            return resolvedGitDir.slice(0, markerIndex);
+          const worktreeMarker = `${path.sep}.git${path.sep}worktrees${path.sep}`;
+          const worktreeMarkerIndex = resolvedGitDir.indexOf(worktreeMarker);
+          if (worktreeMarkerIndex !== -1) {
+            return resolvedGitDir.slice(0, worktreeMarkerIndex);
           }
           if (path.basename(resolvedGitDir) === '.git') {
             return path.dirname(resolvedGitDir);
