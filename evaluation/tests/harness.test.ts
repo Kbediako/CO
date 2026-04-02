@@ -181,6 +181,38 @@ describe('evaluation harness', () => {
     expect(nodePathEntries).not.toContain(rootNodeModules);
   });
 
+  it('stops at the current checkout root for non-ancestor external gitdir layouts', async () => {
+    const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-eval-node-path-external-gitdir-'));
+    tempDirs.push(rootDir);
+
+    const checkoutParentDir = path.join(rootDir, 'checkouts');
+    const checkoutDir = path.join(checkoutParentDir, 'repo');
+    const fixtureDir = path.join(checkoutDir, 'evaluation', 'fixtures', 'typescript-smoke');
+    const externalGitRoot = path.join(rootDir, 'git-metadata');
+    const externalGitDir = path.join(externalGitRoot, '.git');
+    const rootNodeModules = path.join(rootDir, 'node_modules');
+    const checkoutParentNodeModules = path.join(checkoutParentDir, 'node_modules');
+    const checkoutNodeModules = path.join(checkoutDir, 'node_modules');
+
+    await fs.mkdir(fixtureDir, { recursive: true });
+    await fs.mkdir(externalGitDir, { recursive: true });
+    await fs.mkdir(checkoutNodeModules, { recursive: true });
+    await fs.mkdir(checkoutParentNodeModules, { recursive: true });
+    await fs.mkdir(rootNodeModules, { recursive: true });
+    await fs.writeFile(
+      path.join(checkoutDir, '.git'),
+      `gitdir: ${path.relative(checkoutDir, externalGitDir)}\n`
+    );
+
+    const overrides = buildEnvOverrides(undefined, fixtureDir);
+    const nodePathEntries = (overrides.NODE_PATH ?? '').split(path.delimiter).filter(Boolean);
+
+    expect(nodePathEntries).toContain(path.join(fixtureDir, 'node_modules'));
+    expect(nodePathEntries).toContain(checkoutNodeModules);
+    expect(nodePathEntries).not.toContain(checkoutParentNodeModules);
+    expect(nodePathEntries).not.toContain(rootNodeModules);
+  });
+
   it('runs the TypeScript smoke scenario successfully', async () => {
     const result = await runScenario('typescript-smoke', { mode: 'mcp' });
     const goalStatuses = result.goals.map((goal) => goal.status);
