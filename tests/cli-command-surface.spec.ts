@@ -338,7 +338,7 @@ describe('codex-orchestrator command surface', () => {
       CODEX_HOME: tempDir
     };
 
-    const { stdout } = await runCli(['codex', 'setup', '--format', 'json'], env);
+    const { stdout } = await runCli(['codex', 'setup', '--format', 'json'], env, CLI_BOOT_TIMEOUT);
     const payload = JSON.parse(stdout) as {
       status?: string;
       plan?: { method?: string; installRoot?: string };
@@ -355,7 +355,7 @@ describe('codex-orchestrator command surface', () => {
       CODEX_HOME: tempDir
     };
 
-    const { stdout } = await runCli(['codex', 'defaults', '--format', 'json'], env);
+    const { stdout } = await runCli(['codex', 'defaults', '--format', 'json'], env, CLI_BOOT_TIMEOUT);
     const payload = JSON.parse(stdout) as {
       status?: string;
       plan?: { configPath?: string };

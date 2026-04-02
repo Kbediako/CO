@@ -50,7 +50,7 @@ codex-orchestrator co-status
 This reuses the existing `control-host` runtime path, but gives operators a monitor-first command surface.
 
 Interactive TTY controls:
-- `p` freezes or resumes live redraw, so the current frame stays inspectable.
+- `p` pauses into a clean primary-buffer inspect snapshot or resumes the live alternate-screen monitor.
 - `c` toggles compact inspect mode for shorter terminal heights.
 - `s` exports the current frame to `.runs/<task-id>/cli/<run-id>/co-status-snapshots/` for pager or scrollback inspection.
 

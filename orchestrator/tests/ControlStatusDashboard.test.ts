@@ -14,6 +14,8 @@ import {
 } from '../src/cli/control/controlStatusDashboard.js';
 
 const ANSI_PATTERN = new RegExp(`${String.fromCharCode(0x1b)}(?:\\[[0-?]*[ -/]*[@-~]|[@-Z\\\\-_])`, 'g');
+const ANSI_ALT_SCREEN_ENTER = '\u001b[?1049h';
+const ANSI_ALT_SCREEN_EXIT = '\u001b[?1049l';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -355,7 +357,7 @@ describe('control status dashboard', () => {
       '│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded',
       '│',
       '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
-      '│ Inspect: live | full frame',
+      '│ Inspect: live | alternate screen | full frame',
       '│ Snapshot: press s to export a stable frame under run dir',
       '╰─'
     ].join('\n'));
@@ -465,7 +467,7 @@ describe('control status dashboard', () => {
       '│  ↻ CO-32 attempt=2 in 9.000s error=worker crashed restarting cleanly',
       '│',
       '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
-      '│ Inspect: live | full frame',
+      '│ Inspect: live | alternate screen | full frame',
       '│ Snapshot: press s to export a stable frame under run dir',
       '╰─'
     ].join('\n'));
@@ -541,7 +543,7 @@ describe('control status dashboard', () => {
       '│  No queued retries',
       '│',
       '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
-      '│ Inspect: live | full frame',
+      '│ Inspect: live | alternate screen | full frame',
       '│ Snapshot: press s to export a stable frame under run dir',
       '╰─'
     ].join('\n'));
@@ -576,7 +578,7 @@ describe('control status dashboard', () => {
       '│ Running: CO-26 | running | Worker turn active',
       '│ Retry: CO-27 | in 60.000s | rate limit exceeded',
       '│ Controls: p resume live redraw | c full frame | s snapshot export',
-      '│ Inspect: paused | compact inspect | updates waiting',
+      '│ Inspect: paused | primary snapshot | compact inspect | updates waiting',
       '│ Snapshot: saved | /repo/.runs/local-mcp/cli/control-host/co-status-snapshots/co-status-20260331T093000Z.txt',
       '╰─'
     ].join('\n'));
@@ -948,11 +950,14 @@ describe('control status dashboard', () => {
     await handle.flush();
     expect(requestRefresh).toHaveBeenCalledTimes(1);
     expect(writes[0]?.endsWith('\n')).toBe(false);
+    expect(writes[0]?.startsWith(`${ANSI_ALT_SCREEN_ENTER}\u001b[H\u001b[2J`)).toBe(true);
 
     input.emitText('p');
     await handle.flush();
     const pausedWriteCount = writes.length;
-    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | full frame');
+    expect(writes.at(-1)?.startsWith(`${ANSI_ALT_SCREEN_EXIT}\u001b[H\u001b[2J`)).toBe(true);
+    expect(writes.at(-1)?.endsWith('\n')).toBe(true);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
 
     listener?.();
     await handle.flush();
@@ -966,16 +971,79 @@ describe('control status dashboard', () => {
     input.emitText('c');
     await handle.flush();
     expect(stripAnsi(writes.at(-1) ?? '')).toContain(
-      '│ Inspect: paused | compact inspect | updates waiting'
+      '│ Inspect: paused | primary snapshot | compact inspect | updates waiting'
     );
+    expect(writes.at(-1)?.startsWith('\u001b[H\u001b[2J')).toBe(true);
+    expect(writes.at(-1)?.endsWith('\n')).toBe(false);
     expect(writes).toHaveLength(pausedWriteCount + 1);
 
     input.emitText('p');
     await handle.flush();
     expect(requestRefresh).toHaveBeenCalledTimes(2);
-    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+    expect(writes.at(-1)?.startsWith(`${ANSI_ALT_SCREEN_ENTER}\u001b[H\u001b[2J`)).toBe(true);
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | compact inspect');
 
     handle.stop();
+    expect(input.rawModes).toEqual([true, false]);
+  });
+
+  it('preserves the prompt-separating newline when stopping from alternate mode after resuming a paused primary rerender', async () => {
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => buildDataset(),
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+
+    input.emitText('p');
+    await handle.flush();
+    input.emitText('c');
+    await handle.flush();
+
+    expect(writes.at(-1)?.startsWith('\u001b[H\u001b[2J')).toBe(true);
+    expect(writes.at(-1)?.endsWith('\n')).toBe(false);
+
+    input.emitText('p');
+    await handle.flush();
+    expect(writes.at(-1)?.startsWith(`${ANSI_ALT_SCREEN_ENTER}\u001b[H\u001b[2J`)).toBe(true);
+
+    handle.stop();
+
+    expect(writes.at(-1)).toBe(`${ANSI_ALT_SCREEN_EXIT}\n`);
     expect(input.rawModes).toEqual([true, false]);
   });
 
@@ -1045,7 +1113,7 @@ describe('control status dashboard', () => {
     await handle.flush();
 
     expect(requestRefresh).toHaveBeenCalledTimes(2);
-    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | compact inspect');
 
     handle.stop();
   });
@@ -1126,7 +1194,7 @@ describe('control status dashboard', () => {
     await handle.flush();
 
     expect(readCount).toBe(2);
-    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | compact inspect');
     expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Running: CO-26 | running | Worker turn updated');
 
     handle.stop();
@@ -1202,13 +1270,94 @@ describe('control status dashboard', () => {
     resolveFirstDataset?.(buildDataset());
     await handle.flush();
 
-    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | full frame | updates waiting');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame | updates waiting');
 
     input.emitText('p');
     await handle.flush();
 
     expect(requestRefresh).toHaveBeenCalledTimes(2);
-    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | full frame');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | full frame');
+
+    handle.stop();
+  });
+
+  it('keeps the pause handoff scrollback-clean when pausing during an in-flight live refresh', async () => {
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let listener: (() => void) | null = null;
+    let resolveSecondDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const secondDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveSecondDataset = resolve;
+    });
+    let readCount = 0;
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn((callback: () => void) => {
+        listener = callback;
+        return () => {
+          listener = null;
+        };
+      }),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => {
+          readCount += 1;
+          if (readCount === 2) {
+            return await secondDataset;
+          }
+          return buildDataset();
+        },
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    const liveWriteCount = writes.length;
+
+    listener?.();
+    await Promise.resolve();
+    input.emitText('p');
+    await Promise.resolve();
+
+    resolveSecondDataset?.(buildDataset());
+    await handle.flush();
+
+    const pauseWrites = writes.slice(liveWriteCount);
+    expect(pauseWrites).toHaveLength(2);
+    expect(pauseWrites[0]?.startsWith(ANSI_ALT_SCREEN_EXIT)).toBe(true);
+    expect(stripAnsi(pauseWrites[0] ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(pauseWrites[0]?.endsWith('\n')).toBe(true);
+    expect(pauseWrites[1]?.startsWith('\u001b[H\u001b[2J')).toBe(true);
+    expect(stripAnsi(pauseWrites[1] ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(pauseWrites[1]?.endsWith('\n')).toBe(false);
+    expect(pauseWrites.filter((write) => write.endsWith('\n'))).toHaveLength(1);
 
     handle.stop();
   });
@@ -1241,7 +1390,9 @@ describe('control status dashboard', () => {
       })
     );
 
-    expect(constrainedFrame).toContain('│ Inspect: live | full frame | short terminal: pause then compact');
+    expect(constrainedFrame).toContain(
+      '│ Inspect: live | alternate screen | full frame | short terminal: pause then compact'
+    );
   });
 
   it('ignores terminal escape sequences so arrow keys do not trigger compact inspect', async () => {
@@ -1291,12 +1442,12 @@ describe('control status dashboard', () => {
     input.emitText('C');
     await handle.flush();
     expect(writes).toHaveLength(initialWriteCount);
-    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | full frame');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | full frame');
 
     input.emitText('c');
     await handle.flush();
     expect(writes).toHaveLength(initialWriteCount + 1);
-    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | compact inspect');
 
     handle.stop();
   });
@@ -1358,12 +1509,12 @@ describe('control status dashboard', () => {
       const snapshotPath = join(snapshotDir, snapshotFile as string);
       const snapshotText = await readFile(snapshotPath, 'utf8');
       expect(snapshotText).toContain('╭─ CO STATUS');
-      expect(snapshotText).toContain('│ Inspect: paused | compact inspect');
+      expect(snapshotText).toContain('│ Inspect: paused | primary snapshot | compact inspect');
       expect(stripAnsi(writes.at(-1) ?? '')).toContain(`│ Snapshot: saved | ${snapshotPath}`);
 
       input.emitText('p');
       await handle.flush();
-      expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | compact inspect');
+      expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: live | alternate screen | compact inspect');
 
       handle.stop();
     } finally {

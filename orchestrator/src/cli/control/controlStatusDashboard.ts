@@ -48,10 +48,12 @@ interface SummarySegment {
 }
 
 type DashboardViewMode = 'full' | 'compact';
+type DashboardSurfaceMode = 'primary' | 'alternate';
 
 interface DashboardFrameState {
   paused: boolean;
   viewMode: DashboardViewMode;
+  surfaceMode: DashboardSurfaceMode;
   pendingUpdate: boolean;
   snapshotStatus: 'idle' | 'saved' | 'failed';
   snapshotPath: string | null;
@@ -94,6 +96,7 @@ export interface RenderControlStatusFrameInput {
   referenceTime?: Date;
   paused?: boolean;
   viewMode?: DashboardViewMode;
+  surfaceMode?: DashboardSurfaceMode;
   pendingUpdate?: boolean;
   snapshotStatus?: 'idle' | 'saved' | 'failed';
   snapshotPath?: string | null;
@@ -109,6 +112,8 @@ export interface ControlStatusDashboardGateInput {
 }
 
 const ANSI_CLEAR_HOME = '\u001b[H\u001b[2J';
+const ANSI_ENTER_ALT_SCREEN = '\u001b[?1049h';
+const ANSI_EXIT_ALT_SCREEN = '\u001b[?1049l';
 const ANSI_RESET = '\u001b[0m';
 const ANSI_BOLD = '\u001b[1m';
 const ANSI_BLUE = '\u001b[34m';
@@ -184,9 +189,13 @@ export function startControlStatusDashboard(
   let tokenSamples: TokenSample[] = [];
   let renderedState: RenderedDashboardState | null = null;
   let escapeSequenceState: 'idle' | 'escape' | 'control' = 'idle';
+  const liveSurfaceMode: DashboardSurfaceMode = output.isTTY === true ? 'alternate' : 'primary';
+  let activeSurfaceMode: DashboardSurfaceMode = 'primary';
+  let pausedPrimaryPromptNeedsNewline = false;
   let frameState: DashboardFrameState = {
     paused: false,
     viewMode: 'full',
+    surfaceMode: liveSurfaceMode,
     pendingUpdate: false,
     snapshotStatus: 'idle',
     snapshotPath: null,
@@ -282,6 +291,13 @@ export function startControlStatusDashboard(
       }
       detachInput();
       unsubscribe();
+      if (activeSurfaceMode === 'alternate') {
+        output.write(`${ANSI_EXIT_ALT_SCREEN}${pausedPrimaryPromptNeedsNewline ? '\n' : ''}`);
+        activeSurfaceMode = 'primary';
+      } else if (pausedPrimaryPromptNeedsNewline) {
+        output.write('\n');
+      }
+      pausedPrimaryPromptNeedsNewline = false;
     },
     async flush() {
       await activeRender;
@@ -351,7 +367,8 @@ export function startControlStatusDashboard(
       if (key === 'p') {
         frameState = {
           ...frameState,
-          paused: !frameState.paused
+          paused: !frameState.paused,
+          surfaceMode: frameState.paused ? liveSurfaceMode : 'primary'
         };
         if (frameState.paused) {
           requestCachedFrameRender();
@@ -405,6 +422,7 @@ export function startControlStatusDashboard(
         referenceTime: renderedState.referenceTime,
         paused: frameState.paused,
         viewMode: frameState.viewMode,
+        surfaceMode: frameState.surfaceMode,
         pendingUpdate: frameState.pendingUpdate,
         snapshotStatus: 'saved',
         snapshotPath,
@@ -430,26 +448,26 @@ export function startControlStatusDashboard(
   async function renderFrame(forceRefresh: boolean, useCachedFrame: boolean): Promise<void> {
     try {
       if (useCachedFrame && renderedState && !forceRefresh) {
-        output.write(
-          `${ANSI_CLEAR_HOME}${renderControlStatusFrame({
-            dataset: renderedState.dataset,
-            baseUrl: options.baseUrl,
-            taskId: options.taskId,
-            runId: options.runId,
-            runDir: options.runDir,
-            startPipelineId: options.startPipelineId,
-            terminalColumns: output.columns ?? null,
-            terminalRows: output.rows ?? null,
-            throughputTps: renderedState.throughputTps,
-            referenceTime: renderedState.referenceTime,
-            paused: frameState.paused,
-            viewMode: frameState.viewMode,
-            pendingUpdate: frameState.pendingUpdate,
-            snapshotStatus: frameState.snapshotStatus,
-            snapshotPath: frameState.snapshotPath,
-            snapshotMessage: frameState.snapshotMessage
-          })}`
-        );
+        const frame = renderControlStatusFrame({
+          dataset: renderedState.dataset,
+          baseUrl: options.baseUrl,
+          taskId: options.taskId,
+          runId: options.runId,
+          runDir: options.runDir,
+          startPipelineId: options.startPipelineId,
+          terminalColumns: output.columns ?? null,
+          terminalRows: output.rows ?? null,
+          throughputTps: renderedState.throughputTps,
+          referenceTime: renderedState.referenceTime,
+          paused: frameState.paused,
+          viewMode: frameState.viewMode,
+          surfaceMode: frameState.surfaceMode,
+          pendingUpdate: frameState.pendingUpdate,
+          snapshotStatus: frameState.snapshotStatus,
+          snapshotPath: frameState.snapshotPath,
+          snapshotMessage: frameState.snapshotMessage
+        });
+        writeFrame(frame);
         return;
       }
       if (forceRefresh) {
@@ -472,7 +490,7 @@ export function startControlStatusDashboard(
         ...frameState,
         pendingUpdate: frameState.paused ? frameState.pendingUpdate : false
       };
-      output.write(`${ANSI_CLEAR_HOME}${renderControlStatusFrame({
+      const frame = renderControlStatusFrame({
         dataset,
         baseUrl: options.baseUrl,
         taskId: options.taskId,
@@ -485,26 +503,50 @@ export function startControlStatusDashboard(
         referenceTime,
         paused: frameState.paused,
         viewMode: frameState.viewMode,
+        surfaceMode: frameState.surfaceMode,
         pendingUpdate: frameState.pendingUpdate,
         snapshotStatus: frameState.snapshotStatus,
         snapshotPath: frameState.snapshotPath,
         snapshotMessage: frameState.snapshotMessage
-      })}`);
+      });
+      writeFrame(frame);
     } catch (error) {
       const message = (error as Error)?.message ?? String(error);
       logger.warn(`Failed rendering CO STATUS dashboard frame: ${message}`);
       if (stopped) {
         return;
       }
-      output.write(
-        `${ANSI_CLEAR_HOME}${renderControlStatusErrorFrame(
+      writeFrame(
+        renderControlStatusErrorFrame(
           options,
           deps.now(),
           message,
           output.columns ?? null
-        )}`
+        )
       );
     }
+  }
+
+  function writeFrame(frame: string): void {
+    if (frameState.surfaceMode === 'alternate') {
+      if (activeSurfaceMode !== 'alternate') {
+        activeSurfaceMode = 'alternate';
+        output.write(`${ANSI_ENTER_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}`);
+        return;
+      }
+      output.write(`${ANSI_CLEAR_HOME}${frame}`);
+      return;
+    }
+
+    if (activeSurfaceMode === 'alternate') {
+      activeSurfaceMode = 'primary';
+      pausedPrimaryPromptNeedsNewline = false;
+      output.write(`${ANSI_EXIT_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}\n`);
+      return;
+    }
+
+    pausedPrimaryPromptNeedsNewline = frameState.paused;
+    output.write(`${ANSI_CLEAR_HOME}${frame}`);
   }
 }
 
@@ -515,6 +557,7 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
   const frameState: DashboardFrameState = {
     paused: input.paused === true,
     viewMode: input.viewMode ?? 'full',
+    surfaceMode: input.surfaceMode ?? (input.paused === true ? 'primary' : 'alternate'),
     pendingUpdate: input.pendingUpdate === true,
     snapshotStatus: input.snapshotStatus ?? 'idle',
     snapshotPath: input.snapshotPath ?? null,
@@ -807,8 +850,11 @@ function renderInspectLine(
   frameState: DashboardFrameState,
   frameExceedsTerminalHeight: boolean
 ): string {
+  const surfaceLabel = frameState.surfaceMode === 'alternate' ? 'alternate screen' : 'primary snapshot';
   const segments: SummarySegment[] = [
     { text: frameState.paused ? 'paused' : 'live', color: frameState.paused ? ANSI_YELLOW : ANSI_GREEN },
+    { text: ' | ', color: ANSI_GRAY },
+    { text: surfaceLabel, color: frameState.surfaceMode === 'alternate' ? ANSI_BLUE : ANSI_MAGENTA },
     { text: ' | ', color: ANSI_GRAY },
     { text: frameState.viewMode === 'compact' ? 'compact inspect' : 'full frame', color: ANSI_CYAN }
   ];
