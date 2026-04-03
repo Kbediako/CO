@@ -122,6 +122,7 @@ Bundled skills (current shipped roster):
   - `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>`
 - Monitoring and issue bundles:
   - `codex-orchestrator co-status`
+  - `codex-orchestrator co-status attach`
   - `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
   - `codex-orchestrator start <pipeline> --auto-issue-log`
 - Packaging and release checks:

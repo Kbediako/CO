@@ -18,7 +18,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
     );
 
     expect(stdout).toContain('co-status [options]');
-    expect(stdout).toContain('Launch the live CO STATUS dashboard through the control-host path.');
+    expect(stdout).toContain('Launch or attach the CO STATUS terminal viewer.');
   }, cliHelpTimeoutMs);
 
   it('prints dedicated co-status help', async () => {
@@ -28,10 +28,30 @@ describe('codex-orchestrator CLI monitor alias', () => {
       { cwd: repoRoot }
     );
 
-    expect(stdout).toContain('Usage: codex-orchestrator co-status [options]');
-    expect(stdout).toContain('Dedicated monitor alias for the live CO STATUS dashboard.');
-    expect(stdout).toContain('This reuses the same host/runtime path as `control-host`.');
+    expect(stdout).toContain('Usage:');
+    expect(stdout).toContain('codex-orchestrator co-status [options]');
+    expect(stdout).toContain('codex-orchestrator co-status attach [options]');
+    expect(stdout).toContain('Launch the live CO STATUS dashboard by starting the control-host path,');
+    expect(stdout).toContain('or attach a read-only viewer to an already-running local JSON control-host.');
     expect(stdout).toContain('Pipeline used for provider-driven starts (default: provider-linear-worker).');
+    expect(stdout).toContain('Run `codex-orchestrator co-status attach --help` for attach flags.');
+  }, cliHelpTimeoutMs);
+
+  it('prints dedicated co-status attach help', async () => {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', 'attach', '--help'],
+      { cwd: repoRoot }
+    );
+
+    expect(stdout).toContain('Usage: codex-orchestrator co-status attach [options]');
+    expect(stdout).toContain(
+      'Attach a read-only CO STATUS viewer to an already-running local JSON control-host.'
+    );
+    expect(stdout).toContain('This reads persisted endpoint/auth artifacts and does not start another control-host,');
+    expect(stdout).toContain('Linear poller, or Telegram poller.');
+    expect(stdout).toContain('--run-dir <path>');
+    expect(stdout).toContain('--manifest-path <path>');
   }, cliHelpTimeoutMs);
 
   it('prints control-host help with the provider worker default pipeline', async () => {
@@ -53,8 +73,8 @@ describe('codex-orchestrator CLI monitor alias', () => {
         { cwd: repoRoot }
       );
 
-      expect(stdout).toContain('Usage: codex-orchestrator co-status [options]');
-      expect(stdout).toContain('Dedicated monitor alias for the live CO STATUS dashboard.');
+      expect(stdout).toContain('codex-orchestrator co-status [options]');
+      expect(stdout).toContain('codex-orchestrator co-status attach [options]');
     }, cliHelpTimeoutMs);
   }
 });

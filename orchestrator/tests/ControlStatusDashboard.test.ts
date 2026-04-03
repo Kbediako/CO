@@ -10,6 +10,7 @@ import type { OperatorDashboardDataset } from '../src/cli/control/operatorDashbo
 import {
   renderControlStatusFrame,
   shouldEnableControlStatusDashboard,
+  startAttachedControlStatusDashboard,
   startControlStatusDashboard
 } from '../src/cli/control/controlStatusDashboard.js';
 
@@ -361,6 +362,22 @@ describe('control status dashboard', () => {
       '│ Snapshot: press s to export a stable frame under run dir',
       '╰─'
     ].join('\n'));
+  });
+
+  it('labels live primary-screen renders as primary scrollback', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset(),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'attach-viewer',
+      terminalColumns: 120,
+      throughputTps: 1842.7,
+      surfaceMode: 'primary'
+    });
+
+    expect(stripAnsi(frame)).toContain('│ Inspect: live | primary scrollback | full frame');
   });
 
   it('renders narrow terminals with an explicit reduced running table and sorted retry queue', () => {
@@ -955,6 +972,55 @@ describe('control status dashboard', () => {
     handle.stop();
     await vi.advanceTimersByTimeAsync(5000);
     expect(requestRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps attached viewers on primary scrollback while refreshing live data', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let readCount = 0;
+
+    const handle = startAttachedControlStatusDashboard(
+      {
+        readDataset: async () =>
+          buildDataset({
+            totals: {
+              ...buildDataset().totals,
+              total_tokens: 217 + readCount++
+            }
+          }),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'attach-viewer',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          isTTY: true
+        }
+      },
+      {
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_ENTER);
+    expect(stripAnsi(writes[0] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+    expect(writes).toHaveLength(2);
+    expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_ENTER);
+    expect(stripAnsi(writes[1] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
+
+    handle.stop();
   });
 
   it('suppresses timed and runtime-triggered rerenders while paused until resumed', async () => {
