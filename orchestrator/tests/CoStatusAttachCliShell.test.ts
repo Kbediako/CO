@@ -122,6 +122,44 @@ describe('runCoStatusAttachCliShell', () => {
     });
   });
 
+  it('rejects malformed refresh interval flags before resolving the attach target', async () => {
+    await expect(
+      runCoStatusAttachCliShell({
+        flags: {
+          'refresh-interval-ms': true
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow('Invalid --refresh-interval-ms: expected integer milliseconds >= 250');
+
+    await expect(
+      runCoStatusAttachCliShell({
+        flags: {
+          'refresh-interval-ms': ''
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow('Invalid --refresh-interval-ms: expected integer milliseconds >= 250');
+
+    await expect(
+      runCoStatusAttachCliShell({
+        flags: {
+          'refresh-interval-ms': '500ms'
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow('Invalid --refresh-interval-ms: expected integer milliseconds >= 250');
+
+    await expect(
+      runCoStatusAttachCliShell({
+        flags: {
+          'refresh-interval-ms': '1e3'
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow('Invalid --refresh-interval-ms: expected integer milliseconds >= 250');
+  });
+
   it('renders the interactive attach viewer using authenticated ui requests', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-attach-shell-'));
     tempDirs.push(root);
@@ -196,6 +234,10 @@ async function writeEndpointArtifacts(runDir: string, baseUrl: string): Promise<
 
 async function runInteractiveAttachAndStop(runDir: string): Promise<string[]> {
   const writes: string[] = [];
+  let resolveFirstWrite: (() => void) | null = null;
+  const firstWrite = new Promise<void>((resolve) => {
+    resolveFirstWrite = resolve;
+  });
   const stdoutIsTTY = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
   const stdoutColumns = Object.getOwnPropertyDescriptor(process.stdout, 'columns');
   const stderrIsTTY = Object.getOwnPropertyDescriptor(process.stderr, 'isTTY');
@@ -217,6 +259,8 @@ async function runInteractiveAttachAndStop(runDir: string): Promise<string[]> {
     .spyOn(process.stdout, 'write')
     .mockImplementation(((chunk: string | Uint8Array) => {
       writes.push(String(chunk));
+      resolveFirstWrite?.();
+      resolveFirstWrite = null;
       return true;
     }) as typeof process.stdout.write);
 
@@ -227,7 +271,7 @@ async function runInteractiveAttachAndStop(runDir: string): Promise<string[]> {
       },
       printHelp: vi.fn()
     });
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await Promise.race([firstWrite, attachPromise.then(() => undefined, () => undefined)]);
     process.emit('SIGINT');
     await attachPromise;
     return writes;

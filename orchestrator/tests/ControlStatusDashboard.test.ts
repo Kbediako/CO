@@ -2018,4 +2018,63 @@ describe('control status dashboard', () => {
     expect(requestRefresh).toHaveBeenCalledTimes(1);
     expect(writes).toHaveLength(0);
   });
+
+  it('skips the post-refresh read when stop lands during requestRefresh', async () => {
+    const writes: string[] = [];
+    let resolveRefresh: (() => void) | null = null;
+    let signalRefreshStarted: (() => void) | null = null;
+    const refreshStarted = new Promise<void>((resolve) => {
+      signalRefreshStarted = resolve;
+    });
+    const requestRefresh = vi.fn(async () => {
+      signalRefreshStarted?.();
+      signalRefreshStarted = null;
+      await new Promise<void>((resolve) => {
+        resolveRefresh = resolve;
+      });
+    });
+    const runtime = {
+      requestRefresh,
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+    const readDataset = vi.fn(async () => buildDataset());
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120
+        }
+      },
+      {
+        readDataset
+      }
+    );
+
+    await refreshStarted;
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+    expect(readDataset).not.toHaveBeenCalled();
+
+    handle.stop();
+    resolveRefresh?.();
+    await handle.flush();
+
+    expect(readDataset).not.toHaveBeenCalled();
+    expect(writes).toHaveLength(0);
+  });
 });

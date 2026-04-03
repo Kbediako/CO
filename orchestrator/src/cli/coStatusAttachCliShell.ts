@@ -244,12 +244,22 @@ function readStringFlag(flags: ArgMap, key: string): string | undefined {
 }
 
 function readIntervalFlag(flags: ArgMap, key: string): number {
-  const raw = readStringFlag(flags, key);
-  if (!raw) {
+  const value = flags[key];
+  if (value === undefined) {
     return DEFAULT_ATTACH_REFRESH_INTERVAL_MS;
   }
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 250) {
+  if (value === true || typeof value !== 'string') {
+    throw new Error(`Invalid --${key}: expected integer milliseconds >= 250`);
+  }
+  const raw = value.trim();
+  if (raw.length === 0) {
+    throw new Error(`Invalid --${key}: expected integer milliseconds >= 250`);
+  }
+  if (!/^\d+$/u.test(raw)) {
+    throw new Error(`Invalid --${key}: expected integer milliseconds >= 250`);
+  }
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < 250) {
     throw new Error(`Invalid --${key}: expected integer milliseconds >= 250`);
   }
   return parsed;

@@ -572,6 +572,9 @@ function startControlStatusViewer(
       if (forceRefresh) {
         await options.requestRefresh?.();
       }
+      if (stopped) {
+        return;
+      }
       const readController = new AbortController();
       activeReadController = readController;
       const dataset = await options.readDataset(readController.signal).finally(() => {
