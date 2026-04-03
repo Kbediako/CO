@@ -52,6 +52,7 @@ import {
   runControlHostCliShell
 } from '../orchestrator/src/cli/controlHostCliShell.js';
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
+import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -767,7 +768,7 @@ async function handleCoStatus(rawArgs: string[]): Promise<void> {
     printCoStatusHelp();
     return;
   }
-  await runControlHostCliShell({
+  await runCoStatusCliShell({
     flags,
     printHelp: printCoStatusHelp
   });
@@ -1663,8 +1664,12 @@ Launch options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
   --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
-  --format json         Emit machine-readable readiness output.
+  --format json         Emit the current CO STATUS snapshot from the local control-host and exit.
   --help                Show this message.
+
+JSON contract:
+  co-status --format json reads the authenticated operator-dashboard snapshot from the
+  current local control-host and exits. Use \`control-host --format json\` for readiness output.
 
 Attach subcommand:
   attach                Attach to an already-running local JSON control-host.

@@ -3,6 +3,7 @@ import http from 'node:http';
 import { describe, expect, it } from 'vitest';
 
 import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
+import { readCompatibilityState } from '../src/cli/control/observabilitySurface.js';
 import { handleUiDataRequest } from '../src/cli/control/uiDataController.js';
 import type { ControlCompatibilityProjectionSnapshot } from '../src/cli/control/observabilityReadModel.js';
 
@@ -168,5 +169,215 @@ describe('UiDataController', () => {
         last_mode: 'poll'
       }
     });
+  });
+
+  it('keeps the operator-dashboard dataset aligned with /api/v1/state for overlapping fields', async () => {
+    const projection = buildProjection({
+      running: [
+        {
+          issue_identifier: 'CO-76',
+          issue_id: 'issue-76',
+          state: 'running',
+          display_state: 'running',
+          status_reason: null,
+          session_id: 'session-76',
+          turn_count: 4,
+          last_event: 'turn_started',
+          last_message: 'Worker turn active',
+          started_at: '2026-04-03T08:00:00.000Z',
+          last_event_at: '2026-04-03T08:00:30.000Z',
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          }
+        }
+      ],
+      retrying: [
+        {
+          issue_identifier: 'CO-77',
+          issue_id: 'issue-77',
+          task_id: 'linear-co-77',
+          run_id: 'run-co-77',
+          state: 'retrying',
+          display_state: 'retrying',
+          status_reason: 'rate_limited',
+          session_id: 'session-77',
+          thread_id: 'thread-77',
+          turn_count: 2,
+          workspace_path: '/tmp/co-77',
+          attempt: 2,
+          due_at: '2026-04-03T08:01:00.000Z',
+          error: 'rate limit exceeded',
+          last_event: 'retry_scheduled',
+          last_message: 'Retry queued',
+          started_at: '2026-04-03T07:55:00.000Z',
+          last_event_at: '2026-04-03T08:00:40.000Z'
+        }
+      ],
+      codexTotals: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20,
+        seconds_running: 61
+      },
+      rateLimits: {
+        source: 'control-host-polling',
+        requests: {
+          remaining: 19,
+          limit: 30,
+          reset_in_seconds: 42
+        }
+      },
+      selected: {
+        issue_id: 'issue-76',
+        issue_identifier: 'CO-76',
+        task_id: 'linear-co-76',
+        run_id: 'run-1',
+        raw_status: 'in_progress',
+        display_status: 'running',
+        status_reason: null,
+        started_at: '2026-04-03T08:00:00.000Z',
+        updated_at: '2026-04-03T08:00:30.000Z',
+        completed_at: null,
+        summary: 'Worker turn active',
+        last_error: null,
+        latest_action: null,
+        latest_event: {
+          event: 'turn_started',
+          message: 'Worker turn active',
+          at: '2026-04-03T08:00:30.000Z'
+        },
+        workspace: {
+          path: '/tmp/co-76'
+        },
+        question_summary: {
+          queued_count: 0,
+          latest_question: null
+        },
+        tracked: {
+          linear: null
+        }
+      },
+      polling: {
+        enabled: true,
+        interval_ms: 15000,
+        checking: false,
+        queued: false,
+        last_mode: 'poll',
+        last_requested_at: '2026-04-03T08:00:00.000Z',
+        last_completed_at: '2026-04-03T08:00:01.000Z',
+        last_success_at: '2026-04-03T08:00:01.000Z',
+        last_error_at: null,
+        last_error: null,
+        next_poll_at: '2026-04-03T08:00:15.000Z',
+        next_poll_in_ms: 15000
+      }
+    });
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-04-03T08:00:05.000Z'
+    });
+    const state = await readCompatibilityState({
+      controlStore: {
+        snapshot: () => ({
+          run_id: 'control-host',
+          control_seq: 0,
+          latest_action: null,
+          history: [],
+          pending_confirmation: null,
+          queued_questions: null,
+          question_events: [],
+          sessions: null,
+          transport_idempotency: null,
+          provider_traces: null
+        })
+      },
+      paths: {
+        manifestPath: '/repo/.runs/local-mcp/cli/control-host/manifest.json',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        logPath: '/repo/.runs/local-mcp/cli/control-host/runner.ndjson'
+      },
+      readCompatibilityProjection: async () => projection
+    });
+
+    expect(dataset.counts.running).toBe(state.counts.running);
+    expect(dataset.counts.retrying).toBe(state.counts.retrying);
+    expect(
+      dataset.running.map((entry) => ({
+        issue_identifier: entry.issue_identifier,
+        issue_id: entry.issue_id,
+        display_state: entry.display_state,
+        status_reason: entry.status_reason,
+        session_id: entry.session_id,
+        turn_count: entry.turn_count,
+        last_event: entry.last_event,
+        last_message: entry.last_message,
+        started_at: entry.started_at,
+        last_event_at: entry.last_event_at,
+        tokens: entry.tokens
+      }))
+    ).toEqual(
+      state.running.map((entry) => ({
+        issue_identifier: entry.issue_identifier,
+        issue_id: entry.issue_id,
+        display_state: entry.display_state,
+        status_reason: entry.status_reason,
+        session_id: entry.session_id,
+        turn_count: entry.turn_count,
+        last_event: entry.last_event,
+        last_message: entry.last_message,
+        started_at: entry.started_at,
+        last_event_at: entry.last_event_at,
+        tokens: entry.tokens
+      }))
+    );
+    expect(
+      dataset.retrying.map((entry) => ({
+        issue_identifier: entry.issue_identifier,
+        issue_id: entry.issue_id,
+        task_id: entry.task_id,
+        run_id: entry.run_id,
+        display_state: entry.display_state,
+        status_reason: entry.status_reason,
+        session_id: entry.session_id,
+        thread_id: entry.thread_id,
+        turn_count: entry.turn_count,
+        workspace_path: entry.workspace_path,
+        attempt: entry.attempt,
+        due_at: entry.due_at,
+        error: entry.error,
+        last_event: entry.last_event,
+        last_message: entry.last_message,
+        started_at: entry.started_at,
+        last_event_at: entry.last_event_at
+      }))
+    ).toEqual(
+      state.retrying.map((entry) => ({
+        issue_identifier: entry.issue_identifier,
+        issue_id: entry.issue_id,
+        task_id: entry.task_id,
+        run_id: entry.run_id,
+        display_state: entry.display_state,
+        status_reason: entry.status_reason,
+        session_id: entry.session_id,
+        thread_id: entry.thread_id,
+        turn_count: entry.turn_count,
+        workspace_path: entry.workspace_path,
+        attempt: entry.attempt,
+        due_at: entry.due_at,
+        error: entry.error,
+        last_event: entry.last_event,
+        last_message: entry.last_message,
+        started_at: entry.started_at,
+        last_event_at: entry.last_event_at
+      }))
+    );
+    expect(dataset.totals).toEqual(state.codex_totals);
+    expect(dataset.rate_limits).toEqual(state.rate_limits);
+    expect(dataset.polling).toEqual(state.polling);
+    expect(dataset.selected).toEqual(state.selected);
+    expect(dataset.selected?.run_id).toBe('run-1');
   });
 });
