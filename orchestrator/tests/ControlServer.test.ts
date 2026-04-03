@@ -1864,6 +1864,75 @@ describe('ControlServer', () => {
     }
   });
 
+  it('does not treat fallback-only local-mcp claim aliases as current /api/v1/state activity', async () => {
+    const nowMs = Date.now();
+    const startedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const updatedAt = new Date(nowMs - 15_000).toISOString();
+    const { root, env, paths } = await createRunRoot('local-mcp');
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'selected local-mcp fallback manifest with fallback-alias claim'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:local-mcp',
+        issue_id: 'local-mcp',
+        issue_identifier: 'local-mcp',
+        issue_title: 'Fallback-only local-mcp claim',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: updatedAt,
+        task_id: 'local-mcp',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: startedAt,
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-local-mcp-fallback-alias',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: Date.parse(updatedAt),
+        run_id: 'run-other',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-local-mcp-fallback-alias'
+      }
+    ]);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 0, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('local-mcp');
+      expect(statePayload.running).toEqual([]);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('ignores unrelated retained local-mcp claims in /api/v1/state for the selected run', async () => {
     const nowMs = Date.now();
     const startedAt = new Date(nowMs - 5 * 60_000).toISOString();

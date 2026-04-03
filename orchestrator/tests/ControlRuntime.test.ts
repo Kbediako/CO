@@ -1437,6 +1437,57 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('does not treat fallback-only local-mcp claim aliases as authoritative selected activity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'local-mcp',
+        providerIntakeState: createProviderIntakeState([
+          {
+            provider: 'linear',
+            provider_key: 'linear:local-mcp',
+            issue_id: 'local-mcp',
+            issue_identifier: 'local-mcp',
+            issue_title: 'Fallback-only local-mcp claim',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-03-07T00:29:30.000Z',
+            task_id: 'local-mcp',
+            mapping_source: 'provider_id_fallback',
+            state: 'running',
+            reason: 'provider_issue_rehydrated_active_run',
+            accepted_at: '2026-03-07T00:20:00.000Z',
+            updated_at: '2026-03-07T00:29:30.000Z',
+            last_delivery_id: 'delivery-local-mcp-fallback-alias',
+            last_event: 'Issue',
+            last_action: 'update',
+            last_webhook_timestamp: 1_742_360_170_000,
+            run_id: 'run-other',
+            run_manifest_path: null,
+            launch_source: 'control-host',
+            launch_token: 'launch-local-mcp-fallback-alias'
+          }
+        ])
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'local-mcp',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:45.000Z',
+        summary: 'selected local-mcp fallback manifest with fallback-alias claim'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.codexTotals.seconds_running).toBe(0);
+      expect(compatibilityProjection.selected?.issue_identifier).toBe('local-mcp');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the selected local-mcp run in running activity when it carries explicit issue identity', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));

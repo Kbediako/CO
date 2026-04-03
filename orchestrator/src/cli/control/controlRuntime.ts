@@ -460,7 +460,7 @@ function isAuthoritativeSelectedCurrentRunningSource(
   if (claim !== null) {
     return isProviderIntakeClaimActiveCurrentActivity(claim);
   }
-  if (isControlHostSelectedFallbackSource(source)) {
+  if (source.taskId === 'local-mcp' && !hasExplicitCompatibilityIssueIdentity(source)) {
     return false;
   }
   return isFreshNullProviderRunningSource(source);
@@ -513,10 +513,12 @@ function scoreProviderClaimMatch(
 ): number {
   let score = 0;
   const allowRunBindingMatch = canScoreProviderRunBindingMatch(claim, source);
-  if (claim.issue_id && source.issueId && claim.issue_id === source.issueId) {
+  const authoritativeIssueId = readAuthoritativeProviderIssueId(source);
+  const authoritativeIssueIdentifier = readAuthoritativeProviderIssueIdentifier(source);
+  if (claim.issue_id && authoritativeIssueId && claim.issue_id === authoritativeIssueId) {
     score += 16;
   }
-  if (claim.issue_identifier === source.issueIdentifier) {
+  if (claim.issue_identifier && authoritativeIssueIdentifier && claim.issue_identifier === authoritativeIssueIdentifier) {
     score += 12;
   }
   if (isAuthoritativeProviderTaskIdMatch(claim, source)) {
@@ -554,7 +556,7 @@ function canScoreProviderRunBindingMatch(
 
 function isAuthoritativeProviderTaskIdMatch(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier' | 'task_id'>,
-  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier' | 'taskId'>
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
 ): boolean {
   if (!claim.task_id || !source.taskId || claim.task_id !== source.taskId) {
     return false;
@@ -562,9 +564,13 @@ function isAuthoritativeProviderTaskIdMatch(
   if (source.taskId !== 'local-mcp') {
     return true;
   }
+  const authoritativeIssueId = readAuthoritativeProviderIssueId(source);
+  const authoritativeIssueIdentifier = readAuthoritativeProviderIssueIdentifier(source);
   return (
-    (claim.issue_id != null && source.issueId != null && claim.issue_id === source.issueId) ||
-    claim.issue_identifier === source.issueIdentifier
+    (claim.issue_id != null && authoritativeIssueId != null && claim.issue_id === authoritativeIssueId) ||
+    (claim.issue_identifier != null &&
+      authoritativeIssueIdentifier != null &&
+      claim.issue_identifier === authoritativeIssueIdentifier)
   );
 }
 
@@ -640,14 +646,51 @@ function isProviderIntakeScopedRunningSource(
 
 function hasMatchingProviderIssueIdentity(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
-  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier'>
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
 ): boolean {
+  const authoritativeIssueId = readAuthoritativeProviderIssueId(source);
+  const authoritativeIssueIdentifier = readAuthoritativeProviderIssueIdentifier(source);
   return (
-    (claim.issue_id != null && source.issueId != null && claim.issue_id === source.issueId) ||
+    (claim.issue_id != null &&
+      authoritativeIssueId != null &&
+      claim.issue_id === authoritativeIssueId) ||
     (claim.issue_identifier != null &&
-      source.issueIdentifier != null &&
-      claim.issue_identifier === source.issueIdentifier)
+      authoritativeIssueIdentifier != null &&
+      claim.issue_identifier === authoritativeIssueIdentifier)
   );
+}
+
+function readAuthoritativeProviderIssueId(
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'taskId' | 'runId'>
+): string | null {
+  const issueId = source.issueId ?? null;
+  if (!issueId) {
+    return null;
+  }
+  if (source.taskId !== 'local-mcp') {
+    return issueId;
+  }
+  return isFallbackCompatibilityIdentityValue(issueId, source) ? null : issueId;
+}
+
+function readAuthoritativeProviderIssueIdentifier(
+  source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'taskId' | 'runId'>
+): string | null {
+  const issueIdentifier = source.issueIdentifier ?? null;
+  if (!issueIdentifier) {
+    return null;
+  }
+  if (source.taskId !== 'local-mcp') {
+    return issueIdentifier;
+  }
+  return isFallbackCompatibilityIdentityValue(issueIdentifier, source) ? null : issueIdentifier;
+}
+
+function isFallbackCompatibilityIdentityValue(
+  value: string,
+  source: Pick<ControlCompatibilitySourceContext, 'taskId' | 'runId'>
+): boolean {
+  return value === source.taskId || value === source.runId;
 }
 
 function hasExplicitCompatibilityIssueIdentity(
