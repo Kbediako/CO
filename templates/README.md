@@ -14,7 +14,7 @@ repository and will not overwrite files unless you pass --force.
 Current codex template payload includes:
 - `AGENTS.md`
 - `mcp-client.json`
-- `.codex/config.toml` plus `.codex/agents/*` role files
+- `templates/codex/.codex/config.toml` plus `templates/codex/.codex/agents/*` role files
 
 Next steps (recommended):
   codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo

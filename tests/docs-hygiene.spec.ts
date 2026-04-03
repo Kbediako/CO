@@ -15,7 +15,83 @@ afterEach(async () => {
   }
 });
 
+async function writeDocsCatalogFixture(
+  repoRoot: string,
+  {
+    entries = [],
+    patterns = [],
+    readmeBudget = { max_lines: 240, max_h2_sections: 9 }
+  }: {
+    entries?: Array<Record<string, unknown>>;
+    patterns?: Array<Record<string, unknown>>;
+    readmeBudget?: { max_lines: number; max_h2_sections: number };
+  } = {}
+) {
+  await mkdir(join(repoRoot, 'docs', 'guides'), { recursive: true });
+  await writeFile(
+    join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+    [
+      '# Codex Version Policy (CO)',
+      '',
+      '- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0` for the current upstream-aligned main baseline.',
+      '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+      '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
+      ''
+    ].join('\n'),
+    'utf8'
+  );
+  await writeFile(
+    join(repoRoot, 'docs', 'docs-catalog.json'),
+    JSON.stringify(
+      {
+        version: 1,
+        classes: {
+          front_door: { label: 'Front Door', report_order: 10 },
+          repo_guide: { label: 'Repository Guide', report_order: 20 },
+          task_packet: { label: 'Task Packet', report_order: 200 }
+        },
+        policies: {
+          codex_posture: {
+            source_path: 'docs/guides/codex-version-policy.md'
+          },
+          readme_front_door: readmeBudget,
+          bundled_skills_roster: {
+            doc_path: 'README.md',
+            section_heading: '## Skills (bundled)',
+            list_intro: 'Bundled skills'
+          }
+        },
+        entries,
+        patterns
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
+}
+
 describe('docs hygiene tooling', () => {
+  it('fails closed when the docs catalog is missing', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-missing-catalog-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
+
+    await expect(runDocsCheck(repoRoot)).rejects.toThrow('docs/docs-catalog.json');
+  });
+
   it('flags missing npm scripts, missing pipelines, and missing backticked paths', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-check-'));
     createdDirs.push(repoRoot);
@@ -32,6 +108,7 @@ describe('docs hygiene tooling', () => {
       JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
       'utf8'
     );
+    await writeDocsCatalogFixture(repoRoot);
 
     await writeFile(join(repoRoot, 'docs', 'existing.md'), '# Exists\n', 'utf8');
     await writeFile(
@@ -98,6 +175,7 @@ describe('docs hygiene tooling', () => {
       JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
       'utf8'
     );
+    await writeDocsCatalogFixture(repoRoot);
     await writeFile(
       join(repoRoot, 'tasks', 'index.json'),
       JSON.stringify({ items: [], tasks: [] }, null, 2),
@@ -133,6 +211,7 @@ describe('docs hygiene tooling', () => {
       JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
       'utf8'
     );
+    await writeDocsCatalogFixture(repoRoot);
     await writeFile(join(repoRoot, 'tasks', 'index.json'), JSON.stringify({ items: [] }, null, 2), 'utf8');
     await writeFile(
       join(repoRoot, 'docs', 'tasks-archive-policy.json'),
@@ -144,6 +223,144 @@ describe('docs hygiene tooling', () => {
     const errors = await runDocsCheck(repoRoot);
 
     expect(errors.find((error) => error.rule === 'tasks-file-too-large')).toBeUndefined();
+  });
+
+  it('flags stale Codex posture references for catalogued front-door docs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      ['# Codex Orchestrator', '', 'In Codex CLI `0.111.0`, built-in explorer inherits defaults.', ''].join(
+        '\n'
+      ),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'Codex CLI version(s) 0.111.0 != current policy 0.117.0'
+      })
+    );
+  });
+
+  it('flags bundled skill roster drift for the README roster source', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-roster-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await mkdir(join(repoRoot, 'skills', 'codex-orchestrator'), { recursive: true });
+    await mkdir(join(repoRoot, 'skills', 'linear'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['bundled-skills-roster']
+        }
+      ]
+    });
+    await writeFile(join(repoRoot, 'skills', 'codex-orchestrator', 'SKILL.md'), '# Skill\n', 'utf8');
+    await writeFile(join(repoRoot, 'skills', 'linear', 'SKILL.md'), '# Skill\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '## Skills (bundled)',
+        '',
+        'Bundled skills (may vary by release):',
+        '- `codex-orchestrator`',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'bundled-skill-roster-drift',
+        reference: 'documented=[codex-orchestrator] shipped=[codex-orchestrator, linear]'
+      })
+    );
+  });
+
+  it('flags front-door budget overflow for README', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-budget-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['front-door-budget']
+        }
+      ],
+      readmeBudget: { max_lines: 4, max_h2_sections: 1 }
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      ['# Codex Orchestrator', '', '## One', 'a', 'b', '## Two', 'c', ''].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'front-door-budget-exceeded',
+        reference: 'lines=7/4 h2=2/1'
+      })
+    );
   });
 
   it('syncs mirrors for an active task idempotently', async () => {

@@ -2,7 +2,7 @@
 
 ![Setup demo](docs/assets/setup.gif)
 
-Codex Orchestrator is the CLI + runtime that coordinates Codex-driven runs, pipelines, and delegation MCP tooling. The npm release focuses on running pipelines locally, emitting auditable manifests, and hosting the delegation server.
+Codex Orchestrator is the CLI + runtime for Codex-driven pipelines, auditable manifests, and delegation MCP workflows. The npm release is the downstream entrypoint; contributor and repo-internal detail lives in `docs/README.md`.
 
 ## Install
 
@@ -23,12 +23,11 @@ Node.js >= 20 is required.
 
 ## Quick start
 
-1. Run a pipeline with a task id so artifacts are grouped under `.runs/<task-id>/`:
+1. Start a pipeline with a task id so artifacts land under `.runs/<task-id>/`:
    ```bash
    codex-orch start diagnostics --format json --task <task-id>
    ```
-   The command prints the `run_id` plus the manifest path under `.runs/<task-id>/cli/<run-id>/manifest.json`.
-2. Watch status:
+2. Watch the run:
    ```bash
    codex-orch status --run <run-id> --watch --interval 10
    ```
@@ -36,197 +35,44 @@ Node.js >= 20 is required.
    ```bash
    codex-orch resume --run <run-id>
    ```
-   > Tip: if you prefer `npx`, replace `codex-orch` with `npx @kbediako/codex-orchestrator`.
-   > Tip: for multiple commands, you can also `export MCP_RUNNER_TASK_ID=<task-id>` once.
+   The command prints the `run_id` plus the manifest path under `.runs/<task-id>/cli/<run-id>/manifest.json`.
+4. One-shot downstream bootstrap:
+   ```bash
+   codex-orchestrator setup --yes
+   ```
 
-## CO STATUS Monitoring
+## Current posture
 
-Launch the live terminal monitor with the dedicated monitor alias:
+- Current CO compatibility or adoption target: Codex CLI `0.117.0`.
+- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces.
+- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.
+- Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
+- `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and fails fast.
+- Full posture and evidence gates live in `docs/guides/codex-version-policy.md`.
 
-```bash
-codex-orchestrator co-status
-```
+## Downstream setup
 
-This reuses the existing `control-host` runtime path, but gives operators a monitor-first command surface.
+Use this when you want Codex to work inside another repo with the CO defaults.
 
-Interactive TTY controls:
-- `p` pauses into a clean primary-buffer inspect snapshot or resumes the live alternate-screen monitor.
-- `c` toggles compact inspect mode for shorter terminal heights.
-- `s` exports the current frame to `.runs/<task-id>/cli/<run-id>/co-status-snapshots/` for pager or scrollback inspection.
-
-Machine-readable readiness remains available with:
-
-```bash
-codex-orchestrator co-status --format json
-```
-
-## Runtime + Execution Modes
-
-- Mode semantics are orthogonal:
-  - `executionMode=mcp|cloud` controls where stages execute.
-  - `runtimeMode=cli|appserver` controls local runtime provider selection.
-- Local default runtime is `appserver`; preserve `--runtime-mode cli` as break-glass.
-- `--execution-mode cloud --runtime-mode appserver` is intentionally unsupported and fails fast with actionable errors.
-- `js_repl` is enabled by default globally. For deterministic cloud contracts, run explicit feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs). Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable with `codex features enable js_repl`.
-- `memories` remains scoped to explicit eval lanes (legacy alias `memory_tool` is compatibility-only).
-
-## Downstream init (recommended)
-
-Use this when you want Codex to drive work inside another repo with the CO defaults.
-
-1. Install templates:
+1. Seed templates:
    ```bash
    codex-orchestrator init codex --cwd /path/to/repo
    ```
-   One-shot (templates + optional CO-managed Codex CLI install):
-   ```bash
-   codex-orchestrator init codex --codex-cli --yes
-   ```
-   This seeds `AGENTS.md`, `mcp-client.json`, and downstream .codex/config.toml + .codex/agents/* role files (sourced from `templates/codex/.codex/*`), plus `codex.orchestrator.json`.
-2. Register the delegation MCP server (one-time per machine):
+2. Register delegation MCP once per machine:
    ```bash
    codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
    ```
-3. Optional (managed/pinned CLI path): set up a CO-managed Codex CLI:
+3. Optional managed Codex CLI path:
    ```bash
    codex-orchestrator codex setup
-   ```
-   Use this when you want a pinned binary, build-from-source behavior, or a custom fork.
-   Stock/global `codex` is still the default selection; activate managed binary routing with:
-   ```bash
    export CODEX_CLI_USE_MANAGED=1
    ```
-4. Optional (additive global defaults in `~/.codex/config.toml`):
+4. Optional additive global defaults:
    ```bash
-   codex-orchestrator codex defaults
    codex-orchestrator codex defaults --yes
    ```
-   This updates only the CO baseline keys/role wiring and preserves unrelated config entries.
-5. Optional (fast refresh helper for downstream users):
-   ```bash
-   scripts/codex-cli-refresh.sh --repo /path/to/codex --align-only
-   ```
-   Repo-only helper (not included in npm package). Add `--no-push` when you only want local alignment and do not want to update `origin/main`. To refresh the CO-managed CLI, run a separate command with `--force-rebuild` (without `--align-only`). Set `CODEX_REPO` or `CODEX_CLI_SOURCE` to avoid passing `--repo` each time.
 
-## Delegation MCP server
-
-Run the delegation MCP server over stdio:
-```bash
-codex-orchestrator delegate-server --repo /path/to/repo
-```
-Optional: add `--mode question_only` to disable `delegate.spawn/pause/cancel`, keeping `delegate.question.*` + `delegate.status` in the delegate namespace. GitHub tools remain available when GitHub integration is enabled.
-For read-only operator status surfaces, set `delegate.mode = "status_only"` via `--config` (for example: `codex-orchestrator delegate-server --config 'delegate.mode = "status_only"'`): only `delegate.status` is allowed, and all other `delegate.*` / `github.*` tools are blocked.
-
-Register it with Codex once. Delegation MCP is enabled by default (the only MCP enabled by default). To override the default or re-enable after disabling:
-```bash
-codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
-codex -c 'mcp_servers.delegation.enabled=true' ...
-```
-`delegate-server` is the canonical name; `delegation-server` is supported as an alias (older docs may use it).
-
-## Agent role defaults (recommended)
-
-Codex built-ins are `default`, `explorer`, `worker`, and `awaiter`. `researcher` is user-defined.
-- `spawn_agent` defaults to `default` when `agent_type` is omitted, so always set `agent_type` explicitly.
-- Multi-turn loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`), so subagents can iterate before parent synthesis.
-- Keep `fork_context` off by default for bounded subagent streams; set `fork_context=true` only when the subagent must inherit prior thread history.
-
-In Codex CLI `0.111.0`, built-in `explorer` continues to inherit top-level defaults unless you attach a role `config_file`.
-CO's current compatibility/adoption target is `gpt-5.4` across top-level, delegated subagent, and review surfaces. `explorer_fast` remains the only explicit spark exception. Use this target config:
-
-```toml
-model = "gpt-5.4"
-review_model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
-
-[agents]
-max_threads = 12
-
-[agents.explorer_fast]
-description = "Fast explorer (spark text-only)."
-config_file = "./agents/explorer-fast.toml"
-
-[agents.worker_complex]
-description = "Complex worker role."
-config_file = "./agents/worker-complex.toml"
-
-[agents.awaiter]
-description = "Awaiter override (keeps awaiter behavior with latest codex/high reasoning)."
-config_file = "./agents/awaiter-high.toml"
-```
-
-```toml
-# .codex/agents/explorer-fast.toml
-model = "gpt-5.3-codex-spark"
-model_reasoning_effort = "xhigh"
-```
-
-```toml
-# .codex/agents/worker-complex.toml
-model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
-```
-
-Align the downstream awaiter override seeded from `templates/codex/.codex/agents/awaiter-high.toml` and similar review/delegation-facing role files to `gpt-5.4` while keeping their role-specific reasoning settings. When authenticating through ChatGPT, do not swap those surfaces to `gpt-5.4-codex`; delegated and review runs currently reject that model. The starter template intentionally seeds only `max_threads = 12`; if native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` as a temporary workaround and keep the role subtables unchanged.
-
-Caveats:
-- `gpt-5.3-codex-spark` is text-only (no image inputs). Keep it only for `explorer_fast` / fast search-synthesis lanes.
-- Under ChatGPT auth, keep top-level, delegated, and review surfaces on `gpt-5.4`; avoid `gpt-5.4-codex` until provider compatibility changes.
-- Leave `agents.explorer` undefined unless you intentionally want to override built-in explorer behavior.
-- Keep RLM/collab built-ins-first by default; add specialist custom roles only when a measured benefit justifies ongoing maintenance.
-- `max_threads = 12` is the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance; if you intentionally use constrained caps like `8/2` or legacy `6/1/1`, `codex-orchestrator codex defaults --yes` preserves those existing values.
-- Fallbacks are contingency-only: use `8/2` on constrained hosts or deterministic high-risk lanes; use legacy `6/1/1` only as break-glass when an older parser/runtime still consumes spawn-depth caps.
-- Awaiter triage: long waits are expected for long-running jobs; treat it as stuck only after multiple polling windows with no status/progress movement.
-- `codex review` delegates with collab tools disabled in review threads; keep review expectations single-agent and on the same `gpt-5.4` target when running under ChatGPT auth.
-
-Delegation guard profile:
-- `CODEX_ORCHESTRATOR_GUARD_PROFILE=auto` (default): strict in CO-style repos, warn in lightweight repos.
-- Set `CODEX_ORCHESTRATOR_GUARD_PROFILE=warn` for ad-hoc/no-task-id runs.
-- Set `CODEX_ORCHESTRATOR_GUARD_PROFILE=strict` to enforce full delegation evidence checks.
-
-## Delegation + RLM flow
-
-RLM (Recursive Language Model) is the long-horizon loop used by the `rlm` pipeline (`codex-orchestrator rlm "<goal>"` or `codex-orchestrator start rlm --goal "<goal>"`). Delegated runs only enter RLM when the child is launched with the `rlm` pipeline (or the rlm runner directly). In auto mode it resolves to symbolic only when context is large (`RLM_SYMBOLIC_MIN_BYTES`) and an explicit context signal is present (`RLM_CONTEXT_PATH` or delegated run); otherwise it stays iterative. The runner writes state to `.runs/<task-id>/cli/<run-id>/rlm/state.json` and stops when the validator passes or budgets are exhausted.
-For symbolic mode, the Option 2 alignment checker is enabled by default (`RLM_ALIGNMENT_CHECKER=1`) and writes append-only alignment artifacts under `.runs/<task-id>/cli/<run-id>/rlm/alignment/` (ledger + projection). Rollback toggle: set `RLM_ALIGNMENT_CHECKER=0`. Enforcement is opt-in via `RLM_ALIGNMENT_CHECKER_ENFORCE=1`.
-Symbolic subcalls can optionally use collab tools. Fast path: `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; sets `RLM_SYMBOLIC_MULTI_AGENT=1` plus legacy `RLM_SYMBOLIC_COLLAB=1` for compatibility, and implies symbolic mode). Collab requires `multi_agent=true` in `codex features list` (`collab` remains a legacy alias). Collab tool calls parsed from `codex exec --json --enable multi_agent` are stored in `manifest.collab_tool_calls` (bounded by `CODEX_ORCHESTRATOR_COLLAB_MAX_EVENTS`, set to `0` to disable); when present in events, `spawn_agent.fork_context` is captured for observability and surfaced in `codex-orchestrator doctor --usage` fork-context counters. For auditable role routing, prefix spawned prompts with `[agent_type:<role>]` and set `spawn_agent.agent_type` when supported; lifecycle validation enforces prompt-role evidence and validates `agent_type` when present (`RLM_SYMBOLIC_MULTI_AGENT_ROLE_POLICY=warn|off`, legacy alias `RLM_COLLAB_ROLE_POLICY`; `RLM_SYMBOLIC_MULTI_AGENT_ALLOW_DEFAULT_ROLE=1`, legacy alias `RLM_COLLAB_ALLOW_DEFAULT_ROLE`). `codex-orchestrator codex setup` remains available when you want a managed/pinned CLI path (opt-in via `CODEX_CLI_USE_MANAGED=1`).
-For batch fan-out jobs, prefer native `spawn_agents_on_csv` before building custom orchestration wrappers.
-
-### Delegation flow
-```mermaid
-flowchart TB
-  A["Parent run<br/>(delegation MCP enabled)"]
-  C["Delegation MCP server"]
-  D["delegate.spawn"]
-  E["Child run<br/>(pipeline resolved)"]
-  N{Pipeline = rlm?}
-  P["Standard pipeline<br/>(plan/build/test/review)"]
-  RLM["RLM pipeline<br/>(see next chart)"]
-
-  A --> C --> D --> E --> N
-  N -- yes --> RLM
-  N -- no --> P
-  E -. optional .-> Q["delegate.question.enqueue/poll"] -.-> A
-```
-
-### RLM loop
-```mermaid
-flowchart TB
-  F["Resolve mode<br/>(auto -> iterative/symbolic)"]
-  G{Symbolic?}
-  H["Context store<br/>(chunk + search)"]
-  I["Planner JSON<br/>(select subcalls)"]
-  J["Subcalls<br/>(tool + edits, collab optional)"]
-  K["Validator<br/>(test command)"]
-  L["State + artifacts<br/>.runs/&lt;task-id&gt;/cli/&lt;run-id&gt;/rlm/state.json"]
-  M["Exit status"]
-
-  F --> G
-  G -- yes --> H --> I --> J --> K
-  G -- no --> J
-  J --> K
-  K --> L --> M
-  K -- fail & budget left --> F
-```
+For deeper runtime, cloud, and role guidance, use `docs/README.md` and `skills/delegation-usage/SKILL.md`.
 
 ## Skills (bundled)
 
@@ -247,129 +93,45 @@ Options:
 - `--only <skills>` installs only selected skills (comma-separated). Combine with `--force` to overwrite only those.
 - `--codex-home <path>` targets a different Codex home directory.
 
-Bundled skills (may vary by release):
-- `codex-orchestrator`
-- `collab-subagents-first`
+Bundled skills (current shipped roster):
+- `agent-first-adoption-steering`
 - `chrome-devtools`
-- `delegation-usage`
-- `standalone-review`
-- `elegance-review`
-- `docs-first`
-- `collab-evals`
+- `codex-orchestrator`
 - `collab-deliberation`
+- `collab-evals`
+- `collab-subagents-first`
+- `delegate-early` (compatibility alias; use `delegation-usage`)
+- `delegation-usage`
+- `docs-first`
+- `elegance-review`
+- `land`
+- `linear`
 - `long-poll-wait`
 - `release`
-- `agent-first-adoption-steering`
-- `delegate-early` (compatibility alias; use `delegation-usage`)
+- `standalone-review`
 
-## DevTools readiness
+## Common workflows
 
-Check readiness (deps + capability wiring):
-```bash
-codex-orchestrator doctor --format json
-```
+- Doctor and readiness:
+  - `codex-orchestrator doctor --format json`
+  - `codex-orchestrator doctor --apply --yes`
+  - `codex-orchestrator doctor --usage`
+- Pipelines and review:
+  - `codex-orchestrator flow --task <task-id>`
+  - `codex-orchestrator start docs-relevance-advisory --task <task-id>`
+  - `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>`
+- Monitoring and issue bundles:
+  - `codex-orchestrator co-status`
+  - `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
+  - `codex-orchestrator start <pipeline> --auto-issue-log`
+- Packaging and release checks:
+  - `npm run pack:smoke`
+  - `npm run pack:audit`
 
-Auto-fix wiring (delegation + DevTools):
-```bash
-codex-orchestrator doctor --apply --yes
-```
+## More docs
 
-Usage snapshot (scans local `.runs/`):
-```bash
-codex-orchestrator doctor --usage
-```
-`doctor --usage` prints adoption KPIs (advanced/cloud/rlm/collab/delegation coverage), and per-run `run-summary.json` now includes a `usageKpi` section plus cloud fallback metadata when preflight downgrades to MCP.
-`doctor` also includes a codex-defaults advisory section (model/reasoning/agent baseline drift) and points to additive remediation via `codex-orchestrator codex defaults --yes`.
-
-Issue bundle logging (downstream dogfooding / repro handoff):
-```bash
-codex-orchestrator doctor --issue-log --issue-title "Observed failure" --issue-notes "what happened"
-```
-`doctor --issue-log` appends `docs/codex-orchestrator-issues.md` (override via `--issue-log-path`) and writes a JSON bundle under `out/<resolved-task>/doctor/issue-bundles/` with doctor/cloud context (latest run context is included when available).
-
-Auto-capture issue bundles when runs fail:
-```bash
-codex-orchestrator start <pipeline> --auto-issue-log
-codex-orchestrator flow --task <task-id> --auto-issue-log
-```
-This captures both post-manifest run failures and setup failures that occur before a run manifest is created (for example strict repo-config enforcement).
-
-Cloud preflight check (without starting a pipeline):
-```bash
-codex-orchestrator doctor --cloud-preflight
-```
-
-## Downstream usage cheatsheet (agent-first)
-
-- Bootstrap + wire everything: `codex-orchestrator setup --yes` (non-destructive for existing skills by default; add `--refresh-skills` to overwrite)
-- Enable required MCP servers with least privilege: `codex-orchestrator mcp enable --servers delegation --yes` (plan with `--format json`; omit `--servers` only when you intentionally want all disabled servers enabled; env/secret values are redacted in displayed command lines)
-- Low-friction docs->implementation guardrails: `codex-orchestrator flow --task <task-id>`
-- Validate + measure adoption locally: `codex-orchestrator doctor --usage --format json`
-- Run docs relevance as an advisory lane (non-blocking): `codex-orchestrator start docs-relevance-advisory --task <task-id>`
-- Capture reproducible downstream failures: `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
-- Auto-capture failed run issue bundles: `codex-orchestrator start <pipeline> --auto-issue-log` or `codex-orchestrator flow --auto-issue-log`
-- Active PR watch-resolve-merge loop: `codex-orchestrator pr resolve-merge --pr <number> --quiet-minutes <window>` (add `--auto-merge` when approved; exits early when author action is required).
-- Passive PR monitor loop: `codex-orchestrator pr watch-merge --pr <number> --quiet-minutes <window>` (monitor-only behavior; keeps waiting unless terminal/timeout).
-- Review checkpoints (npm-only safe): `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` for manifest-backed standalone review wrapper behavior (auto-skips repo-only diff-budget script when unavailable in downstream installs); in non-interactive/CI runs (stdin not TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; use `codex review "<focus>"` for quick prompt-only checks; use `codex-orchestrator start implementation-gate --task <task-id> --format json` when you want a full gate run.
-- Downstream simulation before shipping wrapper/skill changes: `npm run pack:smoke` (packaged CLI in temp mock repo; validates `review` artifacts and `long-poll-wait` install path; spot-check gate). Use `npm run pack:audit` for full tarball inventory validation.
-- Delegation: `codex-orchestrator doctor --apply --yes`, then enable for a Codex run with: `codex -c 'mcp_servers.delegation.enabled=true' ...`
-- Collab (symbolic RLM subagents): `codex-orchestrator rlm --multi-agent auto "<goal>"` (legacy alias: `--collab auto`; requires Codex `features.multi_agent=true`)
-- Cloud: set `CODEX_CLOUD_ENV_ID` (and optional `CODEX_CLOUD_BRANCH`), then run: `codex-orchestrator start <pipeline> --cloud --target <stage-id>`
-- Cloud fail-fast (avoid fallback reliance): set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny`
-- Repo-config fail-fast (deny packaged config fallback): set `CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED=1` or pass `--repo-config-required`
-- Cloud status retry tuning (optional): `CODEX_CLOUD_STATUS_RETRY_LIMIT`, `CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS`
-
-Print DevTools MCP setup guidance:
-```bash
-codex-orchestrator devtools setup
-```
-
-## Common commands
-
-- `codex-orchestrator start <pipeline>` — run a pipeline (add `--auto-issue-log` for automatic failure bundle capture; add `--repo-config-required` for strict repo-local config mode).
-- `codex-orchestrator flow --task <task-id>` — run `docs-review` then `implementation-gate` in sequence (supports `--auto-issue-log` and `--repo-config-required`).
-- `codex-orchestrator start docs-relevance-advisory --task <task-id>` — run non-blocking docs relevance signals (warn-mode freshness + advisory review lane).
-- `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>` — run standalone review wrapper with manifest-backed evidence (supports run-review flags/env); in non-interactive/CI runs it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`.
-  - Default bounded review mode keeps only the remaining non-validation heavy commands advisory, adds an immediate command-intent boundary for explicit package-manager validation suites plus direct `vitest`/`jest`-style launches and nested review/delegation flows, and keeps the low-signal nearby-inspection drift guard plus bounded meta-surface expansion guard on the non-heavy path; tune or disable the sustained guards with `CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS=<seconds>` and `CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS=<seconds>` (`0` disables, default `180` for each).
-- `codex-orchestrator plan <pipeline>` — preview pipeline stages.
-- `codex-orchestrator exec <cmd>` — run a one-off command with the exec runtime.
-- `codex-orchestrator init codex` — install starter templates (`mcp-client.json`, `AGENTS.md`, downstream .codex/config.toml + .codex/agents/* role files sourced from `templates/codex/.codex/*`, `codex.orchestrator.json`) into a repo.
-- `codex-orchestrator setup --yes` — install bundled skills and configure delegation + DevTools wiring (add `--refresh-skills` to overwrite existing skills in `$CODEX_HOME/skills`).
-- `codex-orchestrator init codex --codex-cli --yes --codex-source <path>` — optionally provision a CO-managed Codex CLI binary (build-from-source default; set `CODEX_CLI_SOURCE` to avoid passing `--codex-source` every time, and `CODEX_CLI_USE_MANAGED=1` to route runs to it).
-- `codex-orchestrator init codex --codex-cli --yes --codex-download-url <url> --codex-download-sha256 <sha>` — opt-in to a prebuilt Codex CLI download.
-- `codex-orchestrator codex setup` — plan/apply a CO-managed Codex CLI install (optional managed/pinned path; use `--download-url` + `--download-sha256` for prebuilts; activate with `CODEX_CLI_USE_MANAGED=1`).
-- `codex-orchestrator codex defaults` — plan/apply additive global defaults in `~/.codex/config.toml` and `~/.codex/agents/*.toml` (`--yes` applies, `--force` allows role file overwrite).
-- `codex-orchestrator delegation setup --yes` — configure delegation MCP server wiring.
-- `codex-orchestrator mcp enable --servers <csv> --yes` — enable specific disabled MCP servers from existing Codex config entries.
-- `codex-orchestrator self-check --format json` — JSON health payload.
-- `codex-orchestrator mcp serve` — Codex MCP stdio server.
-- `npm run pack:smoke` — maintainer smoke gate for packaged downstream behavior (tarball install + review/skill checks). Core lane runs it on downstream-facing diffs; `.github/workflows/pack-smoke-backstop.yml` runs a weekly `main` backstop.
-
-## What ships in the npm release
-
-- CLI + built-in pipelines
-- Delegation MCP server (`delegate-server`)
-- Bundled skills under `skills/`
-- Schemas and templates needed by the CLI
-
-## Repository + contributor guide
-
-Repo internals, development workflows, and deeper architecture notes (contributor/internal) live in the GitHub repository:
-- `docs/README.md`
-- `docs/diagnostics-prompt-guide.md` (first-run diagnostics prompt + expected outputs)
-- `docs/guides/collab-vs-mcp.md` (agent-first decision guide)
-- `docs/guides/rlm-recursion-v2.md` (RLM recursion reference)
-- `docs/guides/cloud-mode-preflight.md` (cloud-mode preflight + fallback guidance)
-- `docs/guides/review-artifacts.md` (where `codex-orchestrator review` / `npm run review` write prompt/output artifacts)
-- `docs/standalone-review-guide.md` (repo-local wrapper behavior + downstream-safe review alternatives)
-
-## RLM benchmark graphs
-
-Seeded OOLONG accuracy curves (Wilson 95% CI, runs=5). In these runs, the baseline accuracy degrades as context length grows, while RLM stays near the ceiling across the tested lengths.
-
-<table>
-  <tr>
-    <td><img src="docs/assets/oolong-baseline-seeded-wilson95-runs5.png" alt="Baseline OOLONG seeded Wilson 95% CI" width="420"></td>
-    <td><img src="docs/assets/oolong-rlm-seeded-wilson95-runs5.png" alt="RLM OOLONG seeded Wilson 95% CI" width="420"></td>
-  </tr>
-</table>
+- `docs/README.md`: repository guide, contributor workflows, and deeper command reference.
+- `docs/guides/codex-version-policy.md`: current posture and promotion gates.
+- `docs/skills-release.md`: bundled skill install and release expectations.
+- `docs/standalone-review-guide.md`: review wrapper behavior and downstream-safe review usage.
+- `skills/delegation-usage/SKILL.md`: delegation defaults and downstream workflow guidance.

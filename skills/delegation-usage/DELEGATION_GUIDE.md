@@ -127,7 +127,7 @@ If you need delegation to respect a repo’s `.codex/orchestrator.toml` (e.g., s
 
 ## Version guard (JSONL handshake)
 
-Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current CO compatibility/adoption target (`codex-cli 0.111.0`) unless a task-scoped canary is explicitly evaluating something newer.
+Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.117.0`) unless a task-scoped canary is explicitly evaluating something newer.
 
 - Check: `codex-orchestrator --version`
 - Update global: `npm i -g @kbediako/codex-orchestrator@latest`
@@ -145,7 +145,7 @@ Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
-- In Codex CLI `0.111.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
+- In Codex CLI `0.117.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
 - Recommended baseline:
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`

@@ -1,8 +1,21 @@
 #!/usr/bin/env node
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 import { parseArgs as parseCliArgs } from './lib/cli-args.js';
 import { collectDocFiles, normalizeTaskKey, pathExists, toPosixPath } from './lib/docs-helpers.js';
+import {
+  countDocumentLines,
+  countHeadingLines,
+  extractBundledSkillNamesFromMarkdown,
+  extractCodexCliVersionMentions,
+  hasExpectedDefaultRuntimeLine,
+  listBundledSkillNames,
+  loadDocsCatalog,
+  readCurrentCodexPosture,
+  resolveDocsCatalogEntry
+} from './lib/docs-catalog.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 export type DocsCheckRule =
@@ -10,7 +23,11 @@ export type DocsCheckRule =
   | 'pipeline-id-missing'
   | 'backticked-path-missing'
   | 'tasks-file-too-large'
-  | 'tasks-index-non-canonical';
+  | 'tasks-index-non-canonical'
+  | 'doc-posture-stale'
+  | 'doc-runtime-posture-stale'
+  | 'bundled-skill-roster-drift'
+  | 'front-door-budget-exceeded';
 
 export interface DocsCheckError {
   file: string;
@@ -43,14 +60,15 @@ interface CliOptions {
 const CANONICAL_TASKS_INDEX_KEYS = new Set(['items', 'specs']);
 
 export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> {
-  const [docFiles, npmScripts, pipelineIds, repoRootEntries, tasksSizeError, tasksIndexShapeError] =
+  const [docFiles, npmScripts, pipelineIds, repoRootEntries, tasksSizeError, tasksIndexShapeError, docsCatalog] =
     await Promise.all([
       collectDocFiles(repoRoot),
       loadNpmScripts(repoRoot),
       loadOrchestratorPipelines(repoRoot),
       loadRepoRootEntries(repoRoot),
       checkTasksFileSize(repoRoot),
-      checkTasksIndexCanonicalShape(repoRoot)
+      checkTasksIndexCanonicalShape(repoRoot),
+      loadDocsCatalog(repoRoot)
     ]);
 
   const errors: DocsCheckError[] = [];
@@ -60,6 +78,13 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   if (tasksIndexShapeError) {
     errors.push(tasksIndexShapeError);
   }
+
+  const codexPosture = docsCatalog
+    ? await readCurrentCodexPosture(repoRoot, docsCatalog.policies?.codex_posture)
+    : null;
+  const bundledSkillNames = docsCatalog ? await listBundledSkillNames(repoRoot) : [];
+  const readmeBudget = docsCatalog?.policies?.readme_front_door ?? {};
+  const rosterPolicy = docsCatalog?.policies?.bundled_skills_roster ?? {};
 
   for (const file of docFiles) {
     const abs = path.join(repoRoot, file);
@@ -105,6 +130,67 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
 
       if (!(await pathExists(resolved))) {
         errors.push({ file, rule: 'backticked-path-missing', reference: normalized });
+      }
+    }
+
+    if (!docsCatalog) {
+      continue;
+    }
+
+    const catalogEntry = resolveDocsCatalogEntry(file, docsCatalog);
+    const truthChecks = new Set(catalogEntry?.truth_checks ?? []);
+
+    if (truthChecks.has('codex-cli-version') && codexPosture?.cli_version) {
+      const versionMentions = extractCodexCliVersionMentions(content);
+      const staleMentions = versionMentions.filter((version: string) => version !== codexPosture.cli_version);
+      if (staleMentions.length > 0) {
+        errors.push({
+          file,
+          rule: 'doc-posture-stale',
+          reference: `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`
+        });
+      }
+    }
+
+    if (
+      truthChecks.has('default-runtime') &&
+      codexPosture?.default_runtime &&
+      !hasExpectedDefaultRuntimeLine(content, codexPosture.default_runtime)
+    ) {
+      errors.push({
+        file,
+        rule: 'doc-runtime-posture-stale',
+        reference: `expected default runtime ${codexPosture.default_runtime} from ${codexPosture.source_path}`
+      });
+    }
+
+    if (truthChecks.has('bundled-skills-roster')) {
+      const documentedSkills = extractBundledSkillNamesFromMarkdown(content, rosterPolicy);
+      if (!stringArraysEqual(documentedSkills, bundledSkillNames)) {
+        errors.push({
+          file,
+          rule: 'bundled-skill-roster-drift',
+          reference: `documented=[${documentedSkills.join(', ')}] shipped=[${bundledSkillNames.join(', ')}]`
+        });
+      }
+    }
+
+    if (truthChecks.has('front-door-budget')) {
+      const maxLines = Number.isFinite(readmeBudget?.max_lines) ? Number(readmeBudget.max_lines) : null;
+      const maxH2Sections = Number.isFinite(readmeBudget?.max_h2_sections)
+        ? Number(readmeBudget.max_h2_sections)
+        : null;
+      const lineCount = countDocumentLines(content);
+      const h2Count = countHeadingLines(content, '## ');
+      if (
+        (Number.isInteger(maxLines) && maxLines !== null && lineCount > maxLines) ||
+        (Number.isInteger(maxH2Sections) && maxH2Sections !== null && h2Count > maxH2Sections)
+      ) {
+        errors.push({
+          file,
+          rule: 'front-door-budget-exceeded',
+          reference: `lines=${lineCount}/${maxLines ?? 'none'} h2=${h2Count}/${maxH2Sections ?? 'none'}`
+        });
       }
     }
   }
@@ -543,6 +629,13 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function stringArraysEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((value, index) => value === right[index]);
+}
+
 function dedupeErrors(errors: DocsCheckError[]): DocsCheckError[] {
   const seen = new Set<string>();
   const deduped: DocsCheckError[] = [];
@@ -603,7 +696,13 @@ async function main(): Promise<void> {
   process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error('[docs-hygiene] failed:', error?.message ?? error);
-  process.exitCode = 1;
-});
+const isDirectExecution =
+  typeof process.argv[1] === 'string' &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isDirectExecution) {
+  main().catch((error) => {
+    console.error('[docs-hygiene] failed:', error?.message ?? error);
+    process.exitCode = 1;
+  });
+}

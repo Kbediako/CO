@@ -3,6 +3,132 @@
   "generated_at": "2026-04-02",
   "entries": [
     {
+      "path": ".agent/task/linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/chrome-devtools/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/codex-orchestrator/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/collab-deliberation/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/collab-evals/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/collab-subagents-first/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/collab-subagents-first/references/subagent-brief-template.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/delegate-early/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/elegance-review/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/land/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/linear/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "skills/release/SKILL.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "templates/README.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-03",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/linear-f3193657-a549-43a2-8cff-50c5284df986.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
