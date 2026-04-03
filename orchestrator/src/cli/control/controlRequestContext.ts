@@ -9,13 +9,13 @@ import type { ControlRuntime, ControlRuntimeSnapshot } from './controlRuntime.js
 import type { ControlStateStore } from './controlState.js';
 import type { DelegationTokenStore } from './delegationTokens.js';
 import type { LinearAdvisoryState } from './linearWebhookController.js';
+import type { ControlSelectedRunRuntimeSnapshot } from './observabilityReadModel.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import type { ProviderIntakeState } from './providerIntakeState.js';
 import type {
   ObservabilityPresenterContext
 } from './observabilitySurface.js';
 import type { QuestionQueue } from './questions.js';
-import type { SelectedRunPresenterContext } from './selectedRunPresenter.js';
 
 export interface ControlRequestPersist {
   control(): Promise<void>;
@@ -59,7 +59,11 @@ export interface ControlRequestContext extends ControlRequestSharedContext {
   expiryLifecycle: ControlExpiryLifecycle | null;
 }
 
-export type ControlPresenterContext = SelectedRunPresenterContext & ObservabilityPresenterContext;
+export interface ControlSelectedRunSnapshotContext {
+  readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
+}
+
+export type ControlPresenterContext = ObservabilityPresenterContext & ControlSelectedRunSnapshotContext;
 
 export interface ControlPresenterRuntimeContext {
   runtimeSnapshot: ControlRuntimeSnapshot;

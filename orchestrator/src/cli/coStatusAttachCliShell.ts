@@ -30,7 +30,7 @@ export interface RunCoStatusAttachCliShellParams {
   printHelp: () => void;
 }
 
-interface CoStatusAttachTarget {
+export interface CoStatusAttachTarget {
   manifestPath: string;
   taskId: string | null;
   runId: string | null;
@@ -111,7 +111,7 @@ export async function runCoStatusAttachCliShell(
   }
 }
 
-async function resolveAttachTarget(flags: ArgMap): Promise<CoStatusAttachTarget> {
+export async function resolveAttachTarget(flags: ArgMap): Promise<CoStatusAttachTarget> {
   const manifestFlag = readStringFlag(flags, 'manifest-path');
   const runDirFlag = readStringFlag(flags, 'run-dir');
   const requestedTaskId = readStringFlag(flags, 'task');
@@ -185,7 +185,7 @@ async function readAttachManifest(
   }
 }
 
-async function fetchUiDataset(
+export async function fetchUiDataset(
   baseUrl: URL,
   token: string,
   options: { signal?: AbortSignal } = {}

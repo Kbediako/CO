@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260403-linear-44a18317-8afe-47e4-b4ba-5424aae86dc5",
+      "title": "CO: Harden CO STATUS end-to-end truth agreement, visual coverage, and legacy monitor cleanup",
+      "relates_to": "tasks/tasks-linear-44a18317-8afe-47e4-b4ba-5424aae86dc5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-03",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-03",
+          "manifest": ".runs/linear-44a18317-8afe-47e4-b4ba-5424aae86dc5-co-76-docs-review/cli/2026-04-03T10-57-30-814Z-627a7b80/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-44a18317-8afe-47e4-b4ba-5424aae86dc5.md",
+        "task": "tasks/tasks-linear-44a18317-8afe-47e4-b4ba-5424aae86dc5.md",
+        "agent_task": ".agent/task/linear-44a18317-8afe-47e4-b4ba-5424aae86dc5.md",
+        "docs": "docs/TECH_SPEC-linear-44a18317-8afe-47e4-b4ba-5424aae86dc5.md"
+      }
+    },
+    {
       "id": "20260403-linear-c4c32123-af51-4552-b55a-03d17917659c",
       "title": "CO: Add a read-only CO STATUS attach viewer with live scrollback for an already-running control-host",
       "relates_to": "tasks/tasks-linear-c4c32123-af51-4552-b55a-03d17917659c.md",
