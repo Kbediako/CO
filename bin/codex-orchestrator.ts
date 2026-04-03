@@ -753,6 +753,9 @@ async function handleCoStatus(rawArgs: string[]): Promise<void> {
       printCoStatusAttachHelp();
       return;
     }
+    if (positionals.length > 0) {
+      throw new Error(`Unknown co-status attach argument(s): ${positionals.join(' ')}`);
+    }
     await runCoStatusAttachCliShell({
       flags,
       printHelp: printCoStatusAttachHelp
@@ -1663,7 +1666,7 @@ Launch options:
   --format json         Emit machine-readable readiness output.
   --help                Show this message.
 
-Attach options:
+Attach subcommand:
   attach                Attach to an already-running local JSON control-host.
                         Run \`codex-orchestrator co-status attach --help\` for attach flags.
 `);

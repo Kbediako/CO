@@ -79,7 +79,7 @@ export interface StartControlStatusDashboardOptions {
 }
 
 export interface StartAttachedControlStatusDashboardOptions {
-  readDataset: () => Promise<OperatorDashboardDataset>;
+  readDataset: (signal: AbortSignal) => Promise<OperatorDashboardDataset>;
   baseUrl: string;
   taskId: string;
   runId: string;
@@ -96,7 +96,7 @@ export interface ControlStatusDashboardHandle {
 }
 
 interface StartControlStatusViewerOptions {
-  readDataset: () => Promise<OperatorDashboardDataset>;
+  readDataset: (signal: AbortSignal) => Promise<OperatorDashboardDataset>;
   requestRefresh?: (() => Promise<void>) | null;
   subscribe?: ((listener: () => void) => () => void) | null;
   baseUrl: string;
@@ -259,6 +259,7 @@ function startControlStatusViewer(
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
   let activeRender: Promise<void> | null = null;
+  let activeReadController: AbortController | null = null;
   let queuedRender = false;
   let queuedForceRefresh = false;
   let queuedReadDataset = false;
@@ -371,6 +372,7 @@ function startControlStatusViewer(
       stopped = true;
       queuedRender = false;
       queuedForceRefresh = false;
+      activeReadController?.abort();
       if (timer) {
         deps.clearTimeout(timer);
         timer = null;
@@ -570,7 +572,13 @@ function startControlStatusViewer(
       if (forceRefresh) {
         await options.requestRefresh?.();
       }
-      const dataset = await options.readDataset();
+      const readController = new AbortController();
+      activeReadController = readController;
+      const dataset = await options.readDataset(readController.signal).finally(() => {
+        if (activeReadController === readController) {
+          activeReadController = null;
+        }
+      });
       if (stopped) {
         return;
       }
@@ -609,10 +617,10 @@ function startControlStatusViewer(
       writeFrame(frame);
     } catch (error) {
       const message = (error as Error)?.message ?? String(error);
-      logger.warn(`Failed rendering CO STATUS dashboard frame: ${message}`);
       if (stopped) {
         return;
       }
+      logger.warn(`Failed rendering CO STATUS dashboard frame: ${message}`);
       writeFrame(
         renderControlStatusErrorFrame(
           options,

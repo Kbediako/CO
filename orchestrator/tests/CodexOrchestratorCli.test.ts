@@ -34,6 +34,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
     expect(stdout).toContain('Launch the live CO STATUS dashboard by starting the control-host path,');
     expect(stdout).toContain('or attach a read-only viewer to an already-running local JSON control-host.');
     expect(stdout).toContain('Pipeline used for provider-driven starts (default: provider-linear-worker).');
+    expect(stdout).toContain('Attach subcommand:');
     expect(stdout).toContain('Run `codex-orchestrator co-status attach --help` for attach flags.');
   }, cliHelpTimeoutMs);
 
@@ -77,4 +78,16 @@ describe('codex-orchestrator CLI monitor alias', () => {
       expect(stdout).toContain('codex-orchestrator co-status attach [options]');
     }, cliHelpTimeoutMs);
   }
+
+  it('rejects unexpected positional arguments for co-status attach', async () => {
+    await expect(
+      execFileAsync(
+        process.execPath,
+        ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', 'attach', 'unexpected-arg'],
+        { cwd: repoRoot }
+      )
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown co-status attach argument(s): unexpected-arg')
+    });
+  }, cliHelpTimeoutMs);
 });

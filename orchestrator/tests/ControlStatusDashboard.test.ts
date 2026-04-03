@@ -1077,12 +1077,14 @@ describe('control status dashboard', () => {
 
     await handle.flush();
     expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_ENTER);
+    expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_EXIT);
     expect(stripAnsi(writes[0] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
 
     await vi.advanceTimersByTimeAsync(1000);
     await handle.flush();
     expect(writes).toHaveLength(2);
     expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_ENTER);
+    expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_EXIT);
     expect(stripAnsi(writes[1] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
 
     handle.stop();

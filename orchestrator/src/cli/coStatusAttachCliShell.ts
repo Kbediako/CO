@@ -89,9 +89,13 @@ export async function runCoStatusAttachCliShell(
   }
 
   let dashboard: ControlStatusDashboardHandle | null = null;
+  const attachAbortController = new AbortController();
   try {
     dashboard = startAttachedControlStatusDashboard({
-      readDataset: async () => await fetchUiDataset(target.baseUrl, target.token),
+      readDataset: async (signal) =>
+        await fetchUiDataset(target.baseUrl, target.token, {
+          signal: AbortSignal.any([attachAbortController.signal, signal])
+        }),
       baseUrl: target.baseUrl.toString(),
       taskId: target.taskId ?? 'unknown',
       runId: target.runId ?? 'unknown',
@@ -101,6 +105,7 @@ export async function runCoStatusAttachCliShell(
     });
     await waitForSignal();
   } finally {
+    attachAbortController.abort();
     dashboard?.stop();
     await dashboard?.flush();
   }
@@ -180,9 +185,22 @@ async function readAttachManifest(
   }
 }
 
-async function fetchUiDataset(baseUrl: URL, token: string): Promise<OperatorDashboardDataset> {
+async function fetchUiDataset(
+  baseUrl: URL,
+  token: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<OperatorDashboardDataset> {
   const url = new URL('/ui/data.json', baseUrl);
   const controller = new AbortController();
+  const linkedSignal = options.signal;
+  const onAbort = () => controller.abort();
+  if (linkedSignal) {
+    if (linkedSignal.aborted) {
+      controller.abort();
+    } else {
+      linkedSignal.addEventListener('abort', onAbort, { once: true });
+    }
+  }
   const timer = setTimeout(() => controller.abort(), DEFAULT_ATTACH_REQUEST_TIMEOUT_MS);
   let response: Response;
   try {
@@ -196,20 +214,24 @@ async function fetchUiDataset(baseUrl: URL, token: string): Promise<OperatorDash
     });
   } catch (error) {
     if ((error as Error)?.name === 'AbortError') {
+      if (linkedSignal?.aborted) {
+        throw new Error('control-host ui request cancelled');
+      }
       throw new Error('control-host ui request timeout');
     }
     throw error;
   } finally {
     clearTimeout(timer);
+    linkedSignal?.removeEventListener('abort', onAbort);
   }
   if (!response.ok) {
     throw new Error(`control-host ui request failed: ${response.status} ${response.statusText}`);
   }
-  const payload = (await response.json()) as Partial<OperatorDashboardDataset> | null;
-  if (payload?.mode !== 'operator_dashboard' || payload.read_only !== true) {
+  const payload = (await response.json()) as unknown;
+  if (!isOperatorDashboardDataset(payload)) {
     throw new Error('control-host ui dataset invalid');
   }
-  return payload as OperatorDashboardDataset;
+  return payload;
 }
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
@@ -239,6 +261,48 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function isOperatorDashboardDataset(value: unknown): value is OperatorDashboardDataset {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (value.mode !== 'operator_dashboard' || value.read_only !== true) {
+    return false;
+  }
+  if (typeof value.generated_at !== 'string' || typeof value.host !== 'string') {
+    return false;
+  }
+  if (
+    !isRecord(value.counts) ||
+    !isFiniteNumber(value.counts.running) ||
+    !isFiniteNumber(value.counts.retrying) ||
+    !isFiniteNumber(value.counts.issues)
+  ) {
+    return false;
+  }
+  if (
+    !isRecord(value.totals) ||
+    !isNumberOrNull(value.totals.input_tokens) ||
+    !isNumberOrNull(value.totals.output_tokens) ||
+    !isNumberOrNull(value.totals.total_tokens) ||
+    !isFiniteNumber(value.totals.seconds_running)
+  ) {
+    return false;
+  }
+  return Array.isArray(value.running) && Array.isArray(value.retrying) && Array.isArray(value.issues);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isNumberOrNull(value: unknown): value is number | null {
+  return value === null || isFiniteNumber(value);
 }
 
 function deriveTaskRunFromManifestPath(manifestPath: string): { taskId: string | null; runId: string | null } {
