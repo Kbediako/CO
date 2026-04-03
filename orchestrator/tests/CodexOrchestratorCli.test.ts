@@ -92,4 +92,29 @@ describe('codex-orchestrator CLI monitor alias', () => {
       stderr: expect.stringContaining('Unknown co-status attach argument(s): unexpected-arg')
     });
   }, cliHelpTimeoutMs);
+
+  it('rejects unexpected positional arguments for doctor', async () => {
+    await expect(
+      execFileAsync(
+        process.execPath,
+        ['--loader', 'ts-node/esm', cliEntrypoint, 'doctor', 'unexpected-arg'],
+        { cwd: repoRoot }
+      )
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown doctor argument(s): unexpected-arg')
+    });
+  }, cliHelpTimeoutMs);
+
+  it('prints dedicated doctor help with the apply/json limitation', async () => {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ['--loader', 'ts-node/esm', cliEntrypoint, 'doctor', '--help'],
+      { cwd: repoRoot }
+    );
+
+    expect(stdout).toContain('Usage: codex-orchestrator doctor [options]');
+    expect(stdout).toContain(
+      '--format json         Emit machine-readable output (not supported with --apply).'
+    );
+  }, cliHelpTimeoutMs);
 });

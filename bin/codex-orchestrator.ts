@@ -1018,6 +1018,9 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
     printDoctorHelp();
     return;
   }
+  if (positionals.length > 0) {
+    throw new Error(`Unknown doctor argument(s): ${positionals.join(' ')}`);
+  }
   await runDoctorCliRequestShell({ flags });
 }
 
@@ -1727,7 +1730,7 @@ Inspect the current repo/user environment for downstream readiness:
 - optional local usage and cloud preflight checks
 
 Options:
-  --format json         Emit machine-readable output.
+  --format json         Emit machine-readable output (not supported with --apply).
   --usage               Include a local usage snapshot (scans .runs/).
   --window-days <n>     Window for --usage (default 30).
   --task <id>           Limit --usage scan to a specific task directory.
