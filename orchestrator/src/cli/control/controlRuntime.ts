@@ -58,6 +58,8 @@ interface ControlRuntimeContext {
   env?: NodeJS.ProcessEnv;
 }
 
+const NULL_PROVIDER_RUNNING_FRESHNESS_MS = 10 * 60 * 1000;
+
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
   readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
@@ -192,7 +194,9 @@ function createControlRuntimeSnapshot(
         ? await context.providerWorkflowConfigStore.refresh()
         : null;
       const running = [
-        ...(selected?.rawStatus === 'in_progress' ? [selected] : []),
+        ...(isAuthoritativeSelectedCurrentRunningSource(selected, context.providerIntakeState)
+          ? [selected]
+          : []),
         ...discoveredSources.filter((source) =>
           source.rawStatus === 'in_progress' &&
           isAuthoritativeCurrentRunningSource(source, context.providerIntakeState)
@@ -436,6 +440,32 @@ function buildProviderRetryState(
   };
 }
 
+function isAuthoritativeSelectedCurrentRunningSource(
+  source: ControlCompatibilitySourceContext | null,
+  providerIntakeState: ProviderIntakeState | undefined
+): source is ControlCompatibilitySourceContext {
+  if (!source || source.rawStatus !== 'in_progress') {
+    return false;
+  }
+  if (!providerIntakeState) {
+    return true;
+  }
+  if (source.issueProvider !== null) {
+    return true;
+  }
+  if (!isControlHostSelectedFallbackSource(source)) {
+    return true;
+  }
+  const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
+  return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
+}
+
+function isControlHostSelectedFallbackSource(
+  source: Pick<ControlCompatibilitySourceContext, 'issueProvider' | 'taskId'>
+): boolean {
+  return source.issueProvider === null && source.taskId === 'local-mcp';
+}
+
 function findMatchingProviderIntakeClaim(
   providerIntakeState: ProviderIntakeState,
   source: Pick<
@@ -537,7 +567,10 @@ function isAuthoritativeCurrentRunningSource(
     if (claim !== null) {
       return isProviderIntakeClaimActiveCurrentActivity(claim);
     }
-    return !hasProviderBoundIssueIdentity(source);
+    return (
+      hasExplicitCompatibilityIssueIdentity(source) &&
+      isFreshNullProviderRunningSource(source)
+    );
   }
   if (!isProviderIntakeScopedRunningSource(source)) {
     return true;
@@ -551,16 +584,30 @@ function isProviderIntakeScopedRunningSource(
   return source.issueProvider === 'linear';
 }
 
-function hasProviderBoundIssueIdentity(
-  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'taskId'>
+function hasExplicitCompatibilityIssueIdentity(
+  source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
 ): boolean {
-  if (!source.issueId) {
-    return false;
-  }
-  if (!source.taskId) {
+  const fallbackIdentity = source.taskId ?? source.runId ?? null;
+  if (source.issueIdentifier && source.issueIdentifier !== fallbackIdentity) {
     return true;
   }
-  return source.issueId !== source.taskId;
+  if (source.issueId && source.issueId !== fallbackIdentity) {
+    return true;
+  }
+  return false;
+}
+
+function isFreshNullProviderRunningSource(
+  source: Pick<ControlCompatibilitySourceContext, 'updatedAt' | 'startedAt'>
+): boolean {
+  const freshestTimestamp =
+    Date.parse(source.updatedAt ?? '') ||
+    Date.parse(source.startedAt ?? '') ||
+    Number.NEGATIVE_INFINITY;
+  if (!Number.isFinite(freshestTimestamp)) {
+    return false;
+  }
+  return Date.now() - freshestTimestamp <= NULL_PROVIDER_RUNNING_FRESHNESS_MS;
 }
 
 function isProviderIntakeClaimActiveCurrentActivity(

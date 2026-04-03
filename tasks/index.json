@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260403-linear-6bed26fd-ea66-43c1-8324-b10871769435",
+      "title": "CO: Exclude historical non-provider in_progress manifests from live CO STATUS current activity/runtime",
+      "relates_to": "tasks/tasks-linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-03",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
+        "task": "tasks/tasks-linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
+        "agent_task": ".agent/task/linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
+        "docs": "docs/TECH_SPEC-linear-6bed26fd-ea66-43c1-8324-b10871769435.md"
+      }
+    },
+    {
       "id": "20260402-linear-f3193657-a549-43a2-8cff-50c5284df986",
       "title": "CO: Fix CO STATUS paused snapshot duplication and authoritative telemetry",
       "relates_to": "tasks/tasks-linear-f3193657-a549-43a2-8cff-50c5284df986.md",
