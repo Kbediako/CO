@@ -1486,6 +1486,531 @@ describe('ControlServer', () => {
     }
   });
 
+  it('keeps explicitly identified null-provider sibling runs in /api/v1/state when no active claim backs them', async () => {
+    const nowMs = Date.now();
+    const currentStartedAt = new Date(nowMs - 10 * 60_000).toISOString();
+    const currentUpdatedAt = new Date(nowMs - 60_000).toISOString();
+    const siblingStartedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const siblingUpdatedAt = new Date(nowMs - 30_000).toISOString();
+    const { root, env, paths } = await createRunRoot('task-empty-intake-current');
+    await seedManifest(paths, {
+      task_id: 'task-empty-intake-current',
+      issue_provider: 'linear',
+      issue_id: 'issue-current',
+      issue_identifier: 'ISSUE-CURRENT',
+      started_at: currentStartedAt,
+      updated_at: currentUpdatedAt
+    });
+    await createSiblingRun(root, 'task-empty-intake-null-provider', 'run-2', {
+      manifest: {
+        issue_identifier: 'ISSUE-NULL-PROVIDER',
+        status: 'in_progress',
+        started_at: siblingStartedAt,
+        updated_at: siblingUpdatedAt,
+        summary: 'current default-provider run without an active claim'
+      }
+    });
+    await seedProviderIntakeState(paths, []);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 2, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-CURRENT');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT',
+        'ISSUE-NULL-PROVIDER'
+      ]);
+
+      const staleIssueRes = await fetch(new URL('/api/v1/ISSUE-NULL-PROVIDER', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(staleIssueRes.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps explicitly identified null-provider sibling runs in /api/v1/state when the intake snapshot is missing', async () => {
+    const nowMs = Date.now();
+    const currentStartedAt = new Date(nowMs - 10 * 60_000).toISOString();
+    const currentUpdatedAt = new Date(nowMs - 60_000).toISOString();
+    const siblingStartedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const siblingUpdatedAt = new Date(nowMs - 30_000).toISOString();
+    const { root, env, paths } = await createRunRoot('task-missing-intake-current');
+    await seedManifest(paths, {
+      task_id: 'task-missing-intake-current',
+      issue_provider: 'linear',
+      issue_id: 'issue-current',
+      issue_identifier: 'ISSUE-CURRENT',
+      started_at: currentStartedAt,
+      updated_at: currentUpdatedAt
+    });
+    await createSiblingRun(root, 'task-missing-intake-null-provider', 'run-2', {
+      manifest: {
+        issue_identifier: 'ISSUE-NULL-PROVIDER',
+        status: 'in_progress',
+        started_at: siblingStartedAt,
+        updated_at: siblingUpdatedAt,
+        summary: 'current default-provider run without an intake snapshot'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 2, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-CURRENT');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT',
+        'ISSUE-NULL-PROVIDER'
+      ]);
+
+      const issueRes = await fetch(new URL('/api/v1/ISSUE-NULL-PROVIDER', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes fallback-only null-provider historical sibling runs from /api/v1/state when no active claim backs them', async () => {
+    const nowMs = Date.now();
+    const currentStartedAt = new Date(nowMs - 10 * 60_000).toISOString();
+    const currentUpdatedAt = new Date(nowMs - 60_000).toISOString();
+    const siblingStartedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const siblingUpdatedAt = new Date(nowMs - 30_000).toISOString();
+    const { root, env, paths } = await createRunRoot('task-empty-intake-current');
+    await seedManifest(paths, {
+      task_id: 'task-empty-intake-current',
+      issue_provider: 'linear',
+      issue_id: 'issue-current',
+      issue_identifier: 'ISSUE-CURRENT',
+      started_at: currentStartedAt,
+      updated_at: currentUpdatedAt
+    });
+    await createSiblingRun(root, 'rlm-CO', 'run-2', {
+      manifest: {
+        status: 'in_progress',
+        started_at: siblingStartedAt,
+        updated_at: siblingUpdatedAt,
+        summary: 'historical fallback-only null-provider run without an active claim'
+      }
+    });
+    await seedProviderIntakeState(paths, []);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-CURRENT');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-CURRENT']);
+
+      const staleIssueRes = await fetch(new URL('/api/v1/rlm-CO', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(staleIssueRes.status).toBe(404);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes fallback-only null-provider historical sibling runs from /api/v1/state when the intake snapshot is missing', async () => {
+    const nowMs = Date.now();
+    const currentStartedAt = new Date(nowMs - 10 * 60_000).toISOString();
+    const currentUpdatedAt = new Date(nowMs - 60_000).toISOString();
+    const siblingStartedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const siblingUpdatedAt = new Date(nowMs - 30_000).toISOString();
+    const { root, env, paths } = await createRunRoot('task-missing-intake-current');
+    await seedManifest(paths, {
+      task_id: 'task-missing-intake-current',
+      issue_provider: 'linear',
+      issue_id: 'issue-current',
+      issue_identifier: 'ISSUE-CURRENT',
+      started_at: currentStartedAt,
+      updated_at: currentUpdatedAt
+    });
+    await createSiblingRun(root, 'rlm-CO', 'run-2', {
+      manifest: {
+        status: 'in_progress',
+        started_at: siblingStartedAt,
+        updated_at: siblingUpdatedAt,
+        summary: 'historical fallback-only null-provider run without an intake snapshot'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-CURRENT');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-CURRENT']);
+
+      const issueRes = await fetch(new URL('/api/v1/rlm-CO', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(404);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the selected local-mcp run in /api/v1/state when it carries explicit issue identity', async () => {
+    const nowMs = Date.now();
+    const startedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const updatedAt = new Date(nowMs - 60_000).toISOString();
+    const { root, env, paths } = await createRunRoot('local-mcp');
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      issue_id: 'issue-local-mcp',
+      issue_identifier: 'ISSUE-LOCAL-MCP',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'selected local-mcp run with explicit issue identity'
+    });
+    await seedProviderIntakeState(paths, []);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-LOCAL-MCP');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-LOCAL-MCP']);
+
+      const issueRes = await fetch(new URL('/api/v1/ISSUE-LOCAL-MCP', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('suppresses the selected local-mcp run from /api/v1/state when its matching claim is no longer active', async () => {
+    const nowMs = Date.now();
+    const startedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const updatedAt = new Date(nowMs - 15_000).toISOString();
+    const { root, env, paths } = await createRunRoot('local-mcp');
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      issue_id: 'issue-local-mcp',
+      issue_identifier: 'ISSUE-LOCAL-MCP',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'selected local-mcp run with completed matching claim'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-local-mcp',
+        issue_id: 'issue-local-mcp',
+        issue_identifier: 'ISSUE-LOCAL-MCP',
+        issue_title: 'Completed local-mcp claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: updatedAt,
+        task_id: 'local-mcp',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_released:not_active',
+        accepted_at: startedAt,
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-local-mcp-completed',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: Date.parse(updatedAt),
+        run_id: 'run-1',
+        run_manifest_path: paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-local-mcp-completed'
+      }
+    ]);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 0, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-LOCAL-MCP');
+      expect(statePayload.running).toEqual([]);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not treat fallback-only local-mcp claim aliases as current /api/v1/state activity', async () => {
+    const nowMs = Date.now();
+    const startedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const updatedAt = new Date(nowMs - 15_000).toISOString();
+    const { root, env, paths } = await createRunRoot('local-mcp');
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'selected local-mcp fallback manifest with fallback-alias claim'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:local-mcp',
+        issue_id: 'local-mcp',
+        issue_identifier: 'local-mcp',
+        issue_title: 'Fallback-only local-mcp claim',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: updatedAt,
+        task_id: 'local-mcp',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: startedAt,
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-local-mcp-fallback-alias',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: Date.parse(updatedAt),
+        run_id: 'run-other',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-local-mcp-fallback-alias'
+      }
+    ]);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 0, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('local-mcp');
+      expect(statePayload.running).toEqual([]);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores unrelated retained local-mcp claims in /api/v1/state for the selected run', async () => {
+    const nowMs = Date.now();
+    const startedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const updatedAt = new Date(nowMs - 15_000).toISOString();
+    const { root, env, paths } = await createRunRoot('local-mcp');
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      issue_id: 'issue-local-mcp',
+      issue_identifier: 'ISSUE-LOCAL-MCP',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'selected local-mcp run with unrelated retained claim'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-other',
+        issue_id: 'issue-other',
+        issue_identifier: 'ISSUE-OTHER',
+        issue_title: 'Completed unrelated local-mcp claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: updatedAt,
+        task_id: 'local-mcp',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_released:not_active',
+        accepted_at: startedAt,
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-local-mcp-other',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: Date.parse(updatedAt),
+        run_id: 'run-1',
+        run_manifest_path: paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-local-mcp-other'
+      }
+    ]);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-LOCAL-MCP');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-LOCAL-MCP']);
+
+      const issueRes = await fetch(new URL('/api/v1/ISSUE-LOCAL-MCP', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('resolves same-issue multi-run compatibility lookups while leaving ui data on the selected run', async () => {
     const { root, env, paths } = await createRunRoot('task-1035-current');
     await seedManifest(paths, {

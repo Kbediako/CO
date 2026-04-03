@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260403-linear-6bed26fd-ea66-43c1-8324-b10871769435",
+      "title": "CO: Exclude historical non-provider in_progress manifests from live CO STATUS current activity/runtime",
+      "relates_to": "tasks/tasks-linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-03",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
+        "task": "tasks/tasks-linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
+        "agent_task": ".agent/task/linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
+        "docs": "docs/TECH_SPEC-linear-6bed26fd-ea66-43c1-8324-b10871769435.md"
+      }
+    },
+    {
       "id": "20260403-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80",
       "title": "CO: Automate docs truthfulness and relevance across README, shipped skills, and agent-facing docs",
       "relates_to": "tasks/tasks-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",

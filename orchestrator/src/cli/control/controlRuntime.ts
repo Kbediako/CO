@@ -58,6 +58,8 @@ interface ControlRuntimeContext {
   env?: NodeJS.ProcessEnv;
 }
 
+const NULL_PROVIDER_RUNNING_FRESHNESS_MS = 10 * 60 * 1000;
+
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
   readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
@@ -192,7 +194,9 @@ function createControlRuntimeSnapshot(
         ? await context.providerWorkflowConfigStore.refresh()
         : null;
       const running = [
-        ...(selected?.rawStatus === 'in_progress' ? [selected] : []),
+        ...(isAuthoritativeSelectedCurrentRunningSource(selected, context.providerIntakeState)
+          ? [selected]
+          : []),
         ...discoveredSources.filter((source) =>
           source.rawStatus === 'in_progress' &&
           isAuthoritativeCurrentRunningSource(source, context.providerIntakeState)
@@ -436,6 +440,45 @@ function buildProviderRetryState(
   };
 }
 
+function isAuthoritativeSelectedCurrentRunningSource(
+  source: ControlCompatibilitySourceContext | null,
+  providerIntakeState: ProviderIntakeState | undefined
+): source is ControlCompatibilitySourceContext {
+  if (!source || source.rawStatus !== 'in_progress') {
+    return false;
+  }
+  if (!providerIntakeState) {
+    return (
+      source.taskId !== 'local-mcp' ||
+      (!isControlHostSelectedFallbackSource(source) && isFreshNullProviderRunningSource(source))
+    );
+  }
+  if (source.taskId !== 'local-mcp') {
+    return true;
+  }
+  const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
+  if (claim !== null) {
+    return isProviderIntakeClaimActiveCurrentActivity(claim);
+  }
+  if (source.taskId === 'local-mcp' && !hasExplicitCompatibilityIssueIdentity(source)) {
+    return false;
+  }
+  return isFreshNullProviderRunningSource(source);
+}
+
+function isControlHostSelectedFallbackSource(
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'taskId' | 'issueIdentifier' | 'issueId' | 'runId'
+  >
+): boolean {
+  return (
+    source.issueProvider === null &&
+    source.taskId === 'local-mcp' &&
+    !hasExplicitCompatibilityIssueIdentity(source)
+  );
+}
+
 function findMatchingProviderIntakeClaim(
   providerIntakeState: ProviderIntakeState,
   source: Pick<
@@ -469,22 +512,66 @@ function scoreProviderClaimMatch(
   >
 ): number {
   let score = 0;
-  if (claim.issue_id && source.issueId && claim.issue_id === source.issueId) {
+  const allowRunBindingMatch = canScoreProviderRunBindingMatch(claim, source);
+  const authoritativeIssueId = readAuthoritativeProviderIssueId(source);
+  const authoritativeIssueIdentifier = readAuthoritativeProviderIssueIdentifier(source);
+  if (claim.issue_id && authoritativeIssueId && claim.issue_id === authoritativeIssueId) {
     score += 16;
   }
-  if (claim.issue_identifier === source.issueIdentifier) {
+  if (claim.issue_identifier && authoritativeIssueIdentifier && claim.issue_identifier === authoritativeIssueIdentifier) {
     score += 12;
   }
-  if (claim.task_id && source.taskId && claim.task_id === source.taskId) {
+  if (isAuthoritativeProviderTaskIdMatch(claim, source)) {
     score += 8;
   }
-  if (claim.run_id && source.runId && claim.run_id === source.runId) {
+  if (allowRunBindingMatch && claim.run_id && source.runId && claim.run_id === source.runId) {
     score += 6;
   }
-  if (claim.run_manifest_path && source.manifestPath && claim.run_manifest_path === source.manifestPath) {
+  if (
+    allowRunBindingMatch &&
+    claim.run_manifest_path &&
+    source.manifestPath &&
+    claim.run_manifest_path === source.manifestPath
+  ) {
     score += 10;
   }
   return score;
+}
+
+function canScoreProviderRunBindingMatch(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId'
+  >
+): boolean {
+  if (source.taskId !== 'local-mcp') {
+    return true;
+  }
+  if (!hasExplicitCompatibilityIssueIdentity(source)) {
+    return true;
+  }
+  return hasMatchingProviderIssueIdentity(claim, source);
+}
+
+function isAuthoritativeProviderTaskIdMatch(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier' | 'task_id'>,
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
+): boolean {
+  if (!claim.task_id || !source.taskId || claim.task_id !== source.taskId) {
+    return false;
+  }
+  if (source.taskId !== 'local-mcp') {
+    return true;
+  }
+  const authoritativeIssueId = readAuthoritativeProviderIssueId(source);
+  const authoritativeIssueIdentifier = readAuthoritativeProviderIssueIdentifier(source);
+  return (
+    (claim.issue_id != null && authoritativeIssueId != null && claim.issue_id === authoritativeIssueId) ||
+    (claim.issue_identifier != null &&
+      authoritativeIssueIdentifier != null &&
+      claim.issue_identifier === authoritativeIssueIdentifier)
+  );
 }
 
 function isSelectedManifestRetryFallbackCandidate(
@@ -530,14 +617,20 @@ function isAuthoritativeCurrentRunningSource(
   providerIntakeState: ProviderIntakeState | undefined
 ): boolean {
   if (!providerIntakeState) {
-    return true;
+    return (
+      source.issueProvider !== null ||
+      (hasExplicitCompatibilityIssueIdentity(source) && isFreshNullProviderRunningSource(source))
+    );
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   if (source.issueProvider === null) {
     if (claim !== null) {
       return isProviderIntakeClaimActiveCurrentActivity(claim);
     }
-    return !hasProviderBoundIssueIdentity(source);
+    return (
+      hasExplicitCompatibilityIssueIdentity(source) &&
+      isFreshNullProviderRunningSource(source)
+    );
   }
   if (!isProviderIntakeScopedRunningSource(source)) {
     return true;
@@ -551,16 +644,83 @@ function isProviderIntakeScopedRunningSource(
   return source.issueProvider === 'linear';
 }
 
-function hasProviderBoundIssueIdentity(
-  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'taskId'>
+function hasMatchingProviderIssueIdentity(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
 ): boolean {
-  if (!source.issueId) {
-    return false;
+  const authoritativeIssueId = readAuthoritativeProviderIssueId(source);
+  const authoritativeIssueIdentifier = readAuthoritativeProviderIssueIdentifier(source);
+  return (
+    (claim.issue_id != null &&
+      authoritativeIssueId != null &&
+      claim.issue_id === authoritativeIssueId) ||
+    (claim.issue_identifier != null &&
+      authoritativeIssueIdentifier != null &&
+      claim.issue_identifier === authoritativeIssueIdentifier)
+  );
+}
+
+function readAuthoritativeProviderIssueId(
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'taskId' | 'runId'>
+): string | null {
+  const issueId = source.issueId ?? null;
+  if (!issueId) {
+    return null;
   }
-  if (!source.taskId) {
+  if (source.taskId !== 'local-mcp') {
+    return issueId;
+  }
+  return isFallbackCompatibilityIdentityValue(issueId, source) ? null : issueId;
+}
+
+function readAuthoritativeProviderIssueIdentifier(
+  source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'taskId' | 'runId'>
+): string | null {
+  const issueIdentifier = source.issueIdentifier ?? null;
+  if (!issueIdentifier) {
+    return null;
+  }
+  if (source.taskId !== 'local-mcp') {
+    return issueIdentifier;
+  }
+  return isFallbackCompatibilityIdentityValue(issueIdentifier, source) ? null : issueIdentifier;
+}
+
+function isFallbackCompatibilityIdentityValue(
+  value: string,
+  source: Pick<ControlCompatibilitySourceContext, 'taskId' | 'runId'>
+): boolean {
+  return value === source.taskId || value === source.runId;
+}
+
+function hasExplicitCompatibilityIssueIdentity(
+  source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
+): boolean {
+  const fallbackIdentities = new Set(
+    [source.taskId, source.runId].filter((value): value is string => typeof value === 'string')
+  );
+  if (source.issueIdentifier && !fallbackIdentities.has(source.issueIdentifier)) {
     return true;
   }
-  return source.issueId !== source.taskId;
+  if (source.issueId && !fallbackIdentities.has(source.issueId)) {
+    return true;
+  }
+  return false;
+}
+
+function isFreshNullProviderRunningSource(
+  source: Pick<ControlCompatibilitySourceContext, 'updatedAt' | 'startedAt'>
+): boolean {
+  const updatedAt = Date.parse(source.updatedAt ?? '');
+  const startedAt = Date.parse(source.startedAt ?? '');
+  const freshestTimestamp = Math.max(
+    Number.isFinite(updatedAt) ? updatedAt : Number.NEGATIVE_INFINITY,
+    Number.isFinite(startedAt) ? startedAt : Number.NEGATIVE_INFINITY
+  );
+  if (!Number.isFinite(freshestTimestamp)) {
+    return false;
+  }
+  return Date.now() - freshestTimestamp <= NULL_PROVIDER_RUNNING_FRESHNESS_MS;
 }
 
 function isProviderIntakeClaimActiveCurrentActivity(
