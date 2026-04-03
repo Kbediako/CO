@@ -51,6 +51,7 @@ import {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   runControlHostCliShell
 } from '../orchestrator/src/cli/controlHostCliShell.js';
+import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -746,6 +747,21 @@ async function handleControlHost(rawArgs: string[]): Promise<void> {
 }
 
 async function handleCoStatus(rawArgs: string[]): Promise<void> {
+  if (rawArgs[0] === 'attach') {
+    const { positionals, flags } = parseArgs(rawArgs.slice(1));
+    if (isHelpRequest(positionals, flags)) {
+      printCoStatusAttachHelp();
+      return;
+    }
+    if (positionals.length > 0) {
+      throw new Error(`Unknown co-status attach argument(s): ${positionals.join(' ')}`);
+    }
+    await runCoStatusAttachCliShell({
+      flags,
+      printHelp: printCoStatusAttachHelp
+    });
+    return;
+  }
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
     printCoStatusHelp();
@@ -1374,8 +1390,9 @@ Commands:
     --format json           Emit machine-readable readiness output.
 
   co-status [options]
-    Dedicated monitor alias for launching the live CO STATUS dashboard.
-    Uses the same host/runtime path and options as control-host.
+    Launch the live CO STATUS dashboard by starting the control-host path.
+  co-status attach [options]
+    Attach a read-only CO STATUS viewer to an already-running local control-host.
 
   status --run <id> [--watch] [--interval N] [--format json]
 
@@ -1452,7 +1469,7 @@ Commands:
     --mode <full|question_only|status_only>  Limit tool surface for child runs.
     --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   control-host            Run the persistent provider intake + oversight host.
-  co-status               Launch the live CO STATUS dashboard through the control-host path.
+  co-status               Launch or attach the CO STATUS terminal viewer.
   version | --version
 
   help                      Show this message.
@@ -1635,17 +1652,41 @@ Options:
 }
 
 function printCoStatusHelp(): void {
-  console.log(`Usage: codex-orchestrator co-status [options]
+  console.log(`Usage:
+  codex-orchestrator co-status [options]
+  codex-orchestrator co-status attach [options]
 
-Dedicated monitor alias for the live CO STATUS dashboard.
-This reuses the same host/runtime path as \`control-host\`.
+Launch the live CO STATUS dashboard by starting the control-host path,
+or attach a read-only viewer to an already-running local JSON control-host.
 
-Options:
+Launch options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
   --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
   --format json         Emit machine-readable readiness output.
   --help                Show this message.
+
+Attach subcommand:
+  attach                Attach to an already-running local JSON control-host.
+                        Run \`codex-orchestrator co-status attach --help\` for attach flags.
+`);
+}
+
+function printCoStatusAttachHelp(): void {
+  console.log(`Usage: codex-orchestrator co-status attach [options]
+
+Attach a read-only CO STATUS viewer to an already-running local JSON control-host.
+This reads persisted endpoint/auth artifacts and does not start another control-host,
+Linear poller, or Telegram poller.
+
+Options:
+  --task <id>               Artifact task id for the host state (default: local-mcp).
+  --run <id>                Host run id for persisted state files (default: control-host).
+  --run-dir <path>          Resolve the host from a specific existing run directory.
+  --manifest-path <path>    Resolve the host from an explicit manifest.json path.
+  --refresh-interval-ms <n> Viewer refresh interval in milliseconds (default: 1000).
+  --format json             Emit machine-readable attach target output instead of launching the viewer.
+  --help                    Show this message.
 `);
 }
 

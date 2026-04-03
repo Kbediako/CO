@@ -10,6 +10,7 @@ import type { OperatorDashboardDataset } from '../src/cli/control/operatorDashbo
 import {
   renderControlStatusFrame,
   shouldEnableControlStatusDashboard,
+  startAttachedControlStatusDashboard,
   startControlStatusDashboard
 } from '../src/cli/control/controlStatusDashboard.js';
 
@@ -361,6 +362,22 @@ describe('control status dashboard', () => {
       '│ Snapshot: press s to export a stable frame under run dir',
       '╰─'
     ].join('\n'));
+  });
+
+  it('labels live primary-screen renders as primary scrollback', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset(),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'attach-viewer',
+      terminalColumns: 120,
+      throughputTps: 1842.7,
+      surfaceMode: 'primary'
+    });
+
+    expect(stripAnsi(frame)).toContain('│ Inspect: live | primary scrollback | full frame');
   });
 
   it('renders narrow terminals with an explicit reduced running table and sorted retry queue', () => {
@@ -955,6 +972,122 @@ describe('control status dashboard', () => {
     handle.stop();
     await vi.advanceTimersByTimeAsync(5000);
     expect(requestRefresh).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the launched dashboard on alternate screen when using the default tty output stream', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const originalIsTTY = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    const originalColumns = Object.getOwnPropertyDescriptor(process.stdout, 'columns');
+    Object.defineProperty(process.stdout, 'isTTY', {
+      configurable: true,
+      value: true
+    });
+    Object.defineProperty(process.stdout, 'columns', {
+      configurable: true,
+      value: 120
+    });
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(((chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+      }) as typeof process.stdout.write);
+
+    const requestRefresh = vi.fn(async () => undefined);
+    const runtime = {
+      requestRefresh,
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    try {
+      const handle = startControlStatusDashboard(
+        {
+          runtime,
+          baseUrl: 'http://127.0.0.1:4100',
+          taskId: 'local-mcp',
+          runId: 'control-host',
+          runDir: '/repo/.runs/local-mcp/cli/control-host',
+          startPipelineId: 'provider-linear-worker',
+          refreshIntervalMs: 1000
+        },
+        {
+          readDataset: async () => buildDataset(),
+          setTimeout,
+          clearTimeout
+        }
+      );
+
+      await handle.flush();
+      expect(writes[0]).toContain(ANSI_ALT_SCREEN_ENTER);
+      expect(stripAnsi(writes[0] ?? '')).toContain('│ Inspect: live | alternate screen | full frame');
+      handle.stop();
+    } finally {
+      writeSpy.mockRestore();
+      if (originalIsTTY) {
+        Object.defineProperty(process.stdout, 'isTTY', originalIsTTY);
+      }
+      if (originalColumns) {
+        Object.defineProperty(process.stdout, 'columns', originalColumns);
+      }
+    }
+  });
+
+  it('keeps attached viewers on primary scrollback while refreshing live data', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let readCount = 0;
+
+    const handle = startAttachedControlStatusDashboard(
+      {
+        readDataset: async () =>
+          buildDataset({
+            totals: {
+              ...buildDataset().totals,
+              total_tokens: 217 + readCount++
+            }
+          }),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'attach-viewer',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          isTTY: true
+        }
+      },
+      {
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_ENTER);
+    expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_EXIT);
+    expect(stripAnsi(writes[0] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+    expect(writes).toHaveLength(2);
+    expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_ENTER);
+    expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_EXIT);
+    expect(stripAnsi(writes[1] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
+
+    handle.stop();
   });
 
   it('suppresses timed and runtime-triggered rerenders while paused until resumed', async () => {
@@ -1883,6 +2016,65 @@ describe('control status dashboard', () => {
 
     expect(readDataset).toHaveBeenCalledTimes(1);
     expect(requestRefresh).toHaveBeenCalledTimes(1);
+    expect(writes).toHaveLength(0);
+  });
+
+  it('skips the post-refresh read when stop lands during requestRefresh', async () => {
+    const writes: string[] = [];
+    let resolveRefresh: (() => void) | null = null;
+    let signalRefreshStarted: (() => void) | null = null;
+    const refreshStarted = new Promise<void>((resolve) => {
+      signalRefreshStarted = resolve;
+    });
+    const requestRefresh = vi.fn(async () => {
+      signalRefreshStarted?.();
+      signalRefreshStarted = null;
+      await new Promise<void>((resolve) => {
+        resolveRefresh = resolve;
+      });
+    });
+    const runtime = {
+      requestRefresh,
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+    const readDataset = vi.fn(async () => buildDataset());
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120
+        }
+      },
+      {
+        readDataset
+      }
+    );
+
+    await refreshStarted;
+    expect(requestRefresh).toHaveBeenCalledTimes(1);
+    expect(readDataset).not.toHaveBeenCalled();
+
+    handle.stop();
+    resolveRefresh?.();
+    await handle.flush();
+
+    expect(readDataset).not.toHaveBeenCalled();
     expect(writes).toHaveLength(0);
   });
 });

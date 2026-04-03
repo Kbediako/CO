@@ -78,9 +78,36 @@ export interface StartControlStatusDashboardOptions {
   input?: DashboardInput;
 }
 
+export interface StartAttachedControlStatusDashboardOptions {
+  readDataset: (signal: AbortSignal) => Promise<OperatorDashboardDataset>;
+  baseUrl: string;
+  taskId: string;
+  runId: string;
+  runDir: string;
+  startPipelineId: string;
+  refreshIntervalMs?: number;
+  output?: DashboardOutput;
+  input?: DashboardInput;
+}
+
 export interface ControlStatusDashboardHandle {
   stop(): void;
   flush(): Promise<void>;
+}
+
+interface StartControlStatusViewerOptions {
+  readDataset: (signal: AbortSignal) => Promise<OperatorDashboardDataset>;
+  requestRefresh?: (() => Promise<void>) | null;
+  subscribe?: ((listener: () => void) => () => void) | null;
+  baseUrl: string;
+  taskId: string;
+  runId: string;
+  runDir: string;
+  startPipelineId: string;
+  refreshIntervalMs?: number;
+  output?: DashboardOutput;
+  input?: DashboardInput;
+  liveSurfaceMode?: DashboardSurfaceMode;
 }
 
 export interface RenderControlStatusFrameInput {
@@ -176,12 +203,63 @@ export function startControlStatusDashboard(
   overrides: Partial<ControlStatusDashboardDependencies> = {}
 ): ControlStatusDashboardHandle {
   const deps = { ...DEFAULT_DEPENDENCIES, ...overrides };
+  const liveOutput = options.output ?? DEFAULT_OUTPUT;
+  return startControlStatusViewer(
+    {
+      readDataset: async () => await deps.readDataset(options.runtime),
+      requestRefresh: async () => {
+        await options.runtime.requestRefresh();
+      },
+      subscribe: (listener) => options.runtime.subscribe(listener),
+      baseUrl: options.baseUrl,
+      taskId: options.taskId,
+      runId: options.runId,
+      runDir: options.runDir,
+      startPipelineId: options.startPipelineId,
+      refreshIntervalMs: options.refreshIntervalMs,
+      output: options.output,
+      input: options.input,
+      liveSurfaceMode: liveOutput.isTTY === true ? 'alternate' : 'primary'
+    },
+    deps
+  );
+}
+
+export function startAttachedControlStatusDashboard(
+  options: StartAttachedControlStatusDashboardOptions,
+  overrides: Partial<ControlStatusDashboardDependencies> = {}
+): ControlStatusDashboardHandle {
+  const deps = { ...DEFAULT_DEPENDENCIES, ...overrides };
+  return startControlStatusViewer(
+    {
+      readDataset: options.readDataset,
+      requestRefresh: null,
+      subscribe: null,
+      baseUrl: options.baseUrl,
+      taskId: options.taskId,
+      runId: options.runId,
+      runDir: options.runDir,
+      startPipelineId: options.startPipelineId,
+      refreshIntervalMs: options.refreshIntervalMs,
+      output: options.output,
+      input: options.input,
+      liveSurfaceMode: 'primary'
+    },
+    deps
+  );
+}
+
+function startControlStatusViewer(
+  options: StartControlStatusViewerOptions,
+  deps: ControlStatusDashboardDependencies
+): ControlStatusDashboardHandle {
   const refreshIntervalMs = Math.max(250, options.refreshIntervalMs ?? DEFAULT_REFRESH_INTERVAL_MS);
   const output = options.output ?? DEFAULT_OUTPUT;
   const input = options.input ?? DEFAULT_INPUT;
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
   let activeRender: Promise<void> | null = null;
+  let activeReadController: AbortController | null = null;
   let queuedRender = false;
   let queuedForceRefresh = false;
   let queuedReadDataset = false;
@@ -189,7 +267,7 @@ export function startControlStatusDashboard(
   let tokenSamples: TokenSample[] = [];
   let renderedState: RenderedDashboardState | null = null;
   let escapeSequenceState: 'idle' | 'escape' | 'control' = 'idle';
-  const liveSurfaceMode: DashboardSurfaceMode = output.isTTY === true ? 'alternate' : 'primary';
+  const liveSurfaceMode: DashboardSurfaceMode = options.liveSurfaceMode ?? 'primary';
   let activeSurfaceMode: DashboardSurfaceMode = 'primary';
   let pausedPrimaryPromptNeedsNewline = false;
   let frameState: DashboardFrameState = {
@@ -281,9 +359,9 @@ export function startControlStatusDashboard(
     timer.unref?.();
   };
 
-  const unsubscribe = options.runtime.subscribe(() => {
+  const unsubscribe = options.subscribe?.(() => {
     requestRender(false);
-  });
+  }) ?? (() => undefined);
 
   const detachInput = attachInteractiveInput();
   requestRender(true);
@@ -294,6 +372,7 @@ export function startControlStatusDashboard(
       stopped = true;
       queuedRender = false;
       queuedForceRefresh = false;
+      activeReadController?.abort();
       if (timer) {
         deps.clearTimeout(timer);
         timer = null;
@@ -491,9 +570,18 @@ export function startControlStatusDashboard(
         return;
       }
       if (forceRefresh) {
-        await options.runtime.requestRefresh();
+        await options.requestRefresh?.();
       }
-      const dataset = await deps.readDataset(options.runtime);
+      if (stopped) {
+        return;
+      }
+      const readController = new AbortController();
+      activeReadController = readController;
+      const dataset = await options.readDataset(readController.signal).finally(() => {
+        if (activeReadController === readController) {
+          activeReadController = null;
+        }
+      });
       if (stopped) {
         return;
       }
@@ -532,10 +620,10 @@ export function startControlStatusDashboard(
       writeFrame(frame);
     } catch (error) {
       const message = (error as Error)?.message ?? String(error);
-      logger.warn(`Failed rendering CO STATUS dashboard frame: ${message}`);
       if (stopped) {
         return;
       }
+      logger.warn(`Failed rendering CO STATUS dashboard frame: ${message}`);
       writeFrame(
         renderControlStatusErrorFrame(
           options,
@@ -870,7 +958,12 @@ function renderInspectLine(
   frameState: DashboardFrameState,
   frameExceedsTerminalHeight: boolean
 ): string {
-  const surfaceLabel = frameState.surfaceMode === 'alternate' ? 'alternate screen' : 'primary snapshot';
+  const surfaceLabel =
+    frameState.surfaceMode === 'alternate'
+      ? 'alternate screen'
+      : frameState.paused
+        ? 'primary snapshot'
+        : 'primary scrollback';
   const segments: SummarySegment[] = [
     { text: frameState.paused ? 'paused' : 'live', color: frameState.paused ? ANSI_YELLOW : ANSI_GREEN },
     { text: ' | ', color: ANSI_GRAY },

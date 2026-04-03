@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260403-linear-c4c32123-af51-4552-b55a-03d17917659c",
+      "title": "CO: Add a read-only CO STATUS attach viewer with live scrollback for an already-running control-host",
+      "relates_to": "tasks/tasks-linear-c4c32123-af51-4552-b55a-03d17917659c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-03",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-03",
+          "manifest": ".runs/linear-c4c32123-af51-4552-b55a-03d17917659c-co-74-docs-review/cli/2026-04-03T08-10-59-428Z-e43ff676/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c4c32123-af51-4552-b55a-03d17917659c.md",
+        "task": "tasks/tasks-linear-c4c32123-af51-4552-b55a-03d17917659c.md",
+        "agent_task": ".agent/task/linear-c4c32123-af51-4552-b55a-03d17917659c.md",
+        "docs": "docs/TECH_SPEC-linear-c4c32123-af51-4552-b55a-03d17917659c.md"
+      }
+    },
+    {
       "id": "20260403-linear-6bed26fd-ea66-43c1-8324-b10871769435",
       "title": "CO: Exclude historical non-provider in_progress manifests from live CO STATUS current activity/runtime",
       "relates_to": "tasks/tasks-linear-6bed26fd-ea66-43c1-8324-b10871769435.md",
