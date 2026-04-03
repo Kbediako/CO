@@ -329,7 +329,7 @@ export function hasExpectedDefaultRuntimeLine(content, expectedRuntime) {
     .map((line) => line.trim())
     .filter((line) => /default runtime|expected default runtime path/i.test(line));
   if (relevantLines.length === 0) {
-    return true;
+    return false;
   }
 
   const runtimePattern = new RegExp(`\\b${escapeRegExp(expectedRuntime)}\\b`, 'i');

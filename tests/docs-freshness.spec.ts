@@ -251,4 +251,53 @@ describe('docs freshness reporting', () => {
     const rendered = renderDocsFreshnessMarkdown(report);
     expect(rendered).toContain('## Drift By Class');
   });
+
+  it('does not render ordinary class docs as uncatalogued when the class only fails on staleness', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-stale-summary-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: 'README.md',
+          owner: 'Codex',
+          status: 'active',
+          last_review: '2026-04-03',
+          cadence_days: 30
+        },
+        {
+          path: 'docs/README.md',
+          owner: 'Codex',
+          status: 'active',
+          last_review: '2025-01-01',
+          cadence_days: 30
+        }
+      ],
+      catalogEntries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door'
+        }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'docs/*.md',
+          doc_class: 'repo_guide'
+        }
+      ]
+    });
+
+    const { report } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    const markdown = renderDocsFreshnessMarkdown(report);
+    expect(markdown).toContain('### Repository Guide');
+    expect(markdown).toContain('`docs/README.md (last_review=2025-01-01, cadence=30');
+    expect(markdown).toContain('- Uncatalogued docs (0): none');
+  });
 });

@@ -1,10 +1,11 @@
-<!-- codex:instruction-stamp aee3caac5bc5233ec1d33916a757a774d8680c005ed62e340740f568c3e2d78e -->
+<!-- codex:instruction-stamp 94d8c3db82d4427b2bf08820ccab2376b7b14e0d74440ecb7d5d60ff3e55e64d -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review.
 - Default to `docs-review` before implementation and `implementation-gate` after code changes.
 - Use `docs-relevance-advisory` when you need semantic docs relevance signal without hard-gate behavior.
+- Local appserver remains the expected default runtime path.
 - Prefer cloud mode when runs are long-running/parallel and cloud prerequisites are ready.
 - Before cloud mode, verify branch availability, non-interactive setup commands, and required secrets/variables; if missing, run in local `mcp` mode and record why.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.

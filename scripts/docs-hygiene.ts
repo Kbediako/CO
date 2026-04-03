@@ -24,6 +24,7 @@ export type DocsCheckRule =
   | 'backticked-path-missing'
   | 'tasks-file-too-large'
   | 'tasks-index-non-canonical'
+  | 'doc-posture-unresolved'
   | 'doc-posture-stale'
   | 'doc-runtime-posture-stale'
   | 'bundled-skill-roster-drift'
@@ -82,6 +83,8 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   const codexPosture = docsCatalog
     ? await readCurrentCodexPosture(repoRoot, docsCatalog.policies?.codex_posture)
     : null;
+  const codexPostureSource =
+    codexPosture?.source_path || String(docsCatalog?.policies?.codex_posture?.source_path || 'docs posture policy');
   const bundledSkillNames = docsCatalog ? await listBundledSkillNames(repoRoot) : [];
   const readmeBudget = docsCatalog?.policies?.readme_front_door ?? {};
   const rosterPolicy = docsCatalog?.policies?.bundled_skills_roster ?? {};
@@ -140,28 +143,40 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
     const catalogEntry = resolveDocsCatalogEntry(file, docsCatalog);
     const truthChecks = new Set(catalogEntry?.truth_checks ?? []);
 
-    if (truthChecks.has('codex-cli-version') && codexPosture?.cli_version) {
-      const versionMentions = extractCodexCliVersionMentions(content);
-      const staleMentions = versionMentions.filter((version: string) => version !== codexPosture.cli_version);
-      if (staleMentions.length > 0) {
+    if (truthChecks.has('codex-cli-version')) {
+      if (!codexPosture?.cli_version) {
         errors.push({
           file,
-          rule: 'doc-posture-stale',
-          reference: `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`
+          rule: 'doc-posture-unresolved',
+          reference: `missing current Codex CLI version in ${codexPostureSource}`
         });
+      } else {
+        const versionMentions = extractCodexCliVersionMentions(content);
+        const staleMentions = versionMentions.filter((version: string) => version !== codexPosture.cli_version);
+        if (staleMentions.length > 0) {
+          errors.push({
+            file,
+            rule: 'doc-posture-stale',
+            reference: `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`
+          });
+        }
       }
     }
 
-    if (
-      truthChecks.has('default-runtime') &&
-      codexPosture?.default_runtime &&
-      !hasExpectedDefaultRuntimeLine(content, codexPosture.default_runtime)
-    ) {
-      errors.push({
-        file,
-        rule: 'doc-runtime-posture-stale',
-        reference: `expected default runtime ${codexPosture.default_runtime} from ${codexPosture.source_path}`
-      });
+    if (truthChecks.has('default-runtime')) {
+      if (!codexPosture?.default_runtime) {
+        errors.push({
+          file,
+          rule: 'doc-posture-unresolved',
+          reference: `missing current default runtime in ${codexPostureSource}`
+        });
+      } else if (!hasExpectedDefaultRuntimeLine(content, codexPosture.default_runtime)) {
+        errors.push({
+          file,
+          rule: 'doc-runtime-posture-stale',
+          reference: `expected default runtime ${codexPosture.default_runtime} from ${codexPosture.source_path}`
+        });
+      }
     }
 
     if (truthChecks.has('bundled-skills-roster')) {

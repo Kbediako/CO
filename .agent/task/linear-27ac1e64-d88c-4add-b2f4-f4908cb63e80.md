@@ -34,7 +34,7 @@
 - [x] `npm run docs:check`. Evidence: local pass on `2026-04-03`.
 - [x] `npm run docs:freshness`. Evidence: local pass on `2026-04-03`; class-separated reporting emitted successfully.
 - [x] `node scripts/diff-budget.mjs`. Evidence: local pass on `2026-04-03` with `DIFF_BUDGET_OVERRIDE_REASON` recorded for the single-lane truthfulness contract.
-- [x] Manifest-backed standalone review wrapper executed or truthful fallback recorded. Evidence: `/Users/kbediako/Code/CO/.runs/linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80/cli/2026-04-03T01-15-24-411Z-7a4efc33/review/telemetry.json` reported `status: succeeded` and `review_outcome: clean-success`.
+- [x] Manifest-backed standalone review wrapper executed or truthful fallback recorded. Evidence: `.runs/linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80/cli/2026-04-03T01-15-24-411Z-7a4efc33/manifest.json` (the same run recorded `status: succeeded` and `review_outcome: clean-success` in review telemetry).
 - [x] Explicit elegance review recorded after review findings are addressed. Evidence: manual elegance pass kept the solution inside the existing `docs:check` / `docs:freshness` surfaces, made the catalog loader fail closed instead of adding a compatibility path, and did not add any auto-edit behavior.
 - [x] `npm run pack:smoke`. Evidence: local pass on `2026-04-03`.
 

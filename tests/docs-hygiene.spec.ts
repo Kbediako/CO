@@ -268,6 +268,98 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('fails closed when the current posture cannot be resolved from the policy source', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-unresolved-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version', 'default-runtime']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      ['# Codex Version Policy (CO)', '', '- Current posture text without machine-readable CLI or runtime lines.', ''].join(
+        '\n'
+      ),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'README.md'), '# Codex Orchestrator\n', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          file: 'README.md',
+          rule: 'doc-posture-unresolved',
+          reference: 'missing current Codex CLI version in docs/guides/codex-version-policy.md'
+        }),
+        expect.objectContaining({
+          file: 'README.md',
+          rule: 'doc-posture-unresolved',
+          reference: 'missing current default runtime in docs/guides/codex-version-policy.md'
+        })
+      ])
+    );
+  });
+
+  it('fails the default-runtime truth check when the runtime sentence is missing entirely', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-runtime-line-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['default-runtime']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      ['# Codex Orchestrator', '', 'This front door mentions no default runtime sentence.', ''].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-runtime-posture-stale',
+        reference: 'expected default runtime appserver from docs/guides/codex-version-policy.md'
+      })
+    );
+  });
+
   it('flags bundled skill roster drift for the README roster source', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-roster-'));
     createdDirs.push(repoRoot);

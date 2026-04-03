@@ -2,6 +2,8 @@
 id: 20260403-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80
 title: CO: Automate docs truthfulness and relevance across README, shipped skills, and agent-facing docs
 relates_to: docs/PRD-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
+related_prd: docs/PRD-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
+related_action_plan: docs/ACTION_PLAN-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
 risk: high
 owners:
   - Codex

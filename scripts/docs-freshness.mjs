@@ -132,7 +132,9 @@ export function renderDocsFreshnessMarkdown(report) {
         (item) => `${item.path} (last_review=${item.last_review}, cadence=${item.cadence_days}, age=${item.age_days})`
       )}`
     );
-    lines.push(`- Uncatalogued docs (${entry.uncatalogued_docs}): ${summarizeItems(failures.docs, (item) => item)}`);
+    lines.push(
+      `- Uncatalogued docs (${entry.uncatalogued_docs}): ${summarizeItems(failures.uncatalogued_docs, (item) => item)}`
+    );
     lines.push('');
   }
 
@@ -168,7 +170,6 @@ export async function runDocsFreshness(
   const metricsByClass = [];
 
   const uncataloguedDocs = [];
-  const docsByClass = {};
   for (const docPath of docFiles) {
     const docClass = classifyPath(docPath, docsCatalog);
     if (!docClass && docsCatalog) {
@@ -176,11 +177,6 @@ export async function runDocsFreshness(
       metricsByClass.push({ doc_class: 'uncatalogued', metric: 'uncatalogued_docs' });
     }
     metricsByClass.push({ doc_class: docClass, metric: 'docs_scanned' });
-    const key = docClass || 'uncatalogued';
-    if (!docsByClass[key]) {
-      docsByClass[key] = [];
-    }
-    docsByClass[key].push(docPath);
   }
 
   const today = new Date();
@@ -264,7 +260,9 @@ export async function runDocsFreshness(
       : classSummary.reduce((result, entry) => {
           result[entry.doc_class] = {
             label: entry.label,
-            docs: docsByClass[entry.doc_class] ?? [],
+            uncatalogued_docs: uncataloguedDocs.filter(
+              (docPath) => (classifyPath(docPath, docsCatalog) || 'uncatalogued') === entry.doc_class
+            ),
             missing_in_registry: missingInRegistry.filter(
               (docPath) => (classifyPath(docPath, docsCatalog) || 'uncatalogued') === entry.doc_class
             ),

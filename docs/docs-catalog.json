@@ -254,6 +254,26 @@
         "codex-cli-version",
         "default-runtime"
       ]
+    },
+    {
+      "path": "docs/TASKS.md",
+      "status": "active",
+      "tier": 2,
+      "doc_class": "report_only",
+      "audience": "maintainers and reviewers",
+      "source_of_truth": [
+        "tasks/tasks-*.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "task snapshot refreshes",
+        "task checklist sync changes",
+        "task archive automation changes"
+      ],
+      "truth_checks": []
     }
   ],
   "patterns": [
