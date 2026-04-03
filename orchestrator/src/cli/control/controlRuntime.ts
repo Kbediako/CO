@@ -450,20 +450,30 @@ function isAuthoritativeSelectedCurrentRunningSource(
   if (!providerIntakeState) {
     return true;
   }
-  if (source.issueProvider !== null) {
-    return true;
-  }
-  if (!isControlHostSelectedFallbackSource(source)) {
+  if (source.taskId !== 'local-mcp') {
     return true;
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
-  return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
+  if (claim !== null) {
+    return isProviderIntakeClaimActiveCurrentActivity(claim);
+  }
+  if (isControlHostSelectedFallbackSource(source)) {
+    return false;
+  }
+  return isFreshNullProviderRunningSource(source);
 }
 
 function isControlHostSelectedFallbackSource(
-  source: Pick<ControlCompatibilitySourceContext, 'issueProvider' | 'taskId'>
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'taskId' | 'issueIdentifier' | 'issueId' | 'runId'
+  >
 ): boolean {
-  return source.issueProvider === null && source.taskId === 'local-mcp';
+  return (
+    source.issueProvider === null &&
+    source.taskId === 'local-mcp' &&
+    !hasExplicitCompatibilityIssueIdentity(source)
+  );
 }
 
 function findMatchingProviderIntakeClaim(
@@ -505,7 +515,7 @@ function scoreProviderClaimMatch(
   if (claim.issue_identifier === source.issueIdentifier) {
     score += 12;
   }
-  if (claim.task_id && source.taskId && claim.task_id === source.taskId) {
+  if (isAuthoritativeProviderTaskIdMatch(claim, source)) {
     score += 8;
   }
   if (claim.run_id && source.runId && claim.run_id === source.runId) {
@@ -515,6 +525,22 @@ function scoreProviderClaimMatch(
     score += 10;
   }
   return score;
+}
+
+function isAuthoritativeProviderTaskIdMatch(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier' | 'task_id'>,
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier' | 'taskId'>
+): boolean {
+  if (!claim.task_id || !source.taskId || claim.task_id !== source.taskId) {
+    return false;
+  }
+  if (source.taskId !== 'local-mcp') {
+    return true;
+  }
+  return (
+    (claim.issue_id != null && source.issueId != null && claim.issue_id === source.issueId) ||
+    claim.issue_identifier === source.issueIdentifier
+  );
 }
 
 function isSelectedManifestRetryFallbackCandidate(
@@ -600,10 +626,12 @@ function hasExplicitCompatibilityIssueIdentity(
 function isFreshNullProviderRunningSource(
   source: Pick<ControlCompatibilitySourceContext, 'updatedAt' | 'startedAt'>
 ): boolean {
-  const freshestTimestamp =
-    Date.parse(source.updatedAt ?? '') ||
-    Date.parse(source.startedAt ?? '') ||
-    Number.NEGATIVE_INFINITY;
+  const updatedAt = Date.parse(source.updatedAt ?? '');
+  const startedAt = Date.parse(source.startedAt ?? '');
+  const freshestTimestamp = Math.max(
+    Number.isFinite(updatedAt) ? updatedAt : Number.NEGATIVE_INFINITY,
+    Number.isFinite(startedAt) ? startedAt : Number.NEGATIVE_INFINITY
+  );
   if (!Number.isFinite(freshestTimestamp)) {
     return false;
   }

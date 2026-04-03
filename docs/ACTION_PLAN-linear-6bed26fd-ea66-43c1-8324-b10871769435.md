@@ -44,7 +44,7 @@
   - `MCP_RUNNER_TASK_ID=linear-6bed26fd-ea66-43c1-8324-b10871769435 npm run docs:check`
   - `MCP_RUNNER_TASK_ID=linear-6bed26fd-ea66-43c1-8324-b10871769435 npm run docs:freshness`
   - `MCP_RUNNER_TASK_ID=linear-6bed26fd-ea66-43c1-8324-b10871769435 node scripts/diff-budget.mjs`
-  - `MCP_RUNNER_TASK_ID=linear-6bed26fd-ea66-43c1-8324-b10871769435 FORCE_CODEX_REVIEW=1 npm run review`
+  - `TASK=linear-6bed26fd-ea66-43c1-8324-b10871769435 NOTES="Goal: validate CO-73 current-running authority | Summary: runtime filter and live proof checks | Risks: explicit null-provider boundary regressions" MCP_RUNNER_TASK_ID=linear-6bed26fd-ea66-43c1-8324-b10871769435 FORCE_CODEX_REVIEW=1 npm run review -- --manifest /Users/kbediako/Code/CO/.runs/linear-6bed26fd-ea66-43c1-8324-b10871769435/cli/2026-04-03T01-11-37-563Z-45ca76bc/manifest.json`
   - `MCP_RUNNER_TASK_ID=linear-6bed26fd-ea66-43c1-8324-b10871769435 npm run pack:smoke`
 - Rollback plan:
   - revert the source-selection change if it hides a legitimately current selected or claim-backed run

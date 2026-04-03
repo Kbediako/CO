@@ -1614,6 +1614,208 @@ describe('ControlServer', () => {
     }
   });
 
+  it('keeps the selected local-mcp run in /api/v1/state when it carries explicit issue identity', async () => {
+    const nowMs = Date.now();
+    const startedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const updatedAt = new Date(nowMs - 60_000).toISOString();
+    const { root, env, paths } = await createRunRoot('local-mcp');
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      issue_id: 'issue-local-mcp',
+      issue_identifier: 'ISSUE-LOCAL-MCP',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'selected local-mcp run with explicit issue identity'
+    });
+    await seedProviderIntakeState(paths, []);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-LOCAL-MCP');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-LOCAL-MCP']);
+
+      const issueRes = await fetch(new URL('/api/v1/ISSUE-LOCAL-MCP', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('suppresses the selected local-mcp run from /api/v1/state when its matching claim is no longer active', async () => {
+    const nowMs = Date.now();
+    const startedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const updatedAt = new Date(nowMs - 15_000).toISOString();
+    const { root, env, paths } = await createRunRoot('local-mcp');
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      issue_id: 'issue-local-mcp',
+      issue_identifier: 'ISSUE-LOCAL-MCP',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'selected local-mcp run with completed matching claim'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-local-mcp',
+        issue_id: 'issue-local-mcp',
+        issue_identifier: 'ISSUE-LOCAL-MCP',
+        issue_title: 'Completed local-mcp claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: updatedAt,
+        task_id: 'local-mcp',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_released:not_active',
+        accepted_at: startedAt,
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-local-mcp-completed',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: Date.parse(updatedAt),
+        run_id: 'run-1',
+        run_manifest_path: paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-local-mcp-completed'
+      }
+    ]);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 0, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-LOCAL-MCP');
+      expect(statePayload.running).toEqual([]);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores unrelated retained local-mcp claims in /api/v1/state for the selected run', async () => {
+    const nowMs = Date.now();
+    const startedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const updatedAt = new Date(nowMs - 15_000).toISOString();
+    const { root, env, paths } = await createRunRoot('local-mcp');
+    await seedManifest(paths, {
+      task_id: 'local-mcp',
+      issue_id: 'issue-local-mcp',
+      issue_identifier: 'ISSUE-LOCAL-MCP',
+      status: 'in_progress',
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: 'selected local-mcp run with unrelated retained claim'
+    });
+    await seedProviderIntakeState(paths, [
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-other',
+        issue_id: 'issue-other',
+        issue_identifier: 'ISSUE-OTHER',
+        issue_title: 'Completed unrelated local-mcp claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: updatedAt,
+        task_id: 'local-mcp',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_released:not_active',
+        accepted_at: startedAt,
+        updated_at: updatedAt,
+        last_delivery_id: 'delivery-local-mcp-other',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: Date.parse(updatedAt),
+        run_id: 'run-other',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-local-mcp-other'
+      }
+    ]);
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-LOCAL-MCP');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-LOCAL-MCP']);
+
+      const issueRes = await fetch(new URL('/api/v1/ISSUE-LOCAL-MCP', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('resolves same-issue multi-run compatibility lookups while leaving ui data on the selected run', async () => {
     const { root, env, paths } = await createRunRoot('task-1035-current');
     await seedManifest(paths, {
