@@ -35,7 +35,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
     expect(stdout).toContain('or attach a read-only viewer to an already-running local JSON control-host.');
     expect(stdout).toContain('Pipeline used for provider-driven starts (default: provider-linear-worker).');
     expect(stdout).toContain('Emit the current CO STATUS snapshot from the local control-host and exit.');
-    expect(stdout).toContain('Use `control-host --format json` for readiness output.');
+    expect(stdout).toContain('Use `control-host --format json` for startup readiness output.');
     expect(stdout).toContain('Attach subcommand:');
     expect(stdout).toContain('Run `codex-orchestrator co-status attach --help` for attach flags.');
   }, cliHelpTimeoutMs);

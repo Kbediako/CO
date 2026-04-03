@@ -206,6 +206,124 @@ describe('runDoctor', () => {
     }
   });
 
+  it('keeps overall doctor status at warning when providers are incomplete', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-incomplete-'));
+    process.env.CODEX_HOME = tempHome;
+    try {
+      const skillDir = join(tempHome, 'skills', 'chrome-devtools');
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, 'SKILL.md'), '# devtools skill', 'utf8');
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12',
+          '',
+          '[mcp_servers.chrome-devtools]',
+          'command = "npx"',
+          'args = ["-y", "chrome-devtools-mcp@latest"]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(tempRepo);
+      expect(result.providers.status).toBe('advisory');
+      expect(result.status).toBe('warning');
+      expect(formatDoctorSummary(result).join('\n')).toContain('Providers: advisory');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+      await rm(tempRepo, { recursive: true, force: true });
+    }
+  });
+
+  it('reports provider readiness when the repo is seeded and env is configured', async () => {
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-'));
+    const previousEnv = {
+      CO_LINEAR_API_TOKEN: process.env.CO_LINEAR_API_TOKEN,
+      CO_LINEAR_WORKSPACE_ID: process.env.CO_LINEAR_WORKSPACE_ID,
+      CO_LINEAR_WEBHOOK_SECRET: process.env.CO_LINEAR_WEBHOOK_SECRET,
+      CO_TELEGRAM_POLLING_ENABLED: process.env.CO_TELEGRAM_POLLING_ENABLED,
+      CO_TELEGRAM_BOT_TOKEN: process.env.CO_TELEGRAM_BOT_TOKEN,
+      CO_TELEGRAM_ALLOWED_CHAT_IDS: process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS,
+      CO_TELEGRAM_ENABLE_MUTATIONS: process.env.CO_TELEGRAM_ENABLE_MUTATIONS,
+      CO_TELEGRAM_PUSH_ENABLED: process.env.CO_TELEGRAM_PUSH_ENABLED
+    };
+
+    try {
+      const providersDir = join(tempRepo, '.codex', 'providers');
+      await mkdir(providersDir, { recursive: true });
+      await writeFile(join(providersDir, 'README.md'), '# Providers', 'utf8');
+      await writeFile(join(providersDir, 'provider.env.example'), 'CO_LINEAR_API_TOKEN=', 'utf8');
+      await writeFile(
+        join(providersDir, 'control.example.json'),
+        JSON.stringify(
+          {
+            feature_toggles: {
+              dispatch_pilot: {
+                enabled: true,
+                source: {
+                  provider: 'linear',
+                  live: true,
+                  workspace_id: 'workspace-id'
+                }
+              },
+              transport_mutating_controls: {
+                enabled: true,
+                allowed_transports: ['telegram']
+              }
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      process.env.CO_LINEAR_API_TOKEN = 'token';
+      process.env.CO_LINEAR_WORKSPACE_ID = 'workspace-id';
+      process.env.CO_LINEAR_WEBHOOK_SECRET = 'secret';
+      process.env.CO_TELEGRAM_POLLING_ENABLED = 'true';
+      process.env.CO_TELEGRAM_BOT_TOKEN = 'bot-token';
+      process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS = '12345,67890';
+      process.env.CO_TELEGRAM_ENABLE_MUTATIONS = 'true';
+      process.env.CO_TELEGRAM_PUSH_ENABLED = 'true';
+
+      const result = runDoctor(tempRepo);
+      expect(result.providers.status).toBe('ok');
+      expect(result.providers.repo_examples.status).toBe('ok');
+      expect(result.providers.control_policy.status).toBe('ok');
+      expect(result.providers.linear.status).toBe('ready');
+      expect(result.providers.telegram.status).toBe('ready');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('Providers: ok');
+      expect(summary).toContain('Linear: ready');
+      expect(summary).toContain('Telegram: ready');
+      expect(summary).toContain('dispatch_pilot: enabled (linear)');
+      expect(summary).toContain('transport policy: telegram allowed');
+    } finally {
+      for (const [key, value] of Object.entries(previousEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+      await rm(tempRepo, { recursive: true, force: true });
+    }
+  });
+
   it('flags review_model when it does not match the baseline', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));

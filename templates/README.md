@@ -15,6 +15,7 @@ Current codex template payload includes:
 - `AGENTS.md`
 - `mcp-client.json`
 - the consumer repo root .codex/config.toml plus .codex/agents/* role files (copied from `templates/codex/.codex/*`)
+- provider onboarding examples under `.codex/providers/`
 
 Next steps (recommended):
   codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo

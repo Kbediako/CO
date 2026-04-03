@@ -5,6 +5,10 @@
       "label": "Front Door",
       "report_order": 10
     },
+    "public_guide": {
+      "label": "Public Guide",
+      "report_order": 15
+    },
     "repo_guide": {
       "label": "Repository Guide",
       "report_order": 20
@@ -59,6 +63,52 @@
       "doc_path": "README.md",
       "section_heading": "## Skills (bundled)",
       "list_intro": "Bundled skills"
+    },
+    "release_surface_paths": {
+      "forbidden_tracked_prefixes": [
+        ".runs/",
+        "out/"
+      ],
+      "allowlisted_paths": []
+    },
+    "public_doc_hygiene": {
+      "doc_classes": [
+        "front_door",
+        "public_guide",
+        "shipped_skill",
+        "shipped_companion",
+        "seeded_template"
+      ],
+      "allowlisted_paths": []
+    },
+    "top_level_docs": {
+      "root": "docs",
+      "allow_files": [
+        "docs/AGENTS.md",
+        "docs/ACTION_PLAN.md",
+        "docs/PRD.md",
+        "docs/PRD_AUTONOMY_UPGRADE.md",
+        "docs/README.md",
+        "docs/REFRACTOR_PLAN.md",
+        "docs/TASKS.md",
+        "docs/TECH_SPEC.md",
+        "docs/TECH_SPEC_AUTONOMY_UPGRADE.md",
+        "docs/codex-orchestrator-issues.md",
+        "docs/delegation-runner-workflow.md",
+        "docs/diagnostics-prompt-guide.md",
+        "docs/micro-task-path.md",
+        "docs/release-notes-template-addendum.md",
+        "docs/skills-release.md",
+        "docs/standalone-review-guide.md"
+      ],
+      "allow_patterns": [
+        "docs/ACTION_PLAN-*.md",
+        "docs/FOLLOWUP-*.md",
+        "docs/PRD-*.md",
+        "docs/REVIEW-*.md",
+        "docs/TASKS-archive-*.md",
+        "docs/TECH_SPEC-*.md"
+      ]
     }
   },
   "entries": [
@@ -71,7 +121,8 @@
       "source_of_truth": [
         "docs/guides/codex-version-policy.md",
         "skills/*/SKILL.md",
-        "docs/README.md"
+        "docs/public/downstream-setup.md",
+        "docs/public/provider-onboarding.md"
       ],
       "owner": "Codex (top-level agent), Review agent",
       "cadence_days": 14,
@@ -88,6 +139,48 @@
         "bundled-skills-roster",
         "front-door-budget"
       ]
+    },
+    {
+      "path": "docs/public/downstream-setup.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "public_guide",
+      "audience": "downstream users",
+      "source_of_truth": [
+        "README.md",
+        "docs/guides/codex-version-policy.md",
+        "templates/codex/**"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "downstream setup command-surface changes",
+        "seeded template changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version"
+      ]
+    },
+    {
+      "path": "docs/public/provider-onboarding.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "public_guide",
+      "audience": "downstream users",
+      "source_of_truth": [
+        "README.md",
+        "templates/codex/**",
+        "repo implementation"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "provider env contract changes",
+        "control policy changes",
+        "seeded template changes"
+      ],
+      "truth_checks": []
     },
     {
       "path": "docs/README.md",
@@ -346,6 +439,23 @@
       "cadence_days": 30,
       "update_triggers": [
         "deliberation or review updates"
+      ]
+    },
+    {
+      "glob": "docs/public/**/*.md",
+      "status": "active",
+      "doc_class": "public_guide",
+      "audience": "downstream users",
+      "source_of_truth": [
+        "README.md",
+        "repo implementation"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "public onboarding changes",
+        "downstream setup changes",
+        "release-surface changes"
       ]
     },
     {

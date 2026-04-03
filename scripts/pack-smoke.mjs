@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { access, chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, chmod, mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -49,6 +49,95 @@ async function assertFileIncludes(filePath, text, label) {
   const raw = await readFile(filePath, 'utf8');
   if (!raw.includes(text)) {
     throw new Error(`${label} missing expected text "${text}" (${filePath})`);
+  }
+}
+
+async function listMarkdownFiles(rootPath) {
+  const files = [];
+  async function walk(currentPath) {
+    let entries = [];
+    try {
+      entries = await readdir(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const nextPath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        await walk(nextPath);
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith('.md')) {
+        files.push(nextPath);
+      }
+    }
+  }
+  await walk(rootPath);
+  return files.sort();
+}
+
+function extractMarkdownLinkTargets(markdown) {
+  const targets = [];
+  const pattern = /!?\[[^\]]*\]\(([^)]+)\)/g;
+  for (const match of markdown.matchAll(pattern)) {
+    const rawTarget = match[1]?.trim();
+    if (!rawTarget) {
+      continue;
+    }
+    const normalized = rawTarget.startsWith('<') && rawTarget.endsWith('>')
+      ? rawTarget.slice(1, -1).trim()
+      : rawTarget;
+    if (!normalized || normalized.startsWith('#')) {
+      continue;
+    }
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(normalized) || normalized.startsWith('//')) {
+      continue;
+    }
+    targets.push(normalized);
+  }
+  return targets;
+}
+
+async function assertMarkdownLinksResolve(packageRoot) {
+  const candidateRoots = [
+    path.join(packageRoot, 'README.md'),
+    path.join(packageRoot, 'docs'),
+    path.join(packageRoot, 'skills'),
+    path.join(packageRoot, 'templates')
+  ];
+  const markdownFiles = [];
+  for (const candidate of candidateRoots) {
+    try {
+      const statPath = await access(candidate).then(() => candidate).catch(() => null);
+      if (!statPath) {
+        continue;
+      }
+      if (candidate.endsWith('.md')) {
+        markdownFiles.push(candidate);
+      } else {
+        markdownFiles.push(...(await listMarkdownFiles(candidate)));
+      }
+    } catch {
+      // ignore missing optional roots
+    }
+  }
+
+  for (const markdownPath of markdownFiles) {
+    const raw = await readFile(markdownPath, 'utf8');
+    for (const target of extractMarkdownLinkTargets(raw)) {
+      const [relativeTarget] = target.split('#');
+      const cleanTarget = relativeTarget?.split('?')[0] ?? relativeTarget;
+      if (!cleanTarget) {
+        continue;
+      }
+      const resolved = path.resolve(path.dirname(markdownPath), cleanTarget);
+      try {
+        await access(resolved);
+      } catch {
+        const relativeSource = path.relative(packageRoot, markdownPath) || path.basename(markdownPath);
+        throw new Error(`broken packaged markdown link in ${relativeSource}: ${target}`);
+      }
+    }
   }
 }
 
@@ -247,14 +336,32 @@ async function main() {
       cwd: tempDir
     });
 
+    const packageRoot = path.join(tempDir, 'node_modules', '@kbediako', 'codex-orchestrator');
     const binName = process.platform === 'win32' ? 'codex-orchestrator.cmd' : 'codex-orchestrator';
     const binPath = path.join(tempDir, 'node_modules', '.bin', binName);
 
+    await assertMarkdownLinksResolve(packageRoot);
     await runCommand(binPath, ['--help'], { cwd: tempDir });
     await runCommand(binPath, ['--version'], { cwd: tempDir });
     await runCommand(binPath, ['review', '--help'], { cwd: tempDir });
     await runCommand(binPath, ['self-check', '--format', 'json'], { cwd: tempDir });
     await runDelegateServerJsonlSmoke(binPath, tempDir);
+
+    const seededRepo = path.join(tempDir, 'seeded-repo');
+    await mkdir(seededRepo, { recursive: true });
+    await runCommand(binPath, ['init', 'codex', '--cwd', seededRepo], { cwd: tempDir });
+    await assertPathExists(
+      path.join(seededRepo, '.codex', 'providers', 'README.md'),
+      'seeded providers README'
+    );
+    await assertPathExists(
+      path.join(seededRepo, '.codex', 'providers', 'provider.env.example'),
+      'seeded provider env example'
+    );
+    await assertPathExists(
+      path.join(seededRepo, '.codex', 'providers', 'control.example.json'),
+      'seeded provider control example'
+    );
 
     const runDir = path.join(tempDir, '.runs', 'pack-smoke', 'cli', '2026-01-01T00-00-00-000Z-packsmoke');
     const manifestPath = path.join(runDir, 'manifest.json');

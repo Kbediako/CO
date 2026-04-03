@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260404-linear-da28812d-8367-4d94-a273-d0652535f818",
+      "title": "CO: Release-prep hardening for public surfaces, provider onboarding, docs hygiene, and Codex 0.118 adoption",
+      "relates_to": "tasks/tasks-linear-da28812d-8367-4d94-a273-d0652535f818.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-04",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-da28812d-8367-4d94-a273-d0652535f818.md",
+        "task": "tasks/tasks-linear-da28812d-8367-4d94-a273-d0652535f818.md",
+        "agent_task": ".agent/task/linear-da28812d-8367-4d94-a273-d0652535f818.md",
+        "docs": "docs/TECH_SPEC-linear-da28812d-8367-4d94-a273-d0652535f818.md"
+      }
+    },
+    {
       "id": "20260403-linear-44a18317-8afe-47e4-b4ba-5424aae86dc5",
       "title": "CO: Harden CO STATUS end-to-end truth agreement, visual coverage, and legacy monitor cleanup",
       "relates_to": "tasks/tasks-linear-44a18317-8afe-47e4-b4ba-5424aae86dc5.md",

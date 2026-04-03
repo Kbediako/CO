@@ -307,6 +307,7 @@ export async function readCurrentCodexPosture(repoRoot, policy = {}) {
   const unsupportedReviewModel =
     /do not target delegated(?:\/review| or review)? surfaces at `([^`]+)`/i.exec(content)?.[1] ??
     /delegated subagent and review surfaces on [^;\n]*; `([^`]+)` is currently unsupported there/i.exec(content)?.[1] ??
+    /delegated(?: subagent)?(?: and|\/) review surfaces on [^\n]* validates `([^`]+)`/i.exec(content)?.[1] ??
     null;
   return {
     source_path: sourcePath,

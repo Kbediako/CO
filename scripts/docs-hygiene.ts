@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
@@ -31,7 +32,10 @@ export type DocsCheckRule =
   | 'doc-posture-stale'
   | 'doc-runtime-posture-stale'
   | 'bundled-skill-roster-drift'
-  | 'front-door-budget-exceeded';
+  | 'front-door-budget-exceeded'
+  | 'tracked-runtime-artifact'
+  | 'public-doc-absolute-path'
+  | 'top-level-doc-sprawl';
 
 export interface DocsCheckError {
   file: string;
@@ -45,6 +49,21 @@ const EXCLUDED_BACKTICKED_PATH_PREFIXES = [
   'archives/',
   'node_modules/',
   'dist/'
+] as const;
+
+const DEFAULT_PUBLIC_DOC_CLASSES = [
+  'front_door',
+  'public_guide',
+  'shipped_skill',
+  'shipped_companion',
+  'seeded_template'
+] as const;
+
+const MACHINE_LOCAL_PATH_PATTERNS = [
+  /(?:file:\/\/)?\/Users\/[^\s`)>"]+/,
+  /(?:file:\/\/)?\/home\/[^\s`)>"]+/,
+  /(?:file:\/\/)?\/private\/var\/[^\s`)>"]+/,
+  /[A-Za-z]:\\Users\\[^\s`)>"]+/
 ] as const;
 
 interface OrchestratorConfig {
@@ -132,6 +151,10 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   const bundledSkillNames = docsCatalog ? await listBundledSkillNames(repoRoot) : [];
   const readmeBudget = docsCatalog?.policies?.readme_front_door ?? {};
   const rosterPolicy = docsCatalog?.policies?.bundled_skills_roster ?? {};
+  if (docsCatalog) {
+    errors.push(...checkTrackedRuntimeArtifacts(repoRoot, docsCatalog.policies?.release_surface_paths));
+    errors.push(...(await checkTopLevelDocsSprawl(repoRoot, docsCatalog.policies?.top_level_docs)));
+  }
 
   for (const file of docFiles) {
     const abs = path.join(repoRoot, file);
@@ -175,7 +198,9 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
         continue;
       }
 
-      if (!(await pathExists(resolved))) {
+      const seededTemplateFallback = resolveSeededTemplatePath(repoRoot, normalized);
+      const existsOnDisk = (await pathExists(resolved)) || (seededTemplateFallback && (await pathExists(seededTemplateFallback)));
+      if (!existsOnDisk) {
         errors.push({ file, rule: 'backticked-path-missing', reference: normalized });
       }
     }
@@ -186,6 +211,16 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
 
     const catalogEntry = resolveDocsCatalogEntry(file, docsCatalog);
     const truthChecks = new Set(catalogEntry?.truth_checks ?? []);
+
+    const publicDocAbsolutePathError = checkPublicDocAbsolutePath(
+      file,
+      content,
+      catalogEntry?.doc_class ?? null,
+      docsCatalog.policies?.public_doc_hygiene
+    );
+    if (publicDocAbsolutePathError) {
+      errors.push(publicDocAbsolutePathError);
+    }
 
     if (truthChecks.has('codex-cli-version')) {
       if (!codexPosture?.cli_version) {
@@ -290,6 +325,112 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   }
 
   return dedupeErrors(errors);
+}
+
+function checkTrackedRuntimeArtifacts(
+  repoRoot: string,
+  policy: { forbidden_tracked_prefixes?: unknown; allowlisted_paths?: unknown } | undefined
+): DocsCheckError[] {
+  const forbiddenPrefixes = normalizeStringArrayPolicy(policy?.forbidden_tracked_prefixes);
+  if (forbiddenPrefixes.length === 0) {
+    return [];
+  }
+
+  const git = spawnSync('git', ['-C', repoRoot, 'ls-files', '--', ...forbiddenPrefixes], {
+    encoding: 'utf8'
+  });
+  if (git.status !== 0) {
+    throw new Error(`git ls-files failed while checking tracked runtime artifacts: ${git.stderr || git.stdout}`);
+  }
+
+  const allowlistedPaths = normalizeStringArrayPolicy(policy?.allowlisted_paths);
+  const trackedPaths = git.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const errors: DocsCheckError[] = [];
+
+  for (const prefix of forbiddenPrefixes) {
+    const offenders = trackedPaths.filter(
+      (filePath) => filePath.startsWith(prefix) && !matchesAnyPolicyPath(filePath, allowlistedPaths)
+    );
+    if (offenders.length === 0) {
+      continue;
+    }
+    errors.push({
+      file: prefix,
+      rule: 'tracked-runtime-artifact',
+      reference: formatPathSample(offenders)
+    });
+  }
+
+  return errors;
+}
+
+async function checkTopLevelDocsSprawl(
+  repoRoot: string,
+  policy: { root?: unknown; allow_files?: unknown; allow_patterns?: unknown } | undefined
+): Promise<DocsCheckError[]> {
+  const docsRoot = normalizePolicyPath(typeof policy?.root === 'string' ? policy.root : 'docs');
+  if (!docsRoot) {
+    return [];
+  }
+
+  const docsRootAbs = path.join(repoRoot, docsRoot);
+  if (!(await pathExists(docsRootAbs))) {
+    return [];
+  }
+
+  const allowFiles = normalizeStringArrayPolicy(policy?.allow_files);
+  const allowPatterns = normalizeStringArrayPolicy(policy?.allow_patterns);
+  const entries = await readdir(docsRootAbs, { withFileTypes: true });
+  const errors: DocsCheckError[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.md')) {
+      continue;
+    }
+    const repoPath = toPosixPath(path.join(docsRoot, entry.name));
+    if (allowFiles.includes(repoPath) || allowPatterns.some((pattern) => matchesPolicyPath(repoPath, pattern))) {
+      continue;
+    }
+    errors.push({
+      file: `${docsRoot}/`,
+      rule: 'top-level-doc-sprawl',
+      reference: repoPath
+    });
+  }
+
+  return errors;
+}
+
+function checkPublicDocAbsolutePath(
+  file: string,
+  content: string,
+  docClass: string | null,
+  policy: { doc_classes?: unknown; allowlisted_paths?: unknown } | undefined
+): DocsCheckError | null {
+  const docClasses = normalizeStringArrayPolicy(policy?.doc_classes);
+  const activeDocClasses = docClasses.length > 0 ? docClasses : [...DEFAULT_PUBLIC_DOC_CLASSES];
+  if (!docClass || !activeDocClasses.includes(docClass)) {
+    return null;
+  }
+
+  const allowlistedPaths = normalizeStringArrayPolicy(policy?.allowlisted_paths);
+  if (matchesAnyPolicyPath(file, allowlistedPaths)) {
+    return null;
+  }
+
+  const match = findMachineLocalPathReference(content);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    file,
+    rule: 'public-doc-absolute-path',
+    reference: `line ${match.line}: ${match.value}`
+  };
 }
 
 async function checkTasksFileSize(repoRoot: string): Promise<DocsCheckError | null> {
@@ -589,6 +730,77 @@ function renderNonCanonicalTasksIndexError(keys: string[]): string {
   return `non-canonical top-level keys: ${joined} (allowed: items, specs)`;
 }
 
+function normalizeStringArrayPolicy(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item) => item.length > 0);
+}
+
+function normalizePolicyPath(value: string): string {
+  const normalized = value.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+  if (!normalized) {
+    return '';
+  }
+  const collapsed = path.posix.normalize(normalized);
+  return collapsed === '.' ? '' : collapsed;
+}
+
+function matchesAnyPolicyPath(filePath: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => matchesPolicyPath(filePath, pattern));
+}
+
+function matchesPolicyPath(filePath: string, pattern: string): boolean {
+  const normalizedPattern = normalizePolicyPath(pattern);
+  if (!normalizedPattern) {
+    return false;
+  }
+  if (normalizedPattern.endsWith('/')) {
+    return filePath.startsWith(normalizedPattern);
+  }
+  if (normalizedPattern.includes('*')) {
+    return new RegExp(`^${escapeRegExp(normalizedPattern).replace(/\\\*/g, '.*')}$`).test(filePath);
+  }
+  return filePath === normalizedPattern;
+}
+
+function formatPathSample(paths: string[]): string {
+  if (paths.length === 0) {
+    return 'no tracked paths';
+  }
+  const sample = paths.slice(0, 3).join(', ');
+  if (paths.length <= 3) {
+    return sample;
+  }
+  return `${sample} (+${paths.length - 3} more)`;
+}
+
+function findMachineLocalPathReference(content: string): { line: number; value: string } | null {
+  const lines = content.split('\n');
+  for (const [index, line] of lines.entries()) {
+    for (const pattern of MACHINE_LOCAL_PATH_PATTERNS) {
+      const match = line.match(pattern);
+      if (!match?.[0]) {
+        continue;
+      }
+      return {
+        line: index + 1,
+        value: truncateReference(match[0], 140)
+      };
+    }
+  }
+  return null;
+}
+
+function truncateReference(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
+}
+
 function extractNpmRunScripts(markdown: string): string[] {
   const results = new Set<string>();
   const pattern = /\bnpm run ([A-Za-z0-9:_-]+)\b/g;
@@ -704,6 +916,13 @@ function stripTrailingLineHint(value: string): string {
   }
   const base = match[1];
   return base ?? value;
+}
+
+function resolveSeededTemplatePath(repoRoot: string, repoRelativePath: string): string | null {
+  if (!repoRelativePath.startsWith('.codex/')) {
+    return null;
+  }
+  return path.resolve(repoRoot, 'templates', 'codex', repoRelativePath);
 }
 
 async function writeFileIfChanged(filePath: string, content: string): Promise<void> {

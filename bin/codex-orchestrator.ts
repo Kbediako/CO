@@ -1013,7 +1013,11 @@ async function handleSetup(rawArgs: string[]): Promise<void> {
 }
 
 async function handleDoctor(rawArgs: string[]): Promise<void> {
-  const { flags } = parseArgs(rawArgs);
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printDoctorHelp();
+    return;
+  }
   await runDoctorCliRequestShell({ flags });
 }
 
@@ -1478,6 +1482,7 @@ Commands:
 Quickstart (agent-first):
   codex-orchestrator flow --task <task-id>
   NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>
+  codex-orchestrator doctor --format json
   codex-orchestrator doctor --usage --window-days 30
   codex-orchestrator rlm --multi-agent auto "<goal>"
   codex-orchestrator start implementation-gate --cloud --target <stage-id>
@@ -1647,7 +1652,7 @@ Options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
   --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
-  --format json         Emit machine-readable readiness output.
+  --format json         Emit the startup readiness payload to stdout, then keep the host running.
   --help                Show this message.
 `);
 }
@@ -1669,7 +1674,7 @@ Launch options:
 
 JSON contract:
   co-status --format json reads the authenticated operator-dashboard snapshot from the
-  current local control-host and exits. Use \`control-host --format json\` for readiness output.
+  current local control-host and exits. Use \`control-host --format json\` for startup readiness output.
 
 Attach subcommand:
   attach                Attach to an already-running local JSON control-host.
@@ -1709,6 +1714,38 @@ Options:
   --format json         Emit machine-readable output.
   --interactive | --ui  Enable read-only HUD when running in a TTY.
   --no-interactive      Force disable HUD.
+`);
+}
+
+function printDoctorHelp(): void {
+  console.log(`Usage: codex-orchestrator doctor [options]
+
+Inspect the current repo/user environment for downstream readiness:
+- packaged and seeded provider onboarding files
+- DevTools + delegation MCP wiring
+- Codex defaults and current CLI posture
+- optional local usage and cloud preflight checks
+
+Options:
+  --format json         Emit machine-readable output.
+  --usage               Include a local usage snapshot (scans .runs/).
+  --window-days <n>     Window for --usage (default 30).
+  --task <id>           Limit --usage scan to a specific task directory.
+  --cloud-preflight     Run cloud readiness preflight checks (env/codex/git/branch).
+  --cloud-env-id <id>   Override env id for --cloud-preflight (default: CODEX_CLOUD_ENV_ID).
+  --cloud-branch <name> Override branch for --cloud-preflight (default: CODEX_CLOUD_BRANCH).
+  --issue-log           Append markdown issue entry + JSON bundle for downstream triage.
+  --issue-title <text>  Optional title for --issue-log entries.
+  --issue-notes <text>  Optional notes for --issue-log entries.
+  --issue-log-path <p>  Output markdown path (default: docs/codex-orchestrator-issues.md).
+  --apply               Plan/apply quick fixes for DevTools + delegation wiring (use with --yes).
+  --yes                 Apply fixes when --apply is set.
+  --help                Show this message.
+
+Examples:
+  codex-orchestrator doctor --format json
+  codex-orchestrator doctor --usage --window-days 30
+  codex-orchestrator doctor --cloud-preflight --cloud-env-id <env-id> --cloud-branch main
 `);
 }
 

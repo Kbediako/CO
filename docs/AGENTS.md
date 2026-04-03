@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4984838266608d9f9e055d3652c1066d878cd9c03c1834f18a8bf7a0cd4262f0 -->
+<!-- codex:instruction-stamp 70438e025718b6b8eaa6c73356266df9e73b7cbcb0bab6831d03738258305f42 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -56,9 +56,10 @@
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Current CO compatibility/adoption target is stable Codex CLI (`0.117.0`).
+- Current CO compatibility/adoption target is stable Codex CLI (`0.118.0`).
+- Current `0.118.0` posture re-audit confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, and `codex review --help` exposing `[PROMPT]` alongside scoped review flags.
 - Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
-- On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.
+- On ChatGPT-auth sessions, keep delegated/review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
 - CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.
 - App-server remains the normal local runtime path, but provider workers still stay on `codex exec` / `codex exec resume` supervision until a separate app-server control seam lands with explicit authority guardrails.
 - Required policy checks for newer-version lanes:
@@ -80,8 +81,8 @@
 - Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed.
 - In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `codex-orchestrator review`/`npm run review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
 - Non-interactive lane policy: direct/manual wrapper runs stay handoff-only unless `FORCE_CODEX_REVIEW=1`; `docs-review` and `implementation-gate` explicitly force review execution; `docs-relevance-advisory` explicitly clears `FORCE_CODEX_REVIEW` and remains prompt-only/advisory; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1`, so its pre-handoff standalone review executes before `Human Review` / `In Review`.
-- Current Codex CLI behavior: do not combine inline prompt arguments with `--uncommitted`, `--base`, or `--commit`; scoped runs must use bounded `--title` transport or prompt-only review without scope flags.
-- Wrapper truthfulness: explicit `npm run review -- --uncommitted|--base|--commit` runs keep the full prompt/context in the saved `review/prompt.txt`, launch `codex review` without any prompt argument, and carry reviewer-visible scoped context via `--title` (user-provided when present, otherwise synthesized from `NOTES` + `--surface`); if Codex rejects a synthesized scoped `--title`, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only reviewer-visible context.
+- Scoped wrapper policy: explicit `npm run review -- --uncommitted|--base|--commit` runs keep the full prompt/context in the saved `review/prompt.txt` and carry reviewer-visible scoped context via `--title` (user-provided when present, otherwise synthesized from `NOTES` + `--surface`).
+- Wrapper truthfulness: `codex review --help` in `0.118.0` exposes `[PROMPT]` with scoped review flags, but CO continues to rely on saved prompt artifacts plus bounded `--title` transport for deterministic scoped runs.
 - Scoped surface limit: explicit `--uncommitted|--base|--commit` wrapper runs support only the default `diff` surface at the actual Codex layer; `--surface audit|architecture` requires an unscoped prompt-capable review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <path>` (repo alias: `npm run review -- --manifest <path>`).
