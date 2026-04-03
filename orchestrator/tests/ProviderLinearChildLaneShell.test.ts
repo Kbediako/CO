@@ -427,6 +427,57 @@ describe('runProviderLinearChildLaneShell', () => {
     });
   });
 
+  it('fails closed when prelude logs precede a malformed final child-lane payload', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const badStdout = [
+      'Advanced mode (auto) enabled.',
+      '{',
+      '  "run_id": "child-run-1",',
+      '  "status": "succeeded",',
+      `  "artifact_root": ".runs/${TASK_ID}-impl-a/cli/child-run-1",`,
+      `  "manifest": ".runs/${TASK_ID}-impl-a/cli/child-run-1/manifest.json"`
+    ].join('\n');
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildStreamShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        execRunner: vi.fn(async () => ({ exitCode: 0, stdout: badStdout, stderr: '' })) as never,
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:00.000Z',
+          state: 'In Progress',
+          state_type: 'started'
+        })) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never,
+        readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'launch',
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      stream: 'impl-a',
+      child_run: null,
+      child_lane: null,
+      error: {
+        code: 'provider_worker_child_lane_output_invalid',
+        status: 502
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([]);
+  });
+
   it('preserves the parent repo-config override when launching a child lane', async () => {
     const { manifestPath } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');

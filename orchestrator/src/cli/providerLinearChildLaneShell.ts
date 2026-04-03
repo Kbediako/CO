@@ -52,6 +52,7 @@ import {
   resolveProviderLinearChildLaneScopeContract
 } from './providerLinearChildLanePhaseContract.js';
 import { slugify } from './utils/strings.js';
+import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -2100,24 +2101,6 @@ function parseProviderChildLaneRunResult(
     runtime_mode: normalizeOptionalString(parsed.runtime_mode),
     runtime_provider: normalizeOptionalString(parsed.runtime_provider)
   };
-}
-
-function parseTrailingJsonObject(raw: string): Record<string, unknown> | null {
-  const lines = raw.split(/\r?\n/u);
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!lines[index]?.trim().startsWith('{')) {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(lines.slice(index).join('\n')) as unknown;
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-    } catch {
-      continue;
-    }
-  }
-  return null;
 }
 
 function resolveRunPath(repoRoot: string, value: string): string {
