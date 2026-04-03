@@ -118,7 +118,8 @@ async function main() {
     }
 
     for (const filePath of filePaths) {
-      if (FORBIDDEN_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
+      const explicitlyAllowed = isAllowedPath(filePath);
+      if (!explicitlyAllowed && FORBIDDEN_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
         errors.push(`forbidden path: ${filePath}`);
         continue;
       }
@@ -130,7 +131,7 @@ async function main() {
         errors.push(`unexpected dist path: ${filePath}`);
         continue;
       }
-      if (!isAllowedPath(filePath)) {
+      if (!explicitlyAllowed) {
         errors.push(`unexpected path: ${filePath}`);
       }
     }

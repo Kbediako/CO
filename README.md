@@ -93,4 +93,5 @@ Bundled skills:
 
 ## Contributing
 
-Contributor and repo-internal guidance lives in [docs/README.md](docs/README.md).
+Contributor and repo-internal guidance lives in the source repository:
+[docs/README.md](https://github.com/Kbediako/CO/blob/main/docs/README.md).

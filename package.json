@@ -27,7 +27,8 @@
     "templates/**",
     "skills/**",
     "codex.orchestrator.json",
-    "docs/public/**",
+    "docs/public/downstream-setup.md",
+    "docs/public/provider-onboarding.md",
     "README.md",
     "LICENSE"
   ],
