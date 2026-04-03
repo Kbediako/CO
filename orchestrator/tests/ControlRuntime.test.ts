@@ -1297,7 +1297,9 @@ describe('ControlRuntime', () => {
       expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
         'ISSUE-CURRENT'
       ]);
-      expect(compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'rlm-CO')).toBeUndefined();
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual([
+        'ISSUE-CURRENT'
+      ]);
     } finally {
       vi.useRealTimers();
     }
@@ -1333,7 +1335,9 @@ describe('ControlRuntime', () => {
       expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
         'ISSUE-CURRENT'
       ]);
-      expect(compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'rlm-CO')).toBeUndefined();
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual([
+        'ISSUE-CURRENT'
+      ]);
     } finally {
       vi.useRealTimers();
     }
