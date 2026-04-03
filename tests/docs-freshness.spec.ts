@@ -208,6 +208,58 @@ describe('docs freshness reporting', () => {
     );
   });
 
+  it('normalizes registry paths before classifying and comparing them', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-normalized-paths-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(join(repoRoot, 'README.md'), '# Front door\n', 'utf8');
+    await writeFile(join(repoRoot, 'docs', 'README.md'), '# Repo guide\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: './README.md',
+          owner: 'Codex',
+          status: 'active',
+          last_review: '2026-04-03',
+          cadence_days: 30
+        },
+        {
+          path: 'docs\\README.md',
+          owner: 'Codex',
+          status: 'active',
+          last_review: '2026-04-03',
+          cadence_days: 30
+        }
+      ],
+      catalogEntries: [
+        {
+          path: './README.md',
+          doc_class: 'front_door'
+        },
+        {
+          path: 'docs\\README.md',
+          doc_class: 'repo_guide'
+        }
+      ]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.missing_in_registry).toBe(0);
+    expect(report.totals.uncatalogued_docs).toBe(0);
+    expect(report.class_summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ doc_class: 'front_door', docs_scanned: 1, registry_entries: 1 }),
+        expect.objectContaining({ doc_class: 'repo_guide', docs_scanned: 1, registry_entries: 1 })
+      ])
+    );
+  });
+
   it('writes a class-separated markdown summary when requested', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-summary-'));
     createdDirs.push(repoRoot);

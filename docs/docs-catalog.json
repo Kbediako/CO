@@ -83,6 +83,7 @@
       ],
       "truth_checks": [
         "codex-cli-version",
+        "model-posture",
         "default-runtime",
         "bundled-skills-roster",
         "front-door-budget"
@@ -108,6 +109,7 @@
       ],
       "truth_checks": [
         "codex-cli-version",
+        "model-posture",
         "default-runtime"
       ]
     },
@@ -130,6 +132,7 @@
       ],
       "truth_checks": [
         "codex-cli-version",
+        "model-posture",
         "default-runtime"
       ]
     },
@@ -152,6 +155,7 @@
       ],
       "truth_checks": [
         "codex-cli-version",
+        "model-posture",
         "default-runtime"
       ]
     },
@@ -171,7 +175,9 @@
         "runtime canary outcome changes",
         "provider compatibility changes"
       ],
-      "truth_checks": []
+      "truth_checks": [
+        "model-posture"
+      ]
     },
     {
       "path": "docs/skills-release.md",
@@ -210,7 +216,8 @@
         "delegation policy changes"
       ],
       "truth_checks": [
-        "codex-cli-version"
+        "codex-cli-version",
+        "model-posture"
       ]
     },
     {
@@ -230,7 +237,8 @@
         "delegation MCP behavior changes"
       ],
       "truth_checks": [
-        "codex-cli-version"
+        "codex-cli-version",
+        "model-posture"
       ]
     },
     {
@@ -252,6 +260,7 @@
       ],
       "truth_checks": [
         "codex-cli-version",
+        "model-posture",
         "default-runtime"
       ]
     },

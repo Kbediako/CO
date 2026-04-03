@@ -19,6 +19,12 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 ## Upstream Sync
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
+## Current Posture
+- Current CO compatibility/adoption target: Codex CLI `0.117.0`.
+- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
+- Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
+- Full posture and promotion gates live in `docs/guides/codex-version-policy.md`.
+
 ## Release Notes
 - Shipped skills note: `docs/release-notes-template-addendum.md`.
 - Optional overview override: add and commit a release overview file at .github/release-overview.md before tagging; the release workflow uses it when present.

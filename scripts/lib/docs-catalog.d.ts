@@ -60,8 +60,13 @@ export function readCurrentCodexPosture(
   cli_version: string | null;
   model: string | null;
   default_runtime: string | null;
+  explorer_fast_model: string | null;
+  unsupported_review_model: string | null;
 }>;
 export function extractCodexCliVersionMentions(content: string): string[];
+export function extractCodexModelMentions(content: string): string[];
+export function extractModelPostureLines(content: string): string[];
 export function hasExpectedDefaultRuntimeLine(content: string, expectedRuntime: string): boolean;
+export function hasExpectedModelPostureLine(content: string, expectedModel: string): boolean;
 export function countDocumentLines(content: string): number;
 export function countHeadingLines(content: string, headingPrefix?: string): number;

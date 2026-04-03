@@ -44,6 +44,21 @@ function normalizeOwner(value) {
   return value.trim();
 }
 
+function normalizeDocPath(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim().replace(/\\/g, '/');
+  if (!trimmed) {
+    return '';
+  }
+
+  const withoutDotPrefix = trimmed.replace(/^\.\//, '');
+  const normalized = path.posix.normalize(withoutDotPrefix);
+  return normalized === '.' ? '' : normalized.replace(/^\.\//, '');
+}
+
 async function loadRegistry(registryPath) {
   const raw = await readFile(registryPath, 'utf8');
   const data = JSON.parse(raw);
@@ -52,7 +67,8 @@ async function loadRegistry(registryPath) {
 }
 
 function classifyPath(docPath, catalog) {
-  const entry = catalog ? resolveDocsCatalogEntry(docPath, catalog) : null;
+  const normalizedPath = normalizeDocPath(docPath);
+  const entry = catalog ? resolveDocsCatalogEntry(normalizedPath, catalog) : null;
   return entry?.doc_class || null;
 }
 
@@ -161,6 +177,7 @@ export async function runDocsFreshness(
     loadRegistry(absoluteRegistryPath),
     loadDocsCatalog(repoRoot)
   ]);
+  const normalizedDocFiles = docFiles.map((docPath) => normalizeDocPath(docPath)).filter(Boolean);
 
   const registryEntries = registryResult.entries;
   const invalidEntries = [];
@@ -170,7 +187,7 @@ export async function runDocsFreshness(
   const metricsByClass = [];
 
   const uncataloguedDocs = [];
-  for (const docPath of docFiles) {
+  for (const docPath of normalizedDocFiles) {
     const docClass = classifyPath(docPath, docsCatalog);
     if (!docClass && docsCatalog) {
       uncataloguedDocs.push(docPath);
@@ -184,7 +201,7 @@ export async function runDocsFreshness(
 
   for (const entry of registryEntries) {
     const issues = [];
-    const entryPath = typeof entry?.path === 'string' ? entry.path : '';
+    const entryPath = normalizeDocPath(entry?.path);
     const owner = normalizeOwner(entry?.owner);
     const status = typeof entry?.status === 'string' ? entry.status : '';
     const cadenceDays = Number.isFinite(entry?.cadence_days) ? Number(entry.cadence_days) : NaN;
@@ -248,7 +265,7 @@ export async function runDocsFreshness(
     }
   }
 
-  const missingInRegistry = docFiles.filter((doc) => !registryPaths.has(doc));
+  const missingInRegistry = normalizedDocFiles.filter((doc) => !registryPaths.has(doc));
   for (const docPath of missingInRegistry) {
     metricsByClass.push({ doc_class: classifyPath(docPath, docsCatalog), metric: 'missing_in_registry' });
   }
@@ -286,7 +303,7 @@ export async function runDocsFreshness(
     registry_path: toPosixPath(path.relative(repoRoot, absoluteRegistryPath)),
     catalog_path: docsCatalog?.relative_path ?? null,
     totals: {
-      docs_scanned: docFiles.length,
+      docs_scanned: normalizedDocFiles.length,
       registry_entries: registryEntries.length,
       missing_in_registry: missingInRegistry.length,
       missing_on_disk: missingOnDisk.length,

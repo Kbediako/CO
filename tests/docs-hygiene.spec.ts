@@ -35,6 +35,8 @@ async function writeDocsCatalogFixture(
       '',
       '- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0` for the current upstream-aligned main baseline.',
       '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+      '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).',
+      '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
       '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
       ''
     ].join('\n'),
@@ -264,6 +266,828 @@ describe('docs hygiene tooling', () => {
         file: 'README.md',
         rule: 'doc-posture-stale',
         reference: 'Codex CLI version(s) 0.111.0 != current policy 0.117.0'
+      })
+    );
+  });
+
+  it('accepts the current Codex CLI version when docs use the parenthesized posture form', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-parenthesized-version-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      ['# Codex Orchestrator', '', '- Current CO compatibility/adoption target is stable Codex CLI (`0.117.0`).', ''].join(
+        '\n'
+      ),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find((error) => error.file === 'README.md' && error.rule === 'doc-posture-stale')
+    ).toBeUndefined();
+  });
+
+  it('matches docs catalog entries after normalizing relative and Windows-style paths', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-catalog-normalized-entry-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: './README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      ['# Codex Orchestrator', '', '- Current CO compatibility/adoption target is stable Codex CLI (`0.117.0`).', ''].join(
+        '\n'
+      ),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find(
+        (error) =>
+          error.file === 'README.md' &&
+          (error.rule === 'doc-posture-unresolved' || error.rule === 'doc-posture-stale')
+      )
+    ).toBeUndefined();
+  });
+
+  it('fails closed when a checked doc drops the current Codex CLI version mention entirely', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-missing-version-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      ['# Codex Orchestrator', '', 'This front door mentions no explicit Codex CLI version.', ''].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'missing Codex CLI version 0.117.0'
+      })
+    );
+  });
+
+  it('accepts the parenthesized Codex CLI form when resolving the policy source posture', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-parenthesized-source-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      [
+        '# Codex Version Policy (CO)',
+        '',
+        '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      ['# Codex Orchestrator', '', '- Current CO compatibility/adoption target is stable Codex CLI (`0.117.0`).', ''].join(
+        '\n'
+      ),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find(
+        (error) =>
+          error.file === 'README.md' &&
+          (error.rule === 'doc-posture-unresolved' || error.rule === 'doc-posture-stale')
+      )
+    ).toBeUndefined();
+  });
+
+  it('accepts the colon model-posture form when resolving the policy source posture', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-colon-source-model-posture-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      [
+        '# Codex Version Policy (CO)',
+        '',
+        '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
+        '- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).',
+        '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
+        '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find(
+        (error) =>
+          error.file === 'README.md' &&
+          (error.rule === 'doc-posture-unresolved' || error.rule === 'doc-posture-stale')
+      )
+    ).toBeUndefined();
+  });
+
+  it('accepts the slash unsupported-review form when resolving the policy source posture', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-slash-source-warning-posture-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      [
+        '# Codex Version Policy (CO)',
+        '',
+        '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).',
+        '- When authenticating through ChatGPT, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
+        '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find(
+        (error) =>
+          error.file === 'README.md' &&
+          (error.rule === 'doc-posture-unresolved' || error.rule === 'doc-posture-stale')
+      )
+    ).toBeUndefined();
+  });
+
+  it('accepts the positive unsupported-review form when resolving the policy source posture', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-positive-source-warning-posture-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      [
+        '# Codex Version Policy (CO)',
+        '',
+        '- Current CO compatibility/adoption target remains stable Codex CLI (`0.117.0`) for the current upstream-aligned main baseline.',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception (fast text-only search/synthesis).',
+        '- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.',
+        '- Local appserver remains the expected default runtime path after the `CO-22` canary.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find(
+        (error) =>
+          error.file === 'README.md' &&
+          (error.rule === 'doc-posture-unresolved' || error.rule === 'doc-posture-stale')
+      )
+    ).toBeUndefined();
+  });
+
+  it('requires the current model posture when a doc opts into model truth checks', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        'Current model posture: `gpt-5.3-codex-spark` for top-level, delegated subagent, and review surfaces.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'model mention(s) gpt-5.3-codex-spark missing current policy gpt-5.4'
+      })
+    );
+  });
+
+  it('does not let incidental config examples satisfy the model posture truth check', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-config-only-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Recommended baseline:',
+        '  - `model = "gpt-5.4"`',
+        '  - `review_model = "gpt-5.4"`',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'missing model posture gpt-5.4'
+      })
+    );
+  });
+
+  it('does not let a compatibility warning line hide a stale model posture line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-warning-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.3-codex` for top-level, delegated subagent, and review surfaces.',
+        '- When authenticating through ChatGPT, do not target delegated or review surfaces at `gpt-5.4-codex`; those runs currently fail immediately. Use `gpt-5.4` instead until provider compatibility changes.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.4'
+      })
+    );
+  });
+
+  it('does not let a current secondary posture line hide a stale primary posture line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-mixed-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.3-codex` for top-level, delegated subagent, and review surfaces.',
+        '- Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.4'
+      })
+    );
+  });
+
+  it('accepts a current secondary ChatGPT-auth evidence line alongside the current primary posture line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-chatgpt-auth-current-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- For ChatGPT auth, this means `gpt-5.4`, not `gpt-5.4-codex`, unless new compatibility evidence exists.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find((error) => error.file === 'README.md' && error.rule === 'doc-posture-stale')
+    ).toBeUndefined();
+  });
+
+  it('accepts a current split explorer_fast exception line alongside the current primary posture line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-explorer-fast-split-current-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find((error) => error.file === 'README.md' && error.rule === 'doc-posture-stale')
+    ).toBeUndefined();
+  });
+
+  it('does not let a stale split explorer_fast exception line hide behind a current primary posture line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-explorer-fast-split-stale-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- `explorer_fast` remains the only explicit `gpt-5.2-codex-spark` exception.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'model mention(s) gpt-5.2-codex-spark missing current policy gpt-5.4'
+      })
+    );
+  });
+
+  it('does not let a stale split unsupported-review warning line hide behind a current primary posture line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-warning-split-stale-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- On ChatGPT-auth sessions, do not target delegated/review surfaces at `gpt-5.3-codex`; those runs currently fail immediately. Use `gpt-5.4` until provider compatibility changes.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.4'
+      })
+    );
+  });
+
+  it('does not let a stale secondary ChatGPT-auth evidence line hide behind a current primary posture line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-chatgpt-auth-stale-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- For ChatGPT auth, this means `gpt-5.4`, not `gpt-5.3-codex`, unless new compatibility evidence exists.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'model mention(s) gpt-5.3-codex missing current policy gpt-5.4'
+      })
+    );
+  });
+
+  it('does not let a stale explorer_fast exception hide on an otherwise current posture line', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-model-explorer-fast-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['model-posture']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.2-codex-spark`.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'doc-posture-stale',
+        reference: 'model mention(s) gpt-5.2-codex-spark missing current policy gpt-5.4'
       })
     );
   });

@@ -10,6 +10,9 @@ import {
   countHeadingLines,
   extractBundledSkillNamesFromMarkdown,
   extractCodexCliVersionMentions,
+  extractCodexModelMentions,
+  extractModelPostureLines,
+  hasExpectedModelPostureLine,
   hasExpectedDefaultRuntimeLine,
   listBundledSkillNames,
   loadDocsCatalog,
@@ -59,6 +62,47 @@ interface CliOptions {
 }
 
 const CANONICAL_TASKS_INDEX_KEYS = new Set(['items', 'specs']);
+
+function isUnsupportedReviewModelLine(line: string): boolean {
+  return (
+    /keep delegated subagent and review surfaces on/i.test(line) ||
+    /keep delegated or review surfaces on/i.test(line) ||
+    /do not target delegated(?:\/review| or review)? surfaces at/i.test(line) ||
+    /for chatgpt auth,\s*this means/i.test(line)
+  );
+}
+
+function extractUnexpectedModelMentions(
+  lines: string[],
+  codexPosture: {
+    model?: string | null;
+    explorer_fast_model?: string | null;
+    unsupported_review_model?: string | null;
+  }
+): string[] {
+  const unexpected = new Set<string>();
+
+  for (const line of lines) {
+    const allowed = new Set<string>();
+    if (codexPosture.model) {
+      allowed.add(codexPosture.model);
+    }
+    if (/explorer_fast/i.test(line) && codexPosture.explorer_fast_model) {
+      allowed.add(codexPosture.explorer_fast_model);
+    }
+    if (isUnsupportedReviewModelLine(line) && codexPosture.unsupported_review_model) {
+      allowed.add(codexPosture.unsupported_review_model);
+    }
+
+    for (const modelMention of extractCodexModelMentions(line)) {
+      if (!allowed.has(modelMention)) {
+        unexpected.add(modelMention);
+      }
+    }
+  }
+
+  return [...unexpected].sort();
+}
 
 export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> {
   const [docFiles, npmScripts, pipelineIds, repoRootEntries, tasksSizeError, tasksIndexShapeError, docsCatalog] =
@@ -152,12 +196,47 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
         });
       } else {
         const versionMentions = extractCodexCliVersionMentions(content);
+        const hasCurrentMention = versionMentions.includes(codexPosture.cli_version);
         const staleMentions = versionMentions.filter((version: string) => version !== codexPosture.cli_version);
-        if (staleMentions.length > 0) {
+        if (!hasCurrentMention || staleMentions.length > 0) {
           errors.push({
             file,
             rule: 'doc-posture-stale',
-            reference: `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`
+            reference:
+              versionMentions.length === 0
+                ? `missing Codex CLI version ${codexPosture.cli_version}`
+                : `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`
+          });
+        }
+      }
+    }
+
+    if (truthChecks.has('model-posture')) {
+      if (!codexPosture?.model) {
+        errors.push({
+          file,
+          rule: 'doc-posture-unresolved',
+          reference: `missing current model posture in ${codexPostureSource}`
+        });
+      } else {
+        const modelPostureLines = extractModelPostureLines(content);
+        const unexpectedModelMentions = extractUnexpectedModelMentions(modelPostureLines, codexPosture);
+        if (!hasExpectedModelPostureLine(content, codexPosture.model)) {
+          errors.push({
+            file,
+            rule: 'doc-posture-stale',
+            reference:
+              modelPostureLines.length === 0
+                ? `missing model posture ${codexPosture.model}`
+                : unexpectedModelMentions.length === 0
+                  ? `model posture line missing current policy ${codexPosture.model}`
+                  : `model mention(s) ${unexpectedModelMentions.join(', ')} missing current policy ${codexPosture.model}`
+          });
+        } else if (unexpectedModelMentions.length > 0) {
+          errors.push({
+            file,
+            rule: 'doc-posture-stale',
+            reference: `model mention(s) ${unexpectedModelMentions.join(', ')} missing current policy ${codexPosture.model}`
           });
         }
       }

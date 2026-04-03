@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 94d8c3db82d4427b2bf08820ccab2376b7b14e0d74440ecb7d5d60ff3e55e64d -->
+<!-- codex:instruction-stamp 4f1b45104800805b6e59e18ee8105370ed3ce75b7bded35b71be26142fba626d -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -54,6 +54,8 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
+- Current CO compatibility/adoption target is stable Codex CLI `0.117.0`.
+- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
 - Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
 - Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.

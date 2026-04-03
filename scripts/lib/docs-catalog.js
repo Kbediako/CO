@@ -12,6 +12,16 @@ function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizeCatalogPath(value) {
+  const normalized = normalizeString(value).replace(/\\/g, '/');
+  if (!normalized) {
+    return '';
+  }
+  const withoutDotPrefix = normalized.replace(/^\.\//, '');
+  const collapsed = path.posix.normalize(withoutDotPrefix);
+  return collapsed === '.' ? '' : collapsed.replace(/^\.\//, '');
+}
+
 function normalizeStringArray(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -61,8 +71,8 @@ function normalizeCatalogRule(raw, kind) {
     throw new Error(`Invalid docs catalog ${kind}: expected object.`);
   }
 
-  const pathValue = normalizeString(raw.path);
-  const glob = normalizeString(raw.glob);
+  const pathValue = normalizeCatalogPath(raw.path);
+  const glob = normalizeCatalogPath(raw.glob);
   if (kind === 'entry' && !pathValue) {
     throw new Error('Invalid docs catalog entry: missing path.');
   }
@@ -146,7 +156,7 @@ export function getDocsCatalogClassMeta(catalog, docClass) {
 }
 
 export function resolveDocsCatalogEntry(docPath, catalog) {
-  const normalizedPath = normalizeString(docPath);
+  const normalizedPath = normalizeCatalogPath(docPath);
   if (!normalizedPath || !catalog) {
     return null;
   }
@@ -286,26 +296,34 @@ export async function readCurrentCodexPosture(repoRoot, policy = {}) {
       source_path: '',
       cli_version: null,
       model: null,
-      default_runtime: null
+      default_runtime: null,
+      explorer_fast_model: null,
+      unsupported_review_model: null
     };
   }
 
   const absolutePath = path.resolve(repoRoot, sourcePath);
   const content = await readFile(absolutePath, 'utf8');
+  const unsupportedReviewModel =
+    /do not target delegated(?:\/review| or review)? surfaces at `([^`]+)`/i.exec(content)?.[1] ??
+    /delegated subagent and review surfaces on [^;\n]*; `([^`]+)` is currently unsupported there/i.exec(content)?.[1] ??
+    null;
   return {
     source_path: sourcePath,
-    cli_version: /Codex CLI `([0-9]+\.[0-9]+\.[0-9]+)`/.exec(content)?.[1] ?? null,
-    model: /Current model posture is `([^`]+)`/.exec(content)?.[1] ?? null,
+    cli_version: /Codex CLI\s+\(?`?([0-9]+\.[0-9]+\.[0-9]+)`?\)?/.exec(content)?.[1] ?? null,
+    model: /Current model posture(?: is|:)\s*`([^`]+)`/i.exec(content)?.[1] ?? null,
     default_runtime:
-      /Local ([A-Za-z0-9_-]+) remains the expected default runtime path/.exec(content)?.[1] ?? null
+      /Local ([A-Za-z0-9_-]+) remains the expected default runtime path/.exec(content)?.[1] ?? null,
+    explorer_fast_model: /explorer_fast[^\n]*`(gpt-[^`]+)`/i.exec(content)?.[1] ?? null,
+    unsupported_review_model: unsupportedReviewModel
   };
 }
 
 export function extractCodexCliVersionMentions(content) {
   const results = new Set();
   const patterns = [
-    /Codex CLI\s+`?([0-9]+\.[0-9]+\.[0-9]+)`?/gi,
-    /codex-cli\s+`?([0-9]+\.[0-9]+\.[0-9]+)`?/gi
+    /Codex CLI\s+\(?`?([0-9]+\.[0-9]+\.[0-9]+)`?\)?/gi,
+    /codex-cli\s+\(?`?([0-9]+\.[0-9]+\.[0-9]+)`?\)?/gi
   ];
 
   for (const pattern of patterns) {
@@ -317,6 +335,44 @@ export function extractCodexCliVersionMentions(content) {
   }
 
   return [...results].sort();
+}
+
+export function extractCodexModelMentions(content) {
+  const results = new Set();
+  for (const match of content.matchAll(/\bgpt-[A-Za-z0-9.-]+\b/g)) {
+    if (match[0]) {
+      results.add(match[0]);
+    }
+  }
+  return [...results].sort();
+}
+
+function isModelPostureLine(line) {
+  return (
+    isPrimaryModelPostureLine(line) ||
+    isSecondaryUnsupportedReviewReferenceLine(line) ||
+    /explorer_fast/i.test(line)
+  );
+}
+
+function isPrimaryModelPostureLine(line) {
+  return (
+    /current model posture/i.test(line) ||
+    /keep delegated subagent and review surfaces on/i.test(line) ||
+    /keep delegated or review surfaces on/i.test(line) ||
+    /do not target delegated(?:\/review| or review)? surfaces at/i.test(line)
+  );
+}
+
+function isSecondaryUnsupportedReviewReferenceLine(line) {
+  return /for chatgpt auth,\s*this means/i.test(line);
+}
+
+export function extractModelPostureLines(content) {
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => isModelPostureLine(line));
 }
 
 export function hasExpectedDefaultRuntimeLine(content, expectedRuntime) {
@@ -334,6 +390,23 @@ export function hasExpectedDefaultRuntimeLine(content, expectedRuntime) {
 
   const runtimePattern = new RegExp(`\\b${escapeRegExp(expectedRuntime)}\\b`, 'i');
   return relevantLines.every((line) => runtimePattern.test(line));
+}
+
+export function hasExpectedModelPostureLine(content, expectedModel) {
+  if (!normalizeString(expectedModel)) {
+    return true;
+  }
+
+  const relevantLines = extractModelPostureLines(content).filter((line) => isPrimaryModelPostureLine(line));
+  if (relevantLines.length === 0) {
+    return false;
+  }
+
+  const modelPattern = new RegExp(
+    `(^|[^A-Za-z0-9.-])${escapeRegExp(expectedModel)}($|[^A-Za-z0-9.-])`,
+    'i'
+  );
+  return relevantLines.every((line) => modelPattern.test(line));
 }
 
 export function countDocumentLines(content) {
