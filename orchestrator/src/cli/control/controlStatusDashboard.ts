@@ -203,6 +203,7 @@ export function startControlStatusDashboard(
   overrides: Partial<ControlStatusDashboardDependencies> = {}
 ): ControlStatusDashboardHandle {
   const deps = { ...DEFAULT_DEPENDENCIES, ...overrides };
+  const liveOutput = options.output ?? DEFAULT_OUTPUT;
   return startControlStatusViewer(
     {
       readDataset: async () => await deps.readDataset(options.runtime),
@@ -218,7 +219,7 @@ export function startControlStatusDashboard(
       refreshIntervalMs: options.refreshIntervalMs,
       output: options.output,
       input: options.input,
-      liveSurfaceMode: options.output?.isTTY === true ? 'alternate' : 'primary'
+      liveSurfaceMode: liveOutput.isTTY === true ? 'alternate' : 'primary'
     },
     deps
   );

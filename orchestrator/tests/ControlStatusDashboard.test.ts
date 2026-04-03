@@ -974,6 +974,71 @@ describe('control status dashboard', () => {
     expect(requestRefresh).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the launched dashboard on alternate screen when using the default tty output stream', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const originalIsTTY = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    const originalColumns = Object.getOwnPropertyDescriptor(process.stdout, 'columns');
+    Object.defineProperty(process.stdout, 'isTTY', {
+      configurable: true,
+      value: true
+    });
+    Object.defineProperty(process.stdout, 'columns', {
+      configurable: true,
+      value: 120
+    });
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(((chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+      }) as typeof process.stdout.write);
+
+    const requestRefresh = vi.fn(async () => undefined);
+    const runtime = {
+      requestRefresh,
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    try {
+      const handle = startControlStatusDashboard(
+        {
+          runtime,
+          baseUrl: 'http://127.0.0.1:4100',
+          taskId: 'local-mcp',
+          runId: 'control-host',
+          runDir: '/repo/.runs/local-mcp/cli/control-host',
+          startPipelineId: 'provider-linear-worker',
+          refreshIntervalMs: 1000
+        },
+        {
+          readDataset: async () => buildDataset(),
+          setTimeout,
+          clearTimeout
+        }
+      );
+
+      await handle.flush();
+      expect(writes[0]).toContain(ANSI_ALT_SCREEN_ENTER);
+      expect(stripAnsi(writes[0] ?? '')).toContain('│ Inspect: live | alternate screen | full frame');
+      handle.stop();
+    } finally {
+      writeSpy.mockRestore();
+      if (originalIsTTY) {
+        Object.defineProperty(process.stdout, 'isTTY', originalIsTTY);
+      }
+      if (originalColumns) {
+        Object.defineProperty(process.stdout, 'columns', originalColumns);
+      }
+    }
+  });
+
   it('keeps attached viewers on primary scrollback while refreshing live data', async () => {
     vi.useFakeTimers();
 
