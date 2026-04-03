@@ -1898,8 +1898,8 @@ describe('ControlServer', () => {
         last_event: 'Issue',
         last_action: 'update',
         last_webhook_timestamp: Date.parse(updatedAt),
-        run_id: 'run-other',
-        run_manifest_path: null,
+        run_id: 'run-1',
+        run_manifest_path: paths.manifestPath,
         launch_source: 'control-host',
         launch_token: 'launch-local-mcp-other'
       }

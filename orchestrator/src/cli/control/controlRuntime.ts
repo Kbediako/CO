@@ -512,6 +512,7 @@ function scoreProviderClaimMatch(
   >
 ): number {
   let score = 0;
+  const allowRunBindingMatch = canScoreProviderRunBindingMatch(claim, source);
   if (claim.issue_id && source.issueId && claim.issue_id === source.issueId) {
     score += 16;
   }
@@ -521,13 +522,34 @@ function scoreProviderClaimMatch(
   if (isAuthoritativeProviderTaskIdMatch(claim, source)) {
     score += 8;
   }
-  if (claim.run_id && source.runId && claim.run_id === source.runId) {
+  if (allowRunBindingMatch && claim.run_id && source.runId && claim.run_id === source.runId) {
     score += 6;
   }
-  if (claim.run_manifest_path && source.manifestPath && claim.run_manifest_path === source.manifestPath) {
+  if (
+    allowRunBindingMatch &&
+    claim.run_manifest_path &&
+    source.manifestPath &&
+    claim.run_manifest_path === source.manifestPath
+  ) {
     score += 10;
   }
   return score;
+}
+
+function canScoreProviderRunBindingMatch(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId'
+  >
+): boolean {
+  if (source.taskId !== 'local-mcp') {
+    return true;
+  }
+  if (!hasExplicitCompatibilityIssueIdentity(source)) {
+    return true;
+  }
+  return hasMatchingProviderIssueIdentity(claim, source);
 }
 
 function isAuthoritativeProviderTaskIdMatch(
@@ -614,6 +636,18 @@ function isProviderIntakeScopedRunningSource(
   source: Pick<ControlCompatibilitySourceContext, 'issueProvider'>
 ): boolean {
   return source.issueProvider === 'linear';
+}
+
+function hasMatchingProviderIssueIdentity(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier'>
+): boolean {
+  return (
+    (claim.issue_id != null && source.issueId != null && claim.issue_id === source.issueId) ||
+    (claim.issue_identifier != null &&
+      source.issueIdentifier != null &&
+      claim.issue_identifier === source.issueIdentifier)
+  );
 }
 
 function hasExplicitCompatibilityIssueIdentity(

@@ -1549,36 +1549,37 @@ describe('ControlRuntime', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
     try {
-      const providerIntakeState = createProviderIntakeState([
-        {
-          provider: 'linear',
-          provider_key: 'linear:issue-other',
-          issue_id: 'issue-other',
-          issue_identifier: 'ISSUE-OTHER',
-          issue_title: 'Completed unrelated local-mcp claim',
-          issue_state: 'Done',
-          issue_state_type: 'completed',
-          issue_updated_at: '2026-03-07T00:29:30.000Z',
-          task_id: 'local-mcp',
-          mapping_source: 'provider_id_fallback',
-          state: 'completed',
-          reason: 'provider_issue_released:not_active',
-          accepted_at: '2026-03-07T00:20:00.000Z',
-          updated_at: '2026-03-07T00:29:30.000Z',
-          last_delivery_id: 'delivery-local-mcp-other',
-          last_event: 'Issue',
-          last_action: 'update',
-          last_webhook_timestamp: 1_742_360_170_000,
-          run_id: 'run-other',
-          run_manifest_path: null,
-          launch_source: 'control-host',
-          launch_token: 'launch-local-mcp-other'
-        }
-      ]);
+      const providerIntakeState = createProviderIntakeState();
       const fixture = await createFixture({
         taskId: 'local-mcp',
         providerIntakeState
       });
+      providerIntakeState.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:issue-other',
+        issue_id: 'issue-other',
+        issue_identifier: 'ISSUE-OTHER',
+        issue_title: 'Completed unrelated local-mcp claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-03-07T00:29:30.000Z',
+        task_id: 'local-mcp',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_released:not_active',
+        accepted_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:30.000Z',
+        last_delivery_id: 'delivery-local-mcp-other',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_170_000,
+        run_id: 'run-1',
+        run_manifest_path: fixture.paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-local-mcp-other'
+      });
+      providerIntakeState.latest_provider_key = 'linear:issue-other';
+      providerIntakeState.latest_reason = 'provider_issue_released:not_active';
       await seedManifest(fixture.paths, {
         task_id: 'local-mcp',
         issue_id: 'issue-local-mcp',
