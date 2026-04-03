@@ -229,6 +229,36 @@ describe('UiDataController', () => {
           reset_in_seconds: 42
         }
       },
+      selected: {
+        issue_id: 'issue-76',
+        issue_identifier: 'CO-76',
+        task_id: 'linear-co-76',
+        run_id: 'run-1',
+        raw_status: 'in_progress',
+        display_status: 'running',
+        status_reason: null,
+        started_at: '2026-04-03T08:00:00.000Z',
+        updated_at: '2026-04-03T08:00:30.000Z',
+        completed_at: null,
+        summary: 'Worker turn active',
+        last_error: null,
+        latest_action: null,
+        latest_event: {
+          event: 'turn_started',
+          message: 'Worker turn active',
+          at: '2026-04-03T08:00:30.000Z'
+        },
+        workspace: {
+          path: '/tmp/co-76'
+        },
+        question_summary: {
+          queued_count: 0,
+          latest_question: null
+        },
+        tracked: {
+          linear: null
+        }
+      },
       polling: {
         enabled: true,
         interval_ms: 15000,
@@ -348,5 +378,6 @@ describe('UiDataController', () => {
     expect(dataset.rate_limits).toEqual(state.rate_limits);
     expect(dataset.polling).toEqual(state.polling);
     expect(dataset.selected).toEqual(state.selected);
+    expect(dataset.selected?.run_id).toBe('run-1');
   });
 });

@@ -42,7 +42,7 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-44a18317-8afe-47e4-b4ba-5424aae86dc5 npm run docs:freshness`. Evidence: terminal output `docs:freshness OK - 3275 docs, 3278 registry entries`.
 - [x] `MCP_RUNNER_TASK_ID=linear-44a18317-8afe-47e4-b4ba-5424aae86dc5 node scripts/diff-budget.mjs`. Evidence: terminal output `✅ Diff budget: OK (scope=working-tree, files=14/25, lines=926/1200, +919/-7)`.
 - [x] `env -u CODEX_ORCHESTRATOR_ROOT -u CODEX_ORCHESTRATOR_RUNS_DIR -u CODEX_ORCHESTRATOR_OUT_DIR -u CODEX_ORCHESTRATOR_REPO_CONFIG_PATH -u CODEX_ORCHESTRATOR_PACKAGE_ROOT -u CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH -u CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT MCP_RUNNER_TASK_ID=linear-44a18317-8afe-47e4-b4ba-5424aae86dc5 npm run pack:smoke`. Evidence: `out/linear-44a18317-8afe-47e4-b4ba-5424aae86dc5/manual/20260403T115430Z-pack-smoke/00-pack-smoke.md`.
-- [x] Manifest-backed standalone review wrapper executed before handoff, with any boundary fallback recorded truthfully. Evidence: `/Users/kbediako/Code/CO/.runs/linear-44a18317-8afe-47e4-b4ba-5424aae86dc5/cli/2026-04-03T10-41-55-984Z-0d38b8c7/review/telemetry.json` reports `status: succeeded`, `review_outcome: clean-success`, `termination_boundary: null`.
+- [x] Manifest-backed standalone review wrapper executed before handoff, with any boundary fallback recorded truthfully. Evidence: `.runs/linear-44a18317-8afe-47e4-b4ba-5424aae86dc5/cli/2026-04-03T10-41-55-984Z-0d38b8c7/review/telemetry.json` reports `status: succeeded`, `review_outcome: clean-success`, `termination_boundary: null`.
 - [x] Explicit elegance/minimality pass recorded after review findings are addressed. Evidence: `out/linear-44a18317-8afe-47e4-b4ba-5424aae86dc5/manual/20260403T115300Z-elegance-review/00-elegance-review.md`.
 
 ## Handoff
