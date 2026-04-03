@@ -1552,6 +1552,71 @@ describe('ControlServer', () => {
     }
   });
 
+  it('keeps explicitly identified null-provider sibling runs in /api/v1/state when the intake snapshot is missing', async () => {
+    const nowMs = Date.now();
+    const currentStartedAt = new Date(nowMs - 10 * 60_000).toISOString();
+    const currentUpdatedAt = new Date(nowMs - 60_000).toISOString();
+    const siblingStartedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const siblingUpdatedAt = new Date(nowMs - 30_000).toISOString();
+    const { root, env, paths } = await createRunRoot('task-missing-intake-current');
+    await seedManifest(paths, {
+      task_id: 'task-missing-intake-current',
+      issue_provider: 'linear',
+      issue_id: 'issue-current',
+      issue_identifier: 'ISSUE-CURRENT',
+      started_at: currentStartedAt,
+      updated_at: currentUpdatedAt
+    });
+    await createSiblingRun(root, 'task-missing-intake-null-provider', 'run-2', {
+      manifest: {
+        issue_identifier: 'ISSUE-NULL-PROVIDER',
+        status: 'in_progress',
+        started_at: siblingStartedAt,
+        updated_at: siblingUpdatedAt,
+        summary: 'current default-provider run without an intake snapshot'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 2, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-CURRENT');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT',
+        'ISSUE-NULL-PROVIDER'
+      ]);
+
+      const issueRes = await fetch(new URL('/api/v1/ISSUE-NULL-PROVIDER', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(200);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('excludes fallback-only null-provider historical sibling runs from /api/v1/state when no active claim backs them', async () => {
     const nowMs = Date.now();
     const currentStartedAt = new Date(nowMs - 10 * 60_000).toISOString();
@@ -1608,6 +1673,67 @@ describe('ControlServer', () => {
         }
       });
       expect(staleIssueRes.status).toBe(404);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes fallback-only null-provider historical sibling runs from /api/v1/state when the intake snapshot is missing', async () => {
+    const nowMs = Date.now();
+    const currentStartedAt = new Date(nowMs - 10 * 60_000).toISOString();
+    const currentUpdatedAt = new Date(nowMs - 60_000).toISOString();
+    const siblingStartedAt = new Date(nowMs - 5 * 60_000).toISOString();
+    const siblingUpdatedAt = new Date(nowMs - 30_000).toISOString();
+    const { root, env, paths } = await createRunRoot('task-missing-intake-current');
+    await seedManifest(paths, {
+      task_id: 'task-missing-intake-current',
+      issue_provider: 'linear',
+      issue_id: 'issue-current',
+      issue_identifier: 'ISSUE-CURRENT',
+      started_at: currentStartedAt,
+      updated_at: currentUpdatedAt
+    });
+    await createSiblingRun(root, 'rlm-CO', 'run-2', {
+      manifest: {
+        status: 'in_progress',
+        started_at: siblingStartedAt,
+        updated_at: siblingUpdatedAt,
+        summary: 'historical fallback-only null-provider run without an intake snapshot'
+      }
+    });
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    const server = await ControlServer.start({
+      paths,
+      config,
+      runId: 'run-1'
+    });
+
+    try {
+      const baseUrl = server.getBaseUrl() ?? '';
+      const token = await readToken(paths.controlAuthPath);
+      const stateRes = await fetch(new URL('/api/v1/state', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(stateRes.status).toBe(200);
+      const statePayload = (await stateRes.json()) as {
+        counts?: { running?: number; retrying?: number };
+        running?: Array<{ issue_identifier?: string }>;
+        selected?: { issue_identifier?: string } | null;
+      };
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-CURRENT');
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-CURRENT']);
+
+      const issueRes = await fetch(new URL('/api/v1/rlm-CO', baseUrl), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      expect(issueRes.status).toBe(404);
     } finally {
       await server.close();
       await rm(root, { recursive: true, force: true });

@@ -1082,6 +1082,46 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('keeps explicitly identified null-provider running sources visible when provider intake state is missing', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-missing-intake-current'
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-missing-intake-current',
+        issue_provider: 'linear',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      await createSiblingRun(fixture.root, 'task-missing-intake-null-provider', 'run-2', {
+        manifest: {
+          issue_identifier: 'ISSUE-NULL-PROVIDER',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          summary: 'active null-provider run without an intake snapshot'
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT',
+        'ISSUE-NULL-PROVIDER'
+      ]);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'ISSUE-NULL-PROVIDER')
+      ).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps explicitly identified null-provider running sources visible when provider intake state has no active claims', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
@@ -1263,6 +1303,42 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('suppresses fallback-only null-provider running sources when provider intake state is missing', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'task-missing-intake-fallback-current'
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-missing-intake-fallback-current',
+        issue_provider: 'linear',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      await createSiblingRun(fixture.root, 'rlm-CO', 'run-2', {
+        manifest: {
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          summary: 'historical fallback-only null-provider run without an intake snapshot'
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT'
+      ]);
+      expect(compatibilityProjection.issues.find((issue) => issue.issueIdentifier === 'rlm-CO')).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps fresh explicitly identified null-provider running sources when started_at is newer than updated_at', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
@@ -1320,6 +1396,31 @@ describe('ControlRuntime', () => {
         started_at: '2026-03-07T00:20:00.000Z',
         updated_at: '2026-03-07T00:29:00.000Z',
         summary: 'control host fallback manifest'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.codexTotals.seconds_running).toBe(0);
+      expect(compatibilityProjection.selected?.issue_identifier).toBe('local-mcp');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not count the selected null-provider fallback manifest as current running activity when provider intake state is missing', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'local-mcp'
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'local-mcp',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'control host fallback manifest without an intake snapshot'
       });
 
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();

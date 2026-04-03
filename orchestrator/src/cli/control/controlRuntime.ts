@@ -448,7 +448,10 @@ function isAuthoritativeSelectedCurrentRunningSource(
     return false;
   }
   if (!providerIntakeState) {
-    return true;
+    return (
+      source.taskId !== 'local-mcp' ||
+      (!isControlHostSelectedFallbackSource(source) && isFreshNullProviderRunningSource(source))
+    );
   }
   if (source.taskId !== 'local-mcp') {
     return true;
@@ -586,7 +589,10 @@ function isAuthoritativeCurrentRunningSource(
   providerIntakeState: ProviderIntakeState | undefined
 ): boolean {
   if (!providerIntakeState) {
-    return true;
+    return (
+      source.issueProvider !== null ||
+      (hasExplicitCompatibilityIssueIdentity(source) && isFreshNullProviderRunningSource(source))
+    );
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
   if (source.issueProvider === null) {
@@ -613,11 +619,13 @@ function isProviderIntakeScopedRunningSource(
 function hasExplicitCompatibilityIssueIdentity(
   source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
 ): boolean {
-  const fallbackIdentity = source.taskId ?? source.runId ?? null;
-  if (source.issueIdentifier && source.issueIdentifier !== fallbackIdentity) {
+  const fallbackIdentities = new Set(
+    [source.taskId, source.runId].filter((value): value is string => typeof value === 'string')
+  );
+  if (source.issueIdentifier && !fallbackIdentities.has(source.issueIdentifier)) {
     return true;
   }
-  if (source.issueId && source.issueId !== fallbackIdentity) {
+  if (source.issueId && !fallbackIdentities.has(source.issueId)) {
     return true;
   }
   return false;
