@@ -1,10 +1,11 @@
-<!-- codex:instruction-stamp aee3caac5bc5233ec1d33916a757a774d8680c005ed62e340740f568c3e2d78e -->
+<!-- codex:instruction-stamp 4f1b45104800805b6e59e18ee8105370ed3ce75b7bded35b71be26142fba626d -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review.
 - Default to `docs-review` before implementation and `implementation-gate` after code changes.
 - Use `docs-relevance-advisory` when you need semantic docs relevance signal without hard-gate behavior.
+- Local appserver remains the expected default runtime path.
 - Prefer cloud mode when runs are long-running/parallel and cloud prerequisites are ready.
 - Before cloud mode, verify branch availability, non-interactive setup commands, and required secrets/variables; if missing, run in local `mcp` mode and record why.
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes.
@@ -53,6 +54,8 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
+- Current CO compatibility/adoption target is stable Codex CLI `0.117.0`.
+- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
 - Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
 - Keep delegated subagent and review surfaces on `gpt-5.4` as well when using ChatGPT auth; `gpt-5.4-codex` is currently unsupported there.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.

@@ -19,6 +19,12 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 ## Upstream Sync
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
+## Current Posture
+- Current CO compatibility/adoption target: Codex CLI `0.117.0`.
+- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
+- Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
+- Full posture and promotion gates live in `docs/guides/codex-version-policy.md`.
+
 ## Release Notes
 - Shipped skills note: `docs/release-notes-template-addendum.md`.
 - Optional overview override: add and commit a release overview file at .github/release-overview.md before tagging; the release workflow uses it when present.
@@ -104,7 +110,7 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
 - `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json`, `AGENTS.md`, downstream .codex/config.toml + .codex/agents/* role files sourced from `templates/codex/.codex/*`, and `codex.orchestrator.json`; no overwrite unless `--force`).
 - `codex-orchestrator setup [--yes] [--refresh-skills]`: one-shot bootstrap for downstream users (installs bundled skills, configures delegation + DevTools wiring, and prints policy/usage guidance). By default, setup does not overwrite existing skills; add `--refresh-skills` when you want to replace existing bundled skill files.
-- Canonical bundled skill roster lives in `README.md` ("Bundled skills" section) and shipped files under `skills/`.
+- Canonical bundled skill roster lives in `README.md` ("Bundled skills" section), with shipped-file parity enforced against `skills/`.
 - `codex-orchestrator start [pipeline] [--auto-issue-log] [--repo-config-required]`: starts a pipeline run. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation); `--repo-config-required` disables packaged config fallback.
 - `codex-orchestrator flow [--task <task-id>] [--auto-issue-log] [--repo-config-required]`: runs `docs-review` then `implementation-gate` in sequence; stops on the first failure. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation); `--repo-config-required` disables packaged config fallback.
 - `codex-orchestrator doctor [--format json] [--usage] [--cloud-preflight] [--issue-log] [--apply]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`) with adoption KPIs. `--issue-log` appends/creates `docs/codex-orchestrator-issues.md` (or `--issue-log-path`) and writes a JSON bundle under `out/<resolved-task>/doctor/issue-bundles/` with doctor context plus latest run context when available. `--apply` plans/applies quick fixes (use with `--yes`).
@@ -213,8 +219,8 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | `npm run lint` | Lints orchestrator, adapters, shared packages. Auto-runs `node scripts/build-patterns-if-needed.mjs` so codemods compile when missing/outdated. |
 | `npm run test` | Vitest suite covering orchestration core, CLI services, and patterns. |
 | `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
-| `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs. |
-| `npm run docs:freshness` | Validates docs registry coverage + review recency; writes `out/<task-id>/docs-freshness.json`. |
+| `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs, current posture locks, bundled-skill roster parity, and the README front-door budget. |
+| `npm run docs:freshness` | Validates docs registry coverage plus catalog class coverage and writes a class-separated report to `out/<task-id>/docs-freshness.json`. |
 | `npm run ci:cloud-canary` | Runs the cloud canary harness (`scripts/cloud-canary-ci.mjs`) to verify cloud lifecycle manifest + run-summary evidence; credential-gated by `CODEX_CLOUD_ENV_ID` and optional auth secrets (`CODEX_CLOUD_BRANCH` defaults to `main`). Feature flags can be passed through with `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` (comma- or space-delimited, e.g. `sqlite,memories`). |
 | `node scripts/delegation-guard.mjs` | Enforces subagent delegation evidence before review (repo-only). |
 | `node scripts/spec-guard.mjs --dry-run` | Validates spec freshness; required before review (repo-only). |

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 71b851f6b39516cfb7f6bc39909e546b714bb1439b8f4d4b2c9db681037537a0 -->
+<!-- codex:instruction-stamp 4984838266608d9f9e055d3652c1066d878cd9c03c1834f18a8bf7a0cd4262f0 -->
 # Repository Agent Guidance
 
 ## Project 0303 — Codex Orchestrator Autonomy Enhancements
@@ -20,7 +20,7 @@
 ## Docs Review Gate (Pre-Implementation)
 - Before implementation work, capture a docs-review manifest via `npx codex-orchestrator start docs-review --format json --no-interactive --task <task-id>` with `MCP_RUNNER_TASK_ID` set.
 - Record the manifest path in the task checklists (`tasks/`, `.agent/task/`, `docs/TASKS.md`) and `tasks/index.json` for evidence.
-- The docs-review pipeline runs `npm run docs:freshness` after `npm run docs:check` and emits `out/<task-id>/docs-freshness.json`.
+- The docs-review pipeline runs `npm run docs:freshness` after `npm run docs:check` and emits a class-separated `out/<task-id>/docs-freshness.json`.
 - If `docs:check` fails with `tasks-file-too-large`, the tasks archive automation workflow will open a PR and sync payloads to `task-archives`; use `npm run docs:archive-tasks` for manual fallback.
 - Implementation docs archiving follows `docs/implementation-docs-archive-policy.json`; the automation workflow syncs payloads to `doc-archives` and opens a PR with stubs. Use `npm run docs:archive-implementation` for manual fallback.
 

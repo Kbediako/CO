@@ -1,0 +1,495 @@
+{
+  "version": 1,
+  "classes": {
+    "front_door": {
+      "label": "Front Door",
+      "report_order": 10
+    },
+    "repo_guide": {
+      "label": "Repository Guide",
+      "report_order": 20
+    },
+    "agent_policy": {
+      "label": "Agent Policy",
+      "report_order": 30
+    },
+    "active_guide": {
+      "label": "Active Guide",
+      "report_order": 40
+    },
+    "shipped_skill": {
+      "label": "Shipped Skill",
+      "report_order": 50
+    },
+    "shipped_companion": {
+      "label": "Shipped Companion",
+      "report_order": 60
+    },
+    "seeded_template": {
+      "label": "Seeded Template",
+      "report_order": 70
+    },
+    "task_packet": {
+      "label": "Task Packet",
+      "report_order": 200
+    },
+    "task_mirror": {
+      "label": "Task Mirror",
+      "report_order": 210
+    },
+    "report_only": {
+      "label": "Report Only",
+      "report_order": 220
+    },
+    "uncatalogued": {
+      "label": "Uncatalogued",
+      "report_order": 999
+    }
+  },
+  "policies": {
+    "codex_posture": {
+      "source_path": "docs/guides/codex-version-policy.md"
+    },
+    "readme_front_door": {
+      "path": "README.md",
+      "max_lines": 240,
+      "max_h2_sections": 9
+    },
+    "bundled_skills_roster": {
+      "doc_path": "README.md",
+      "section_heading": "## Skills (bundled)",
+      "list_intro": "Bundled skills"
+    }
+  },
+  "entries": [
+    {
+      "path": "README.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "front_door",
+      "audience": "downstream users",
+      "source_of_truth": [
+        "docs/guides/codex-version-policy.md",
+        "skills/*/SKILL.md",
+        "docs/README.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "default runtime posture changes",
+        "bundled skill roster changes",
+        "front-door command-surface changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version",
+        "model-posture",
+        "default-runtime",
+        "bundled-skills-roster",
+        "front-door-budget"
+      ]
+    },
+    {
+      "path": "docs/README.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "repo_guide",
+      "audience": "contributors and maintainers",
+      "source_of_truth": [
+        "README.md",
+        "docs/guides/codex-version-policy.md",
+        "skills/*/SKILL.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "repo command-surface changes",
+        "bundled skill roster changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version",
+        "model-posture",
+        "default-runtime"
+      ]
+    },
+    {
+      "path": "AGENTS.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "agent_policy",
+      "audience": "repo agents and maintainers",
+      "source_of_truth": [
+        "docs/guides/codex-version-policy.md",
+        "templates/codex/AGENTS.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "runtime posture changes",
+        "review policy changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version",
+        "model-posture",
+        "default-runtime"
+      ]
+    },
+    {
+      "path": "docs/AGENTS.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "agent_policy",
+      "audience": "repo agents and maintainers",
+      "source_of_truth": [
+        "AGENTS.md",
+        "docs/guides/codex-version-policy.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "runtime posture changes",
+        "docs gate changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version",
+        "model-posture",
+        "default-runtime"
+      ]
+    },
+    {
+      "path": "docs/guides/codex-version-policy.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "active_guide",
+      "audience": "maintainers and reviewers",
+      "source_of_truth": [
+        "self"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "Codex adoption target changes",
+        "runtime canary outcome changes",
+        "provider compatibility changes"
+      ],
+      "truth_checks": [
+        "model-posture"
+      ]
+    },
+    {
+      "path": "docs/skills-release.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "active_guide",
+      "audience": "release maintainers",
+      "source_of_truth": [
+        "README.md",
+        "skills/*/SKILL.md",
+        "package.json"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "bundled skill roster changes",
+        "skills install command-surface changes",
+        "release workflow changes"
+      ],
+      "truth_checks": []
+    },
+    {
+      "path": "skills/delegation-usage/SKILL.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "shipped_skill",
+      "audience": "downstream Codex users",
+      "source_of_truth": [
+        "docs/guides/codex-version-policy.md",
+        "README.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "delegation policy changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version",
+        "model-posture"
+      ]
+    },
+    {
+      "path": "skills/delegation-usage/DELEGATION_GUIDE.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "shipped_companion",
+      "audience": "downstream Codex users",
+      "source_of_truth": [
+        "docs/guides/codex-version-policy.md",
+        "skills/delegation-usage/SKILL.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "delegation MCP behavior changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version",
+        "model-posture"
+      ]
+    },
+    {
+      "path": "templates/codex/AGENTS.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "seeded_template",
+      "audience": "downstream seeded repositories",
+      "source_of_truth": [
+        "AGENTS.md",
+        "docs/guides/codex-version-policy.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "runtime posture changes",
+        "seeded downstream policy changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version",
+        "model-posture",
+        "default-runtime"
+      ]
+    },
+    {
+      "path": "docs/TASKS.md",
+      "status": "active",
+      "tier": 2,
+      "doc_class": "report_only",
+      "audience": "maintainers and reviewers",
+      "source_of_truth": [
+        "tasks/tasks-*.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "task snapshot refreshes",
+        "task checklist sync changes",
+        "task archive automation changes"
+      ],
+      "truth_checks": []
+    }
+  ],
+  "patterns": [
+    {
+      "glob": "docs/PRD-*.md",
+      "status": "active",
+      "doc_class": "task_packet",
+      "audience": "task-local maintainers and reviewers",
+      "source_of_truth": [
+        "Linear or task source issue",
+        "tasks/specs/*.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "task scope changes",
+        "task acceptance changes"
+      ]
+    },
+    {
+      "glob": "docs/ACTION_PLAN-*.md",
+      "status": "active",
+      "doc_class": "task_packet",
+      "audience": "task-local maintainers and reviewers",
+      "source_of_truth": [
+        "tasks/specs/*.md",
+        "task implementation state"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "task sequencing changes",
+        "task validation changes"
+      ]
+    },
+    {
+      "glob": "docs/TECH_SPEC-*.md",
+      "status": "active",
+      "doc_class": "task_packet",
+      "audience": "task-local maintainers and reviewers",
+      "source_of_truth": [
+        "tasks/specs/*.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "task implementation changes",
+        "validation contract changes"
+      ]
+    },
+    {
+      "glob": "docs/findings/**/*.md",
+      "status": "active",
+      "doc_class": "report_only",
+      "audience": "maintainers and reviewers",
+      "source_of_truth": [
+        "task packets",
+        "review findings"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "deliberation or review updates"
+      ]
+    },
+    {
+      "glob": "docs/**/*.md",
+      "status": "active",
+      "doc_class": "active_guide",
+      "audience": "contributors and maintainers",
+      "source_of_truth": [
+        "repo implementation",
+        "README.md",
+        "AGENTS.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "command-surface changes",
+        "policy changes",
+        "workflow changes"
+      ]
+    },
+    {
+      "glob": "tasks/**/*.md",
+      "status": "active",
+      "doc_class": "task_packet",
+      "audience": "task-local maintainers and reviewers",
+      "source_of_truth": [
+        "task issue",
+        "implementation state"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "task scope changes",
+        "task validation changes"
+      ]
+    },
+    {
+      "glob": ".agent/task/*.md",
+      "status": "active",
+      "doc_class": "task_mirror",
+      "audience": "agents and reviewers",
+      "source_of_truth": [
+        "tasks/tasks-*.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "task checklist changes"
+      ]
+    },
+    {
+      "glob": ".agent/SOPs/**/*.md",
+      "status": "active",
+      "doc_class": "active_guide",
+      "audience": "agents and maintainers",
+      "source_of_truth": [
+        "AGENTS.md",
+        "repo workflow behavior"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "workflow changes",
+        "merge or review policy changes"
+      ]
+    },
+    {
+      "glob": ".agent/**/*.md",
+      "status": "active",
+      "doc_class": "agent_policy",
+      "audience": "agents and maintainers",
+      "source_of_truth": [
+        "AGENTS.md",
+        "repo workflow behavior"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "agent workflow changes"
+      ]
+    },
+    {
+      "glob": ".ai-dev-tasks/**/*.md",
+      "status": "active",
+      "doc_class": "task_packet",
+      "audience": "task-local maintainers and reviewers",
+      "source_of_truth": [
+        "task issue",
+        "implementation state"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "task scope changes"
+      ]
+    },
+    {
+      "glob": "skills/*/SKILL.md",
+      "status": "active",
+      "doc_class": "shipped_skill",
+      "audience": "downstream Codex users",
+      "source_of_truth": [
+        "README.md",
+        "repo behavior"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "bundled skill contract changes",
+        "command or workflow changes"
+      ]
+    },
+    {
+      "glob": "skills/**/*.md",
+      "status": "active",
+      "doc_class": "shipped_companion",
+      "audience": "downstream Codex users",
+      "source_of_truth": [
+        "skills/*/SKILL.md",
+        "repo behavior"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "bundled skill contract changes",
+        "workflow changes"
+      ]
+    },
+    {
+      "glob": "templates/**/*.md",
+      "status": "active",
+      "doc_class": "seeded_template",
+      "audience": "downstream seeded repositories",
+      "source_of_truth": [
+        "AGENTS.md",
+        "README.md",
+        "repo behavior"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "seeded template changes",
+        "downstream policy changes"
+      ]
+    }
+  ]
+}

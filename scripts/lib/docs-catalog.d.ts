@@ -1,0 +1,72 @@
+export const DEFAULT_DOCS_CATALOG_PATH: string;
+
+export interface DocsCatalogClassMeta {
+  label: string;
+  report_order: number;
+}
+
+export interface DocsCatalogRule {
+  path: string;
+  glob: string;
+  glob_regex: RegExp | null;
+  status: string;
+  tier: number | null;
+  doc_class: string;
+  audience: string;
+  source_of_truth: string[];
+  owner: string;
+  cadence_days: number | null;
+  update_triggers: string[];
+  truth_checks: string[];
+  matched_by?: 'path' | 'glob';
+}
+
+export interface DocsCatalog {
+  version: number;
+  relative_path: string;
+  absolute_path: string;
+  classes: Record<string, DocsCatalogClassMeta>;
+  policies: Record<string, any>;
+  entries: DocsCatalogRule[];
+  patterns: DocsCatalogRule[];
+}
+
+export function loadDocsCatalog(repoRoot: string, relativePath?: string): Promise<DocsCatalog>;
+export function maybeLoadDocsCatalog(repoRoot: string, relativePath?: string): Promise<DocsCatalog | null>;
+export function getDocsCatalogClassMeta(catalog: DocsCatalog | null, docClass: string): DocsCatalogClassMeta;
+export function resolveDocsCatalogEntry(docPath: string, catalog: DocsCatalog | null): DocsCatalogRule | null;
+export function summarizeDocsByClass(
+  items: Array<{ doc_class: string | null; metric: string }>,
+  catalog: DocsCatalog | null
+): Array<{
+  doc_class: string;
+  label: string;
+  report_order: number;
+  docs_scanned: number;
+  registry_entries: number;
+  missing_in_registry: number;
+  missing_on_disk: number;
+  invalid_entries: number;
+  stale_entries: number;
+  uncatalogued_docs: number;
+}>;
+export function listBundledSkillNames(repoRoot: string): Promise<string[]>;
+export function extractBundledSkillNamesFromMarkdown(content: string, policy?: Record<string, any>): string[];
+export function readCurrentCodexPosture(
+  repoRoot: string,
+  policy?: Record<string, any>
+): Promise<{
+  source_path: string;
+  cli_version: string | null;
+  model: string | null;
+  default_runtime: string | null;
+  explorer_fast_model: string | null;
+  unsupported_review_model: string | null;
+}>;
+export function extractCodexCliVersionMentions(content: string): string[];
+export function extractCodexModelMentions(content: string): string[];
+export function extractModelPostureLines(content: string): string[];
+export function hasExpectedDefaultRuntimeLine(content: string, expectedRuntime: string): boolean;
+export function hasExpectedModelPostureLine(content: string, expectedModel: string): boolean;
+export function countDocumentLines(content: string): number;
+export function countHeadingLines(content: string, headingPrefix?: string): number;

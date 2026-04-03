@@ -1,7 +1,7 @@
 import { access, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
-const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'tasks'];
+const DOC_ROOTS = ['.agent', '.ai-dev-tasks', 'docs', 'skills', 'tasks', 'templates'];
 const DOC_ROOT_FILES = ['README.md', 'AGENTS.md'];
 const EXCLUDED_DIR_NAMES = new Set(['.runs', 'out', 'archives', 'node_modules', 'dist']);
 

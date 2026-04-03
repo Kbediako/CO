@@ -18,6 +18,23 @@
       }
     },
     {
+      "id": "20260403-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80",
+      "title": "CO: Automate docs truthfulness and relevance across README, shipped skills, and agent-facing docs",
+      "relates_to": "tasks/tasks-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-03",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+        "task": "tasks/tasks-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+        "agent_task": ".agent/task/linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
+        "docs": "docs/TECH_SPEC-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md"
+      }
+    },
+    {
       "id": "20260403-linear-11672de5-eb62-4942-bfdf-1d8282d786d2",
       "title": "CO: Deduplicate child-lane trailing JSON-tail parsing with shared helper",
       "relates_to": "tasks/tasks-linear-11672de5-eb62-4942-bfdf-1d8282d786d2.md",
