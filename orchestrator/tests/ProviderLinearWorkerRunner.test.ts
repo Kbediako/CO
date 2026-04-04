@@ -667,6 +667,50 @@ describe('provider linear worker runner', () => {
     );
   });
 
+  it('suppresses deterministic workpad validation retries within the same attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      latest_by_operation: {
+        'upsert-workpad': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'upsert-workpad',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'workpad_marker_missing',
+          error_message: 'Workpad body must contain "## Codex Workpad".'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `upsert-workpad` in this attempt until you first fix the deterministic validation error (workpad_marker_missing: Workpad body must contain "## Codex Workpad".).'
+    );
+  });
+
   it('ignores malformed audit summaries when deriving continuation suppressions', () => {
     const issue = createTrackedIssue();
     const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';

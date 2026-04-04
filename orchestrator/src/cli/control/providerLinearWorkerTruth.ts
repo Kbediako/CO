@@ -203,6 +203,12 @@ function isDeterministicProviderMutationFailure(entry: ProviderLinearAuditEntry)
   if (errorCode === 'linear_workpad_comment_id_invalid') {
     return true;
   }
+  if (errorCode === 'workpad_body_missing') {
+    return true;
+  }
+  if (errorCode === 'workpad_marker_missing') {
+    return true;
+  }
   if (errorCode === 'workpad_structure_invalid') {
     return true;
   }
