@@ -4767,6 +4767,155 @@ describe('provider linear worker runner', () => {
     }
   });
 
+  it('keeps trailing live refresh state across turn boundaries', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: 'http://127.0.0.1:43123',
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      join(controlHostRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    const refreshBodies: Array<Record<string, unknown>> = [];
+    let resolveFirstLiveRefresh: ((response: Response) => void) | null = null;
+    let firstLiveRefreshStartedResolve: (() => void) | null = null;
+    const firstLiveRefreshStarted = new Promise<void>((resolve) => {
+      firstLiveRefreshStartedResolve = resolve;
+    });
+    let secondTurnStartedResolve: (() => void) | null = null;
+    const secondTurnStarted = new Promise<void>((resolve) => {
+      secondTurnStartedResolve = resolve;
+    });
+    let allowSecondTurnToFinishResolve: (() => void) | null = null;
+    const allowSecondTurnToFinish = new Promise<void>((resolve) => {
+      allowSecondTurnToFinishResolve = resolve;
+    });
+    let liveRefreshCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: unknown, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+        refreshBodies.push(body);
+        if (body.owner_status === 'in_progress') {
+          liveRefreshCount += 1;
+          if (liveRefreshCount === 1) {
+            firstLiveRefreshStartedResolve?.();
+            return await new Promise<Response>((resolve) => {
+              resolveFirstLiveRefresh = resolve;
+            });
+          }
+        }
+        return new Response(JSON.stringify({ queued: true, coalesced: false }), {
+          status: 202,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      })
+    );
+
+    let runnerCallCount = 0;
+    const workerPromise = runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '2'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner: vi.fn(async (request) => {
+          runnerCallCount += 1;
+          const currentTurnId = `turn-${runnerCallCount}`;
+          if (runnerCallCount === 1) {
+            request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+          }
+          if (runnerCallCount === 2) {
+            secondTurnStartedResolve?.();
+          }
+          request.onStdoutChunk?.(`{"type":"turn_context","payload":{"turn_id":"${currentTurnId}"}}\n`);
+          request.onStdoutChunk?.(
+            `{"type":"event_msg","payload":{"type":"agent_message","message":"${currentTurnId} active"}}\n`
+          );
+          if (runnerCallCount === 2) {
+            await allowSecondTurnToFinish;
+          }
+          return {
+            exitCode: 0,
+            stdout: [
+              ...(runnerCallCount === 1 ? ['{"type":"thread.started","thread_id":"thread-1"}'] : []),
+              `{"type":"turn_context","payload":{"turn_id":"${currentTurnId}"}}`,
+              `{"type":"event_msg","payload":{"type":"agent_message","message":"${currentTurnId} active"}}`,
+              `{"type":"event_msg","payload":{"type":"task_complete","turn_id":"${currentTurnId}"}}`
+            ].join('\n'),
+            stderr: ''
+          };
+        }),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    await firstLiveRefreshStarted;
+    await secondTurnStarted;
+
+    resolveFirstLiveRefresh?.(
+      new Response(JSON.stringify({ queued: true, coalesced: false }), {
+        status: 202,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    await vi.waitFor(() => {
+      expect(refreshBodies.filter((body) => body.owner_status === 'in_progress')).toHaveLength(2);
+    });
+
+    allowSecondTurnToFinishResolve?.();
+    const proof = await workerPromise;
+    expect(proof).toMatchObject({
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active'
+    });
+  });
+
   it('treats Ready as the live Todo-equivalent queue state even though Linear marks it unstarted', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const readTrackedIssue = vi

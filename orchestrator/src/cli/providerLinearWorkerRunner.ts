@@ -2193,6 +2193,8 @@ export async function runProviderLinearWorker(
   let lifecycle = classifyProviderLinearWorkerLifecycle(issue);
   let liveRefreshRequestedAtMs = 0;
   let liveRefreshRequest: Promise<void> | null = null;
+  let liveRefreshPending = false;
+  let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   let liveProofWrite: Promise<void> = Promise.resolve();
 
   if (!lifecycle.isExecutionEligible) {
@@ -2210,8 +2212,6 @@ export async function runProviderLinearWorker(
   for (let turnNumber = 1; turnNumber <= context.maxTurns; turnNumber += 1) {
     let liveStdoutBuffer = '';
     let liveProofSignature: string | null = null;
-    let liveRefreshPending = false;
-    let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
     const liveParseState = buildEmptyProviderLinearWorkerJsonlParseResult();
     const scheduleTrailingLiveRefresh = (): void => {
       if (!liveRefreshPending || liveRefreshRequest !== null || liveRefreshTimer !== null) {
