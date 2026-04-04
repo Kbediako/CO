@@ -886,7 +886,7 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
     const featureToggles = isRecord(parsed) && isRecord(parsed.feature_toggles)
       ? (parsed.feature_toggles as Record<string, unknown>)
       : null;
-    const dispatchPilot = readRecordValue(featureToggles, 'dispatch_pilot');
+    const dispatchPilot = resolveDispatchPilotControls(featureToggles);
     const dispatchSource = readRecordValue(dispatchPilot, 'source');
     const transportMutating = resolveTransportMutatingControls(featureToggles);
     const transportMutatingEnabled = readBooleanValue(transportMutating?.enabled);
@@ -924,6 +924,15 @@ function resolveTransportMutatingControls(
   const direct = readRecordValue(featureToggles, 'transport_mutating_controls');
   const coordinator = readRecordValue(featureToggles, 'coordinator');
   const nested = readRecordValue(coordinator, 'transport_mutating_controls');
+  return nested ?? direct ?? null;
+}
+
+function resolveDispatchPilotControls(
+  featureToggles: Record<string, unknown> | null
+): Record<string, unknown> | null {
+  const direct = readRecordValue(featureToggles, 'dispatch_pilot');
+  const coordinator = readRecordValue(featureToggles, 'coordinator');
+  const nested = readRecordValue(coordinator, 'dispatch_pilot');
   return nested ?? direct ?? null;
 }
 

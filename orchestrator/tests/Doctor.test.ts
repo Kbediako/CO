@@ -347,12 +347,14 @@ describe('runDoctor', () => {
         JSON.stringify(
           {
             feature_toggles: {
-              dispatch_pilot: {
-                enabled: true,
-                source: {
-                  provider: 'linear',
-                  live: true,
-                  workspace_id: 'workspace-id'
+              coordinator: {
+                dispatch_pilot: {
+                  enabled: true,
+                  source: {
+                    provider: 'linear',
+                    live: true,
+                    workspace_id: 'workspace-id'
+                  }
                 }
               },
               transport_mutating_controls: {
@@ -384,6 +386,7 @@ describe('runDoctor', () => {
       const summary = formatDoctorSummary(result).join('\n');
       expect(summary).toContain('Providers: ok');
       expect(summary).toContain('Telegram: ready');
+      expect(summary).toContain('dispatch_pilot: enabled (linear)');
       expect(summary).toContain('transport policy: telegram allowed');
     } finally {
       for (const [key, value] of Object.entries(previousEnv)) {
