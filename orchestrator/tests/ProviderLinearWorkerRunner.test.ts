@@ -4538,6 +4538,100 @@ describe('provider linear worker runner', () => {
     }
   });
 
+  it('requests a control-host refresh when the expected control-host manifest is missing but endpoint artifacts remain', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    const controlServer = await createControlEndpointServer();
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: controlServer.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    try {
+      const proof = await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue({
+            state: 'Merging',
+            state_type: 'started',
+            assignee_id: null,
+            assignee_name: null
+          })),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async () => ({
+            exitCode: 0,
+            stdout: [
+              '{"type":"thread.started","thread_id":"thread-1"}',
+              '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+              '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+            ].join('\n'),
+            stderr: ''
+          })),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log
+        }
+      );
+
+      expect(proof).toMatchObject({
+        owner_status: 'succeeded',
+        end_reason: 'max_turns_reached_issue_still_active'
+      });
+      const written = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(written).toMatchObject({
+        owner_status: 'succeeded',
+        end_reason: 'max_turns_reached_issue_still_active'
+      });
+      expect(controlServer.requests).toHaveLength(1);
+      expect(controlServer.requests[0]).toMatchObject({
+        url: '/api/v1/refresh',
+        body: {
+          action: 'refresh',
+          source: 'provider-linear-worker',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          owner_status: 'succeeded',
+          end_reason: 'max_turns_reached_issue_still_active'
+        }
+      });
+      expectRefreshAuthHeaders(controlServer.requests[0]?.headers);
+      expect(log.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('provider-linear-worker could not request control-host refresh')
+      );
+    } finally {
+      await controlServer.close();
+    }
+  });
+
   it('requests a control-host refresh for live turn-running proof updates', async () => {
     const { manifestPath } = await createManifestRoot();
     const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
