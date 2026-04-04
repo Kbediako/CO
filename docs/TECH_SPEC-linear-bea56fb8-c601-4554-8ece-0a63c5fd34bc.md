@@ -90,5 +90,6 @@ last_review: 2026-04-04
 - Are there any downstream `co-status` consumers relying on the current default dashboard side effect that must stay opt-in instead of disappearing entirely?
 
 ## Approvals
-- Reviewer: Pending `codex-orchestrator docs-review`
+- Reviewer: `codex-orchestrator docs-review` approved with `review_outcome: clean-success`
 - Date: 2026-04-04
+- Manifest: `.runs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc-co-78-docs-review/cli/2026-04-03T23-02-25-401Z-e6287e4b/manifest.json`

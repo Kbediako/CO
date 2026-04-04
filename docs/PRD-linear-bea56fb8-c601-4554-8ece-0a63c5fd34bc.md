@@ -134,5 +134,5 @@
 
 ## Approvals
 - Product: Self-approved from the Linear issue scope
-- Engineering: Pending docs-review and pre-implementation audit completion
+- Engineering: `codex-orchestrator docs-review` completed with `review_outcome: clean-success`; manifest `.runs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc-co-78-docs-review/cli/2026-04-03T23-02-25-401Z-e6287e4b/manifest.json`
 - Design: N/A

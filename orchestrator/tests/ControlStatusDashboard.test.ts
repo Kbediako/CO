@@ -340,6 +340,31 @@ describe('control status dashboard', () => {
 
     expect(frame).toContain('\u001b[1m╭─ CO STATUS\u001b[0m');
     const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toBe([
+      '╭─ CO STATUS',
+      '│ Agents: 1/2 tracked',
+      '│ Throughput: 1,842 tps',
+      '│ Runtime: 15m 12s',
+      '│ Tokens: in 100 | out 117 | total 217',
+      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
+      '│ Project: CO Control and Advisory',
+      '│ Dashboard: http://127.0.0.1:4100',
+      '│ Next refresh: 15s',
+      '├─ Running',
+      '│',
+      '│   ID         STAGE        PID      AGE / TURN   TOKENS     SESSION        EVENT                                       ',
+      '│   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────',
+      '│ ● CO-26      running      4242     15m 0s / 4          217 session-26     Worker turn active                          ',
+      '│',
+      '├─ Backoff queue',
+      '│',
+      '│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded',
+      '│',
+      '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
+      '│ Inspect: live | alternate screen | full frame',
+      '│ Snapshot: press s to export a stable frame under run dir',
+      '╰─'
+    ].join('\n'));
     expect(plainFrame).toContain('│ Agents: 1/2 tracked');
     expect(plainFrame).toContain('│ Throughput: 1,842 tps');
     expect(plainFrame).toContain('│ Tokens: in 100 | out 117 | total 217');

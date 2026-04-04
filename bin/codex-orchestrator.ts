@@ -1477,7 +1477,7 @@ Commands:
     --mode <full|question_only|status_only>  Limit tool surface for child runs.
     --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   control-host            Run the persistent provider intake + oversight host.
-  co-status               Launch or attach the CO STATUS terminal viewer.
+  co-status               Attach the CO STATUS terminal viewer or emit the current snapshot from an already-running local control-host.
   version | --version
 
   help                      Show this message.
