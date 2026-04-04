@@ -652,6 +652,45 @@ describe('provider linear worker runner', () => {
     }
   });
 
+  it('kills the child when the live stdout hook throws', async () => {
+    vi.resetModules();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const kill = vi.fn();
+    const fakeChild = Object.assign(new EventEmitter(), {
+      stdout,
+      stderr,
+      kill
+    }) as unknown as ChildProcess;
+    const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    vi.doMock('node:child_process', () => ({
+      ...actualChildProcess,
+      spawn: vi.fn(() => fakeChild)
+    }));
+
+    try {
+      const { defaultExecRunner } = await import('../src/cli/providerLinearWorkerRunner.js');
+      const resultPromise = defaultExecRunner({
+        command: 'codex',
+        args: ['exec'],
+        cwd: tempRoot ?? process.cwd(),
+        env: {},
+        mirrorOutput: false,
+        onStdoutChunk: () => {
+          throw new Error('stdout hook failed');
+        }
+      });
+
+      stdout.write('stdout-before-failure');
+
+      await expect(resultPromise).rejects.toThrow('stdout hook failed');
+      expect(kill).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
+  });
+
   it('continues on the same thread across turns and writes a proof sidecar', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const readTrackedIssue = vi

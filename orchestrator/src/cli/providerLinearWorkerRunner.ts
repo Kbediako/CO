@@ -329,6 +329,9 @@ export function defaultExecRunner(
         try {
           request.onStdoutChunk?.(renderedChunk);
         } catch (error) {
+          if (typeof child.kill === 'function') {
+            child.kill();
+          }
           finalizeError(error instanceof Error ? error : new Error(String(error)));
         }
       });
