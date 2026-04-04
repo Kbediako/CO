@@ -710,6 +710,9 @@ describe('control status dashboard', () => {
         rate_limits: {
           codex: {
             source: 'legacy-proof',
+            observed_at: '2026-03-30T01:15:00.000Z',
+            suppression: 'cooldown',
+            retry_after_seconds: 120,
             requests: {
               remaining: 1,
               limit: 30,

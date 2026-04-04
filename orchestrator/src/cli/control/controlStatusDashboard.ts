@@ -1407,7 +1407,9 @@ function formatCombinedRateLimitSegments(
     return null;
   }
   const pieces: SummarySegment[] = [];
-  const codexPieces = formatCompactCodexRateLimitSegments(codex, referenceTime);
+  const codexPieces = formatCompactCodexRateLimitSegments(codex, referenceTime, {
+    allowLegacyMetadata: true
+  });
   if (codexPieces) {
     pieces.push(...codexPieces);
   }
@@ -1423,7 +1425,8 @@ function formatCombinedRateLimitSegments(
 
 function formatCompactCodexRateLimitSegments(
   value: Record<string, unknown>,
-  referenceTime: Date
+  referenceTime: Date,
+  options: { allowLegacyMetadata?: boolean } = {}
 ): SummarySegment[] | null {
   const limitId = readRecordString(value, ['limit_id', 'limitId', 'limit_name', 'limitName']);
   const primary = asRecord(value.primary);
@@ -1438,7 +1441,10 @@ function formatCompactCodexRateLimitSegments(
     if (!requests && !endpointRequests) {
       return null;
     }
-    if (observedAt !== null || suppression !== null || retryAfterSeconds !== null) {
+    if (
+      options.allowLegacyMetadata !== true &&
+      (observedAt !== null || suppression !== null || retryAfterSeconds !== null)
+    ) {
       return null;
     }
     const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];
@@ -1473,7 +1479,8 @@ function formatCompactCodexRateLimitSegments(
 
 function formatCodexRateLimitSegments(
   value: Record<string, unknown>,
-  referenceTime: Date
+  referenceTime: Date,
+  options: { allowLegacyMetadata?: boolean } = {}
 ): SummarySegment[] | null {
   const limitId = readRecordString(value, ['limit_id', 'limitId', 'limit_name', 'limitName']);
   const primary = asRecord(value.primary);
@@ -1488,7 +1495,10 @@ function formatCodexRateLimitSegments(
     if (!requests && !endpointRequests) {
       return null;
     }
-    if (observedAt !== null || suppression !== null || retryAfterSeconds !== null) {
+    if (
+      options.allowLegacyMetadata !== true &&
+      (observedAt !== null || suppression !== null || retryAfterSeconds !== null)
+    ) {
       return null;
     }
     const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];

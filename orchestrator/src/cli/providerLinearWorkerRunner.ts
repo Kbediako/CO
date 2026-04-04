@@ -2323,6 +2323,16 @@ export async function runProviderLinearWorker(
         queueLiveProofWrite();
       }
     };
+    const flushLiveStdoutTail = (): void => {
+      const trailingLine = liveStdoutBuffer.trim();
+      liveStdoutBuffer = '';
+      if (!trailingLine) {
+        return;
+      }
+      if (applyProviderLinearWorkerJsonlLine(liveParseState, trailingLine)) {
+        queueLiveProofWrite();
+      }
+    };
     const sharedRepoCheckoutPath =
       (await resolveProviderControlHostRepoRoot({
         manifestPath: context.manifestPath,
@@ -2363,6 +2373,7 @@ export async function runProviderLinearWorker(
       finalProof = await persistProof(finalProof);
       throw error instanceof Error ? error : new Error(String(error));
     }
+    flushLiveStdoutTail();
     await liveProofWrite;
     const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
     threadId = parsed.threadId ?? threadId;
