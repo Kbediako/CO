@@ -244,8 +244,13 @@ export function buildCompatibilityRunningEntry(
     rawStatus: selected.rawStatus,
     proofEvent: proof?.last_event ?? null
   });
-  const runningMessage = runningEvent === proof?.last_event ? proof?.last_message ?? selected.latestEvent?.message ?? selected.summary : selected.latestEvent?.message ?? proof?.last_message ?? selected.summary;
-  const runningEventAt = runningEvent === proof?.last_event ? proof?.last_event_at ?? selected.latestEvent?.at ?? selected.updatedAt : selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt;
+  const preferProofTelemetry = runningEvent.source === 'proof';
+  const runningMessage = preferProofTelemetry
+    ? proof?.last_message ?? selected.latestEvent?.message ?? selected.summary
+    : selected.latestEvent?.message ?? proof?.last_message ?? selected.summary;
+  const runningEventAt = preferProofTelemetry
+    ? proof?.last_event_at ?? selected.latestEvent?.at ?? selected.updatedAt
+    : selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt;
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -255,7 +260,7 @@ export function buildCompatibilityRunningEntry(
     pid: selected.providerLinearWorkerProof?.pid ?? null,
     session_id: proof?.latest_session_id ?? null,
     turn_count: proof?.turn_count ?? null,
-    last_event: runningEvent,
+    last_event: runningEvent.event,
     last_message: runningMessage,
     started_at: selected.startedAt,
     last_event_at: runningEventAt,
@@ -359,7 +364,7 @@ function selectRunningEvent(input: {
   latestAction: string | null;
   rawStatus: string;
   proofEvent: string | null;
-}): string {
+}): { event: string; source: 'proof' | 'latest' | 'fallback' } {
   if (input.proofEvent) {
     const genericFallbacks = new Set([
       input.rawStatus,
@@ -370,10 +375,22 @@ function selectRunningEvent(input: {
       'started'
     ].filter((value): value is string => Boolean(value)));
     if (!input.latestEvent || genericFallbacks.has(input.latestEvent)) {
-      return input.proofEvent;
+      return {
+        event: input.proofEvent,
+        source: 'proof'
+      };
     }
   }
-  return input.latestEvent ?? input.latestAction ?? input.rawStatus;
+  if (input.latestEvent) {
+    return {
+      event: input.latestEvent,
+      source: 'latest'
+    };
+  }
+  return {
+    event: input.latestAction ?? input.rawStatus,
+    source: 'fallback'
+  };
 }
 
 function resolveCompatibilityRunningState(selected: ControlCompatibilitySourceContext): string {

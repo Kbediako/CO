@@ -2305,33 +2305,38 @@ describe('ControlRuntime', () => {
         seconds_running: 720
       });
       expect(compatibilityProjection.rateLimits).toEqual({
-        observed_at: '2026-03-07T00:29:45.000Z',
-        source: 'control-host-polling',
-        suppression: 'none',
-        suppression_reason: null,
-        retry_after_seconds: null,
-        cooldown_until: null,
-        cooldown_active: false,
-        request_id: 'polling-1',
-        requests: {
-          remaining: 17,
-          limit: 30,
-          reset_at: '2026-03-07T00:30:42.000Z'
+        codex: {
+          source: 'legacy-proof'
         },
-        endpoint_requests: null,
-        complexity: {
-          remaining: 180,
-          limit: 200,
-          reset_at: '2026-03-07T00:30:07.000Z'
-        },
-        endpoint_complexity: null
+        linear_budget: {
+          observed_at: '2026-03-07T00:29:45.000Z',
+          source: 'control-host-polling',
+          suppression: 'none',
+          suppression_reason: null,
+          retry_after_seconds: null,
+          cooldown_until: null,
+          cooldown_active: false,
+          request_id: 'polling-1',
+          requests: {
+            remaining: 17,
+            limit: 30,
+            reset_at: '2026-03-07T00:30:42.000Z'
+          },
+          endpoint_requests: null,
+          complexity: {
+            remaining: 180,
+            limit: 200,
+            reset_at: '2026-03-07T00:30:07.000Z'
+          },
+          endpoint_complexity: null
+        }
       });
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('prefers worker proof linear budget snapshots over legacy proof rate-limit fields', async () => {
+  it('preserves codex rate limits when the same proof also carries worker proof linear budget', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
     try {
@@ -2375,22 +2380,27 @@ describe('ControlRuntime', () => {
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
       expect(compatibilityProjection.rateLimits).toEqual({
-        observed_at: '2026-03-07T00:29:00.000Z',
-        source: 'worker-proof',
-        suppression: 'none',
-        suppression_reason: null,
-        retry_after_seconds: null,
-        cooldown_until: null,
-        cooldown_active: false,
-        request_id: 'worker-budget-1',
-        requests: {
-          remaining: 8,
-          limit: 30,
-          reset_at: '2026-03-07T00:30:42.000Z'
+        codex: {
+          source: 'legacy-proof'
         },
-        endpoint_requests: null,
-        complexity: null,
-        endpoint_complexity: null
+        linear_budget: {
+          observed_at: '2026-03-07T00:29:00.000Z',
+          source: 'worker-proof',
+          suppression: 'none',
+          suppression_reason: null,
+          retry_after_seconds: null,
+          cooldown_until: null,
+          cooldown_active: false,
+          request_id: 'worker-budget-1',
+          requests: {
+            remaining: 8,
+            limit: 30,
+            reset_at: '2026-03-07T00:30:42.000Z'
+          },
+          endpoint_requests: null,
+          complexity: null,
+          endpoint_complexity: null
+        }
       });
     } finally {
       vi.useRealTimers();

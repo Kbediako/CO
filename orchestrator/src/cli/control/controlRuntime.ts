@@ -785,7 +785,6 @@ function buildCompatibilityTelemetrySnapshot(
         latestAuthoritativeRateLimits = linearBudget;
         latestAuthoritativeRateLimitsAt = candidateTimestamp;
       }
-      continue;
     }
 
     if (proof?.rate_limits) {
