@@ -292,6 +292,59 @@ describe('SelectedRunProjection', () => {
     expect(selected?.lastError).toContain('Provider linear worker failed with Codex exit code 1.');
   });
 
+  it('honors camelCase manifest timestamps before preferring older provider proof', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updatedAt: '2026-03-20T01:15:30.970Z',
+        summary: 'Provider linear worker reached review handoff.',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker reached review handoff.'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'codex_exit_1',
+          updated_at: '2026-03-20T01:15:29.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'succeeded',
+      summary: 'Provider linear worker reached review handoff.',
+      lastError: null
+    });
+  });
+
   it('ignores deterministic mutation suppressions recorded before the current provider attempt', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

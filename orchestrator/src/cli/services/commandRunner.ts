@@ -34,6 +34,7 @@ import {
   buildProviderLinearWorkerTerminalSummary,
   deriveDeterministicProviderMutationSuppressions,
   formatDeterministicProviderMutationDegradationSummary,
+  isProviderLinearWorkerProofFreshForStage,
   resolveProviderLinearWorkerAttemptStartedAt,
   resolveProviderLinearWorkerTerminalReason,
   resolveProviderLinearWorkerTerminalStatus
@@ -428,10 +429,17 @@ export async function runCommandStage(
       }
     }
     if (providerLinearWorkerStage) {
-      const providerLinearWorkerProof = await loadProviderLinearWorkerProof(
+      let providerLinearWorkerProof = await loadProviderLinearWorkerProof(
         join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
       );
-      const providerLinearWorkerProofRecord = providerLinearWorkerProof as Record<string, unknown> | null;
+      let providerLinearWorkerProofRecord = providerLinearWorkerProof as Record<string, unknown> | null;
+      if (
+        providerLinearWorkerProofRecord &&
+        !isProviderLinearWorkerProofFreshForStage(providerLinearWorkerProofRecord, entry.started_at ?? null)
+      ) {
+        providerLinearWorkerProof = null;
+        providerLinearWorkerProofRecord = null;
+      }
       if (result.status === 'succeeded' && providerLinearWorkerProofRecord === null) {
         providerLinearWorkerFailureReason = 'provider_linear_worker_proof_missing_or_unreadable';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
@@ -466,7 +474,7 @@ export async function runCommandStage(
           degradationSummary
         });
         forceProviderLinearWorkerFailure = true;
-      } else if (reviewTelemetryStatus === 'failed') {
+      } else if (providerLinearWorkerFailureReason === null && reviewTelemetryStatus === 'failed') {
         providerLinearWorkerFailureReason = 'provider_linear_worker_review_failed';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
           status: 'failed',

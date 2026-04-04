@@ -53,6 +53,30 @@ export function resolveProviderLinearWorkerAttemptStartedAt(
   return readStringValue(proof ?? {}, 'attempt_started_at');
 }
 
+export function isProviderLinearWorkerProofFreshForStage(
+  proof: Record<string, unknown> | null | undefined,
+  stageStartedAt: string | null | undefined
+): boolean {
+  if (!proof) {
+    return false;
+  }
+  const stageStartedAtMs = readTimestampMs(
+    {
+      started_at: stageStartedAt ?? null
+    },
+    'started_at'
+  );
+  if (!Number.isFinite(stageStartedAtMs)) {
+    return true;
+  }
+  const proofAttemptStartedAtMs = readTimestampMs(proof ?? {}, 'attempt_started_at');
+  if (Number.isFinite(proofAttemptStartedAtMs)) {
+    return proofAttemptStartedAtMs >= stageStartedAtMs;
+  }
+  const proofUpdatedAtMs = readTimestampMs(proof ?? {}, 'updated_at');
+  return Number.isFinite(proofUpdatedAtMs) && proofUpdatedAtMs >= stageStartedAtMs;
+}
+
 export function shouldUseProviderLinearWorkerTerminalProofForSelectedRun(
   manifest: Record<string, unknown>,
   proof: Record<string, unknown> | null | undefined
@@ -66,7 +90,13 @@ export function shouldUseProviderLinearWorkerTerminalProofForSelectedRun(
     return false;
   }
   const manifestStatus = readStringValue(manifest, 'status');
-  const manifestUpdatedAtMs = readTimestampMs(manifest, 'updated_at', 'started_at');
+  const manifestUpdatedAtMs = readTimestampMs(
+    manifest,
+    'updated_at',
+    'updatedAt',
+    'started_at',
+    'startedAt'
+  );
   if (!manifestStatus || manifestStatus === 'in_progress') {
     return !Number.isFinite(manifestUpdatedAtMs) || proofUpdatedAtMs >= manifestUpdatedAtMs;
   }
