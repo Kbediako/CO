@@ -248,6 +248,7 @@ describe('PipelineResolver env overrides', () => {
     const testEnv = findCommandStageEnv(implementationGate, 'test');
 
     expect(testStage?.command).toBe('npm run test');
+    expect(testEnv.CODEX_VITEST_PROGRESS).toBe('1');
     expect(testEnv.FORCE_CODEX_REVIEW).toBe('');
     expect(testEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('');
     expect(testEnv.CODEX_NON_INTERACTIVE).toBe('');
