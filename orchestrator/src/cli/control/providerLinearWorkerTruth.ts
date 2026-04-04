@@ -111,11 +111,13 @@ export function deriveDeterministicProviderMutationSuppressions(
     },
     'recorded_at'
   );
+  if (!Number.isFinite(recordedAtNotBeforeMs)) {
+    return [];
+  }
   const entries = Object.values(latestByOperation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
     .filter((entry) =>
-      !Number.isFinite(recordedAtNotBeforeMs)
-        || readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
+      readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
     )
     .filter((entry) => entry.ok === false && isDeterministicProviderMutationFailure(entry))
     .sort((left, right) => left.operation.localeCompare(right.operation));

@@ -624,6 +624,49 @@ describe('provider linear worker runner', () => {
     );
   });
 
+  it('ignores deterministic mutation suppressions when the current attempt start is missing', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      latest_by_operation: {
+        'create-follow-up': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'create-follow-up',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_follow_up_parity_matrix_missing',
+          error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit
+    });
+
+    expect(continuationPrompt).not.toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).not.toContain(
+      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix.'
+    );
+  });
+
   it('ignores malformed audit summaries when deriving continuation suppressions', () => {
     const issue = createTrackedIssue();
     const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
