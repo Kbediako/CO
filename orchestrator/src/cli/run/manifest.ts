@@ -507,6 +507,17 @@ export function appendSummary(manifest: CliManifest, message: string | null | un
   manifest.summary = `${manifest.summary}\n${message}`;
 }
 
+export function removeStageFailureSummary(manifest: CliManifest, stageTitle: string): void {
+  removeSummaryLines(
+    manifest,
+    (line) => line.trim().startsWith(`Stage '${stageTitle}' failed with exit code `) && line.trim().endsWith('.')
+  );
+}
+
+export function removeSubpipelineFailureSummary(manifest: CliManifest, pipelineId: string): void {
+  removeSummaryLines(manifest, (line) => line.trim() === `Sub-pipeline '${pipelineId}' failed.`);
+}
+
 export function finalizeStatus(manifest: CliManifest, status: RunStatus, detail?: string | null): void {
   manifest.status = status;
   manifest.status_detail = detail ?? null;
@@ -552,6 +563,17 @@ async function createCompatibilityPointer(env: EnvironmentPaths, paths: RunPaths
       manifest: relativeManifest
     });
   }
+}
+
+function removeSummaryLines(
+  manifest: CliManifest,
+  predicate: (line: string) => boolean
+): void {
+  if (!manifest.summary) {
+    return;
+  }
+  const retainedLines = manifest.summary.split('\n').filter((line) => !predicate(line));
+  manifest.summary = retainedLines.join('\n').trim() || null;
 }
 
 async function resolveManifestPathForRunId(env: EnvironmentPaths, runId: string): Promise<string> {

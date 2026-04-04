@@ -239,6 +239,59 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('prefers newer failed provider proof over an optimistic manifest status', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Provider linear worker completed with forced standalone review enabled for handoff',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker completed with forced standalone review enabled for handoff'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'codex_exit_1',
+          updated_at: '2026-03-20T01:15:29.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'failed'
+    });
+    expect(selected?.summary).toContain('Provider linear worker failed with Codex exit code 1.');
+    expect(selected?.lastError).toContain('Provider linear worker failed with Codex exit code 1.');
+  });
+
   it('preserves legitimate summary lines while removing stale succeeded failure lines', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -755,6 +808,54 @@ describe('SelectedRunProjection', () => {
       displayStatus: 'failed',
       summary: 'retryable failure pending rerun'
     });
+  });
+
+  it('excludes auxiliary manual live proof harness runs from compatibility discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const liveRunPaths = resolveRunPaths(taskEnv, 'run-live');
+    await mkdir(liveRunPaths.runDir, { recursive: true });
+    await writeFile(
+      liveRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-live',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const helperRunPaths = resolveRunPaths(taskEnv, '2026-03-20T01-16-30-000Z-manual-live-proof');
+    await mkdir(helperRunPaths.runDir, { recursive: true });
+    await writeFile(
+      helperRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: '2026-03-20T01-16-30-000Z-manual-live-proof',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:16:30.000Z',
+        summary: 'manual live proof harness'
+      }),
+      'utf8'
+    );
+
+    const discovery = await discoverCompatibilityCollectionContexts(createProjectionContext(paths));
+
+    expect(discovery.running.map((entry) => entry.runId)).toEqual(['run-live']);
+    expect(discovery.running.find((entry) => entry.runId?.includes('manual-live-proof'))).toBeUndefined();
   });
 
   it('discovers authoritative retry contexts even when the queued retry has no recorded attempt yet', async () => {

@@ -30,6 +30,15 @@ import {
   readProviderIntakeClaim,
   selectProviderIntakeClaim
 } from './providerIntakeState.js';
+import {
+  buildProviderLinearWorkerTerminalSummary,
+  deriveDeterministicProviderMutationSuppressions,
+  formatDeterministicProviderMutationDegradationSummary,
+  isAuxiliaryProviderProofHarnessManifest,
+  resolveProviderLinearWorkerTerminalReason,
+  resolveProviderLinearWorkerTerminalStatus,
+  shouldUseProviderLinearWorkerTerminalProofForSelectedRun
+} from './providerLinearWorkerTruth.js';
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
@@ -241,15 +250,50 @@ function buildProjectionContextFromParts(
   }
   const { manifestRecord, issueIdentifier, issueId, taskId, runId } = snapshot;
   const control = parts.control;
-  const rawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
+  const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
-  const updatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
-  const completedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? null;
+  const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(
+    manifestRecord,
+    (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
+  );
+  const proofTerminalStatus = useTerminalProof
+    ? resolveProviderLinearWorkerTerminalStatus(
+        (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
+      )
+    : null;
+  const rawStatus = proofTerminalStatus ?? manifestRawStatus;
+  const manifestUpdatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
+  const proofUpdatedAt = useTerminalProof
+    ? readStringValue(
+        ((parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null) ?? {},
+        'updated_at'
+      )
+    : null;
+  const updatedAt =
+    proofUpdatedAt && (!manifestUpdatedAt || compareIsoTimestamp(proofUpdatedAt, manifestUpdatedAt) >= 0)
+      ? proofUpdatedAt
+      : manifestUpdatedAt;
+  const completedAt =
+    rawStatus === 'in_progress'
+      ? readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? null
+      : readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? proofUpdatedAt ?? updatedAt;
   const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
+  const proofSummary =
+    useTerminalProof && proofTerminalStatus
+      ? buildProviderLinearWorkerTerminalSummary({
+          status: proofTerminalStatus,
+          endReason: resolveProviderLinearWorkerTerminalReason(
+            (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
+          ),
+          degradationSummary: formatDeterministicProviderMutationDegradationSummary(
+            deriveDeterministicProviderMutationSuppressions(parts.providerLinearWorkerProof?.linear_audit ?? null)
+          )
+        })
+      : null;
   const summary = resolveSelectedRunDisplaySummary({
     manifestRecord,
     rawStatus,
-    summary: manifestSummary
+    summary: proofSummary ?? manifestSummary
   });
   const workspacePath = resolveSelectedRunWorkspacePath({
     manifestRecord,
@@ -694,6 +738,9 @@ async function readTaskCompatibilityContexts(
     if (!snapshot) {
       continue;
     }
+    if (isAuxiliaryProviderProofHarnessManifest(manifest as unknown as Record<string, unknown>)) {
+      continue;
+    }
 
     const control = normalizeControlState(
       await readJsonFile<ControlState>(join(runDir, 'control.json')),
@@ -980,6 +1027,21 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
     }
   }
   return undefined;
+}
+
+function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
+  const leftValue = Date.parse(left ?? '');
+  const rightValue = Date.parse(right ?? '');
+  if (!Number.isFinite(leftValue) && !Number.isFinite(rightValue)) {
+    return 0;
+  }
+  if (!Number.isFinite(leftValue)) {
+    return -1;
+  }
+  if (!Number.isFinite(rightValue)) {
+    return 1;
+  }
+  return leftValue - rightValue;
 }
 
 function buildProjectionLookupAliases(input: {

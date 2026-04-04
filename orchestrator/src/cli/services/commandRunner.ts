@@ -18,6 +18,10 @@ import {
   updateCommandStatus
 } from '../run/manifest.js';
 import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
+import {
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  type ProviderLinearWorkerProof
+} from '../providerLinearWorkerRunner.js';
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
@@ -26,6 +30,13 @@ import {
   type ReviewOutcomeDisposition
 } from '../../../../scripts/lib/review-execution-telemetry.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
+import {
+  buildProviderLinearWorkerTerminalSummary,
+  deriveDeterministicProviderMutationSuppressions,
+  formatDeterministicProviderMutationDegradationSummary,
+  resolveProviderLinearWorkerTerminalReason,
+  resolveProviderLinearWorkerTerminalStatus
+} from '../control/providerLinearWorkerTruth.js';
 
 const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024;
 const EMIT_COMMAND_STREAM_MIRRORS = EnvUtils.getBoolean('CODEX_ORCHESTRATOR_EMIT_COMMAND_STREAMS', false);
@@ -337,11 +348,12 @@ export async function runCommandStage(
       timeoutMs: timeoutBoundMs
     });
     const enforceReviewEvidenceConsistency = shouldEnforceReviewEvidenceConsistency(stage);
+    const providerLinearWorkerStage = isProviderLinearWorkerCommandStage(stage);
     const reviewTelemetryPath = join(paths.runDir, 'review', 'telemetry.json');
     const shouldAwaitReviewTelemetry =
-      isReviewCommandStage(stage) &&
+      (isReviewCommandStage(stage) || providerLinearWorkerStage) &&
       shouldAwaitReviewTelemetryEvidence(execEnv, enforceReviewEvidenceConsistency);
-    const reviewTelemetry = isReviewCommandStage(stage)
+    const reviewTelemetry = isReviewCommandStage(stage) || providerLinearWorkerStage
       ? await loadReviewTelemetryEvidence(reviewTelemetryPath, {
           waitForEvidence: shouldAwaitReviewTelemetry
         })
@@ -358,9 +370,24 @@ export async function runCommandStage(
           telemetryPath: reviewTelemetryPath
         })
       : null;
+    const providerReviewTelemetryMismatch =
+      providerLinearWorkerStage && reviewTelemetry !== null
+      ? verifyReviewTelemetryFreshness({
+          env,
+          paths,
+          startedAt: entry.started_at,
+          telemetry: reviewTelemetry,
+          telemetryPath: reviewTelemetryPath
+        })
+      : null;
+    const providerReviewTelemetry =
+      providerReviewTelemetryMismatch === null
+        ? reviewTelemetry
+        : null;
     const reviewEvidenceWaiverReason = resolveReviewEvidenceWaiverReason(stage.env);
     let effectiveSummary = summary;
     let forceReviewEvidenceFailure = false;
+    let forceProviderLinearWorkerFailure = false;
 
     if (reviewEvidenceMismatch && enforceReviewEvidenceConsistency) {
       if (reviewEvidenceWaiverReason) {
@@ -393,13 +420,56 @@ export async function runCommandStage(
         effectiveSummary = `${effectiveSummary} (${reviewOutcomeSummary})`;
       }
     }
+    if (providerLinearWorkerStage) {
+      const providerLinearWorkerProof = await loadProviderLinearWorkerProof(
+        join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
+      );
+      const providerLinearWorkerProofRecord = providerLinearWorkerProof as Record<string, unknown> | null;
+      const proofTerminalStatus = resolveProviderLinearWorkerTerminalStatus(providerLinearWorkerProofRecord);
+      const proofTerminalReason = resolveProviderLinearWorkerTerminalReason(providerLinearWorkerProofRecord);
+      const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
+      const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
+      const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
+        providerLinearWorkerProof?.linear_audit ?? null
+      );
+      const degradationSummary = formatDeterministicProviderMutationDegradationSummary(mutationSuppressions);
+
+      if (proofTerminalStatus === 'failed') {
+        effectiveSummary = buildProviderLinearWorkerTerminalSummary({
+          status: 'failed',
+          endReason: proofTerminalReason,
+          reviewOutcomeSummary,
+          degradationSummary
+        });
+        forceProviderLinearWorkerFailure = true;
+      } else if (reviewTelemetryStatus === 'failed') {
+        effectiveSummary = buildProviderLinearWorkerTerminalSummary({
+          status: 'failed',
+          endReason: null,
+          reviewOutcomeSummary: reviewOutcomeSummary ?? 'review telemetry reported terminal failure',
+          degradationSummary
+        });
+        forceProviderLinearWorkerFailure = true;
+      } else if (proofTerminalStatus === 'succeeded') {
+        effectiveSummary = buildProviderLinearWorkerTerminalSummary({
+          status: 'succeeded',
+          endReason: proofTerminalReason,
+          reviewOutcomeSummary,
+          degradationSummary
+        });
+      } else if (degradationSummary) {
+        effectiveSummary = `${effectiveSummary} (${degradationSummary})`;
+      }
+    }
     const effectiveExitCode =
-      forceReviewEvidenceFailure && normalizedExitCode === 0 ? 1 : normalizedExitCode;
+      (forceReviewEvidenceFailure || forceProviderLinearWorkerFailure) && normalizedExitCode === 0
+        ? 1
+        : normalizedExitCode;
 
     entry.completed_at = isoTimestamp();
     entry.exit_code = effectiveExitCode;
     entry.summary = effectiveSummary;
-    entry.status = forceReviewEvidenceFailure
+    entry.status = forceReviewEvidenceFailure || forceProviderLinearWorkerFailure
       ? 'failed'
       : result.status === 'succeeded'
         ? 'succeeded'
@@ -573,6 +643,15 @@ function isReviewCommandStage(stage: CommandStage): boolean {
   );
 }
 
+function isProviderLinearWorkerCommandStage(stage: CommandStage): boolean {
+  const stageId = stage.id.trim().toLowerCase();
+  if (stageId === 'provider-linear-worker') {
+    return true;
+  }
+  const haystack = `${stage.title} ${stage.command}`.toLowerCase();
+  return haystack.includes('providerlinearworkerrunner');
+}
+
 function resolveReviewEvidenceWaiverReason(
   env: Record<string, string> | NodeJS.ProcessEnv | undefined
 ): string | null {
@@ -612,6 +691,41 @@ async function verifyReviewEvidenceConsistency(options: {
     };
   }
 
+  const freshnessMismatch = verifyReviewTelemetryFreshness({
+    env: options.env,
+    paths: options.paths,
+    startedAt: options.startedAt,
+    telemetry,
+    telemetryPath
+  });
+  if (freshnessMismatch) {
+    return freshnessMismatch;
+  }
+
+  const generatedAt = coerceTelemetryString(telemetry.generated_at);
+  const telemetryStatus = coerceTelemetryString(telemetry.status);
+  const telemetryOutputLogPath = coerceTelemetryString(telemetry.output_log_path);
+  if (telemetryStatus !== options.expectedStatus) {
+    return {
+      message: `review telemetry status ${telemetryStatus ?? '<missing>'} does not match terminal stage result ${options.expectedStatus}.`,
+      telemetryPath,
+      telemetryStatus,
+      telemetryGeneratedAt: generatedAt,
+      telemetryOutputLogPath
+    };
+  }
+
+  return null;
+}
+
+function verifyReviewTelemetryFreshness(options: {
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  startedAt: string | null | undefined;
+  telemetry: ReviewTelemetryEvidencePayload;
+  telemetryPath: string;
+}): ReviewEvidenceMismatch | null {
+  const { env, paths, startedAt, telemetry, telemetryPath } = options;
   const generatedAt =
     typeof telemetry.generated_at === 'string' && telemetry.generated_at.trim().length > 0
       ? telemetry.generated_at
@@ -636,10 +750,10 @@ async function verifyReviewEvidenceConsistency(options: {
     };
   }
 
-  const startedAtMs = typeof options.startedAt === 'string' ? Date.parse(options.startedAt) : Number.NaN;
+  const startedAtMs = typeof startedAt === 'string' ? Date.parse(startedAt) : Number.NaN;
   if (Number.isFinite(startedAtMs) && generatedAtMs < startedAtMs) {
     return {
-      message: `review telemetry is stale (generated_at ${generatedAt} precedes stage start ${options.startedAt}).`,
+      message: `review telemetry is stale (generated_at ${generatedAt} precedes stage start ${startedAt}).`,
       telemetryPath,
       telemetryStatus: coerceTelemetryString(telemetry.status),
       telemetryGeneratedAt: generatedAt,
@@ -647,21 +761,11 @@ async function verifyReviewEvidenceConsistency(options: {
     };
   }
 
-  const telemetryStatus = coerceTelemetryString(telemetry.status);
-  if (telemetryStatus !== options.expectedStatus) {
-    return {
-      message: `review telemetry status ${telemetryStatus ?? '<missing>'} does not match terminal stage result ${options.expectedStatus}.`,
-      telemetryPath,
-      telemetryStatus,
-      telemetryGeneratedAt: generatedAt,
-      telemetryOutputLogPath: coerceTelemetryString(telemetry.output_log_path)
-    };
-  }
-
   const expectedOutputLogPath = relativeToRepo(
-    options.env,
-    join(options.paths.runDir, 'review', 'output.log')
+    env,
+    join(paths.runDir, 'review', 'output.log')
   );
+  const telemetryStatus = coerceTelemetryString(telemetry.status);
   const telemetryOutputLogPath = coerceTelemetryString(telemetry.output_log_path);
   if (telemetryOutputLogPath !== expectedOutputLogPath) {
     return {
@@ -709,6 +813,18 @@ async function readReviewTelemetryEvidence(
     const raw = await readFile(telemetryPath, 'utf8');
     const parsed = JSON.parse(raw) as ReviewTelemetryEvidencePayload | null;
     return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadProviderLinearWorkerProof(
+  proofPath: string
+): Promise<ProviderLinearWorkerProof | null> {
+  try {
+    const raw = await readFile(proofPath, 'utf8');
+    const parsed = JSON.parse(raw) as ProviderLinearWorkerProof | null;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -1012,9 +1128,6 @@ function buildSummary(
   signal: NodeJS.Signals | null,
   options: { timedOut?: boolean; timeoutMs?: number | null } = {}
 ): string {
-  if (stage.summaryHint) {
-    return stage.summaryHint;
-  }
   if (options.timedOut) {
     const timeoutLabel =
       typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
@@ -1027,6 +1140,9 @@ function buildSummary(
   }
   if (exitCode !== 0) {
     return `Exited with code ${exitCode}${stderr ? ` — ${truncate(stderr)}` : ''}`;
+  }
+  if (stage.summaryHint) {
+    return stage.summaryHint;
   }
   if (stdout) {
     return truncate(stdout);

@@ -528,6 +528,105 @@ describe('runCommandStage review evidence consistency', () => {
     expect(result.summary).toContain('review ok');
   });
 
+  it('fails a succeeded provider-linear-worker stage when authoritative review telemetry reports terminal failure', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'failed-boundary',
+        termination_boundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'review-timeout',
+          reason: 'bounded out',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed');
+    expect(result.summary).toContain('review outcome: review-wrapper failure via relevant-reinspection-dwell');
+    expect(manifest.commands[0]?.status).toBe('failed');
+    expect(manifest.commands[0]?.exit_code).toBe(1);
+  });
+
+  it('ignores stale provider-worker review telemetry from an earlier attempt in the same run', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        generated_at: '1970-01-01T00:00:00.000Z',
+        review_outcome: 'failed-boundary',
+        termination_boundary: {
+          kind: 'startup-anchor',
+          provenance: 'review-timeout',
+          reason: 'stale telemetry',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1'
+      }
+    );
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.summary).not.toContain('review-wrapper failure');
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+  });
+
+  it('does not use summary hints for failed provider-linear-worker stages', async () => {
+    mockState.runImpl = async () => buildFailedExecResult('provider worker exited\n', 2);
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.summary).toContain('Exited with code 2');
+    expect(result.summary).not.toContain('forced standalone review enabled for handoff');
+    expect(manifest.commands[0]?.status).toBe('failed');
+  });
+
   it('ignores inherited review evidence env for review stages unless the stage opts in explicitly', async () => {
     mockState.runImpl = async () => buildSuccessfulExecResult();
     const previous = process.env.CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY;
@@ -649,7 +748,7 @@ async function bootstrapReviewStage(stageEnv: Record<string, string> = {}) {
 }
 
 async function bootstrapCommandStage(
-  stageSeed: Pick<CommandStage, 'id' | 'title' | 'command'>,
+  stageSeed: Pick<CommandStage, 'id' | 'title' | 'command'> & Partial<Pick<CommandStage, 'summaryHint'>>,
   stageEnv: Record<string, string> = {}
 ) {
   const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -658,6 +757,7 @@ async function bootstrapCommandStage(
     id: stageSeed.id,
     title: stageSeed.title,
     command: stageSeed.command,
+    ...(stageSeed.summaryHint ? { summaryHint: stageSeed.summaryHint } : {}),
     env: {
       ...stageEnv
     }
@@ -682,6 +782,27 @@ async function bootstrapCommandStage(
     paths,
     stage
   };
+}
+
+async function writeProviderLinearWorkerProofArtifacts(
+  input: Record<string, unknown>,
+  overrides: Partial<Record<string, unknown>>
+): Promise<void> {
+  const runDir = String(((input.env ?? {}) as NodeJS.ProcessEnv).CODEX_ORCHESTRATOR_RUN_DIR);
+  await writeFile(
+    join(runDir, 'provider-linear-worker-proof.json'),
+    JSON.stringify({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      owner_phase: 'ended',
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive',
+      updated_at: '2026-03-24T00:00:01.000Z',
+      linear_audit: null,
+      ...overrides
+    }),
+    'utf8'
+  );
 }
 
 async function writeReviewArtifacts(

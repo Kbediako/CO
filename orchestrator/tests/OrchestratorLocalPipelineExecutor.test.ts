@@ -267,4 +267,64 @@ describe('executeOrchestratorLocalPipeline', () => {
     );
     expect(result.notes).toContain('Child Stage: succeeded');
   });
+
+  it('removes stale stage-failure summary lines when a rerun later succeeds', async () => {
+    const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const pipeline: PipelineDefinition = {
+      id: 'local-rerun',
+      title: 'Local Rerun',
+      stages: [
+        {
+          kind: 'command',
+          id: 'provider-linear-worker',
+          title: 'Run provider linear worker',
+          command: 'node providerLinearWorkerRunner.js'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-local-rerun', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+    manifest.summary = "Stage 'Run provider linear worker' failed with exit code 1.\nExisting non-failure note.";
+    const persister = new ManifestPersister({ manifest, paths, persistIntervalMs: 1000 });
+
+    vi.spyOn(CommandRunner, 'runCommandStage').mockImplementation(async ({ manifest }) => {
+      updateCommandStatus(manifest, 0, {
+        status: 'succeeded',
+        started_at: isoTimestamp(),
+        completed_at: isoTimestamp(),
+        exit_code: 0,
+        summary: 'provider worker recovered'
+      });
+      return { exitCode: 0, summary: 'provider worker recovered' };
+    });
+
+    const result = await executeOrchestratorLocalPipeline({
+      env,
+      pipeline,
+      manifest,
+      paths,
+      persister,
+      runtimeMode: 'appserver',
+      runtimeSessionId: null,
+      controlWatcher: {
+        sync: async () => {},
+        waitForResume: async () => {},
+        isCanceled: () => false
+      },
+      schedulePersist: async () => {},
+      startSubpipeline: vi.fn(async () => {
+        throw new Error('unexpected');
+      })
+    });
+
+    expect(result.success).toBe(true);
+    expect(manifest.summary).toBe('Existing non-failure note.');
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+  });
 });
