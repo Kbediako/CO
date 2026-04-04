@@ -756,8 +756,8 @@ function buildCompatibilityTelemetrySnapshot(
   if (polling?.linear_budget?.observed_at) {
     latestAuthoritativeRateLimitsAt = Date.parse(polling.linear_budget.observed_at) || Number.NEGATIVE_INFINITY;
   }
-  let latestLegacyRateLimits: Record<string, unknown> | null = null;
-  let latestLegacyRateLimitsAt = Number.NEGATIVE_INFINITY;
+  let latestCodexRateLimits: Record<string, unknown> | null = null;
+  let latestCodexRateLimitsAt = Number.NEGATIVE_INFINITY;
 
   for (const source of sources) {
     const proof = source.providerLinearWorkerProof ?? null;
@@ -788,12 +788,12 @@ function buildCompatibilityTelemetrySnapshot(
       continue;
     }
 
-    if (proof?.rate_limits && latestAuthoritativeRateLimits === null) {
+    if (proof?.rate_limits) {
       const candidateTimestamp =
         Date.parse(proof.updated_at ?? source.updatedAt ?? '') || Number.NEGATIVE_INFINITY;
-      if (candidateTimestamp >= latestLegacyRateLimitsAt) {
-        latestLegacyRateLimits = proof.rate_limits;
-        latestLegacyRateLimitsAt = candidateTimestamp;
+      if (candidateTimestamp >= latestCodexRateLimitsAt) {
+        latestCodexRateLimits = proof.rate_limits;
+        latestCodexRateLimitsAt = candidateTimestamp;
       }
     }
   }
@@ -805,8 +805,24 @@ function buildCompatibilityTelemetrySnapshot(
       total_tokens: hasTotalTokens ? totalTokens : null,
       seconds_running: Number(secondsRunning.toFixed(3))
     },
-    rateLimits: latestAuthoritativeRateLimits ?? latestLegacyRateLimits
+    rateLimits: combineCompatibilityRateLimits({
+      codex: latestCodexRateLimits,
+      linearBudget: latestAuthoritativeRateLimits
+    })
   };
+}
+
+function combineCompatibilityRateLimits(input: {
+  codex: Record<string, unknown> | null;
+  linearBudget: Record<string, unknown> | null;
+}): Record<string, unknown> | null {
+  if (input.codex && input.linearBudget) {
+    return {
+      codex: input.codex,
+      linear_budget: input.linearBudget
+    };
+  }
+  return input.codex ?? input.linearBudget ?? null;
 }
 
 function buildCompatibilityTelemetrySources(snapshot: Pick<

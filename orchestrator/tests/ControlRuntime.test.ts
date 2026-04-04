@@ -1952,6 +1952,54 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('prefers an authoritative proof event over the generic in_progress fallback in running rows', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1037-event-current'
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-event-current',
+      issue_id: 'issue-1037-event',
+      issue_identifier: 'ISSUE-1037-EVENT',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'generic manifest fallback'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-event',
+      issue_identifier: 'ISSUE-1037-EVENT',
+      pid: '4242',
+      turn_count: 1,
+      last_event: 'turn.completed',
+      last_message: 'Codex turn completed',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1037-EVENT'
+    );
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-EVENT',
+        pid: '4242',
+        last_event: 'turn.completed',
+        last_message: 'Codex turn completed',
+        last_event_at: '2026-03-07T00:29:30.000Z'
+      })
+    ]);
+    expect(sameIssueRecord?.payload.running).toMatchObject({
+      issue_identifier: 'ISSUE-1037-EVENT',
+      pid: '4242',
+      last_event: 'turn.completed',
+      last_message: 'Codex turn completed',
+      last_event_at: '2026-03-07T00:29:30.000Z'
+    });
+  });
+
   it('excludes completed sibling telemetry from runtime rows and codex totals', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
@@ -2407,26 +2455,36 @@ describe('ControlRuntime', () => {
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
       expect(compatibilityProjection.rateLimits).toEqual({
-        observed_at: '2026-03-07T00:29:45.000Z',
-        source: 'control-host-polling',
-        suppression: 'none',
-        suppression_reason: null,
-        retry_after_seconds: null,
-        cooldown_until: null,
-        cooldown_active: false,
-        request_id: 'polling-1',
-        requests: {
-          remaining: 17,
-          limit: 30,
-          reset_at: '2026-03-07T00:30:42.000Z'
+        codex: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 1,
+            limit: 30,
+            reset_at: '2026-03-07T00:31:00.000Z'
+          }
         },
-        endpoint_requests: null,
-        complexity: {
-          remaining: 180,
-          limit: 200,
-          reset_at: '2026-03-07T00:30:07.000Z'
-        },
-        endpoint_complexity: null
+        linear_budget: {
+          observed_at: '2026-03-07T00:29:45.000Z',
+          source: 'control-host-polling',
+          suppression: 'none',
+          suppression_reason: null,
+          retry_after_seconds: null,
+          cooldown_until: null,
+          cooldown_active: false,
+          request_id: 'polling-1',
+          requests: {
+            remaining: 17,
+            limit: 30,
+            reset_at: '2026-03-07T00:30:42.000Z'
+          },
+          endpoint_requests: null,
+          complexity: {
+            remaining: 180,
+            limit: 200,
+            reset_at: '2026-03-07T00:30:07.000Z'
+          },
+          endpoint_complexity: null
+        }
       });
     } finally {
       vi.useRealTimers();

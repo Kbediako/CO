@@ -238,18 +238,27 @@ export function buildCompatibilityRunningEntry(
   selected: ControlCompatibilitySourceContext
 ): ControlRunningPayload {
   const proof = selected.providerLinearWorkerProof ?? null;
+  const runningEvent = selectRunningEvent({
+    latestEvent: selected.latestEvent?.event ?? null,
+    latestAction: selected.latestAction ?? null,
+    rawStatus: selected.rawStatus,
+    proofEvent: proof?.last_event ?? null
+  });
+  const runningMessage = runningEvent === proof?.last_event ? proof?.last_message ?? selected.latestEvent?.message ?? selected.summary : selected.latestEvent?.message ?? proof?.last_message ?? selected.summary;
+  const runningEventAt = runningEvent === proof?.last_event ? proof?.last_event_at ?? selected.latestEvent?.at ?? selected.updatedAt : selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt;
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
     state: resolveCompatibilityRunningState(selected),
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
+    pid: selected.providerLinearWorkerProof?.pid ?? null,
     session_id: proof?.latest_session_id ?? null,
     turn_count: proof?.turn_count ?? null,
-    last_event: selected.latestEvent?.event ?? proof?.last_event ?? selected.latestAction ?? selected.rawStatus,
-    last_message: selected.latestEvent?.message ?? proof?.last_message ?? selected.summary,
+    last_event: runningEvent,
+    last_message: runningMessage,
     started_at: selected.startedAt,
-    last_event_at: selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt,
+    last_event_at: runningEventAt,
     tokens: proof?.tokens ?? buildEmptyTokenUsage()
   };
 }
@@ -343,6 +352,28 @@ function buildEmptyTokenUsage(): ControlRunningPayload['tokens'] {
     output_tokens: null,
     total_tokens: null
   };
+}
+
+function selectRunningEvent(input: {
+  latestEvent: string | null;
+  latestAction: string | null;
+  rawStatus: string;
+  proofEvent: string | null;
+}): string {
+  if (input.proofEvent) {
+    const genericFallbacks = new Set([
+      input.rawStatus,
+      input.latestAction,
+      'in_progress',
+      'running',
+      'resuming',
+      'started'
+    ].filter((value): value is string => Boolean(value)));
+    if (!input.latestEvent || genericFallbacks.has(input.latestEvent)) {
+      return input.proofEvent;
+    }
+  }
+  return input.latestEvent ?? input.latestAction ?? input.rawStatus;
 }
 
 function resolveCompatibilityRunningState(selected: ControlCompatibilitySourceContext): string {

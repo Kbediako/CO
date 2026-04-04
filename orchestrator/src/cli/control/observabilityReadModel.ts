@@ -189,6 +189,7 @@ export interface ControlRunningPayload {
   state: string;
   display_state: string;
   status_reason: string | null;
+  pid: string | null;
   session_id: string | null;
   turn_count: number | null;
   last_event: string | null;

@@ -35,7 +35,7 @@ interface TokenSample {
 }
 
 interface RunningColumn {
-  key: 'id' | 'stage' | 'age' | 'tokens' | 'session' | 'event';
+  key: 'id' | 'stage' | 'pid' | 'age' | 'tokens' | 'session' | 'event';
   label: string;
   width: number;
   align?: 'left' | 'right';
@@ -108,6 +108,7 @@ interface StartControlStatusViewerOptions {
   output?: DashboardOutput;
   input?: DashboardInput;
   liveSurfaceMode?: DashboardSurfaceMode;
+  showDashboardLine?: boolean;
 }
 
 export interface RenderControlStatusFrameInput {
@@ -117,6 +118,7 @@ export interface RenderControlStatusFrameInput {
   runId: string;
   runDir: string;
   startPipelineId: string;
+  showDashboardLine?: boolean;
   terminalColumns?: number | null;
   terminalRows?: number | null;
   throughputTps?: number | null;
@@ -219,7 +221,8 @@ export function startControlStatusDashboard(
       refreshIntervalMs: options.refreshIntervalMs,
       output: options.output,
       input: options.input,
-      liveSurfaceMode: liveOutput.isTTY === true ? 'alternate' : 'primary'
+      liveSurfaceMode: liveOutput.isTTY === true ? 'alternate' : 'primary',
+      showDashboardLine: true
     },
     deps
   );
@@ -243,7 +246,8 @@ export function startAttachedControlStatusDashboard(
       refreshIntervalMs: options.refreshIntervalMs,
       output: options.output,
       input: options.input,
-      liveSurfaceMode: 'primary'
+      liveSurfaceMode: 'primary',
+      showDashboardLine: false
     },
     deps
   );
@@ -515,6 +519,7 @@ function startControlStatusViewer(
         runId: options.runId,
         runDir: options.runDir,
         startPipelineId: options.startPipelineId,
+        showDashboardLine: options.showDashboardLine,
         terminalColumns: output.columns ?? null,
         terminalRows: output.rows ?? null,
         throughputTps: renderedState.throughputTps,
@@ -554,6 +559,7 @@ function startControlStatusViewer(
           runId: options.runId,
           runDir: options.runDir,
           startPipelineId: options.startPipelineId,
+          showDashboardLine: options.showDashboardLine,
           terminalColumns: output.columns ?? null,
           terminalRows: output.rows ?? null,
           throughputTps: renderedState.throughputTps,
@@ -605,6 +611,7 @@ function startControlStatusViewer(
         runId: options.runId,
         runDir: options.runDir,
         startPipelineId: options.startPipelineId,
+        showDashboardLine: options.showDashboardLine,
         terminalColumns: output.columns ?? null,
         terminalRows: output.rows ?? null,
         throughputTps,
@@ -683,13 +690,15 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
     renderTokensLine(input.dataset, terminalColumns),
     renderRateLimitsLine(input.dataset, referenceTime, terminalColumns),
     renderProjectLine(input.dataset, terminalColumns),
-    renderDashboardLine(input.baseUrl, terminalColumns),
     renderNextRefreshLine(input.dataset, terminalColumns),
     colorize('├─ Running', ANSI_BOLD),
     '│',
     renderRunningHeaderRow(runningColumns),
     renderRunningSeparatorRow(runningColumns)
   ];
+  if (input.showDashboardLine !== false) {
+    lines.splice(7, 0, renderDashboardLine(input.baseUrl, terminalColumns));
+  }
 
   lines.push(...renderRunningRows(input.dataset.running, runningColumns, referenceTime));
   lines.push('│');
@@ -739,8 +748,8 @@ function renderCompactControlStatusFrame(
 
 function renderControlStatusErrorFrame(
   input: Pick<
-    StartControlStatusDashboardOptions,
-    'baseUrl' | 'taskId' | 'runId' | 'runDir' | 'startPipelineId'
+    StartControlStatusViewerOptions,
+    'baseUrl' | 'taskId' | 'runId' | 'runDir' | 'startPipelineId' | 'showDashboardLine'
   >,
   now: Date,
   message: string,
@@ -748,14 +757,9 @@ function renderControlStatusErrorFrame(
 ): string {
   const safe = (value: unknown): string => sanitizeDisplayValue(value);
   const columns = resolveTerminalColumns(terminalColumns);
-  return [
+  const lines = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
     renderSummaryLine('Generated', [{ text: now.toISOString(), color: ANSI_CYAN }], columns),
-    renderSummaryLine(
-      'Dashboard',
-      [{ text: safe(input.baseUrl), color: ANSI_CYAN, truncateMode: 'middle' }],
-      columns
-    ),
     renderSummaryLine(
       'Task',
       [
@@ -778,7 +782,19 @@ function renderControlStatusErrorFrame(
     ),
     renderSummaryLine('Dashboard error', [{ text: safe(message), color: ANSI_RED }], columns),
     '╰─'
-  ].join('\n');
+  ];
+  if (input.showDashboardLine !== false) {
+    lines.splice(
+      2,
+      0,
+      renderSummaryLine(
+        'Dashboard',
+        [{ text: safe(input.baseUrl), color: ANSI_CYAN, truncateMode: 'middle' }],
+        columns
+      )
+    );
+  }
+  return lines.join('\n');
 }
 
 function renderAgentsLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
@@ -1052,6 +1068,8 @@ function renderRunningRow(
         return colorize(formatted, ANSI_MAGENTA);
       case 'tokens':
         return colorize(formatted, ANSI_YELLOW);
+      case 'pid':
+        return colorize(formatted, ANSI_YELLOW);
       case 'session':
         return colorize(formatted, ANSI_CYAN);
       case 'stage':
@@ -1100,7 +1118,7 @@ function renderRetryRow(
 }
 
 function resolveRunningAccent(entry: OperatorDashboardSessionPayload): string {
-  const lastEvent = sanitizeDisplayValue(entry.last_event).toLowerCase();
+  const lastEvent = normalizeRunningEventKey(entry.last_event) ?? '';
   const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
   if (lastEvent.includes('turn_completed')) {
     return ANSI_MAGENTA;
@@ -1130,6 +1148,8 @@ function formatRunningColumnValue(
       return sanitizeDisplayValue(entry.issue_identifier);
     case 'stage':
       return sanitizeDisplayValue(entry.display_state);
+    case 'pid':
+      return formatPid(entry.pid);
     case 'age':
       return formatRuntimeAndTurns(entry.started_at, referenceTime, entry.turn_count);
     case 'tokens':
@@ -1139,24 +1159,25 @@ function formatRunningColumnValue(
     case 'event':
       return summarizeRunningEvent(entry);
     default:
-      return '-';
+      return 'n/a';
   }
 }
 
 function summarizeRunningEvent(entry: OperatorDashboardSessionPayload): string {
   const lastMessage = sanitizeDisplayValue(entry.last_message);
-  if (lastMessage !== '-') {
+  const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
+  if (lastMessage !== '-' && lastMessage.toLowerCase() !== displayState) {
     return lastMessage;
   }
-  const lastEvent = sanitizeDisplayValue(entry.last_event);
-  if (lastEvent !== '-') {
-    return lastEvent;
+  const humanizedEvent = humanizeRunningEvent(entry.last_event);
+  if (humanizedEvent !== 'n/a' && humanizedEvent.toLowerCase() !== displayState) {
+    return humanizedEvent;
   }
-  const statusReason = sanitizeDisplayValue(entry.status_reason);
-  if (statusReason !== '-') {
+  const statusReason = humanizeRunningEvent(entry.status_reason);
+  if (statusReason !== 'n/a' && statusReason.toLowerCase() !== displayState) {
     return statusReason;
   }
-  return sanitizeDisplayValue(entry.display_state);
+  return 'n/a';
 }
 
 function selectRunningColumns(terminalColumns: number): RunningColumn[] {
@@ -1165,6 +1186,7 @@ function selectRunningColumns(terminalColumns: number): RunningColumn[] {
       ? [
           { key: 'id', label: 'ID', width: 10 },
           { key: 'stage', label: 'STAGE', width: 12 },
+          { key: 'pid', label: 'PID', width: 8 },
           { key: 'age', label: 'AGE / TURN', width: 12 },
           { key: 'tokens', label: 'TOKENS', width: 10, align: 'right' },
           { key: 'session', label: 'SESSION', width: 14 },
@@ -1172,16 +1194,19 @@ function selectRunningColumns(terminalColumns: number): RunningColumn[] {
         ]
       : terminalColumns >= 96
         ? [
-            { key: 'id', label: 'ID', width: 10 },
-            { key: 'stage', label: 'STAGE', width: 12 },
+            { key: 'id', label: 'ID', width: 9 },
+            { key: 'stage', label: 'STAGE', width: 10 },
+            { key: 'pid', label: 'PID', width: 7 },
             { key: 'age', label: 'AGE / TURN', width: 12 },
-            { key: 'tokens', label: 'TOKENS', width: 10, align: 'right' },
+            { key: 'tokens', label: 'TOKENS', width: 9, align: 'right' },
+            { key: 'session', label: 'SESSION', width: 12 },
             { key: 'event', label: 'EVENT', width: 0 }
           ]
         : terminalColumns >= 78
           ? [
               { key: 'id', label: 'ID', width: 9 },
               { key: 'stage', label: 'STAGE', width: 10 },
+              { key: 'pid', label: 'PID', width: 7 },
               { key: 'tokens', label: 'TOKENS', width: 9, align: 'right' },
               { key: 'event', label: 'EVENT', width: 0 }
             ]
@@ -1290,10 +1315,11 @@ function formatRuntimeAndTurns(
     startedTimestamp === null
       ? 'n/a'
       : formatRuntimeSeconds(Math.max(0, (referenceTime.getTime() - startedTimestamp) / 1000));
-  if (typeof turnCount === 'number' && Number.isFinite(turnCount) && turnCount > 0) {
-    return `${runtime} / ${Math.floor(turnCount)}`;
-  }
-  return runtime;
+  const turns =
+    typeof turnCount === 'number' && Number.isFinite(turnCount) && turnCount >= 0
+      ? String(Math.floor(turnCount))
+      : 'n/a';
+  return `${runtime} / ${turns}`;
 }
 
 function formatRuntimeSeconds(value: number | null | undefined): string {
@@ -1326,12 +1352,12 @@ function formatCount(value: number | string | null | undefined): string {
 
 function formatOptionalCount(value: number | string | null | undefined): string {
   if (value === null || value === undefined) {
-    return '-';
+    return 'n/a';
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (trimmed.length === 0) {
-      return '-';
+      return 'n/a';
     }
     const parsed = Number(trimmed);
     if (Number.isFinite(parsed)) {
@@ -1342,7 +1368,7 @@ function formatOptionalCount(value: number | string | null | undefined): string 
   if (typeof value === 'number' && Number.isFinite(value)) {
     return NUMBER_FORMAT.format(Math.trunc(value));
   }
-  return '-';
+  return 'n/a';
 }
 
 function formatRateLimitSegments(
@@ -1353,41 +1379,107 @@ function formatRateLimitSegments(
     return [{ text: 'unavailable', color: ANSI_GRAY }];
   }
 
+  const combined = formatCombinedRateLimitSegments(value, referenceTime);
+  if (combined) {
+    return combined;
+  }
+
+  const codexRateLimits = formatCodexRateLimitSegments(value, referenceTime);
+  if (codexRateLimits) {
+    return codexRateLimits;
+  }
+
   const linearBudget = formatLinearBudgetSegments(value, referenceTime);
   if (linearBudget) {
     return linearBudget;
   }
 
+  return [{ text: formatRecord(value), color: ANSI_GRAY }];
+}
+
+function formatCombinedRateLimitSegments(
+  value: Record<string, unknown>,
+  referenceTime: Date
+): SummarySegment[] | null {
+  const codex = asRecord(value.codex);
+  const linearBudget = asRecord(value.linear_budget) ?? asRecord(value.linearBudget);
+  if (!codex || !linearBudget) {
+    return null;
+  }
+  const pieces: SummarySegment[] = [];
+  const codexPieces = formatCompactCodexRateLimitSegments(codex, referenceTime);
+  if (codexPieces) {
+    pieces.push(...codexPieces);
+  }
+  const linearPieces = formatCompactLinearBudgetSegments(linearBudget, referenceTime);
+  if (linearPieces) {
+    if (pieces.length > 0) {
+      pieces.push({ text: ' | ', color: ANSI_GRAY });
+    }
+    pieces.push(...linearPieces);
+  }
+  return pieces.length > 0 ? pieces : null;
+}
+
+function formatCompactCodexRateLimitSegments(
+  value: Record<string, unknown>,
+  referenceTime: Date
+): SummarySegment[] | null {
   const limitId = readRecordString(value, ['limit_id', 'limitId', 'limit_name', 'limitName']);
   const primary = asRecord(value.primary);
   const secondary = asRecord(value.secondary);
   const credits = asRecord(value.credits);
-  if (limitId || primary || secondary || credits) {
-    const pieces: SummarySegment[] = [
-      { text: sanitizeDisplayValue(limitId ?? 'unknown'), color: ANSI_YELLOW }
-    ];
-    if (primary) {
-      pieces.push({ text: ' | ', color: ANSI_GRAY });
-      pieces.push({
-        text: `primary ${formatRateLimitBucket(primary, referenceTime)}`,
-        color: ANSI_CYAN
-      });
-    }
-    if (secondary) {
-      pieces.push({ text: ' | ', color: ANSI_GRAY });
-      pieces.push({
-        text: `secondary ${formatRateLimitBucket(secondary, referenceTime)}`,
-        color: ANSI_CYAN
-      });
-    }
-    if (credits) {
-      pieces.push({ text: ' | ', color: ANSI_GRAY });
-      pieces.push({ text: formatRateLimitCredits(credits), color: ANSI_GREEN });
-    }
-    return pieces;
+  if (!limitId && !primary && !secondary && !credits) {
+    return null;
   }
+  const pieces: SummarySegment[] = [
+    { text: sanitizeDisplayValue(limitId ?? 'unknown'), color: ANSI_YELLOW }
+  ];
+  if (primary) {
+    pieces.push({ text: ` p${formatCompactRateLimitBucket(primary, referenceTime)}`, color: ANSI_CYAN });
+  }
+  if (secondary) {
+    pieces.push({ text: ` s${formatCompactRateLimitBucket(secondary, referenceTime)}`, color: ANSI_CYAN });
+  }
+  if (credits) {
+    pieces.push({ text: ` ${formatCompactRateLimitCredits(credits)}`, color: ANSI_GREEN });
+  }
+  return pieces;
+}
 
-  return [{ text: formatRecord(value), color: ANSI_GRAY }];
+function formatCodexRateLimitSegments(
+  value: Record<string, unknown>,
+  referenceTime: Date
+): SummarySegment[] | null {
+  const limitId = readRecordString(value, ['limit_id', 'limitId', 'limit_name', 'limitName']);
+  const primary = asRecord(value.primary);
+  const secondary = asRecord(value.secondary);
+  const credits = asRecord(value.credits);
+  if (!limitId && !primary && !secondary && !credits) {
+    return null;
+  }
+  const pieces: SummarySegment[] = [
+    { text: sanitizeDisplayValue(limitId ?? 'unknown'), color: ANSI_YELLOW }
+  ];
+  if (primary) {
+    pieces.push({ text: ' | ', color: ANSI_GRAY });
+    pieces.push({
+      text: `primary ${formatRateLimitBucket(primary, referenceTime)}`,
+      color: ANSI_CYAN
+    });
+  }
+  if (secondary) {
+    pieces.push({ text: ' | ', color: ANSI_GRAY });
+    pieces.push({
+      text: `secondary ${formatRateLimitBucket(secondary, referenceTime)}`,
+      color: ANSI_CYAN
+    });
+  }
+  if (credits) {
+    pieces.push({ text: ' | ', color: ANSI_GRAY });
+    pieces.push({ text: formatRateLimitCredits(credits), color: ANSI_GREEN });
+  }
+  return pieces;
 }
 
 function formatLinearBudgetSegments(
@@ -1426,7 +1518,7 @@ function formatLinearBudgetSegments(
 
   const pieces: SummarySegment[] = [
     {
-      text: sanitizeDisplayValue(source === null ? 'Linear API' : `Linear API (${source})`),
+      text: 'Linear',
       color: ANSI_YELLOW
     }
   ];
@@ -1447,8 +1539,66 @@ function formatLinearBudgetSegments(
   if (retryAfterSeconds !== null) {
     pieces.push({ text: ' | ', color: ANSI_GRAY });
     pieces.push({
-      text: `retry ${Math.max(0, Math.floor(retryAfterSeconds))}s`,
+      text: `retry ${formatHumanDurationShort(retryAfterSeconds)}`,
       color: ANSI_MAGENTA
+    });
+  }
+  return pieces;
+}
+
+function formatCompactLinearBudgetSegments(
+  value: Record<string, unknown>,
+  referenceTime: Date
+): SummarySegment[] | null {
+  const requests = asRecord(value.requests);
+  const endpointRequests = asRecord(value.endpoint_requests);
+  const complexity = asRecord(value.complexity);
+  const endpointComplexity = asRecord(value.endpoint_complexity);
+  const observedAt = readRecordString(value, ['observed_at', 'observedAt']);
+  const source = readRecordString(value, ['source']);
+  const suppression = readRecordString(value, ['suppression']);
+  const retryAfterSeconds = readRecordNumber(value, ['retry_after_seconds', 'retryAfterSeconds']);
+  const looksLikeLinearBudget =
+    observedAt !== null ||
+    suppression !== null ||
+    retryAfterSeconds !== null ||
+    source?.toLowerCase().startsWith('linear') === true;
+  if (!looksLikeLinearBudget) {
+    return null;
+  }
+
+  const pieces: SummarySegment[] = [{ text: 'Linear', color: ANSI_YELLOW }];
+  if (suppression && suppression !== 'none') {
+    pieces.push({
+      text: ` ${sanitizeDisplayValue(suppression)}`,
+      color: suppression === 'cooldown' || suppression === 'exhausted' ? ANSI_RED : ANSI_YELLOW
+    });
+  }
+  if (retryAfterSeconds !== null) {
+    pieces.push({ text: ` ${formatHumanDurationShort(retryAfterSeconds)}`, color: ANSI_MAGENTA });
+  }
+  if (requests) {
+    pieces.push({
+      text: ` req${formatCompactRateLimitBucket(requests, referenceTime)}`,
+      color: ANSI_CYAN
+    });
+  }
+  if (endpointRequests) {
+    pieces.push({
+      text: ` ep-req${formatCompactRateLimitBucket(endpointRequests, referenceTime)}`,
+      color: ANSI_CYAN
+    });
+  }
+  if (complexity) {
+    pieces.push({
+      text: ` cx${formatCompactRateLimitBucket(complexity, referenceTime)}`,
+      color: ANSI_CYAN
+    });
+  }
+  if (endpointComplexity) {
+    pieces.push({
+      text: ` ep-cx${formatCompactRateLimitBucket(endpointComplexity, referenceTime)}`,
+      color: ANSI_CYAN
     });
   }
   return pieces;
@@ -1474,7 +1624,32 @@ function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: D
   }
 
   if (resetSeconds !== null) {
-    return `${base} reset ${Math.max(0, Math.floor(resetSeconds))}s`;
+    return `${base} reset ${formatHumanDurationShort(resetSeconds)}`;
+  }
+  return base;
+}
+
+function formatCompactRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
+  const remaining = readRecordNumber(bucket, ['remaining']);
+  const limit = readRecordNumber(bucket, ['limit']);
+  const resetSeconds =
+    readRecordNumber(bucket, ['reset_in_seconds', 'resetInSeconds']) ??
+    secondsUntilTimestamp(
+      readRecordString(bucket, ['reset_at', 'resetAt', 'resets_at', 'resetsAt']),
+      referenceTime
+    );
+
+  let base = 'n/a';
+  if (remaining !== null && limit !== null) {
+    base = `${formatCount(remaining)}/${formatCount(limit)}`;
+  } else if (remaining !== null) {
+    base = `rem${formatCount(remaining)}`;
+  } else if (limit !== null) {
+    base = `lim${formatCount(limit)}`;
+  }
+
+  if (resetSeconds !== null) {
+    return `${base} ${formatHumanDurationShort(resetSeconds)}`;
   }
   return base;
 }
@@ -1491,6 +1666,20 @@ function formatRateLimitCredits(credits: Record<string, unknown>): string {
     return `credits ${balance.toFixed(2)}`;
   }
   return 'credits available';
+}
+
+function formatCompactRateLimitCredits(credits: Record<string, unknown>): string {
+  if (readRecordBoolean(credits, ['unlimited']) === true) {
+    return 'cr unlimited';
+  }
+  if (readRecordBoolean(credits, ['has_credits', 'hasCredits']) === false) {
+    return 'cr none';
+  }
+  const balance = readRecordNumber(credits, ['balance']);
+  if (balance !== null) {
+    return `cr${balance.toFixed(2)}`;
+  }
+  return 'cr available';
 }
 
 function formatRecord(value: Record<string, unknown>): string {
@@ -1519,12 +1708,17 @@ function formatRecordValue(value: unknown): string {
 function compactSessionId(sessionId: string | null | undefined): string {
   const sanitized = sanitizeDisplayValue(sessionId);
   if (sanitized === '-') {
-    return sanitized;
+    return 'n/a';
   }
   if (sanitized.length <= 10) {
     return sanitized;
   }
   return `${sanitized.slice(0, 4)}...${sanitized.slice(-6)}`;
+}
+
+function formatPid(pid: string | null | undefined): string {
+  const sanitized = sanitizeDisplayValue(pid);
+  return sanitized === '-' ? 'n/a' : sanitized;
 }
 
 function renderSummaryLine(
@@ -1604,6 +1798,64 @@ function sanitizeDisplayValue(value: unknown): string {
   }
   const sanitized = sanitizeTerminalText(String(value));
   return sanitized.length === 0 ? '-' : sanitized;
+}
+
+function humanizeRunningEvent(event: string | null | undefined): string {
+  const normalized = normalizeRunningEventKey(event);
+  if (!normalized) {
+    return 'n/a';
+  }
+  switch (normalized) {
+    case 'agent_message':
+      return 'agent message';
+    case 'task_started':
+      return 'task started';
+    case 'task_complete':
+    case 'turn_completed':
+      return 'turn completed';
+    case 'turn_started':
+      return 'turn started';
+    case 'turn_failed':
+      return 'turn failed';
+    case 'turn_cancelled':
+      return 'turn cancelled';
+    case 'thread_tokenusage_updated':
+      return 'token usage updated';
+    case 'account_ratelimits_updated':
+      return 'rate limits updated';
+    case 'retry_scheduled':
+      return 'retry scheduled';
+    default:
+      return normalized.replace(/_/g, ' ');
+  }
+}
+
+function normalizeRunningEventKey(value: string | null | undefined): string | null {
+  const sanitized = sanitizeDisplayValue(value);
+  if (sanitized === '-') {
+    return null;
+  }
+  return sanitized
+    .toLowerCase()
+    .replace(/^codex\/event\//u, '')
+    .replace(/[./]+/gu, '_')
+    .replace(/[^a-z0-9_]+/gu, '_')
+    .replace(/_+/gu, '_')
+    .replace(/^_|_$/gu, '');
+}
+
+function formatHumanDurationShort(valueSeconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(normalizeFiniteNumber(valueSeconds)));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  return `${seconds}s`;
 }
 
 function truncate(value: string, maxLength: number): string {

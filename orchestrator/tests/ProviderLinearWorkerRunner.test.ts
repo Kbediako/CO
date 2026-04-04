@@ -584,6 +584,22 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
   });
 
+  it('parses live turn.completed usage and derives total tokens when the Codex stream omits total_tokens', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn.completed","usage":{"input_tokens":32795,"cached_input_tokens":3456,"output_tokens":52}}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 32795,
+      output_tokens: 52,
+      total_tokens: 32847
+    });
+    expect(parsed.lastEvent).toBe('turn.completed');
+  });
+
   it('waits for child close before resolving piped stdio capture', async () => {
     vi.resetModules();
     const stdout = new PassThrough();
@@ -3904,6 +3920,146 @@ describe('provider linear worker runner', () => {
       thread_id: 'thread-1',
       latest_turn_id: 'turn-1',
       end_reason: 'max_turns_reached_issue_still_active'
+    });
+  });
+
+  it('persists the current turn count in live proof updates before the turn completes', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const writeProof = vi.fn(async () => undefined);
+    const execRunner = vi.fn(async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
+      request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+      request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
+      request.onStdoutChunk?.(
+        '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active"}}\n'
+      );
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        writeProof,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const liveTurnRunningProof = [...writeProof.mock.calls]
+      .map(([, proof]) => proof)
+      .reverse()
+      .find((proof) => proof.owner_phase === 'turn_running' && proof.latest_turn_id === 'turn-1');
+
+    expect(liveTurnRunningProof).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      turn_count: 1,
+      last_message: 'Worker turn active',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress'
+    });
+  });
+
+  it('does not reuse the previous turn session before a later turn emits turn_context', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const writeProof = vi.fn(async () => undefined);
+    const execRunner = vi
+      .fn<
+        (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => Promise<{
+          exitCode: number;
+          stdout: string;
+          stderr: string;
+        }>
+      >()
+      .mockImplementationOnce(async (request) => {
+        request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+        request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
+        request.onStdoutChunk?.('{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}\n');
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+          ].join('\n'),
+          stderr: ''
+        };
+      })
+      .mockImplementationOnce(async (request) => {
+        request.onStdoutChunk?.(
+          '{"type":"event_msg","payload":{"type":"agent_message","message":"Second turn reasoning"}}\n'
+        );
+        request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-2"}}\n');
+        request.onStdoutChunk?.('{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-2"}}\n');
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"event_msg","payload":{"type":"agent_message","message":"Second turn reasoning"}}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-2"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-2"}}'
+          ].join('\n'),
+          stderr: ''
+        };
+      });
+
+    await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '2'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        writeProof,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const secondTurnPreContextProof = writeProof.mock.calls
+      .map(([, proof]) => proof)
+      .find(
+        (proof) =>
+          proof.owner_phase === 'turn_running' &&
+          proof.turn_count === 2 &&
+          proof.last_message === 'Second turn reasoning' &&
+          proof.latest_turn_id === null
+      );
+
+    expect(secondTurnPreContextProof).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: null,
+      latest_session_id: null,
+      turn_count: 2,
+      last_message: 'Second turn reasoning',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress'
     });
   });
 

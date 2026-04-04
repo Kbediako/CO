@@ -1,7 +1,6 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
-import { fetchUiDataset, resolveAttachTarget } from './coStatusAttachCliShell.js';
-import { runControlHostCliShell } from './controlHostCliShell.js';
+import { fetchUiDataset, resolveAttachTarget, runCoStatusAttachCliShell } from './coStatusAttachCliShell.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -19,7 +18,7 @@ export async function runCoStatusCliShell(params: RunCoStatusCliShellParams): Pr
 
   const format: OutputFormat = readStringFlag(params.flags, 'format') === 'json' ? 'json' : 'text';
   if (format !== 'json') {
-    await runControlHostCliShell(params);
+    await runCoStatusAttachCliShell(params);
     return;
   }
 
