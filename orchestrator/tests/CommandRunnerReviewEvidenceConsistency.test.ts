@@ -844,6 +844,30 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.command_exit_code).toBe(0);
   });
 
+  it('preserves failed provider-worker command summaries even when proof reports success', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      return buildFailedExecResult('provider worker exited\n', 2);
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.summary).toContain('Exited with code 2');
+    expect(result.summary).not.toContain('Provider linear worker reached review handoff.');
+    expect(manifest.commands[0]?.status).toBe('failed');
+  });
+
   it('does not use summary hints for failed provider-linear-worker stages', async () => {
     mockState.runImpl = async () => buildFailedExecResult('provider worker exited\n', 2);
 

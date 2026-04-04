@@ -483,7 +483,7 @@ export async function runCommandStage(
           degradationSummary
         });
         forceProviderLinearWorkerFailure = true;
-      } else if (proofTerminalStatus === 'succeeded') {
+      } else if (proofTerminalStatus === 'succeeded' && result.status === 'succeeded') {
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
           status: 'succeeded',
           endReason: proofTerminalReason,
