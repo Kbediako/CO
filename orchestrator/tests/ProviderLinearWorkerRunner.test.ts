@@ -4638,75 +4638,79 @@ describe('provider linear worker runner', () => {
 
   it('queues a trailing live refresh after suppressing an in-flight refresh', async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-21T09:00:00.000Z'));
-    const { manifestPath } = await createManifestRoot();
-    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
-    await mkdir(controlHostRunDir, { recursive: true });
-    await writeFile(
-      join(controlHostRunDir, 'control_endpoint.json'),
-      JSON.stringify({
-        base_url: 'http://127.0.0.1:43123',
-        token_path: 'control_auth.json'
-      }),
-      'utf8'
-    );
-    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
-    await writeFile(
-      join(controlHostRunDir, 'manifest.json'),
-      JSON.stringify({
-        run_id: 'control-host',
-        task_id: 'local-mcp',
-        workspace_path: tempRoot
-      }),
-      'utf8'
-    );
-    await writeFile(
-      manifestPath,
-      JSON.stringify({
-        run_id: 'run-child',
-        task_id: 'linear-lin-issue-1',
-        issue_id: 'lin-issue-1',
-        issue_identifier: 'CO-2',
-        workspace_path: tempRoot,
-        provider_control_host_task_id: 'local-mcp',
-        provider_control_host_run_id: 'control-host'
-      }),
-      'utf8'
-    );
-
-    const refreshBodies: Array<Record<string, unknown>> = [];
-    let resolveFirstLiveRefresh: ((response: Response) => void) | null = null;
-    let firstLiveRefreshStartedResolve: (() => void) | null = null;
-    const firstLiveRefreshStarted = new Promise<void>((resolve) => {
-      firstLiveRefreshStartedResolve = resolve;
-    });
-    let allowRunnerToFinishResolve: (() => void) | null = null;
-    const allowRunnerToFinish = new Promise<void>((resolve) => {
-      allowRunnerToFinishResolve = resolve;
-    });
-    let refreshCallCount = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (_input: unknown, init?: RequestInit) => {
-        refreshCallCount += 1;
-        const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-        refreshBodies.push(body);
-        if (refreshCallCount === 1) {
-          firstLiveRefreshStartedResolve?.();
-          return await new Promise<Response>((resolve) => {
-            resolveFirstLiveRefresh = resolve;
-          });
-        }
-        return new Response(JSON.stringify({ queued: true, coalesced: false }), {
-          status: 202,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-      })
-    );
-
     try {
+      vi.setSystemTime(new Date('2026-03-21T09:00:00.000Z'));
+      const { manifestPath } = await createManifestRoot();
+      const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+      await mkdir(controlHostRunDir, { recursive: true });
+      await writeFile(
+        join(controlHostRunDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: 'http://127.0.0.1:43123',
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+      await writeFile(
+        join(controlHostRunDir, 'control_auth.json'),
+        JSON.stringify({ token: 'control-token' }),
+        'utf8'
+      );
+      await writeFile(
+        join(controlHostRunDir, 'manifest.json'),
+        JSON.stringify({
+          run_id: 'control-host',
+          task_id: 'local-mcp',
+          workspace_path: tempRoot
+        }),
+        'utf8'
+      );
+      await writeFile(
+        manifestPath,
+        JSON.stringify({
+          run_id: 'run-child',
+          task_id: 'linear-lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          workspace_path: tempRoot,
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host'
+        }),
+        'utf8'
+      );
+
+      const refreshBodies: Array<Record<string, unknown>> = [];
+      let resolveFirstLiveRefresh: ((response: Response) => void) | null = null;
+      let firstLiveRefreshStartedResolve: (() => void) | null = null;
+      const firstLiveRefreshStarted = new Promise<void>((resolve) => {
+        firstLiveRefreshStartedResolve = resolve;
+      });
+      let allowRunnerToFinishResolve: (() => void) | null = null;
+      const allowRunnerToFinish = new Promise<void>((resolve) => {
+        allowRunnerToFinishResolve = resolve;
+      });
+      let refreshCallCount = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_input: unknown, init?: RequestInit) => {
+          refreshCallCount += 1;
+          const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+          refreshBodies.push(body);
+          if (refreshCallCount === 1) {
+            firstLiveRefreshStartedResolve?.();
+            return await new Promise<Response>((resolve) => {
+              resolveFirstLiveRefresh = resolve;
+            });
+          }
+          return new Response(JSON.stringify({ queued: true, coalesced: false }), {
+            status: 202,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+        })
+      );
+
       const workerPromise = runProviderLinearWorker(
         {
           CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
