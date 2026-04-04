@@ -26,6 +26,11 @@ import {
 } from './utils/cloudPreflight.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 import {
+  hasLinearApiCredentials,
+  hasLinearSourceBinding,
+  resolveLinearSourceSetup
+} from './control/linearDispatchSource.js';
+import {
   BASELINE_AGENTS,
   BASELINE_MODEL,
   BASELINE_REVIEW_MODEL,
@@ -52,8 +57,6 @@ const OPTIONAL_DEPENDENCIES = [
   { name: 'cheerio', install: 'npm install --save-dev cheerio' }
 ];
 
-const LINEAR_CREDENTIAL_ENV_KEYS = ['CO_LINEAR_API_TOKEN', 'CO_LINEAR_API_KEY', 'LINEAR_API_KEY'] as const;
-const LINEAR_BINDING_ENV_KEYS = ['CO_LINEAR_WORKSPACE_ID', 'CO_LINEAR_TEAM_ID', 'CO_LINEAR_PROJECT_ID'] as const;
 const PROVIDER_ROOT_RELATIVE_PATH = '.codex/providers';
 
 export interface DoctorDependencyStatus {
@@ -177,6 +180,11 @@ export interface DoctorResult {
       detail?: string;
       dispatch_pilot_enabled: boolean | null;
       dispatch_pilot_provider: string | null;
+      dispatch_pilot_source_setup: {
+        workspace_id: string | null;
+        team_id: string | null;
+        project_id: string | null;
+      } | null;
       transport_mutating_enabled: boolean | null;
       telegram_transport_allowed: boolean | null;
     };
@@ -310,7 +318,8 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   const delegationConfig = inspectDelegationConfig();
   const delegationStatus: DoctorResult['delegation']['status'] =
     delegationConfig.status === 'ok' ? 'ok' : 'missing-config';
-  const providers = inspectProviderReadiness(cwd, process.env);
+  const repoRoot = resolveDoctorRepoRoot(cwd);
+  const providers = inspectProviderReadiness(repoRoot, process.env);
 
   return {
     status: missing.length === 0 && codexDefaults.status === 'ok' && providers.status === 'ok' ? 'ok' : 'warning',
@@ -641,26 +650,37 @@ function inspectProviderReadiness(
     .map(([key]) => key);
 
   const controlPolicy = readProviderControlPolicy(providerRoot);
-  const linearCredentialsPresent = LINEAR_CREDENTIAL_ENV_KEYS.some((key) => Boolean(normalizeOptionalString(env[key])));
-  const linearBindingPresent = LINEAR_BINDING_ENV_KEYS.some((key) => Boolean(normalizeOptionalString(env[key])));
+  const linearSourceSetup = resolveLinearSourceSetup(
+    {
+      provider: 'linear',
+      workspace_id: controlPolicy.dispatch_pilot_source_setup?.workspace_id ?? null,
+      team_id: controlPolicy.dispatch_pilot_source_setup?.team_id ?? null,
+      project_id: controlPolicy.dispatch_pilot_source_setup?.project_id ?? null
+    },
+    env
+  );
+  const linearCredentialsPresent = hasLinearApiCredentials(env);
+  const linearBindingPresent = hasLinearSourceBinding(linearSourceSetup);
   const linearWebhookSecretPresent = Boolean(normalizeOptionalString(env.CO_LINEAR_WEBHOOK_SECRET));
+  const linearRequired =
+    controlPolicy.dispatch_pilot_enabled === true && controlPolicy.dispatch_pilot_provider === 'linear';
   const linearReady =
     linearCredentialsPresent &&
     linearBindingPresent &&
     linearWebhookSecretPresent &&
-    controlPolicy.dispatch_pilot_enabled === true &&
-    controlPolicy.dispatch_pilot_provider === 'linear';
+    linearRequired;
 
   const telegramPollingEnabled = parseEnvBoolean(env.CO_TELEGRAM_POLLING_ENABLED);
   const telegramBotTokenPresent = Boolean(normalizeOptionalString(env.CO_TELEGRAM_BOT_TOKEN));
   const telegramAllowedChatIds = parseCsvList(env.CO_TELEGRAM_ALLOWED_CHAT_IDS).length;
   const telegramMutationsEnabled = parseEnvBoolean(env.CO_TELEGRAM_ENABLE_MUTATIONS);
   const telegramPushEnabled = parseEnvBoolean(env.CO_TELEGRAM_PUSH_ENABLED);
+  const telegramRequired = controlPolicy.telegram_transport_allowed === true;
   const telegramReady =
     telegramPollingEnabled &&
     telegramBotTokenPresent &&
     telegramAllowedChatIds > 0 &&
-    controlPolicy.telegram_transport_allowed === true;
+    telegramRequired;
 
   const repoExamplesStatus: DoctorResult['providers']['repo_examples']['status'] =
     missingRepoExamples.length === 0 ? 'ok' : 'missing';
@@ -669,8 +689,8 @@ function inspectProviderReadiness(
     status:
       repoExamplesStatus === 'ok' &&
       controlPolicy.status === 'ok' &&
-      linearReady &&
-      telegramReady
+      (!linearRequired || linearReady) &&
+      (!telegramRequired || telegramReady)
         ? 'ok'
         : 'advisory',
     repo_examples: {
@@ -808,8 +828,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function readStringValue(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
+function readStringValue(value: unknown, ...keys: string[]): string | null {
+  if (keys.length === 0) {
+    return typeof value === 'string' ? value : null;
+  }
+  if (!isRecord(value)) {
+    return null;
+  }
+  for (const key of keys) {
+    if (typeof value[key] === 'string') {
+      return value[key] as string;
+    }
+  }
+  return null;
 }
 
 function readNumberValue(value: unknown): number | null {
@@ -876,6 +907,7 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
       path: preferredPath,
       dispatch_pilot_enabled: null,
       dispatch_pilot_provider: null,
+      dispatch_pilot_source_setup: null,
       transport_mutating_enabled: null,
       telegram_transport_allowed: null
     };
@@ -883,11 +915,13 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
 
   try {
     const parsed = JSON.parse(readFileSync(candidate, 'utf8')) as unknown;
-    const featureToggles = isRecord(parsed) && isRecord(parsed.feature_toggles)
-      ? (parsed.feature_toggles as Record<string, unknown>)
-      : null;
+    if (!isRecord(parsed)) {
+      throw new Error('provider control policy must be a JSON object');
+    }
+    const featureToggles = isRecord(parsed.feature_toggles) ? (parsed.feature_toggles as Record<string, unknown>) : null;
     const dispatchPilot = resolveDispatchPilotControls(featureToggles);
     const dispatchSource = readRecordValue(dispatchPilot, 'source');
+    const dispatchBindingSource = readRecordValue(dispatchSource, 'linear') ?? dispatchSource;
     const transportMutating = resolveTransportMutatingControls(featureToggles);
     const transportMutatingEnabled = readBooleanValue(transportMutating?.enabled);
     const allowedTransports = readStringArrayValue(transportMutating, 'allowed_transports', 'allowedTransports');
@@ -900,8 +934,17 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
     return {
       status: 'ok',
       path: candidate,
-      dispatch_pilot_enabled: readBooleanValue(dispatchPilot?.enabled) ?? false,
-      dispatch_pilot_provider: normalizeOptionalString(readStringValue(dispatchSource?.provider)),
+      dispatch_pilot_enabled: readBooleanValue(dispatchPilot?.enabled),
+      dispatch_pilot_provider: normalizeOptionalString(
+        readStringValue(dispatchSource, 'provider', 'source_provider', 'sourceProvider')
+      ),
+      dispatch_pilot_source_setup: dispatchBindingSource
+        ? {
+            workspace_id: normalizeOptionalString(readStringValue(dispatchBindingSource, 'workspace_id', 'workspaceId')),
+            team_id: normalizeOptionalString(readStringValue(dispatchBindingSource, 'team_id', 'teamId')),
+            project_id: normalizeOptionalString(readStringValue(dispatchBindingSource, 'project_id', 'projectId'))
+          }
+        : null,
       transport_mutating_enabled: transportMutatingEnabled,
       telegram_transport_allowed: telegramTransportAllowed
     };
@@ -912,6 +955,7 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
       detail: error instanceof Error ? error.message : String(error),
       dispatch_pilot_enabled: null,
       dispatch_pilot_provider: null,
+      dispatch_pilot_source_setup: null,
       transport_mutating_enabled: null,
       telegram_transport_allowed: null
     };

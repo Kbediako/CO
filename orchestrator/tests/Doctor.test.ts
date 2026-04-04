@@ -324,6 +324,161 @@ describe('runDoctor', () => {
     }
   });
 
+  it('resolves provider readiness from the repo root when doctor runs in a nested directory', async () => {
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-root-'));
+    const nestedDir = join(tempRepo, 'packages', 'demo');
+    const previousEnv = {
+      CO_LINEAR_API_TOKEN: process.env.CO_LINEAR_API_TOKEN,
+      CO_LINEAR_WORKSPACE_ID: process.env.CO_LINEAR_WORKSPACE_ID,
+      CO_LINEAR_WEBHOOK_SECRET: process.env.CO_LINEAR_WEBHOOK_SECRET,
+      CO_TELEGRAM_POLLING_ENABLED: process.env.CO_TELEGRAM_POLLING_ENABLED,
+      CO_TELEGRAM_BOT_TOKEN: process.env.CO_TELEGRAM_BOT_TOKEN,
+      CO_TELEGRAM_ALLOWED_CHAT_IDS: process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS,
+      CO_TELEGRAM_ENABLE_MUTATIONS: process.env.CO_TELEGRAM_ENABLE_MUTATIONS,
+      CO_TELEGRAM_PUSH_ENABLED: process.env.CO_TELEGRAM_PUSH_ENABLED
+    };
+
+    try {
+      await mkdir(join(tempRepo, 'tasks'), { recursive: true });
+      await writeFile(join(tempRepo, 'tasks', 'index.json'), '{"items":[]}', 'utf8');
+      await mkdir(nestedDir, { recursive: true });
+      const providersDir = join(tempRepo, '.codex', 'providers');
+      await mkdir(providersDir, { recursive: true });
+      await writeFile(join(providersDir, 'README.md'), '# Providers', 'utf8');
+      await writeFile(join(providersDir, 'provider.env.example'), 'CO_LINEAR_API_TOKEN=', 'utf8');
+      await writeFile(
+        join(providersDir, 'control.example.json'),
+        JSON.stringify(
+          {
+            feature_toggles: {
+              dispatch_pilot: {
+                enabled: true,
+                source: {
+                  provider: 'linear',
+                  workspace_id: 'workspace-id'
+                }
+              },
+              transport_mutating_controls: {
+                enabled: true,
+                allowed_transports: ['telegram']
+              }
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      process.env.CO_LINEAR_API_TOKEN = 'token';
+      process.env.CO_LINEAR_WORKSPACE_ID = 'workspace-id';
+      process.env.CO_LINEAR_WEBHOOK_SECRET = 'secret';
+      process.env.CO_TELEGRAM_POLLING_ENABLED = 'true';
+      process.env.CO_TELEGRAM_BOT_TOKEN = 'bot-token';
+      process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS = '12345,67890';
+      process.env.CO_TELEGRAM_ENABLE_MUTATIONS = 'true';
+      process.env.CO_TELEGRAM_PUSH_ENABLED = 'true';
+
+      const result = runDoctor(nestedDir);
+      expect(result.providers.status).toBe('ok');
+      expect(result.providers.repo_examples.root).toBe(join(tempRepo, '.codex', 'providers'));
+      expect(result.providers.linear.status).toBe('ready');
+    } finally {
+      for (const [key, value] of Object.entries(previousEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+      await rm(tempRepo, { recursive: true, force: true });
+    }
+  });
+
+  it('treats disabled providers as neutral for an ok aggregate provider status', async () => {
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-linear-only-'));
+    const previousEnv = {
+      CO_LINEAR_API_TOKEN: process.env.CO_LINEAR_API_TOKEN,
+      CO_LINEAR_WORKSPACE_ID: process.env.CO_LINEAR_WORKSPACE_ID,
+      CO_LINEAR_WEBHOOK_SECRET: process.env.CO_LINEAR_WEBHOOK_SECRET,
+      CO_TELEGRAM_POLLING_ENABLED: process.env.CO_TELEGRAM_POLLING_ENABLED,
+      CO_TELEGRAM_BOT_TOKEN: process.env.CO_TELEGRAM_BOT_TOKEN,
+      CO_TELEGRAM_ALLOWED_CHAT_IDS: process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS,
+      CO_TELEGRAM_ENABLE_MUTATIONS: process.env.CO_TELEGRAM_ENABLE_MUTATIONS,
+      CO_TELEGRAM_PUSH_ENABLED: process.env.CO_TELEGRAM_PUSH_ENABLED
+    };
+
+    try {
+      const providersDir = join(tempRepo, '.codex', 'providers');
+      await mkdir(providersDir, { recursive: true });
+      await writeFile(join(providersDir, 'README.md'), '# Providers', 'utf8');
+      await writeFile(join(providersDir, 'provider.env.example'), 'CO_LINEAR_API_TOKEN=', 'utf8');
+      await writeFile(
+        join(providersDir, 'control.example.json'),
+        JSON.stringify(
+          {
+            feature_toggles: {
+              dispatch_pilot: {
+                enabled: true,
+                source: {
+                  provider: 'linear',
+                  workspace_id: 'workspace-id'
+                }
+              }
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      process.env.CO_LINEAR_API_TOKEN = 'token';
+      process.env.CO_LINEAR_WORKSPACE_ID = 'workspace-id';
+      process.env.CO_LINEAR_WEBHOOK_SECRET = 'secret';
+      delete process.env.CO_TELEGRAM_POLLING_ENABLED;
+      delete process.env.CO_TELEGRAM_BOT_TOKEN;
+      delete process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS;
+      delete process.env.CO_TELEGRAM_ENABLE_MUTATIONS;
+      delete process.env.CO_TELEGRAM_PUSH_ENABLED;
+
+      const result = runDoctor(tempRepo);
+      expect(result.providers.status).toBe('ok');
+      expect(result.providers.linear.status).toBe('ready');
+      expect(result.providers.telegram.status).toBe('incomplete');
+      expect(result.status).toBe('ok');
+      expect(formatDoctorSummary(result).join('\n')).toContain('Providers: ok');
+    } finally {
+      for (const [key, value] of Object.entries(previousEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+      await rm(tempRepo, { recursive: true, force: true });
+    }
+  });
+
+  it('treats non-object provider control payloads as invalid', async () => {
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-invalid-policy-'));
+
+    try {
+      const providersDir = join(tempRepo, '.codex', 'providers');
+      await mkdir(providersDir, { recursive: true });
+      await writeFile(join(providersDir, 'README.md'), '# Providers', 'utf8');
+      await writeFile(join(providersDir, 'provider.env.example'), 'CO_LINEAR_API_TOKEN=', 'utf8');
+      await writeFile(join(providersDir, 'control.example.json'), '[]', 'utf8');
+
+      const result = runDoctor(tempRepo);
+      expect(result.providers.control_policy.status).toBe('invalid');
+      expect(result.providers.control_policy.detail).toContain('provider control policy must be a JSON object');
+      expect(result.providers.status).toBe('advisory');
+    } finally {
+      await rm(tempRepo, { recursive: true, force: true });
+    }
+  });
+
   it('treats missing transport allowlists as unrestricted when mutating controls are enabled', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-'));
     const previousEnv = {
@@ -351,9 +506,9 @@ describe('runDoctor', () => {
                 dispatch_pilot: {
                   enabled: true,
                   source: {
-                    provider: 'linear',
+                    sourceProvider: 'linear',
                     live: true,
-                    workspace_id: 'workspace-id'
+                    workspaceId: 'workspace-id'
                   }
                 }
               },
@@ -369,7 +524,6 @@ describe('runDoctor', () => {
       );
 
       process.env.CO_LINEAR_API_TOKEN = 'token';
-      process.env.CO_LINEAR_WORKSPACE_ID = 'workspace-id';
       process.env.CO_LINEAR_WEBHOOK_SECRET = 'secret';
       process.env.CO_TELEGRAM_POLLING_ENABLED = 'true';
       process.env.CO_TELEGRAM_BOT_TOKEN = 'bot-token';
@@ -380,11 +534,15 @@ describe('runDoctor', () => {
       const result = runDoctor(tempRepo);
       expect(result.providers.status).toBe('ok');
       expect(result.providers.control_policy.transport_mutating_enabled).toBe(true);
+      expect(result.providers.control_policy.dispatch_pilot_provider).toBe('linear');
+      expect(result.providers.linear.binding_present).toBe(true);
+      expect(result.providers.linear.status).toBe('ready');
       expect(result.providers.telegram.telegram_transport_allowed).toBe(true);
       expect(result.providers.telegram.status).toBe('ready');
 
       const summary = formatDoctorSummary(result).join('\n');
       expect(summary).toContain('Providers: ok');
+      expect(summary).toContain('Linear: ready');
       expect(summary).toContain('Telegram: ready');
       expect(summary).toContain('dispatch_pilot: enabled (linear)');
       expect(summary).toContain('transport policy: telegram allowed');
