@@ -27,7 +27,8 @@
     "templates/**",
     "skills/**",
     "codex.orchestrator.json",
-    "docs/assets/setup.gif",
+    "docs/public/downstream-setup.md",
+    "docs/public/provider-onboarding.md",
     "README.md",
     "LICENSE"
   ],
@@ -128,7 +129,7 @@
     "js-yaml": "^4.1.0",
     "react": "^18.3.1"
   },
-  "description": "![Setup demo](docs/assets/setup.gif)",
+  "description": "Codex-driven orchestration CLI with auditable manifests, downstream repo bootstrapping, and delegation MCP workflows.",
   "main": "dist/orchestrator/src/cli/orchestrator.js",
   "directories": {
     "doc": "docs",

@@ -115,6 +115,7 @@ export function formatInitSummary(result: InitResult, cwd: string): string[] {
   lines.push(
     '  - Review codex.orchestrator.json and adjust pipeline commands to your repository toolchain'
   );
+  lines.push('  - Review .codex/providers/provider.env.example and .codex/providers/control.example.json');
   lines.push('  - codex-orchestrator setup --yes  # installs bundled skills + configures delegation/devtools wiring');
   lines.push(
     '  - codex-orchestrator codex setup  # optional managed/pinned Codex CLI (activate with CODEX_CLI_USE_MANAGED=1; stock codex is default)'

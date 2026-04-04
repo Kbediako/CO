@@ -1985,7 +1985,10 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.steps).toBeTruthy();
     expect(payload.steps?.guidance?.note).toContain('Agent-first default');
     expect(payload.steps?.guidance?.references).toContain(
-      'https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md'
+      'https://github.com/Kbediako/CO/blob/main/docs/public/downstream-setup.md'
+    );
+    expect(payload.steps?.guidance?.references).toContain(
+      'https://github.com/Kbediako/CO/blob/main/docs/public/provider-onboarding.md'
     );
     expect(payload.steps?.guidance?.recommended_commands).toContain(
       'codex-orchestrator flow --task <task-id>'

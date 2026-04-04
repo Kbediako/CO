@@ -1,0 +1,132 @@
+# Provider Onboarding
+
+This guide is the downstream-safe provider contract for Linear and Telegram.
+
+## Contract
+
+- Once per machine: install CO, authenticate Codex, and confirm `codex-orchestrator doctor --format json` works.
+- Once per repo: seed `.codex/providers/` with `codex-orchestrator init codex`.
+- Runtime env carries secrets and provider bindings.
+- Control policy carries `dispatch_pilot` and `transport_mutating_controls`.
+- Linear and Telegram should both have a machine-checkable readiness signal before live smoke.
+
+## Generated scaffolding
+
+`codex-orchestrator init codex` seeds:
+
+- `.codex/providers/README.md`
+- `.codex/providers/provider.env.example`
+- `.codex/providers/control.example.json`
+
+Use those files as the starting point for your repo-specific provider setup.
+
+## Environment variables
+
+Recommended Linear env:
+
+- `CO_LINEAR_API_TOKEN`
+- `CO_LINEAR_WORKSPACE_ID`
+- `CO_LINEAR_TEAM_ID`
+- `CO_LINEAR_PROJECT_ID`
+- `CO_LINEAR_WEBHOOK_SECRET`
+
+Supported Linear token fallbacks:
+
+- `CO_LINEAR_API_KEY`
+- `LINEAR_API_KEY`
+
+Telegram env:
+
+- `CO_TELEGRAM_POLLING_ENABLED`
+- `CO_TELEGRAM_BOT_TOKEN`
+- `CO_TELEGRAM_ALLOWED_CHAT_IDS`
+- `CO_TELEGRAM_ENABLE_MUTATIONS`
+- `CO_TELEGRAM_POLL_INTERVAL_MS`
+- `CO_TELEGRAM_PUSH_ENABLED`
+- `CO_TELEGRAM_PUSH_INTERVAL_MS`
+
+## Control policy
+
+Keep the provider policy explicit.
+
+`dispatch_pilot` should declare a Linear source and stay advisory-first:
+
+```json
+{
+  "feature_toggles": {
+    "dispatch_pilot": {
+      "enabled": true,
+      "source": {
+        "provider": "linear",
+        "live": true,
+        "workspace_id": "workspace-id",
+        "team_id": "team-id",
+        "project_id": "project-id"
+      }
+    }
+  }
+}
+```
+
+Telegram mutation policy should be explicit too:
+
+```json
+{
+  "feature_toggles": {
+    "transport_mutating_controls": {
+      "enabled": true,
+      "allowed_transports": ["telegram"]
+    }
+  }
+}
+```
+
+Nested `coordinator.dispatch_pilot` and `coordinator.transport_mutating_controls` remain valid compatibility paths.
+
+## Readiness
+
+`codex-orchestrator doctor --format json` is the machine-checkable readiness surface.
+
+Expect it to tell you:
+
+- whether delegation and DevTools wiring are present
+- whether Linear credentials and binding env are populated
+- whether `CO_LINEAR_WEBHOOK_SECRET` is present
+- whether Telegram polling, token, and allowlist env are populated
+- whether repo scaffolding under `.codex/providers/` exists
+
+## Smoke flow
+
+Use this minimal smoke flow:
+
+1. Check readiness:
+   ```bash
+   codex-orchestrator doctor --format json
+   ```
+2. Start the host in a dedicated terminal and keep it running:
+   ```bash
+   codex-orchestrator control-host --format json
+   ```
+   This prints a startup readiness payload and then keeps the host alive.
+3. In another terminal, inspect the current status snapshot:
+   ```bash
+   codex-orchestrator co-status --format json
+   ```
+4. Telegram read-only smoke:
+   - send `/help` from an allowlisted chat
+   - confirm the bot replies
+5. Linear advisory smoke:
+   - confirm the status snapshot reaches `dispatch_pilot.status=ready`
+   - confirm the selected tracked issue resolves from the configured workspace, team, or project binding
+
+## Help surfaces
+
+Use these commands when onboarding an operator:
+
+```bash
+codex-orchestrator doctor --help
+codex-orchestrator control-host --help
+codex-orchestrator co-status --help
+```
+
+`control-host --format json` is a persistent host startup handshake, not a one-shot status dump.

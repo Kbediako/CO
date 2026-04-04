@@ -1,6 +1,6 @@
 # Codex Orchestrator (Repository Guide)
 
-> **Internal/Contributor guide:** This document covers repository internals and workflow details. End‑user installation and usage live in `README.md`.
+> Internal contributor guide. Public downstream docs live in `README.md` and `docs/public/`.
 
 Codex Orchestrator is the coordination layer that glues together Codex-driven agents, run pipelines, approval policies, and evidence capture for multi-stage automation projects. It wraps a reusable orchestration core with a CLI that produces auditable manifests, integrates with control-plane validators, and syncs run results to downstream systems.
 
@@ -13,14 +13,16 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 ## Collab vs MCP
 - Decision guide: `docs/guides/collab-vs-mcp.md`.
 
-## Downstream init
-- See `README.md` for the recommended quick-start flow.
+## Public docs
+- Public front door: `README.md`
+- Downstream setup: `docs/public/downstream-setup.md`
+- Provider onboarding: `docs/public/provider-onboarding.md`
 
 ## Upstream Sync
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
 ## Current Posture
-- Current CO compatibility/adoption target: Codex CLI `0.117.0`.
+- Current CO compatibility/adoption target: Codex CLI `0.118.0`.
 - Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark`.
 - Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
 - Full posture and promotion gates live in `docs/guides/codex-version-policy.md`.
