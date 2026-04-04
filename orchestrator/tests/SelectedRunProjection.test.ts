@@ -273,6 +273,39 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('treats canceled selected runs as terminal for completedAt projection', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'canceled',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Run canceled by operator.'
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'canceled',
+      completedAt: '2026-03-20T01:15:28.970Z'
+    });
+  });
+
   it('prefers newer failed provider proof over an optimistic manifest status', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -1042,6 +1075,45 @@ describe('SelectedRunProjection', () => {
       rawStatus: 'failed',
       displayStatus: 'failed',
       summary: 'retryable failure pending rerun'
+    });
+  });
+
+  it('treats canceled manifests as retry fallback candidates when provider intake state is absent', async () => {
+    const { root, paths } = await createHostPaths();
+    const retryEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const retryPaths = resolveRunPaths(retryEnv, 'run-child');
+    await mkdir(retryPaths.runDir, { recursive: true });
+    await writeFile(
+      retryPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'canceled',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'retry aborted before handoff',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const discovery = await discoverCompatibilityCollectionContexts(createProjectionContext(paths));
+
+    expect(discovery.running).toEqual([]);
+    expect(discovery.retrying).toHaveLength(1);
+    expect(discovery.retrying[0]).toMatchObject({
+      issueIdentifier: 'CO-2',
+      runId: 'run-child',
+      rawStatus: 'canceled',
+      displayStatus: 'canceled',
+      summary: 'retry aborted before handoff'
     });
   });
 

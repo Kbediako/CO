@@ -523,7 +523,7 @@ function resolveSelectedRunDisplaySummary(input: {
 }
 
 function isTerminalRunStatus(status: string): boolean {
-  return status === 'succeeded' || status === 'failed' || status === 'cancelled';
+  return status === 'succeeded' || status === 'failed' || status === 'cancelled' || status === 'canceled';
 }
 
 function hasStaleSucceededFailureSummary(summary: string): boolean {
@@ -818,7 +818,7 @@ function isManifestRetryFallbackCandidate(manifestRecord: Record<string, unknown
     return false;
   }
   const status = readStringValue(manifestRecord, 'status');
-  return status === 'failed' || status === 'cancelled';
+  return status === 'failed' || status === 'cancelled' || status === 'canceled';
 }
 
 function findMatchingProviderIntakeClaim(
