@@ -1892,15 +1892,22 @@ async function requestProviderControlHostRefresh(input: {
   proof: ProviderLinearWorkerProof;
   repoRoot: string;
   log: Pick<typeof logger, 'warn'>;
+  allowInProgress?: boolean;
 }): Promise<void> {
   const shouldRefresh =
-    input.proof.owner_phase === 'ended' &&
     (
-      input.proof.owner_status === 'failed' ||
+      input.allowInProgress === true &&
+      input.proof.owner_status === 'in_progress'
+    ) ||
+    (
+      input.proof.owner_phase === 'ended' &&
       (
-        input.proof.owner_status === 'succeeded' &&
-        typeof input.proof.end_reason === 'string' &&
-        PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS.has(input.proof.end_reason)
+        input.proof.owner_status === 'failed' ||
+        (
+          input.proof.owner_status === 'succeeded' &&
+          typeof input.proof.end_reason === 'string' &&
+          PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS.has(input.proof.end_reason)
+        )
       )
     );
   if (!shouldRefresh) {
@@ -2078,7 +2085,6 @@ export async function runProviderLinearWorker(
     ...runtimeContext.env
   };
   const auditPath = resolve(context.runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME);
-  const proofPath = buildProofPath(context.runDir);
   const workerPid = String(process.pid);
   childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
   const helperCommand = resolveProviderLinearHelperCommand(childEnv);
@@ -2183,6 +2189,7 @@ export async function runProviderLinearWorker(
   let turnId: string | null = null;
   let lifecycle = classifyProviderLinearWorkerLifecycle(issue);
   let liveRefreshRequestedAtMs = 0;
+  let liveRefreshRequest: Promise<void> | null = null;
   let liveProofWrite: Promise<void> = Promise.resolve();
 
   if (!lifecycle.isExecutionEligible) {
@@ -2245,21 +2252,23 @@ export async function runProviderLinearWorker(
       finalProof = nextProof;
       liveProofWrite = liveProofWrite
         .then(async () => {
-          await withProviderLinearWorkerProofLock(context.runDir, async () => {
-            await deps.writeProof(proofPath, nextProof);
-          });
+          const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+          finalProof = hydratedProof;
           const nowMs = Date.now();
-          if (nowMs - liveRefreshRequestedAtMs < 1_000) {
+          if (nowMs - liveRefreshRequestedAtMs < 1_000 || liveRefreshRequest !== null) {
             return;
           }
           liveRefreshRequestedAtMs = nowMs;
-          await requestProviderControlHostRefresh({
+          liveRefreshRequest = requestProviderControlHostRefresh({
             currentManifestPath: context.manifestPath,
             env,
             manifest: context.manifest,
-            proof: nextProof,
+            proof: hydratedProof,
             repoRoot: context.repoRoot,
-            log: deps.log
+            log: deps.log,
+            allowInProgress: true
+          }).finally(() => {
+            liveRefreshRequest = null;
           });
         })
         .catch((error) => {

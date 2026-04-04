@@ -3980,6 +3980,136 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('hydrates shared sidecar metadata into live proof updates before the turn completes', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const writeProof = vi.fn(async () => undefined);
+    const childStreamRecord = {
+      stream: 'docs-review',
+      pipeline_id: 'docs-review',
+      task_id: 'linear-lin-issue-1-docs-review',
+      run_id: 'docs-run-1',
+      status: 'succeeded',
+      manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-docs-review', 'cli', 'docs-run-1', 'manifest.json'),
+      artifact_root: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1',
+      log_path: '.runs/linear-lin-issue-1-docs-review/cli/docs-run-1/run.log',
+      summary: 'docs-review passed',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-21T09:00:00.050Z'
+    };
+    const childLaneScope = resolveProviderLinearChildLaneScopeContract({
+      files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+      phases: []
+    });
+    const childLaneRecord = {
+      stream: 'impl-a',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: 'linear-lin-issue-1-impl-a',
+      run_id: 'child-run-1',
+      status: 'succeeded',
+      manifest_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'manifest.json'),
+      artifact_root: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1',
+      log_path: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1/run.log',
+      summary: 'child lane finished',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-21T09:00:00.075Z',
+      purpose: 'Implement bounded same-issue child lanes',
+      instructions: null,
+      scope: childLaneScope,
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-21T09:00:00.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-21T09:00:00.075Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+      patch_artifact_path: join(tempRoot ?? '', '.runs', 'linear-lin-issue-1-impl-a', 'cli', 'child-run-1', 'provider-linear-child-lane.patch'),
+      patch_bytes: 256,
+      decision: 'pending',
+      decision_at: null,
+      decision_reason: null
+    };
+    await appendProviderLinearWorkerChildStreamRecord(runDir, childStreamRecord);
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLaneRecord);
+    const workerEnv = {
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+      CODEX_HOME: tempRoot!,
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    };
+    await recordLinearBudgetHeadersObservation({
+      env: workerEnv,
+      source: 'dispatch_source_issue_by_id',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '1',
+        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+      }
+    });
+    const execRunner = vi.fn(async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
+      request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+      request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
+      request.onStdoutChunk?.(
+        '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active"}}\n'
+      );
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await runProviderLinearWorker(workerEnv, {
+      readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+      resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+      execRunner,
+      writeProof,
+      now: vi
+        .fn()
+        .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+        .mockReturnValue('2026-03-21T09:00:01.000Z'),
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    });
+
+    const liveTurnRunningProof = [...writeProof.mock.calls]
+      .map(([, proof]) => proof)
+      .reverse()
+      .find((proof) => proof.owner_phase === 'turn_running' && proof.latest_turn_id === 'turn-1');
+
+    expect(liveTurnRunningProof).toMatchObject({
+      owner_phase: 'turn_running',
+      child_streams: expect.arrayContaining([
+        expect.objectContaining({
+          stream: 'docs-review'
+        })
+      ]),
+      child_lanes: expect.arrayContaining([
+        expect.objectContaining({
+          stream: 'impl-a'
+        })
+      ]),
+      linear_budget: expect.objectContaining({
+        suppression: 'low',
+        requests: expect.objectContaining({
+          remaining: 1
+        })
+      })
+    });
+  });
+
   it('does not reuse the previous turn session before a later turn emits turn_context', async () => {
     const { manifestPath } = await createManifestRoot();
     const writeProof = vi.fn(async () => undefined);
@@ -4160,6 +4290,251 @@ describe('provider linear worker runner', () => {
     } finally {
       await controlServer.close();
     }
+  });
+
+  it('requests a control-host refresh for live turn-running proof updates', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    const controlServer = await createControlEndpointServer();
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: controlServer.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      join(controlHostRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    try {
+      await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue({
+            state: 'Merging',
+            state_type: 'started',
+            assignee_id: null,
+            assignee_name: null
+          })),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+            request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
+            request.onStdoutChunk?.(
+              '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active"}}\n'
+            );
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      );
+
+      expect(controlServer.requests).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            url: '/api/v1/refresh',
+            body: expect.objectContaining({
+              action: 'refresh',
+              source: 'provider-linear-worker',
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              owner_status: 'in_progress',
+              end_reason: null
+            })
+          }),
+          expect.objectContaining({
+            url: '/api/v1/refresh',
+            body: expect.objectContaining({
+              action: 'refresh',
+              source: 'provider-linear-worker',
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              owner_status: 'succeeded',
+              end_reason: 'max_turns_reached_issue_still_active'
+            })
+          })
+        ])
+      );
+      for (const request of controlServer.requests) {
+        expectRefreshAuthHeaders(request.headers);
+      }
+    } finally {
+      await controlServer.close();
+    }
+  });
+
+  it('does not block worker completion on an in-flight live control-host refresh', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeFile(
+      join(controlHostRunDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: 'http://127.0.0.1:43123',
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+    await writeFile(join(controlHostRunDir, 'control_auth.json'), JSON.stringify({ token: 'control-token' }), 'utf8');
+    await writeFile(
+      join(controlHostRunDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        workspace_path: tempRoot
+      }),
+      'utf8'
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: tempRoot,
+        provider_control_host_task_id: 'local-mcp',
+        provider_control_host_run_id: 'control-host'
+      }),
+      'utf8'
+    );
+
+    const refreshBodies: Array<Record<string, unknown>> = [];
+    let liveRefreshStartedResolve: (() => void) | null = null;
+    const liveRefreshStarted = new Promise<void>((resolve) => {
+      liveRefreshStartedResolve = resolve;
+    });
+    let resolveLiveRefresh: ((response: Response) => void) | null = null;
+    let refreshCallCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: unknown, init?: RequestInit) => {
+        refreshCallCount += 1;
+        refreshBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        if (refreshCallCount === 1) {
+          liveRefreshStartedResolve?.();
+          return await new Promise<Response>((resolve) => {
+            resolveLiveRefresh = resolve;
+          });
+        }
+        return new Response(JSON.stringify({ queued: true, coalesced: false }), {
+          status: 202,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      })
+    );
+
+    const workerPromise = runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner: vi.fn(async (request) => {
+          request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+          request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
+          request.onStdoutChunk?.(
+            '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active"}}\n'
+          );
+          return {
+            exitCode: 0,
+            stdout: [
+              '{"type":"thread.started","thread_id":"thread-1"}',
+              '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+              '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active"}}',
+              '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+            ].join('\n'),
+            stderr: ''
+          };
+        }),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    await liveRefreshStarted;
+    const outcome = await Promise.race([
+      workerPromise.then(() => 'resolved'),
+      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 250))
+    ]);
+    expect(outcome).toBe('resolved');
+    resolveLiveRefresh?.(
+      new Response(JSON.stringify({ queued: true, coalesced: false }), {
+        status: 202,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+    );
+    await workerPromise;
+
+    expect(refreshBodies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          owner_status: 'in_progress',
+          end_reason: null
+        }),
+        expect.objectContaining({
+          owner_status: 'succeeded',
+          end_reason: 'max_turns_reached_issue_still_active'
+        })
+      ])
+    );
   });
 
   it('treats Ready as the live Todo-equivalent queue state even though Linear marks it unstarted', async () => {

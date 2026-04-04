@@ -17,6 +17,7 @@ review_notes:
   - 2026-04-04: The workspace started detached at `4f4ecdcb88897c76a25d5acff85b25e58ffd4e8d` (contained by `main` and `linear/co-77-release-prep-hardening`) and moved onto branch `linear/co-78-status-truthful-telemetry-parity` before tracked repo edits.
   - 2026-04-04: Pre-implementation audit identified the active CO rendering seam in `orchestrator/src/cli/control/controlStatusDashboard.ts` with focused regression coverage in `orchestrator/tests/ControlStatusDashboard.test.ts`, and the detailed Symphony reference in `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/status_dashboard.ex` plus `/Users/kbediako/Code/symphony/elixir/test/symphony_elixir/orchestrator_status_test.exs`.
   - 2026-04-04: Issue-quality review approves one bounded lane over the full visible default CO STATUS contract: default launch behavior, header telemetry, rate-limit presentation, running-row semantics, degraded/idle states, and real-device screenshot proof. Narrow single-field fixes, dashboard redesign, and unrelated control-host refactors remain out of scope.
+  - 2026-04-04: Audited `codex-orchestrator docs-review` child stream completed with `status: succeeded`, `review_outcome: clean-success`, and no blocking findings. Evidence: `.runs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc-co-78-docs-review/cli/2026-04-03T23-02-25-401Z-e6287e4b/manifest.json`, `.runs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc-co-78-docs-review/cli/2026-04-03T23-02-25-401Z-e6287e4b/review/telemetry.json`.
 ---
 
 # Technical Specification
@@ -105,5 +106,6 @@ The lane therefore needs one coherent pass over the full visible surface: defaul
 
 ## Approvals
 
-- Reviewer: Pending `codex-orchestrator docs-review`
+- Reviewer: `codex-orchestrator docs-review` approved with `review_outcome: clean-success`
 - Date: `2026-04-04`
+- Manifest: `.runs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc-co-78-docs-review/cli/2026-04-03T23-02-25-401Z-e6287e4b/manifest.json`
