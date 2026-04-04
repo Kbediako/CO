@@ -1429,8 +1429,32 @@ function formatCompactCodexRateLimitSegments(
   const primary = asRecord(value.primary);
   const secondary = asRecord(value.secondary);
   const credits = asRecord(value.credits);
+  const requests = asRecord(value.requests);
+  const endpointRequests = asRecord(value.endpoint_requests);
+  const observedAt = readRecordString(value, ['observed_at', 'observedAt']);
+  const suppression = readRecordString(value, ['suppression']);
+  const retryAfterSeconds = readRecordNumber(value, ['retry_after_seconds', 'retryAfterSeconds']);
   if (!limitId && !primary && !secondary && !credits) {
-    return null;
+    if (!requests && !endpointRequests) {
+      return null;
+    }
+    if (observedAt !== null || suppression !== null || retryAfterSeconds !== null) {
+      return null;
+    }
+    const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];
+    if (requests) {
+      pieces.push({
+        text: ` req${formatCompactRateLimitBucket(requests, referenceTime)}`,
+        color: ANSI_CYAN
+      });
+    }
+    if (endpointRequests) {
+      pieces.push({
+        text: ` ep-req${formatCompactRateLimitBucket(endpointRequests, referenceTime)}`,
+        color: ANSI_CYAN
+      });
+    }
+    return pieces;
   }
   const pieces: SummarySegment[] = [
     { text: sanitizeDisplayValue(limitId ?? 'unknown'), color: ANSI_YELLOW }
@@ -1455,8 +1479,34 @@ function formatCodexRateLimitSegments(
   const primary = asRecord(value.primary);
   const secondary = asRecord(value.secondary);
   const credits = asRecord(value.credits);
+  const requests = asRecord(value.requests);
+  const endpointRequests = asRecord(value.endpoint_requests);
+  const observedAt = readRecordString(value, ['observed_at', 'observedAt']);
+  const suppression = readRecordString(value, ['suppression']);
+  const retryAfterSeconds = readRecordNumber(value, ['retry_after_seconds', 'retryAfterSeconds']);
   if (!limitId && !primary && !secondary && !credits) {
-    return null;
+    if (!requests && !endpointRequests) {
+      return null;
+    }
+    if (observedAt !== null || suppression !== null || retryAfterSeconds !== null) {
+      return null;
+    }
+    const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];
+    if (requests) {
+      pieces.push({ text: ' | ', color: ANSI_GRAY });
+      pieces.push({
+        text: `requests ${formatRateLimitBucket(requests, referenceTime)}`,
+        color: ANSI_CYAN
+      });
+    }
+    if (endpointRequests) {
+      pieces.push({ text: ' | ', color: ANSI_GRAY });
+      pieces.push({
+        text: `ep requests ${formatRateLimitBucket(endpointRequests, referenceTime)}`,
+        color: ANSI_CYAN
+      });
+    }
+    return pieces;
   }
   const pieces: SummarySegment[] = [
     { text: sanitizeDisplayValue(limitId ?? 'unknown'), color: ANSI_YELLOW }

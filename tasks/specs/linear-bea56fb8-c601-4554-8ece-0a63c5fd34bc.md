@@ -44,6 +44,22 @@ The lane therefore needs one coherent pass over the full visible surface: defaul
 6. Automated coverage must exercise the shared visible-truth path for launch/default behavior, telemetry aggregation, rate-limit rendering, row semantics, and degraded or empty states.
 7. Manual validation must cover live, paused/inspect, compact/constrained-height, idle/empty, and retry/degraded states with real screenshots from this device embedded directly in Linear.
 
+## Protected Expectations
+
+- This lane owns the full visible default CO STATUS contract, not a narrow single-field fix.
+- `co-status`, `Tokens`, `Throughput`, `Rate Limits`, `STAGE`, `EVENT`, `PID`, `AGE / TURN`, `TOKENS`, and `SESSION` are all user-visible product surface in this issue.
+- The default non-JSON `co-status` path must stop auto-running and advertising the HTTP dashboard.
+- Symphony remains the reference for operator-useful semantics, especially for event meaning, PID visibility, turn or session or token projection, and rate-limit presentation.
+- Validation evidence must use real screenshots captured from this device and embedded directly in Linear.
+
+## Reject These Wrong Interpretations
+
+- Only fix the first empty field the reporter mentioned and treat the rest of the frame as out of scope.
+- Keep starting the HTTP dashboard by default and merely hide the rendered `Dashboard:` line.
+- Accept rendered proof cards, mock frames, or text-derived screenshots as closeout evidence.
+- Assume untouched visible fields are correct without re-testing them after the truth-path edits.
+- Treat `AGE / TURN` as a pure paint bug even when upstream turn, session, or token data is missing.
+
 ## Current Truth
 
 - `controlStatusDashboard.ts` owns the visible terminal frame and currently renders `Throughput`, `Rate Limits`, optional `Dashboard:`, and running-row columns including `AGE / TURN`, `TOKENS`, `SESSION`, and `EVENT`.
@@ -85,6 +101,13 @@ The lane therefore needs one coherent pass over the full visible surface: defaul
 - Add focused coverage for default launch behavior, Codex-first rate limits, cleaned Linear budget rendering, PID column semantics, event humanization, and `n/a` degradation behavior.
 - Back the closeout with real-device screenshots for the required live and degraded states.
 
+## Non-Goals
+
+- No broad redesign of the HTTP dashboard UI or UX itself.
+- No unrelated control-host refactor beyond the bounded seams needed to restore the default CO STATUS contract.
+- No proof-card rendering, mock frames, or synthetic screenshot generation for validation.
+- No narrow fix that leaves the rest of the visible default CO STATUS surface unverified.
+
 ## Parity / Alignment Matrix
 
 | Surface | Current CO truth | Symphony reference | Target CO truth |
@@ -95,6 +118,15 @@ The lane therefore needs one coherent pass over the full visible surface: defaul
 | `PID` | absent | present in running table | present in running table |
 | `AGE / TURN`, `TOKENS`, `SESSION` | often effectively empty or misleading | projected or explicit unavailable semantics | authoritative values or explicit `n/a` |
 | Validation | historically under-covered visible surface | snapshot-tested status surface | full visible-surface re-test plus real screenshots |
+
+## Not Done If
+
+- `co-status` still auto-starts or advertises the HTTP dashboard by default.
+- `Tokens`, `Throughput`, `Rate Limits`, `EVENT`, `PID`, `AGE / TURN`, `TOKENS`, or `SESSION` remain empty, misleading, or unverified during real active usage.
+- The Linear rate-limit line still leaks raw source text such as `dispatch_source_issue_by_id`.
+- Reset timing remains as unclear raw-seconds output without trustworthy human intent.
+- Symphony was not used as the detailed reference for the operator semantics in this lane.
+- Closeout evidence relies on rendered proof cards instead of real screenshots embedded directly in Linear.
 
 ## Validation Plan
 

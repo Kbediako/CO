@@ -2207,7 +2207,35 @@ export async function runProviderLinearWorker(
   for (let turnNumber = 1; turnNumber <= context.maxTurns; turnNumber += 1) {
     let liveStdoutBuffer = '';
     let liveProofSignature: string | null = null;
+    let liveRefreshPending = false;
+    let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
     const liveParseState = buildEmptyProviderLinearWorkerJsonlParseResult();
+    const scheduleTrailingLiveRefresh = (): void => {
+      if (!liveRefreshPending || liveRefreshRequest !== null || liveRefreshTimer !== null) {
+        return;
+      }
+      const waitMs = Math.max(0, 1_000 - (Date.now() - liveRefreshRequestedAtMs));
+      liveRefreshTimer = setTimeout(() => {
+        liveRefreshTimer = null;
+        if (!liveRefreshPending || liveRefreshRequest !== null) {
+          return;
+        }
+        liveRefreshPending = false;
+        liveRefreshRequestedAtMs = Date.now();
+        liveRefreshRequest = requestProviderControlHostRefresh({
+          currentManifestPath: context.manifestPath,
+          env,
+          manifest: context.manifest,
+          proof: finalProof,
+          repoRoot: context.repoRoot,
+          log: deps.log,
+          allowInProgress: true
+        }).finally(() => {
+          liveRefreshRequest = null;
+          scheduleTrailingLiveRefresh();
+        });
+      }, waitMs);
+    };
     const queueLiveProofWrite = (): void => {
       const liveThreadId = liveParseState.threadId ?? threadId;
       const liveTurnId = liveParseState.turnId;
@@ -2256,8 +2284,11 @@ export async function runProviderLinearWorker(
           finalProof = hydratedProof;
           const nowMs = Date.now();
           if (nowMs - liveRefreshRequestedAtMs < 1_000 || liveRefreshRequest !== null) {
+            liveRefreshPending = true;
+            scheduleTrailingLiveRefresh();
             return;
           }
+          liveRefreshPending = false;
           liveRefreshRequestedAtMs = nowMs;
           liveRefreshRequest = requestProviderControlHostRefresh({
             currentManifestPath: context.manifestPath,
@@ -2269,6 +2300,7 @@ export async function runProviderLinearWorker(
             allowInProgress: true
           }).finally(() => {
             liveRefreshRequest = null;
+            scheduleTrailingLiveRefresh();
           });
         })
         .catch((error) => {

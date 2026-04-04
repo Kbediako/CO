@@ -678,7 +678,7 @@ describe('control status dashboard', () => {
     }
   );
 
-  it('falls back to generic summaries for legacy proof rate-limit payloads', () => {
+  it('surfaces legacy Codex request limits without leaking raw source labels', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
         rate_limits: {
@@ -700,8 +700,56 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Rate Limits: source=legacy-proof');
-    expect(plainFrame).not.toContain('Linear API (legacy-proof)');
+    expect(plainFrame).toContain('│ Rate Limits: Codex | requests 1/30 reset 1m');
+    expect(plainFrame).not.toContain('legacy-proof');
+  });
+
+  it('keeps legacy Codex request limits visible when combined with Linear budget', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          codex: {
+            source: 'legacy-proof',
+            requests: {
+              remaining: 1,
+              limit: 30,
+              reset_at: '2026-03-30T01:16:00.000Z'
+            }
+          },
+          linear_budget: {
+            observed_at: '2026-03-30T01:15:00.000Z',
+            source: 'linear-budget-state',
+            suppression: 'cooldown',
+            retry_after_seconds: 120,
+            requests: {
+              remaining: 19,
+              limit: 30,
+              reset_at: '2026-03-30T01:15:42.000Z'
+            },
+            complexity: {
+              remaining: 180,
+              limit: 200,
+              reset_at: '2026-03-30T01:15:07.000Z'
+            }
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex req1/30 1m');
+    expect(rateLimitLine).toContain('Linear cooldown 2m req19/30 42s cx180/200 7s');
+    expect(rateLimitLine).not.toContain('legacy-proof');
   });
 
   it('sanitizes terminal control characters before rendering text fields', () => {
