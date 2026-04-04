@@ -30,6 +30,7 @@ import {
   hasLinearSourceBinding,
   resolveLinearSourceSetup
 } from './control/linearDispatchSource.js';
+import { normalizeDispatchSourceProvider } from './control/trackerDispatchPilot.js';
 import {
   BASELINE_AGENTS,
   BASELINE_MODEL,
@@ -922,6 +923,9 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
     const dispatchPilot = resolveDispatchPilotControls(featureToggles);
     const dispatchSource = readRecordValue(dispatchPilot, 'source');
     const dispatchBindingSource = readRecordValue(dispatchSource, 'linear') ?? dispatchSource;
+    const rawDispatchPilotProvider = normalizeOptionalString(
+      readStringValue(dispatchSource, 'provider', 'source_provider', 'sourceProvider')
+    );
     const transportMutating = resolveTransportMutatingControls(featureToggles);
     const transportMutatingEnabled = readBooleanValue(transportMutating?.enabled);
     const allowedTransports = readStringArrayValue(transportMutating, 'allowed_transports', 'allowedTransports');
@@ -935,9 +939,8 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
       status: 'ok',
       path: candidate,
       dispatch_pilot_enabled: readBooleanValue(dispatchPilot?.enabled),
-      dispatch_pilot_provider: normalizeOptionalString(
-        readStringValue(dispatchSource, 'provider', 'source_provider', 'sourceProvider')
-      ),
+      dispatch_pilot_provider:
+        normalizeDispatchSourceProvider(rawDispatchPilotProvider ?? undefined) ?? rawDispatchPilotProvider,
       dispatch_pilot_source_setup: dispatchBindingSource
         ? {
             workspace_id: normalizeOptionalString(readStringValue(dispatchBindingSource, 'workspace_id', 'workspaceId')),

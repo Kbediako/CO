@@ -566,7 +566,7 @@ function isLiveDispatchSource(source: Record<string, unknown>): boolean {
   return Boolean(mode && mode.trim().toLowerCase() === 'live');
 }
 
-function normalizeDispatchSourceProvider(value: string | undefined): DispatchPilotSourceSetup['provider'] | null {
+export function normalizeDispatchSourceProvider(value: string | undefined): DispatchPilotSourceSetup['provider'] | null {
   if (!value) {
     return null;
   }

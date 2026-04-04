@@ -505,7 +505,7 @@ describe('runDoctor', () => {
                 dispatch_pilot: {
                   enabled: true,
                   source: {
-                    sourceProvider: 'linear',
+                    sourceProvider: 'Linear_Advisory',
                     live: true,
                     workspaceId: 'workspace-id'
                   }
@@ -534,6 +534,7 @@ describe('runDoctor', () => {
       expect(result.providers.status).toBe('ok');
       expect(result.providers.control_policy.transport_mutating_enabled).toBe(true);
       expect(result.providers.control_policy.dispatch_pilot_provider).toBe('linear');
+      expect(result.providers.linear.dispatch_pilot_provider).toBe('linear');
       expect(result.providers.linear.binding_present).toBe(true);
       expect(result.providers.linear.status).toBe('ready');
       expect(result.providers.telegram.telegram_transport_allowed).toBe(true);
