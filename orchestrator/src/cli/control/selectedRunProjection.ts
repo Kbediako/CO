@@ -35,6 +35,7 @@ import {
   deriveDeterministicProviderMutationSuppressions,
   formatDeterministicProviderMutationDegradationSummary,
   isAuxiliaryProviderProofHarnessManifest,
+  isProviderLinearWorkerProofFreshForStage,
   resolveProviderLinearWorkerAttemptStartedAt,
   resolveProviderLinearWorkerTerminalReason,
   resolveProviderLinearWorkerTerminalStatus,
@@ -253,22 +254,17 @@ function buildProjectionContextFromParts(
   const control = parts.control;
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
-  const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(
-    manifestRecord,
-    (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
-  );
-  const proofTerminalStatus = useTerminalProof
-    ? resolveProviderLinearWorkerTerminalStatus(
-        (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
-      )
+  const providerProofRecord = (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null;
+  const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(manifestRecord, providerProofRecord);
+  const useScopedTerminalProof =
+    useTerminalProof && isProviderLinearWorkerProofFreshForStage(providerProofRecord, startedAt);
+  const proofTerminalStatus = useScopedTerminalProof
+    ? resolveProviderLinearWorkerTerminalStatus(providerProofRecord)
     : null;
   const rawStatus = proofTerminalStatus ?? manifestRawStatus;
   const manifestUpdatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
-  const proofUpdatedAt = useTerminalProof
-    ? readStringValue(
-        ((parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null) ?? {},
-        'updated_at'
-      )
+  const proofUpdatedAt = useScopedTerminalProof
+    ? readStringValue(providerProofRecord ?? {}, 'updated_at')
     : null;
   const updatedAt =
     proofUpdatedAt && (!manifestUpdatedAt || compareIsoTimestamp(proofUpdatedAt, manifestUpdatedAt) >= 0)
@@ -277,18 +273,14 @@ function buildProjectionContextFromParts(
   const manifestCompletedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt');
   const completedAt = manifestCompletedAt ?? (isTerminalRunStatus(rawStatus) ? proofUpdatedAt ?? updatedAt : null);
   const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
-  const proofAttemptStartedAt = useTerminalProof
-    ? resolveProviderLinearWorkerAttemptStartedAt(
-        (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
-      )
+  const proofAttemptStartedAt = useScopedTerminalProof
+    ? resolveProviderLinearWorkerAttemptStartedAt(providerProofRecord)
     : null;
   const proofSummary =
-    useTerminalProof && proofTerminalStatus
+    useScopedTerminalProof && proofTerminalStatus
       ? buildProviderLinearWorkerTerminalSummary({
           status: proofTerminalStatus,
-          endReason: resolveProviderLinearWorkerTerminalReason(
-            (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
-          ),
+          endReason: resolveProviderLinearWorkerTerminalReason(providerProofRecord),
           degradationSummary:
             proofAttemptStartedAt === null
               ? null
