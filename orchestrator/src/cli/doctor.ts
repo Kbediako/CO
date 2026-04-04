@@ -832,18 +832,14 @@ function readRecordValue(value: unknown, ...keys: string[]): Record<string, unkn
   return null;
 }
 
-function readStringArrayValue(value: unknown, ...keys: string[]): string[] {
-  const record = readRecordValue(value, ...keys);
-  if (record) {
-    return [];
-  }
+function readStringArrayValue(value: unknown, ...keys: string[]): string[] | undefined {
   const raw = isRecord(value)
     ? keys.map((key) => value[key]).find((entry) => Array.isArray(entry))
     : Array.isArray(value)
       ? value
-      : null;
+      : undefined;
   if (!Array.isArray(raw)) {
-    return [];
+    return undefined;
   }
   return raw
     .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
@@ -893,16 +889,21 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
     const dispatchPilot = readRecordValue(featureToggles, 'dispatch_pilot');
     const dispatchSource = readRecordValue(dispatchPilot, 'source');
     const transportMutating = resolveTransportMutatingControls(featureToggles);
+    const transportMutatingEnabled = readBooleanValue(transportMutating?.enabled);
     const allowedTransports = readStringArrayValue(transportMutating, 'allowed_transports', 'allowedTransports');
+    const telegramTransportAllowed =
+      transportMutating === null
+        ? null
+        : transportMutatingEnabled === true
+          ? allowedTransports ? allowedTransports.includes('telegram') : true
+          : false;
     return {
       status: 'ok',
       path: candidate,
       dispatch_pilot_enabled: readBooleanValue(dispatchPilot?.enabled) ?? false,
       dispatch_pilot_provider: normalizeOptionalString(readStringValue(dispatchSource?.provider)),
-      transport_mutating_enabled: readBooleanValue(transportMutating?.enabled),
-      telegram_transport_allowed: transportMutating
-        ? allowedTransports.includes('telegram')
-        : null
+      transport_mutating_enabled: transportMutatingEnabled,
+      telegram_transport_allowed: telegramTransportAllowed
     };
   } catch (error) {
     return {
