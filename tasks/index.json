@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260404-linear-529457d9-5636-4394-a21e-b96e4f4fae74",
+      "title": "CO: Recover provider-worker claims cleanly after missing control-host manifest and shared-budget cooldown",
+      "relates_to": "tasks/tasks-linear-529457d9-5636-4394-a21e-b96e4f4fae74.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-04",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-529457d9-5636-4394-a21e-b96e4f4fae74.md",
+        "task": "tasks/tasks-linear-529457d9-5636-4394-a21e-b96e4f4fae74.md",
+        "agent_task": ".agent/task/linear-529457d9-5636-4394-a21e-b96e4f4fae74.md",
+        "docs": "docs/TECH_SPEC-linear-529457d9-5636-4394-a21e-b96e4f4fae74.md"
+      }
+    },
+    {
       "id": "20260404-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc",
       "title": "CO STATUS: restore truthful default operator telemetry and Symphony parity",
       "relates_to": "tasks/tasks-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",

@@ -1706,6 +1706,17 @@ async function resolveProviderControlHostManifestPath(
   };
 }
 
+async function realpathOrResolveIfMissing(pathname: string): Promise<string> {
+  try {
+    return await realpath(pathname);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return resolve(pathname);
+    }
+    throw error;
+  }
+}
+
 function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
   const relativePath = relative(rootPath, targetPath);
   return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
@@ -1926,12 +1937,17 @@ async function requestProviderControlHostRefresh(input: {
     if (!manifestTarget) {
       return;
     }
-    const canonicalManifestPath = await realpath(manifestTarget.manifestPath);
     const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
-    if (!isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)) {
+    const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+    const canonicalManifestPath = await realpathOrResolveIfMissing(
+      resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
+    );
+    if (
+      !isPathWithinRoot(canonicalRunDir, canonicalRunsRoot) ||
+      !isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)
+    ) {
       throw new Error('control-host manifest path invalid');
     }
-    const canonicalRunDir = dirname(canonicalManifestPath);
     const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
     if (!workerTaskId) {
       throw new Error('provider task id unavailable');
