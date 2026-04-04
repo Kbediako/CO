@@ -547,6 +547,49 @@ describe('runDoctor', () => {
     }
   });
 
+  it('treats enabled dispatch pilot without a provider as invalid', async () => {
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-missing-provider-'));
+
+    try {
+      const providersDir = join(tempRepo, '.codex', 'providers');
+      await mkdir(providersDir, { recursive: true });
+      await writeFile(join(providersDir, 'README.md'), '# Providers', 'utf8');
+      await writeFile(join(providersDir, 'provider.env.example'), 'CO_LINEAR_API_TOKEN=', 'utf8');
+      await writeFile(
+        join(providersDir, 'control.example.json'),
+        JSON.stringify(
+          {
+            feature_toggles: {
+              dispatch_pilot: {
+                enabled: true,
+                source: {
+                  live: true,
+                  workspace_id: 'workspace-id'
+                }
+              }
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      const result = runDoctor(tempRepo);
+      expect(result.providers.status).toBe('advisory');
+      expect(result.providers.control_policy.status).toBe('invalid');
+      expect(result.providers.control_policy.detail).toContain(
+        'dispatch_pilot.source.provider is required when dispatch_pilot.enabled=true'
+      );
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('Providers: advisory');
+      expect(summary).toContain('control policy: invalid');
+    } finally {
+      await rm(tempRepo, { recursive: true, force: true });
+    }
+  });
+
   it('treats missing transport allowlists as unrestricted when mutating controls are enabled', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-'));
     const previousEnv = {

@@ -924,9 +924,23 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
     const dispatchPilot = resolveDispatchPilotControls(featureToggles);
     const dispatchSource = readRecordValue(dispatchPilot, 'source');
     const dispatchBindingSource = readRecordValue(dispatchSource, 'linear') ?? dispatchSource;
+    const dispatchPilotEnabled = readBooleanValue(dispatchPilot?.enabled);
     const rawDispatchPilotProvider = normalizeOptionalString(
       readStringValue(dispatchSource, 'provider', 'source_provider', 'sourceProvider')
     );
+    const normalizedDispatchPilotProvider = normalizeDispatchSourceProvider(rawDispatchPilotProvider ?? undefined);
+    if (dispatchPilotEnabled === true) {
+      if (!dispatchSource) {
+        throw new Error('dispatch_pilot.source is required when dispatch_pilot.enabled=true');
+      }
+      if (!normalizedDispatchPilotProvider) {
+        throw new Error(
+          rawDispatchPilotProvider
+            ? `unsupported dispatch_pilot.source.provider: ${rawDispatchPilotProvider}`
+            : 'dispatch_pilot.source.provider is required when dispatch_pilot.enabled=true'
+        );
+      }
+    }
     const transportMutating = resolveTransportMutatingControls(featureToggles);
     const transportMutatingEnabled = readBooleanValue(transportMutating?.enabled);
     const allowedTransports = readStringArrayValue(transportMutating, 'allowed_transports', 'allowedTransports');
@@ -939,9 +953,8 @@ function readProviderControlPolicy(providerRoot: string): DoctorResult['provider
     return {
       status: 'ok',
       path: candidate,
-      dispatch_pilot_enabled: readBooleanValue(dispatchPilot?.enabled),
-      dispatch_pilot_provider:
-        normalizeDispatchSourceProvider(rawDispatchPilotProvider ?? undefined) ?? rawDispatchPilotProvider,
+      dispatch_pilot_enabled: dispatchPilotEnabled,
+      dispatch_pilot_provider: normalizedDispatchPilotProvider ?? rawDispatchPilotProvider,
       dispatch_pilot_source_setup: dispatchBindingSource
         ? {
             workspace_id: normalizeOptionalString(readStringValue(dispatchBindingSource, 'workspace_id', 'workspaceId')),
