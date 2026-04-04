@@ -133,6 +133,19 @@ describe('runCoStatusCliShell', () => {
     expect(loggedLines[3]).toContain('/.runs/local-mcp/cli/control-host');
     expect(loggedLines[4]).toContain('/.runs/local-mcp/cli/control-host/manifest.json');
   });
+
+  it('rejects launch-only flags now that co-status is attach-only', async () => {
+    await expect(
+      runCoStatusCliShell({
+        flags: {
+          pipeline: 'docs-review'
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow(
+      'co-status attaches to an existing control host and does not accept launch-only flags: --pipeline. Use `control-host` to start a control host with launch settings.'
+    );
+  });
 });
 
 async function startUiServer(): Promise<{
