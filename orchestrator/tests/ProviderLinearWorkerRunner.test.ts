@@ -4619,8 +4619,11 @@ describe('provider linear worker runner', () => {
     ]);
     expect(outcome).toBe('resolved');
     await workerPromise;
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
     expect(liveRefreshAborted).toBe(true);
     expect(log.warn).not.toHaveBeenCalled();
+    expect(refreshBodies).toHaveLength(2);
+    expect(refreshBodies.filter((body) => body.owner_status === 'in_progress')).toHaveLength(1);
 
     expect(refreshBodies).toEqual(
       expect.arrayContaining([
@@ -4640,7 +4643,7 @@ describe('provider linear worker runner', () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date('2026-03-21T09:00:00.000Z'));
-      const { manifestPath } = await createManifestRoot();
+      const { runDir, manifestPath } = await createManifestRoot();
       const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
       await mkdir(controlHostRunDir, { recursive: true });
       await writeFile(
@@ -4769,6 +4772,16 @@ describe('provider linear worker runner', () => {
       await vi.waitFor(() => {
         expect(refreshBodies.filter((body) => body.owner_status === 'in_progress')).toHaveLength(2);
       });
+      const queuedRefreshProof = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(queuedRefreshProof).toMatchObject({
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        turn_count: 1,
+        last_message: 'Worker turn updated',
+        owner_status: 'in_progress'
+      });
 
       allowRunnerToFinishResolve?.();
       await workerPromise;
@@ -4780,7 +4793,7 @@ describe('provider linear worker runner', () => {
   it('keeps trailing live refresh state across turn boundaries', async () => {
     vi.useFakeTimers();
     try {
-      const { manifestPath } = await createManifestRoot();
+      const { runDir, manifestPath } = await createManifestRoot();
       const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
       await mkdir(controlHostRunDir, { recursive: true });
       await writeFile(
@@ -4918,6 +4931,16 @@ describe('provider linear worker runner', () => {
       await vi.advanceTimersByTimeAsync(1_100);
       await vi.waitFor(() => {
         expect(refreshBodies.filter((body) => body.owner_status === 'in_progress')).toHaveLength(2);
+      });
+      const secondTurnProof = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(secondTurnProof).toMatchObject({
+        latest_turn_id: 'turn-2',
+        latest_session_id: 'thread-1-turn-2',
+        turn_count: 2,
+        last_message: 'turn-2 active',
+        owner_status: 'in_progress'
       });
 
       allowSecondTurnToFinishResolve?.();

@@ -368,7 +368,6 @@ function selectRunningEvent(input: {
   if (input.proofEvent) {
     const genericFallbacks = new Set([
       input.rawStatus,
-      input.latestAction,
       'in_progress',
       'running',
       'resuming',
