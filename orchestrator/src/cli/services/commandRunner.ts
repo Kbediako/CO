@@ -389,6 +389,10 @@ export async function runCommandStage(
     let effectiveSummary = summary;
     let forceReviewEvidenceFailure = false;
     let forceProviderLinearWorkerFailure = false;
+    let providerLinearWorkerFailureReason: string | null = null;
+    let providerLinearWorkerTerminalStatus: string | null = null;
+    let providerLinearWorkerTerminalReason: string | null = null;
+    let providerLinearWorkerReviewOutcomeSummary: string | null = null;
 
     if (reviewEvidenceMismatch && enforceReviewEvidenceConsistency) {
       if (reviewEvidenceWaiverReason) {
@@ -416,7 +420,9 @@ export async function runCommandStage(
       }
     }
     if (!reviewEvidenceMismatch) {
-      const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(reviewTelemetry);
+      const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(
+        providerLinearWorkerStage ? providerReviewTelemetry : reviewTelemetry
+      );
       if (reviewOutcomeSummary) {
         effectiveSummary = `${effectiveSummary} (${reviewOutcomeSummary})`;
       }
@@ -427,6 +433,7 @@ export async function runCommandStage(
       );
       const providerLinearWorkerProofRecord = providerLinearWorkerProof as Record<string, unknown> | null;
       if (result.status === 'succeeded' && providerLinearWorkerProofRecord === null) {
+        providerLinearWorkerFailureReason = 'provider_linear_worker_proof_missing_or_unreadable';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
           status: 'failed',
           endReason: 'provider_linear_worker_proof_missing_or_unreadable'
@@ -435,10 +442,13 @@ export async function runCommandStage(
       }
       const proofTerminalStatus = resolveProviderLinearWorkerTerminalStatus(providerLinearWorkerProofRecord);
       const proofTerminalReason = resolveProviderLinearWorkerTerminalReason(providerLinearWorkerProofRecord);
+      providerLinearWorkerTerminalStatus = proofTerminalStatus;
+      providerLinearWorkerTerminalReason = proofTerminalReason;
       const proofAttemptStartedAt =
         resolveProviderLinearWorkerAttemptStartedAt(providerLinearWorkerProofRecord) ?? entry.started_at ?? null;
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
       const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
+      providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
         providerLinearWorkerProof?.linear_audit ?? null,
         {
@@ -448,6 +458,7 @@ export async function runCommandStage(
       const degradationSummary = formatDeterministicProviderMutationDegradationSummary(mutationSuppressions);
 
       if (proofTerminalStatus === 'failed') {
+        providerLinearWorkerFailureReason = 'provider_linear_worker_terminal_failed';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
           status: 'failed',
           endReason: proofTerminalReason,
@@ -456,6 +467,7 @@ export async function runCommandStage(
         });
         forceProviderLinearWorkerFailure = true;
       } else if (reviewTelemetryStatus === 'failed') {
+        providerLinearWorkerFailureReason = 'provider_linear_worker_review_failed';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
           status: 'failed',
           endReason: null,
@@ -554,6 +566,39 @@ export async function runCommandStage(
         manifest,
         entry,
         entry.status === 'skipped' ? 'command-allow-failure' : 'command-failed',
+        errorDetails
+      );
+    }
+
+    if (forceProviderLinearWorkerFailure && result.status === 'succeeded' && !entry.error_file) {
+      const errorDetails: Record<string, unknown> = {
+        exit_code: effectiveExitCode,
+        command_exit_code: normalizedExitCode,
+        sandbox_state: result.sandboxState,
+        failure_reason: providerLinearWorkerFailureReason ?? 'provider_linear_worker_authoritative_failure',
+        detail: effectiveSummary
+      };
+      if (providerLinearWorkerTerminalStatus) {
+        errorDetails.provider_linear_worker_terminal_status = providerLinearWorkerTerminalStatus;
+      }
+      if (providerLinearWorkerTerminalReason) {
+        errorDetails.provider_linear_worker_end_reason = providerLinearWorkerTerminalReason;
+      }
+      if (providerLinearWorkerReviewOutcomeSummary) {
+        errorDetails.review_outcome_summary = providerLinearWorkerReviewOutcomeSummary;
+      }
+      if (stdoutTruncated) {
+        errorDetails.stdout_truncated = true;
+      }
+      if (stderrTruncated) {
+        errorDetails.stderr_truncated = true;
+      }
+      entry.error_file = await appendCommandError(
+        env,
+        paths,
+        manifest,
+        entry,
+        'provider-linear-worker-authoritative-failed',
         errorDetails
       );
     }

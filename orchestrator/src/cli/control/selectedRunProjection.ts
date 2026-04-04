@@ -279,6 +279,11 @@ function buildProjectionContextFromParts(
       ? readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? null
       : readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? proofUpdatedAt ?? updatedAt;
   const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
+  const proofAttemptStartedAt = useTerminalProof
+    ? resolveProviderLinearWorkerAttemptStartedAt(
+        (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
+      )
+    : null;
   const proofSummary =
     useTerminalProof && proofTerminalStatus
       ? buildProviderLinearWorkerTerminalSummary({
@@ -286,13 +291,17 @@ function buildProjectionContextFromParts(
           endReason: resolveProviderLinearWorkerTerminalReason(
             (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
           ),
-          degradationSummary: formatDeterministicProviderMutationDegradationSummary(
-            deriveDeterministicProviderMutationSuppressions(parts.providerLinearWorkerProof?.linear_audit ?? null, {
-              recordedAtNotBefore: resolveProviderLinearWorkerAttemptStartedAt(
-                (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
-              )
-            })
-          )
+          degradationSummary:
+            proofAttemptStartedAt === null
+              ? null
+              : formatDeterministicProviderMutationDegradationSummary(
+                  deriveDeterministicProviderMutationSuppressions(
+                    parts.providerLinearWorkerProof?.linear_audit ?? null,
+                    {
+                      recordedAtNotBefore: proofAttemptStartedAt
+                    }
+                  )
+                )
         })
       : null;
   const summary = resolveSelectedRunDisplaySummary({

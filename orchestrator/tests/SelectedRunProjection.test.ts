@@ -366,6 +366,80 @@ describe('SelectedRunProjection', () => {
     expect(selected?.summary).not.toContain('deterministic provider mutation suppressed');
   });
 
+  it('omits degradation text when provider proof cannot be scoped to a single attempt', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Provider linear worker completed with forced standalone review enabled for handoff',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker completed with forced standalone review enabled for handoff'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: undefined,
+          linear_audit: {
+            path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+            attempted_count: 1,
+            success_count: 0,
+            failure_count: 1,
+            latest_recorded_at: '2026-03-20T01:15:27.970Z',
+            latest_by_operation: {
+              'create-follow-up': {
+                recorded_at: '2026-03-20T01:15:27.970Z',
+                operation: 'create-follow-up',
+                ok: false,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: null,
+                via: null,
+                state: null,
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                error_code: 'linear_follow_up_parity_matrix_missing',
+                error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+              }
+            }
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.summary).toContain('Provider linear worker stopped because the issue was no longer active.');
+    expect(selected?.summary).not.toContain('deterministic provider mutation suppressed');
+  });
+
   it('preserves legitimate summary lines while removing stale succeeded failure lines', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
