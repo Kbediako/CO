@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260404-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc",
+      "title": "CO STATUS: restore truthful default operator telemetry and Symphony parity",
+      "relates_to": "tasks/tasks-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-04",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+        "task": "tasks/tasks-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+        "agent_task": ".agent/task/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md",
+        "docs": "docs/TECH_SPEC-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md"
+      }
+    },
+    {
       "id": "20260404-linear-da28812d-8367-4d94-a273-d0652535f818",
       "title": "CO: Release-prep hardening for public surfaces, provider onboarding, docs hygiene, and Codex 0.118 adoption",
       "relates_to": "tasks/tasks-linear-da28812d-8367-4d94-a273-d0652535f818.md",

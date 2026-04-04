@@ -1398,7 +1398,7 @@ Commands:
     --format json           Emit machine-readable readiness output.
 
   co-status [options]
-    Launch the live CO STATUS dashboard by starting the control-host path.
+    Attach the CO STATUS terminal viewer or emit the current snapshot from an already-running local control-host.
   co-status attach [options]
     Attach a read-only CO STATUS viewer to an already-running local control-host.
 
@@ -1665,13 +1665,12 @@ function printCoStatusHelp(): void {
   codex-orchestrator co-status [options]
   codex-orchestrator co-status attach [options]
 
-Launch the live CO STATUS dashboard by starting the control-host path,
-or attach a read-only viewer to an already-running local JSON control-host.
+Attach the CO STATUS terminal viewer to an already-running local JSON control-host,
+or emit the current CO STATUS snapshot from that host in JSON mode.
 
-Launch options:
+Viewer options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
-  --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
   --format json         Emit the current CO STATUS snapshot from the local control-host and exit.
   --help                Show this message.
 

@@ -84,6 +84,68 @@ describe('runCoStatusCliShell', () => {
     const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
     expect(payload).toEqual(buildUiPayload());
   });
+
+  it('uses the attach path for default text-mode status instead of starting a control host', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = join(root, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+
+    const server = await startUiServer();
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'snapshot-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(server.requests).toEqual([]);
+    const loggedLines = log.mock.calls.map((call) => String(call[0]));
+    expect(loggedLines).toHaveLength(5);
+    expect(loggedLines[0]).toBe(`CO STATUS attach target: ${new URL(server.baseUrl).toString()}`);
+    expect(loggedLines[1]).toBe('Task: local-mcp');
+    expect(loggedLines[2]).toBe('Run: control-host');
+    expect(loggedLines[3]).toContain('/.runs/local-mcp/cli/control-host');
+    expect(loggedLines[4]).toContain('/.runs/local-mcp/cli/control-host/manifest.json');
+  });
+
+  it('rejects launch-only flags now that co-status is attach-only', async () => {
+    await expect(
+      runCoStatusCliShell({
+        flags: {
+          pipeline: 'docs-review'
+        },
+        printHelp: vi.fn()
+      })
+    ).rejects.toThrow(
+      'co-status attaches to an existing control host and does not accept launch-only flags: --pipeline. Use `control-host` to start a control host with launch settings.'
+    );
+  });
 });
 
 async function startUiServer(): Promise<{

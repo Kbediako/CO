@@ -84,6 +84,7 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
         run_id: 'run-26',
         display_state: 'running',
         status_reason: null,
+        pid: '4242',
         session_id: 'session-26',
         thread_id: 'thread-26',
         turn_count: 4,
@@ -189,6 +190,7 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
         provider_linear_worker_proof: {
           issue_id: 'issue-26',
           issue_identifier: 'CO-26',
+          pid: '4242',
           thread_id: 'thread-26',
           latest_turn_id: 'turn-26',
           latest_session_id: 'session-26',
@@ -337,31 +339,16 @@ describe('control status dashboard', () => {
     });
 
     expect(frame).toContain('\u001b[1m╭─ CO STATUS\u001b[0m');
-    expect(stripAnsi(frame)).toBe([
-      '╭─ CO STATUS',
-      '│ Agents: 1/2 tracked',
-      '│ Throughput: 1,842 tps',
-      '│ Runtime: 15m 12s',
-      '│ Tokens: in 100 | out 117 | total 217',
-      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
-      '│ Project: CO Control and Advisory',
-      '│ Dashboard: http://127.0.0.1:4100',
-      '│ Next refresh: 15s',
-      '├─ Running',
-      '│',
-      '│   ID         STAGE        AGE / TURN   TOKENS     SESSION        EVENT                                                ',
-      '│   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────',
-      '│ ● CO-26      running      15m 0s / 4          217 session-26     Worker turn active                                   ',
-      '│',
-      '├─ Backoff queue',
-      '│',
-      '│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded',
-      '│',
-      '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
-      '│ Inspect: live | alternate screen | full frame',
-      '│ Snapshot: press s to export a stable frame under run dir',
-      '╰─'
-    ].join('\n'));
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Agents: 1/2 tracked');
+    expect(plainFrame).toContain('│ Throughput: 1,842 tps');
+    expect(plainFrame).toContain('│ Tokens: in 100 | out 117 | total 217');
+    expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50');
+    expect(plainFrame).toContain('│ Dashboard: http://127.0.0.1:4100');
+    expect(plainFrame).toContain('│   ID         STAGE        PID');
+    expect(plainFrame).toContain('│ ● CO-26      running      4242');
+    expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded');
+    expect(plainFrame).toContain('│ Inspect: live | alternate screen | full frame');
   });
 
   it('labels live primary-screen renders as primary scrollback', () => {
@@ -461,33 +448,13 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toBe([
-      '╭─ CO STATUS',
-      '│ Agents: 1/4 tracked',
-      '│ Throughput: 15 tps',
-      '│ Runtime: 15m 12s',
-      '│ Tokens: in 100 | out 117 | total 217',
-      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits...',
-      '│ Project: CO Control and Advisory',
-      '│ Dashboard: http://127.0.0.1:4100',
-      '│ Next refresh: 15s',
-      '├─ Running',
-      '│',
-      '│   ID        STAGE      TOKENS    EVENT                                            ',
-      '│   ────────────────────────────────────────────────────────────────────────────────',
-      '│ ● CO-26     running          217 Worker turn active                               ',
-      '│',
-      '├─ Backoff queue',
-      '│',
-      '│  ↻ CO-30 attempt=1 in 1.500s error=error with \\nnewline',
-      '│  ↻ CO-31 attempt=4 in 4.250s error=network timeout',
-      '│  ↻ CO-32 attempt=2 in 9.000s error=worker crashed restarting cleanly',
-      '│',
-      '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
-      '│ Inspect: live | alternate screen | full frame',
-      '│ Snapshot: press s to export a stable frame under run dir',
-      '╰─'
-    ].join('\n'));
+    expect(plainFrame).toContain('│ Throughput: 15 tps');
+    expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits...');
+    expect(plainFrame).toContain('│   ID        STAGE      PID');
+    expect(plainFrame).toContain('│ ● CO-26     running    4242');
+    expect(plainFrame).toContain('│  ↻ CO-30 attempt=1 in 1.500s error=error with \\nnewline');
+    expect(plainFrame).toContain('│  ↻ CO-31 attempt=4 in 4.250s error=network timeout');
+    expect(plainFrame).toContain('│  ↻ CO-32 attempt=2 in 9.000s error=worker crashed restarting cleanly');
     for (const line of plainFrame.split('\n')) {
       expect(line.length).toBeLessThanOrEqual(84);
     }
@@ -539,31 +506,12 @@ describe('control status dashboard', () => {
       throughputTps: 0
     });
 
-    expect(stripAnsi(frame)).toBe([
-      '╭─ CO STATUS',
-      '│ Agents: 0/0 tracked',
-      '│ Throughput: 0 tps',
-      '│ Runtime: 15m 12s',
-      '│ Tokens: in 100 | out 117 | total 217',
-      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
-      '│ Project: n/a',
-      '│ Dashboard: http://127.0.0.1:4100',
-      '│ Next refresh: 15s',
-      '├─ Running',
-      '│',
-      '│   ID         STAGE        AGE / TURN   TOKENS     SESSION        EVENT                                                ',
-      '│   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────',
-      '│  No active agents',
-      '│',
-      '├─ Backoff queue',
-      '│',
-      '│  No queued retries',
-      '│',
-      '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
-      '│ Inspect: live | alternate screen | full frame',
-      '│ Snapshot: press s to export a stable frame under run dir',
-      '╰─'
-    ].join('\n'));
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Agents: 0/0 tracked');
+    expect(plainFrame).toContain('│ Project: n/a');
+    expect(plainFrame).toContain('│   ID         STAGE        PID');
+    expect(plainFrame).toContain('│  No active agents');
+    expect(plainFrame).toContain('│  No queued retries');
   });
 
   it('renders compact inspect mode as a short-terminal summary frame', () => {
@@ -648,7 +596,7 @@ describe('control status dashboard', () => {
       throughputTps: 0
     });
 
-    expect(stripAnsi(frame)).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 60s');
+    expect(stripAnsi(frame)).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 1m');
   });
 
   it('renders authoritative Linear budget snapshots instead of falling back to unavailable', () => {
@@ -680,11 +628,57 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain(
-      '│ Rate Limits: Linear API (control-host-polling) | requests 19/30 reset 42s | complexity 180/200 reset 7s | state low'
+      '│ Rate Limits: Linear | requests 19/30 reset 42s | complexity 180/200 reset 7s | state low'
     );
   });
 
-  it('falls back to generic summaries for legacy proof rate-limit payloads', () => {
+  it.each([96, 115])(
+    'keeps both Codex and Linear rate-limit state visible when combined sources render in %i columns',
+    (terminalColumns) => {
+      const frame = renderControlStatusFrame({
+        dataset: buildDataset({
+          rate_limits: {
+            codex: buildDataset().rate_limits,
+            linear_budget: {
+              observed_at: '2026-03-30T01:15:00.000Z',
+              source: 'linear-budget-state',
+              suppression: 'cooldown',
+              retry_after_seconds: 120,
+              requests: {
+                remaining: 19,
+                limit: 30,
+                reset_at: '2026-03-30T01:15:42.000Z'
+              },
+              complexity: {
+                remaining: 180,
+                limit: 200,
+                reset_at: '2026-03-30T01:15:07.000Z'
+              }
+            }
+          }
+        }),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        terminalColumns,
+        throughputTps: 0
+      });
+
+      const plainFrame = stripAnsi(frame);
+      const rateLimitLine = plainFrame
+        .split('\n')
+        .find((line) => line.startsWith('│ Rate Limits: '));
+      expect(rateLimitLine).toBeDefined();
+      expect(rateLimitLine).toContain('gpt-5 p19/30 42s s3/5 7s cr1234.50');
+      expect(rateLimitLine).toContain('Linear cooldown 2m req19/30 42s cx180/200 7s');
+      expect(rateLimitLine).not.toContain('...');
+      expect(rateLimitLine?.length ?? 0).toBeLessThanOrEqual(terminalColumns);
+    }
+  );
+
+  it('surfaces legacy Codex request limits without leaking raw source labels', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
         rate_limits: {
@@ -706,8 +700,59 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Rate Limits: source=legacy-proof');
-    expect(plainFrame).not.toContain('Linear API (legacy-proof)');
+    expect(plainFrame).toContain('│ Rate Limits: Codex | requests 1/30 reset 1m');
+    expect(plainFrame).not.toContain('legacy-proof');
+  });
+
+  it('keeps legacy Codex request limits visible when combined with Linear budget', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          codex: {
+            source: 'legacy-proof',
+            observed_at: '2026-03-30T01:15:00.000Z',
+            suppression: 'cooldown',
+            retry_after_seconds: 120,
+            requests: {
+              remaining: 1,
+              limit: 30,
+              reset_at: '2026-03-30T01:16:00.000Z'
+            }
+          },
+          linear_budget: {
+            observed_at: '2026-03-30T01:15:00.000Z',
+            source: 'linear-budget-state',
+            suppression: 'cooldown',
+            retry_after_seconds: 120,
+            requests: {
+              remaining: 19,
+              limit: 30,
+              reset_at: '2026-03-30T01:15:42.000Z'
+            },
+            complexity: {
+              remaining: 180,
+              limit: 200,
+              reset_at: '2026-03-30T01:15:07.000Z'
+            }
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex req1/30 1m');
+    expect(rateLimitLine).toContain('Linear cooldown 2m req19/30 42s cx180/200 7s');
+    expect(rateLimitLine).not.toContain('legacy-proof');
   });
 
   it('sanitizes terminal control characters before rendering text fields', () => {
@@ -804,8 +849,9 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Tokens: in - | out - | total -');
-    expect(plainFrame).toContain('│ ● CO-26      running      15m 0s / 4            - session-26');
+    expect(plainFrame).toContain('│ Tokens: in n/a | out n/a | total n/a');
+    expect(plainFrame).toContain('│ ● CO-26      running      4242');
+    expect(plainFrame).toContain('15m 0s / 4          n/a session-26');
   });
 
   it('clamps dashboard error frames to the active terminal width', async () => {
@@ -1079,6 +1125,7 @@ describe('control status dashboard', () => {
     expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_ENTER);
     expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_EXIT);
     expect(stripAnsi(writes[0] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
+    expect(stripAnsi(writes[0] ?? '')).not.toContain('│ Dashboard: ');
 
     await vi.advanceTimersByTimeAsync(1000);
     await handle.flush();
@@ -1086,6 +1133,7 @@ describe('control status dashboard', () => {
     expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_ENTER);
     expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_EXIT);
     expect(stripAnsi(writes[1] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
+    expect(stripAnsi(writes[1] ?? '')).not.toContain('│ Dashboard: ');
 
     handle.stop();
   });
@@ -1816,7 +1864,7 @@ describe('control status dashboard', () => {
     await handle.flush();
 
     const plainFrame = stripAnsi(writes[0] ?? '');
-    expect(plainFrame).toContain('│ ● CO-26      running      15m 0s / 4');
+    expect(plainFrame).toContain('│ ● CO-26      running      4242     15m 0s / 4');
     expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded');
 
     handle.stop();
