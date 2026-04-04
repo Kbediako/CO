@@ -49,8 +49,8 @@
 - [x] `MCP_RUNNER_TASK_ID=linear-74d6e549-46cc-46be-9a61-76ae61b014f4 npm run pack:smoke` if downstream-facing CLI, package, or skill surfaces change. Evidence: skipped by scope; changed files are limited to `vitest.config.core.ts`, `tests/vitest-progress-config.spec.ts`, `orchestrator/tests/PipelineResolverEnvOverrides.test.ts`, `codex.orchestrator.json`, and docs/task mirrors, with no CLI/package/skills/review-wrapper implementation paths touched.
 
 ## Handoff
-- [ ] Workpad refreshed after docs, after implementation, and immediately before any review or merge handoff. Evidence: current refresh in progress with final validation + review status.
-- [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [x] Workpad refreshed after docs, after implementation, and immediately before any review or merge handoff. Evidence: Linear workpad comment `44f26831-4c3f-41f5-bebc-6897452046ee` refreshed after validation/review and again after PR + review-thread follow-up.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: PR `#362` / `https://github.com/Kbediako/CO/pull/362`, Linear attachment `2c0387d2-686b-4c02-9058-a08115710059`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: `git fetch origin refs/heads/main:refs/remotes/origin/main && git merge --ff-only origin/main` returned `Already up to date.` before PR open.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [x] Issue remains active until review handoff prerequisites are complete. Evidence: Linear state is still `In Progress`.

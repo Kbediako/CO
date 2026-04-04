@@ -1065,11 +1065,7 @@ describe('TelegramOversightBridge', () => {
         payload: { summary: 'projection changed' }
       });
 
-      await waitForCondition(async () => telegram.sentMessages.length === 2);
-      expect(telegram.sentMessages[1]?.text).toContain('Summary: task needs review');
-
-      const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
-      const state = JSON.parse(stateRaw) as {
+      let deliveredState: {
         next_update_id?: number;
         push?: {
           last_sent_projection_hash?: string | null;
@@ -1078,7 +1074,42 @@ describe('TelegramOversightBridge', () => {
           pending_projection_hash?: string | null;
           pending_projection_observed_at?: string | null;
         };
-      };
+      } | null = null;
+      await waitForCondition(async () => {
+        if (telegram.sentMessages.length !== 2) {
+          return false;
+        }
+        const stateRaw = await readFile(join(paths.runDir, 'telegram-oversight-state.json'), 'utf8');
+        const parsed = JSON.parse(stateRaw) as {
+          next_update_id?: number;
+          push?: {
+            last_sent_projection_hash?: string | null;
+            last_sent_at?: string | null;
+            last_event_seq?: number | null;
+            pending_projection_hash?: string | null;
+            pending_projection_observed_at?: string | null;
+          };
+        };
+        if (
+          parsed.next_update_id === 41 &&
+          parsed.push?.last_sent_projection_hash &&
+          parsed.push?.last_sent_at &&
+          parsed.push?.last_event_seq === 3 &&
+          parsed.push?.pending_projection_hash === null &&
+          parsed.push?.pending_projection_observed_at === null
+        ) {
+          deliveredState = parsed;
+          return true;
+        }
+        return false;
+      });
+
+      expect(telegram.sentMessages[1]?.text).toContain('Summary: task needs review');
+      expect(deliveredState).not.toBeNull();
+      if (!deliveredState) {
+        throw new Error('expected delivered projection state to be persisted');
+      }
+      const state = deliveredState;
       expect(state.next_update_id).toBe(41);
       expect(state.push?.last_sent_projection_hash).toBeTruthy();
       expect(state.push?.last_sent_at).toBeTruthy();
