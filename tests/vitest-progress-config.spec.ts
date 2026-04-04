@@ -5,37 +5,23 @@ const ORIGINAL_CODEX_VITEST_PROGRESS = process.env.CODEX_VITEST_PROGRESS;
 const ORIGINAL_CODEX_NON_INTERACTIVE = process.env.CODEX_NON_INTERACTIVE;
 const ORIGINAL_CODEX_NONINTERACTIVE = process.env.CODEX_NONINTERACTIVE;
 const ORIGINAL_CODEX_NO_INTERACTIVE = process.env.CODEX_NO_INTERACTIVE;
+const TRACKED_ENV_KEYS = [
+  'CI',
+  'CODEX_VITEST_PROGRESS',
+  'CODEX_NON_INTERACTIVE',
+  'CODEX_NONINTERACTIVE',
+  'CODEX_NO_INTERACTIVE'
+] as const;
+const ORIGINAL_ENV_BY_KEY = {
+  CI: ORIGINAL_CI,
+  CODEX_VITEST_PROGRESS: ORIGINAL_CODEX_VITEST_PROGRESS,
+  CODEX_NON_INTERACTIVE: ORIGINAL_CODEX_NON_INTERACTIVE,
+  CODEX_NONINTERACTIVE: ORIGINAL_CODEX_NONINTERACTIVE,
+  CODEX_NO_INTERACTIVE: ORIGINAL_CODEX_NO_INTERACTIVE
+} satisfies Record<(typeof TRACKED_ENV_KEYS)[number], string | undefined>;
 
 afterEach(() => {
-  if (ORIGINAL_CI === undefined) {
-    delete process.env.CI;
-  } else {
-    process.env.CI = ORIGINAL_CI;
-  }
-
-  if (ORIGINAL_CODEX_NON_INTERACTIVE === undefined) {
-    delete process.env.CODEX_NON_INTERACTIVE;
-  } else {
-    process.env.CODEX_NON_INTERACTIVE = ORIGINAL_CODEX_NON_INTERACTIVE;
-  }
-
-  if (ORIGINAL_CODEX_NONINTERACTIVE === undefined) {
-    delete process.env.CODEX_NONINTERACTIVE;
-  } else {
-    process.env.CODEX_NONINTERACTIVE = ORIGINAL_CODEX_NONINTERACTIVE;
-  }
-
-  if (ORIGINAL_CODEX_NO_INTERACTIVE === undefined) {
-    delete process.env.CODEX_NO_INTERACTIVE;
-  } else {
-    process.env.CODEX_NO_INTERACTIVE = ORIGINAL_CODEX_NO_INTERACTIVE;
-  }
-
-  if (ORIGINAL_CODEX_VITEST_PROGRESS === undefined) {
-    delete process.env.CODEX_VITEST_PROGRESS;
-  } else {
-    process.env.CODEX_VITEST_PROGRESS = ORIGINAL_CODEX_VITEST_PROGRESS;
-  }
+  restoreTrackedEnv();
 });
 
 describe('vitest progress reporter config', () => {
@@ -53,6 +39,14 @@ describe('vitest progress reporter config', () => {
     const config = await loadConfigForCiValue(undefined);
     expect(config.test?.reporters).toBeUndefined();
     expect(config.test ? 'reporters' in config.test : false).toBe(false);
+  });
+
+  it('leaves the progress reporter disabled for falsy CODEX env values', async () => {
+    for (const falsyValue of ['0', 'false', 'no', '']) {
+      const config = await loadConfig({ CODEX_VITEST_PROGRESS: falsyValue });
+      expect(config.test?.reporters).toBeUndefined();
+      expect(config.test ? 'reporters' in config.test : false).toBe(false);
+    }
   });
 
   it('enables the progress reporter for CODEX_NON_INTERACTIVE worker runs', async () => {
@@ -89,35 +83,7 @@ describe('vitest progress reporter config', () => {
 });
 
 async function loadConfig(env: Partial<NodeJS.ProcessEnv>) {
-  if (env.CI === undefined) {
-    delete process.env.CI;
-  } else {
-    process.env.CI = env.CI;
-  }
-
-  if (env.CODEX_NON_INTERACTIVE === undefined) {
-    delete process.env.CODEX_NON_INTERACTIVE;
-  } else {
-    process.env.CODEX_NON_INTERACTIVE = env.CODEX_NON_INTERACTIVE;
-  }
-
-  if (env.CODEX_NONINTERACTIVE === undefined) {
-    delete process.env.CODEX_NONINTERACTIVE;
-  } else {
-    process.env.CODEX_NONINTERACTIVE = env.CODEX_NONINTERACTIVE;
-  }
-
-  if (env.CODEX_NO_INTERACTIVE === undefined) {
-    delete process.env.CODEX_NO_INTERACTIVE;
-  } else {
-    process.env.CODEX_NO_INTERACTIVE = env.CODEX_NO_INTERACTIVE;
-  }
-
-  if (env.CODEX_VITEST_PROGRESS === undefined) {
-    delete process.env.CODEX_VITEST_PROGRESS;
-  } else {
-    process.env.CODEX_VITEST_PROGRESS = env.CODEX_VITEST_PROGRESS;
-  }
+  applyTrackedEnv(env);
 
   const configUrl = new URL(
     `../vitest.config.core.ts?ci=${env.CI ?? 'unset'}&noninteractive=${env.CODEX_NON_INTERACTIVE ?? 'unset'}&noninteractive_alias=${env.CODEX_NONINTERACTIVE ?? 'unset'}&nointeractive=${env.CODEX_NO_INTERACTIVE ?? 'unset'}&progress=${env.CODEX_VITEST_PROGRESS ?? 'unset'}&t=${Date.now()}`,
@@ -129,4 +95,26 @@ async function loadConfig(env: Partial<NodeJS.ProcessEnv>) {
 
 async function loadConfigForCiValue(ciValue: string | undefined) {
   return await loadConfig({ CI: ciValue });
+}
+
+function applyTrackedEnv(env: Partial<NodeJS.ProcessEnv>) {
+  for (const key of TRACKED_ENV_KEYS) {
+    const value = env[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+function restoreTrackedEnv() {
+  for (const key of TRACKED_ENV_KEYS) {
+    const original = ORIGINAL_ENV_BY_KEY[key];
+    if (original === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = original;
+    }
+  }
 }
