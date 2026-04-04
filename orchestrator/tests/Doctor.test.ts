@@ -464,6 +464,103 @@ describe('runDoctor', () => {
     }
   });
 
+  it('prefers task roots over nested provider templates when both signals exist', async () => {
+    const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-template-root-'));
+    const templateDir = join(tempRepo, 'templates', 'codex');
+    const previousEnv = {
+      CO_LINEAR_API_TOKEN: process.env.CO_LINEAR_API_TOKEN,
+      CO_LINEAR_WORKSPACE_ID: process.env.CO_LINEAR_WORKSPACE_ID,
+      CO_LINEAR_WEBHOOK_SECRET: process.env.CO_LINEAR_WEBHOOK_SECRET,
+      CO_TELEGRAM_POLLING_ENABLED: process.env.CO_TELEGRAM_POLLING_ENABLED,
+      CO_TELEGRAM_BOT_TOKEN: process.env.CO_TELEGRAM_BOT_TOKEN,
+      CO_TELEGRAM_ALLOWED_CHAT_IDS: process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS,
+      CO_TELEGRAM_ENABLE_MUTATIONS: process.env.CO_TELEGRAM_ENABLE_MUTATIONS,
+      CO_TELEGRAM_PUSH_ENABLED: process.env.CO_TELEGRAM_PUSH_ENABLED
+    };
+
+    try {
+      await mkdir(join(tempRepo, 'tasks'), { recursive: true });
+      await writeFile(join(tempRepo, 'tasks', 'index.json'), '{"items":[]}', 'utf8');
+      await mkdir(templateDir, { recursive: true });
+
+      const repoProvidersDir = join(tempRepo, '.codex', 'providers');
+      await mkdir(repoProvidersDir, { recursive: true });
+      await writeFile(join(repoProvidersDir, 'README.md'), '# Providers', 'utf8');
+      await writeFile(join(repoProvidersDir, 'provider.env.example'), 'CO_LINEAR_API_TOKEN=', 'utf8');
+      await writeFile(
+        join(repoProvidersDir, 'control.example.json'),
+        JSON.stringify(
+          {
+            feature_toggles: {
+              dispatch_pilot: {
+                enabled: true,
+                source: {
+                  provider: 'linear',
+                  workspace_id: 'workspace-id'
+                }
+              },
+              transport_mutating_controls: {
+                enabled: true,
+                allowed_transports: ['telegram']
+              }
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      const templateProvidersDir = join(templateDir, '.codex', 'providers');
+      await mkdir(templateProvidersDir, { recursive: true });
+      await writeFile(join(templateProvidersDir, 'README.md'), '# Template Providers', 'utf8');
+      await writeFile(join(templateProvidersDir, 'provider.env.example'), 'CO_LINEAR_API_TOKEN=', 'utf8');
+      await writeFile(
+        join(templateProvidersDir, 'control.example.json'),
+        JSON.stringify(
+          {
+            feature_toggles: {
+              dispatch_pilot: {
+                enabled: true,
+                source: {
+                  live: true,
+                  workspace_id: 'template-workspace'
+                }
+              }
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+
+      process.env.CO_LINEAR_API_TOKEN = 'token';
+      process.env.CO_LINEAR_WORKSPACE_ID = 'workspace-id';
+      process.env.CO_LINEAR_WEBHOOK_SECRET = 'secret';
+      process.env.CO_TELEGRAM_POLLING_ENABLED = 'true';
+      process.env.CO_TELEGRAM_BOT_TOKEN = 'bot-token';
+      process.env.CO_TELEGRAM_ALLOWED_CHAT_IDS = '12345,67890';
+      process.env.CO_TELEGRAM_ENABLE_MUTATIONS = 'true';
+      process.env.CO_TELEGRAM_PUSH_ENABLED = 'true';
+
+      const result = runDoctor(templateDir);
+      expect(result.providers.status).toBe('ok');
+      expect(result.providers.repo_examples.root).toBe(join(tempRepo, '.codex', 'providers'));
+      expect(result.providers.control_policy.status).toBe('ok');
+      expect(result.providers.linear.status).toBe('ready');
+    } finally {
+      for (const [key, value] of Object.entries(previousEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+      await rm(tempRepo, { recursive: true, force: true });
+    }
+  });
+
   it('treats disabled providers as neutral for an ok aggregate provider status', async () => {
     const tempRepo = await mkdtemp(join(tmpdir(), 'doctor-providers-linear-only-'));
     const previousEnv = {

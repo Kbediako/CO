@@ -436,9 +436,13 @@ export async function runDoctorCloudPreflight(options: {
 function resolveDoctorRepoRoot(cwd: string): string {
   const fallback = resolve(cwd);
   let current: string | null = fallback;
+  let providerRootCandidate: string | null = null;
   while (current) {
-    if (existsSync(join(current, 'tasks', 'index.json')) || existsSync(join(current, PROVIDER_ROOT_RELATIVE_PATH))) {
+    if (existsSync(join(current, 'tasks', 'index.json'))) {
       return current;
+    }
+    if (!providerRootCandidate && existsSync(join(current, PROVIDER_ROOT_RELATIVE_PATH))) {
+      providerRootCandidate = current;
     }
     const parent = dirname(current);
     if (parent === current) {
@@ -446,7 +450,7 @@ function resolveDoctorRepoRoot(cwd: string): string {
     }
     current = parent;
   }
-  return fallback;
+  return providerRootCandidate ?? fallback;
 }
 
 export function formatDoctorCloudPreflightSummary(result: DoctorCloudPreflightResult): string[] {
