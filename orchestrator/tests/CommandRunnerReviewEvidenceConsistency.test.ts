@@ -662,6 +662,24 @@ describe('runCommandStage review evidence consistency', () => {
     expect(manifest.commands[0]?.status).toBe('succeeded');
   });
 
+  it('fails a succeeded provider-linear-worker stage when authoritative proof is missing', async () => {
+    mockState.runImpl = async () => buildSuccessfulExecResult();
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'Provider linear worker failed because authoritative proof was missing or unreadable.'
+    );
+    expect(manifest.commands[0]?.status).toBe('failed');
+  });
+
   it('does not use summary hints for failed provider-linear-worker stages', async () => {
     mockState.runImpl = async () => buildFailedExecResult('provider worker exited\n', 2);
 

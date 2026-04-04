@@ -101,16 +101,21 @@ export function deriveDeterministicProviderMutationSuppressions(
   if (!audit) {
     return [];
   }
+  const latestByOperation = audit.latest_by_operation;
+  if (!latestByOperation || typeof latestByOperation !== 'object') {
+    return [];
+  }
   const recordedAtNotBeforeMs = readTimestampMs(
     {
       recorded_at: options.recordedAtNotBefore ?? null
     },
     'recorded_at'
   );
-  const entries = Object.values(audit.latest_by_operation)
+  const entries = Object.values(latestByOperation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
     .filter((entry) =>
-      !Number.isFinite(recordedAtNotBeforeMs) || readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
+      !Number.isFinite(recordedAtNotBeforeMs)
+        || readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
     )
     .filter((entry) => entry.ok === false && isDeterministicProviderMutationFailure(entry))
     .sort((left, right) => left.operation.localeCompare(right.operation));
@@ -233,6 +238,8 @@ function formatProviderLinearWorkerTerminalBaseSummary(
           return 'Provider linear worker failed because the Codex exec runner could not start or complete.';
         case 'thread_id_missing':
           return 'Provider linear worker failed because Codex did not emit a thread identifier.';
+        case 'provider_linear_worker_proof_missing_or_unreadable':
+          return 'Provider linear worker failed because authoritative proof was missing or unreadable.';
         default:
           return `Provider linear worker failed (${endReason}).`;
       }

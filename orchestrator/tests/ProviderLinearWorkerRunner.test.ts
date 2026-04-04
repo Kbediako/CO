@@ -624,6 +624,27 @@ describe('provider linear worker runner', () => {
     );
   });
 
+  it('ignores malformed audit summaries when deriving continuation suppressions', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: {
+        path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+        attempted_count: 1,
+        success_count: 0,
+        failure_count: 1,
+        latest_recorded_at: '2026-03-21T09:00:00.000Z',
+        latest_by_operation: null
+      } as unknown as ProviderLinearAuditSummary,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).not.toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+  });
+
   it('parses thread and turn lineage from codex jsonl output', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [

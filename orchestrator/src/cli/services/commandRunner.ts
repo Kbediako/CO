@@ -426,6 +426,13 @@ export async function runCommandStage(
         join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
       );
       const providerLinearWorkerProofRecord = providerLinearWorkerProof as Record<string, unknown> | null;
+      if (result.status === 'succeeded' && providerLinearWorkerProofRecord === null) {
+        effectiveSummary = buildProviderLinearWorkerTerminalSummary({
+          status: 'failed',
+          endReason: 'provider_linear_worker_proof_missing_or_unreadable'
+        });
+        forceProviderLinearWorkerFailure = true;
+      }
       const proofTerminalStatus = resolveProviderLinearWorkerTerminalStatus(providerLinearWorkerProofRecord);
       const proofTerminalReason = resolveProviderLinearWorkerTerminalReason(providerLinearWorkerProofRecord);
       const proofAttemptStartedAt =
