@@ -34,6 +34,7 @@ import {
   buildProviderLinearWorkerTerminalSummary,
   deriveDeterministicProviderMutationSuppressions,
   formatDeterministicProviderMutationDegradationSummary,
+  resolveProviderLinearWorkerAttemptStartedAt,
   resolveProviderLinearWorkerTerminalReason,
   resolveProviderLinearWorkerTerminalStatus
 } from '../control/providerLinearWorkerTruth.js';
@@ -427,10 +428,15 @@ export async function runCommandStage(
       const providerLinearWorkerProofRecord = providerLinearWorkerProof as Record<string, unknown> | null;
       const proofTerminalStatus = resolveProviderLinearWorkerTerminalStatus(providerLinearWorkerProofRecord);
       const proofTerminalReason = resolveProviderLinearWorkerTerminalReason(providerLinearWorkerProofRecord);
+      const proofAttemptStartedAt =
+        resolveProviderLinearWorkerAttemptStartedAt(providerLinearWorkerProofRecord) ?? entry.started_at ?? null;
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
       const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
-        providerLinearWorkerProof?.linear_audit ?? null
+        providerLinearWorkerProof?.linear_audit ?? null,
+        {
+          recordedAtNotBefore: proofAttemptStartedAt
+        }
       );
       const degradationSummary = formatDeterministicProviderMutationDegradationSummary(mutationSuppressions);
 

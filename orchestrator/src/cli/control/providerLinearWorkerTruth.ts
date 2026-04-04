@@ -47,6 +47,12 @@ export function resolveProviderLinearWorkerTerminalReason(
   return readStringValue(proof ?? {}, 'end_reason');
 }
 
+export function resolveProviderLinearWorkerAttemptStartedAt(
+  proof: Record<string, unknown> | null | undefined
+): string | null {
+  return readStringValue(proof ?? {}, 'attempt_started_at');
+}
+
 export function shouldUseProviderLinearWorkerTerminalProofForSelectedRun(
   manifest: Record<string, unknown>,
   proof: Record<string, unknown> | null | undefined
@@ -87,13 +93,25 @@ export function buildProviderLinearWorkerTerminalSummary(input: {
 }
 
 export function deriveDeterministicProviderMutationSuppressions(
-  audit: ProviderLinearAuditSummary | null | undefined
+  audit: ProviderLinearAuditSummary | null | undefined,
+  options: {
+    recordedAtNotBefore?: string | null;
+  } = {}
 ): ProviderLinearMutationSuppression[] {
   if (!audit) {
     return [];
   }
+  const recordedAtNotBeforeMs = readTimestampMs(
+    {
+      recorded_at: options.recordedAtNotBefore ?? null
+    },
+    'recorded_at'
+  );
   const entries = Object.values(audit.latest_by_operation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
+    .filter((entry) =>
+      !Number.isFinite(recordedAtNotBeforeMs) || readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
+    )
     .filter((entry) => entry.ok === false && isDeterministicProviderMutationFailure(entry))
     .sort((left, right) => left.operation.localeCompare(right.operation));
   return entries.map((entry) => buildDeterministicProviderMutationSuppression(entry));

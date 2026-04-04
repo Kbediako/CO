@@ -214,6 +214,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
 export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
+  attempt_started_at?: string | null;
   pid: string | null;
   thread_id: string | null;
   latest_turn_id: string | null;
@@ -700,9 +701,12 @@ function buildRuntimeProofGuidance(helperCommand: string, issueId: string): stri
 }
 
 function buildDeterministicMutationSuppressionSection(
-  audit: ProviderLinearAuditSummary | null
+  audit: ProviderLinearAuditSummary | null,
+  attemptStartedAt: string | null
 ): string[] {
-  const suppressions = deriveDeterministicProviderMutationSuppressions(audit);
+  const suppressions = deriveDeterministicProviderMutationSuppressions(audit, {
+    recordedAtNotBefore: attemptStartedAt
+  });
   if (suppressions.length === 0) {
     return [];
   }
@@ -720,10 +724,12 @@ export function buildProviderWorkerPrompt(
   sharedRepoCheckoutPath: string,
   attemptContext: {
     linearAudit?: ProviderLinearAuditSummary | null;
+    attemptStartedAt?: string | null;
   } = {}
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
-    attemptContext.linearAudit ?? null
+    attemptContext.linearAudit ?? null,
+    attemptContext.attemptStartedAt ?? null
   );
   if (turnNumber > 1) {
     return [
@@ -2128,9 +2134,11 @@ export async function runProviderLinearWorker(
     childEnv.CODEX_INTERACTIVE = '0';
   }
 
+  const attemptStartedAt = deps.now();
   let finalProof: ProviderLinearWorkerProof = {
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
+    attempt_started_at: attemptStartedAt,
     pid: workerPid,
     thread_id: null,
     latest_turn_id: null,
@@ -2152,7 +2160,7 @@ export async function runProviderLinearWorker(
     tracked_issue_error: null,
     linear_budget: null,
     end_reason: null,
-    updated_at: deps.now()
+    updated_at: attemptStartedAt
   };
 
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
@@ -2413,7 +2421,8 @@ export async function runProviderLinearWorker(
         helperCommand,
         sharedRepoCheckoutPath,
         {
-          linearAudit: finalProof.linear_audit
+          linearAudit: finalProof.linear_audit,
+          attemptStartedAt: finalProof.attempt_started_at ?? null
         }
       );
       const args =
@@ -2452,6 +2461,7 @@ export async function runProviderLinearWorker(
       finalProof = {
         issue_id: context.issueId,
         issue_identifier: context.issueIdentifier,
+        attempt_started_at: finalProof.attempt_started_at,
         pid: workerPid,
         thread_id: threadId,
         latest_turn_id: turnId,

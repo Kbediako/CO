@@ -610,6 +610,58 @@ describe('runCommandStage review evidence consistency', () => {
     expect(manifest.commands[0]?.status).toBe('succeeded');
   });
 
+  it('ignores deterministic mutation suppressions recorded before the current provider-worker attempt', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: '2026-03-24T00:00:00.000Z',
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        linear_audit: {
+          path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+          attempted_count: 1,
+          success_count: 0,
+          failure_count: 1,
+          latest_recorded_at: '2026-03-23T23:59:59.000Z',
+          latest_by_operation: {
+            'create-follow-up': {
+              recorded_at: '2026-03-23T23:59:59.000Z',
+              operation: 'create-follow-up',
+              ok: false,
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              source_setup: null,
+              action: null,
+              via: null,
+              state: null,
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: 'linear_follow_up_parity_matrix_missing',
+              error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+            }
+          }
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.summary).not.toContain('deterministic provider mutation suppressed');
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+  });
+
   it('does not use summary hints for failed provider-linear-worker stages', async () => {
     mockState.runImpl = async () => buildFailedExecResult('provider worker exited\n', 2);
 

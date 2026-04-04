@@ -35,6 +35,7 @@ import {
   deriveDeterministicProviderMutationSuppressions,
   formatDeterministicProviderMutationDegradationSummary,
   isAuxiliaryProviderProofHarnessManifest,
+  resolveProviderLinearWorkerAttemptStartedAt,
   resolveProviderLinearWorkerTerminalReason,
   resolveProviderLinearWorkerTerminalStatus,
   shouldUseProviderLinearWorkerTerminalProofForSelectedRun
@@ -286,7 +287,11 @@ function buildProjectionContextFromParts(
             (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
           ),
           degradationSummary: formatDeterministicProviderMutationDegradationSummary(
-            deriveDeterministicProviderMutationSuppressions(parts.providerLinearWorkerProof?.linear_audit ?? null)
+            deriveDeterministicProviderMutationSuppressions(parts.providerLinearWorkerProof?.linear_audit ?? null, {
+              recordedAtNotBefore: resolveProviderLinearWorkerAttemptStartedAt(
+                (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null
+              )
+            })
           )
         })
       : null;
