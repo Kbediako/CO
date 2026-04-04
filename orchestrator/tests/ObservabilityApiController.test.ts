@@ -556,6 +556,199 @@ describe('ObservabilityApiController', () => {
     ]);
   });
 
+  it('keeps control-action events from being masked by stale proof events', () => {
+    const runningSource = buildCompatibilitySource('task-1311-running', {
+      compatibilityState: 'In Progress',
+      displayStatus: 'paused',
+      statusReason: 'control_pause',
+      latestAction: 'pause',
+      updatedAt: '2026-03-20T00:02:00.000Z',
+      summary: 'Awaiting operator input',
+      latestEvent: {
+        at: '2026-03-20T00:02:00.000Z',
+        event: 'pause',
+        message: 'Awaiting operator input',
+        requestedBy: 'telegram',
+        reason: 'control_pause'
+      },
+      providerLinearWorkerProof: {
+        issue_id: 'task-1311-running-id',
+        issue_identifier: 'task-1311-running',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'task_complete',
+        last_message: 'done',
+        last_event_at: '2026-03-20T00:01:00.000Z',
+        tokens: {
+          input_tokens: 12,
+          output_tokens: 8,
+          total_tokens: 20
+        },
+        rate_limits: null,
+        owner_phase: 'turn_completed',
+        owner_status: 'in_progress',
+        workspace_path: '/tmp/task-1311-running',
+        end_reason: null,
+        updated_at: '2026-03-20T00:01:00.000Z'
+      }
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: runningSource,
+      running: [runningSource],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20,
+        seconds_running: 120
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null
+    });
+
+    expect(projection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'task-1311-running',
+        last_event: 'pause',
+        last_message: 'Awaiting operator input',
+        last_event_at: '2026-03-20T00:02:00.000Z'
+      })
+    ]);
+  });
+
+  it('restores proof event precedence after sticky resume actions', () => {
+    const runningSource = buildCompatibilitySource('task-1311-running', {
+      compatibilityState: 'In Progress',
+      displayStatus: 'in_progress',
+      statusReason: null,
+      latestAction: 'resume',
+      updatedAt: '2026-03-20T00:02:00.000Z',
+      summary: 'Operator resumed the run',
+      latestEvent: {
+        at: '2026-03-20T00:02:00.000Z',
+        event: 'resume',
+        message: 'Operator resumed the run',
+        requestedBy: 'telegram',
+        reason: 'operator_resume'
+      },
+      providerLinearWorkerProof: {
+        issue_id: 'task-1311-running-id',
+        issue_identifier: 'task-1311-running',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'turn.completed',
+        last_message: 'Worker resumed and completed a turn',
+        last_event_at: '2026-03-20T00:03:00.000Z',
+        tokens: {
+          input_tokens: 12,
+          output_tokens: 8,
+          total_tokens: 20
+        },
+        rate_limits: null,
+        owner_phase: 'turn_completed',
+        owner_status: 'in_progress',
+        workspace_path: '/tmp/task-1311-running',
+        end_reason: null,
+        updated_at: '2026-03-20T00:03:00.000Z'
+      }
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: runningSource,
+      running: [runningSource],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20,
+        seconds_running: 120
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null
+    });
+
+    expect(projection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'task-1311-running',
+        last_event: 'turn.completed',
+        last_message: 'Worker resumed and completed a turn',
+        last_event_at: '2026-03-20T00:03:00.000Z'
+      })
+    ]);
+  });
+
+  it('preserves authoritative message and timestamp when selected and proof share the same event key', () => {
+    const runningSource = buildCompatibilitySource('task-1311-running', {
+      updatedAt: '2026-03-20T00:02:00.000Z',
+      latestEvent: {
+        at: '2026-03-20T00:02:00.000Z',
+        event: 'turn.completed',
+        message: 'Manifest event is newer',
+        requestedBy: null,
+        reason: null
+      },
+      providerLinearWorkerProof: {
+        issue_id: 'task-1311-running-id',
+        issue_identifier: 'task-1311-running',
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 1,
+        last_event: 'turn.completed',
+        last_message: 'Proof event is stale',
+        last_event_at: '2026-03-20T00:01:00.000Z',
+        tokens: {
+          input_tokens: 12,
+          output_tokens: 8,
+          total_tokens: 20
+        },
+        rate_limits: null,
+        owner_phase: 'turn_completed',
+        owner_status: 'in_progress',
+        workspace_path: '/tmp/task-1311-running',
+        end_reason: null,
+        updated_at: '2026-03-20T00:01:00.000Z'
+      }
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: runningSource,
+      running: [runningSource],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20,
+        seconds_running: 120
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null
+    });
+
+    expect(projection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'task-1311-running',
+        last_event: 'turn.completed',
+        last_message: 'Manifest event is newer',
+        last_event_at: '2026-03-20T00:02:00.000Z'
+      })
+    ]);
+  });
+
   it('preserves nested child lane proof details on compatibility issue payloads', () => {
     const childLane: ProviderLinearWorkerChildLaneRecord = {
       stream: 'api-proof',

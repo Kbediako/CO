@@ -213,6 +213,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
 export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
+  pid: string | null;
   thread_id: string | null;
   latest_turn_id: string | null;
   latest_session_id: string | null;
@@ -261,6 +262,7 @@ export interface ProviderLinearWorkerExecRequest {
   cwd: string;
   env: NodeJS.ProcessEnv;
   mirrorOutput: boolean;
+  onStdoutChunk?: ((chunk: string) => void) | null;
 }
 
 export interface ProviderLinearWorkerExecResult {
@@ -322,7 +324,16 @@ export function defaultExecRunner(
 
     if (!request.mirrorOutput) {
       child.stdout?.on('data', (chunk) => {
-        stdout += chunk.toString();
+        const renderedChunk = chunk.toString();
+        stdout += renderedChunk;
+        try {
+          request.onStdoutChunk?.(renderedChunk);
+        } catch (error) {
+          if (typeof child.kill === 'function') {
+            child.kill();
+          }
+          finalizeError(error instanceof Error ? error : new Error(String(error)));
+        }
       });
       child.stderr?.on('data', (chunk) => {
         stderr += chunk.toString();
@@ -773,78 +784,122 @@ export function buildProviderWorkerPrompt(
 }
 
 export function parseProviderLinearWorkerJsonl(raw: string): ProviderLinearWorkerJsonlParseResult {
-  let threadId: string | null = null;
-  let turnId: string | null = null;
-  let finalMessage: string | null = null;
-  let lastEvent: string | null = null;
-  let lastEventAt: string | null = null;
-  let tokens = buildEmptyProviderLinearWorkerTokenUsage();
-  let rateLimits: Record<string, unknown> | null = null;
+  const state = buildEmptyProviderLinearWorkerJsonlParseResult();
 
   for (const line of raw.split(/\r?\n/u)) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('{')) {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-      const eventSummary = extractProviderWorkerEventSummary(parsed);
-      if (eventSummary.event) {
-        lastEvent = eventSummary.event;
-      }
-      if (eventSummary.at) {
-        lastEventAt = eventSummary.at;
-      }
-      if (eventSummary.message) {
-        finalMessage = eventSummary.message;
-      }
-      const observedTokens = extractProviderWorkerTokenUsage(parsed);
-      if (observedTokens && hasProviderWorkerTokenUsage(observedTokens)) {
-        tokens = observedTokens;
-      }
-      const observedRateLimits = extractProviderWorkerRateLimits(parsed);
-      if (observedRateLimits) {
-        rateLimits = observedRateLimits;
-      }
-      if (parsed.type === 'thread.started' && typeof parsed.thread_id === 'string') {
-        threadId = parsed.thread_id;
-        continue;
-      }
-      if (parsed.type === 'turn_context' && isRecord(parsed.payload)) {
-        turnId = normalizeOptionalString(parsed.payload.turn_id) ?? turnId;
-        continue;
-      }
-      if (parsed.type === 'event_msg' && isRecord(parsed.payload)) {
-        if (parsed.payload.type === 'task_complete') {
-          turnId = normalizeOptionalString(parsed.payload.turn_id) ?? turnId;
-        }
-        if (parsed.payload.type === 'agent_message') {
-          finalMessage = normalizeOptionalString(parsed.payload.message) ?? finalMessage;
-        }
-        continue;
-      }
-      if (
-        parsed.type === 'response_item' &&
-        isRecord(parsed.payload) &&
-        parsed.payload.type === 'message' &&
-        Array.isArray(parsed.payload.content)
-      ) {
-        for (const item of parsed.payload.content) {
-          if (
-            isRecord(item) &&
-            item.type === 'output_text' &&
-            typeof item.text === 'string'
-          ) {
-            finalMessage = item.text;
-          }
-        }
-      }
-    } catch {
-      continue;
-    }
+    applyProviderLinearWorkerJsonlLine(state, line);
   }
 
-  return { threadId, turnId, finalMessage, lastEvent, lastEventAt, tokens, rateLimits };
+  return state;
+}
+
+function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJsonlParseResult {
+  return {
+    threadId: null,
+    turnId: null,
+    finalMessage: null,
+    lastEvent: null,
+    lastEventAt: null,
+    tokens: buildEmptyProviderLinearWorkerTokenUsage(),
+    rateLimits: null
+  };
+}
+
+function applyProviderLinearWorkerJsonlLine(
+  state: ProviderLinearWorkerJsonlParseResult,
+  line: string
+): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('{')) {
+    return false;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    return applyProviderLinearWorkerJsonlRecord(state, parsed);
+  } catch {
+    return false;
+  }
+}
+
+function applyProviderLinearWorkerJsonlRecord(
+  state: ProviderLinearWorkerJsonlParseResult,
+  parsed: Record<string, unknown>
+): boolean {
+  let changed = false;
+  const eventSummary = extractProviderWorkerEventSummary(parsed);
+  if (eventSummary.event && eventSummary.event !== state.lastEvent) {
+    state.lastEvent = eventSummary.event;
+    changed = true;
+  }
+  if (eventSummary.at && eventSummary.at !== state.lastEventAt) {
+    state.lastEventAt = eventSummary.at;
+    changed = true;
+  }
+  if (eventSummary.message && eventSummary.message !== state.finalMessage) {
+    state.finalMessage = eventSummary.message;
+    changed = true;
+  }
+  const observedTokens = extractProviderWorkerTokenUsage(parsed);
+  if (observedTokens && hasProviderWorkerTokenUsage(observedTokens)) {
+    state.tokens = observedTokens;
+    changed = true;
+  }
+  const observedRateLimits = extractProviderWorkerRateLimits(parsed);
+  if (observedRateLimits) {
+    state.rateLimits = observedRateLimits;
+    changed = true;
+  }
+  if (parsed.type === 'thread.started' && typeof parsed.thread_id === 'string') {
+    if (parsed.thread_id !== state.threadId) {
+      state.threadId = parsed.thread_id;
+      changed = true;
+    }
+    return changed;
+  }
+  if (parsed.type === 'turn_context' && isRecord(parsed.payload)) {
+    const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
+    if (nextTurnId && nextTurnId !== state.turnId) {
+      state.turnId = nextTurnId;
+      changed = true;
+    }
+    return changed;
+  }
+  if (parsed.type === 'event_msg' && isRecord(parsed.payload)) {
+    if (parsed.payload.type === 'task_complete') {
+      const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
+      if (nextTurnId && nextTurnId !== state.turnId) {
+        state.turnId = nextTurnId;
+        changed = true;
+      }
+    }
+    if (parsed.payload.type === 'agent_message') {
+      const nextMessage = normalizeOptionalString(parsed.payload.message);
+      if (nextMessage && nextMessage !== state.finalMessage) {
+        state.finalMessage = nextMessage;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+  if (
+    parsed.type === 'response_item' &&
+    isRecord(parsed.payload) &&
+    parsed.payload.type === 'message' &&
+    Array.isArray(parsed.payload.content)
+  ) {
+    for (const item of parsed.payload.content) {
+      if (
+        isRecord(item) &&
+        item.type === 'output_text' &&
+        typeof item.text === 'string' &&
+        item.text !== state.finalMessage
+      ) {
+        state.finalMessage = item.text;
+        changed = true;
+      }
+    }
+  }
+  return changed;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -915,10 +970,11 @@ function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTo
     return normalizedDirectUsage;
   }
 
+  const eventType = normalizeOptionalString(input.type);
   const method =
     normalizeOptionalString(input.method) ??
     normalizeOptionalString((input.payload as Record<string, unknown> | undefined)?.method);
-  if (method === 'turn/completed' || method === 'turn_completed') {
+  if (eventType === 'turn.completed' || method === 'turn/completed' || method === 'turn_completed') {
     const turnUsage = normalizeProviderWorkerTokenUsage(
       findRecordAtPaths(input, [
         ['usage'],
@@ -959,13 +1015,15 @@ function normalizeProviderWorkerTokenUsage(
     'totalTokens',
     'total'
   ]);
-  if (inputTokens === null && outputTokens === null && totalTokens === null) {
+  const normalizedTotalTokens =
+    totalTokens ?? (inputTokens !== null && outputTokens !== null ? inputTokens + outputTokens : null);
+  if (inputTokens === null && outputTokens === null && normalizedTotalTokens === null) {
     return null;
   }
   return {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
-    total_tokens: totalTokens
+    total_tokens: normalizedTotalTokens
   };
 }
 
@@ -1837,15 +1895,23 @@ async function requestProviderControlHostRefresh(input: {
   proof: ProviderLinearWorkerProof;
   repoRoot: string;
   log: Pick<typeof logger, 'warn'>;
+  allowInProgress?: boolean;
+  abortSignal?: AbortSignal;
 }): Promise<void> {
   const shouldRefresh =
-    input.proof.owner_phase === 'ended' &&
     (
-      input.proof.owner_status === 'failed' ||
+      input.allowInProgress === true &&
+      input.proof.owner_status === 'in_progress'
+    ) ||
+    (
+      input.proof.owner_phase === 'ended' &&
       (
-        input.proof.owner_status === 'succeeded' &&
-        typeof input.proof.end_reason === 'string' &&
-        PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS.has(input.proof.end_reason)
+        input.proof.owner_status === 'failed' ||
+        (
+          input.proof.owner_status === 'succeeded' &&
+          typeof input.proof.end_reason === 'string' &&
+          PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS.has(input.proof.end_reason)
+        )
       )
     );
   if (!shouldRefresh) {
@@ -1901,6 +1967,9 @@ async function requestProviderControlHostRefresh(input: {
     const token = await readControlEndpointToken(canonicalTokenPath);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
+    const requestSignal = input.abortSignal
+      ? AbortSignal.any([controller.signal, input.abortSignal])
+      : controller.signal;
     try {
       const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
         method: 'POST',
@@ -1918,7 +1987,7 @@ async function requestProviderControlHostRefresh(input: {
           owner_status: input.proof.owner_status,
           end_reason: input.proof.end_reason
         }),
-        signal: controller.signal
+        signal: requestSignal
       });
       const responseBody = await response.text();
       if (response.status !== 202) {
@@ -1933,6 +2002,9 @@ async function requestProviderControlHostRefresh(input: {
       clearTimeout(timer);
     }
   } catch (error) {
+    if (input.abortSignal?.aborted === true) {
+      return;
+    }
     const message = (error as Error)?.name === 'AbortError'
       ? 'refresh request timeout'
       : (error as Error)?.message ?? String(error);
@@ -2023,6 +2095,7 @@ export async function runProviderLinearWorker(
     ...runtimeContext.env
   };
   const auditPath = resolve(context.runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME);
+  const workerPid = String(process.pid);
   childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
   const helperCommand = resolveProviderLinearHelperCommand(childEnv);
   if (shouldForceNonInteractive(childEnv)) {
@@ -2036,6 +2109,7 @@ export async function runProviderLinearWorker(
   let finalProof: ProviderLinearWorkerProof = {
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
+    pid: workerPid,
     thread_id: null,
     latest_turn_id: null,
     latest_session_id: null,
@@ -2124,116 +2198,31 @@ export async function runProviderLinearWorker(
   let threadId: string | null = null;
   let turnId: string | null = null;
   let lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+  let liveRefreshRequestedAtMs = 0;
+  let liveRefreshRequest: Promise<void> | null = null;
+  let liveRefreshAbortController: AbortController | null = null;
+  let liveRefreshPending = false;
+  let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  let liveRefreshClosed = false;
+  let liveProofWrite: Promise<void> = Promise.resolve();
 
-  if (!lifecycle.isExecutionEligible) {
-    finalProof = {
-      ...finalProof,
-      owner_phase: 'ended',
-      owner_status: 'succeeded',
-      end_reason: lifecycle.terminalReason,
-      updated_at: deps.now()
-    };
-    finalProof = await persistProof(finalProof);
-    return finalProof;
-  }
-
-  for (let turnNumber = 1; turnNumber <= context.maxTurns; turnNumber += 1) {
-    const sharedRepoCheckoutPath =
-      (await resolveProviderControlHostRepoRoot({
-        manifestPath: context.manifestPath,
-        workerWorkspacePath: context.repoRoot,
-        taskId: context.taskId
-      })) ??
-      deriveSharedRepoCheckoutPathFallback(context.repoRoot, context.taskId);
-    const prompt = buildProviderWorkerPrompt(
-      issue,
-      turnNumber,
-      context.maxTurns,
-      helperCommand,
-      sharedRepoCheckoutPath
-    );
-    const args =
-      turnNumber === 1
-        ? ['exec', '--json', prompt]
-        : ['exec', 'resume', '--json', threadId ?? '', prompt];
-    const resolved = resolveRuntimeCodexCommand(args, runtimeContext);
-    let execResult: ProviderLinearWorkerExecResult;
-    try {
-      execResult = await deps.execRunner({
-        command: resolved.command,
-        args: resolved.args,
-        cwd: context.repoRoot,
-        env: childEnv,
-        mirrorOutput: false
-      });
-    } catch (error) {
-      finalProof = {
-        ...finalProof,
-        owner_phase: 'ended',
-        owner_status: 'failed',
-        end_reason: 'exec_runner_failed',
-        updated_at: deps.now()
-      };
-      finalProof = await persistProof(finalProof);
-      throw error instanceof Error ? error : new Error(String(error));
+  const cancelLiveRefreshState = async (): Promise<void> => {
+    liveRefreshClosed = true;
+    liveRefreshPending = false;
+    if (liveRefreshTimer !== null) {
+      clearTimeout(liveRefreshTimer);
+      liveRefreshTimer = null;
     }
-    const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
-    threadId = parsed.threadId ?? threadId;
-    turnId = parsed.turnId ?? turnId;
-    const session = deriveLatestTurnSessionId({ threadId, turnId });
-
-    finalProof = {
-      issue_id: context.issueId,
-      issue_identifier: context.issueIdentifier,
-      thread_id: threadId,
-      latest_turn_id: turnId,
-      latest_session_id: session.sessionId,
-      latest_session_id_source: session.source,
-      turn_count: turnNumber,
-      last_event: parsed.lastEvent ?? finalProof.last_event,
-      last_message: parsed.finalMessage ?? finalProof.last_message,
-      last_event_at: parsed.lastEventAt ?? finalProof.last_event_at,
-      tokens: hasProviderWorkerTokenUsage(parsed.tokens) ? parsed.tokens : finalProof.tokens,
-      rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
-      owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
-      owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
-      workspace_path: context.workspacePath,
-      source_setup: context.sourceSetup,
-      linear_audit: finalProof.linear_audit,
-      tracked_issue_error: null,
-      end_reason: null,
-      updated_at: deps.now()
-    };
-    finalProof = await persistProof(finalProof);
-
-    if (execResult.exitCode !== 0) {
-      finalProof = {
-        ...finalProof,
-        owner_phase: 'ended',
-        owner_status: 'failed',
-        end_reason: `codex_exit_${execResult.exitCode ?? 'unknown'}`,
-        updated_at: deps.now()
-      };
-      finalProof = await persistProof(finalProof);
-      throw new Error(
-        `provider-linear-worker turn ${turnNumber} failed with exit code ${execResult.exitCode ?? 'unknown'}`
-      );
+    await liveProofWrite;
+    if (liveRefreshRequest !== null) {
+      liveRefreshAbortController?.abort();
+      await liveRefreshRequest;
     }
+    liveRefreshAbortController = null;
+    liveRefreshRequest = null;
+  };
 
-    if (!threadId) {
-      finalProof = {
-        ...finalProof,
-        owner_phase: 'ended',
-        owner_status: 'failed',
-        end_reason: 'thread_id_missing',
-        updated_at: deps.now()
-      };
-      finalProof = await persistProof(finalProof);
-      throw new Error('provider-linear-worker could not determine thread_id from Codex JSONL output.');
-    }
-
-    issue = await readTrackedIssueWithFailClosedProof();
-    lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+  try {
     if (!lifecycle.isExecutionEligible) {
       finalProof = {
         ...finalProof,
@@ -2246,28 +2235,285 @@ export async function runProviderLinearWorker(
       return finalProof;
     }
 
-    if (turnNumber === context.maxTurns) {
+    for (let turnNumber = 1; turnNumber <= context.maxTurns; turnNumber += 1) {
+      let liveStdoutBuffer = '';
+      let liveProofSignature: string | null = null;
+      const liveParseState = buildEmptyProviderLinearWorkerJsonlParseResult();
+      const scheduleTrailingLiveRefresh = (): void => {
+        if (liveRefreshClosed || !liveRefreshPending || liveRefreshRequest !== null || liveRefreshTimer !== null) {
+          return;
+        }
+        const waitMs = Math.max(0, 1_000 - (Date.now() - liveRefreshRequestedAtMs));
+        liveRefreshTimer = setTimeout(() => {
+          liveRefreshTimer = null;
+          if (liveRefreshClosed || !liveRefreshPending || liveRefreshRequest !== null) {
+            return;
+          }
+          liveRefreshPending = false;
+          liveRefreshRequestedAtMs = Date.now();
+          const abortController = new AbortController();
+          liveRefreshAbortController = abortController;
+          liveRefreshRequest = requestProviderControlHostRefresh({
+            currentManifestPath: context.manifestPath,
+            env,
+            manifest: context.manifest,
+            proof: finalProof,
+            repoRoot: context.repoRoot,
+            log: deps.log,
+            allowInProgress: true,
+            abortSignal: abortController.signal
+          }).finally(() => {
+            if (liveRefreshAbortController === abortController) {
+              liveRefreshAbortController = null;
+            }
+            liveRefreshRequest = null;
+            scheduleTrailingLiveRefresh();
+          });
+        }, waitMs);
+      };
+      const queueLiveProofWrite = (): void => {
+        const liveThreadId = liveParseState.threadId ?? threadId;
+        const liveTurnId = liveParseState.turnId;
+        const session = deriveLatestTurnSessionId({
+          threadId: liveThreadId,
+          turnId: liveTurnId
+        });
+        const nextProof: ProviderLinearWorkerProof = {
+          ...finalProof,
+          pid: workerPid,
+          thread_id: liveThreadId,
+          latest_turn_id: liveTurnId,
+          latest_session_id: session.sessionId,
+          latest_session_id_source: session.source,
+          turn_count: turnNumber,
+          last_event: liveParseState.lastEvent ?? finalProof.last_event,
+          last_message: liveParseState.finalMessage ?? finalProof.last_message,
+          last_event_at: liveParseState.lastEventAt ?? finalProof.last_event_at,
+          tokens: hasProviderWorkerTokenUsage(liveParseState.tokens) ? liveParseState.tokens : finalProof.tokens,
+          rate_limits: liveParseState.rateLimits ?? finalProof.rate_limits,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          updated_at: deps.now()
+        };
+        const signature = JSON.stringify({
+          thread_id: nextProof.thread_id,
+          latest_turn_id: nextProof.latest_turn_id,
+          latest_session_id: nextProof.latest_session_id,
+          latest_session_id_source: nextProof.latest_session_id_source,
+          turn_count: nextProof.turn_count,
+          last_event: nextProof.last_event,
+          last_message: nextProof.last_message,
+          last_event_at: nextProof.last_event_at,
+          tokens: nextProof.tokens,
+          rate_limits: nextProof.rate_limits,
+          owner_phase: nextProof.owner_phase
+        });
+        if (signature === liveProofSignature) {
+          return;
+        }
+        liveProofSignature = signature;
+        finalProof = nextProof;
+        liveProofWrite = liveProofWrite
+          .then(async () => {
+            const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+            finalProof = hydratedProof;
+            if (liveRefreshClosed) {
+              return;
+            }
+            const nowMs = Date.now();
+            if (nowMs - liveRefreshRequestedAtMs < 1_000 || liveRefreshRequest !== null) {
+              liveRefreshPending = true;
+              scheduleTrailingLiveRefresh();
+              return;
+            }
+            liveRefreshPending = false;
+            liveRefreshRequestedAtMs = nowMs;
+            const abortController = new AbortController();
+            liveRefreshAbortController = abortController;
+            liveRefreshRequest = requestProviderControlHostRefresh({
+              currentManifestPath: context.manifestPath,
+              env,
+              manifest: context.manifest,
+              proof: hydratedProof,
+              repoRoot: context.repoRoot,
+              log: deps.log,
+              allowInProgress: true,
+              abortSignal: abortController.signal
+            }).finally(() => {
+              if (liveRefreshAbortController === abortController) {
+                liveRefreshAbortController = null;
+              }
+              liveRefreshRequest = null;
+              scheduleTrailingLiveRefresh();
+            });
+          })
+          .catch((error) => {
+            deps.log.warn(
+              `provider-linear-worker could not persist live proof update for ${context.issueIdentifier}: ${
+                (error as Error)?.message ?? String(error)
+              }`
+            );
+          });
+      };
+      const handleLiveStdoutChunk = (chunk: string): void => {
+        liveStdoutBuffer += chunk;
+        const lines = liveStdoutBuffer.split(/\r?\n/u);
+        liveStdoutBuffer = lines.pop() ?? '';
+        let changed = false;
+        for (const line of lines) {
+          changed = applyProviderLinearWorkerJsonlLine(liveParseState, line) || changed;
+        }
+        if (changed) {
+          queueLiveProofWrite();
+        }
+      };
+      const flushLiveStdoutTail = (): void => {
+        const trailingLine = liveStdoutBuffer.trim();
+        liveStdoutBuffer = '';
+        if (!trailingLine) {
+          return;
+        }
+        if (applyProviderLinearWorkerJsonlLine(liveParseState, trailingLine)) {
+          queueLiveProofWrite();
+        }
+      };
+      const sharedRepoCheckoutPath =
+        (await resolveProviderControlHostRepoRoot({
+          manifestPath: context.manifestPath,
+          workerWorkspacePath: context.repoRoot,
+          taskId: context.taskId
+        })) ??
+        deriveSharedRepoCheckoutPathFallback(context.repoRoot, context.taskId);
+      const prompt = buildProviderWorkerPrompt(
+        issue,
+        turnNumber,
+        context.maxTurns,
+        helperCommand,
+        sharedRepoCheckoutPath
+      );
+      const args =
+        turnNumber === 1
+          ? ['exec', '--json', prompt]
+          : ['exec', 'resume', '--json', threadId ?? '', prompt];
+      const resolved = resolveRuntimeCodexCommand(args, runtimeContext);
+      let execResult: ProviderLinearWorkerExecResult;
+      try {
+        execResult = await deps.execRunner({
+          command: resolved.command,
+          args: resolved.args,
+          cwd: context.repoRoot,
+          env: childEnv,
+          mirrorOutput: false,
+          onStdoutChunk: handleLiveStdoutChunk
+        });
+      } catch (error) {
+        finalProof = {
+          ...finalProof,
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'exec_runner_failed',
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        throw error instanceof Error ? error : new Error(String(error));
+      }
+      flushLiveStdoutTail();
+      await liveProofWrite;
+      const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
+      threadId = parsed.threadId ?? threadId;
+      turnId = parsed.turnId ?? turnId;
+      const session = deriveLatestTurnSessionId({ threadId, turnId });
+
       finalProof = {
-        ...finalProof,
-        owner_phase: 'ended',
-        owner_status: 'succeeded',
-        end_reason: 'max_turns_reached_issue_still_active',
+        issue_id: context.issueId,
+        issue_identifier: context.issueIdentifier,
+        pid: workerPid,
+        thread_id: threadId,
+        latest_turn_id: turnId,
+        latest_session_id: session.sessionId,
+        latest_session_id_source: session.source,
+        turn_count: turnNumber,
+        last_event: parsed.lastEvent ?? finalProof.last_event,
+        last_message: parsed.finalMessage ?? finalProof.last_message,
+        last_event_at: parsed.lastEventAt ?? finalProof.last_event_at,
+        tokens: hasProviderWorkerTokenUsage(parsed.tokens) ? parsed.tokens : finalProof.tokens,
+        rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
+        owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
+        owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
+        workspace_path: context.workspacePath,
+        source_setup: context.sourceSetup,
+        linear_audit: finalProof.linear_audit,
+        tracked_issue_error: null,
+        end_reason: null,
         updated_at: deps.now()
       };
       finalProof = await persistProof(finalProof);
-      return finalProof;
-    }
-  }
 
-  finalProof = {
-    ...finalProof,
-    owner_phase: 'ended',
-    owner_status: 'succeeded',
-    end_reason: 'worker_completed',
-    updated_at: deps.now()
-  };
-  finalProof = await persistProof(finalProof);
-  return finalProof;
+      if (execResult.exitCode !== 0) {
+        finalProof = {
+          ...finalProof,
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: `codex_exit_${execResult.exitCode ?? 'unknown'}`,
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        throw new Error(
+          `provider-linear-worker turn ${turnNumber} failed with exit code ${execResult.exitCode ?? 'unknown'}`
+        );
+      }
+
+      if (!threadId) {
+        finalProof = {
+          ...finalProof,
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'thread_id_missing',
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        throw new Error('provider-linear-worker could not determine thread_id from Codex JSONL output.');
+      }
+
+      issue = await readTrackedIssueWithFailClosedProof();
+      lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+      if (!lifecycle.isExecutionEligible) {
+        finalProof = {
+          ...finalProof,
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          end_reason: lifecycle.terminalReason,
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        return finalProof;
+      }
+
+      if (turnNumber === context.maxTurns) {
+        finalProof = {
+          ...finalProof,
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          end_reason: 'max_turns_reached_issue_still_active',
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        return finalProof;
+      }
+    }
+
+    finalProof = {
+      ...finalProof,
+      owner_phase: 'ended',
+      owner_status: 'succeeded',
+      end_reason: 'worker_completed',
+      updated_at: deps.now()
+    };
+    finalProof = await persistProof(finalProof);
+    return finalProof;
+  } finally {
+    await cancelLiveRefreshState();
+  }
 }
 
 function resolveProviderLinearHelperCommand(env: NodeJS.ProcessEnv): string {

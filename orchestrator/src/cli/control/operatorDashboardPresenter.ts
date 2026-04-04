@@ -29,6 +29,7 @@ export interface OperatorDashboardSessionPayload {
   run_id: string | null;
   display_state: string;
   status_reason: string | null;
+  pid: string | null;
   session_id: string | null;
   thread_id: string | null;
   turn_count: number | null;
@@ -232,6 +233,7 @@ function buildRunningSessionPayload(
     run_id: issue?.run_id ?? null,
     display_state: entry.display_state,
     status_reason: entry.status_reason,
+    pid: proof === null ? (entry.pid ?? null) : (proof.pid ?? null),
     session_id: proof?.latest_session_id ?? entry.session_id,
     thread_id: proof?.thread_id ?? null,
     turn_count: proof?.turn_count ?? entry.turn_count,
