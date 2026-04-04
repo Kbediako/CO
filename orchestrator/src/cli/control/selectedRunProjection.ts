@@ -274,10 +274,8 @@ function buildProjectionContextFromParts(
     proofUpdatedAt && (!manifestUpdatedAt || compareIsoTimestamp(proofUpdatedAt, manifestUpdatedAt) >= 0)
       ? proofUpdatedAt
       : manifestUpdatedAt;
-  const completedAt =
-    rawStatus === 'in_progress'
-      ? readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? null
-      : readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? proofUpdatedAt ?? updatedAt;
+  const manifestCompletedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt');
+  const completedAt = manifestCompletedAt ?? (isTerminalRunStatus(rawStatus) ? proofUpdatedAt ?? updatedAt : null);
   const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
   const proofAttemptStartedAt = useTerminalProof
     ? resolveProviderLinearWorkerAttemptStartedAt(
@@ -522,6 +520,10 @@ function resolveSelectedRunDisplaySummary(input: {
     return filteredSummary ?? 'Completed successfully';
   }
   return input.summary;
+}
+
+function isTerminalRunStatus(status: string): boolean {
+  return status === 'succeeded' || status === 'failed' || status === 'cancelled';
 }
 
 function hasStaleSucceededFailureSummary(summary: string): boolean {
