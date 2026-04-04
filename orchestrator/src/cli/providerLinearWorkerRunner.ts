@@ -36,6 +36,7 @@ import {
   summarizeProviderLinearAuditPath,
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
+import { deriveDeterministicProviderMutationSuppressions } from './control/providerLinearWorkerTruth.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
 import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
@@ -213,6 +214,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
 export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
+  attempt_started_at?: string | null;
   pid: string | null;
   thread_id: string | null;
   latest_turn_id: string | null;
@@ -698,13 +700,37 @@ function buildRuntimeProofGuidance(helperCommand: string, issueId: string): stri
   return `- For app-touching lanes, inspect permit posture with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --format json\`, then generate reviewer-usable handoff content with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --kind <screenshot|external-link|video> --proof-url <reviewer-url> --title <label> --summary <what changed> --format json\`; add \`--reachability-mode dns-public\` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers. When the issue explicitly requires screenshot proof embedded directly in Linear instead of an external reviewer URL, place the screenshot in the workpad body as markdown image syntax pointing at a local file (for example \`![Proof screenshot](file:///absolute/path/to/proof.png)\`; use \`![Proof screenshot](<file:///absolute/path/to/proof (1).png>)\` when the path contains spaces or parentheses) and refresh the workpad with \`${helperCommand} upsert-workpad --issue-id ${issueId} --body-file <workpad.md>\`; the helper uploads supported local image refs to Linear and rewrites them to Linear-hosted asset URLs before the comment mutation lands.`;
 }
 
+function buildDeterministicMutationSuppressionSection(
+  audit: ProviderLinearAuditSummary | null,
+  attemptStartedAt: string | null
+): string[] {
+  const suppressions = deriveDeterministicProviderMutationSuppressions(audit, {
+    recordedAtNotBefore: attemptStartedAt
+  });
+  if (suppressions.length === 0) {
+    return [];
+  }
+  return [
+    '- Same-attempt deterministic provider mutation suppressions are in effect for any mutation that already failed validation in this run.',
+    ...suppressions.map((suppression) => `- ${suppression.instruction}`)
+  ];
+}
+
 export function buildProviderWorkerPrompt(
   issue: LiveLinearTrackedIssue,
   turnNumber: number,
   maxTurns: number,
   helperCommand: string,
-  sharedRepoCheckoutPath: string
+  sharedRepoCheckoutPath: string,
+  attemptContext: {
+    linearAudit?: ProviderLinearAuditSummary | null;
+    attemptStartedAt?: string | null;
+  } = {}
 ): string {
+  const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
+    attemptContext.linearAudit ?? null,
+    attemptContext.attemptStartedAt ?? null
+  );
   if (turnNumber > 1) {
     return [
       'Continuation guidance:',
@@ -720,6 +746,7 @@ export function buildProviderWorkerPrompt(
       '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
       '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
       `- When you discover a meaningful out-of-scope improvement, use \`${helperCommand} create-follow-up --issue-id ${issue.id} ...\` to file a same-project follow-up issue in \`Backlog\` with a clear title, description, intent checksum, non-goals, \`Not Done If\`, acceptance criteria, a \`related\` link, the required parity matrix for parity/alignment follow-ups, and optional blocker linkage instead of expanding scope.`,
+      ...deterministicMutationSuppressions,
       '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
       buildRuntimeProofGuidance(helperCommand, issue.id),
       `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
@@ -758,6 +785,7 @@ export function buildProviderWorkerPrompt(
     '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
     '- Refresh the same workpad after each meaningful milestone and immediately before any review or merge handoff. Keep final closeout in that same workpad comment.',
     '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
+    ...deterministicMutationSuppressions,
     buildRuntimeProofGuidance(helperCommand, issue.id),
     `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
     `- When the issue benefits from bounded same-issue implementation help, use parent-owned child lanes via \`${helperCommand} child-lane --action launch --stream <name> --purpose <goal> --files <csv> --phases <csv>\`, then accept, reject, or invalidate the resulting patch artifact from the parent lane.`,
@@ -2122,9 +2150,11 @@ export async function runProviderLinearWorker(
     childEnv.CODEX_INTERACTIVE = '0';
   }
 
+  const attemptStartedAt = deps.now();
   let finalProof: ProviderLinearWorkerProof = {
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
+    attempt_started_at: attemptStartedAt,
     pid: workerPid,
     thread_id: null,
     latest_turn_id: null,
@@ -2146,7 +2176,7 @@ export async function runProviderLinearWorker(
     tracked_issue_error: null,
     linear_budget: null,
     end_reason: null,
-    updated_at: deps.now()
+    updated_at: attemptStartedAt
   };
 
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
@@ -2405,7 +2435,11 @@ export async function runProviderLinearWorker(
         turnNumber,
         context.maxTurns,
         helperCommand,
-        sharedRepoCheckoutPath
+        sharedRepoCheckoutPath,
+        {
+          linearAudit: finalProof.linear_audit,
+          attemptStartedAt: finalProof.attempt_started_at ?? null
+        }
       );
       const args =
         turnNumber === 1
@@ -2443,6 +2477,7 @@ export async function runProviderLinearWorker(
       finalProof = {
         issue_id: context.issueId,
         issue_identifier: context.issueIdentifier,
+        attempt_started_at: finalProof.attempt_started_at,
         pid: workerPid,
         thread_id: threadId,
         latest_turn_id: turnId,

@@ -30,6 +30,17 @@ import {
   readProviderIntakeClaim,
   selectProviderIntakeClaim
 } from './providerIntakeState.js';
+import {
+  buildProviderLinearWorkerTerminalSummary,
+  deriveDeterministicProviderMutationSuppressions,
+  formatDeterministicProviderMutationDegradationSummary,
+  isAuxiliaryProviderProofHarnessManifest,
+  isProviderLinearWorkerProofFreshForStage,
+  resolveProviderLinearWorkerAttemptStartedAt,
+  resolveProviderLinearWorkerTerminalReason,
+  resolveProviderLinearWorkerTerminalStatus,
+  shouldUseProviderLinearWorkerTerminalProofForSelectedRun
+} from './providerLinearWorkerTruth.js';
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
@@ -241,15 +252,52 @@ function buildProjectionContextFromParts(
   }
   const { manifestRecord, issueIdentifier, issueId, taskId, runId } = snapshot;
   const control = parts.control;
-  const rawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
+  const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
-  const updatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
-  const completedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt') ?? null;
+  const providerProofRecord = (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null;
+  const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(manifestRecord, providerProofRecord);
+  const useScopedTerminalProof =
+    useTerminalProof && isProviderLinearWorkerProofFreshForStage(providerProofRecord, startedAt);
+  const proofTerminalStatus = useScopedTerminalProof
+    ? resolveProviderLinearWorkerTerminalStatus(providerProofRecord)
+    : null;
+  const rawStatus = proofTerminalStatus ?? manifestRawStatus;
+  const manifestUpdatedAt = readStringValue(manifestRecord, 'updated_at', 'updatedAt') ?? null;
+  const proofUpdatedAt = useScopedTerminalProof
+    ? readStringValue(providerProofRecord ?? {}, 'updated_at')
+    : null;
+  const updatedAt =
+    proofUpdatedAt && (!manifestUpdatedAt || compareIsoTimestamp(proofUpdatedAt, manifestUpdatedAt) >= 0)
+      ? proofUpdatedAt
+      : manifestUpdatedAt;
+  const manifestCompletedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt');
+  const completedAt = manifestCompletedAt ?? (isTerminalRunStatus(rawStatus) ? proofUpdatedAt ?? updatedAt : null);
   const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
+  const proofAttemptStartedAt = useScopedTerminalProof
+    ? resolveProviderLinearWorkerAttemptStartedAt(providerProofRecord)
+    : null;
+  const proofSummary =
+    useScopedTerminalProof && proofTerminalStatus
+      ? buildProviderLinearWorkerTerminalSummary({
+          status: proofTerminalStatus,
+          endReason: resolveProviderLinearWorkerTerminalReason(providerProofRecord),
+          degradationSummary:
+            proofAttemptStartedAt === null
+              ? null
+              : formatDeterministicProviderMutationDegradationSummary(
+                  deriveDeterministicProviderMutationSuppressions(
+                    parts.providerLinearWorkerProof?.linear_audit ?? null,
+                    {
+                      recordedAtNotBefore: proofAttemptStartedAt
+                    }
+                  )
+                )
+        })
+      : null;
   const summary = resolveSelectedRunDisplaySummary({
     manifestRecord,
     rawStatus,
-    summary: manifestSummary
+    summary: proofSummary ?? manifestSummary
   });
   const workspacePath = resolveSelectedRunWorkspacePath({
     manifestRecord,
@@ -464,6 +512,10 @@ function resolveSelectedRunDisplaySummary(input: {
     return filteredSummary ?? 'Completed successfully';
   }
   return input.summary;
+}
+
+function isTerminalRunStatus(status: string): boolean {
+  return status === 'succeeded' || status === 'failed' || status === 'cancelled' || status === 'canceled';
 }
 
 function hasStaleSucceededFailureSummary(summary: string): boolean {
@@ -694,6 +746,9 @@ async function readTaskCompatibilityContexts(
     if (!snapshot) {
       continue;
     }
+    if (isAuxiliaryProviderProofHarnessManifest(manifest as unknown as Record<string, unknown>)) {
+      continue;
+    }
 
     const control = normalizeControlState(
       await readJsonFile<ControlState>(join(runDir, 'control.json')),
@@ -755,7 +810,7 @@ function isManifestRetryFallbackCandidate(manifestRecord: Record<string, unknown
     return false;
   }
   const status = readStringValue(manifestRecord, 'status');
-  return status === 'failed' || status === 'cancelled';
+  return status === 'failed' || status === 'cancelled' || status === 'canceled';
 }
 
 function findMatchingProviderIntakeClaim(
@@ -980,6 +1035,21 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
     }
   }
   return undefined;
+}
+
+function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
+  const leftValue = Date.parse(left ?? '');
+  const rightValue = Date.parse(right ?? '');
+  if (!Number.isFinite(leftValue) && !Number.isFinite(rightValue)) {
+    return 0;
+  }
+  if (!Number.isFinite(leftValue)) {
+    return -1;
+  }
+  if (!Number.isFinite(rightValue)) {
+    return 1;
+  }
+  return leftValue - rightValue;
 }
 
 function buildProjectionLookupAliases(input: {

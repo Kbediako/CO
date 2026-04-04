@@ -239,6 +239,382 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('does not synthesize completedAt for queued selected runs', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Queued for retry.'
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'queued',
+      summary: 'Queued for retry.',
+      completedAt: null
+    });
+  });
+
+  it('treats canceled selected runs as terminal for completedAt projection', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'canceled',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Run canceled by operator.'
+      }),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'canceled',
+      completedAt: '2026-03-20T01:15:28.970Z'
+    });
+  });
+
+  it('prefers newer failed provider proof over an optimistic manifest status', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Provider linear worker completed with forced standalone review enabled for handoff',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker completed with forced standalone review enabled for handoff'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'codex_exit_1',
+          updated_at: '2026-03-20T01:15:29.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'failed'
+    });
+    expect(selected?.summary).toContain('Provider linear worker failed with Codex exit code 1.');
+    expect(selected?.lastError).toContain('Provider linear worker failed with Codex exit code 1.');
+  });
+
+  it('honors camelCase manifest timestamps before preferring older provider proof', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updatedAt: '2026-03-20T01:15:30.970Z',
+        summary: 'Provider linear worker reached review handoff.',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker reached review handoff.'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'codex_exit_1',
+          updated_at: '2026-03-20T01:15:29.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'succeeded',
+      summary: 'Provider linear worker reached review handoff.',
+      lastError: null
+    });
+  });
+
+  it('ignores terminal proof rewritten from a prior attempt after a rerun starts', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-03-20T01:15:30.970Z',
+        updated_at: '2026-03-20T01:15:29.970Z',
+        summary: 'Provider linear worker reached review handoff.',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker reached review handoff.'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'codex_exit_1',
+          attempt_started_at: '2026-03-20T01:15:28.970Z',
+          updated_at: '2026-03-20T01:15:31.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'succeeded',
+      summary: 'Provider linear worker reached review handoff.',
+      lastError: null
+    });
+  });
+
+  it('ignores deterministic mutation suppressions recorded before the current provider attempt', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Provider linear worker completed with forced standalone review enabled for handoff',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker completed with forced standalone review enabled for handoff'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: '2026-03-20T01:15:28.970Z',
+          linear_audit: {
+            path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+            attempted_count: 1,
+            success_count: 0,
+            failure_count: 1,
+            latest_recorded_at: '2026-03-20T01:15:27.970Z',
+            latest_by_operation: {
+              'create-follow-up': {
+                recorded_at: '2026-03-20T01:15:27.970Z',
+                operation: 'create-follow-up',
+                ok: false,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: null,
+                via: null,
+                state: null,
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                error_code: 'linear_follow_up_parity_matrix_missing',
+                error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+              }
+            }
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.summary).toContain('Provider linear worker stopped because the issue was no longer active.');
+    expect(selected?.summary).not.toContain('deterministic provider mutation suppressed');
+  });
+
+  it('omits degradation text when provider proof cannot be scoped to a single attempt', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Provider linear worker completed with forced standalone review enabled for handoff',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Provider linear worker completed with forced standalone review enabled for handoff'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: undefined,
+          linear_audit: {
+            path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+            attempted_count: 1,
+            success_count: 0,
+            failure_count: 1,
+            latest_recorded_at: '2026-03-20T01:15:27.970Z',
+            latest_by_operation: {
+              'create-follow-up': {
+                recorded_at: '2026-03-20T01:15:27.970Z',
+                operation: 'create-follow-up',
+                ok: false,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: null,
+                via: null,
+                state: null,
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                error_code: 'linear_follow_up_parity_matrix_missing',
+                error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+              }
+            }
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.summary).toContain('Provider linear worker stopped because the issue was no longer active.');
+    expect(selected?.summary).not.toContain('deterministic provider mutation suppressed');
+  });
+
   it('preserves legitimate summary lines while removing stale succeeded failure lines', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -755,6 +1131,93 @@ describe('SelectedRunProjection', () => {
       displayStatus: 'failed',
       summary: 'retryable failure pending rerun'
     });
+  });
+
+  it('treats canceled manifests as retry fallback candidates when provider intake state is absent', async () => {
+    const { root, paths } = await createHostPaths();
+    const retryEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const retryPaths = resolveRunPaths(retryEnv, 'run-child');
+    await mkdir(retryPaths.runDir, { recursive: true });
+    await writeFile(
+      retryPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'canceled',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'retry aborted before handoff',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const discovery = await discoverCompatibilityCollectionContexts(createProjectionContext(paths));
+
+    expect(discovery.running).toEqual([]);
+    expect(discovery.retrying).toHaveLength(1);
+    expect(discovery.retrying[0]).toMatchObject({
+      issueIdentifier: 'CO-2',
+      runId: 'run-child',
+      rawStatus: 'canceled',
+      displayStatus: 'canceled',
+      summary: 'retry aborted before handoff'
+    });
+  });
+
+  it('excludes auxiliary manual live proof harness runs from compatibility discovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const liveRunPaths = resolveRunPaths(taskEnv, 'run-live');
+    await mkdir(liveRunPaths.runDir, { recursive: true });
+    await writeFile(
+      liveRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-live',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+
+    const helperRunPaths = resolveRunPaths(taskEnv, '2026-03-20T01-16-30-000Z-manual-live-proof');
+    await mkdir(helperRunPaths.runDir, { recursive: true });
+    await writeFile(
+      helperRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: '2026-03-20T01-16-30-000Z-manual-live-proof',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:16:30.000Z',
+        summary: 'manual live proof harness'
+      }),
+      'utf8'
+    );
+
+    const discovery = await discoverCompatibilityCollectionContexts(createProjectionContext(paths));
+
+    expect(discovery.running.map((entry) => entry.runId)).toEqual(['run-live']);
+    expect(discovery.running.find((entry) => entry.runId?.includes('manual-live-proof'))).toBeUndefined();
   });
 
   it('discovers authoritative retry contexts even when the queued retry has no recorded attempt yet', async () => {

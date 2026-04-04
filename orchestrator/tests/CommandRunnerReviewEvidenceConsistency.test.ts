@@ -528,6 +528,363 @@ describe('runCommandStage review evidence consistency', () => {
     expect(result.summary).toContain('review ok');
   });
 
+  it('fails a succeeded provider-linear-worker stage when authoritative review telemetry reports terminal failure', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'failed-boundary',
+        termination_boundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'review-timeout',
+          reason: 'bounded out',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed');
+    expect(result.summary).toContain('review outcome: review-wrapper failure via relevant-reinspection-dwell');
+    expect(manifest.commands[0]?.status).toBe('failed');
+    expect(manifest.commands[0]?.exit_code).toBe(1);
+    expect(manifest.commands[0]?.error_file).toBeTruthy();
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_failed');
+    expect(errorPayload.details?.command_exit_code).toBe(0);
+  });
+
+  it('treats prior-attempt provider-worker proofs as missing authoritative proof', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: '1970-01-01T00:00:00.000Z',
+        owner_phase: 'ended',
+        owner_status: 'failed',
+        end_reason: 'codex_exit_9'
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'Provider linear worker failed because authoritative proof was missing or unreadable.'
+    );
+    expect(result.summary).not.toContain('Codex exit code 9');
+    expect(manifest.commands[0]?.status).toBe('failed');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_proof_missing_or_unreadable');
+  });
+
+  it('uses provider proof updated_at as the stale-proof fallback for older proofs', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: undefined,
+        updated_at: '1970-01-01T00:00:00.000Z',
+        owner_phase: 'ended',
+        owner_status: 'failed',
+        end_reason: 'codex_exit_7'
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'Provider linear worker failed because authoritative proof was missing or unreadable.'
+    );
+    expect(result.summary).not.toContain('Codex exit code 7');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_proof_missing_or_unreadable');
+  });
+
+  it('ignores stale provider-worker review telemetry from an earlier attempt in the same run', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        generated_at: '1970-01-01T00:00:00.000Z',
+        review_outcome: 'failed-boundary',
+        termination_boundary: {
+          kind: 'startup-anchor',
+          provenance: 'review-timeout',
+          reason: 'stale telemetry',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1'
+      }
+    );
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.summary).not.toContain('review-wrapper failure');
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+  });
+
+  it('preserves proof-missing failure reason when review telemetry also fails', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'failed-boundary',
+        termination_boundary: {
+          kind: 'startup-anchor',
+          provenance: 'review-timeout',
+          reason: 'proof missing',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'Provider linear worker failed because authoritative proof was missing or unreadable.'
+    );
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_proof_missing_or_unreadable');
+  });
+
+  it('does not append stale provider-worker review telemetry when the current attempt never wrote terminal proof', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'running',
+        owner_status: null,
+        end_reason: null
+      });
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        generated_at: '1970-01-01T00:00:00.000Z',
+        review_outcome: 'failed-boundary',
+        termination_boundary: {
+          kind: 'startup-anchor',
+          provenance: 'review-timeout',
+          reason: 'stale telemetry',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1'
+      }
+    );
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toBe('Provider linear worker completed with forced standalone review enabled for handoff');
+    expect(result.summary).not.toContain('review-wrapper failure');
+  });
+
+  it('ignores deterministic mutation suppressions recorded before the current provider-worker attempt', async () => {
+    mockState.runImpl = async (input) => {
+      const attemptStartedAt = new Date().toISOString();
+      const priorAuditTimestamp = new Date(Date.parse(attemptStartedAt) - 1_000).toISOString();
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: attemptStartedAt,
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        linear_audit: {
+          path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+          attempted_count: 1,
+          success_count: 0,
+          failure_count: 1,
+          latest_recorded_at: priorAuditTimestamp,
+          latest_by_operation: {
+            'create-follow-up': {
+              recorded_at: priorAuditTimestamp,
+              operation: 'create-follow-up',
+              ok: false,
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              source_setup: null,
+              action: null,
+              via: null,
+              state: null,
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: 'linear_follow_up_parity_matrix_missing',
+              error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+            }
+          }
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.summary).not.toContain('deterministic provider mutation suppressed');
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+  });
+
+  it('fails a succeeded provider-linear-worker stage when authoritative proof is missing', async () => {
+    mockState.runImpl = async () => buildSuccessfulExecResult();
+
+    const { env, manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'Provider linear worker failed because authoritative proof was missing or unreadable.'
+    );
+    expect(manifest.commands[0]?.status).toBe('failed');
+    expect(manifest.commands[0]?.error_file).toBeTruthy();
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_proof_missing_or_unreadable');
+    expect(errorPayload.details?.command_exit_code).toBe(0);
+  });
+
+  it('preserves failed provider-worker command summaries even when proof reports success', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      return buildFailedExecResult('provider worker exited\n', 2);
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.summary).toContain('Exited with code 2');
+    expect(result.summary).not.toContain('Provider linear worker reached review handoff.');
+    expect(manifest.commands[0]?.status).toBe('failed');
+  });
+
+  it('does not use summary hints for failed provider-linear-worker stages', async () => {
+    mockState.runImpl = async () => buildFailedExecResult('provider worker exited\n', 2);
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.summary).toContain('Exited with code 2');
+    expect(result.summary).not.toContain('forced standalone review enabled for handoff');
+    expect(manifest.commands[0]?.status).toBe('failed');
+  });
+
   it('ignores inherited review evidence env for review stages unless the stage opts in explicitly', async () => {
     mockState.runImpl = async () => buildSuccessfulExecResult();
     const previous = process.env.CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY;
@@ -649,7 +1006,7 @@ async function bootstrapReviewStage(stageEnv: Record<string, string> = {}) {
 }
 
 async function bootstrapCommandStage(
-  stageSeed: Pick<CommandStage, 'id' | 'title' | 'command'>,
+  stageSeed: Pick<CommandStage, 'id' | 'title' | 'command'> & Partial<Pick<CommandStage, 'summaryHint'>>,
   stageEnv: Record<string, string> = {}
 ) {
   const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
@@ -658,6 +1015,7 @@ async function bootstrapCommandStage(
     id: stageSeed.id,
     title: stageSeed.title,
     command: stageSeed.command,
+    ...(stageSeed.summaryHint ? { summaryHint: stageSeed.summaryHint } : {}),
     env: {
       ...stageEnv
     }
@@ -682,6 +1040,29 @@ async function bootstrapCommandStage(
     paths,
     stage
   };
+}
+
+async function writeProviderLinearWorkerProofArtifacts(
+  input: Record<string, unknown>,
+  overrides: Partial<Record<string, unknown>>
+): Promise<void> {
+  const runDir = String(((input.env ?? {}) as NodeJS.ProcessEnv).CODEX_ORCHESTRATOR_RUN_DIR);
+  const currentAttemptTimestamp = new Date().toISOString();
+  await writeFile(
+    join(runDir, 'provider-linear-worker-proof.json'),
+    JSON.stringify({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      attempt_started_at: currentAttemptTimestamp,
+      owner_phase: 'ended',
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive',
+      updated_at: currentAttemptTimestamp,
+      linear_audit: null,
+      ...overrides
+    }),
+    'utf8'
+  );
 }
 
 async function writeReviewArtifacts(

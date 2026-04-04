@@ -26,7 +26,8 @@ import {
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
-  appendProviderLinearAuditEntry
+  appendProviderLinearAuditEntry,
+  type ProviderLinearAuditSummary
 } from '../src/cli/control/providerLinearWorkflowAudit.js';
 import { recordLinearBudgetHeadersObservation } from '../src/cli/control/linearBudgetState.js';
 import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/providerLinearChildLanePhaseContract.js';
@@ -533,6 +534,202 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('leave it untouched and record the explicit skip reason before `Done`');
     expect(continuationPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
     expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.');
+  });
+
+  it('includes deterministic mutation suppressions in continuation prompts when the same attempt already failed validation', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      latest_by_operation: {
+        'create-follow-up': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'create-follow-up',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_follow_up_parity_matrix_missing',
+          error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix.'
+    );
+  });
+
+  it('ignores deterministic mutation suppressions that predate the current attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      latest_by_operation: {
+        'create-follow-up': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'create-follow-up',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_follow_up_parity_matrix_missing',
+          error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T09:00:01.000Z'
+    });
+
+    expect(continuationPrompt).not.toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).not.toContain(
+      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix.'
+    );
+  });
+
+  it('ignores deterministic mutation suppressions when the current attempt start is missing', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      latest_by_operation: {
+        'create-follow-up': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'create-follow-up',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'linear_follow_up_parity_matrix_missing',
+          error_message: 'Parity/alignment follow-up issues require a parity matrix.'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit
+    });
+
+    expect(continuationPrompt).not.toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).not.toContain(
+      'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix.'
+    );
+  });
+
+  it('suppresses deterministic workpad validation retries within the same attempt', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const audit: ProviderLinearAuditSummary = {
+      path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+      attempted_count: 1,
+      success_count: 0,
+      failure_count: 1,
+      latest_recorded_at: '2026-03-21T09:00:00.000Z',
+      latest_by_operation: {
+        'upsert-workpad': {
+          recorded_at: '2026-03-21T09:00:00.000Z',
+          operation: 'upsert-workpad',
+          ok: false,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: null,
+          via: null,
+          state: null,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          error_code: 'workpad_marker_missing',
+          error_message: 'Workpad body must contain "## Codex Workpad".'
+        }
+      }
+    };
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: audit,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
+    expect(continuationPrompt).toContain(
+      'Do not retry `upsert-workpad` in this attempt until you first fix the deterministic validation error (workpad_marker_missing: Workpad body must contain "## Codex Workpad".).'
+    );
+  });
+
+  it('ignores malformed audit summaries when deriving continuation suppressions', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
+      linearAudit: {
+        path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+        attempted_count: 1,
+        success_count: 0,
+        failure_count: 1,
+        latest_recorded_at: '2026-03-21T09:00:00.000Z',
+        latest_by_operation: null
+      } as unknown as ProviderLinearAuditSummary,
+      attemptStartedAt: '2026-03-21T08:59:59.000Z'
+    });
+
+    expect(continuationPrompt).not.toContain(
+      'Same-attempt deterministic provider mutation suppressions are in effect'
+    );
   });
 
   it('parses thread and turn lineage from codex jsonl output', () => {

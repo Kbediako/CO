@@ -5,7 +5,7 @@ import type { EnvironmentPaths } from '../run/environment.js';
 import type { RunPaths } from '../run/runPaths.js';
 import type { RuntimeMode } from '../runtime/types.js';
 import { runCommandStage } from './commandRunner.js';
-import { appendSummary } from '../run/manifest.js';
+import { appendSummary, removeStageFailureSummary, removeSubpipelineFailureSummary } from '../run/manifest.js';
 import { relativeToRepo, resolveRunPaths } from '../run/runPaths.js';
 import { isoTimestamp } from '../utils/time.js';
 
@@ -96,6 +96,7 @@ export async function executeOrchestratorLocalPipeline(
           await schedulePersist({ manifest: true, force: true });
           break;
         }
+        removeStageFailureSummary(manifest, stage.title);
       } catch (error) {
         entry.status = 'failed';
         entry.completed_at = isoTimestamp();
@@ -163,6 +164,7 @@ export async function executeOrchestratorLocalPipeline(
         success = false;
         break;
       }
+      removeSubpipelineFailureSummary(manifest, stage.pipeline);
     } catch (error) {
       entry.completed_at = isoTimestamp();
       entry.summary = `Sub-pipeline error: ${(error as Error)?.message ?? String(error)}`;
