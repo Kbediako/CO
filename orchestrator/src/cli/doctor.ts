@@ -437,7 +437,7 @@ function resolveDoctorRepoRoot(cwd: string): string {
   const fallback = resolve(cwd);
   let current: string | null = fallback;
   while (current) {
-    if (existsSync(join(current, 'tasks', 'index.json'))) {
+    if (existsSync(join(current, 'tasks', 'index.json')) || existsSync(join(current, PROVIDER_ROOT_RELATIVE_PATH))) {
       return current;
     }
     const parent = dirname(current);
