@@ -10,11 +10,17 @@ const REQUIRED_FILES = [
   'dist/scripts/run-review.js',
   'schemas/manifest.json',
   'skills/long-poll-wait/SKILL.md',
+  'docs/public/downstream-setup.md',
+  'docs/public/provider-onboarding.md',
+  'templates/codex/.codex/providers/README.md',
+  'templates/codex/.codex/providers/provider.env.example',
+  'templates/codex/.codex/providers/control.example.json',
   'README.md',
   'LICENSE'
 ];
 
 const ALLOWED_PREFIXES = ['dist/', 'schemas/', 'templates/', 'skills/'];
+const EXPLICIT_ALLOWED_PREFIXES = ['docs/public/'];
 const ALLOWED_ROOT_FILES = new Set([
   'README.md',
   'LICENSE',
@@ -30,7 +36,6 @@ const DIST_ALLOWED_PREFIXES = [
   'dist/types/'
 ];
 const DIST_ALLOWED_EXACT_FILES = new Set(['dist/scripts/run-review.js']);
-const EXPLICIT_ALLOWED_FILES = new Set(['docs/assets/setup.gif', 'docs/README.md']);
 
 const FORBIDDEN_PREFIXES = [
   '.agent/',
@@ -65,6 +70,9 @@ function collectFilePaths(record) {
 
 function isAllowedPath(filePath) {
   if (ALLOWED_ROOT_FILES.has(filePath)) {
+    return true;
+  }
+  if (EXPLICIT_ALLOWED_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
     return true;
   }
   return ALLOWED_PREFIXES.some((prefix) => filePath.startsWith(prefix));
@@ -110,10 +118,8 @@ async function main() {
     }
 
     for (const filePath of filePaths) {
-      if (EXPLICIT_ALLOWED_FILES.has(filePath)) {
-        continue;
-      }
-      if (FORBIDDEN_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
+      const explicitlyAllowed = isAllowedPath(filePath);
+      if (!explicitlyAllowed && FORBIDDEN_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
         errors.push(`forbidden path: ${filePath}`);
         continue;
       }
@@ -125,7 +131,7 @@ async function main() {
         errors.push(`unexpected dist path: ${filePath}`);
         continue;
       }
-      if (!isAllowedPath(filePath)) {
+      if (!explicitlyAllowed) {
         errors.push(`unexpected path: ${filePath}`);
       }
     }

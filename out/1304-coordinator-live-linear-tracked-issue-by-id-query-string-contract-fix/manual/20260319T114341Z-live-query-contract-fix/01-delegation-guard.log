@@ -1,2 +1,0 @@
-Delegation guard override active.
-Reason: reused existing read-only subagent thread after spawn limit during publication truth-sync

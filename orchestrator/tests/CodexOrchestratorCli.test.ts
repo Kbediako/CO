@@ -36,7 +36,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
     expect(stdout).toContain('Attach the CO STATUS terminal viewer to an already-running local JSON control-host,');
     expect(stdout).toContain('or emit the current CO STATUS snapshot from that host in JSON mode.');
     expect(stdout).toContain('Emit the current CO STATUS snapshot from the local control-host and exit.');
-    expect(stdout).toContain('Use `control-host --format json` for readiness output.');
+    expect(stdout).toContain('Use `control-host --format json` for startup readiness output.');
     expect(stdout).toContain('Attach subcommand:');
     expect(stdout).toContain('Run `codex-orchestrator co-status attach --help` for attach flags.');
     expect(stdout).not.toContain('Pipeline used for provider-driven starts');
@@ -93,5 +93,30 @@ describe('codex-orchestrator CLI monitor alias', () => {
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown co-status attach argument(s): unexpected-arg')
     });
+  }, cliHelpTimeoutMs);
+
+  it('rejects unexpected positional arguments for doctor', async () => {
+    await expect(
+      execFileAsync(
+        process.execPath,
+        ['--loader', 'ts-node/esm', cliEntrypoint, 'doctor', 'unexpected-arg'],
+        { cwd: repoRoot }
+      )
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Unknown doctor argument(s): unexpected-arg')
+    });
+  }, cliHelpTimeoutMs);
+
+  it('prints dedicated doctor help with the apply/json limitation', async () => {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ['--loader', 'ts-node/esm', cliEntrypoint, 'doctor', '--help'],
+      { cwd: repoRoot }
+    );
+
+    expect(stdout).toContain('Usage: codex-orchestrator doctor [options]');
+    expect(stdout).toContain(
+      '--format json         Emit machine-readable output (not supported with --apply).'
+    );
   }, cliHelpTimeoutMs);
 });

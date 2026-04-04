@@ -1,0 +1,18 @@
+{
+  "feature_toggles": {
+    "dispatch_pilot": {
+      "enabled": true,
+      "source": {
+        "provider": "linear",
+        "live": true,
+        "workspace_id": "workspace-id",
+        "team_id": "team-id",
+        "project_id": "project-id"
+      }
+    },
+    "transport_mutating_controls": {
+      "enabled": true,
+      "allowed_transports": ["telegram"]
+    }
+  }
+}

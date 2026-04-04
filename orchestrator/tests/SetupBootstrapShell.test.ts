@@ -38,7 +38,7 @@ describe('runSetupBootstrapShell', () => {
     ]);
     expect(payload.steps.guidance.note).toContain('Agent-first default');
     expect(payload.steps.guidance.references).toContain(
-      'https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md'
+      'https://github.com/Kbediako/CO/blob/main/docs/public/downstream-setup.md'
     );
   });
 
@@ -106,13 +106,14 @@ describe('runSetupBootstrapShell', () => {
       '- Agent-first default: run docs-review before implementation and implementation-gate before handoff.',
       '- Recommended commands:',
       '  - codex-orchestrator flow --task <task-id>',
-      '  - codex-orchestrator doctor --usage',
+      '  - codex-orchestrator doctor --format json',
       '  - codex-orchestrator rlm --multi-agent auto "<goal>"',
       '  - codex-orchestrator codex defaults --yes',
       '  - codex-orchestrator mcp enable --servers delegation --yes',
       '- References:',
-      '  - https://github.com/Kbediako/CO#downstream-usage-cheatsheet-agent-first',
-      '  - https://github.com/Kbediako/CO/blob/main/docs/AGENTS.md',
+      '  - https://github.com/Kbediako/CO#downstream-setup',
+      '  - https://github.com/Kbediako/CO/blob/main/docs/public/downstream-setup.md',
+      '  - https://github.com/Kbediako/CO/blob/main/docs/public/provider-onboarding.md',
       '  - https://github.com/Kbediako/CO/blob/main/docs/guides/collab-vs-mcp.md',
       '  - https://github.com/Kbediako/CO/blob/main/docs/guides/rlm-recursion-v2.md',
       'Run with --yes to apply this setup.'

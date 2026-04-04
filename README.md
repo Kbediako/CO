@@ -1,106 +1,79 @@
 # Codex Orchestrator
 
-![Setup demo](docs/assets/setup.gif)
-
-Codex Orchestrator is the CLI + runtime for Codex-driven pipelines, auditable manifests, and delegation MCP workflows. The npm release is the downstream entrypoint; contributor and repo-internal detail lives in `docs/README.md`.
+Codex Orchestrator is a CLI and runtime for Codex-driven pipelines, auditable manifests, delegation MCP workflows, and downstream repo bootstrapping.
 
 ## Install
 
-- Global install (recommended for CLI use):
-  ```bash
-  npm i -g @kbediako/codex-orchestrator
-  ```
-- After install, use either `codex-orchestrator` or the short alias `codex-orch`:
-  ```bash
-  codex-orchestrator --version
-  ```
-- Or run via npx:
-  ```bash
-  npx @kbediako/codex-orchestrator --version
-  ```
+```bash
+npm i -g @kbediako/codex-orchestrator
+codex-orchestrator --version
+```
 
-Node.js >= 20 is required.
+Node.js `>=20` is required.
 
-## Quick start
+CO currently targets Codex CLI `0.118.0`.
 
-1. Start a pipeline with a task id so artifacts land under `.runs/<task-id>/`:
-   ```bash
-   codex-orch start diagnostics --format json --task <task-id>
-   ```
-2. Watch the run:
-   ```bash
-   codex-orch status --run <run-id> --watch --interval 10
-   ```
-3. Resume if needed:
-   ```bash
-   codex-orch resume --run <run-id>
-   ```
-   The command prints the `run_id` plus the manifest path under `.runs/<task-id>/cli/<run-id>/manifest.json`.
-4. One-shot downstream bootstrap:
-   ```bash
-   codex-orchestrator setup --yes
-   ```
+## 2-minute quickstart
 
-## Current posture
-
-- Current CO compatibility or adoption target: Codex CLI `0.117.0`.
-- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces.
-- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.
-- Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
-- `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and fails fast.
-- Full posture and evidence gates live in `docs/guides/codex-version-policy.md`.
-
-## Downstream setup
-
-Use this when you want Codex to work inside another repo with the CO defaults.
-
-1. Seed templates:
+1. Install the downstream repo templates:
    ```bash
    codex-orchestrator init codex --cwd /path/to/repo
    ```
-2. Register delegation MCP once per machine:
+2. Configure bundled skills plus delegation and DevTools wiring once per machine:
    ```bash
-   codex mcp add delegation -- codex-orchestrator delegate-server --repo /path/to/repo
+   codex-orchestrator setup --yes
    ```
-3. Optional managed Codex CLI path:
+3. Log in to Codex. If browser login is not available, use device auth:
    ```bash
-   codex-orchestrator codex setup
-   export CODEX_CLI_USE_MANAGED=1
+   codex login
+   # Fallback
+   codex login --device-auth
    ```
-4. Optional additive global defaults:
+4. Run the default docs-first flow inside your repo:
    ```bash
-   codex-orchestrator codex defaults --yes
+   codex-orchestrator flow --task <task-id>
+   ```
+5. Check local readiness:
+   ```bash
+   codex-orchestrator doctor --format json
    ```
 
-For deeper runtime, cloud, and role guidance, use `docs/README.md` and `skills/delegation-usage/SKILL.md`.
+## Downstream setup
+
+Public downstream docs shipped in the npm package:
+
+- [docs/public/downstream-setup.md](docs/public/downstream-setup.md): install, repo bootstrap, machine setup, and first-run flow
+- [docs/public/provider-onboarding.md](docs/public/provider-onboarding.md): Linear and Telegram onboarding, env vars, policy examples, readiness, and smoke flow
+
+`init codex` also seeds provider examples under `.codex/providers/` so fresh repos do not need to hand-author the first env and policy files from scratch.
+
+## Common commands
+
+```bash
+codex-orchestrator flow --task <task-id>
+codex-orchestrator review --task <task-id>
+codex-orchestrator doctor --usage --window-days 30
+codex-orchestrator start diagnostics --task <task-id> --format json
+codex-orchestrator co-status
+```
 
 ## Skills (bundled)
 
-Recommended one-shot bootstrap (skills + delegation + DevTools wiring):
-```bash
-codex-orchestrator setup --yes
-# Optional: overwrite existing bundled skills in $CODEX_HOME/skills
-# codex-orchestrator setup --yes --refresh-skills
-```
+Install bundled skills into `$CODEX_HOME/skills`:
 
-The release ships skills under `skills/` for downstream packaging. If you already have global skills installed, treat those as the primary reference and use bundled skills as the shipped fallback. Install bundled skills into `$CODEX_HOME/skills`:
 ```bash
 codex-orchestrator skills install
 ```
 
-Options:
-- `--force` overwrites existing files.
-- `--only <skills>` installs only selected skills (comma-separated). Combine with `--force` to overwrite only those.
-- `--codex-home <path>` targets a different Codex home directory.
+Bundled skills:
 
-Bundled skills (current shipped roster):
 - `agent-first-adoption-steering`
 - `chrome-devtools`
 - `codex-orchestrator`
 - `collab-deliberation`
 - `collab-evals`
 - `collab-subagents-first`
-- `delegate-early` (compatibility alias; use `delegation-usage`)
+- `delegate-early`
 - `delegation-usage`
 - `docs-first`
 - `elegance-review`
@@ -110,29 +83,15 @@ Bundled skills (current shipped roster):
 - `release`
 - `standalone-review`
 
-## Common workflows
+## Public posture
 
-- Doctor and readiness:
-  - `codex-orchestrator doctor --format json`
-  - `codex-orchestrator doctor --apply --yes`
-  - `codex-orchestrator doctor --usage`
-- Pipelines and review:
-  - `codex-orchestrator flow --task <task-id>`
-  - `codex-orchestrator start docs-relevance-advisory --task <task-id>`
-  - `NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>`
-- Monitoring and issue bundles:
-  - `codex-orchestrator co-status`
-  - `codex-orchestrator co-status attach`
-  - `codex-orchestrator doctor --issue-log --issue-title "<title>" --issue-notes "<notes>"`
-  - `codex-orchestrator start <pipeline> --auto-issue-log`
-- Packaging and release checks:
-  - `npm run pack:smoke`
-  - `npm run pack:audit`
+- Current Codex CLI target: `0.118.0`
+- Current model posture: `gpt-5.4`
+- `explorer_fast` remains the explicit `gpt-5.3-codex-spark` exception
+- Local default runtime: `appserver`
+- `executionMode=cloud` with explicit `runtimeMode=appserver` remains unsupported
 
-## More docs
+## Contributing
 
-- `docs/README.md`: repository guide, contributor workflows, and deeper command reference.
-- `docs/guides/codex-version-policy.md`: current posture and promotion gates.
-- `docs/skills-release.md`: bundled skill install and release expectations.
-- `docs/standalone-review-guide.md`: review wrapper behavior and downstream-safe review usage.
-- `skills/delegation-usage/SKILL.md`: delegation defaults and downstream workflow guidance.
+Contributor and repo-internal guidance lives in the source repository:
+[docs/README.md](https://github.com/Kbediako/CO/blob/main/docs/README.md).

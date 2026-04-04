@@ -26,6 +26,12 @@ import {
 } from './utils/cloudPreflight.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 import {
+  hasLinearApiCredentials,
+  hasLinearSourceBinding,
+  resolveLinearSourceSetup
+} from './control/linearDispatchSource.js';
+import { normalizeDispatchSourceProvider } from './control/trackerDispatchPilot.js';
+import {
   BASELINE_AGENTS,
   BASELINE_MODEL,
   BASELINE_REVIEW_MODEL,
@@ -51,6 +57,8 @@ const OPTIONAL_DEPENDENCIES = [
   { name: 'pixelmatch', install: 'npm install --save-dev pixelmatch' },
   { name: 'cheerio', install: 'npm install --save-dev cheerio' }
 ];
+
+const PROVIDER_ROOT_RELATIVE_PATH = '.codex/providers';
 
 export interface DoctorDependencyStatus {
   name: string;
@@ -154,6 +162,51 @@ export interface DoctorResult {
       detail?: string;
     };
     enablement: string[];
+  };
+  providers: {
+    status: 'ok' | 'advisory';
+    repo_examples: {
+      status: 'ok' | 'missing';
+      root: string;
+      paths: {
+        readme: string;
+        env_example: string;
+        control_example: string;
+      };
+      missing: string[];
+    };
+    control_policy: {
+      status: 'ok' | 'missing' | 'invalid';
+      path: string;
+      detail?: string;
+      dispatch_pilot_enabled: boolean | null;
+      dispatch_pilot_provider: string | null;
+      dispatch_pilot_source_setup: {
+        workspace_id: string | null;
+        team_id: string | null;
+        project_id: string | null;
+      } | null;
+      transport_mutating_enabled: boolean | null;
+      telegram_transport_allowed: boolean | null;
+    };
+    linear: {
+      status: 'ready' | 'incomplete';
+      credentials_present: boolean;
+      binding_present: boolean;
+      webhook_secret_present: boolean;
+      dispatch_pilot_enabled: boolean | null;
+      dispatch_pilot_provider: string | null;
+    };
+    telegram: {
+      status: 'ready' | 'incomplete';
+      polling_enabled: boolean;
+      bot_token_present: boolean;
+      allowed_chat_ids: number;
+      mutations_enabled: boolean;
+      push_enabled: boolean;
+      telegram_transport_allowed: boolean | null;
+    };
+    guidance: string[];
   };
 }
 
@@ -266,9 +319,11 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   const delegationConfig = inspectDelegationConfig();
   const delegationStatus: DoctorResult['delegation']['status'] =
     delegationConfig.status === 'ok' ? 'ok' : 'missing-config';
+  const repoRoot = resolveDoctorRepoRoot(cwd);
+  const providers = inspectProviderReadiness(repoRoot, process.env);
 
   return {
-    status: missing.length === 0 && codexDefaults.status === 'ok' ? 'ok' : 'warning',
+    status: missing.length === 0 && codexDefaults.status === 'ok' && providers.status === 'ok' ? 'ok' : 'warning',
     missing,
     dependencies,
     devtools,
@@ -310,7 +365,8 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
         "Enable for a run with: codex -c 'mcp_servers.delegation.enabled=true' ...",
         'See: codex-orchestrator init codex'
       ]
-    }
+    },
+    providers
   };
 }
 
@@ -380,9 +436,13 @@ export async function runDoctorCloudPreflight(options: {
 function resolveDoctorRepoRoot(cwd: string): string {
   const fallback = resolve(cwd);
   let current: string | null = fallback;
+  let providerRootCandidate: string | null = null;
   while (current) {
     if (existsSync(join(current, 'tasks', 'index.json'))) {
       return current;
+    }
+    if (!providerRootCandidate && existsSync(join(current, PROVIDER_ROOT_RELATIVE_PATH))) {
+      providerRootCandidate = current;
     }
     const parent = dirname(current);
     if (parent === current) {
@@ -390,7 +450,7 @@ function resolveDoctorRepoRoot(cwd: string): string {
     }
     current = parent;
   }
-  return fallback;
+  return providerRootCandidate ?? fallback;
 }
 
 export function formatDoctorCloudPreflightSummary(result: DoctorCloudPreflightResult): string[] {
@@ -543,7 +603,132 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
     lines.push(`  - ${line}`);
   }
 
+  lines.push(`Providers: ${result.providers.status}`);
+  lines.push(`  - repo examples: ${result.providers.repo_examples.status} (${result.providers.repo_examples.root})`);
+  if (result.providers.repo_examples.missing.length > 0) {
+    lines.push(`    missing: ${result.providers.repo_examples.missing.join(', ')}`);
+  }
+  lines.push(
+    `  - control policy: ${result.providers.control_policy.status} (${result.providers.control_policy.path})`
+  );
+  if (result.providers.control_policy.detail) {
+    lines.push(`    detail: ${result.providers.control_policy.detail}`);
+  }
+  lines.push(`  - Linear: ${result.providers.linear.status}`);
+  lines.push(`    credentials: ${result.providers.linear.credentials_present ? 'present' : 'missing'}`);
+  lines.push(`    binding: ${result.providers.linear.binding_present ? 'present' : 'missing'}`);
+  lines.push(`    webhook secret: ${result.providers.linear.webhook_secret_present ? 'present' : 'missing'}`);
+  lines.push(
+    `    dispatch_pilot: ${renderProviderToggleSummary(
+      result.providers.linear.dispatch_pilot_enabled,
+      result.providers.linear.dispatch_pilot_provider
+    )}`
+  );
+  lines.push(`  - Telegram: ${result.providers.telegram.status}`);
+  lines.push(`    polling: ${result.providers.telegram.polling_enabled ? 'enabled' : 'disabled'}`);
+  lines.push(`    bot token: ${result.providers.telegram.bot_token_present ? 'present' : 'missing'}`);
+  lines.push(`    allowlisted chats: ${result.providers.telegram.allowed_chat_ids}`);
+  lines.push(`    mutations: ${result.providers.telegram.mutations_enabled ? 'enabled' : 'disabled'}`);
+  lines.push(`    push: ${result.providers.telegram.push_enabled ? 'enabled' : 'disabled'}`);
+  lines.push(
+    `    transport policy: ${renderTransportPolicySummary(result.providers.telegram.telegram_transport_allowed)}`
+  );
+  for (const line of result.providers.guidance) {
+    lines.push(`  - ${line}`);
+  }
+
   return lines;
+}
+
+function inspectProviderReadiness(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv = process.env
+): DoctorResult['providers'] {
+  const providerRoot = join(repoRoot, PROVIDER_ROOT_RELATIVE_PATH);
+  const repoExamples = {
+    readme: join(providerRoot, 'README.md'),
+    env_example: join(providerRoot, 'provider.env.example'),
+    control_example: join(providerRoot, 'control.example.json')
+  };
+  const missingRepoExamples = Object.entries(repoExamples)
+    .filter(([, filePath]) => !existsSync(filePath))
+    .map(([key]) => key);
+
+  const controlPolicy = readProviderControlPolicy(providerRoot);
+  const linearSourceSetup = resolveLinearSourceSetup(
+    {
+      provider: 'linear',
+      workspace_id: controlPolicy.dispatch_pilot_source_setup?.workspace_id ?? null,
+      team_id: controlPolicy.dispatch_pilot_source_setup?.team_id ?? null,
+      project_id: controlPolicy.dispatch_pilot_source_setup?.project_id ?? null
+    },
+    env
+  );
+  const linearCredentialsPresent = hasLinearApiCredentials(env);
+  const linearBindingPresent = hasLinearSourceBinding(linearSourceSetup);
+  const linearWebhookSecretPresent = Boolean(normalizeOptionalString(env.CO_LINEAR_WEBHOOK_SECRET));
+  const linearRequired =
+    controlPolicy.dispatch_pilot_enabled === true && controlPolicy.dispatch_pilot_provider === 'linear';
+  const linearReady =
+    linearCredentialsPresent &&
+    linearBindingPresent &&
+    linearWebhookSecretPresent &&
+    linearRequired;
+
+  const telegramPollingEnabled = parseEnvBoolean(env.CO_TELEGRAM_POLLING_ENABLED);
+  const telegramBotTokenPresent = Boolean(normalizeOptionalString(env.CO_TELEGRAM_BOT_TOKEN));
+  const telegramAllowedChatIds = parseCsvList(env.CO_TELEGRAM_ALLOWED_CHAT_IDS).length;
+  const telegramMutationsEnabled = parseEnvBoolean(env.CO_TELEGRAM_ENABLE_MUTATIONS);
+  const telegramPushEnabled = parseEnvBoolean(env.CO_TELEGRAM_PUSH_ENABLED);
+  const telegramRequired = controlPolicy.telegram_transport_allowed === true;
+  const telegramReady =
+    telegramPollingEnabled &&
+    telegramBotTokenPresent &&
+    telegramAllowedChatIds > 0 &&
+    telegramMutationsEnabled &&
+    telegramRequired;
+
+  const repoExamplesStatus: DoctorResult['providers']['repo_examples']['status'] =
+    missingRepoExamples.length === 0 ? 'ok' : 'missing';
+
+  return {
+    status:
+      repoExamplesStatus === 'ok' &&
+      controlPolicy.status === 'ok' &&
+      (!linearRequired || linearReady) &&
+      (!telegramRequired || telegramReady)
+        ? 'ok'
+        : 'advisory',
+    repo_examples: {
+      status: repoExamplesStatus,
+      root: providerRoot,
+      paths: repoExamples,
+      missing: missingRepoExamples
+    },
+    control_policy: controlPolicy,
+    linear: {
+      status: linearReady ? 'ready' : 'incomplete',
+      credentials_present: linearCredentialsPresent,
+      binding_present: linearBindingPresent,
+      webhook_secret_present: linearWebhookSecretPresent,
+      dispatch_pilot_enabled: controlPolicy.dispatch_pilot_enabled,
+      dispatch_pilot_provider: controlPolicy.dispatch_pilot_provider
+    },
+    telegram: {
+      status: telegramReady ? 'ready' : 'incomplete',
+      polling_enabled: telegramPollingEnabled,
+      bot_token_present: telegramBotTokenPresent,
+      allowed_chat_ids: telegramAllowedChatIds,
+      mutations_enabled: telegramMutationsEnabled,
+      push_enabled: telegramPushEnabled,
+      telegram_transport_allowed: controlPolicy.telegram_transport_allowed
+    },
+    guidance: [
+      'Seed the current repo with: codex-orchestrator init codex --cwd <repo>',
+      'Review .codex/providers/provider.env.example and .codex/providers/control.example.json before enabling providers.',
+      'Re-run codex-orchestrator doctor --format json after exporting provider env vars to confirm readiness.'
+    ]
+  };
 }
 
 function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): DoctorCodexDefaultsAdvisory {
@@ -649,12 +834,186 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function readStringValue(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
+function readStringValue(value: unknown, ...keys: string[]): string | null {
+  if (keys.length === 0) {
+    return typeof value === 'string' ? value : null;
+  }
+  if (!isRecord(value)) {
+    return null;
+  }
+  for (const key of keys) {
+    if (typeof value[key] === 'string') {
+      return value[key] as string;
+    }
+  }
+  return null;
 }
 
 function readNumberValue(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function readBooleanValue(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function readRecordValue(value: unknown, ...keys: string[]): Record<string, unknown> | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  for (const key of keys) {
+    if (isRecord(value[key])) {
+      return value[key] as Record<string, unknown>;
+    }
+  }
+  return null;
+}
+
+function readStringArrayValue(value: unknown, ...keys: string[]): string[] | undefined {
+  const raw = isRecord(value)
+    ? keys.map((key) => value[key]).find((entry) => Array.isArray(entry))
+    : Array.isArray(value)
+      ? value
+      : undefined;
+  if (!Array.isArray(raw)) {
+    return undefined;
+  }
+  return raw
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter((entry) => entry.length > 0);
+}
+
+function parseEnvBoolean(value: string | null | undefined): boolean {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return false;
+  }
+  return ['1', 'true', 'yes', 'on'].includes(normalized.toLowerCase());
+}
+
+function parseCsvList(value: string | null | undefined): string[] {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return [];
+  }
+  return normalized
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function readProviderControlPolicy(providerRoot: string): DoctorResult['providers']['control_policy'] {
+  const preferredPath = join(providerRoot, 'control.json');
+  const fallbackPath = join(providerRoot, 'control.example.json');
+  const candidate = existsSync(preferredPath) ? preferredPath : existsSync(fallbackPath) ? fallbackPath : preferredPath;
+
+  if (!existsSync(candidate)) {
+    return {
+      status: 'missing',
+      path: preferredPath,
+      dispatch_pilot_enabled: null,
+      dispatch_pilot_provider: null,
+      dispatch_pilot_source_setup: null,
+      transport_mutating_enabled: null,
+      telegram_transport_allowed: null
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(candidate, 'utf8')) as unknown;
+    if (!isRecord(parsed)) {
+      throw new Error('provider control policy must be a JSON object');
+    }
+    const featureToggles = isRecord(parsed.feature_toggles) ? (parsed.feature_toggles as Record<string, unknown>) : null;
+    const dispatchPilot = resolveDispatchPilotControls(featureToggles);
+    const dispatchSource = readRecordValue(dispatchPilot, 'source');
+    const dispatchBindingSource = readRecordValue(dispatchSource, 'linear') ?? dispatchSource;
+    const dispatchPilotEnabled = readBooleanValue(dispatchPilot?.enabled);
+    const rawDispatchPilotProvider = normalizeOptionalString(
+      readStringValue(dispatchSource, 'provider', 'source_provider', 'sourceProvider')
+    );
+    const normalizedDispatchPilotProvider = normalizeDispatchSourceProvider(rawDispatchPilotProvider ?? undefined);
+    if (dispatchPilotEnabled === true) {
+      if (!dispatchSource) {
+        throw new Error('dispatch_pilot.source is required when dispatch_pilot.enabled=true');
+      }
+      if (!normalizedDispatchPilotProvider) {
+        throw new Error(
+          rawDispatchPilotProvider
+            ? `unsupported dispatch_pilot.source.provider: ${rawDispatchPilotProvider}`
+            : 'dispatch_pilot.source.provider is required when dispatch_pilot.enabled=true'
+        );
+      }
+    }
+    const transportMutating = resolveTransportMutatingControls(featureToggles);
+    const transportMutatingEnabled = readBooleanValue(transportMutating?.enabled);
+    const allowedTransports = readStringArrayValue(transportMutating, 'allowed_transports', 'allowedTransports');
+    const telegramTransportAllowed =
+      transportMutating === null
+        ? null
+        : transportMutatingEnabled === true
+          ? allowedTransports ? allowedTransports.includes('telegram') : true
+          : false;
+    return {
+      status: 'ok',
+      path: candidate,
+      dispatch_pilot_enabled: dispatchPilotEnabled,
+      dispatch_pilot_provider: normalizedDispatchPilotProvider ?? rawDispatchPilotProvider,
+      dispatch_pilot_source_setup: dispatchBindingSource
+        ? {
+            workspace_id: normalizeOptionalString(readStringValue(dispatchBindingSource, 'workspace_id', 'workspaceId')),
+            team_id: normalizeOptionalString(readStringValue(dispatchBindingSource, 'team_id', 'teamId')),
+            project_id: normalizeOptionalString(readStringValue(dispatchBindingSource, 'project_id', 'projectId'))
+          }
+        : null,
+      transport_mutating_enabled: transportMutatingEnabled,
+      telegram_transport_allowed: telegramTransportAllowed
+    };
+  } catch (error) {
+    return {
+      status: 'invalid',
+      path: candidate,
+      detail: error instanceof Error ? error.message : String(error),
+      dispatch_pilot_enabled: null,
+      dispatch_pilot_provider: null,
+      dispatch_pilot_source_setup: null,
+      transport_mutating_enabled: null,
+      telegram_transport_allowed: null
+    };
+  }
+}
+
+function resolveTransportMutatingControls(
+  featureToggles: Record<string, unknown> | null
+): Record<string, unknown> | null {
+  const direct = readRecordValue(featureToggles, 'transport_mutating_controls');
+  const coordinator = readRecordValue(featureToggles, 'coordinator');
+  const nested = readRecordValue(coordinator, 'transport_mutating_controls');
+  return nested ?? direct ?? null;
+}
+
+function resolveDispatchPilotControls(
+  featureToggles: Record<string, unknown> | null
+): Record<string, unknown> | null {
+  const direct = readRecordValue(featureToggles, 'dispatch_pilot');
+  const coordinator = readRecordValue(featureToggles, 'coordinator');
+  const nested = readRecordValue(coordinator, 'dispatch_pilot');
+  return nested ?? direct ?? null;
+}
+
+function renderProviderToggleSummary(enabled: boolean | null, provider: string | null): string {
+  if (enabled === null) {
+    return 'unconfigured';
+  }
+  const label = enabled ? 'enabled' : 'disabled';
+  return provider ? `${label} (${provider})` : label;
+}
+
+function renderTransportPolicySummary(allowed: boolean | null): string {
+  if (allowed === null) {
+    return 'unconfigured';
+  }
+  return allowed ? 'telegram allowed' : 'telegram blocked';
 }
 
 function isReasoningAtLeastMinimum(value: string | null, minimum: string): boolean {
