@@ -681,6 +681,7 @@ function inspectProviderReadiness(
     telegramPollingEnabled &&
     telegramBotTokenPresent &&
     telegramAllowedChatIds > 0 &&
+    telegramMutationsEnabled &&
     telegramRequired;
 
   const repoExamplesStatus: DoctorResult['providers']['repo_examples']['status'] =
