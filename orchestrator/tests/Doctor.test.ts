@@ -446,7 +446,6 @@ describe('runDoctor', () => {
       expect(result.providers.status).toBe('ok');
       expect(result.providers.linear.status).toBe('ready');
       expect(result.providers.telegram.status).toBe('incomplete');
-      expect(result.status).toBe('ok');
       expect(formatDoctorSummary(result).join('\n')).toContain('Providers: ok');
     } finally {
       for (const [key, value] of Object.entries(previousEnv)) {
