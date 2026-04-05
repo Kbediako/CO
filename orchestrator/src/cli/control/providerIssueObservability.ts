@@ -573,20 +573,12 @@ function deriveMergeCloseoutProgressSnapshot(
     };
   }
 
-  if ((checksPending ?? 0) > 0) {
-    return {
-      phase: 'waiting_on_checks',
-      kind: 'merge_closeout',
-      status: 'waiting',
-      summary,
-      last_semantic_progress_at: lastSemanticProgressAt,
-      stall_classification: 'waiting_on_checks',
-      stall_reason: gateReasons[0] ?? 'checks_pending',
-      recovery_recommendation: 'wait_for_checks'
-    };
-  }
-
-  if ((checksFailed ?? 0) > 0 || (unresolvedThreadCount ?? 0) > 0 || actionRequiredReasons.length > 0) {
+  if (
+    mergeStatus === 'action_required' ||
+    (checksFailed ?? 0) > 0 ||
+    (unresolvedThreadCount ?? 0) > 0 ||
+    actionRequiredReasons.length > 0
+  ) {
     return {
       phase: 'waiting_on_review',
       kind: 'merge_closeout',
@@ -598,6 +590,19 @@ function deriveMergeCloseoutProgressSnapshot(
         actionRequiredReasons[0] ??
         (unresolvedThreadCount && unresolvedThreadCount > 0 ? 'unresolved_review_threads' : 'review_action_required'),
       recovery_recommendation: 'address_review_feedback'
+    };
+  }
+
+  if ((checksPending ?? 0) > 0) {
+    return {
+      phase: 'waiting_on_checks',
+      kind: 'merge_closeout',
+      status: 'waiting',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'waiting_on_checks',
+      stall_reason: gateReasons[0] ?? 'checks_pending',
+      recovery_recommendation: 'wait_for_checks'
     };
   }
 

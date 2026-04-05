@@ -504,6 +504,7 @@ function buildSelectedRunLatestEvent(input: {
   if (
     !input.controlAction &&
     input.providerDebugSnapshot?.progress &&
+    hasAuthoritativeProviderDebugEvidence(input.providerDebugSnapshot) &&
     shouldPreferProviderDebugProgressEvent(input.fallbackEvent)
   ) {
     return {
@@ -527,6 +528,17 @@ function buildSelectedRunLatestEvent(input: {
     requestedBy: input.controlAction?.requested_by ?? null,
     reason: input.controlAction?.reason ?? null
   };
+}
+
+function hasAuthoritativeProviderDebugEvidence(
+  providerDebugSnapshot: ControlProviderDebugSnapshot
+): boolean {
+  return Boolean(
+    providerDebugSnapshot.claim ||
+      providerDebugSnapshot.worker ||
+      providerDebugSnapshot.pull_request ||
+      providerDebugSnapshot.last_audit_operation
+  );
 }
 
 function shouldPreferProviderDebugProgressEvent(fallbackEvent: string): boolean {

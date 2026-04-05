@@ -132,4 +132,60 @@ describe('provider issue observability', () => {
     });
     expect(progress?.stall_reason).toBe('no_semantic_progress_since:2026-04-05T05:40:00.000Z');
   });
+
+  it('prioritizes action-required merge blockers over pending checks', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-04-05T06:10:00.000Z'
+      },
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_active_run',
+        updated_at: '2026-04-05T06:09:00.000Z',
+        run_id: 'run-82-review',
+        merge_closeout: {
+          recorded_at: '2026-04-05T06:11:00.000Z',
+          status: 'watching',
+          reason: 'checks_pending',
+          summary: 'Required checks are still running, but review threads also need action.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/82',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 82
+          },
+          snapshot: {
+            review_decision: 'CHANGES_REQUESTED',
+            merge_state_status: 'BLOCKED',
+            ready_to_merge: false,
+            gate_reasons: ['required_checks_pending'],
+            action_required_reasons: ['changes_requested'],
+            unresolved_thread_count: 2,
+            checks_pending: 1,
+            checks_failed: 0,
+            required_checks_pending: 1,
+            required_checks_failed: 0,
+            updated_at: '2026-04-05T06:11:00.000Z',
+            merged_at: null
+          }
+        }
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      progress: {
+        phase: 'waiting_on_review',
+        kind: 'merge_closeout',
+        status: 'waiting',
+        stall_classification: 'waiting_on_review',
+        stall_reason: 'changes_requested',
+        recovery_recommendation: 'address_review_feedback'
+      },
+      stall_classification: 'waiting_on_review',
+      recovery_recommendation: 'address_review_feedback'
+    });
+  });
 });

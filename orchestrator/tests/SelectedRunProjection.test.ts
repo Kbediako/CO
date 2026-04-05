@@ -375,6 +375,48 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('keeps the generic latest event when no provider claim or proof exists', async () => {
+    const { paths } = await createHostPaths();
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-2',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot?.progress).toMatchObject({
+      phase: 'unknown',
+      kind: 'workflow',
+      status: 'progressing'
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Tracked issue is active.'
+    });
+  });
+
   it('does not synthesize completedAt for queued selected runs', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
