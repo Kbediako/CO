@@ -1091,10 +1091,13 @@ function maxCommentTimestampForKind(issueComments, kind, requestAtMs, headOid) {
       continue;
     }
     const createdAtMs = parseTimestampMs(comment.created_at);
-    if (createdAtMs === null || createdAtMs <= requestAtMs) {
+    const updatedAtMs = parseTimestampMs(comment.updated_at);
+    const effectiveAtMs =
+      comment.__source === 'issue' ? maxTimestamp([createdAtMs, updatedAtMs]) : createdAtMs;
+    if (effectiveAtMs === null || effectiveAtMs <= requestAtMs) {
       continue;
     }
-    timestamps.push(createdAtMs);
+    timestamps.push(effectiveAtMs);
   }
   return maxTimestamp(timestamps);
 }

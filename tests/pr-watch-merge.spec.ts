@@ -941,6 +941,29 @@ describe('resolveBotRereviewTimingForKind', () => {
     expect(result.inProgressAtMs).toBeNull();
     expect(result.completeAtMs).toBe(Date.parse('2026-02-18T04:46:00Z'));
   });
+
+  it('uses updated_at for coderabbit issue comments edited after the latest rereview request', () => {
+    const result = resolveBotRereviewTimingForKind({
+      kind: 'coderabbit',
+      requestAtMs,
+      issueComments: [
+        {
+          user: { login: 'coderabbitai[bot]' },
+          created_at: '2026-02-18T04:40:00Z',
+          updated_at: '2026-02-18T04:46:00Z',
+          __source: 'issue',
+          body: '`@maintainer`: Reviewed at head `abc123`. Everything is clean — no issues found.\n\nPR is ready to merge.'
+        }
+      ],
+      reviews: [],
+      issueReactions: [],
+      requestCommentReactions: [],
+      headOid: 'abc123'
+    });
+
+    expect(result.inProgressAtMs).toBeNull();
+    expect(result.completeAtMs).toBe(Date.parse('2026-02-18T04:46:00Z'));
+  });
 });
 
 describe('resolveLatestBotRereviewRequests', () => {
