@@ -1453,23 +1453,47 @@ function valueContainsProviderWorkerSessionNeedle(value: unknown, needle: string
   return Object.values(value).some((item) => valueContainsProviderWorkerSessionNeedle(item, needle));
 }
 
+function valueEqualsProviderWorkerSessionNeedle(value: unknown, needle: string): boolean {
+  if (typeof value === 'string') {
+    return value === needle;
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => valueEqualsProviderWorkerSessionNeedle(item, needle));
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+  return Object.values(value).some((item) => valueEqualsProviderWorkerSessionNeedle(item, needle));
+}
+
 function prefixContainsProviderWorkerSessionHeader(
   prefix: string,
   workspacePath: string,
   promptNeedles: readonly string[]
 ): boolean {
-  if (prefix.includes(workspacePath) && promptNeedles.some((needle) => prefix.includes(needle))) {
-    return true;
-  }
+  let hasExactWorkspacePath = false;
+  let hasPromptNeedle = promptNeedles.some((needle) => prefix.includes(needle));
   for (const line of prefix.split(/\r?\n/u)) {
     const parsed = parseProviderWorkerSessionJsonlLine(line);
     if (!parsed || parsed.type !== 'session_meta' || !isRecord(parsed.payload)) {
+      if (
+        !hasPromptNeedle &&
+        parsed &&
+        isRecord(parsed.payload) &&
+        promptNeedles.some((needle) => valueContainsProviderWorkerSessionNeedle(parsed.payload, needle))
+      ) {
+        hasPromptNeedle = true;
+      }
       continue;
     }
-    if (
-      valueContainsProviderWorkerSessionNeedle(parsed.payload, workspacePath) &&
-      promptNeedles.some((needle) => valueContainsProviderWorkerSessionNeedle(parsed.payload, needle))
-    ) {
+    hasExactWorkspacePath =
+      hasExactWorkspacePath || valueEqualsProviderWorkerSessionNeedle(parsed.payload, workspacePath);
+    if (!hasPromptNeedle) {
+      hasPromptNeedle = promptNeedles.some((needle) =>
+        valueContainsProviderWorkerSessionNeedle(parsed.payload, needle)
+      );
+    }
+    if (hasExactWorkspacePath && hasPromptNeedle) {
       return true;
     }
   }

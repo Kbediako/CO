@@ -5089,6 +5089,119 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('requires an exact workspace-path match when no thread hint is available', async () => {
+    const { runDir } = await createManifestRoot();
+    const issue = createTrackedIssue();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const codexHome = join(tempRoot ?? '', '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2030', '03', '21');
+    const workspacePath = join(tempRoot ?? '', 'CO');
+    const workspacePrefixCollisionPath = join(tempRoot ?? '', 'CO-ci');
+    const matchingSessionLogPath = join(
+      sessionDir,
+      'rollout-2030-03-21T09-00-08-000Z-thread-2.jsonl'
+    );
+    const prefixCollisionSessionLogPath = join(
+      sessionDir,
+      'rollout-2030-03-21T09-00-09-000Z-thread-20.jsonl'
+    );
+    await mkdir(sessionDir, { recursive: true });
+    await mkdir(workspacePath, { recursive: true });
+    await mkdir(workspacePrefixCollisionPath, { recursive: true });
+    await writeFile(
+      matchingSessionLogPath,
+      [
+        `{"timestamp":"2030-03-21T09:00:08.000Z","type":"session_meta","payload":{"id":"thread-2","cwd":"${workspacePath}","source":"exec"}}`,
+        `{"timestamp":"2030-03-21T09:00:08.050Z","type":"turn_context","payload":{"turn_id":"turn-2","user_instructions":"You are the provider worker for Linear issue ${issue.identifier}: ${issue.title}"}}`,
+        '{"timestamp":"2030-03-21T09:00:08.100Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":12,"output_tokens":8,"total_tokens":20}},"rate_limits":{"primary":{"used_percent":12.5,"window_minutes":300},"secondary":{"used_percent":48,"window_minutes":10080}}}}'
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      prefixCollisionSessionLogPath,
+      [
+        `{"timestamp":"2030-03-21T09:00:09.000Z","type":"session_meta","payload":{"id":"thread-20","cwd":"${workspacePrefixCollisionPath}","source":"exec"}}`,
+        `{"timestamp":"2030-03-21T09:00:09.050Z","type":"turn_context","payload":{"turn_id":"turn-20","user_instructions":"You are the provider worker for Linear issue ${issue.identifier}: ${issue.title}"}}`,
+        '{"timestamp":"2030-03-21T09:00:09.100Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":999,"output_tokens":1,"total_tokens":1000}},"rate_limits":{"primary":{"used_percent":99,"window_minutes":300},"secondary":{"used_percent":88,"window_minutes":10080}}}}'
+      ].join('\n'),
+      'utf8'
+    );
+    const matchingMtime = new Date('2030-03-21T09:00:08.000Z');
+    const prefixCollisionMtime = new Date('2030-03-21T09:00:09.000Z');
+    await utimes(matchingSessionLogPath, matchingMtime, matchingMtime);
+    await utimes(prefixCollisionSessionLogPath, prefixCollisionMtime, prefixCollisionMtime);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: issue.identifier,
+          attempt_started_at: '2030-03-21T09:00:07.000Z',
+          pid: '12345',
+          thread_id: null,
+          latest_turn_id: null,
+          latest_session_id: null,
+          latest_session_id_source: null,
+          turn_count: 1,
+          last_event: null,
+          last_message: null,
+          last_event_at: null,
+          tokens: {
+            input_tokens: null,
+            output_tokens: null,
+            total_tokens: null
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: workspacePath,
+          source_setup: null,
+          linear_audit: null,
+          child_streams: [],
+          child_lanes: [],
+          progress: null,
+          tracked_issue_error: null,
+          linear_budget: null,
+          end_reason: null,
+          updated_at: '2030-03-21T09:00:07.000Z'
+        } satisfies ProviderLinearWorkerProof,
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const proof = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2030-03-21T09:00:10.000Z',
+      undefined,
+      { ...process.env, CODEX_HOME: codexHome }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-2-turn-2',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 48,
+          window_minutes: 10080
+        }
+      },
+      updated_at: '2030-03-21T09:00:10.000Z'
+    });
+  });
+
   it('includes the current day when scanning session-log directories after midnight', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2030-03-22T00:02:00.000Z'));
