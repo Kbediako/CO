@@ -4986,7 +4986,7 @@ describe('provider linear worker runner', () => {
       prefixCollisionSessionLogPath,
       [
         `{"timestamp":"2030-03-21T09:00:07.000Z","type":"session_meta","payload":{"id":"thread-20","cwd":"${tempRoot}","source":"exec"}}`,
-        '{"timestamp":"2030-03-21T09:00:07.050Z","type":"turn_context","payload":{"turn_id":"turn-20","user_instructions":"You are the provider worker for Linear issue CO-20: Different issue title"}}',
+        `{"timestamp":"2030-03-21T09:00:07.050Z","type":"turn_context","payload":{"turn_id":"turn-20","user_instructions":"You are the provider worker for Linear issue CO-20: ${issue.title}"}}`,
         '{"timestamp":"2030-03-21T09:00:07.100Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":999,"output_tokens":1,"total_tokens":1000}},"rate_limits":{"primary":{"used_percent":99,"window_minutes":300},"secondary":{"used_percent":88,"window_minutes":10080}}}}'
       ].join('\n'),
       'utf8'
