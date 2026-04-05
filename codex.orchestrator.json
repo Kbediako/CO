@@ -19,6 +19,7 @@
         "title": "npm run test",
         "command": "npm run test",
         "env": {
+          "CODEX_VITEST_PROGRESS": "1",
           "FORCE_CODEX_REVIEW": "",
           "CODEX_REVIEW_NON_INTERACTIVE": "",
           "CODEX_NON_INTERACTIVE": "",

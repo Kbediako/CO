@@ -18,6 +18,23 @@
       }
     },
     {
+      "id": "20260405-linear-74d6e549-46cc-46be-9a61-76ae61b014f4",
+      "title": "CO: Fix non-interactive npm run test quiet-tail / MessagePort hang",
+      "relates_to": "tasks/tasks-linear-74d6e549-46cc-46be-9a61-76ae61b014f4.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-05",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-74d6e549-46cc-46be-9a61-76ae61b014f4.md",
+        "task": "tasks/tasks-linear-74d6e549-46cc-46be-9a61-76ae61b014f4.md",
+        "agent_task": ".agent/task/linear-74d6e549-46cc-46be-9a61-76ae61b014f4.md",
+        "docs": "docs/TECH_SPEC-linear-74d6e549-46cc-46be-9a61-76ae61b014f4.md"
+      }
+    },
+    {
       "id": "20260404-linear-486fd104-53d7-4657-b26f-c477f7e730a3",
       "title": "CO: Make provider-worker closeout reporting authoritative and suppress deterministic invalid retries",
       "relates_to": "tasks/tasks-linear-486fd104-53d7-4657-b26f-c477f7e730a3.md",

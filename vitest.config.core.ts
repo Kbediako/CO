@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 import { createVitestProgressReporter } from './scripts/lib/vitest-progress-reporter.js';
 
-const reporters = envFlagEnabled(process.env.CI)
+const reporters = shouldEnableVitestProgressReporter(process.env)
   ? ['default', createVitestProgressReporter()]
   : null;
 
@@ -38,4 +38,17 @@ function envFlagEnabled(value: string | undefined): boolean {
 
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+function shouldEnableVitestProgressReporter(env: NodeJS.ProcessEnv): boolean {
+  // Provider-worker runs are non-interactive and can spend several minutes in
+  // long final specs without default Vitest output. Keep the reporter enabled
+  // for those lanes so quiet tails are observable instead of looking hung.
+  return (
+    envFlagEnabled(env.CI) ||
+    envFlagEnabled(env.CODEX_VITEST_PROGRESS) ||
+    envFlagEnabled(env.CODEX_NON_INTERACTIVE) ||
+    envFlagEnabled(env.CODEX_NONINTERACTIVE) ||
+    envFlagEnabled(env.CODEX_NO_INTERACTIVE)
+  );
 }
