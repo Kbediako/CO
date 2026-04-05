@@ -1941,6 +1941,7 @@ export function createProviderIssueHandoffService(
         run_manifest_path: null,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
+        merge_closeout: null,
         ...buildProviderRetryLaunchFields({
           claim: latestRetryStateBase,
           previousRun: latestRun,
@@ -1974,6 +1975,7 @@ export function createProviderIssueHandoffService(
           run_manifest_path: null,
           launch_source: PROVIDER_LAUNCH_SOURCE,
           launch_token: launchToken,
+          merge_closeout: null,
           ...buildQueuedProviderRetryFields({
             claim: latestRetryStateBase,
             previousRun: latestRun,
@@ -1995,6 +1997,7 @@ export function createProviderIssueHandoffService(
             run_manifest_path: startedRun.manifestPath,
             launch_source: PROVIDER_LAUNCH_SOURCE,
             launch_token: launchToken,
+            merge_closeout: null,
             ...buildProviderRetryLaunchFields({
               claim: latestRetryStateBase,
               previousRun: latestRun,

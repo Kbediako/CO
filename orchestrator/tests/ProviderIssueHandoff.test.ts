@@ -2874,6 +2874,116 @@ describe('createProviderIssueHandoffService', () => {
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.start');
   });
 
+  it('clears stale merge_closeout metadata when a fresh accepted-issue launch starts a new run', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_action_required',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-03-19T04:20:00.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        status: 'action_required',
+        reason: 'pr_closed_unmerged',
+        summary: 'Attached PR #357 is closed without merging; reopen it or attach a replacement PR.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/357'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/357',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 357
+        },
+        snapshot: {
+          state: 'CLOSED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=CLOSED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:20:00.000Z',
+          merged_at: null,
+          head_oid: 'abc123'
+        },
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    });
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-child-fresh-launch',
+        manifestPath: '/tmp/provider-run/fresh-launch-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:40:00.000Z'
+      }),
+      deliveryId: 'delivery-fresh-launch-after-closeout',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_200_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:40:00.000Z',
+      run_id: 'run-child-fresh-launch',
+      run_manifest_path: '/tmp/provider-run/fresh-launch-manifest.json'
+    });
+    expect(state.claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(result.claim?.merge_closeout ?? null).toBeNull();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('still queues best-effort rehydrate when post-start runtime publication throws', async () => {
     vi.useFakeTimers();
 
