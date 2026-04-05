@@ -49,7 +49,7 @@
 
 ## Handoff
 - [x] Workpad refreshed after docs, after implementation, and before the current stop point. Evidence: Linear workpad comment `a7dd092c-13ce-40c6-8d00-cb3012ba5dcf`.
-- [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
+- [x] PR attached to the Linear issue before review-state transition. Evidence: draft PR `#363` / `https://github.com/Kbediako/CO/pull/363`, Linear attachment `511c800f-8d04-4461-9f65-455215331ea7`.
 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
-- [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
+- [ ] PR checks green, the draft blocker is intentionally cleared, and actionable review feedback is handled or explicitly pushed back before review-state transition. Evidence: current `ready-review` samples show `bot_rereview_pending=[-]`, `unresolved_threads=0`, and `blocked_by=draft, required_checks_pending=1` with `Core Lane` still running on PR `#363`.
 - [x] Issue remains active until review handoff prerequisites are complete. Evidence: Linear state remains `In Progress`.

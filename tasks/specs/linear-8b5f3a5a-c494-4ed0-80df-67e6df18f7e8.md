@@ -26,6 +26,7 @@ review_notes:
   - 2026-04-05: The unrelated stale `0102` / `0105` packet blocker discovered during `docs:freshness` was split into follow-up `CO-86` so this lane can stay scoped to the `ready-review` watcher fix.
   - 2026-04-05: Manifest-backed standalone review was attempted with `FORCE_CODEX_REVIEW=1 npm run review`, but the wrapper telemetry classified the run as `failed-boundary` with `termination_boundary.kind=startup-anchor`. Manual fallback review of `scripts/lib/pr-watch-merge.js:39-42`, `scripts/lib/pr-watch-merge.js:1064-1095`, and `tests/pr-watch-merge.spec.ts:883-942` found no additional correctness, regression, or missing-test findings. Evidence: `out/linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8/manual/20260405T014324Z-standalone-review-fallback.md`.
   - 2026-04-05: Explicit elegance review kept the current design unchanged: one local phrase list plus the existing timing/head gate was the smallest safe contract, and no extra abstraction or refactor was justified. Evidence: `out/linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8/manual/20260405T014400Z-elegance-review.md`.
+  - 2026-04-05: Draft PR `#363` was opened and attached to the issue. Initial `pr ready-review` monitoring on that PR stayed truthful for the repaired seam: `bot_rereview_pending=[-]`, `unack_bot_feedback=0`, and `unresolved_threads=0`; the observed blockers were the intentional `draft` state and pending required check `Core Lane`.
 ---
 
 # Technical Specification
