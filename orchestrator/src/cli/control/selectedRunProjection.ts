@@ -12,6 +12,7 @@ import {
 } from '../run/workspacePath.js';
 import {
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  refreshProviderLinearWorkerProofSnapshot,
   type ProviderLinearWorkerProof
 } from '../providerLinearWorkerRunner.js';
 import {
@@ -754,9 +755,7 @@ async function resolveProjectionContextParts(
       questions: context.questionQueue.list(),
       runDir: context.paths.runDir,
       trackedIssue: context.linearAdvisoryState.tracked_issue,
-      providerLinearWorkerProof: await readJsonFile<ProviderLinearWorkerProof>(
-        join(context.paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
-      )
+      providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(context.paths.runDir)
     };
   }
 
@@ -775,9 +774,7 @@ async function resolveProjectionContextParts(
     questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
     runDir: snapshot.runDir,
     trackedIssue: advisoryState?.tracked_issue ?? null,
-    providerLinearWorkerProof: await readJsonFile<ProviderLinearWorkerProof>(
-      join(snapshot.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
-    )
+    providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(snapshot.runDir)
   };
 }
 
@@ -876,9 +873,7 @@ async function readTaskCompatibilityContexts(
         questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
         runDir,
         trackedIssue: advisoryState?.tracked_issue ?? null,
-        providerLinearWorkerProof: await readJsonFile<ProviderLinearWorkerProof>(
-          join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
-        )
+        providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(runDir)
       },
       resolveRunsRootFromRunDir(runDir),
       options.controlWorkspacePath ?? resolveSafeLegacyWorkspacePathFromRunDir(runDir),
@@ -914,6 +909,44 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
   } catch {
     return null;
   }
+}
+
+async function readProviderLinearWorkerProofForProjection(
+  runDir: string
+): Promise<ProviderLinearWorkerProof | null> {
+  const proof = await readJsonFile<ProviderLinearWorkerProof>(
+    join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
+  );
+  if (!shouldRefreshProviderLinearWorkerProjectionProof(proof)) {
+    return proof;
+  }
+  return (
+    (await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      undefined,
+      undefined,
+      process.env,
+      { updatedAtComparisonScope: 'telemetry' }
+    ).catch(() => proof)) ?? proof
+  );
+}
+
+function shouldRefreshProviderLinearWorkerProjectionProof(
+  proof: ProviderLinearWorkerProof | null
+): boolean {
+  if (!proof || proof.owner_phase !== 'turn_running' || proof.owner_status !== 'in_progress') {
+    return false;
+  }
+  const tokens = proof.tokens ?? null;
+  const hasTokens =
+    tokens?.input_tokens != null || tokens?.output_tokens != null || tokens?.total_tokens != null;
+  return (
+    !proof.latest_turn_id ||
+    !proof.latest_session_id ||
+    !hasTokens ||
+    proof.rate_limits == null
+  );
 }
 
 function isManifestRetryFallbackCandidate(manifestRecord: Record<string, unknown>): boolean {

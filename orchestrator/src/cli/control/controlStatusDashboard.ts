@@ -1557,7 +1557,11 @@ function formatCodexRateLimitSegments(
 }
 
 function resolveCodexRateLimitBucketLabel(bucket: Record<string, unknown>): string | null {
-  const windowDurationMins = readRecordNumber(bucket, ['windowDurationMins', 'window_duration_mins']);
+  const windowDurationMins = readRecordNumber(bucket, [
+    'windowDurationMins',
+    'window_duration_mins',
+    'window_minutes'
+  ]);
   const normalizedWindowMinutes =
     windowDurationMins !== null && Number.isFinite(windowDurationMins)
       ? Math.max(0, Math.trunc(windowDurationMins))
@@ -1695,7 +1699,11 @@ function formatCompactLinearBudgetSegments(
 
 function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
   const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
-  const windowDurationMins = readRecordNumber(bucket, ['windowDurationMins', 'window_duration_mins']);
+  const windowDurationMins = readRecordNumber(bucket, [
+    'windowDurationMins',
+    'window_duration_mins',
+    'window_minutes'
+  ]);
   if (usedPercent !== null && windowDurationMins !== null) {
     return `${formatPercent(usedPercent)} / ${formatCount(windowDurationMins)}m`;
   }
@@ -1728,7 +1736,11 @@ function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: D
 
 function formatCompactRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
   const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
-  const windowDurationMins = readRecordNumber(bucket, ['windowDurationMins', 'window_duration_mins']);
+  const windowDurationMins = readRecordNumber(bucket, [
+    'windowDurationMins',
+    'window_duration_mins',
+    'window_minutes'
+  ]);
   if (usedPercent !== null && windowDurationMins !== null) {
     return `${formatPercent(usedPercent)}/${formatCount(windowDurationMins)}m`;
   }

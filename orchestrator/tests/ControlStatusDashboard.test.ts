@@ -652,6 +652,34 @@ describe('control status dashboard', () => {
     );
   });
 
+  it('renders snake-case Codex session-log windows with explicit 5-hour and weekly labels', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          primary: {
+            used_percent: 12.5,
+            window_minutes: 300
+          },
+          secondary: {
+            used_percent: 48,
+            window_minutes: 10080
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    expect(stripAnsi(frame)).toContain(
+      '│ Rate Limits: Codex | 5-hour 12.5% / 300m | weekly 48% / 10,080m'
+    );
+  });
+
   it('renders authoritative Linear budget snapshots instead of falling back to unavailable', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({

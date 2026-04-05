@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260405-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc",
+      "title": "CO STATUS: restore live root control-host Codex session, token, throughput, and 5-hour/weekly rate-limit telemetry after CO-83",
+      "relates_to": "tasks/tasks-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-05",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc.md",
+        "task": "tasks/tasks-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc.md",
+        "agent_task": ".agent/task/linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc.md",
+        "docs": "docs/TECH_SPEC-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc.md"
+      }
+    },
+    {
       "id": "20260405-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8",
       "title": "CO: Fix ready-review false block on current-head CodeRabbit issue-comment completion",
       "relates_to": "tasks/tasks-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8.md",
