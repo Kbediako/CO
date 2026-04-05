@@ -3476,7 +3476,10 @@ function hasProviderClaimTransitioned(
     (claim.retry_attempt ?? null) !== (next.retry_attempt ?? null) ||
     (claim.retry_due_at ?? null) !== (next.retry_due_at ?? null) ||
     (claim.retry_error ?? null) !== (next.retry_error ?? null) ||
-    !areProviderMergeCloseoutRecordsEqual(claim.merge_closeout, next.merge_closeout)
+    (
+      next.merge_closeout !== undefined &&
+      !areProviderMergeCloseoutRecordsEqual(claim.merge_closeout, next.merge_closeout)
+    )
   );
 }
 

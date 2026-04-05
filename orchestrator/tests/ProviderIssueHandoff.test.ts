@@ -7032,6 +7032,160 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
+  it('does not treat omitted merge_closeout as a transition when refreshing an unchanged active claim', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-refresh-owned-active-merge-closeout'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-refresh-owned-active-merge-closeout');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-refresh-owned-active-merge-closeout',
+        task_id: 'task-refresh-owned-active-merge-closeout',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'task-refresh-owned-active-merge-closeout',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-refresh-owned-active-merge-closeout',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_049_000,
+      run_id: 'run-refresh-owned-active-merge-closeout',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'refresh-owned-active-merge-closeout-token',
+      merge_closeout: {
+        version: 1,
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        source_setup: null,
+        arming: {
+          status: 'armed',
+          summary: 'ready',
+          decision_at: '2026-03-19T04:30:10.000Z',
+          snapshot: {
+            ready_to_merge: true,
+            merge_state_status: 'CLEAN',
+            review_decision: 'APPROVED',
+            required_checks_pending: [],
+            required_checks_failed: [],
+            unresolved_threads: 0,
+            action_required_reasons: []
+          }
+        },
+        merge_attempt: {
+          status: 'attempted',
+          attempted_at: '2026-03-19T04:30:15.000Z',
+          method: 'gh_pr_merge',
+          head_oid: 'abc123',
+          command: ['gh', 'pr', 'merge', '357', '--merge', '--delete-branch=false'],
+          exit_code: 0,
+          stdout: 'merged',
+          stderr: ''
+        },
+        merge_result: {
+          status: 'merged',
+          observed_at: '2026-03-19T04:30:20.000Z',
+          merged_at: '2026-03-19T04:30:18.000Z',
+          head_oid: 'abc123',
+          state: 'MERGED'
+        },
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-03-19T04:30:25.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'transitioned',
+          attempted_at: '2026-03-19T04:30:30.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-03-19T04:30:30.000Z',
+          error: null
+        },
+        status: 'merged',
+        reason: 'merged_and_transitioned_done',
+        summary: 'PR #357 merged and issue transitioned to Done.'
+      }
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        state: 'Human Review',
+        state_type: 'started',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      publishRuntime,
+      resolveTrackedIssue
+    });
+
+    await service.refresh();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(publishRuntime).not.toHaveBeenCalled();
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_transitioned_done',
+      linear_transition: {
+        status: 'transitioned',
+        target_state: 'Done'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('keeps an active claim lifecycle-owned on refresh when the live Merging issue has assignee_id null', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
