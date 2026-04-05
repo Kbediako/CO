@@ -874,6 +874,24 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
   });
 
+  it('parses payload-wrapped legacy rate-limit envelopes from appserver notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","payload":{"method":"account/rateLimits/updated","params":{"msg":{"payload":{"info":{"rate_limits":{"limit_id":"coding","primary":{"remaining":42}}}}}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        remaining: 42
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: primary remaining 42');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
   it('ignores unrenderable rate-limit snapshots that would overwrite useful telemetry', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
