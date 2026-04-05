@@ -1001,10 +1001,13 @@ function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTo
   const directTotalUsage = findRecordAtPaths(input, [
     ['params', 'msg', 'payload', 'info', 'total_token_usage'],
     ['params', 'msg', 'info', 'total_token_usage'],
+    ['payload', 'params', 'tokenUsage', 'total'],
     ['params', 'tokenUsage', 'total'],
     ['tokenUsage', 'total'],
+    ['payload', 'params', 'usage'],
     ['params', 'usage'],
     ['usage'],
+    ['payload', 'params', 'tokenUsage'],
     ['params', 'tokenUsage'],
     ['tokenUsage']
   ]);
@@ -1022,6 +1025,7 @@ function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTo
       findRecordAtPaths(input, [
         ['usage'],
         ['payload', 'usage'],
+        ['payload', 'params', 'usage'],
         ['params', 'usage']
       ])
     );
@@ -1109,18 +1113,12 @@ function extractProviderWorkerRateLimits(input: unknown): Record<string, unknown
 }
 
 function isProviderWorkerRateLimitsRecord(input: Record<string, unknown>): boolean {
-  const limitId =
-    normalizeOptionalString(input.limit_id) ??
-    normalizeOptionalString(input.limit_name);
   const primary = isRecord(input.primary) ? input.primary : null;
   const secondary = isRecord(input.secondary) ? input.secondary : null;
   const credits = isRecord(input.credits) ? input.credits : null;
   const hasBucket = Boolean(primary || secondary || credits);
   if (!hasBucket) {
     return false;
-  }
-  if (limitId) {
-    return true;
   }
   return (
     hasProviderWorkerRateLimitBucketSummary(primary) ||
@@ -1280,7 +1278,7 @@ function humanizeProviderWorkerItemType(value: string | null): string | null {
 
 function formatProviderWorkerPercent(value: number): string {
   const rounded = Math.round(value * 10) / 10;
-  return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1).replace(/\.0$/, '')}%`;
+  return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1)}%`;
 }
 
 function hasProviderWorkerRateLimitBucketSummary(bucket: Record<string, unknown> | null): boolean {
@@ -1290,11 +1288,7 @@ function hasProviderWorkerRateLimitBucketSummary(bucket: Record<string, unknown>
   return (
     readProviderWorkerNumericField(bucket, ['remaining']) !== null ||
     readProviderWorkerNumericField(bucket, ['limit']) !== null ||
-    readProviderWorkerNumericField(bucket, ['reset_in_seconds', 'resetInSeconds']) !== null ||
-    normalizeOptionalString(bucket.reset_at) !== null ||
-    normalizeOptionalString(bucket.resetAt) !== null ||
-    readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']) !== null ||
-    readProviderWorkerNumericField(bucket, ['windowDurationMins', 'window_duration_mins']) !== null
+    readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']) !== null
   );
 }
 
