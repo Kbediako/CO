@@ -838,6 +838,24 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
   });
 
+  it('parses legacy nested rate-limit envelopes from appserver payloads', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"msg":{"payload":{"info":{"rate_limits":{"limit_id":"coding","primary":{"remaining":42}}}}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        remaining: 42
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: primary remaining 42');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
   it('waits for child close before resolving piped stdio capture', async () => {
     vi.resetModules();
     const stdout = new PassThrough();

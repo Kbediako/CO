@@ -1092,6 +1092,10 @@ function extractProviderWorkerRateLimits(input: unknown): Record<string, unknown
     ['payload', 'rate_limits'],
     ['params', 'rateLimits'],
     ['payload', 'params', 'rateLimits'],
+    ['params', 'msg', 'payload', 'info', 'rate_limits'],
+    ['params', 'msg', 'info', 'rate_limits'],
+    ['params', 'msg', 'payload', 'info', 'rateLimits'],
+    ['params', 'msg', 'info', 'rateLimits'],
     ['rateLimits'],
     ['payload', 'rateLimits']
   ];
@@ -1141,14 +1145,7 @@ function humanizeProviderWorkerMethod(method: string, input: Record<string, unkn
       return usageSummary ? `thread token usage updated (${usageSummary})` : 'thread token usage updated';
     }
     case 'account/ratelimits/updated': {
-      const rateLimits = findRecordAtPaths(input, [
-        ['params', 'rateLimits'],
-        ['payload', 'params', 'rateLimits'],
-        ['rateLimits'],
-        ['payload', 'rateLimits'],
-        ['rate_limits'],
-        ['payload', 'rate_limits']
-      ]);
+      const rateLimits = extractProviderWorkerRateLimits(input);
       const rateLimitSummary = formatProviderWorkerRateLimitSummary(rateLimits);
       return rateLimitSummary ? `rate limits updated: ${rateLimitSummary}` : 'rate limits updated';
     }
