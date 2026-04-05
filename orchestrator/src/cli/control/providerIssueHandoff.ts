@@ -17,6 +17,7 @@ import {
   sortLiveLinearTrackedIssuesForDispatch,
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
+import { resolveLinearWebhookSourceSetup } from './linearWebhookController.js';
 import { resolveLinearApiTokenFingerprint } from './linearGraphqlClient.js';
 import {
   classifyProviderLinearWorkflowState,
@@ -25,6 +26,7 @@ import {
   providerLinearTodoBlockedByNonTerminal
 } from './providerLinearWorkflowStates.js';
 import { callChildControlEndpoint } from './questionChildResolutionAdapter.js';
+import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 import {
   buildProviderFallbackTaskId,
   buildProviderIssueKey,
@@ -145,6 +147,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    sourceSetup?: DispatchPilotSourceSetup | null;
     repoRoot: string;
     env?: NodeJS.ProcessEnv;
   }) => Promise<ProviderMergeCloseoutRecord>) | null;
@@ -347,6 +350,15 @@ export function createProviderIssueHandoffService(
     return claim;
   };
 
+  const resolveMergeCloseoutSourceSetup = (): DispatchPilotSourceSetup | null => {
+    const readFeatureToggles = options.readFeatureToggles ?? null;
+    if (!readFeatureToggles) {
+      return null;
+    }
+    const resolution = resolveLinearWebhookSourceSetup(readFeatureToggles(), process.env);
+    return 'sourceSetup' in resolution ? resolution.sourceSetup : null;
+  };
+
   const maybeHandleDeterministicMergingCloseout = async (input: {
     claim: ProviderIntakeClaimRecord;
     trackedIssue: LiveLinearTrackedIssue;
@@ -361,6 +373,7 @@ export function createProviderIssueHandoffService(
       issueState: input.trackedIssue.state,
       issueStateType: input.trackedIssue.state_type,
       issueUpdatedAt: input.trackedIssue.updated_at,
+      sourceSetup: resolveMergeCloseoutSourceSetup(),
       repoRoot
     });
     return await upsertProviderClaimAndPersist({

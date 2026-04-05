@@ -294,6 +294,16 @@ export async function runProviderDeterministicMergeCloseout(
   const alreadyMerged = snapshot.merged_at !== null || snapshot.state === 'MERGED';
 
   if (!alreadyMerged && !snapshot.ready_to_merge) {
+    if (snapshot.state === 'CLOSED') {
+      return {
+        ...baseWithContext,
+        pr,
+        snapshot,
+        status: 'action_required',
+        reason: 'pr_closed_unmerged',
+        summary: `Attached PR #${pr.number} is closed without merging; reopen it or attach a replacement PR.`
+      };
+    }
     if (snapshot.action_required_reasons.length > 0) {
       return {
         ...baseWithContext,

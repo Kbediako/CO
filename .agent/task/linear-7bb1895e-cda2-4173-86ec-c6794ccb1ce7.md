@@ -26,21 +26,21 @@
 
 ## Validation
 - [x] Add focused regressions for merge-closeout proof state, restart/recovery relaunch, and explicit action-required outcomes. Evidence: `orchestrator/tests/ProviderMergeCloseout.test.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`, `orchestrator/tests/ControlServerStartupInputPreparation.test.ts`.
-- [ ] `node scripts/delegation-guard.mjs`. Evidence: pending.
-- [ ] `node scripts/spec-guard.mjs --dry-run`. Evidence: pending.
-- [x] `npm run build`. Evidence: local run on 2026-04-05 after the refresh-order fix.
-- [ ] `npm run lint`. Evidence: pending.
-- [ ] `npm run test`. Evidence: pending.
-- [ ] `npm run docs:check`. Evidence: pending.
-- [ ] `npm run docs:freshness`. Evidence: pending.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: pending.
-- [ ] Manifest-backed standalone review wrapper executed or truthful fallback recorded. Evidence: pending.
-- [ ] Explicit elegance review recorded after review findings are addressed. Evidence: pending.
-- [ ] `npm run pack:smoke`. Evidence: pending.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: local run on 2026-04-05 reported `Delegation guard: OK (1 subagent manifest(s) found).`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: local run on 2026-04-05 after the review-driven fixes.
+- [x] `npm run build`. Evidence: local run on 2026-04-05 after the review-driven fixes.
+- [x] `npm run lint`. Evidence: local run on 2026-04-05 after the review-driven fixes.
+- [x] `npm run test`. Evidence: local run on 2026-04-05 reported `312` files and `2964` tests passed.
+- [x] `npm run docs:check`. Evidence: local run on 2026-04-05 after the stale-review-date refresh.
+- [x] `npm run docs:freshness`. Evidence: local run on 2026-04-05 after the stale-review-date refresh.
+- [x] `node scripts/diff-budget.mjs`. Evidence: local run on 2026-04-05 after the review-driven fixes.
+- [x] Manifest-backed standalone review wrapper executed and the rerun fallback was recorded truthfully. Evidence: `.runs/linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7/cli/2026-04-05T01-13-22-125Z-24a60b65/manifest.json`, Linear workpad comment `2283d72b-14d9-4964-b4b1-d4feabc775bc`.
+- [x] Explicit elegance review recorded after review findings were addressed. Evidence: Linear workpad comment `2283d72b-14d9-4964-b4b1-d4feabc775bc`.
+- [x] `npm run pack:smoke`. Evidence: local run on 2026-04-05 reported `pack smoke passed`.
 
 ## Handoff
 - [x] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: Linear workpad comment `2283d72b-14d9-4964-b4b1-d4feabc775bc`.
 - [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge commit `9fadab726`.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [ ] Issue moved to the actual team review state (`In Review`) only after coding stops. Evidence: pending.

@@ -11903,6 +11903,18 @@ describe('createProviderIssueHandoffService', () => {
       persist,
       launcher,
       runMergeCloseout,
+      readFeatureToggles: () => ({
+        dispatch_pilot: {
+          enabled: true,
+          source: {
+            provider: 'linear',
+            workspace_id: 'workspace-1',
+            team_id: 'team-1',
+            project_id: 'project-1',
+            summary: 'scoped merge-closeout test source'
+          }
+        }
+      }),
       resolveTrackedIssue: async () => ({
         kind: 'ready',
         trackedIssue: createTrackedIssue({
@@ -11924,6 +11936,12 @@ describe('createProviderIssueHandoffService', () => {
       issueState: 'Merging',
       issueStateType: 'started',
       issueUpdatedAt: '2026-03-19T04:30:30.000Z',
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        project_id: 'project-1'
+      },
       repoRoot: root
     });
     expect(launcher.start).not.toHaveBeenCalled();

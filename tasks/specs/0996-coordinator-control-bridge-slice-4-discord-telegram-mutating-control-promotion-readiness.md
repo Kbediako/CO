@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-control-bridge-slice-4-discord-telegram-mutatin
 risk: high
 owners:
   - Codex
-last_review: 2026-03-05
+last_review: 2026-04-05
 ---
 
 ## Summary

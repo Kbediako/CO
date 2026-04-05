@@ -694,4 +694,81 @@ describe('runProviderDeterministicMergeCloseout', () => {
       attached_pr_urls: []
     });
   });
+
+  it('treats a closed-unmerged attached PR as action required instead of watchable', async () => {
+    const runCommand = vi.fn(async () => ({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    }));
+    const transitionIssueState = vi.fn();
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-80',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-05T00:09:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: () => '2026-04-05T00:09:00.000Z',
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-80',
+            title: 'Deterministic merge closeout',
+            description: null,
+            url: null,
+            updated_at: '2026-04-05T00:09:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/357' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot: vi.fn(async () => ({
+          state: 'CLOSED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=CLOSED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-05T00:09:00.000Z',
+          mergedAt: null,
+          headOid: 'abc123',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        })),
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'pr_closed_unmerged',
+      pr: {
+        owner: 'asabeko',
+        repo: 'CO',
+        number: 357
+      },
+      snapshot: {
+        state: 'CLOSED',
+        gate_reasons: ['state=CLOSED']
+      }
+    });
+    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
+    expect(transitionIssueState).not.toHaveBeenCalled();
+  });
 });
