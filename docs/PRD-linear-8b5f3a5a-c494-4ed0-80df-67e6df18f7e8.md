@@ -7,7 +7,7 @@
 - Desired Outcome: make the ready-review watcher treat the relevant current-head CodeRabbit issue-comment completion as a truthful completion signal without weakening required checks, unresolved feedback gates, or genuine pending rereview detection.
 
 ## User Request Translation (Context Anchor)
-- User intent / needs (in your own words): reproduce the false block from the CO-84 / PR #362 evidence, fix the watcher so current-head CodeRabbit issue-comment completions can unblock the quiet window, and keep the monitor head-aware so stale bot output never counts for a newer head or rereview cycle.
+- User intent / needs (in your own words): reproduce the false block from the CO-84 / PR #362 evidence, fix the watcher so current-head CodeRabbit issue-comment completions can unblock the quiet window, and keep the monitor head-aware, so stale bot output never counts for a newer head or rereview cycle.
 - Success criteria / acceptance:
   - deterministic reproduction exists for the false `bot_rereview_pending=[coderabbitai]` state
   - current-head CodeRabbit issue-comment completion no longer leaves `ready-review` blocked forever
