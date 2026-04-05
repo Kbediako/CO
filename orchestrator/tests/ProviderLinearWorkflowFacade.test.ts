@@ -6817,6 +6817,7 @@ describe('providerLinearWorkflowFacade', () => {
       issue: {
         id: 'lin-issue-1',
         identifier: 'CO-1',
+        updated_at: null,
         state: {
           id: 'state-human-review',
           name: 'Human Review',
