@@ -262,9 +262,9 @@ function buildProjectionContextFromParts(
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
   const providerProofRecord = (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null;
+  const proofIsFreshForStage = isProviderLinearWorkerProofFreshForStage(providerProofRecord, startedAt);
   const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(manifestRecord, providerProofRecord);
-  const useScopedTerminalProof =
-    useTerminalProof && isProviderLinearWorkerProofFreshForStage(providerProofRecord, startedAt);
+  const useScopedTerminalProof = useTerminalProof && proofIsFreshForStage;
   const proofTerminalStatus = useScopedTerminalProof
     ? resolveProviderLinearWorkerTerminalStatus(providerProofRecord)
     : null;
@@ -323,7 +323,7 @@ function buildProjectionContextFromParts(
   const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
     tracked_issue: parts.trackedIssue,
     claim: providerClaim,
-    proof: parts.providerLinearWorkerProof,
+    proof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null,
     rehydrated_at: providerIntakeState?.rehydrated_at ?? null
   });
   const latestEvent = buildSelectedRunLatestEvent({

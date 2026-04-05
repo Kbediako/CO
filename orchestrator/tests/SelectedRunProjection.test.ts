@@ -357,6 +357,10 @@ describe('SelectedRunProjection', () => {
     ).buildSelectedRunContext();
 
     expect(selected?.providerDebugSnapshot).toMatchObject({
+      claim: {
+        freshness: 'rehydrated',
+        is_rehydrated: true
+      },
       pull_request: {
         number: 82
       },
@@ -373,6 +377,59 @@ describe('SelectedRunProjection', () => {
       message: 'Waiting for required checks before merge.',
       at: '2026-03-20T01:16:20.000Z'
     });
+  });
+
+  it('ignores stale terminal proof snapshots when the selected stage started later', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        started_at: '2026-03-20T01:20:00.000Z',
+        updated_at: '2026-03-20T01:20:05.000Z',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: '2026-03-20T01:15:00.000Z',
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          last_event: 'task_complete',
+          last_message: 'Old worker run completed.',
+          last_event_at: '2026-03-20T01:15:28.970Z',
+          updated_at: '2026-03-20T01:16:00.000Z',
+          end_reason: 'issue_inactive'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(paths, undefined)
+    ).buildSelectedRunContext();
+
+    expect(selected?.rawStatus).toBe('in_progress');
+    expect(selected?.completedAt).toBeNull();
+    expect(selected?.providerDebugSnapshot).toBeNull();
   });
 
   it('keeps the generic latest event when no provider claim or proof exists', async () => {

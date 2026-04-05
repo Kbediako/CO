@@ -154,6 +154,7 @@ interface ProviderIssueProofLike {
   linear_audit?: ProviderLinearAuditSummary | null;
   child_streams?: ProviderIssueChildStreamLike[] | null;
   child_lanes?: ProviderIssueChildLaneLike[] | null;
+  end_reason?: string | null;
 }
 
 export interface ControlProviderDebugSnapshot {
@@ -353,36 +354,14 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const trackedWorkflowState = trackedIssue ? classifyProviderLinearWorkflowState(trackedIssue) : null;
   const ownerPhase = normalizeOptionalString(proof?.owner_phase);
   const ownerStatus = normalizeOptionalString(proof?.owner_status);
+  const endReason = normalizeOptionalString(proof?.end_reason);
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(proof?.last_event_at),
     latestAudit?.recorded_at ?? null,
     normalizeOptionalString(proof?.attempt_started_at)
   );
 
-  if (mergeCloseout) {
-    return deriveMergeCloseoutProgressSnapshot(mergeCloseout);
-  }
-
-  if (ownerPhase === 'ended' && ownerStatus === 'succeeded') {
-    return {
-      phase: trackedWorkflowState?.isHandoff ? 'review_handoff' : 'completed',
-      kind: trackedWorkflowState?.isHandoff ? 'workflow' : 'worker',
-      status: 'completed',
-      summary:
-        normalizeOptionalString(proof?.last_message) ??
-        'Provider worker completed successfully.',
-      last_semantic_progress_at: lastSemanticProgressAt,
-      stall_classification: 'completed',
-      stall_reason: null,
-      recovery_recommendation: 'no_action'
-    };
-  }
-
-  if (
-    ownerStatus === 'failed' ||
-    ownerPhase === 'turn_failed' ||
-    ownerPhase === 'ended'
-  ) {
+  if (ownerStatus === 'failed' || ownerPhase === 'turn_failed') {
     return {
       phase: ownerPhase === 'turn_failed' ? 'turn_failed' : 'failed',
       kind: 'worker',
@@ -394,6 +373,39 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       stall_classification: 'failed',
       stall_reason: normalizeOptionalString(proof?.last_event) ?? normalizeOptionalString(ownerPhase),
       recovery_recommendation: 'inspect_worker_logs'
+    };
+  }
+
+  if (mergeCloseout) {
+    return deriveMergeCloseoutProgressSnapshot(mergeCloseout);
+  }
+
+  if (ownerPhase === 'ended' && ownerStatus === 'succeeded') {
+    if (endReason === 'max_turns_reached_issue_still_active') {
+      return {
+        phase: 'inactive',
+        kind: 'worker',
+        status: 'stalled',
+        summary:
+          normalizeOptionalString(proof?.last_message) ??
+          'Provider worker exhausted max turns while the issue remained active.',
+        last_semantic_progress_at: lastSemanticProgressAt,
+        stall_classification: 'stalled',
+        stall_reason: endReason,
+        recovery_recommendation: 'inspect_worker_logs'
+      };
+    }
+    return {
+      phase: trackedWorkflowState?.isHandoff ? 'review_handoff' : 'completed',
+      kind: trackedWorkflowState?.isHandoff ? 'workflow' : 'worker',
+      status: 'completed',
+      summary:
+        normalizeOptionalString(proof?.last_message) ??
+        'Provider worker completed successfully.',
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'completed',
+      stall_reason: null,
+      recovery_recommendation: 'no_action'
     };
   }
 

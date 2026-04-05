@@ -341,11 +341,11 @@ export function selectProviderIntakeClaim(
 export function buildProviderIntakeSummary(
   state: ProviderIntakeState | null | undefined
 ): ProviderIntakeSummaryPayload | null {
-  const claim = selectProviderIntakeClaim(state);
+  const normalizedState = normalizeProviderIntakeState(state);
+  const claim = selectProviderIntakeClaim(normalizedState);
   if (!claim) {
     return null;
   }
-  const normalizedState = normalizeProviderIntakeState(state);
   const freshness = deriveProviderIntakeClaimFreshness({
     claim,
     rehydrated_at: normalizedState.rehydrated_at
