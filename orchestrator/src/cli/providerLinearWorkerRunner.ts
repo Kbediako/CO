@@ -949,28 +949,29 @@ function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
   message: string | null;
   at: string | null;
 } {
+  const payload = isRecord(input.payload) ? input.payload : null;
   const timestamp =
     normalizeOptionalString(input.timestamp) ??
-    (isRecord(input.payload)
-      ? normalizeOptionalString(input.payload.timestamp) ??
-        normalizeOptionalString(input.payload.created_at) ??
-        normalizeOptionalString(input.payload.at)
+    (payload
+      ? normalizeOptionalString(payload.timestamp) ??
+        normalizeOptionalString(payload.created_at) ??
+        normalizeOptionalString(payload.at)
       : null);
-  if (input.type === 'event_msg' && isRecord(input.payload)) {
+  if (input.type === 'event_msg' && payload) {
     return {
-      event: normalizeOptionalString(input.payload.type),
-      message: normalizeOptionalString(input.payload.message),
+      event: normalizeOptionalString(payload.type),
+      message: normalizeOptionalString(payload.message),
       at: timestamp
     };
   }
   if (
     input.type === 'response_item' &&
-    isRecord(input.payload) &&
-    input.payload.type === 'message' &&
-    Array.isArray(input.payload.content)
+    payload &&
+    payload.type === 'message' &&
+    Array.isArray(payload.content)
   ) {
     let outputText: string | null = null;
-    for (const item of input.payload.content) {
+    for (const item of payload.content) {
       if (isRecord(item) && item.type === 'output_text') {
         outputText = normalizeOptionalString(item.text) ?? outputText;
       }
@@ -978,6 +979,16 @@ function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
     return {
       event: outputText ? 'message' : null,
       message: outputText,
+      at: timestamp
+    };
+  }
+  const method =
+    normalizeOptionalString(input.method) ??
+    normalizeOptionalString(payload?.method);
+  if (method) {
+    return {
+      event: method,
+      message: humanizeProviderWorkerMethod(method, input),
       at: timestamp
     };
   }
@@ -996,8 +1007,15 @@ function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTo
   const directTotalUsage = findRecordAtPaths(input, [
     ['params', 'msg', 'payload', 'info', 'total_token_usage'],
     ['params', 'msg', 'info', 'total_token_usage'],
+    ['payload', 'params', 'tokenUsage', 'total'],
     ['params', 'tokenUsage', 'total'],
-    ['tokenUsage', 'total']
+    ['tokenUsage', 'total'],
+    ['payload', 'params', 'usage'],
+    ['params', 'usage'],
+    ['usage'],
+    ['payload', 'params', 'tokenUsage'],
+    ['params', 'tokenUsage'],
+    ['tokenUsage']
   ]);
   const normalizedDirectUsage = normalizeProviderWorkerTokenUsage(directTotalUsage);
   if (normalizedDirectUsage) {
@@ -1013,6 +1031,7 @@ function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTo
       findRecordAtPaths(input, [
         ['usage'],
         ['payload', 'usage'],
+        ['payload', 'params', 'usage'],
         ['params', 'usage']
       ])
     );
@@ -1072,43 +1091,223 @@ function readTokenCount(input: Record<string, unknown>, keys: string[]): number 
 }
 
 function extractProviderWorkerRateLimits(input: unknown): Record<string, unknown> | null {
-  return findRateLimitsRecord(input);
-}
-
-function findRateLimitsRecord(input: unknown): Record<string, unknown> | null {
-  if (Array.isArray(input)) {
-    for (const item of input) {
-      const nested = findRateLimitsRecord(item);
-      if (nested) {
-        return nested;
-      }
-    }
-    return null;
-  }
   if (!isRecord(input)) {
     return null;
   }
   if (isProviderWorkerRateLimitsRecord(input)) {
     return input;
   }
-  for (const value of Object.values(input)) {
-    const nested = findRateLimitsRecord(value);
-    if (nested) {
-      return nested;
+  const candidatePaths = [
+    ['rate_limits'],
+    ['payload', 'rate_limits'],
+    ['params', 'rateLimits'],
+    ['params', 'rate_limits'],
+    ['payload', 'params', 'rateLimits'],
+    ['payload', 'params', 'rate_limits'],
+    ['params', 'msg', 'payload', 'info', 'rate_limits'],
+    ['params', 'msg', 'info', 'rate_limits'],
+    ['params', 'msg', 'payload', 'info', 'rateLimits'],
+    ['params', 'msg', 'info', 'rateLimits'],
+    ['payload', 'params', 'msg', 'payload', 'info', 'rate_limits'],
+    ['payload', 'params', 'msg', 'info', 'rate_limits'],
+    ['payload', 'params', 'msg', 'payload', 'info', 'rateLimits'],
+    ['payload', 'params', 'msg', 'info', 'rateLimits'],
+    ['rateLimits'],
+    ['payload', 'rateLimits']
+  ];
+  for (const candidatePath of candidatePaths) {
+    const candidate = findRecordAtPath(input, candidatePath);
+    if (candidate && isProviderWorkerRateLimitsRecord(candidate)) {
+      return candidate;
     }
   }
   return null;
 }
 
 function isProviderWorkerRateLimitsRecord(input: Record<string, unknown>): boolean {
-  const limitId =
-    normalizeOptionalString(input.limit_id) ??
-    normalizeOptionalString(input.limit_name);
-  const hasBucket =
-    Object.prototype.hasOwnProperty.call(input, 'primary') ||
-    Object.prototype.hasOwnProperty.call(input, 'secondary') ||
-    Object.prototype.hasOwnProperty.call(input, 'credits');
-  return Boolean(limitId) && hasBucket;
+  const primary = isRecord(input.primary) ? input.primary : null;
+  const secondary = isRecord(input.secondary) ? input.secondary : null;
+  return hasProviderWorkerRateLimitBucketSummary(primary) || hasProviderWorkerRateLimitBucketSummary(secondary);
+}
+
+function humanizeProviderWorkerMethod(method: string, input: Record<string, unknown>): string | null {
+  switch (method.toLowerCase()) {
+    case 'thread/tokenusage/updated': {
+      const usage = extractProviderWorkerTokenUsage(input);
+      const usageSummary = formatProviderWorkerTokenUsageSummary(usage);
+      return usageSummary ? `thread token usage updated (${usageSummary})` : 'thread token usage updated';
+    }
+    case 'account/ratelimits/updated': {
+      const rateLimits = extractProviderWorkerRateLimits(input);
+      const rateLimitSummary = formatProviderWorkerRateLimitSummary(rateLimits);
+      return rateLimitSummary ? `rate limits updated: ${rateLimitSummary}` : 'rate limits updated';
+    }
+    case 'item/started':
+    case 'item/completed':
+    case 'item/updated': {
+      const item = findRecordAtPaths(input, [
+        ['params', 'item'],
+        ['payload', 'params', 'item'],
+        ['item'],
+        ['payload', 'item']
+      ]);
+      const itemType =
+        normalizeOptionalString(item?.type) ??
+        normalizeOptionalString(item?.kind) ??
+        normalizeOptionalString(item?.status);
+      const action = method.slice(method.lastIndexOf('/') + 1).toLowerCase();
+      const itemLabel = humanizeProviderWorkerItemType(itemType);
+      return itemLabel ? `item ${action}: ${itemLabel}` : `item ${action}`;
+    }
+    case 'turn/started':
+      return 'turn started';
+    case 'turn/completed': {
+      const turn = findRecordAtPaths(input, [
+        ['params', 'turn'],
+        ['payload', 'params', 'turn'],
+        ['turn'],
+        ['payload', 'turn']
+      ]);
+      const status = normalizeOptionalString(turn?.status);
+      return status ? `turn completed (${status})` : 'turn completed';
+    }
+    default:
+      return null;
+  }
+}
+
+function formatProviderWorkerTokenUsageSummary(
+  usage: ProviderLinearWorkerTokenUsage | null
+): string | null {
+  if (!usage) {
+    return null;
+  }
+  const parts: string[] = [];
+  if (typeof usage.input_tokens === 'number' && Number.isFinite(usage.input_tokens)) {
+    parts.push(`in ${Math.max(0, Math.trunc(usage.input_tokens))}`);
+  }
+  if (typeof usage.output_tokens === 'number' && Number.isFinite(usage.output_tokens)) {
+    parts.push(`out ${Math.max(0, Math.trunc(usage.output_tokens))}`);
+  }
+  if (typeof usage.total_tokens === 'number' && Number.isFinite(usage.total_tokens)) {
+    parts.push(`total ${Math.max(0, Math.trunc(usage.total_tokens))}`);
+  }
+  return parts.length > 0 ? parts.join(' / ') : null;
+}
+
+function formatProviderWorkerRateLimitSummary(
+  rateLimits: Record<string, unknown> | null
+): string | null {
+  if (!rateLimits) {
+    return null;
+  }
+  const segments: string[] = [];
+  const primary = isRecord(rateLimits.primary) ? rateLimits.primary : null;
+  if (primary) {
+    const summary = formatProviderWorkerRateLimitBucketSummary(primary);
+    if (summary) {
+      segments.push(`${resolveProviderWorkerRateLimitWindowLabel(primary, 'primary')} ${summary}`);
+    }
+  }
+  const secondary = isRecord(rateLimits.secondary) ? rateLimits.secondary : null;
+  if (secondary) {
+    const summary = formatProviderWorkerRateLimitBucketSummary(secondary);
+    if (summary) {
+      segments.push(`${resolveProviderWorkerRateLimitWindowLabel(secondary, 'secondary')} ${summary}`);
+    }
+  }
+  return segments.length > 0 ? segments.join('; ') : null;
+}
+
+function formatProviderWorkerRateLimitBucketSummary(bucket: Record<string, unknown>): string | null {
+  const usedPercent = readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']);
+  const windowDurationMins = readProviderWorkerNumericField(bucket, ['windowDurationMins', 'window_duration_mins']);
+  if (usedPercent !== null && windowDurationMins !== null) {
+    return `${formatProviderWorkerPercent(usedPercent)} / ${Math.max(0, Math.trunc(windowDurationMins))}m`;
+  }
+  if (usedPercent !== null) {
+    return `${formatProviderWorkerPercent(usedPercent)} used`;
+  }
+  const remaining = readProviderWorkerNumericField(bucket, ['remaining']);
+  const limit = readProviderWorkerNumericField(bucket, ['limit']);
+  if (remaining !== null && limit !== null) {
+    return `${Math.max(0, Math.trunc(remaining))}/${Math.max(0, Math.trunc(limit))}`;
+  }
+  if (remaining !== null) {
+    return `remaining ${Math.max(0, Math.trunc(remaining))}`;
+  }
+  if (limit !== null) {
+    return `limit ${Math.max(0, Math.trunc(limit))}`;
+  }
+  const resetInSeconds = readProviderWorkerNumericField(bucket, ['reset_in_seconds', 'resetInSeconds']);
+  if (resetInSeconds !== null) {
+    return `reset in ${Math.max(0, Math.trunc(resetInSeconds))}s`;
+  }
+  const resetAt = normalizeOptionalString(
+    bucket.reset_at ?? bucket.resetAt ?? bucket.resets_at ?? bucket.resetsAt
+  );
+  if (resetAt) {
+    return `resets at ${resetAt}`;
+  }
+  return null;
+}
+
+function resolveProviderWorkerRateLimitWindowLabel(
+  bucket: Record<string, unknown>,
+  fallback: 'primary' | 'secondary'
+): string {
+  const windowDurationMins = readProviderWorkerNumericField(bucket, ['windowDurationMins', 'window_duration_mins']);
+  const normalizedWindowMinutes =
+    windowDurationMins !== null && Number.isFinite(windowDurationMins)
+      ? Math.max(0, Math.trunc(windowDurationMins))
+      : null;
+  if (normalizedWindowMinutes === 300) {
+    return '5-hour';
+  }
+  if (normalizedWindowMinutes === 10_080) {
+    return 'weekly';
+  }
+  return fallback;
+}
+
+function humanizeProviderWorkerItemType(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[._/]+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function formatProviderWorkerPercent(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1)}%`;
+}
+
+function hasProviderWorkerRateLimitBucketSummary(bucket: Record<string, unknown> | null): boolean {
+  if (!bucket) {
+    return false;
+  }
+  return (
+    readProviderWorkerNumericField(bucket, ['remaining']) !== null ||
+    readProviderWorkerNumericField(bucket, ['limit']) !== null ||
+    readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']) !== null ||
+    readProviderWorkerNumericField(bucket, ['reset_in_seconds', 'resetInSeconds']) !== null ||
+    normalizeOptionalString(bucket.reset_at ?? bucket.resetAt ?? bucket.resets_at ?? bucket.resetsAt) !==
+      null
+  );
+}
+
+function readProviderWorkerNumericField(input: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = input[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return null;
 }
 
 function findRecordAtPaths(
@@ -1116,20 +1315,26 @@ function findRecordAtPaths(
   paths: string[][]
 ): Record<string, unknown> | null {
   for (const path of paths) {
-    let current: unknown = input;
-    let found = true;
-    for (const segment of path) {
-      if (!isRecord(current)) {
-        found = false;
-        break;
-      }
-      current = current[segment];
-    }
-    if (found && isRecord(current)) {
-      return current;
+    const record = findRecordAtPath(input, path);
+    if (record) {
+      return record;
     }
   }
   return null;
+}
+
+function findRecordAtPath(
+  input: Record<string, unknown>,
+  path: string[]
+): Record<string, unknown> | null {
+  let current: unknown = input;
+  for (const segment of path) {
+    if (!isRecord(current)) {
+      return null;
+    }
+    current = current[segment];
+  }
+  return isRecord(current) ? current : null;
 }
 
 export function deriveLatestTurnSessionId(input: {

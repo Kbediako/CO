@@ -798,6 +798,217 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEvent).toBe('turn.completed');
   });
 
+  it('parses appserver method telemetry into proof event/message semantics', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"notification","method":"thread/tokenUsage/updated","params":{"tokenUsage":{"total":{"inputTokens":12,"outputTokens":4,"totalTokens":16}}},"timestamp":"2026-03-21T09:00:00.100Z"}',
+        '{"type":"notification","method":"item/completed","params":{"item":{"type":"fileChange","status":"completed"}},"timestamp":"2026-03-21T09:00:00.200Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 12,
+      output_tokens: 4,
+      total_tokens: 16
+    });
+    expect(parsed.lastEvent).toBe('item/completed');
+    expect(parsed.finalMessage).toBe('item completed: file change');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.200Z');
+  });
+
+  it('parses payload-wrapped notification token usage into live proof totals', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"total":{"inputTokens":18,"outputTokens":6,"totalTokens":24}}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 18,
+      output_tokens: 6,
+      total_tokens: 24
+    });
+    expect(parsed.lastEvent).toBe('thread/tokenUsage/updated');
+    expect(parsed.finalMessage).toBe('thread token usage updated (in 18 / out 6 / total 24)');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.100Z');
+  });
+
+  it('keeps token-update humanization aligned with parser-supported tokenUsage shapes', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"inputTokens":7,"outputTokens":5,"totalTokens":12}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 7,
+      output_tokens: 5,
+      total_tokens: 12
+    });
+    expect(parsed.finalMessage).toBe('thread token usage updated (in 7 / out 5 / total 12)');
+  });
+
+  it('parses Codex usage-window rate limits without a legacy limit id', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('parses legacy nested rate-limit envelopes from appserver payloads', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"msg":{"payload":{"info":{"rate_limits":{"limit_id":"coding","primary":{"remaining":42}}}}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        remaining: 42
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: primary remaining 42');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('parses payload-wrapped legacy rate-limit envelopes from appserver notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","payload":{"method":"account/rateLimits/updated","params":{"msg":{"payload":{"info":{"rate_limits":{"limit_id":"coding","primary":{"remaining":42}}}}}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        remaining: 42
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: primary remaining 42');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('parses non-payload snake-case rate-limit envelopes from appserver notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rate_limits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('preserves reset-only rate-limit snapshots even when the latest line is a raw proof fragment', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
+        '{"rate_limits":{"limit_id":"coding","primary":{"reset_at":"2026-03-21T10:00:00.000Z"}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        reset_at: '2026-03-21T10:00:00.000Z'
+      }
+    });
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
+  it('humanizes reset-only rate-limit notifications from appserver envelopes', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rate_limits":{"limit_id":"coding","primary":{"reset_at":"2026-03-21T10:00:00.000Z"}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        reset_at: '2026-03-21T10:00:00.000Z'
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe(
+      'rate limits updated: primary resets at 2026-03-21T10:00:00.000Z'
+    );
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('ignores truly unrenderable rate-limit snapshots that would overwrite useful telemetry', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
+        '{"rate_limits":{"limit_id":"coding","primary":{"bucket":"unknown"}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
+  it('ignores credits-only rate-limit snapshots that would overwrite useful windows', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
+        '{"rate_limits":{"credits":{"balance":123}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
   it('waits for child close before resolving piped stdio capture', async () => {
     vi.resetModules();
     const stdout = new PassThrough();

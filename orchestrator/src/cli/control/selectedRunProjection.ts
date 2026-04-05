@@ -30,6 +30,7 @@ import {
   readProviderIntakeClaim,
   selectProviderIntakeClaim
 } from './providerIntakeState.js';
+import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 import {
   buildProviderIssueDebugSnapshot,
   type ControlProviderDebugSnapshot
@@ -97,6 +98,11 @@ interface ProjectionContextParts {
   runDir: string;
   trackedIssue: LiveLinearTrackedIssue | null;
   providerLinearWorkerProof: ProviderLinearWorkerProof | null;
+}
+
+interface ResolvedCompatibilityState {
+  state: string | null;
+  stateType: string | null;
 }
 
 interface LinearAdvisoryStateSnapshot {
@@ -314,10 +320,12 @@ function buildProjectionContextFromParts(
   });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
+  const compatibilityState = resolveCompatibilityState(parts.trackedIssue, providerClaim);
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
     rawStatus,
     latestAction,
-    questionSummary
+    questionSummary,
+    compatibilityState
   });
   const tracked = buildTrackedLinearPayload(parts.trackedIssue);
   const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
@@ -365,7 +373,7 @@ function buildProjectionContextFromParts(
     runDir: snapshot.runDir,
     questionSummary,
     tracked,
-    compatibilityState: resolveCompatibilityState(parts.trackedIssue, providerClaim),
+    compatibilityState: compatibilityState?.state ?? null,
     providerLinearWorkerProof: parts.providerLinearWorkerProof,
     providerDebugSnapshot,
     providerRetryState: buildProviderRetryState(providerClaim)
@@ -394,8 +402,16 @@ function resolveSelectedRunWorkspacePath(input: {
 function resolveCompatibilityState(
   trackedIssue: LiveLinearTrackedIssue | null,
   providerClaim: ProviderIntakeClaimRecord | null
-): string | null {
-  return trackedIssue?.state ?? providerClaim?.issue_state ?? null;
+): ResolvedCompatibilityState | null {
+  const state = trackedIssue?.state ?? providerClaim?.issue_state ?? null;
+  const stateType = trackedIssue?.state_type ?? providerClaim?.issue_state_type ?? null;
+  if (!state && !stateType) {
+    return null;
+  }
+  return {
+    state,
+    stateType
+  };
 }
 
 function isCliRunManifestPathWithinRunsRoot(manifestPath: string, runsRoot: string): boolean {
@@ -481,6 +497,7 @@ function resolveSelectedRunDisplayStatus(input: {
   rawStatus: string;
   latestAction: ControlAction['action'] | null;
   questionSummary: SelectedRunQuestionSummary;
+  compatibilityState: ResolvedCompatibilityState | null;
 }): { displayStatus: string; statusReason: string | null } {
   if (input.rawStatus === 'in_progress' && input.latestAction === 'pause') {
     return {
@@ -491,7 +508,41 @@ function resolveSelectedRunDisplayStatus(input: {
   if (input.rawStatus === 'in_progress' && input.questionSummary.queuedCount > 0) {
     return { displayStatus: 'awaiting_input', statusReason: 'queued_questions' };
   }
+  if (input.rawStatus === 'in_progress') {
+    const operatorVisibleState = resolveOperatorVisibleRunningState(input.compatibilityState);
+    if (operatorVisibleState) {
+      return { displayStatus: operatorVisibleState, statusReason: null };
+    }
+  }
   return { displayStatus: input.rawStatus, statusReason: null };
+}
+
+function resolveOperatorVisibleRunningState(
+  compatibilityState: ResolvedCompatibilityState | null
+): string | null {
+  const normalizedState = compatibilityState?.state?.trim() ?? null;
+  const normalizedStateType = compatibilityState?.stateType?.trim().toLowerCase() ?? null;
+  if (!normalizedState) {
+    return null;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: normalizedState,
+    state_type: normalizedStateType
+  });
+  if (
+    workflowState.isTodo ||
+    workflowState.isTerminal ||
+    normalizedStateType === 'triage' ||
+    normalizedStateType === 'backlog' ||
+    normalizedStateType === 'unstarted'
+  ) {
+    return null;
+  }
+  const stateKey = normalizedState.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (stateKey === 'inprogress' || stateKey === 'running' || stateKey === 'started') {
+    return 'running';
+  }
+  return normalizedState;
 }
 
 function buildSelectedRunLatestEvent(input: {

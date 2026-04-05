@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260405-linear-6e5a9260-4822-453b-ba5b-aa513849e06e",
+      "title": "CO: Restore authoritative CO STATUS telemetry for stage, event, tokens, throughput, session, and rate limits",
+      "relates_to": "tasks/tasks-linear-6e5a9260-4822-453b-ba5b-aa513849e06e.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-05",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-6e5a9260-4822-453b-ba5b-aa513849e06e.md",
+        "task": "tasks/tasks-linear-6e5a9260-4822-453b-ba5b-aa513849e06e.md",
+        "agent_task": ".agent/task/linear-6e5a9260-4822-453b-ba5b-aa513849e06e.md",
+        "docs": "docs/TECH_SPEC-linear-6e5a9260-4822-453b-ba5b-aa513849e06e.md"
+      }
+    },
+    {
       "id": "20260405-linear-736c3631-341a-4250-875f-e8808ef2a31b",
       "title": "CO: Add authoritative provider-worker progress and stall observability for self-repair and external debugging",
       "relates_to": "tasks/tasks-linear-736c3631-341a-4250-875f-e8808ef2a31b.md",

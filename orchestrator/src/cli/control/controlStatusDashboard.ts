@@ -1463,13 +1463,27 @@ function formatCompactCodexRateLimitSegments(
     return pieces;
   }
   const pieces: SummarySegment[] = [
-    { text: sanitizeDisplayValue(limitId ?? 'unknown'), color: ANSI_YELLOW }
+    { text: sanitizeDisplayValue(limitId ?? 'Codex'), color: ANSI_YELLOW }
   ];
   if (primary) {
-    pieces.push({ text: ` p${formatCompactRateLimitBucket(primary, referenceTime)}`, color: ANSI_CYAN });
+    const label = resolveCodexRateLimitBucketLabel(primary);
+    pieces.push({
+      text:
+        label === null
+          ? ` p${formatCompactRateLimitBucket(primary, referenceTime)}`
+          : ` ${label} ${formatCompactRateLimitBucket(primary, referenceTime)}`,
+      color: ANSI_CYAN
+    });
   }
   if (secondary) {
-    pieces.push({ text: ` s${formatCompactRateLimitBucket(secondary, referenceTime)}`, color: ANSI_CYAN });
+    const label = resolveCodexRateLimitBucketLabel(secondary);
+    pieces.push({
+      text:
+        label === null
+          ? ` s${formatCompactRateLimitBucket(secondary, referenceTime)}`
+          : ` ${label} ${formatCompactRateLimitBucket(secondary, referenceTime)}`,
+      color: ANSI_CYAN
+    });
   }
   if (credits) {
     pieces.push({ text: ` ${formatCompactRateLimitCredits(credits)}`, color: ANSI_GREEN });
@@ -1519,19 +1533,19 @@ function formatCodexRateLimitSegments(
     return pieces;
   }
   const pieces: SummarySegment[] = [
-    { text: sanitizeDisplayValue(limitId ?? 'unknown'), color: ANSI_YELLOW }
+    { text: sanitizeDisplayValue(limitId ?? 'Codex'), color: ANSI_YELLOW }
   ];
   if (primary) {
     pieces.push({ text: ' | ', color: ANSI_GRAY });
     pieces.push({
-      text: `primary ${formatRateLimitBucket(primary, referenceTime)}`,
+      text: `${resolveCodexRateLimitBucketLabel(primary) ?? 'primary'} ${formatRateLimitBucket(primary, referenceTime)}`,
       color: ANSI_CYAN
     });
   }
   if (secondary) {
     pieces.push({ text: ' | ', color: ANSI_GRAY });
     pieces.push({
-      text: `secondary ${formatRateLimitBucket(secondary, referenceTime)}`,
+      text: `${resolveCodexRateLimitBucketLabel(secondary) ?? 'secondary'} ${formatRateLimitBucket(secondary, referenceTime)}`,
       color: ANSI_CYAN
     });
   }
@@ -1540,6 +1554,21 @@ function formatCodexRateLimitSegments(
     pieces.push({ text: formatRateLimitCredits(credits), color: ANSI_GREEN });
   }
   return pieces;
+}
+
+function resolveCodexRateLimitBucketLabel(bucket: Record<string, unknown>): string | null {
+  const windowDurationMins = readRecordNumber(bucket, ['windowDurationMins', 'window_duration_mins']);
+  const normalizedWindowMinutes =
+    windowDurationMins !== null && Number.isFinite(windowDurationMins)
+      ? Math.max(0, Math.trunc(windowDurationMins))
+      : null;
+  if (normalizedWindowMinutes === 300) {
+    return '5-hour';
+  }
+  if (normalizedWindowMinutes === 10_080) {
+    return 'weekly';
+  }
+  return null;
 }
 
 function formatLinearBudgetSegments(
@@ -1665,6 +1694,14 @@ function formatCompactLinearBudgetSegments(
 }
 
 function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
+  const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
+  const windowDurationMins = readRecordNumber(bucket, ['windowDurationMins', 'window_duration_mins']);
+  if (usedPercent !== null && windowDurationMins !== null) {
+    return `${formatPercent(usedPercent)} / ${formatCount(windowDurationMins)}m`;
+  }
+  if (usedPercent !== null) {
+    return `${formatPercent(usedPercent)} used`;
+  }
   const remaining = readRecordNumber(bucket, ['remaining']);
   const limit = readRecordNumber(bucket, ['limit']);
   const resetSeconds =
@@ -1690,6 +1727,14 @@ function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: D
 }
 
 function formatCompactRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
+  const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
+  const windowDurationMins = readRecordNumber(bucket, ['windowDurationMins', 'window_duration_mins']);
+  if (usedPercent !== null && windowDurationMins !== null) {
+    return `${formatPercent(usedPercent)}/${formatCount(windowDurationMins)}m`;
+  }
+  if (usedPercent !== null) {
+    return formatPercent(usedPercent);
+  }
   const remaining = readRecordNumber(bucket, ['remaining']);
   const limit = readRecordNumber(bucket, ['limit']);
   const resetSeconds =
@@ -1740,6 +1785,11 @@ function formatCompactRateLimitCredits(credits: Record<string, unknown>): string
     return `cr${balance.toFixed(2)}`;
   }
   return 'cr available';
+}
+
+function formatPercent(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1).replace(/\.0$/, '')}%`;
 }
 
 function formatRecord(value: Record<string, unknown>): string {
@@ -1883,6 +1933,14 @@ function humanizeRunningEvent(event: string | null | undefined): string {
       return 'token usage updated';
     case 'account_ratelimits_updated':
       return 'rate limits updated';
+    case 'notification':
+      return 'notification';
+    case 'item_started':
+      return 'item started';
+    case 'item_completed':
+      return 'item completed';
+    case 'item_updated':
+      return 'item updated';
     case 'retry_scheduled':
       return 'retry scheduled';
     default:
