@@ -3889,6 +3889,79 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('waits for queued live proof writes before persisting an execRunner failure', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    let releaseLiveProofWrite: (() => void) | null = null;
+    const liveProofWriteBlocked = new Promise<void>((resolve) => {
+      releaseLiveProofWrite = resolve;
+    });
+    const writeProof = vi.fn(async (path: string, proof: ProviderLinearWorkerProof) => {
+      if (proof.owner_phase === 'turn_running' && proof.latest_turn_id === 'turn-1') {
+        await liveProofWriteBlocked;
+      }
+      await writeFile(path, JSON.stringify(proof), 'utf8');
+    });
+    const execRunner = vi.fn(async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
+      request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+      request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
+      request.onStdoutChunk?.(
+        '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active","timestamp":"2026-03-21T09:00:00.500Z"}}\n'
+      );
+      throw new Error('spawn failed');
+    });
+
+    const workerPromise = runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        writeProof,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    await vi.waitFor(() => {
+      expect(writeProof).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          owner_phase: 'turn_running',
+          latest_turn_id: 'turn-1'
+        })
+      );
+    });
+    releaseLiveProofWrite?.();
+
+    await expect(workerPromise).rejects.toThrow('spawn failed');
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      last_message: 'Worker turn active',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'exec_runner_failed'
+    });
+    expect(writeProof.mock.calls.at(-1)?.[1]).toMatchObject({
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'exec_runner_failed'
+    });
+  });
+
   it('fails closed when a codex turn does not emit thread_id', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
 

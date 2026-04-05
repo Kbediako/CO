@@ -3415,6 +3415,8 @@ export async function runProviderLinearWorker(
         stopLiveSessionTail();
         await liveSessionTailPromise;
         clearLiveSemanticStallTimer();
+        flushLiveStdoutTail();
+        await liveProofWrite;
         const failedProofBase = shouldPreservePreviousTurnTelemetryOnLaunchFailure(liveParseState)
           ? {
               ...finalProof,
