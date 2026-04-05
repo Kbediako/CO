@@ -1233,6 +1233,16 @@ function formatProviderWorkerRateLimitBucketSummary(bucket: Record<string, unkno
   if (limit !== null) {
     return `limit ${Math.max(0, Math.trunc(limit))}`;
   }
+  const resetInSeconds = readProviderWorkerNumericField(bucket, ['reset_in_seconds', 'resetInSeconds']);
+  if (resetInSeconds !== null) {
+    return `reset in ${Math.max(0, Math.trunc(resetInSeconds))}s`;
+  }
+  const resetAt = normalizeOptionalString(
+    bucket.reset_at ?? bucket.resetAt ?? bucket.resets_at ?? bucket.resetsAt
+  );
+  if (resetAt) {
+    return `resets at ${resetAt}`;
+  }
   return null;
 }
 
@@ -1277,7 +1287,10 @@ function hasProviderWorkerRateLimitBucketSummary(bucket: Record<string, unknown>
   return (
     readProviderWorkerNumericField(bucket, ['remaining']) !== null ||
     readProviderWorkerNumericField(bucket, ['limit']) !== null ||
-    readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']) !== null
+    readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']) !== null ||
+    readProviderWorkerNumericField(bucket, ['reset_in_seconds', 'resetInSeconds']) !== null ||
+    normalizeOptionalString(bucket.reset_at ?? bucket.resetAt ?? bucket.resets_at ?? bucket.resetsAt) !==
+      null
   );
 }
 

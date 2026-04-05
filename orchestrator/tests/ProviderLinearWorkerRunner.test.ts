@@ -929,11 +929,48 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
   });
 
-  it('ignores unrenderable rate-limit snapshots that would overwrite useful telemetry', () => {
+  it('preserves reset-only rate-limit snapshots even when the latest line is a raw proof fragment', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
         '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
         '{"rate_limits":{"limit_id":"coding","primary":{"reset_at":"2026-03-21T10:00:00.000Z"}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        reset_at: '2026-03-21T10:00:00.000Z'
+      }
+    });
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
+  it('humanizes reset-only rate-limit notifications from appserver envelopes', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rate_limits":{"limit_id":"coding","primary":{"reset_at":"2026-03-21T10:00:00.000Z"}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        reset_at: '2026-03-21T10:00:00.000Z'
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe(
+      'rate limits updated: primary resets at 2026-03-21T10:00:00.000Z'
+    );
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('ignores truly unrenderable rate-limit snapshots that would overwrite useful telemetry', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
+        '{"rate_limits":{"limit_id":"coding","primary":{"bucket":"unknown"}}}'
       ].join('\n')
     );
 
