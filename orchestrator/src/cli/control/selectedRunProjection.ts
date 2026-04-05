@@ -945,7 +945,7 @@ function shouldRefreshProviderLinearWorkerProjectionProof(
     !proof.latest_turn_id ||
     !proof.latest_session_id ||
     !hasTokens ||
-    proof.rate_limits === null
+    proof.rate_limits == null
   );
 }
 
