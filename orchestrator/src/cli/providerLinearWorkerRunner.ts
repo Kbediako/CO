@@ -1769,11 +1769,12 @@ function buildProviderLinearWorkerTurnBootstrapProof(
 function shouldPreservePreviousTurnTelemetryOnLaunchFailure(
   parseState: ProviderLinearWorkerJsonlParseResult
 ): boolean {
+  const lastEvent = normalizeOptionalString(parseState.lastEvent);
   return (
     parseState.turnId === null &&
-    parseState.lastEvent === null &&
+    (lastEvent === null || lastEvent === 'thread.started') &&
     parseState.finalMessage === null &&
-    parseState.lastEventAt === null &&
+    (parseState.lastEventAt === null || lastEvent === 'thread.started') &&
     !hasProviderWorkerTokenUsage(parseState.tokens) &&
     parseState.rateLimits === null
   );
@@ -3444,7 +3445,7 @@ export async function runProviderLinearWorker(
         const failedProofBase = shouldPreservePreviousTurnTelemetryOnLaunchFailure(liveParseState)
           ? {
               ...finalProof,
-              thread_id: previousTurnProof.thread_id,
+              thread_id: finalProof.thread_id ?? previousTurnProof.thread_id,
               latest_turn_id: previousTurnProof.latest_turn_id,
               latest_session_id: previousTurnProof.latest_session_id,
               latest_session_id_source: previousTurnProof.latest_session_id_source,

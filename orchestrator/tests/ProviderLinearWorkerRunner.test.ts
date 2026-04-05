@@ -3889,6 +3889,79 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('preserves a freshly discovered thread id when a resumed execRunner rejects before new turn context arrives', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    let execCallCount = 0;
+    const execRunner = vi.fn(
+      async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
+        execCallCount += 1;
+        if (execCallCount === 1) {
+          return {
+            exitCode: 0,
+            stdout: [
+              '{"type":"thread.started","thread_id":"thread-1"}',
+              '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+              '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":12,"output_tokens":8,"total_tokens":20}},"rate_limits":{"primary":{"used_percent":12.5,"window_minutes":300},"secondary":{"used_percent":48,"window_minutes":10080}}}}',
+              '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+            ].join('\n'),
+            stderr: ''
+          };
+        }
+        request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-2"}\n');
+        throw new Error('spawn failed');
+      }
+    );
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '2'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('spawn failed');
+
+    expect(execRunner).toHaveBeenCalledTimes(2);
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 48,
+          window_minutes: 10080
+        }
+      },
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'exec_runner_failed'
+    });
+  });
+
   it('waits for queued live proof writes before persisting an execRunner failure', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     let releaseLiveProofWrite: (() => void) | null = null;
