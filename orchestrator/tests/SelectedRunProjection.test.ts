@@ -528,6 +528,90 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('does not borrow provider claims from same-issue sibling runs', async () => {
+    const { root } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const selectedPaths = resolveRunPaths(childEnv, 'run-selected');
+    await mkdir(selectedPaths.runDir, { recursive: true });
+    await writeFile(
+      selectedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-selected',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Selected sibling run is active.'
+      }),
+      'utf8'
+    );
+    const activePaths = resolveRunPaths(childEnv, 'run-active');
+    const providerIntakeState = createProviderIntakeState(activePaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      run_id: 'run-active',
+      run_manifest_path: activePaths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      merge_closeout: {
+        recorded_at: '2026-03-20T01:16:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-20T01:16:20.000Z',
+        status: 'watching',
+        reason: 'checks_pending',
+        summary: 'Waiting for required checks before merge.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          ready_to_merge: false,
+          gate_reasons: ['required_checks_pending'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 2,
+          checks_failed: 0,
+          required_checks_pending: 2,
+          required_checks_failed: 0,
+          updated_at: '2026-03-20T01:16:20.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    };
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(selectedPaths, providerIntakeState)
+    ).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toBeNull();
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Selected sibling run is active.'
+    });
+  });
+
   it('does not synthesize completedAt for queued selected runs', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

@@ -21,7 +21,8 @@ import {
   runProviderLinearWorker,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
-  type ProviderLinearWorkerDependencies
+  type ProviderLinearWorkerDependencies,
+  type ProviderLinearWorkerProof
 } from '../src/cli/providerLinearWorkerRunner.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import {
