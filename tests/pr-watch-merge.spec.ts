@@ -880,7 +880,29 @@ describe('resolveBotRereviewTimingForKind', () => {
     expect(result.completeAtMs).toBeNull();
   });
 
-  it('only treats current-head pull comments as coderabbit completion signals', () => {
+  it('treats current-cycle issue comments with current-head completion signatures as coderabbit completion signals', () => {
+    const result = resolveBotRereviewTimingForKind({
+      kind: 'coderabbit',
+      requestAtMs,
+      issueComments: [
+        {
+          user: { login: 'coderabbitai[bot]' },
+          created_at: '2026-02-18T04:46:00Z',
+          __source: 'issue',
+          body: '`@maintainer`: Reviewed at head `abc123`. Everything is clean — no issues found.\n\nPR is ready to merge.'
+        }
+      ],
+      reviews: [],
+      issueReactions: [],
+      requestCommentReactions: [],
+      headOid: 'abc123'
+    });
+
+    expect(result.inProgressAtMs).toBeNull();
+    expect(result.completeAtMs).toBe(Date.parse('2026-02-18T04:46:00Z'));
+  });
+
+  it('ignores coderabbit issue comments without a current-head completion signature and still accepts pull comments', () => {
     const result = resolveBotRereviewTimingForKind({
       kind: 'coderabbit',
       requestAtMs,
@@ -888,7 +910,14 @@ describe('resolveBotRereviewTimingForKind', () => {
         {
           user: { login: 'coderabbitai[bot]' },
           created_at: '2026-02-18T04:44:00Z',
-          __source: 'issue'
+          __source: 'issue',
+          body: 'No actionable comments were generated in the recent review.'
+        },
+        {
+          user: { login: 'coderabbitai[bot]' },
+          created_at: '2026-02-18T04:44:30Z',
+          __source: 'issue',
+          body: '`@maintainer`: Reviewed at head `old-head`. Everything is clean — no issues found.\n\nPR is ready to merge.'
         },
         {
           user: { login: 'coderabbitai[bot]' },

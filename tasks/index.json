@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260405-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8",
+      "title": "CO: Fix ready-review false block on current-head CodeRabbit issue-comment completion",
+      "relates_to": "tasks/tasks-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-05",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-05",
+          "manifest": ".runs/linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8-co-85-docs-review/cli/2026-04-05T01-20-27-806Z-8e94d0e8/manifest.json",
+          "override_reason": "The child docs-review run preserved delegation evidence and passed docs:check, but failed only on unrelated repo-wide stale baseline debt (`docs:freshness` reported 8 stale docs: Task Packet stale=6, Task Mirror stale=2) while spec-guard dry-run separately surfaced unrelated older specs 0996-1008 at 31 days old. The CO-85 packet itself is registered; see out/linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8/manual/20260405T012027Z-docs-review-fallback.md."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8.md",
+        "task": "tasks/tasks-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8.md",
+        "agent_task": ".agent/task/linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8.md",
+        "docs": "docs/TECH_SPEC-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8.md"
+      }
+    },
+    {
       "id": "20260405-linear-74d6e549-46cc-46be-9a61-76ae61b014f4",
       "title": "CO: Fix non-interactive npm run test quiet-tail / MessagePort hang",
       "relates_to": "tasks/tasks-linear-74d6e549-46cc-46be-9a61-76ae61b014f4.md",

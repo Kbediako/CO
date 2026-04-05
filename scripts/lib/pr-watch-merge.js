@@ -36,6 +36,11 @@ const BOT_MENTION_PATTERNS = {
 };
 const BOT_IN_PROGRESS_REACTION_CONTENT = new Set(['eyes']);
 const BOT_COMPLETE_REACTION_CONTENT = new Set(['+1', 'hooray', 'heart', 'rocket', 'laugh', 'confused']);
+const CODERABBIT_ISSUE_COMMENT_COMPLETION_PATTERNS = [
+  /No actionable comments were generated in the recent review/iu,
+  /Everything is clean\b/iu,
+  /PR is ready to merge\b/iu
+];
 
 function normalizeReadinessMode(rawValue) {
   return typeof rawValue === 'string' && rawValue.trim().toLowerCase() === 'review' ? 'review' : 'merge';
@@ -1068,11 +1073,21 @@ function maxCommentTimestampForKind(issueComments, kind, requestAtMs, headOid) {
     if (resolveBotKindFromLogin(comment.user?.login) !== kind) {
       continue;
     }
-    if (comment.__source !== 'pull') {
-      continue;
-    }
-    const commentCommitId = typeof comment.commit_id === 'string' ? comment.commit_id : null;
-    if (headOid && commentCommitId && commentCommitId !== headOid) {
+    if (comment.__source === 'pull') {
+      const commentCommitId = typeof comment.commit_id === 'string' ? comment.commit_id : null;
+      if (headOid && commentCommitId && commentCommitId !== headOid) {
+        continue;
+      }
+    } else if (
+      !(
+        kind === 'coderabbit' &&
+        typeof comment.body === 'string' &&
+        typeof headOid === 'string' &&
+        headOid.length > 0 &&
+        comment.body.toLowerCase().includes(headOid.toLowerCase()) &&
+        CODERABBIT_ISSUE_COMMENT_COMPLETION_PATTERNS.some((pattern) => pattern.test(comment.body))
+      )
+    ) {
       continue;
     }
     const createdAtMs = parseTimestampMs(comment.created_at);
