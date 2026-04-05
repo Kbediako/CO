@@ -1713,6 +1713,138 @@ describe('SelectedRunProjection', () => {
     }
   });
 
+  it('refreshes in-progress provider proofs when token fields are undefined in the sidecar', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: '2026-03-20T01:15:28.970Z',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'item.completed',
+          last_message: null,
+          last_event_at: null,
+          tokens: {} as ProviderLinearWorkerProof['tokens'],
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: root,
+          end_reason: null,
+          updated_at: '2026-03-20T01:15:28.970Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const codexHome = join(root, '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2026', '03', '20');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      join(sessionDir, 'rollout-2026-03-20T01-15-30-000Z-thread-1.jsonl'),
+      [
+        JSON.stringify({
+          type: 'session_meta',
+          payload: {
+            id: 'thread-1',
+            cwd: root,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Autonomous intake handoff'
+          }
+        }),
+        JSON.stringify({
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-3'
+          }
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'token_count',
+            info: {
+              total_token_usage: {
+                input_tokens: 55,
+                output_tokens: 21,
+                total_tokens: 76
+              }
+            },
+            rate_limits: {
+              primary: {
+                used_percent: 18,
+                window_minutes: 300
+              },
+              secondary: {
+                used_percent: 52,
+                window_minutes: 10080
+              }
+            }
+          }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+
+    const originalCodexHome = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = codexHome;
+    try {
+      const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+      expect(selected?.providerLinearWorkerProof).toMatchObject({
+        latest_turn_id: 'turn-3',
+        latest_session_id: 'thread-1-turn-3',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        tokens: {
+          input_tokens: 55,
+          output_tokens: 21,
+          total_tokens: 76
+        },
+        rate_limits: {
+          primary: {
+            used_percent: 18,
+            window_minutes: 300
+          },
+          secondary: {
+            used_percent: 52,
+            window_minutes: 10080
+          }
+        }
+      });
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+    }
+  });
+
   it('prefers queued retry claim status text over a retained prior manifest summary', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

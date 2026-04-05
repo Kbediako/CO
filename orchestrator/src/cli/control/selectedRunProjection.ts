@@ -940,7 +940,7 @@ function shouldRefreshProviderLinearWorkerProjectionProof(
   }
   const tokens = proof.tokens ?? null;
   const hasTokens =
-    tokens?.input_tokens !== null || tokens?.output_tokens !== null || tokens?.total_tokens !== null;
+    tokens?.input_tokens != null || tokens?.output_tokens != null || tokens?.total_tokens != null;
   return (
     !proof.latest_turn_id ||
     !proof.latest_session_id ||
