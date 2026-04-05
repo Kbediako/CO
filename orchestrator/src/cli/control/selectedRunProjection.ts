@@ -880,49 +880,77 @@ function findMatchingProviderIntakeClaim(
   if (!state || !snapshot) {
     return null;
   }
-  const runBoundClaim =
-    state.claims.find((claim) => providerIntakeClaimMatchesSelectedRun(claim, snapshot)) ?? null;
-  if (runBoundClaim) {
-    return runBoundClaim;
+  const issueScopedClaim = findIssueScopedProviderIntakeClaim(state, snapshot);
+  if (issueScopedClaim) {
+    return providerIntakeClaimCanFallbackByIssue(issueScopedClaim, snapshot) ? issueScopedClaim : null;
   }
+  return state.claims.find((claim) => providerIntakeClaimMatchesSelectedRun(claim, snapshot)) ?? null;
+}
+
+function findIssueScopedProviderIntakeClaim(
+  state: ProviderIntakeState,
+  snapshot: SelectedRunManifestSnapshot
+): ProviderIntakeClaimRecord | null {
   if (snapshot.issueId) {
     const byIssueId = readProviderIntakeClaim(state, buildProviderIssueKey('linear', snapshot.issueId));
-    if (byIssueId && providerIntakeClaimCanFallbackByIssue(byIssueId, snapshot)) {
+    if (byIssueId) {
       return byIssueId;
     }
   }
-  return (
-    state.claims.find(
-      (claim) =>
-        providerIntakeClaimCanFallbackByIssue(claim, snapshot) &&
-        claim.issue_identifier === snapshot.issueIdentifier
-    ) ?? null
-  );
+  return state.claims.find((claim) => claim.issue_identifier === snapshot.issueIdentifier) ?? null;
 }
 
 function providerIntakeClaimMatchesSelectedRun(
-  claim: Pick<ProviderIntakeClaimRecord, 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'>,
-  snapshot: Pick<SelectedRunManifestSnapshot, 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'>
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  snapshot: Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+  >
 ): boolean {
   if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
     return true;
   }
+  if (!providerIntakeClaimMatchesIssueIdentity(claim, snapshot)) {
+    return false;
+  }
   if (claim.run_id && snapshot.runId) {
+    if (claim.task_id && snapshot.taskId && claim.task_id !== snapshot.taskId) {
+      return false;
+    }
     return claim.run_id === snapshot.runId;
   }
   if (claim.task_id && snapshot.taskId) {
-    return claim.task_id === snapshot.taskId && claim.issue_identifier === snapshot.issueIdentifier;
+    return claim.task_id === snapshot.taskId;
   }
   return false;
 }
 
 function providerIntakeClaimCanFallbackByIssue(
-  claim: Pick<ProviderIntakeClaimRecord, 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'>,
-  snapshot: Pick<SelectedRunManifestSnapshot, 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'>
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  snapshot: Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+  >
 ): boolean {
   return (
     providerIntakeClaimMatchesSelectedRun(claim, snapshot) ||
     (!claim.run_manifest_path && !claim.run_id && !claim.task_id)
+  );
+}
+
+function providerIntakeClaimMatchesIssueIdentity(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier'>
+): boolean {
+  return (
+    (claim.issue_id != null && snapshot.issueId != null && claim.issue_id === snapshot.issueId) ||
+    claim.issue_identifier === snapshot.issueIdentifier
   );
 }
 

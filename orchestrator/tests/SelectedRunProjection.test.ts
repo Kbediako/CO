@@ -708,6 +708,102 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('prefers the selected issue claim over a different-task claim with the same run id', async () => {
+    const { root } = await createHostPaths();
+    const selectedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const selectedPaths = resolveRunPaths(selectedEnv, 'run-child');
+    await mkdir(selectedPaths.runDir, { recursive: true });
+    await writeFile(
+      selectedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Selected run stays scoped to its own issue.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-20T01:16:00.000Z',
+      rehydrated_at: '2026-03-20T01:16:00.000Z',
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-99',
+          issue_id: 'lin-issue-99',
+          issue_identifier: 'CO-99',
+          issue_title: 'Different task with colliding run id',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T01:16:10.000Z',
+          task_id: 'linear-lin-issue-99',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-20T01:12:00.000Z',
+          updated_at: '2026-03-20T01:16:10.000Z',
+          last_delivery_id: 'delivery-99',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_010_000,
+          run_id: 'run-child',
+          run_manifest_path: join(root, '.runs', 'linear-lin-issue-99', 'cli', 'run-child', 'manifest.json')
+        },
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Selected run issue',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T01:16:20.000Z',
+          task_id: 'linear-lin-issue-1',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-20T01:12:30.000Z',
+          updated_at: '2026-03-20T01:16:20.000Z',
+          last_delivery_id: 'delivery-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_020_000,
+          run_id: 'run-child',
+          run_manifest_path: selectedPaths.manifestPath
+        }
+      ]
+    };
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(selectedPaths, providerIntakeState)
+    ).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      claim: {
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-child',
+        updated_at: '2026-03-20T01:16:20.000Z'
+      }
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Selected run stays scoped to its own issue.'
+    });
+  });
+
   it('does not synthesize completedAt for queued selected runs', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
