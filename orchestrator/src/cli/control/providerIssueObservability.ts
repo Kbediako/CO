@@ -655,6 +655,19 @@ function deriveMergeCloseoutProgressSnapshot(
     };
   }
 
+  if (mergeStatus === 'action_required' || actionRequiredReasons.length > 0) {
+    return {
+      phase: 'watching_merge',
+      kind: 'merge_closeout',
+      status: 'stalled',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'stalled',
+      stall_reason: actionRequiredReasons[0] ?? normalizeOptionalString(mergeCloseout.reason) ?? 'merge_action_required',
+      recovery_recommendation: 'inspect_merge_closeout'
+    };
+  }
+
   if ((checksPending ?? 0) > 0) {
     return {
       phase: 'waiting_on_checks',
@@ -678,19 +691,6 @@ function deriveMergeCloseoutProgressSnapshot(
       stall_classification: 'progressing',
       stall_reason: null,
       recovery_recommendation: 'continue_waiting'
-    };
-  }
-
-  if (mergeStatus === 'action_required' || actionRequiredReasons.length > 0) {
-    return {
-      phase: 'watching_merge',
-      kind: 'merge_closeout',
-      status: 'stalled',
-      summary,
-      last_semantic_progress_at: lastSemanticProgressAt,
-      stall_classification: 'stalled',
-      stall_reason: actionRequiredReasons[0] ?? normalizeOptionalString(mergeCloseout.reason) ?? 'merge_action_required',
-      recovery_recommendation: 'inspect_merge_closeout'
     };
   }
 
