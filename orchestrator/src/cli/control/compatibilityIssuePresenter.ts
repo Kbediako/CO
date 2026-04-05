@@ -240,17 +240,28 @@ export function buildCompatibilityRunningEntry(
   const proof = selected.providerLinearWorkerProof ?? null;
   const runningEvent = selectRunningEvent({
     latestEvent: selected.latestEvent?.event ?? null,
+    latestEventAt: selected.latestEvent?.at ?? null,
+    latestMessage: selected.latestEvent?.message ?? null,
     latestAction: selected.latestAction ?? null,
     rawStatus: selected.rawStatus,
-    proofEvent: proof?.last_event ?? null
+    proofEvent: proof?.last_event ?? null,
+    proofMessage: proof?.last_message ?? null,
+    proofEventAt: proof?.last_event_at ?? null
   });
   const preferProofTelemetry = runningEvent.source === 'proof';
+  const latestEventKey = normalizeCompatibilityEventKey(selected.latestEvent?.event ?? null);
+  const preserveLatestControlActionContext =
+    runningEvent.source === 'latest' && isExplicitControlActionEventKey(latestEventKey);
   const runningMessage = preferProofTelemetry
     ? proof?.last_message ?? selected.latestEvent?.message ?? selected.summary
-    : selected.latestEvent?.message ?? proof?.last_message ?? selected.summary;
+    : preserveLatestControlActionContext
+      ? selected.latestEvent?.message ?? selected.summary
+      : selected.latestEvent?.message ?? proof?.last_message ?? selected.summary;
   const runningEventAt = preferProofTelemetry
     ? proof?.last_event_at ?? selected.latestEvent?.at ?? selected.updatedAt
-    : selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt;
+    : preserveLatestControlActionContext
+      ? selected.latestEvent?.at ?? selected.updatedAt
+      : selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt;
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -361,25 +372,47 @@ function buildEmptyTokenUsage(): ControlRunningPayload['tokens'] {
 
 function selectRunningEvent(input: {
   latestEvent: string | null;
+  latestEventAt: string | null;
+  latestMessage: string | null;
   latestAction: string | null;
   rawStatus: string;
   proofEvent: string | null;
+  proofMessage: string | null;
+  proofEventAt: string | null;
 }): { event: string; source: 'proof' | 'latest' | 'fallback' } {
-  if (input.proofEvent) {
-    const genericFallbacks = new Set([
+  const latestEventKey = normalizeCompatibilityEventKey(input.latestEvent);
+  const genericFallbacks = new Set(
+    [
       input.rawStatus,
       input.latestAction === 'pause' ? null : input.latestAction,
       'in_progress',
       'running',
       'resuming',
-      'started'
-    ].filter((value): value is string => Boolean(value)));
-    if (!input.latestEvent || genericFallbacks.has(input.latestEvent)) {
-      return {
-        event: input.proofEvent,
-        source: 'proof'
-      };
-    }
+      'started',
+      'message',
+      'notification',
+      'item.started',
+      'item.completed',
+      'item.updated'
+    ]
+      .map((value) => normalizeCompatibilityEventKey(value))
+      .filter((value): value is string => Boolean(value))
+  );
+  const proofTelemetryIsNewerThanLatest =
+    compareCompatibilityTimestamps(input.proofEventAt, input.latestEventAt) > 0;
+  const proofMayOverrideLatestControlAction =
+    !isExplicitControlActionEventKey(latestEventKey) || proofTelemetryIsNewerThanLatest;
+  const preferProofTelemetry =
+    Boolean(input.proofEvent || input.proofMessage) &&
+    proofMayOverrideLatestControlAction &&
+    (!latestEventKey ||
+      genericFallbacks.has(latestEventKey) ||
+      (!normalizeCompatibilityMessage(input.latestMessage) && normalizeCompatibilityMessage(input.proofMessage)));
+  if (preferProofTelemetry) {
+    return {
+      event: input.proofEvent ?? input.latestEvent ?? input.latestAction ?? input.rawStatus,
+      source: 'proof'
+    };
   }
   if (input.latestEvent) {
     return {
@@ -391,6 +424,52 @@ function selectRunningEvent(input: {
     event: input.latestAction ?? input.rawStatus,
     source: 'fallback'
   };
+}
+
+function normalizeCompatibilityEventKey(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  return trimmed
+    .toLowerCase()
+    .replace(/^codex\/event\//u, '')
+    .replace(/[./]+/gu, '_')
+    .replace(/[^a-z0-9_]+/gu, '_')
+    .replace(/_+/gu, '_')
+    .replace(/^_|_$/gu, '');
+}
+
+function normalizeCompatibilityMessage(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function isExplicitControlActionEventKey(value: string | null): boolean {
+  return value === 'pause' || value === 'resume';
+}
+
+function compareCompatibilityTimestamps(left: string | null, right: string | null): number {
+  const leftTime = parseCompatibilityTimestamp(left);
+  const rightTime = parseCompatibilityTimestamp(right);
+  if (leftTime === null || rightTime === null) {
+    return 0;
+  }
+  return leftTime - rightTime;
+}
+
+function parseCompatibilityTimestamp(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function resolveCompatibilityRunningState(selected: ControlCompatibilitySourceContext): string {
