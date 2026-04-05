@@ -1359,6 +1359,20 @@ async function fetchSnapshot(owner, repo, prNumber, previousRequiredChecksCache 
   };
 }
 
+export async function fetchPrStatusSnapshot(input) {
+  const owner = typeof input?.owner === 'string' ? input.owner.trim() : '';
+  const repo = typeof input?.repo === 'string' ? input.repo.trim() : '';
+  const prNumber = Number(input?.prNumber);
+  if (!owner || !repo || !Number.isInteger(prNumber) || prNumber <= 0) {
+    throw new Error('fetchPrStatusSnapshot requires owner, repo, and a positive integer prNumber.');
+  }
+  const readinessMode = normalizeReadinessMode(input?.readinessMode);
+  const { snapshot } = await fetchSnapshot(owner, repo, prNumber, null, {
+    readinessMode
+  });
+  return snapshot;
+}
+
 export function buildPrMergeArgs({ owner, repo, prNumber, mergeMethod, deleteBranch, headOid }) {
   // gh pr merge has no --yes flag; rely on non-interactive stdio + explicit merge method.
   const args = ['pr', 'merge', String(prNumber), `--${mergeMethod}`, '--repo', `${owner}/${repo}`];

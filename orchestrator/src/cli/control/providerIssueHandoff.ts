@@ -43,6 +43,7 @@ import {
   runProviderTerminalCleanup,
   type ProviderTerminalCleanupConfig
 } from './providerTerminalCleanup.js';
+import type { ProviderMergeCloseoutRecord } from './providerMergeCloseout.js';
 
 export interface ProviderIssueLauncher {
   start(input: {
@@ -138,6 +139,15 @@ export interface CreateProviderIssueHandoffServiceOptions {
   resolveTrackedIssues?: (() => Promise<ProviderTrackedIssuePollResolution>) | null;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore | null;
   runTerminalCleanup?: typeof runProviderTerminalCleanup;
+  runMergeCloseout?: ((input: {
+    issueId: string;
+    issueIdentifier?: string | null;
+    issueState?: string | null;
+    issueStateType?: string | null;
+    issueUpdatedAt?: string | null;
+    repoRoot: string;
+    env?: NodeJS.ProcessEnv;
+  }) => Promise<ProviderMergeCloseoutRecord>) | null;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
@@ -209,6 +219,7 @@ export function createProviderIssueHandoffService(
   const allowedRunRoots = [resolve(options.paths.runDir, '..', '..', '..')];
   const repoRoot = resolve(options.paths.repoRoot);
   const runTerminalCleanup = options.runTerminalCleanup ?? runProviderTerminalCleanup;
+  const runMergeCloseout = options.runMergeCloseout ?? null;
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -334,6 +345,37 @@ export function createProviderIssueHandoffService(
       await persistState();
     }
     return claim;
+  };
+
+  const maybeHandleDeterministicMergingCloseout = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: LiveLinearTrackedIssue;
+    latestRun: ProviderIssueRunRecord | null;
+  }): Promise<ProviderIntakeClaimRecord | null> => {
+    if (!runMergeCloseout || normalizeProviderLinearWorkflowState(input.trackedIssue.state) !== 'merging') {
+      return null;
+    }
+    const mergeCloseout = await runMergeCloseout({
+      issueId: input.trackedIssue.id,
+      issueIdentifier: input.trackedIssue.identifier,
+      issueState: input.trackedIssue.state,
+      issueStateType: input.trackedIssue.state_type,
+      issueUpdatedAt: input.trackedIssue.updated_at,
+      repoRoot
+    });
+    return await upsertProviderClaimAndPersist({
+      ...input.claim,
+      issue_state: mergeCloseout.issue_state,
+      issue_state_type: mergeCloseout.issue_state_type,
+      issue_updated_at: mergeCloseout.issue_updated_at,
+      state: 'completed',
+      reason: resolveProviderMergeCloseoutClaimReason(mergeCloseout),
+      task_id: input.latestRun?.taskId ?? input.claim.task_id,
+      run_id: input.latestRun?.runId ?? input.claim.run_id,
+      run_manifest_path: input.latestRun?.manifestPath ?? input.claim.run_manifest_path,
+      ...clearProviderRetryFields(),
+      merge_closeout: mergeCloseout
+    });
   };
 
   const scheduleBestEffortRehydrateWithRefreshLock = (
@@ -1822,6 +1864,20 @@ export function createProviderIssueHandoffService(
           nextIssueUpdatedAt: input.trackedIssue.updated_at
         });
       if (latestRun?.status === 'succeeded' && latestExisting?.state !== 'released') {
+        const mergeCloseoutClaim = latestExisting
+          ? await maybeHandleDeterministicMergingCloseout({
+              claim: latestExisting,
+              trackedIssue: input.trackedIssue,
+              latestRun
+            })
+          : null;
+        if (mergeCloseoutClaim) {
+          return {
+            kind: 'ignored',
+            reason: mergeCloseoutClaim.reason ?? 'provider_issue_merge_closeout_completed',
+            claim: mergeCloseoutClaim
+          };
+        }
         if (!retryingFailedRelaunch) {
           if (
             input.trackedIssue.updated_at === null ||
@@ -2125,6 +2181,15 @@ export function createProviderIssueHandoffService(
                     trackedIssueRefetch
                   })
                 : claim;
+            const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
+              claim: currentClaim,
+              trackedIssue: resolution.trackedIssue,
+              latestRun
+            });
+            if (mergeCloseoutClaim) {
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              continue;
+            }
             await retainOwnedHandoffClaim({
               claim: currentClaim,
               trackedIssue: resolution.trackedIssue,
@@ -2183,6 +2248,17 @@ export function createProviderIssueHandoffService(
                   trackedIssueRefetch
                 })
               : claim;
+          if (latestRun?.status === 'succeeded') {
+            const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
+              claim: currentClaim,
+              trackedIssue: resolution.trackedIssue,
+              latestRun
+            });
+            if (mergeCloseoutClaim) {
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              continue;
+            }
+          }
           if (currentClaim.retry_queued === true) {
             noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
             continue;
@@ -3239,6 +3315,24 @@ function resolveProviderRetryErrorFromRun(run: ProviderIssueRunRecord | null): s
   return run.summary ?? null;
 }
 
+function resolveProviderMergeCloseoutClaimReason(
+  mergeCloseout: ProviderMergeCloseoutRecord
+): string {
+  switch (mergeCloseout.status) {
+    case 'merged':
+      return 'provider_issue_merge_closeout_merged';
+    case 'action_required':
+      return 'provider_issue_merge_closeout_action_required';
+    case 'transition_failed':
+      return 'provider_issue_merge_closeout_transition_failed';
+    case 'merge_failed':
+      return 'provider_issue_merge_closeout_failed';
+    case 'watching':
+    default:
+      return 'provider_issue_merge_closeout_watching';
+  }
+}
+
 type ProviderRetryDelayType = 'continuation' | 'failure';
 
 function buildProviderRetryDueAt(delayType: ProviderRetryDelayType, attempt: number): string {
@@ -3266,30 +3360,19 @@ function isValidProviderRetryTimestamp(value: string | null | undefined): value 
 
 function hasProviderClaimTransitioned(
   claim: ProviderIntakeClaimRecord,
-  next: Pick<
-    ProviderIntakeClaimRecord,
-    | 'issue_identifier'
-    | 'issue_title'
-    | 'issue_state'
-    | 'issue_state_type'
-    | 'issue_updated_at'
-    | 'issue_viewer_id'
-    | 'issue_viewer_auth_fingerprint'
-    | 'issue_assignee_id'
-    | 'issue_assignee_name'
-    | 'issue_blocked_by'
-    | 'state'
-    | 'reason'
-    | 'task_id'
-    | 'run_id'
-    | 'run_manifest_path'
-    | 'retry_queued'
-    | 'retry_attempt'
-    | 'retry_due_at'
-    | 'retry_error'
-  > | (
+  next: (
     Pick<
       ProviderIntakeClaimRecord,
+      | 'issue_identifier'
+      | 'issue_title'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_viewer_id'
+      | 'issue_viewer_auth_fingerprint'
+      | 'issue_assignee_id'
+      | 'issue_assignee_name'
+      | 'issue_blocked_by'
       | 'state'
       | 'reason'
       | 'task_id'
@@ -3299,23 +3382,36 @@ function hasProviderClaimTransitioned(
       | 'retry_attempt'
       | 'retry_due_at'
       | 'retry_error'
-    > &
-      Partial<
-        Pick<
-          ProviderIntakeClaimRecord,
-          | 'issue_identifier'
-          | 'issue_title'
-          | 'issue_state'
-          | 'issue_state_type'
-          | 'issue_updated_at'
-          | 'issue_viewer_id'
-          | 'issue_viewer_auth_fingerprint'
-          | 'issue_assignee_id'
-          | 'issue_assignee_name'
-          | 'issue_blocked_by'
+    > | (
+      Pick<
+        ProviderIntakeClaimRecord,
+        | 'state'
+        | 'reason'
+        | 'task_id'
+        | 'run_id'
+        | 'run_manifest_path'
+        | 'retry_queued'
+        | 'retry_attempt'
+        | 'retry_due_at'
+        | 'retry_error'
+      > &
+        Partial<
+          Pick<
+            ProviderIntakeClaimRecord,
+            | 'issue_identifier'
+            | 'issue_title'
+            | 'issue_state'
+            | 'issue_state_type'
+            | 'issue_updated_at'
+            | 'issue_viewer_id'
+            | 'issue_viewer_auth_fingerprint'
+            | 'issue_assignee_id'
+            | 'issue_assignee_name'
+            | 'issue_blocked_by'
+          >
         >
-      >
-  )
+    )
+  ) & Partial<Pick<ProviderIntakeClaimRecord, 'merge_closeout'>>
 ): boolean {
   return (
     (
@@ -3366,7 +3462,8 @@ function hasProviderClaimTransitioned(
     (claim.retry_queued ?? null) !== (next.retry_queued ?? null) ||
     (claim.retry_attempt ?? null) !== (next.retry_attempt ?? null) ||
     (claim.retry_due_at ?? null) !== (next.retry_due_at ?? null) ||
-    (claim.retry_error ?? null) !== (next.retry_error ?? null)
+    (claim.retry_error ?? null) !== (next.retry_error ?? null) ||
+    !areProviderMergeCloseoutRecordsEqual(claim.merge_closeout, next.merge_closeout)
   );
 }
 
@@ -3391,6 +3488,13 @@ function areProviderIssueBlockersEqual(
       blocker?.state_type === other?.state_type
     );
   });
+}
+
+function areProviderMergeCloseoutRecordsEqual(
+  left: ProviderIntakeClaimRecord['merge_closeout'],
+  right: ProviderIntakeClaimRecord['merge_closeout']
+): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 }
 
 function isProviderClaimRehydrationTimedOut(

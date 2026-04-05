@@ -170,7 +170,8 @@ describe('prepareControlServerStartupInputs', () => {
           retry_queued: null,
           retry_attempt: null,
           retry_due_at: null,
-          retry_error: null
+          retry_error: null,
+          merge_closeout: null
         }
       ]
     };
