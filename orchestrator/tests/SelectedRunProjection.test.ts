@@ -239,6 +239,571 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('surfaces the authoritative provider debug snapshot and semantic latest event for merge closeout lanes', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Merge closeout lane active.'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'turn_completed',
+          owner_status: 'in_progress',
+          last_event: 'task_complete',
+          last_message: 'Merge closeout lane active.',
+          last_event_at: '2026-03-20T01:15:28.970Z',
+          linear_audit: {
+            path: join(childPaths.runDir, 'provider-linear-worker-linear-audit.jsonl'),
+            attempted_count: 1,
+            success_count: 1,
+            failure_count: 0,
+            latest_recorded_at: '2026-03-20T01:16:10.000Z',
+            latest_by_operation: {
+              transition: {
+                recorded_at: '2026-03-20T01:16:10.000Z',
+                operation: 'transition',
+                ok: true,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: 'updated',
+                via: null,
+                state: 'Merging',
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                error_code: null,
+                error_message: null
+              }
+            }
+          }
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_state: 'Merging',
+      reason: 'provider_issue_rehydrated_active_run',
+      state: 'running',
+      merge_closeout: {
+        recorded_at: '2026-03-20T01:16:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-20T01:16:20.000Z',
+        status: 'watching',
+        reason: 'checks_pending',
+        summary: 'Waiting for required checks before merge.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          ready_to_merge: false,
+          gate_reasons: ['required_checks_pending'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 2,
+          checks_failed: 0,
+          required_checks_pending: 2,
+          required_checks_failed: 0,
+          updated_at: '2026-03-20T01:16:20.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      claim: {
+        freshness: 'rehydrated',
+        is_rehydrated: true
+      },
+      pull_request: {
+        number: 82
+      },
+      progress: {
+        phase: 'waiting_on_checks',
+        kind: 'merge_closeout',
+        status: 'waiting',
+        recovery_recommendation: 'wait_for_checks'
+      },
+      stall_classification: 'waiting_on_checks'
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'waiting_on_checks',
+      message: 'Waiting for required checks before merge.',
+      at: '2026-03-20T01:16:20.000Z'
+    });
+  });
+
+  it('ignores stale terminal proof snapshots when the selected stage started later', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        started_at: '2026-03-20T01:20:00.000Z',
+        updated_at: '2026-03-20T01:20:05.000Z',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: '2026-03-20T01:15:00.000Z',
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          last_event: 'task_complete',
+          last_message: 'Old worker run completed.',
+          last_event_at: '2026-03-20T01:15:28.970Z',
+          updated_at: '2026-03-20T01:16:00.000Z',
+          end_reason: 'issue_inactive'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(paths, undefined)
+    ).buildSelectedRunContext();
+
+    expect(selected?.rawStatus).toBe('in_progress');
+    expect(selected?.completedAt).toBeNull();
+    expect(selected?.providerDebugSnapshot).toBeNull();
+  });
+
+  it('keeps the generic latest event when no provider claim or proof exists', async () => {
+    const { paths } = await createHostPaths();
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-2',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot?.progress).toMatchObject({
+      phase: 'unknown',
+      kind: 'workflow',
+      status: 'progressing'
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Tracked issue is active.'
+    });
+  });
+
+  it('keeps the generic latest event when provider evidence is only a stale claim', async () => {
+    const { paths } = await createHostPaths();
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'stale',
+      reason: 'provider_issue_stale',
+      updated_at: '2026-03-20T01:14:28.970Z'
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-2',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      claim: {
+        freshness: 'stale'
+      },
+      progress: {
+        phase: 'unknown',
+        kind: 'workflow',
+        status: 'progressing'
+      }
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Tracked issue is active.'
+    });
+  });
+
+  it('keeps the generic latest event when stale claim merge-closeout data is the only provider evidence', async () => {
+    const { paths } = await createHostPaths();
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'stale',
+      reason: 'provider_issue_stale',
+      updated_at: '2026-03-20T01:14:28.970Z',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      merge_closeout: {
+        recorded_at: '2026-03-20T01:16:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-20T01:16:20.000Z',
+        status: 'watching',
+        reason: 'checks_pending',
+        summary: 'Waiting for required checks before merge.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          ready_to_merge: false,
+          gate_reasons: ['required_checks_pending'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 2,
+          checks_failed: 0,
+          required_checks_pending: 2,
+          required_checks_failed: 0,
+          updated_at: '2026-03-20T01:16:20.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-2',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      claim: {
+        freshness: 'stale'
+      },
+      pull_request: {
+        number: 82
+      },
+      progress: {
+        phase: 'waiting_on_checks',
+        kind: 'merge_closeout',
+        status: 'waiting'
+      }
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Tracked issue is active.'
+    });
+  });
+
+  it('does not borrow provider claims from same-issue sibling runs', async () => {
+    const { root } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const selectedPaths = resolveRunPaths(childEnv, 'run-selected');
+    await mkdir(selectedPaths.runDir, { recursive: true });
+    await writeFile(
+      selectedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-selected',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Selected sibling run is active.'
+      }),
+      'utf8'
+    );
+    const activePaths = resolveRunPaths(childEnv, 'run-active');
+    const providerIntakeState = createProviderIntakeState(activePaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      run_id: 'run-active',
+      run_manifest_path: activePaths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      merge_closeout: {
+        recorded_at: '2026-03-20T01:16:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-20T01:16:20.000Z',
+        status: 'watching',
+        reason: 'checks_pending',
+        summary: 'Waiting for required checks before merge.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          ready_to_merge: false,
+          gate_reasons: ['required_checks_pending'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 2,
+          checks_failed: 0,
+          required_checks_pending: 2,
+          required_checks_failed: 0,
+          updated_at: '2026-03-20T01:16:20.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    };
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(selectedPaths, providerIntakeState)
+    ).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toBeNull();
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Selected sibling run is active.'
+    });
+  });
+
+  it('prefers the selected issue claim over a different-task claim with the same run id', async () => {
+    const { root } = await createHostPaths();
+    const selectedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const selectedPaths = resolveRunPaths(selectedEnv, 'run-child');
+    await mkdir(selectedPaths.runDir, { recursive: true });
+    await writeFile(
+      selectedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Selected run stays scoped to its own issue.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-20T01:16:00.000Z',
+      rehydrated_at: '2026-03-20T01:16:00.000Z',
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-99',
+          issue_id: 'lin-issue-99',
+          issue_identifier: 'CO-99',
+          issue_title: 'Different task with colliding run id',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T01:16:10.000Z',
+          task_id: 'linear-lin-issue-99',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-20T01:12:00.000Z',
+          updated_at: '2026-03-20T01:16:10.000Z',
+          last_delivery_id: 'delivery-99',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_010_000,
+          run_id: 'run-child',
+          run_manifest_path: join(root, '.runs', 'linear-lin-issue-99', 'cli', 'run-child', 'manifest.json')
+        },
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Selected run issue',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T01:16:20.000Z',
+          task_id: 'linear-lin-issue-1',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-20T01:12:30.000Z',
+          updated_at: '2026-03-20T01:16:20.000Z',
+          last_delivery_id: 'delivery-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_020_000,
+          run_id: 'run-child',
+          run_manifest_path: selectedPaths.manifestPath
+        }
+      ]
+    };
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(selectedPaths, providerIntakeState)
+    ).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      claim: {
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-child',
+        updated_at: '2026-03-20T01:16:20.000Z'
+      }
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Selected run stays scoped to its own issue.'
+    });
+  });
+
   it('does not synthesize completedAt for queued selected runs', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

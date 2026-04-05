@@ -14,6 +14,7 @@ import {
 } from '../src/cli/control/providerPollingHealth.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
+import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
 import type { QuestionRecord } from '../src/cli/control/questions.js';
 import {
@@ -221,6 +222,32 @@ function buildLiveLinearDispatchPilot(): Record<string, unknown> {
         project_id: 'lin-project-1'
       }
     }
+  };
+}
+
+function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
+  return {
+    provider: 'linear',
+    id: 'lin-issue-1',
+    identifier: 'ISSUE-1',
+    title: 'Tracked issue',
+    description: 'Tracked issue for control-runtime tests.',
+    url: 'https://linear.app/asabeko/issue/ISSUE-1',
+    state: 'In Progress',
+    state_type: 'started',
+    viewer_id: 'viewer-1',
+    assignee_id: 'viewer-1',
+    assignee_name: 'Codex',
+    workspace_id: 'workspace-1',
+    team_id: 'team-1',
+    team_key: 'CO',
+    team_name: 'CO',
+    project_id: 'project-1',
+    project_name: 'Coordinator',
+    updated_at: '2026-03-07T00:00:00.000Z',
+    blocked_by: [],
+    recent_activity: [],
+    ...overrides
   };
 }
 
@@ -1952,7 +1979,7 @@ describe('ControlRuntime', () => {
     }
   });
 
-  it('prefers an authoritative proof event over the generic in_progress fallback in running rows', async () => {
+  it('prefers semantic provider progress over the generic in_progress fallback in running rows', async () => {
     const fixture = await createFixture({
       taskId: 'task-1037-event-current'
     });
@@ -1986,7 +2013,7 @@ describe('ControlRuntime', () => {
       expect.objectContaining({
         issue_identifier: 'ISSUE-1037-EVENT',
         pid: '4242',
-        last_event: 'turn.completed',
+        last_event: 'turn_completed',
         last_message: 'Codex turn completed',
         last_event_at: '2026-03-07T00:29:30.000Z'
       })
@@ -1994,10 +2021,159 @@ describe('ControlRuntime', () => {
     expect(sameIssueRecord?.payload.running).toMatchObject({
       issue_identifier: 'ISSUE-1037-EVENT',
       pid: '4242',
-      last_event: 'turn.completed',
+      last_event: 'turn_completed',
       last_message: 'Codex turn completed',
       last_event_at: '2026-03-07T00:29:30.000Z'
     });
+  });
+
+  it('projects operator-visible workflow phase into running display state', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1037-stage-current',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-1037-stage',
+          identifier: 'ISSUE-1037-STAGE',
+          title: 'Review handoff pending merge',
+          state: 'In Review',
+          updated_at: '2026-03-07T00:29:45.000Z'
+        })
+      }
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-stage-current',
+      issue_id: 'issue-1037-stage',
+      issue_identifier: 'ISSUE-1037-STAGE',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'awaiting reviewer handoff'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-stage',
+      issue_identifier: 'ISSUE-1037-STAGE',
+      pid: '4242',
+      turn_count: 3,
+      last_event: 'turn/completed',
+      last_message: 'turn completed (completed)',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1037-STAGE'
+    );
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-STAGE',
+        display_state: 'In Review'
+      })
+    ]);
+    expect(sameIssueRecord?.payload.display_status).toBe('In Review');
+    expect(sameIssueRecord?.payload.running?.display_state).toBe('In Review');
+  });
+
+  it('does not let queued workflow states override an active running display state', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1037-stage-ready',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-1037-stage-ready',
+          identifier: 'ISSUE-1037-STAGE-READY',
+          title: 'Refresh lag still shows Ready',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-03-07T00:29:45.000Z'
+        })
+      }
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-stage-ready',
+      issue_id: 'issue-1037-stage-ready',
+      issue_identifier: 'ISSUE-1037-STAGE-READY',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'worker is still running'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-stage-ready',
+      issue_identifier: 'ISSUE-1037-STAGE-READY',
+      pid: '4343',
+      turn_count: 2,
+      last_event: 'turn/completed',
+      last_message: 'turn completed (completed)',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1037-STAGE-READY'
+    );
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-STAGE-READY',
+        display_state: 'in_progress'
+      })
+    ]);
+    expect(sameIssueRecord?.payload.display_status).toBe('in_progress');
+    expect(sameIssueRecord?.payload.running?.display_state).toBe('in_progress');
+  });
+
+  it('does not let custom unstarted state types override an active running display state', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1037-stage-custom-backlog',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-1037-stage-custom-backlog',
+          identifier: 'ISSUE-1037-STAGE-CUSTOM-BACKLOG',
+          title: 'Custom backlog label should not replace a live run',
+          state: 'Queued Up',
+          state_type: 'unstarted',
+          updated_at: '2026-03-07T00:29:45.000Z'
+        })
+      }
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-stage-custom-backlog',
+      issue_id: 'issue-1037-stage-custom-backlog',
+      issue_identifier: 'ISSUE-1037-STAGE-CUSTOM-BACKLOG',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'worker is still running'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-stage-custom-backlog',
+      issue_identifier: 'ISSUE-1037-STAGE-CUSTOM-BACKLOG',
+      pid: '4444',
+      turn_count: 2,
+      last_event: 'turn/completed',
+      last_message: 'turn completed (completed)',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1037-STAGE-CUSTOM-BACKLOG'
+    );
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-STAGE-CUSTOM-BACKLOG',
+        display_state: 'in_progress'
+      })
+    ]);
+    expect(sameIssueRecord?.payload.display_status).toBe('in_progress');
+    expect(sameIssueRecord?.payload.running?.display_state).toBe('in_progress');
   });
 
   it('excludes completed sibling telemetry from runtime rows and codex totals', async () => {

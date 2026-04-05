@@ -351,7 +351,7 @@ export interface ProviderLinearIssueContext {
 
 type ProviderLinearIssueSummary = Pick<
   ProviderLinearIssueContext,
-  'id' | 'identifier' | 'url' | 'workspace_id' | 'state' | 'team' | 'project'
+  'id' | 'identifier' | 'url' | 'updated_at' | 'workspace_id' | 'state' | 'team' | 'project'
 >;
 
 export type ProviderLinearIssueContextResult =
@@ -407,6 +407,7 @@ export type ProviderLinearTransitionResult =
         id: string;
         identifier: string;
         state: ProviderLinearWorkflowState | null;
+        updated_at: string | null;
       };
       previous_state: ProviderLinearWorkflowState | null;
       target_state: ProviderLinearWorkflowState;
@@ -553,6 +554,7 @@ interface LinearIssueSummaryQueryResponse {
     id?: string | null;
     identifier?: string | null;
     url?: string | null;
+    updatedAt?: string | null;
     state?: {
       id?: string | null;
       name?: string | null;
@@ -614,6 +616,7 @@ interface IssueTransitionMutationResponse {
     issue?: {
       id?: string | null;
       identifier?: string | null;
+      updatedAt?: string | null;
       state?: {
         id?: string | null;
         name?: string | null;
@@ -1330,7 +1333,8 @@ export async function transitionProviderLinearIssueState(input: {
       issue: {
         id: summary.id,
         identifier: summary.identifier,
-        state: summary.state
+        state: summary.state,
+        updated_at: summary.updated_at
       },
       previous_state: summary.state,
       target_state: targetState,
@@ -1371,12 +1375,14 @@ export async function transitionProviderLinearIssueState(input: {
     return failure('transition', 'linear_state_transition_failed', 'Linear issue state transition did not succeed.', 503);
   }
 
+  const transitionedUpdatedAt = normalizeIso(issue?.updatedAt as string | null | undefined);
   if (cacheContext && canTrustCachedMutationContext) {
     await writeCachedIssueContextRecord(
       input.env,
       {
         ...cacheContext,
-        state: updatedState
+        state: updatedState,
+        updated_at: transitionedUpdatedAt
       },
       session.session.sourceSetup
     );
@@ -1388,7 +1394,8 @@ export async function transitionProviderLinearIssueState(input: {
     issue: {
       id: normalizeRequiredString(issue?.id)!,
       identifier: normalizeRequiredString(issue?.identifier)!,
-      state: updatedState
+      state: updatedState,
+      updated_at: transitionedUpdatedAt
     },
     previous_state: summary.state,
     target_state: targetState,
@@ -2796,6 +2803,7 @@ function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinea
     id: issue.id,
     identifier: issue.identifier,
     url: issue.url,
+    updated_at: issue.updated_at,
     workspace_id: issue.workspace_id,
     state: issue.state,
     team: issue.team,
@@ -2810,6 +2818,7 @@ function mergeCachedIssueContextSummary(
   return {
     ...issue,
     url: summary.url,
+    updated_at: summary.updated_at,
     workspace_id: summary.workspace_id,
     state: summary.state,
     team: summary.team,
@@ -3493,6 +3502,7 @@ function parseIssueSummary(
       id,
       identifier,
       url: normalizeOptionalString(issueNode.url),
+      updated_at: normalizeIso(issueNode.updatedAt),
       workspace_id: normalizedWorkspaceId,
       state: parseWorkflowState(issueNode.state ?? null),
       team: issueNode.team
@@ -3700,6 +3710,7 @@ function buildIssueSummaryQuery(): string {
       id
       identifier
       url
+      updatedAt
       state {
         id
         name
@@ -3803,6 +3814,7 @@ function buildIssueTransitionMutation(): string {
       issue {
         id
         identifier
+        updatedAt
         state {
           id
           name

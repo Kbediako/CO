@@ -477,7 +477,52 @@ describe('buildProviderIntakeSummary', () => {
       issue_viewer_id: 'viewer-1',
       state: 'handoff_owned',
       reason: 'provider_issue_handoff_owned',
-      run_id: 'run-1'
+      run_id: 'run-1',
+      freshness: 'fresh',
+      rehydrated_at: null,
+      is_rehydrated: false
+    });
+  });
+
+  it('marks summary claims as rehydrated when the latest intake state was restored', () => {
+    const summary = buildProviderIntakeSummary({
+      schema_version: 1,
+      updated_at: '2026-03-19T04:50:00.000Z',
+      rehydrated_at: '2026-03-19T04:45:00.000Z',
+      latest_provider_key: 'linear:lin-issue-1',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-1',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          issue_title: 'Autonomous intake handoff',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:40:00.000Z',
+          task_id: 'linear-lin-issue-1',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-19T04:40:05.000Z',
+          updated_at: '2026-03-19T04:44:59.000Z',
+          last_delivery_id: 'delivery-1',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_050_000,
+          run_id: 'run-1',
+          run_manifest_path: '/tmp/run-1/manifest.json',
+          launch_source: null,
+          launch_token: null
+        }
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      freshness: 'rehydrated',
+      rehydrated_at: '2026-03-19T04:45:00.000Z',
+      is_rehydrated: true
     });
   });
 });

@@ -30,6 +30,11 @@ import {
   readProviderIntakeClaim,
   selectProviderIntakeClaim
 } from './providerIntakeState.js';
+import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
+import {
+  buildProviderIssueDebugSnapshot,
+  type ControlProviderDebugSnapshot
+} from './providerIssueObservability.js';
 import {
   buildProviderLinearWorkerTerminalSummary,
   deriveDeterministicProviderMutationSuppressions,
@@ -93,6 +98,11 @@ interface ProjectionContextParts {
   runDir: string;
   trackedIssue: LiveLinearTrackedIssue | null;
   providerLinearWorkerProof: ProviderLinearWorkerProof | null;
+}
+
+interface ResolvedCompatibilityState {
+  state: string | null;
+  stateType: string | null;
 }
 
 interface LinearAdvisoryStateSnapshot {
@@ -218,7 +228,8 @@ async function buildSelectedRunContextFromSnapshot(
     parts,
     resolveRunsRootFromRunDir(context.paths.runDir),
     controlWorkspacePath,
-    providerClaim
+    providerClaim,
+    context.providerIntakeState ?? null
   );
 }
 
@@ -236,7 +247,8 @@ async function buildCompatibilitySourceContextFromSnapshot(
     parts,
     resolveRunsRootFromRunDir(context.paths.runDir),
     controlWorkspacePath,
-    providerClaim
+    providerClaim,
+    context.providerIntakeState ?? null
   );
 }
 
@@ -245,7 +257,8 @@ function buildProjectionContextFromParts(
   parts: ProjectionContextParts,
   controlRunsRoot: string | null,
   controlWorkspacePath: string | null,
-  providerClaim: ProviderIntakeClaimRecord | null = null
+  providerClaim: ProviderIntakeClaimRecord | null = null,
+  providerIntakeState: ProviderIntakeState | null = null
 ): SelectedRunContext | null {
   if (!snapshot) {
     return null;
@@ -255,9 +268,9 @@ function buildProjectionContextFromParts(
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
   const providerProofRecord = (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null;
+  const proofIsFreshForStage = isProviderLinearWorkerProofFreshForStage(providerProofRecord, startedAt);
   const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(manifestRecord, providerProofRecord);
-  const useScopedTerminalProof =
-    useTerminalProof && isProviderLinearWorkerProofFreshForStage(providerProofRecord, startedAt);
+  const useScopedTerminalProof = useTerminalProof && proofIsFreshForStage;
   const proofTerminalStatus = useScopedTerminalProof
     ? resolveProviderLinearWorkerTerminalStatus(providerProofRecord)
     : null;
@@ -307,17 +320,26 @@ function buildProjectionContextFromParts(
   });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
+  const compatibilityState = resolveCompatibilityState(parts.trackedIssue, providerClaim);
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
     rawStatus,
     latestAction,
-    questionSummary
+    questionSummary,
+    compatibilityState
   });
   const tracked = buildTrackedLinearPayload(parts.trackedIssue);
+  const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
+    tracked_issue: parts.trackedIssue,
+    claim: providerClaim,
+    proof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null,
+    rehydrated_at: providerIntakeState?.rehydrated_at ?? null
+  });
   const latestEvent = buildSelectedRunLatestEvent({
     controlAction: control.latest_action ?? null,
     updatedAt,
     summary,
-    fallbackEvent: rawStatus
+    fallbackEvent: rawStatus,
+    providerDebugSnapshot
   });
   const lastError =
     rawStatus === 'failed'
@@ -351,8 +373,9 @@ function buildProjectionContextFromParts(
     runDir: snapshot.runDir,
     questionSummary,
     tracked,
-    compatibilityState: resolveCompatibilityState(parts.trackedIssue, providerClaim),
+    compatibilityState: compatibilityState?.state ?? null,
     providerLinearWorkerProof: parts.providerLinearWorkerProof,
+    providerDebugSnapshot,
     providerRetryState: buildProviderRetryState(providerClaim)
   };
 }
@@ -379,8 +402,16 @@ function resolveSelectedRunWorkspacePath(input: {
 function resolveCompatibilityState(
   trackedIssue: LiveLinearTrackedIssue | null,
   providerClaim: ProviderIntakeClaimRecord | null
-): string | null {
-  return trackedIssue?.state ?? providerClaim?.issue_state ?? null;
+): ResolvedCompatibilityState | null {
+  const state = trackedIssue?.state ?? providerClaim?.issue_state ?? null;
+  const stateType = trackedIssue?.state_type ?? providerClaim?.issue_state_type ?? null;
+  if (!state && !stateType) {
+    return null;
+  }
+  return {
+    state,
+    stateType
+  };
 }
 
 function isCliRunManifestPathWithinRunsRoot(manifestPath: string, runsRoot: string): boolean {
@@ -466,6 +497,7 @@ function resolveSelectedRunDisplayStatus(input: {
   rawStatus: string;
   latestAction: ControlAction['action'] | null;
   questionSummary: SelectedRunQuestionSummary;
+  compatibilityState: ResolvedCompatibilityState | null;
 }): { displayStatus: string; statusReason: string | null } {
   if (input.rawStatus === 'in_progress' && input.latestAction === 'pause') {
     return {
@@ -476,7 +508,41 @@ function resolveSelectedRunDisplayStatus(input: {
   if (input.rawStatus === 'in_progress' && input.questionSummary.queuedCount > 0) {
     return { displayStatus: 'awaiting_input', statusReason: 'queued_questions' };
   }
+  if (input.rawStatus === 'in_progress') {
+    const operatorVisibleState = resolveOperatorVisibleRunningState(input.compatibilityState);
+    if (operatorVisibleState) {
+      return { displayStatus: operatorVisibleState, statusReason: null };
+    }
+  }
   return { displayStatus: input.rawStatus, statusReason: null };
+}
+
+function resolveOperatorVisibleRunningState(
+  compatibilityState: ResolvedCompatibilityState | null
+): string | null {
+  const normalizedState = compatibilityState?.state?.trim() ?? null;
+  const normalizedStateType = compatibilityState?.stateType?.trim().toLowerCase() ?? null;
+  if (!normalizedState) {
+    return null;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: normalizedState,
+    state_type: normalizedStateType
+  });
+  if (
+    workflowState.isTodo ||
+    workflowState.isTerminal ||
+    normalizedStateType === 'triage' ||
+    normalizedStateType === 'backlog' ||
+    normalizedStateType === 'unstarted'
+  ) {
+    return null;
+  }
+  const stateKey = normalizedState.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (stateKey === 'inprogress' || stateKey === 'running' || stateKey === 'started') {
+    return 'running';
+  }
+  return normalizedState;
 }
 
 function buildSelectedRunLatestEvent(input: {
@@ -484,7 +550,25 @@ function buildSelectedRunLatestEvent(input: {
   updatedAt: string | null;
   summary: string | null;
   fallbackEvent: string;
+  providerDebugSnapshot: ControlProviderDebugSnapshot | null;
 }): SelectedRunLatestEvent | null {
+  if (
+    !input.controlAction &&
+    input.providerDebugSnapshot?.progress &&
+    hasAuthoritativeProviderDebugEvidence(input.providerDebugSnapshot) &&
+    shouldPreferProviderDebugProgressEvent(input.fallbackEvent)
+  ) {
+    return {
+      at:
+        input.providerDebugSnapshot.progress.last_semantic_progress_at ??
+        input.providerDebugSnapshot.last_semantic_progress_at ??
+        input.updatedAt,
+      event: input.providerDebugSnapshot.progress.phase,
+      message: input.providerDebugSnapshot.progress.summary ?? input.summary,
+      requestedBy: null,
+      reason: input.providerDebugSnapshot.progress.stall_reason ?? null
+    };
+  }
   if (!input.controlAction && !input.updatedAt && !input.summary) {
     return null;
   }
@@ -495,6 +579,32 @@ function buildSelectedRunLatestEvent(input: {
     requestedBy: input.controlAction?.requested_by ?? null,
     reason: input.controlAction?.reason ?? null
   };
+}
+
+function hasAuthoritativeProviderDebugEvidence(
+  providerDebugSnapshot: ControlProviderDebugSnapshot
+): boolean {
+  const claimIsStale = providerDebugSnapshot.claim?.freshness === 'stale';
+  if (claimIsStale && providerDebugSnapshot.progress?.kind === 'merge_closeout') {
+    return false;
+  }
+  const hasFreshClaim = providerDebugSnapshot.claim !== null && !claimIsStale;
+  const hasFreshPullRequest = providerDebugSnapshot.pull_request !== null && !claimIsStale;
+  return Boolean(
+    hasFreshClaim ||
+      providerDebugSnapshot.worker ||
+      hasFreshPullRequest ||
+      providerDebugSnapshot.last_audit_operation
+  );
+}
+
+function shouldPreferProviderDebugProgressEvent(fallbackEvent: string): boolean {
+  return (
+    fallbackEvent === 'in_progress' ||
+    fallbackEvent === 'running' ||
+    fallbackEvent === 'started' ||
+    fallbackEvent === 'resuming'
+  );
 }
 
 function resolveSelectedRunDisplaySummary(input: {
@@ -772,7 +882,8 @@ async function readTaskCompatibilityContexts(
       },
       resolveRunsRootFromRunDir(runDir),
       options.controlWorkspacePath ?? resolveSafeLegacyWorkspacePathFromRunDir(runDir),
-      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot)
+      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot),
+      options.providerIntakeState ?? null
     );
     if (context) {
       discovered.push({
@@ -820,25 +931,77 @@ function findMatchingProviderIntakeClaim(
   if (!state || !snapshot) {
     return null;
   }
+  const issueScopedClaim = findIssueScopedProviderIntakeClaim(state, snapshot);
+  if (issueScopedClaim) {
+    return providerIntakeClaimCanFallbackByIssue(issueScopedClaim, snapshot) ? issueScopedClaim : null;
+  }
+  return state.claims.find((claim) => providerIntakeClaimMatchesSelectedRun(claim, snapshot)) ?? null;
+}
+
+function findIssueScopedProviderIntakeClaim(
+  state: ProviderIntakeState,
+  snapshot: SelectedRunManifestSnapshot
+): ProviderIntakeClaimRecord | null {
   if (snapshot.issueId) {
     const byIssueId = readProviderIntakeClaim(state, buildProviderIssueKey('linear', snapshot.issueId));
     if (byIssueId) {
       return byIssueId;
     }
   }
+  return state.claims.find((claim) => claim.issue_identifier === snapshot.issueIdentifier) ?? null;
+}
+
+function providerIntakeClaimMatchesSelectedRun(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  snapshot: Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+  >
+): boolean {
+  if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
+    return true;
+  }
+  if (!providerIntakeClaimMatchesIssueIdentity(claim, snapshot)) {
+    return false;
+  }
+  if (claim.run_id && snapshot.runId) {
+    if (claim.task_id && snapshot.taskId && claim.task_id !== snapshot.taskId) {
+      return false;
+    }
+    return claim.run_id === snapshot.runId;
+  }
+  if (claim.task_id && snapshot.taskId) {
+    return claim.task_id === snapshot.taskId;
+  }
+  return false;
+}
+
+function providerIntakeClaimCanFallbackByIssue(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  snapshot: Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+  >
+): boolean {
   return (
-    state.claims.find((claim) => {
-      if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
-        return true;
-      }
-      if (claim.run_id && snapshot.runId && claim.run_id === snapshot.runId) {
-        return true;
-      }
-      if (claim.task_id && snapshot.taskId && claim.task_id === snapshot.taskId) {
-        return claim.issue_identifier === snapshot.issueIdentifier;
-      }
-      return claim.issue_identifier === snapshot.issueIdentifier;
-    }) ?? null
+    providerIntakeClaimMatchesSelectedRun(claim, snapshot) ||
+    (!claim.run_manifest_path && !claim.run_id && !claim.task_id)
+  );
+}
+
+function providerIntakeClaimMatchesIssueIdentity(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'issue_identifier'>,
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier'>
+): boolean {
+  return (
+    (claim.issue_id != null && snapshot.issueId != null && claim.issue_id === snapshot.issueId) ||
+    claim.issue_identifier === snapshot.issueIdentifier
   );
 }
 
@@ -918,6 +1081,10 @@ async function buildProviderRetryContextFromClaim(
       tracked: null,
       compatibilityState: claim.issue_state,
       providerLinearWorkerProof: null,
+      providerDebugSnapshot: buildProviderIssueDebugSnapshot({
+        claim,
+        rehydrated_at: context.providerIntakeState?.rehydrated_at ?? null
+      }),
       providerRetryState: buildProviderRetryState(claim)
     };
   }
@@ -929,7 +1096,8 @@ async function buildProviderRetryContextFromClaim(
       parts,
       resolveRunsRootFromRunDir(context.paths.runDir),
       controlWorkspacePath,
-      claim
+      claim,
+      context.providerIntakeState ?? null
     ) ??
     null;
   if (!base) {

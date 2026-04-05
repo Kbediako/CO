@@ -21,7 +21,8 @@ import {
   runProviderLinearWorker,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
-  type ProviderLinearWorkerDependencies
+  type ProviderLinearWorkerDependencies,
+  type ProviderLinearWorkerProof
 } from '../src/cli/providerLinearWorkerRunner.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import {
@@ -797,6 +798,217 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEvent).toBe('turn.completed');
   });
 
+  it('parses appserver method telemetry into proof event/message semantics', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"notification","method":"thread/tokenUsage/updated","params":{"tokenUsage":{"total":{"inputTokens":12,"outputTokens":4,"totalTokens":16}}},"timestamp":"2026-03-21T09:00:00.100Z"}',
+        '{"type":"notification","method":"item/completed","params":{"item":{"type":"fileChange","status":"completed"}},"timestamp":"2026-03-21T09:00:00.200Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 12,
+      output_tokens: 4,
+      total_tokens: 16
+    });
+    expect(parsed.lastEvent).toBe('item/completed');
+    expect(parsed.finalMessage).toBe('item completed: file change');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.200Z');
+  });
+
+  it('parses payload-wrapped notification token usage into live proof totals', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"total":{"inputTokens":18,"outputTokens":6,"totalTokens":24}}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 18,
+      output_tokens: 6,
+      total_tokens: 24
+    });
+    expect(parsed.lastEvent).toBe('thread/tokenUsage/updated');
+    expect(parsed.finalMessage).toBe('thread token usage updated (in 18 / out 6 / total 24)');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.100Z');
+  });
+
+  it('keeps token-update humanization aligned with parser-supported tokenUsage shapes', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"inputTokens":7,"outputTokens":5,"totalTokens":12}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 7,
+      output_tokens: 5,
+      total_tokens: 12
+    });
+    expect(parsed.finalMessage).toBe('thread token usage updated (in 7 / out 5 / total 12)');
+  });
+
+  it('parses Codex usage-window rate limits without a legacy limit id', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('parses legacy nested rate-limit envelopes from appserver payloads', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"msg":{"payload":{"info":{"rate_limits":{"limit_id":"coding","primary":{"remaining":42}}}}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        remaining: 42
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: primary remaining 42');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('parses payload-wrapped legacy rate-limit envelopes from appserver notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","payload":{"method":"account/rateLimits/updated","params":{"msg":{"payload":{"info":{"rate_limits":{"limit_id":"coding","primary":{"remaining":42}}}}}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        remaining: 42
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: primary remaining 42');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('parses non-payload snake-case rate-limit envelopes from appserver notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rate_limits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('preserves reset-only rate-limit snapshots even when the latest line is a raw proof fragment', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
+        '{"rate_limits":{"limit_id":"coding","primary":{"reset_at":"2026-03-21T10:00:00.000Z"}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        reset_at: '2026-03-21T10:00:00.000Z'
+      }
+    });
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
+  it('humanizes reset-only rate-limit notifications from appserver envelopes', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rate_limits":{"limit_id":"coding","primary":{"reset_at":"2026-03-21T10:00:00.000Z"}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      limit_id: 'coding',
+      primary: {
+        reset_at: '2026-03-21T10:00:00.000Z'
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe(
+      'rate limits updated: primary resets at 2026-03-21T10:00:00.000Z'
+    );
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
+  it('ignores truly unrenderable rate-limit snapshots that would overwrite useful telemetry', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
+        '{"rate_limits":{"limit_id":"coding","primary":{"bucket":"unknown"}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
+  it('ignores credits-only rate-limit snapshots that would overwrite useful windows', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
+        '{"rate_limits":{"credits":{"balance":123}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
   it('waits for child close before resolving piped stdio capture', async () => {
     vi.resetModules();
     const stdout = new PassThrough();
@@ -1068,6 +1280,11 @@ describe('provider linear worker runner', () => {
           stderr: ''
         };
       });
+    const log = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn()
+    };
 
     const proof = await runProviderLinearWorker(
       {
@@ -1085,7 +1302,7 @@ describe('provider linear worker runner', () => {
           .fn()
           .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
           .mockReturnValue('2026-03-21T09:00:01.000Z'),
-        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        log
       }
     );
 
@@ -1169,6 +1386,13 @@ describe('provider linear worker runner', () => {
           ]
         })
       })]),
+      progress: {
+        phase: 'completed',
+        kind: 'worker',
+        status: 'completed',
+        stall_classification: 'completed',
+        recovery_recommendation: 'no_action'
+      },
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -1240,8 +1464,18 @@ describe('provider linear worker runner', () => {
           ]
         })
       })]),
+      progress: {
+        phase: 'completed',
+        kind: 'worker',
+        status: 'completed'
+      },
       end_reason: 'issue_inactive'
     });
+    expect(
+      log.info.mock.calls.some(([message]) =>
+        typeof message === 'string' && message.includes('[provider-linear-worker-progress]')
+      )
+    ).toBe(true);
   });
 
   it('passes env-backed Linear scope bindings into tracked issue refreshes', async () => {
@@ -1589,6 +1823,11 @@ describe('provider linear worker runner', () => {
         requests: {
           remaining: 1
         }
+      },
+      progress: {
+        phase: 'unknown',
+        kind: 'worker',
+        status: 'progressing'
       }
     });
   });
@@ -5240,6 +5479,201 @@ describe('provider linear worker runner', () => {
         owner_status: 'succeeded',
         end_reason: 'max_turns_reached_issue_still_active'
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('emits stalled semantic progress for quiet live turns before the runner exits', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-03-21T09:00:00.000Z'));
+      const { manifestPath } = await createManifestRoot();
+      const writtenProofs: ProviderLinearWorkerProof[] = [];
+      const log = {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn()
+      };
+      let allowRunnerToFinishResolve: (() => void) | null = null;
+      const allowRunnerToFinish = new Promise<void>((resolve) => {
+        allowRunnerToFinishResolve = resolve;
+      });
+
+      const workerPromise = runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue({
+            state: 'Merging',
+            state_type: 'started',
+            assignee_id: null,
+            assignee_name: null
+          })),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+            request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
+            request.onStdoutChunk?.(
+              '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active","timestamp":"2026-03-21T09:00:00.000Z"}}\n'
+            );
+            await allowRunnerToFinish;
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active","timestamp":"2026-03-21T09:00:00.000Z"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:16:05.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: () => new Date().toISOString(),
+          writeProof: vi.fn(async (_path, proof) => {
+            writtenProofs.push(JSON.parse(JSON.stringify(proof)) as ProviderLinearWorkerProof);
+          }),
+          log
+        }
+      );
+
+      await vi.waitFor(() => {
+        expect(
+          writtenProofs.some(
+            (proof) => proof.owner_phase === 'turn_running' && proof.progress?.status === 'progressing'
+          )
+        ).toBe(true);
+      });
+      await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 1_000);
+      await vi.waitFor(() => {
+        expect(
+          writtenProofs.some(
+            (proof) => proof.owner_phase === 'turn_running' && proof.progress?.status === 'stalled'
+          )
+        ).toBe(true);
+      });
+      expect(
+        log.info.mock.calls.some(([message]) =>
+          typeof message === 'string' &&
+          message.includes('[provider-linear-worker-progress]') &&
+          message.includes('"status":"stalled"')
+        )
+      ).toBe(true);
+
+      allowRunnerToFinishResolve?.();
+      await workerPromise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps polling audit sidecars after the first stalled refresh', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-03-21T09:00:00.000Z'));
+      const { manifestPath, runDir } = await createManifestRoot();
+      const auditPath = join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME);
+      const writtenProofs: ProviderLinearWorkerProof[] = [];
+      let allowRunnerToFinishResolve: (() => void) | null = null;
+      const allowRunnerToFinish = new Promise<void>((resolve) => {
+        allowRunnerToFinishResolve = resolve;
+      });
+
+      const workerPromise = runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue({
+            state: 'Merging',
+            state_type: 'started',
+            assignee_id: null,
+            assignee_name: null
+          })),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
+            request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
+            request.onStdoutChunk?.(
+              '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active","timestamp":"2026-03-21T09:00:00.000Z"}}\n'
+            );
+            await allowRunnerToFinish;
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"agent_message","message":"Worker turn active","timestamp":"2026-03-21T09:00:00.000Z"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:30:05.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: () => new Date().toISOString(),
+          writeProof: vi.fn(async (_path, proof) => {
+            writtenProofs.push(JSON.parse(JSON.stringify(proof)) as ProviderLinearWorkerProof);
+          }),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      );
+
+      await vi.waitFor(() => {
+        expect(
+          writtenProofs.some(
+            (proof) => proof.owner_phase === 'turn_running' && proof.progress?.status === 'progressing'
+          )
+        ).toBe(true);
+      });
+
+      await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 1_000);
+      await vi.waitFor(() => {
+        expect(
+          writtenProofs.some(
+            (proof) => proof.owner_phase === 'turn_running' && proof.progress?.status === 'stalled'
+          )
+        ).toBe(true);
+      });
+
+      await appendProviderLinearAuditEntry(auditPath, {
+        recorded_at: '2026-03-21T09:20:00.000Z',
+        operation: 'transition',
+        ok: true,
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        source_setup: null,
+        action: 'updated',
+        via: null,
+        state: 'Merging',
+        follow_up_issue_id: null,
+        follow_up_issue_identifier: null,
+        failed_relation_type: null,
+        comment_id: null,
+        attachment_id: null,
+        error_code: null,
+        error_message: null
+      });
+
+      await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 1_000);
+      await vi.waitFor(() => {
+        expect(
+          writtenProofs.some(
+            (proof) =>
+              proof.owner_phase === 'turn_running' &&
+              proof.linear_audit?.attempted_count === 1 &&
+              proof.progress?.status === 'progressing'
+          )
+        ).toBe(true);
+      });
+
+      allowRunnerToFinishResolve?.();
+      await workerPromise;
     } finally {
       vi.useRealTimers();
     }

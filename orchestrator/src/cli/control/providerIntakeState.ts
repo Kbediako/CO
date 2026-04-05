@@ -1,6 +1,11 @@
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
+import type { ProviderMergeCloseoutRecord } from './providerMergeCloseout.js';
+import {
+  deriveProviderIntakeClaimFreshness,
+  type ProviderIntakeClaimFreshness
+} from './providerIssueObservability.js';
 
 const PROVIDER_INTAKE_CLAIM_LIMIT = 128;
 
@@ -57,6 +62,7 @@ export interface ProviderIntakeClaimRecord {
   retry_attempt?: number | null;
   retry_due_at?: string | null;
   retry_error?: string | null;
+  merge_closeout?: ProviderMergeCloseoutRecord | null;
 }
 
 export interface ProviderIntakeState {
@@ -85,6 +91,9 @@ export interface ProviderIntakeSummaryPayload {
   state: ProviderIntakeSummaryState;
   reason: string | null;
   run_id: string | null;
+  freshness: ProviderIntakeClaimFreshness | null;
+  rehydrated_at: string | null;
+  is_rehydrated: boolean;
   updated_at: string;
 }
 
@@ -267,7 +276,11 @@ export function upsertProviderIntakeClaim(
     retry_error:
       input.retry_error === undefined
         ? retryStateDefaults.retryError
-        : normalizeRetryError(input.retry_error)
+        : normalizeRetryError(input.retry_error),
+    merge_closeout:
+      input.merge_closeout === undefined
+        ? cloneProviderMergeCloseoutRecord(existing?.merge_closeout)
+        : cloneProviderMergeCloseoutRecord(input.merge_closeout)
   };
 
   if (existingIndex >= 0) {
@@ -328,10 +341,15 @@ export function selectProviderIntakeClaim(
 export function buildProviderIntakeSummary(
   state: ProviderIntakeState | null | undefined
 ): ProviderIntakeSummaryPayload | null {
-  const claim = selectProviderIntakeClaim(state);
+  const normalizedState = normalizeProviderIntakeState(state);
+  const claim = selectProviderIntakeClaim(normalizedState);
   if (!claim) {
     return null;
   }
+  const freshness = deriveProviderIntakeClaimFreshness({
+    claim,
+    rehydrated_at: normalizedState.rehydrated_at
+  });
   return {
     provider: claim.provider,
     issue_id: claim.issue_id,
@@ -348,6 +366,9 @@ export function buildProviderIntakeSummary(
     state: deriveProviderIntakeSummaryState(claim),
     reason: claim.reason,
     run_id: claim.run_id,
+    freshness,
+    rehydrated_at: normalizedState.rehydrated_at,
+    is_rehydrated: freshness === 'rehydrated',
     updated_at: claim.updated_at
   };
 }
@@ -432,7 +453,8 @@ function normalizeProviderIntakeClaim(
     retry_queued: normalizeRetryQueued(input.retry_queued),
     retry_attempt: normalizeRetryAttempt(input.retry_attempt),
     retry_due_at: normalizeRetryTimestamp(input.retry_due_at),
-    retry_error: normalizeRetryError(input.retry_error)
+    retry_error: normalizeRetryError(input.retry_error),
+    merge_closeout: cloneProviderMergeCloseoutRecord(input.merge_closeout)
   };
 }
 
@@ -468,6 +490,14 @@ function normalizeRetryTimestamp(value: unknown): string | null {
 
 function normalizeRetryError(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function cloneProviderMergeCloseoutRecord(
+  value: ProviderMergeCloseoutRecord | null | undefined
+): ProviderMergeCloseoutRecord | null {
+  return isRecordLike(value)
+    ? (JSON.parse(JSON.stringify(value)) as ProviderMergeCloseoutRecord)
+    : null;
 }
 
 function normalizeClaimState(value: string): ProviderIntakeClaimState {

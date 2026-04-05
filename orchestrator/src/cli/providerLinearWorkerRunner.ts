@@ -37,6 +37,10 @@ import {
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import { deriveDeterministicProviderMutationSuppressions } from './control/providerLinearWorkerTruth.js';
+import {
+  deriveProviderLinearWorkerProgressSnapshot,
+  type ProviderLinearWorkerProgressSnapshot
+} from './control/providerIssueObservability.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
 import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
@@ -109,6 +113,7 @@ const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
 const PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS = new Set<string>([
   'max_turns_reached_issue_still_active'
 ]);
+const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
@@ -233,6 +238,7 @@ export interface ProviderLinearWorkerProof {
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
   child_lanes?: ProviderLinearWorkerChildLaneRecord[];
+  progress?: ProviderLinearWorkerProgressSnapshot | null;
   linear_budget?: LinearBudgetStatus | null;
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
   end_reason: string | null;
@@ -943,28 +949,29 @@ function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
   message: string | null;
   at: string | null;
 } {
+  const payload = isRecord(input.payload) ? input.payload : null;
   const timestamp =
     normalizeOptionalString(input.timestamp) ??
-    (isRecord(input.payload)
-      ? normalizeOptionalString(input.payload.timestamp) ??
-        normalizeOptionalString(input.payload.created_at) ??
-        normalizeOptionalString(input.payload.at)
+    (payload
+      ? normalizeOptionalString(payload.timestamp) ??
+        normalizeOptionalString(payload.created_at) ??
+        normalizeOptionalString(payload.at)
       : null);
-  if (input.type === 'event_msg' && isRecord(input.payload)) {
+  if (input.type === 'event_msg' && payload) {
     return {
-      event: normalizeOptionalString(input.payload.type),
-      message: normalizeOptionalString(input.payload.message),
+      event: normalizeOptionalString(payload.type),
+      message: normalizeOptionalString(payload.message),
       at: timestamp
     };
   }
   if (
     input.type === 'response_item' &&
-    isRecord(input.payload) &&
-    input.payload.type === 'message' &&
-    Array.isArray(input.payload.content)
+    payload &&
+    payload.type === 'message' &&
+    Array.isArray(payload.content)
   ) {
     let outputText: string | null = null;
-    for (const item of input.payload.content) {
+    for (const item of payload.content) {
       if (isRecord(item) && item.type === 'output_text') {
         outputText = normalizeOptionalString(item.text) ?? outputText;
       }
@@ -972,6 +979,16 @@ function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
     return {
       event: outputText ? 'message' : null,
       message: outputText,
+      at: timestamp
+    };
+  }
+  const method =
+    normalizeOptionalString(input.method) ??
+    normalizeOptionalString(payload?.method);
+  if (method) {
+    return {
+      event: method,
+      message: humanizeProviderWorkerMethod(method, input),
       at: timestamp
     };
   }
@@ -990,8 +1007,15 @@ function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTo
   const directTotalUsage = findRecordAtPaths(input, [
     ['params', 'msg', 'payload', 'info', 'total_token_usage'],
     ['params', 'msg', 'info', 'total_token_usage'],
+    ['payload', 'params', 'tokenUsage', 'total'],
     ['params', 'tokenUsage', 'total'],
-    ['tokenUsage', 'total']
+    ['tokenUsage', 'total'],
+    ['payload', 'params', 'usage'],
+    ['params', 'usage'],
+    ['usage'],
+    ['payload', 'params', 'tokenUsage'],
+    ['params', 'tokenUsage'],
+    ['tokenUsage']
   ]);
   const normalizedDirectUsage = normalizeProviderWorkerTokenUsage(directTotalUsage);
   if (normalizedDirectUsage) {
@@ -1007,6 +1031,7 @@ function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTo
       findRecordAtPaths(input, [
         ['usage'],
         ['payload', 'usage'],
+        ['payload', 'params', 'usage'],
         ['params', 'usage']
       ])
     );
@@ -1066,43 +1091,223 @@ function readTokenCount(input: Record<string, unknown>, keys: string[]): number 
 }
 
 function extractProviderWorkerRateLimits(input: unknown): Record<string, unknown> | null {
-  return findRateLimitsRecord(input);
-}
-
-function findRateLimitsRecord(input: unknown): Record<string, unknown> | null {
-  if (Array.isArray(input)) {
-    for (const item of input) {
-      const nested = findRateLimitsRecord(item);
-      if (nested) {
-        return nested;
-      }
-    }
-    return null;
-  }
   if (!isRecord(input)) {
     return null;
   }
   if (isProviderWorkerRateLimitsRecord(input)) {
     return input;
   }
-  for (const value of Object.values(input)) {
-    const nested = findRateLimitsRecord(value);
-    if (nested) {
-      return nested;
+  const candidatePaths = [
+    ['rate_limits'],
+    ['payload', 'rate_limits'],
+    ['params', 'rateLimits'],
+    ['params', 'rate_limits'],
+    ['payload', 'params', 'rateLimits'],
+    ['payload', 'params', 'rate_limits'],
+    ['params', 'msg', 'payload', 'info', 'rate_limits'],
+    ['params', 'msg', 'info', 'rate_limits'],
+    ['params', 'msg', 'payload', 'info', 'rateLimits'],
+    ['params', 'msg', 'info', 'rateLimits'],
+    ['payload', 'params', 'msg', 'payload', 'info', 'rate_limits'],
+    ['payload', 'params', 'msg', 'info', 'rate_limits'],
+    ['payload', 'params', 'msg', 'payload', 'info', 'rateLimits'],
+    ['payload', 'params', 'msg', 'info', 'rateLimits'],
+    ['rateLimits'],
+    ['payload', 'rateLimits']
+  ];
+  for (const candidatePath of candidatePaths) {
+    const candidate = findRecordAtPath(input, candidatePath);
+    if (candidate && isProviderWorkerRateLimitsRecord(candidate)) {
+      return candidate;
     }
   }
   return null;
 }
 
 function isProviderWorkerRateLimitsRecord(input: Record<string, unknown>): boolean {
-  const limitId =
-    normalizeOptionalString(input.limit_id) ??
-    normalizeOptionalString(input.limit_name);
-  const hasBucket =
-    Object.prototype.hasOwnProperty.call(input, 'primary') ||
-    Object.prototype.hasOwnProperty.call(input, 'secondary') ||
-    Object.prototype.hasOwnProperty.call(input, 'credits');
-  return Boolean(limitId) && hasBucket;
+  const primary = isRecord(input.primary) ? input.primary : null;
+  const secondary = isRecord(input.secondary) ? input.secondary : null;
+  return hasProviderWorkerRateLimitBucketSummary(primary) || hasProviderWorkerRateLimitBucketSummary(secondary);
+}
+
+function humanizeProviderWorkerMethod(method: string, input: Record<string, unknown>): string | null {
+  switch (method.toLowerCase()) {
+    case 'thread/tokenusage/updated': {
+      const usage = extractProviderWorkerTokenUsage(input);
+      const usageSummary = formatProviderWorkerTokenUsageSummary(usage);
+      return usageSummary ? `thread token usage updated (${usageSummary})` : 'thread token usage updated';
+    }
+    case 'account/ratelimits/updated': {
+      const rateLimits = extractProviderWorkerRateLimits(input);
+      const rateLimitSummary = formatProviderWorkerRateLimitSummary(rateLimits);
+      return rateLimitSummary ? `rate limits updated: ${rateLimitSummary}` : 'rate limits updated';
+    }
+    case 'item/started':
+    case 'item/completed':
+    case 'item/updated': {
+      const item = findRecordAtPaths(input, [
+        ['params', 'item'],
+        ['payload', 'params', 'item'],
+        ['item'],
+        ['payload', 'item']
+      ]);
+      const itemType =
+        normalizeOptionalString(item?.type) ??
+        normalizeOptionalString(item?.kind) ??
+        normalizeOptionalString(item?.status);
+      const action = method.slice(method.lastIndexOf('/') + 1).toLowerCase();
+      const itemLabel = humanizeProviderWorkerItemType(itemType);
+      return itemLabel ? `item ${action}: ${itemLabel}` : `item ${action}`;
+    }
+    case 'turn/started':
+      return 'turn started';
+    case 'turn/completed': {
+      const turn = findRecordAtPaths(input, [
+        ['params', 'turn'],
+        ['payload', 'params', 'turn'],
+        ['turn'],
+        ['payload', 'turn']
+      ]);
+      const status = normalizeOptionalString(turn?.status);
+      return status ? `turn completed (${status})` : 'turn completed';
+    }
+    default:
+      return null;
+  }
+}
+
+function formatProviderWorkerTokenUsageSummary(
+  usage: ProviderLinearWorkerTokenUsage | null
+): string | null {
+  if (!usage) {
+    return null;
+  }
+  const parts: string[] = [];
+  if (typeof usage.input_tokens === 'number' && Number.isFinite(usage.input_tokens)) {
+    parts.push(`in ${Math.max(0, Math.trunc(usage.input_tokens))}`);
+  }
+  if (typeof usage.output_tokens === 'number' && Number.isFinite(usage.output_tokens)) {
+    parts.push(`out ${Math.max(0, Math.trunc(usage.output_tokens))}`);
+  }
+  if (typeof usage.total_tokens === 'number' && Number.isFinite(usage.total_tokens)) {
+    parts.push(`total ${Math.max(0, Math.trunc(usage.total_tokens))}`);
+  }
+  return parts.length > 0 ? parts.join(' / ') : null;
+}
+
+function formatProviderWorkerRateLimitSummary(
+  rateLimits: Record<string, unknown> | null
+): string | null {
+  if (!rateLimits) {
+    return null;
+  }
+  const segments: string[] = [];
+  const primary = isRecord(rateLimits.primary) ? rateLimits.primary : null;
+  if (primary) {
+    const summary = formatProviderWorkerRateLimitBucketSummary(primary);
+    if (summary) {
+      segments.push(`${resolveProviderWorkerRateLimitWindowLabel(primary, 'primary')} ${summary}`);
+    }
+  }
+  const secondary = isRecord(rateLimits.secondary) ? rateLimits.secondary : null;
+  if (secondary) {
+    const summary = formatProviderWorkerRateLimitBucketSummary(secondary);
+    if (summary) {
+      segments.push(`${resolveProviderWorkerRateLimitWindowLabel(secondary, 'secondary')} ${summary}`);
+    }
+  }
+  return segments.length > 0 ? segments.join('; ') : null;
+}
+
+function formatProviderWorkerRateLimitBucketSummary(bucket: Record<string, unknown>): string | null {
+  const usedPercent = readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']);
+  const windowDurationMins = readProviderWorkerNumericField(bucket, ['windowDurationMins', 'window_duration_mins']);
+  if (usedPercent !== null && windowDurationMins !== null) {
+    return `${formatProviderWorkerPercent(usedPercent)} / ${Math.max(0, Math.trunc(windowDurationMins))}m`;
+  }
+  if (usedPercent !== null) {
+    return `${formatProviderWorkerPercent(usedPercent)} used`;
+  }
+  const remaining = readProviderWorkerNumericField(bucket, ['remaining']);
+  const limit = readProviderWorkerNumericField(bucket, ['limit']);
+  if (remaining !== null && limit !== null) {
+    return `${Math.max(0, Math.trunc(remaining))}/${Math.max(0, Math.trunc(limit))}`;
+  }
+  if (remaining !== null) {
+    return `remaining ${Math.max(0, Math.trunc(remaining))}`;
+  }
+  if (limit !== null) {
+    return `limit ${Math.max(0, Math.trunc(limit))}`;
+  }
+  const resetInSeconds = readProviderWorkerNumericField(bucket, ['reset_in_seconds', 'resetInSeconds']);
+  if (resetInSeconds !== null) {
+    return `reset in ${Math.max(0, Math.trunc(resetInSeconds))}s`;
+  }
+  const resetAt = normalizeOptionalString(
+    bucket.reset_at ?? bucket.resetAt ?? bucket.resets_at ?? bucket.resetsAt
+  );
+  if (resetAt) {
+    return `resets at ${resetAt}`;
+  }
+  return null;
+}
+
+function resolveProviderWorkerRateLimitWindowLabel(
+  bucket: Record<string, unknown>,
+  fallback: 'primary' | 'secondary'
+): string {
+  const windowDurationMins = readProviderWorkerNumericField(bucket, ['windowDurationMins', 'window_duration_mins']);
+  const normalizedWindowMinutes =
+    windowDurationMins !== null && Number.isFinite(windowDurationMins)
+      ? Math.max(0, Math.trunc(windowDurationMins))
+      : null;
+  if (normalizedWindowMinutes === 300) {
+    return '5-hour';
+  }
+  if (normalizedWindowMinutes === 10_080) {
+    return 'weekly';
+  }
+  return fallback;
+}
+
+function humanizeProviderWorkerItemType(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[._/]+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function formatProviderWorkerPercent(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1)}%`;
+}
+
+function hasProviderWorkerRateLimitBucketSummary(bucket: Record<string, unknown> | null): boolean {
+  if (!bucket) {
+    return false;
+  }
+  return (
+    readProviderWorkerNumericField(bucket, ['remaining']) !== null ||
+    readProviderWorkerNumericField(bucket, ['limit']) !== null ||
+    readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']) !== null ||
+    readProviderWorkerNumericField(bucket, ['reset_in_seconds', 'resetInSeconds']) !== null ||
+    normalizeOptionalString(bucket.reset_at ?? bucket.resetAt ?? bucket.resets_at ?? bucket.resetsAt) !==
+      null
+  );
+}
+
+function readProviderWorkerNumericField(input: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = input[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return null;
 }
 
 function findRecordAtPaths(
@@ -1110,20 +1315,26 @@ function findRecordAtPaths(
   paths: string[][]
 ): Record<string, unknown> | null {
   for (const path of paths) {
-    let current: unknown = input;
-    let found = true;
-    for (const segment of path) {
-      if (!isRecord(current)) {
-        found = false;
-        break;
-      }
-      current = current[segment];
-    }
-    if (found && isRecord(current)) {
-      return current;
+    const record = findRecordAtPath(input, path);
+    if (record) {
+      return record;
     }
   }
   return null;
+}
+
+function findRecordAtPath(
+  input: Record<string, unknown>,
+  path: string[]
+): Record<string, unknown> | null {
+  let current: unknown = input;
+  for (const segment of path) {
+    if (!isRecord(current)) {
+      return null;
+    }
+    current = current[segment];
+  }
+  return isRecord(current) ? current : null;
 }
 
 export function deriveLatestTurnSessionId(input: {
@@ -2066,12 +2277,19 @@ async function writeProofSnapshot(
 ): Promise<ProviderLinearWorkerProof> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
-    const hydratedProof = {
+    const proofWithHydratedSources = {
       ...proof,
       linear_audit: await summarizeProviderLinearAuditPath(auditPath),
       child_streams: await readProviderLinearWorkerChildStreams(runDir),
       child_lanes: await readProviderLinearWorkerChildLanes(runDir),
       linear_budget: linearBudget
+    };
+    const hydratedProof = {
+      ...proofWithHydratedSources,
+      progress: deriveProviderLinearWorkerProgressSnapshot({
+        proof: proofWithHydratedSources,
+        now: deps.now
+      })
     };
     await deps.writeProof(buildProofPath(runDir), hydratedProof);
     return hydratedProof;
@@ -2099,13 +2317,20 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     }
     const parsed = JSON.parse(raw) as ProviderLinearWorkerProof;
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
-    const hydrated: ProviderLinearWorkerProof = {
+    const proofWithHydratedSources: ProviderLinearWorkerProof = {
       ...parsed,
       linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
       child_streams: await readProviderLinearWorkerChildStreams(runDir),
       child_lanes: await readProviderLinearWorkerChildLanes(runDir),
       linear_budget: linearBudget,
       updated_at: now()
+    };
+    const hydrated: ProviderLinearWorkerProof = {
+      ...proofWithHydratedSources,
+      progress: deriveProviderLinearWorkerProgressSnapshot({
+        proof: proofWithHydratedSources,
+        now
+      })
     };
     await writeProof(proofPath, hydrated);
     return hydrated;
@@ -2173,14 +2398,33 @@ export async function runProviderLinearWorker(
     linear_audit: null,
     child_streams: [],
     child_lanes: [],
+    progress: null,
     tracked_issue_error: null,
     linear_budget: null,
     end_reason: null,
     updated_at: attemptStartedAt
   };
+  let lastProgressSignature: string | null = null;
+
+  const emitSemanticProgressIfChanged = (proof: ProviderLinearWorkerProof): void => {
+    const progress = proof.progress ?? null;
+    const signature = progress ? JSON.stringify(progress) : null;
+    if (!signature || signature === lastProgressSignature) {
+      return;
+    }
+    lastProgressSignature = signature;
+    deps.log.info(
+      `[provider-linear-worker-progress] ${JSON.stringify({
+        issue_id: proof.issue_id,
+        issue_identifier: proof.issue_identifier,
+        progress
+      })}`
+    );
+  };
 
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
     const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+    emitSemanticProgressIfChanged(hydratedProof);
     await requestProviderControlHostRefresh({
       currentManifestPath: context.manifestPath,
       env,
@@ -2249,8 +2493,16 @@ export async function runProviderLinearWorker(
   let liveRefreshAbortController: AbortController | null = null;
   let liveRefreshPending = false;
   let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  let liveSemanticStallTimer: ReturnType<typeof setTimeout> | null = null;
   let liveRefreshClosed = false;
   let liveProofWrite: Promise<void> = Promise.resolve();
+
+  const clearLiveSemanticStallTimer = (): void => {
+    if (liveSemanticStallTimer !== null) {
+      clearTimeout(liveSemanticStallTimer);
+      liveSemanticStallTimer = null;
+    }
+  };
 
   const cancelLiveRefreshState = async (): Promise<void> => {
     liveRefreshClosed = true;
@@ -2259,6 +2511,7 @@ export async function runProviderLinearWorker(
       clearTimeout(liveRefreshTimer);
       liveRefreshTimer = null;
     }
+    clearLiveSemanticStallTimer();
     await liveProofWrite;
     if (liveRefreshRequest !== null) {
       liveRefreshAbortController?.abort();
@@ -2314,8 +2567,84 @@ export async function runProviderLinearWorker(
             }
             liveRefreshRequest = null;
             scheduleTrailingLiveRefresh();
-          });
+            });
         }, waitMs);
+      };
+      const queueLiveRefresh = (proof: ProviderLinearWorkerProof): void => {
+        if (liveRefreshClosed) {
+          return;
+        }
+        const nowMs = Date.now();
+        if (nowMs - liveRefreshRequestedAtMs < 1_000 || liveRefreshRequest !== null) {
+          liveRefreshPending = true;
+          scheduleTrailingLiveRefresh();
+          return;
+        }
+        liveRefreshPending = false;
+        liveRefreshRequestedAtMs = nowMs;
+        const abortController = new AbortController();
+        liveRefreshAbortController = abortController;
+        liveRefreshRequest = requestProviderControlHostRefresh({
+          currentManifestPath: context.manifestPath,
+          env,
+          manifest: context.manifest,
+          proof,
+          repoRoot: context.repoRoot,
+          log: deps.log,
+          allowInProgress: true,
+          abortSignal: abortController.signal
+        }).finally(() => {
+          if (liveRefreshAbortController === abortController) {
+            liveRefreshAbortController = null;
+          }
+          liveRefreshRequest = null;
+          scheduleTrailingLiveRefresh();
+        });
+      };
+      const shouldKeepPollingLiveSemanticState = (proof: ProviderLinearWorkerProof): boolean => {
+        const progress = proof.progress ?? null;
+        return (
+          proof.owner_phase === 'turn_running'
+          && progress !== null
+          && progress.status !== 'completed'
+          && progress.status !== 'failed'
+        );
+      };
+      const scheduleLiveSemanticStallRefresh = (proof: ProviderLinearWorkerProof): void => {
+        clearLiveSemanticStallTimer();
+        if (liveRefreshClosed || !shouldKeepPollingLiveSemanticState(proof)) {
+          return;
+        }
+        liveSemanticStallTimer = setTimeout(() => {
+          liveSemanticStallTimer = null;
+          liveProofWrite = liveProofWrite
+            .then(async () => {
+              if (liveRefreshClosed || !shouldKeepPollingLiveSemanticState(finalProof)) {
+                return;
+              }
+              const hydratedProof = await writeProofSnapshot(
+                deps,
+                context.runDir,
+                auditPath,
+                {
+                  ...finalProof,
+                  updated_at: deps.now()
+                },
+                childEnv
+              );
+              finalProof = hydratedProof;
+              emitSemanticProgressIfChanged(hydratedProof);
+              queueLiveRefresh(hydratedProof);
+              scheduleLiveSemanticStallRefresh(hydratedProof);
+            })
+            .catch((error) => {
+              deps.log.warn(
+                `provider-linear-worker could not persist semantic stall refresh for ${context.issueIdentifier}: ${
+                  (error as Error)?.message ?? String(error)
+                }`
+              );
+            });
+        }, PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS);
       };
       const queueLiveProofWrite = (): void => {
         const liveThreadId = liveParseState.threadId ?? threadId;
@@ -2339,6 +2668,7 @@ export async function runProviderLinearWorker(
           rate_limits: liveParseState.rateLimits ?? finalProof.rate_limits,
           owner_phase: 'turn_running',
           owner_status: 'in_progress',
+          progress: finalProof.progress ?? null,
           updated_at: deps.now()
         };
         const signature = JSON.stringify({
@@ -2358,40 +2688,18 @@ export async function runProviderLinearWorker(
           return;
         }
         liveProofSignature = signature;
+        clearLiveSemanticStallTimer();
         finalProof = nextProof;
         liveProofWrite = liveProofWrite
           .then(async () => {
             const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
             finalProof = hydratedProof;
+            emitSemanticProgressIfChanged(hydratedProof);
+            scheduleLiveSemanticStallRefresh(hydratedProof);
             if (liveRefreshClosed) {
               return;
             }
-            const nowMs = Date.now();
-            if (nowMs - liveRefreshRequestedAtMs < 1_000 || liveRefreshRequest !== null) {
-              liveRefreshPending = true;
-              scheduleTrailingLiveRefresh();
-              return;
-            }
-            liveRefreshPending = false;
-            liveRefreshRequestedAtMs = nowMs;
-            const abortController = new AbortController();
-            liveRefreshAbortController = abortController;
-            liveRefreshRequest = requestProviderControlHostRefresh({
-              currentManifestPath: context.manifestPath,
-              env,
-              manifest: context.manifest,
-              proof: hydratedProof,
-              repoRoot: context.repoRoot,
-              log: deps.log,
-              allowInProgress: true,
-              abortSignal: abortController.signal
-            }).finally(() => {
-              if (liveRefreshAbortController === abortController) {
-                liveRefreshAbortController = null;
-              }
-              liveRefreshRequest = null;
-              scheduleTrailingLiveRefresh();
-            });
+            queueLiveRefresh(hydratedProof);
           })
           .catch((error) => {
             deps.log.warn(
@@ -2457,6 +2765,7 @@ export async function runProviderLinearWorker(
           onStdoutChunk: handleLiveStdoutChunk
         });
       } catch (error) {
+        clearLiveSemanticStallTimer();
         finalProof = {
           ...finalProof,
           owner_phase: 'ended',
@@ -2467,6 +2776,7 @@ export async function runProviderLinearWorker(
         finalProof = await persistProof(finalProof);
         throw error instanceof Error ? error : new Error(String(error));
       }
+      clearLiveSemanticStallTimer();
       flushLiveStdoutTail();
       await liveProofWrite;
       const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
@@ -2474,9 +2784,9 @@ export async function runProviderLinearWorker(
       turnId = parsed.turnId ?? turnId;
       const session = deriveLatestTurnSessionId({ threadId, turnId });
 
-      finalProof = {
-        issue_id: context.issueId,
-        issue_identifier: context.issueIdentifier,
+        finalProof = {
+          issue_id: context.issueId,
+          issue_identifier: context.issueIdentifier,
         attempt_started_at: finalProof.attempt_started_at,
         pid: workerPid,
         thread_id: threadId,
@@ -2492,12 +2802,15 @@ export async function runProviderLinearWorker(
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
         owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
         workspace_path: context.workspacePath,
-        source_setup: context.sourceSetup,
-        linear_audit: finalProof.linear_audit,
-        tracked_issue_error: null,
-        end_reason: null,
-        updated_at: deps.now()
-      };
+          source_setup: context.sourceSetup,
+          linear_audit: finalProof.linear_audit,
+          child_streams: finalProof.child_streams,
+          child_lanes: finalProof.child_lanes,
+          progress: finalProof.progress ?? null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: deps.now()
+        };
       finalProof = await persistProof(finalProof);
 
       if (execResult.exitCode !== 0) {
