@@ -4699,7 +4699,9 @@ describe('provider linear worker runner', () => {
       ].join('\n'),
       'utf8'
     );
+    const hintedMtime = new Date('2026-03-21T09:00:01.000Z');
     const staleMtime = new Date('2026-03-21T09:00:02.000Z');
+    await utimes(sessionLogPath, hintedMtime, hintedMtime);
     await utimes(staleSessionLogPath, staleMtime, staleMtime);
 
     const writeProof = vi.fn(async () => undefined);

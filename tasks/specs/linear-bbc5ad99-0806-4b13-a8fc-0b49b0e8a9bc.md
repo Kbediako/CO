@@ -18,6 +18,8 @@ review_notes:
   - 2026-04-05: Pre-implementation audit confirmed the remaining lane is the live root control-host truth path for `Tokens`, `TOKENS`, `SESSION`, `Throughput`, and Codex `5-hour` / `weekly`, with the active seams in `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `orchestrator/src/cli/control/compatibilityIssuePresenter.ts`, `orchestrator/src/cli/control/controlRuntime.ts`, `orchestrator/src/cli/control/controlStatusDashboard.ts`, and `orchestrator/src/cli/control/selectedRunProjection.ts`.
   - 2026-04-05: Current truth is not a layout-only issue: `controlStatusDashboard.ts` already contains the protected labels/columns and rate-limit labels, while `controlRuntime.ts` and the provider-worker proof path still determine whether authoritative root-host telemetry reaches those surfaces during active runs.
   - 2026-04-05: Issue-quality review approves one bounded root telemetry lane over runtime parse, proof persistence, root aggregation/projection, terminal rendering, and direct root-host proof. Browser redesign, workspace-only proof validation, and synthetic telemetry remain out of scope.
+  - 2026-04-05: Audited `docs-review` succeeded in `.runs/linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc-co-98-docs-review/cli/2026-04-05T13-36-14-575Z-1c06d24e/manifest.json` and review telemetry reported `status=succeeded`, `review_outcome=clean-success`.
+  - 2026-04-05: Implementation restored root-host session/token/throughput/Codex rate-limit truth via authoritative appserver session-log hydration, in-progress selected-run proof refresh, dashboard `window_minutes` rendering, and a follow-up exact-issue-identifier matcher fix after PR review flagged the `CO-2` / `CO-20` collision case.
 ---
 
 # Technical Specification
@@ -103,7 +105,7 @@ This lane therefore needs one coherent pass across runtime parse, proof persiste
 
 ## Approvals
 
-- Reviewer: pending `codex-orchestrator docs-review`
+- Reviewer: `codex-orchestrator docs-review`
 - Date: `2026-04-05`
-- Manifest: pending
-- Review telemetry: pending
+- Manifest: `.runs/linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc-co-98-docs-review/cli/2026-04-05T13-36-14-575Z-1c06d24e/manifest.json`
+- Review telemetry: `.runs/linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc-co-98-docs-review/cli/2026-04-05T13-36-14-575Z-1c06d24e/review/telemetry.json`
