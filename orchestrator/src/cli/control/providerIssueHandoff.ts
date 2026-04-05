@@ -35,6 +35,7 @@ import {
   readProviderIntakeClaim,
   type ProviderLaunchSource,
   type ProviderIntakeClaimRecord,
+  type ProviderIntakeClaimState,
   type ProviderIntakeState,
   type ProviderTaskMappingSource,
   upsertProviderIntakeClaim
@@ -376,12 +377,13 @@ export function createProviderIssueHandoffService(
       sourceSetup: resolveMergeCloseoutSourceSetup(),
       repoRoot
     });
+    const claimState = resolveProviderMergeCloseoutClaimState(mergeCloseout);
     return await upsertProviderClaimAndPersist({
       ...input.claim,
       issue_state: mergeCloseout.issue_state,
       issue_state_type: mergeCloseout.issue_state_type,
       issue_updated_at: mergeCloseout.issue_updated_at,
-      state: 'completed',
+      state: claimState,
       reason: resolveProviderMergeCloseoutClaimReason(mergeCloseout),
       task_id: input.latestRun?.taskId ?? input.claim.task_id,
       run_id: input.latestRun?.runId ?? input.claim.run_id,
@@ -3343,6 +3345,21 @@ function resolveProviderMergeCloseoutClaimReason(
     case 'watching':
     default:
       return 'provider_issue_merge_closeout_watching';
+  }
+}
+
+function resolveProviderMergeCloseoutClaimState(
+  mergeCloseout: ProviderMergeCloseoutRecord
+): ProviderIntakeClaimState {
+  switch (mergeCloseout.status) {
+    case 'action_required':
+    case 'merge_failed':
+    case 'transition_failed':
+      return 'handoff_failed';
+    case 'watching':
+    case 'merged':
+    default:
+      return 'completed';
   }
 }
 

@@ -146,8 +146,8 @@ last_review: 2026-04-05
   - rely on the new bounded merge-closeout watchdog signal rather than operator polling alone
 
 ## Open Questions
-- Whether the minimal truthful implementation can keep merge-closeout detail entirely on the proof sidecar, or whether a compact claim-level arming snapshot is required for control-host correctness. Prefer proof-first unless tests show claim persistence is necessary.
+- Resolved on 2026-04-05: keep merge-closeout truth on both the proof sidecar and the compact intake-claim `merge_closeout` snapshot. The claim-level record is required for control-host refresh correctness, while the proof remains the detailed worker artifact.
 
 ## Approvals
-- Reviewer: pending docs-review
-- Date: 2026-04-05
+- Reviewer: docs-review child stream (`.runs/linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7-co-80-docs-review/cli/2026-04-04T15-45-52-765Z-8416294b/manifest.json`)
+- Date: 2026-04-04

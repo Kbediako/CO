@@ -116,7 +116,8 @@ describe('runProviderDeterministicMergeCloseout', () => {
           issue: {
             id: 'lin-issue-1',
             identifier: 'CO-80',
-            state: { id: 'state-done', name: 'Done', type: 'completed' }
+            state: { id: 'state-done', name: 'Done', type: 'completed' },
+            updated_at: '2026-04-05T00:00:10.000Z'
           },
           previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
           target_state: { id: 'state-done', name: 'Done', type: 'completed' },
@@ -145,9 +146,11 @@ describe('runProviderDeterministicMergeCloseout', () => {
         status: 'transitioned',
         target_state: 'Done',
         issue_state: 'Done',
-        issue_state_type: 'completed'
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T00:00:10.000Z'
       }
     });
+    expect(result.issue_updated_at).toBe('2026-04-05T00:00:10.000Z');
     expect(fetchSnapshot).toHaveBeenCalledTimes(2);
     expect(runCommand).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -248,7 +251,8 @@ describe('runProviderDeterministicMergeCloseout', () => {
           issue: {
             id: 'lin-issue-1',
             identifier: 'CO-80',
-            state: { id: 'state-done', name: 'Done', type: 'completed' }
+            state: { id: 'state-done', name: 'Done', type: 'completed' },
+            updated_at: '2026-04-05T00:02:05.000Z'
           },
           previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
           target_state: { id: 'state-done', name: 'Done', type: 'completed' },
@@ -269,9 +273,11 @@ describe('runProviderDeterministicMergeCloseout', () => {
         status: 'transitioned',
         target_state: 'Done',
         issue_state: 'Done',
-        issue_state_type: 'completed'
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T00:02:05.000Z'
       }
     });
+    expect(result.issue_updated_at).toBe('2026-04-05T00:02:05.000Z');
     expect(fetchSnapshot).toHaveBeenCalledTimes(1);
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
   });

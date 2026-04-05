@@ -420,7 +420,7 @@ export async function runProviderDeterministicMergeCloseout(
         target_state: transitionResult.target_state.name,
         issue_state: transitionResult.issue.state?.name ?? null,
         issue_state_type: transitionResult.issue.state?.type ?? null,
-        issue_updated_at: currentIssueUpdatedAt,
+        issue_updated_at: transitionResult.issue.updated_at ?? currentIssueUpdatedAt,
         error: null
       }
     : {

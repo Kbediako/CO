@@ -42,5 +42,6 @@
 - [x] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: Linear workpad comment `2283d72b-14d9-4964-b4b1-d4feabc775bc`.
 - [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
 - [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge commit `9fadab726`.
+- [ ] All actionable review threads resolved or waiver recorded before review-state transition. Evidence: pending.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [ ] Issue moved to the actual team review state (`In Review`) only after coding stops. Evidence: pending.
