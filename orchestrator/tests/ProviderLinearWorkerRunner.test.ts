@@ -907,6 +907,28 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
   });
 
+  it('parses non-payload snake-case rate-limit envelopes from appserver notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rate_limits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
   it('ignores unrenderable rate-limit snapshots that would overwrite useful telemetry', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [

@@ -1095,6 +1095,7 @@ function extractProviderWorkerRateLimits(input: unknown): Record<string, unknown
     ['rate_limits'],
     ['payload', 'rate_limits'],
     ['params', 'rateLimits'],
+    ['params', 'rate_limits'],
     ['payload', 'params', 'rateLimits'],
     ['payload', 'params', 'rate_limits'],
     ['params', 'msg', 'payload', 'info', 'rate_limits'],
