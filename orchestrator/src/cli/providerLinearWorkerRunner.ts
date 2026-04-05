@@ -1120,30 +1120,13 @@ function extractProviderWorkerRateLimits(input: unknown): Record<string, unknown
 function isProviderWorkerRateLimitsRecord(input: Record<string, unknown>): boolean {
   const primary = isRecord(input.primary) ? input.primary : null;
   const secondary = isRecord(input.secondary) ? input.secondary : null;
-  const credits = isRecord(input.credits) ? input.credits : null;
-  const hasBucket = Boolean(primary || secondary || credits);
-  if (!hasBucket) {
-    return false;
-  }
-  return (
-    hasProviderWorkerRateLimitBucketSummary(primary) ||
-    hasProviderWorkerRateLimitBucketSummary(secondary) ||
-    hasProviderWorkerRateLimitCreditsSummary(credits)
-  );
+  return hasProviderWorkerRateLimitBucketSummary(primary) || hasProviderWorkerRateLimitBucketSummary(secondary);
 }
 
 function humanizeProviderWorkerMethod(method: string, input: Record<string, unknown>): string | null {
   switch (method.toLowerCase()) {
     case 'thread/tokenusage/updated': {
-      const usage = normalizeProviderWorkerTokenUsage(
-        findRecordAtPaths(input, [
-          ['params', 'tokenUsage', 'total'],
-          ['payload', 'params', 'tokenUsage', 'total'],
-          ['params', 'usage'],
-          ['payload', 'params', 'usage'],
-          ['usage']
-        ])
-      );
+      const usage = extractProviderWorkerTokenUsage(input);
       const usageSummary = formatProviderWorkerTokenUsageSummary(usage);
       return usageSummary ? `thread token usage updated (${usageSummary})` : 'thread token usage updated';
     }
@@ -1294,18 +1277,6 @@ function hasProviderWorkerRateLimitBucketSummary(bucket: Record<string, unknown>
     readProviderWorkerNumericField(bucket, ['remaining']) !== null ||
     readProviderWorkerNumericField(bucket, ['limit']) !== null ||
     readProviderWorkerNumericField(bucket, ['usedPercent', 'used_percent']) !== null
-  );
-}
-
-function hasProviderWorkerRateLimitCreditsSummary(bucket: Record<string, unknown> | null): boolean {
-  if (!bucket) {
-    return false;
-  }
-  return (
-    readProviderWorkerNumericField(bucket, ['balance']) !== null ||
-    typeof bucket.unlimited === 'boolean' ||
-    typeof bucket.has_credits === 'boolean' ||
-    typeof bucket.hasCredits === 'boolean'
   );
 }
 

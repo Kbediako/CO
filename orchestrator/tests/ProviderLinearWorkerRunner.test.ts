@@ -834,6 +834,21 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.100Z');
   });
 
+  it('keeps token-update humanization aligned with parser-supported tokenUsage shapes', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"inputTokens":7,"outputTokens":5,"totalTokens":12}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 7,
+      output_tokens: 5,
+      total_tokens: 12
+    });
+    expect(parsed.finalMessage).toBe('thread token usage updated (in 7 / out 5 / total 12)');
+  });
+
   it('parses Codex usage-window rate limits without a legacy limit id', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -897,6 +912,27 @@ describe('provider linear worker runner', () => {
       [
         '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
         '{"rate_limits":{"limit_id":"coding","primary":{"reset_at":"2026-03-21T10:00:00.000Z"}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+  });
+
+  it('ignores credits-only rate-limit snapshots that would overwrite useful windows', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}',
+        '{"rate_limits":{"credits":{"balance":123}}}'
       ].join('\n')
     );
 
