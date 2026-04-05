@@ -920,4 +920,100 @@ describe('ObservabilityApiController', () => {
       })
     ]);
   });
+
+  it('preserves authoritative provider debug snapshots on compatibility issue payloads', () => {
+    const runningSource = buildCompatibilitySource('task-1311-merge-closeout', {
+      providerDebugSnapshot: {
+        live_linear_state: {
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-20T00:02:00.000Z'
+        },
+        claim: {
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          updated_at: '2026-03-20T00:01:30.000Z',
+          run_id: 'run-merge-closeout',
+          launch_source: 'control-host',
+          launch_started_at: '2026-03-20T00:00:00.000Z',
+          freshness: 'rehydrated',
+          is_rehydrated: true,
+          rehydrated_at: '2026-03-20T00:01:00.000Z'
+        },
+        worker: null,
+        pull_request: {
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82,
+          merge_closeout_status: 'watching',
+          reason: 'checks_pending',
+          summary: 'Waiting for required checks before merge.',
+          ready_to_merge: false,
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          unresolved_thread_count: 0,
+          checks_pending: 2,
+          checks_failed: 0,
+          required_checks_pending: 2,
+          required_checks_failed: 0,
+          gate_reasons: ['required_checks_pending'],
+          action_required_reasons: [],
+          updated_at: '2026-03-20T00:02:00.000Z',
+          merged_at: null
+        },
+        progress: {
+          phase: 'waiting_on_checks',
+          kind: 'merge_closeout',
+          status: 'waiting',
+          summary: 'Waiting for required checks before merge.',
+          last_semantic_progress_at: '2026-03-20T00:02:00.000Z',
+          stall_classification: 'waiting_on_checks',
+          stall_reason: 'required_checks_pending',
+          recovery_recommendation: 'wait_for_checks'
+        },
+        last_audit_operation: {
+          recorded_at: '2026-03-20T00:01:50.000Z',
+          operation: 'attach-pr',
+          ok: true,
+          action: 'attached',
+          state: 'Merging',
+          error_code: null,
+          error_message: null
+        },
+        last_semantic_progress_at: '2026-03-20T00:02:00.000Z',
+        stall_classification: 'waiting_on_checks',
+        stall_reason: 'required_checks_pending',
+        recovery_recommendation: 'wait_for_checks'
+      }
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: runningSource,
+      running: [runningSource],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20,
+        seconds_running: 120
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null
+    });
+
+    expect(
+      projection.issues.find((issue) => issue.issueIdentifier === 'task-1311-merge-closeout')?.payload
+        .provider_debug_snapshot
+    ).toMatchObject({
+      progress: {
+        phase: 'waiting_on_checks',
+        recovery_recommendation: 'wait_for_checks'
+      },
+      stall_classification: 'waiting_on_checks'
+    });
+  });
 });

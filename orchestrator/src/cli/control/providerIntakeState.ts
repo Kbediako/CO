@@ -2,6 +2,10 @@ import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderMergeCloseoutRecord } from './providerMergeCloseout.js';
+import {
+  deriveProviderIntakeClaimFreshness,
+  type ProviderIntakeClaimFreshness
+} from './providerIssueObservability.js';
 
 const PROVIDER_INTAKE_CLAIM_LIMIT = 128;
 
@@ -87,6 +91,9 @@ export interface ProviderIntakeSummaryPayload {
   state: ProviderIntakeSummaryState;
   reason: string | null;
   run_id: string | null;
+  freshness: ProviderIntakeClaimFreshness | null;
+  rehydrated_at: string | null;
+  is_rehydrated: boolean;
   updated_at: string;
 }
 
@@ -334,10 +341,15 @@ export function selectProviderIntakeClaim(
 export function buildProviderIntakeSummary(
   state: ProviderIntakeState | null | undefined
 ): ProviderIntakeSummaryPayload | null {
-  const claim = selectProviderIntakeClaim(state);
+  const normalizedState = normalizeProviderIntakeState(state);
+  const claim = selectProviderIntakeClaim(normalizedState);
   if (!claim) {
     return null;
   }
+  const freshness = deriveProviderIntakeClaimFreshness({
+    claim,
+    rehydrated_at: normalizedState.rehydrated_at
+  });
   return {
     provider: claim.provider,
     issue_id: claim.issue_id,
@@ -354,6 +366,9 @@ export function buildProviderIntakeSummary(
     state: deriveProviderIntakeSummaryState(claim),
     reason: claim.reason,
     run_id: claim.run_id,
+    freshness,
+    rehydrated_at: normalizedState.rehydrated_at,
+    is_rehydrated: freshness === 'rehydrated',
     updated_at: claim.updated_at
   };
 }

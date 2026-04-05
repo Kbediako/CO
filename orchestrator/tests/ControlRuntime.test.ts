@@ -1979,7 +1979,7 @@ describe('ControlRuntime', () => {
     }
   });
 
-  it('prefers an authoritative proof event over the generic in_progress fallback in running rows', async () => {
+  it('prefers semantic provider progress over the generic in_progress fallback in running rows', async () => {
     const fixture = await createFixture({
       taskId: 'task-1037-event-current'
     });
@@ -2013,7 +2013,7 @@ describe('ControlRuntime', () => {
       expect.objectContaining({
         issue_identifier: 'ISSUE-1037-EVENT',
         pid: '4242',
-        last_event: 'turn.completed',
+        last_event: 'turn_completed',
         last_message: 'Codex turn completed',
         last_event_at: '2026-03-07T00:29:30.000Z'
       })
@@ -2021,7 +2021,7 @@ describe('ControlRuntime', () => {
     expect(sameIssueRecord?.payload.running).toMatchObject({
       issue_identifier: 'ISSUE-1037-EVENT',
       pid: '4242',
-      last_event: 'turn.completed',
+      last_event: 'turn_completed',
       last_message: 'Codex turn completed',
       last_event_at: '2026-03-07T00:29:30.000Z'
     });

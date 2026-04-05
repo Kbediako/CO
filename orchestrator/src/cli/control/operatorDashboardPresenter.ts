@@ -99,6 +99,7 @@ export interface OperatorDashboardIssuePayload {
   attempts: ControlIssuePayload['attempts'];
   tracked: ControlIssuePayload['tracked'];
   provider_linear_worker_proof: ControlIssuePayload['provider_linear_worker_proof'] | null;
+  provider_debug_snapshot?: ControlIssuePayload['provider_debug_snapshot'] | null;
   is_selected: boolean;
 }
 
@@ -217,6 +218,7 @@ function buildIssuePayload(
     attempts: issue.attempts,
     tracked: issue.tracked,
     provider_linear_worker_proof: proof,
+    provider_debug_snapshot: issue.provider_debug_snapshot ?? null,
     is_selected: isSelected
   };
 }

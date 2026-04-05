@@ -37,6 +37,10 @@ import {
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import { deriveDeterministicProviderMutationSuppressions } from './control/providerLinearWorkerTruth.js';
+import {
+  deriveProviderLinearWorkerProgressSnapshot,
+  type ProviderLinearWorkerProgressSnapshot
+} from './control/providerIssueObservability.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
 import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
@@ -109,6 +113,7 @@ const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
 const PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS = new Set<string>([
   'max_turns_reached_issue_still_active'
 ]);
+const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
   parse: (source: string) => unknown;
@@ -233,6 +238,7 @@ export interface ProviderLinearWorkerProof {
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
   child_lanes?: ProviderLinearWorkerChildLaneRecord[];
+  progress?: ProviderLinearWorkerProgressSnapshot | null;
   linear_budget?: LinearBudgetStatus | null;
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
   end_reason: string | null;
@@ -2271,12 +2277,19 @@ async function writeProofSnapshot(
 ): Promise<ProviderLinearWorkerProof> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
-    const hydratedProof = {
+    const proofWithHydratedSources = {
       ...proof,
       linear_audit: await summarizeProviderLinearAuditPath(auditPath),
       child_streams: await readProviderLinearWorkerChildStreams(runDir),
       child_lanes: await readProviderLinearWorkerChildLanes(runDir),
       linear_budget: linearBudget
+    };
+    const hydratedProof = {
+      ...proofWithHydratedSources,
+      progress: deriveProviderLinearWorkerProgressSnapshot({
+        proof: proofWithHydratedSources,
+        now: deps.now
+      })
     };
     await deps.writeProof(buildProofPath(runDir), hydratedProof);
     return hydratedProof;
@@ -2304,13 +2317,20 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     }
     const parsed = JSON.parse(raw) as ProviderLinearWorkerProof;
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
-    const hydrated: ProviderLinearWorkerProof = {
+    const proofWithHydratedSources: ProviderLinearWorkerProof = {
       ...parsed,
       linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
       child_streams: await readProviderLinearWorkerChildStreams(runDir),
       child_lanes: await readProviderLinearWorkerChildLanes(runDir),
       linear_budget: linearBudget,
       updated_at: now()
+    };
+    const hydrated: ProviderLinearWorkerProof = {
+      ...proofWithHydratedSources,
+      progress: deriveProviderLinearWorkerProgressSnapshot({
+        proof: proofWithHydratedSources,
+        now
+      })
     };
     await writeProof(proofPath, hydrated);
     return hydrated;
@@ -2378,14 +2398,33 @@ export async function runProviderLinearWorker(
     linear_audit: null,
     child_streams: [],
     child_lanes: [],
+    progress: null,
     tracked_issue_error: null,
     linear_budget: null,
     end_reason: null,
     updated_at: attemptStartedAt
   };
+  let lastProgressSignature: string | null = null;
+
+  const emitSemanticProgressIfChanged = (proof: ProviderLinearWorkerProof): void => {
+    const progress = proof.progress ?? null;
+    const signature = progress ? JSON.stringify(progress) : null;
+    if (!signature || signature === lastProgressSignature) {
+      return;
+    }
+    lastProgressSignature = signature;
+    deps.log.info(
+      `[provider-linear-worker-progress] ${JSON.stringify({
+        issue_id: proof.issue_id,
+        issue_identifier: proof.issue_identifier,
+        progress
+      })}`
+    );
+  };
 
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
     const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+    emitSemanticProgressIfChanged(hydratedProof);
     await requestProviderControlHostRefresh({
       currentManifestPath: context.manifestPath,
       env,
@@ -2454,8 +2493,16 @@ export async function runProviderLinearWorker(
   let liveRefreshAbortController: AbortController | null = null;
   let liveRefreshPending = false;
   let liveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  let liveSemanticStallTimer: ReturnType<typeof setTimeout> | null = null;
   let liveRefreshClosed = false;
   let liveProofWrite: Promise<void> = Promise.resolve();
+
+  const clearLiveSemanticStallTimer = (): void => {
+    if (liveSemanticStallTimer !== null) {
+      clearTimeout(liveSemanticStallTimer);
+      liveSemanticStallTimer = null;
+    }
+  };
 
   const cancelLiveRefreshState = async (): Promise<void> => {
     liveRefreshClosed = true;
@@ -2464,6 +2511,7 @@ export async function runProviderLinearWorker(
       clearTimeout(liveRefreshTimer);
       liveRefreshTimer = null;
     }
+    clearLiveSemanticStallTimer();
     await liveProofWrite;
     if (liveRefreshRequest !== null) {
       liveRefreshAbortController?.abort();
@@ -2519,8 +2567,84 @@ export async function runProviderLinearWorker(
             }
             liveRefreshRequest = null;
             scheduleTrailingLiveRefresh();
-          });
+            });
         }, waitMs);
+      };
+      const queueLiveRefresh = (proof: ProviderLinearWorkerProof): void => {
+        if (liveRefreshClosed) {
+          return;
+        }
+        const nowMs = Date.now();
+        if (nowMs - liveRefreshRequestedAtMs < 1_000 || liveRefreshRequest !== null) {
+          liveRefreshPending = true;
+          scheduleTrailingLiveRefresh();
+          return;
+        }
+        liveRefreshPending = false;
+        liveRefreshRequestedAtMs = nowMs;
+        const abortController = new AbortController();
+        liveRefreshAbortController = abortController;
+        liveRefreshRequest = requestProviderControlHostRefresh({
+          currentManifestPath: context.manifestPath,
+          env,
+          manifest: context.manifest,
+          proof,
+          repoRoot: context.repoRoot,
+          log: deps.log,
+          allowInProgress: true,
+          abortSignal: abortController.signal
+        }).finally(() => {
+          if (liveRefreshAbortController === abortController) {
+            liveRefreshAbortController = null;
+          }
+          liveRefreshRequest = null;
+          scheduleTrailingLiveRefresh();
+        });
+      };
+      const shouldKeepPollingLiveSemanticState = (proof: ProviderLinearWorkerProof): boolean => {
+        const progress = proof.progress ?? null;
+        return (
+          proof.owner_phase === 'turn_running'
+          && progress !== null
+          && progress.status !== 'completed'
+          && progress.status !== 'failed'
+        );
+      };
+      const scheduleLiveSemanticStallRefresh = (proof: ProviderLinearWorkerProof): void => {
+        clearLiveSemanticStallTimer();
+        if (liveRefreshClosed || !shouldKeepPollingLiveSemanticState(proof)) {
+          return;
+        }
+        liveSemanticStallTimer = setTimeout(() => {
+          liveSemanticStallTimer = null;
+          liveProofWrite = liveProofWrite
+            .then(async () => {
+              if (liveRefreshClosed || !shouldKeepPollingLiveSemanticState(finalProof)) {
+                return;
+              }
+              const hydratedProof = await writeProofSnapshot(
+                deps,
+                context.runDir,
+                auditPath,
+                {
+                  ...finalProof,
+                  updated_at: deps.now()
+                },
+                childEnv
+              );
+              finalProof = hydratedProof;
+              emitSemanticProgressIfChanged(hydratedProof);
+              queueLiveRefresh(hydratedProof);
+              scheduleLiveSemanticStallRefresh(hydratedProof);
+            })
+            .catch((error) => {
+              deps.log.warn(
+                `provider-linear-worker could not persist semantic stall refresh for ${context.issueIdentifier}: ${
+                  (error as Error)?.message ?? String(error)
+                }`
+              );
+            });
+        }, PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS);
       };
       const queueLiveProofWrite = (): void => {
         const liveThreadId = liveParseState.threadId ?? threadId;
@@ -2544,6 +2668,7 @@ export async function runProviderLinearWorker(
           rate_limits: liveParseState.rateLimits ?? finalProof.rate_limits,
           owner_phase: 'turn_running',
           owner_status: 'in_progress',
+          progress: finalProof.progress ?? null,
           updated_at: deps.now()
         };
         const signature = JSON.stringify({
@@ -2563,40 +2688,18 @@ export async function runProviderLinearWorker(
           return;
         }
         liveProofSignature = signature;
+        clearLiveSemanticStallTimer();
         finalProof = nextProof;
         liveProofWrite = liveProofWrite
           .then(async () => {
             const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
             finalProof = hydratedProof;
+            emitSemanticProgressIfChanged(hydratedProof);
+            scheduleLiveSemanticStallRefresh(hydratedProof);
             if (liveRefreshClosed) {
               return;
             }
-            const nowMs = Date.now();
-            if (nowMs - liveRefreshRequestedAtMs < 1_000 || liveRefreshRequest !== null) {
-              liveRefreshPending = true;
-              scheduleTrailingLiveRefresh();
-              return;
-            }
-            liveRefreshPending = false;
-            liveRefreshRequestedAtMs = nowMs;
-            const abortController = new AbortController();
-            liveRefreshAbortController = abortController;
-            liveRefreshRequest = requestProviderControlHostRefresh({
-              currentManifestPath: context.manifestPath,
-              env,
-              manifest: context.manifest,
-              proof: hydratedProof,
-              repoRoot: context.repoRoot,
-              log: deps.log,
-              allowInProgress: true,
-              abortSignal: abortController.signal
-            }).finally(() => {
-              if (liveRefreshAbortController === abortController) {
-                liveRefreshAbortController = null;
-              }
-              liveRefreshRequest = null;
-              scheduleTrailingLiveRefresh();
-            });
+            queueLiveRefresh(hydratedProof);
           })
           .catch((error) => {
             deps.log.warn(
@@ -2662,6 +2765,7 @@ export async function runProviderLinearWorker(
           onStdoutChunk: handleLiveStdoutChunk
         });
       } catch (error) {
+        clearLiveSemanticStallTimer();
         finalProof = {
           ...finalProof,
           owner_phase: 'ended',
@@ -2672,6 +2776,7 @@ export async function runProviderLinearWorker(
         finalProof = await persistProof(finalProof);
         throw error instanceof Error ? error : new Error(String(error));
       }
+      clearLiveSemanticStallTimer();
       flushLiveStdoutTail();
       await liveProofWrite;
       const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
@@ -2679,9 +2784,9 @@ export async function runProviderLinearWorker(
       turnId = parsed.turnId ?? turnId;
       const session = deriveLatestTurnSessionId({ threadId, turnId });
 
-      finalProof = {
-        issue_id: context.issueId,
-        issue_identifier: context.issueIdentifier,
+        finalProof = {
+          issue_id: context.issueId,
+          issue_identifier: context.issueIdentifier,
         attempt_started_at: finalProof.attempt_started_at,
         pid: workerPid,
         thread_id: threadId,
@@ -2697,12 +2802,15 @@ export async function runProviderLinearWorker(
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
         owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
         workspace_path: context.workspacePath,
-        source_setup: context.sourceSetup,
-        linear_audit: finalProof.linear_audit,
-        tracked_issue_error: null,
-        end_reason: null,
-        updated_at: deps.now()
-      };
+          source_setup: context.sourceSetup,
+          linear_audit: finalProof.linear_audit,
+          child_streams: finalProof.child_streams,
+          child_lanes: finalProof.child_lanes,
+          progress: finalProof.progress ?? null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: deps.now()
+        };
       finalProof = await persistProof(finalProof);
 
       if (execResult.exitCode !== 0) {
