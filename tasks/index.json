@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260406-linear-7f1931f8-cfd0-4698-951e-df1c3984a337",
+      "title": "CO STATUS: bound provider proof session-log refresh cost",
+      "relates_to": "tasks/tasks-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-06",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md",
+        "task": "tasks/tasks-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md",
+        "agent_task": ".agent/task/linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md",
+        "docs": "docs/TECH_SPEC-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md"
+      }
+    },
+    {
       "id": "20260405-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc",
       "title": "CO STATUS: restore live root control-host Codex session, token, throughput, and 5-hour/weekly rate-limit telemetry after CO-83",
       "relates_to": "tasks/tasks-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc.md",

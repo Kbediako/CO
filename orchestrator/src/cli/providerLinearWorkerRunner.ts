@@ -67,6 +67,8 @@ export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-pro
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-worker-child-streams.json';
 export const PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME = 'provider-linear-worker-child-lanes.json';
+const PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME =
+  'provider-linear-worker-session-log-hydration.json';
 const PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_PROOF_FILENAME}.lock`;
 const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME}.lock`;
 const PROVIDER_LINEAR_WORKER_CHILD_LANES_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME}.lock`;
@@ -295,9 +297,21 @@ interface ProviderWorkerSessionLogTailState {
   bootstrapPending: boolean;
 }
 
+interface ProviderWorkerSessionLogHydrationState {
+  path: string;
+  offset_bytes: number;
+  trailing_text: string;
+  bootstrap_pending: boolean;
+}
+
 interface ProviderControlHostManifestTarget {
   currentRun: ProviderWorkerRunLocation;
   manifestPath: string;
+}
+
+interface ProviderLinearWorkerSessionLogHydrationResult {
+  proof: ProviderLinearWorkerProof;
+  hydrationState: ProviderWorkerSessionLogHydrationState | null;
 }
 
 export interface ProviderLinearWorkerDependencies {
@@ -1581,6 +1595,62 @@ function resetProviderWorkerSessionLogTailState(state: ProviderWorkerSessionLogT
   state.bootstrapPending = true;
 }
 
+function normalizeProviderWorkerSessionLogHydrationState(
+  value: unknown
+): ProviderWorkerSessionLogHydrationState | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const path = normalizeOptionalString(value.path);
+  const offsetBytes =
+    typeof value.offset_bytes === 'number' && Number.isFinite(value.offset_bytes) && value.offset_bytes >= 0
+      ? value.offset_bytes
+      : null;
+  if (!path || offsetBytes === null) {
+    return null;
+  }
+  return {
+    path,
+    offset_bytes: offsetBytes,
+    trailing_text: typeof value.trailing_text === 'string' ? value.trailing_text : '',
+    bootstrap_pending: typeof value.bootstrap_pending === 'boolean' ? value.bootstrap_pending : true
+  };
+}
+
+function buildProviderWorkerSessionLogTailState(
+  path: string,
+  hydrationState: ProviderWorkerSessionLogHydrationState | null
+): ProviderWorkerSessionLogTailState {
+  if (!hydrationState || hydrationState.path !== path) {
+    return {
+      path,
+      offsetBytes: 0,
+      trailingText: '',
+      bootstrapPending: true
+    };
+  }
+  return {
+    path,
+    offsetBytes: hydrationState.offset_bytes,
+    trailingText: hydrationState.trailing_text,
+    bootstrapPending: hydrationState.bootstrap_pending
+  };
+}
+
+function snapshotProviderWorkerSessionLogTailState(
+  state: ProviderWorkerSessionLogTailState
+): ProviderWorkerSessionLogHydrationState | null {
+  if (!state.path) {
+    return null;
+  }
+  return {
+    path: state.path,
+    offset_bytes: state.offsetBytes,
+    trailing_text: state.trailingText,
+    bootstrap_pending: state.bootstrapPending
+  };
+}
+
 async function readProviderWorkerSessionLogDelta(
   state: ProviderWorkerSessionLogTailState
 ): Promise<string> {
@@ -1696,10 +1766,14 @@ function flushProviderWorkerSessionLogTail(
   tailState: ProviderWorkerSessionLogTailState
 ): boolean {
   const trailingLine = tailState.trailingText.trim();
-  tailState.trailingText = '';
   if (!trailingLine) {
+    tailState.trailingText = '';
     return false;
   }
+  if (!parseProviderWorkerSessionJsonlLine(trailingLine)) {
+    return false;
+  }
+  tailState.trailingText = '';
   const shouldBootstrap = tailState.bootstrapPending;
   tailState.bootstrapPending = false;
   const trailingLines = shouldBootstrap
@@ -1799,12 +1873,16 @@ function shouldAdvanceProviderLinearWorkerProofUpdatedAt(
 
 async function hydrateProviderLinearWorkerProofFromSessionLog(
   proof: ProviderLinearWorkerProof,
-  env: NodeJS.ProcessEnv
-): Promise<ProviderLinearWorkerProof> {
+  env: NodeJS.ProcessEnv,
+  hydrationState: ProviderWorkerSessionLogHydrationState | null = null
+): Promise<ProviderLinearWorkerSessionLogHydrationResult> {
   const workspacePath = normalizeOptionalString(proof.workspace_path);
   const issueIdentifier = normalizeOptionalString(proof.issue_identifier);
   if (!workspacePath || !issueIdentifier) {
-    return proof;
+    return {
+      proof,
+      hydrationState: null
+    };
   }
   const discoveryEnv =
     typeof proof.thread_id === 'string' && proof.thread_id.trim().length > 0
@@ -1822,10 +1900,16 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       startedAt: proof.attempt_started_at ?? null
     });
   } catch {
-    return proof;
+    return {
+      proof,
+      hydrationState: null
+    };
   }
   if (!sessionLogPath) {
-    return proof;
+    return {
+      proof,
+      hydrationState: null
+    };
   }
 
   const parseState: ProviderLinearWorkerJsonlParseResult = {
@@ -1837,12 +1921,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
     rateLimits: proof.rate_limits
   };
-  const tailState: ProviderWorkerSessionLogTailState = {
-    path: sessionLogPath,
-    offsetBytes: 0,
-    trailingText: '',
-    bootstrapPending: true
-  };
+  const tailState = buildProviderWorkerSessionLogTailState(sessionLogPath, hydrationState);
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
@@ -1850,7 +1929,10 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     }
     flushProviderWorkerSessionLogTail(parseState, tailState);
   } catch {
-    return proof;
+    return {
+      proof,
+      hydrationState: null
+    };
   }
 
   const liveThreadId = parseState.threadId ?? proof.thread_id;
@@ -1861,17 +1943,20 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     turnId: liveTurnId
   });
   return {
-    ...proof,
-    thread_id: liveThreadId,
-    latest_turn_id: liveTurnId,
-    latest_session_id: session.sessionId ?? proof.latest_session_id,
-    latest_session_id_source: session.source ?? proof.latest_session_id_source,
-    tokens: hasProviderWorkerTokenUsage(parseState.tokens)
-      ? parseState.tokens
-      : liveTurnChanged
-        ? buildEmptyProviderLinearWorkerTokenUsage()
-        : proof.tokens,
-    rate_limits: parseState.rateLimits ?? (liveTurnChanged ? null : proof.rate_limits)
+    proof: {
+      ...proof,
+      thread_id: liveThreadId,
+      latest_turn_id: liveTurnId,
+      latest_session_id: session.sessionId ?? proof.latest_session_id,
+      latest_session_id_source: session.source ?? proof.latest_session_id_source,
+      tokens: hasProviderWorkerTokenUsage(parseState.tokens)
+        ? parseState.tokens
+        : liveTurnChanged
+          ? buildEmptyProviderLinearWorkerTokenUsage()
+          : proof.tokens,
+      rate_limits: parseState.rateLimits ?? (liveTurnChanged ? null : proof.rate_limits)
+    },
+    hydrationState: snapshotProviderWorkerSessionLogTailState(tailState)
   };
 }
 
@@ -2063,6 +2148,10 @@ function buildProofPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
 }
 
+function buildProofSessionLogHydrationPath(runDir: string): string {
+  return resolve(runDir, PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME);
+}
+
 function buildProofLockPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME);
 }
@@ -2081,6 +2170,24 @@ function buildChildLanesPath(runDir: string): string {
 
 function buildChildLanesLockPath(runDir: string): string {
   return resolve(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_LOCK_FILENAME);
+}
+
+async function readProviderWorkerSessionLogHydrationState(
+  runDir: string
+): Promise<ProviderWorkerSessionLogHydrationState | null> {
+  try {
+    const raw = await readFile(buildProofSessionLogHydrationPath(runDir), 'utf8');
+    return normalizeProviderWorkerSessionLogHydrationState(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+async function writeProviderWorkerSessionLogHydrationState(
+  runDir: string,
+  hydrationState: ProviderWorkerSessionLogHydrationState | null
+): Promise<void> {
+  await writeJsonAtomic(buildProofSessionLogHydrationPath(runDir), hydrationState);
 }
 
 export async function readProviderLinearWorkerChildStreams(
@@ -2874,6 +2981,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
 ): Promise<ProviderLinearWorkerProof | null> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
     const proofPath = buildProofPath(runDir);
+    const priorHydrationState = await readProviderWorkerSessionLogHydrationState(runDir);
     let raw: string;
     try {
       raw = await readFile(proofPath, 'utf8');
@@ -2893,10 +3001,12 @@ export async function refreshProviderLinearWorkerProofSnapshot(
       linear_budget: linearBudget,
       updated_at: parsed.updated_at ?? null
     };
-    const proofWithSessionTelemetry = await hydrateProviderLinearWorkerProofFromSessionLog(
+    const proofWithSessionTelemetryResult = await hydrateProviderLinearWorkerProofFromSessionLog(
       proofWithHydratedSources,
-      env
+      env,
+      priorHydrationState
     );
+    const proofWithSessionTelemetry = proofWithSessionTelemetryResult.proof;
     const hydratedWithoutUpdatedAt: ProviderLinearWorkerProof = {
       ...proofWithSessionTelemetry,
       progress: deriveProviderLinearWorkerProgressSnapshot({
@@ -2915,6 +3025,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
         : parsed.updated_at ?? null
     };
     await writeProof(proofPath, hydrated);
+    await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
     return hydrated;
   });
 }
