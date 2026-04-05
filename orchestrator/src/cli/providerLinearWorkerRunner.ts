@@ -1395,9 +1395,10 @@ function buildProviderWorkerSessionPromptNeedles(issue: {
   title?: string | null;
 }): string[] {
   const title = normalizeOptionalString(issue.title);
-  const needles = [`You are the provider worker for Linear issue ${issue.identifier}`];
+  const baseNeedle = `You are the provider worker for Linear issue ${issue.identifier}`;
+  const needles = [`${baseNeedle}:`];
   if (title) {
-    needles.unshift(`You are the provider worker for Linear issue ${issue.identifier}: ${title}`);
+    needles.unshift(`${baseNeedle}: ${title}`);
   }
   return needles;
 }

@@ -4883,6 +4883,137 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('matches appserver session logs by exact issue identifier when no thread hint is available', async () => {
+    const { runDir } = await createManifestRoot();
+    const issue = createTrackedIssue();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const codexHome = join(tempRoot ?? '', '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2030', '03', '21');
+    const matchingSessionLogPath = join(
+      sessionDir,
+      'rollout-2030-03-21T09-00-06-000Z-thread-2.jsonl'
+    );
+    const prefixCollisionSessionLogPath = join(
+      sessionDir,
+      'rollout-2030-03-21T09-00-07-000Z-thread-20.jsonl'
+    );
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      matchingSessionLogPath,
+      [
+        `{"timestamp":"2030-03-21T09:00:06.000Z","type":"session_meta","payload":{"id":"thread-2","cwd":"${tempRoot}","source":"exec"}}`,
+        `{"timestamp":"2030-03-21T09:00:06.050Z","type":"turn_context","payload":{"turn_id":"turn-2","user_instructions":"You are the provider worker for Linear issue ${issue.identifier}: ${issue.title}"}}`,
+        '{"timestamp":"2030-03-21T09:00:06.100Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":12,"output_tokens":8,"total_tokens":20}},"rate_limits":{"primary":{"used_percent":12.5,"window_minutes":300},"secondary":{"used_percent":48,"window_minutes":10080}}}}'
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      prefixCollisionSessionLogPath,
+      [
+        `{"timestamp":"2030-03-21T09:00:07.000Z","type":"session_meta","payload":{"id":"thread-20","cwd":"${tempRoot}","source":"exec"}}`,
+        '{"timestamp":"2030-03-21T09:00:07.050Z","type":"turn_context","payload":{"turn_id":"turn-20","user_instructions":"You are the provider worker for Linear issue CO-20: Different issue title"}}',
+        '{"timestamp":"2030-03-21T09:00:07.100Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":999,"output_tokens":1,"total_tokens":1000}},"rate_limits":{"primary":{"used_percent":99,"window_minutes":300},"secondary":{"used_percent":88,"window_minutes":10080}}}}'
+      ].join('\n'),
+      'utf8'
+    );
+    const matchingMtime = new Date('2030-03-21T09:00:06.000Z');
+    const prefixCollisionMtime = new Date('2030-03-21T09:00:07.000Z');
+    await utimes(matchingSessionLogPath, matchingMtime, matchingMtime);
+    await utimes(prefixCollisionSessionLogPath, prefixCollisionMtime, prefixCollisionMtime);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: issue.identifier,
+          attempt_started_at: '2030-03-21T09:00:05.000Z',
+          pid: '12345',
+          thread_id: null,
+          latest_turn_id: null,
+          latest_session_id: null,
+          latest_session_id_source: null,
+          turn_count: 1,
+          last_event: null,
+          last_message: null,
+          last_event_at: null,
+          tokens: {
+            input_tokens: null,
+            output_tokens: null,
+            total_tokens: null
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: tempRoot,
+          source_setup: null,
+          linear_audit: null,
+          child_streams: [],
+          child_lanes: [],
+          progress: null,
+          tracked_issue_error: null,
+          linear_budget: null,
+          end_reason: null,
+          updated_at: '2030-03-21T09:00:05.000Z'
+        } satisfies ProviderLinearWorkerProof,
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const proof = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2030-03-21T09:00:08.000Z',
+      undefined,
+      { ...process.env, CODEX_HOME: codexHome }
+    );
+    const onDisk = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-2-turn-2',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 48,
+          window_minutes: 10080
+        }
+      },
+      updated_at: '2030-03-21T09:00:08.000Z'
+    });
+    expect(onDisk).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-2-turn-2',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 48,
+          window_minutes: 10080
+        }
+      },
+      updated_at: '2030-03-21T09:00:08.000Z'
+    });
+  });
+
   it('bootstraps resumed session logs from the latest turn context instead of replaying prior-turn tokens', async () => {
     const { manifestPath } = await createManifestRoot();
     const issue = createTrackedIssue();
