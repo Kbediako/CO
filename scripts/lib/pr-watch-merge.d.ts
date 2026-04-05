@@ -73,6 +73,13 @@ export interface PrWatchMergeArgsOptions {
   headOid?: string | null;
 }
 
+export interface PrWatchMergeSnapshotInput {
+  owner: string;
+  repo: string;
+  prNumber: number;
+  readinessMode?: 'merge' | 'review';
+}
+
 export function printPrWatchMergeHelp(options?: PrWatchMergeOptions): void;
 
 export function isHumanReviewActor(
@@ -177,6 +184,7 @@ export function resolveBotRereviewTimingForKind(params: {
   inProgressAtMs: number | null;
 };
 
+export function fetchPrStatusSnapshot(input: PrWatchMergeSnapshotInput): Promise<PrWatchMergeSnapshot>;
 export function buildPrMergeArgs(options: PrWatchMergeArgsOptions): string[];
 
 export function runPrWatchMerge(argv: string[], options?: PrWatchMergeOptions): Promise<number>;

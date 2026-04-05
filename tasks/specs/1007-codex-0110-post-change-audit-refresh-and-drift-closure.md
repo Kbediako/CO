@@ -5,7 +5,7 @@ relates_to: docs/PRD-codex-0110-post-change-audit-refresh-and-drift-closure.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-03-05
+last_review: 2026-04-05
 ---
 
 ## Summary
