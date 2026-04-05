@@ -1403,21 +1403,23 @@ function buildProviderWorkerSessionPromptNeedles(issue: {
   return needles;
 }
 
-function buildProviderWorkerRecentSessionDayDirs(sessionRoot: string, referenceDate: Date): string[] {
+function buildProviderWorkerRecentSessionDayDirs(sessionRoot: string, referenceDates: readonly Date[]): string[] {
   const results: string[] = [];
   const seen = new Set<string>();
-  for (const dayOffset of [0, -1]) {
-    const current = new Date(referenceDate.getTime());
-    current.setDate(current.getDate() + dayOffset);
-    const dir = join(
-      sessionRoot,
-      String(current.getFullYear()),
-      String(current.getMonth() + 1).padStart(2, '0'),
-      String(current.getDate()).padStart(2, '0')
-    );
-    if (!seen.has(dir)) {
-      seen.add(dir);
-      results.push(dir);
+  for (const referenceDate of referenceDates) {
+    for (const dayOffset of [0, -1]) {
+      const current = new Date(referenceDate.getTime());
+      current.setDate(current.getDate() + dayOffset);
+      const dir = join(
+        sessionRoot,
+        String(current.getFullYear()),
+        String(current.getMonth() + 1).padStart(2, '0'),
+        String(current.getDate()).padStart(2, '0')
+      );
+      if (!seen.has(dir)) {
+        seen.add(dir);
+        results.push(dir);
+      }
     }
   }
   return results;
@@ -1486,6 +1488,7 @@ async function discoverProviderWorkerSessionLogPath(input: {
   const sessionRoot = join(resolveCodexHome(input.env), 'sessions');
   const startedAtMs = Date.parse(input.startedAt ?? '');
   const referenceDate = Number.isFinite(startedAtMs) ? new Date(startedAtMs) : new Date();
+  const currentDate = new Date();
   const cutoffMs = Number.isFinite(startedAtMs)
     ? startedAtMs - PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS
     : Date.now() - PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS;
@@ -1494,7 +1497,7 @@ async function discoverProviderWorkerSessionLogPath(input: {
   const sessionMetaNeedle = threadIdHint ? `"id":"${threadIdHint}"` : null;
   const candidates: Array<{ path: string; mtimeMs: number }> = [];
 
-  for (const dayDir of buildProviderWorkerRecentSessionDayDirs(sessionRoot, referenceDate)) {
+  for (const dayDir of buildProviderWorkerRecentSessionDayDirs(sessionRoot, [currentDate, referenceDate])) {
     let entries: string[];
     try {
       entries = await readdir(dayDir);
