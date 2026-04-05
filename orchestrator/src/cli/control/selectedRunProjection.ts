@@ -533,8 +533,10 @@ function buildSelectedRunLatestEvent(input: {
 function hasAuthoritativeProviderDebugEvidence(
   providerDebugSnapshot: ControlProviderDebugSnapshot
 ): boolean {
+  const hasFreshClaim =
+    providerDebugSnapshot.claim !== null && providerDebugSnapshot.claim.freshness !== 'stale';
   return Boolean(
-    providerDebugSnapshot.claim ||
+    hasFreshClaim ||
       providerDebugSnapshot.worker ||
       providerDebugSnapshot.pull_request ||
       providerDebugSnapshot.last_audit_operation
