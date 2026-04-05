@@ -355,6 +355,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const ownerPhase = normalizeOptionalString(proof?.owner_phase);
   const ownerStatus = normalizeOptionalString(proof?.owner_status);
   const endReason = normalizeOptionalString(proof?.end_reason);
+  const claimState = normalizeProviderLinearWorkflowState(claim?.state);
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(proof?.last_event_at),
     latestAudit?.recorded_at ?? null,
@@ -376,7 +377,19 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     };
   }
 
-  if (mergeCloseout) {
+  if (
+    mergeCloseout
+    && !(
+      claimState === 'stale'
+      && hasAuthoritativeWorkerProgressSignal({
+        proof,
+        ownerPhase,
+        ownerStatus,
+        endReason,
+        lastSemanticProgressAt
+      })
+    )
+  ) {
     return deriveMergeCloseoutProgressSnapshot(mergeCloseout);
   }
 
@@ -534,6 +547,26 @@ export function selectLatestProviderLinearAuditEntry(
     return null;
   }
   return entries.sort((left, right) => compareIsoTimestamp(right.recorded_at, left.recorded_at))[0] ?? null;
+}
+
+function hasAuthoritativeWorkerProgressSignal(input: {
+  proof: ProviderIssueProofLike | null;
+  ownerPhase: string | null;
+  ownerStatus: string | null;
+  endReason: string | null;
+  lastSemanticProgressAt: string | null;
+}): boolean {
+  if (!input.proof) {
+    return false;
+  }
+  return Boolean(
+    input.ownerPhase
+    || input.ownerStatus
+    || input.endReason
+    || input.lastSemanticProgressAt
+    || normalizeOptionalString(input.proof.last_event)
+    || normalizeOptionalString(input.proof.last_message)
+  );
 }
 
 function deriveMergeCloseoutProgressSnapshot(

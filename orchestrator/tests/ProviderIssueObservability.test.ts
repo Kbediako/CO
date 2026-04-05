@@ -254,6 +254,66 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('does not let stale merge closeout state mask live worker progress', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      tracked_issue: {
+        state: 'In Progress',
+        state_type: 'started'
+      },
+      claim: {
+        state: 'stale',
+        reason: 'provider_issue_stale',
+        updated_at: '2026-04-05T06:19:00.000Z',
+        run_id: 'run-82-live',
+        merge_closeout: {
+          recorded_at: '2026-04-05T06:21:00.000Z',
+          status: 'watching',
+          reason: 'checks_pending',
+          summary: 'Waiting for required checks before merge.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/82',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 82
+          },
+          snapshot: {
+            review_decision: 'APPROVED',
+            merge_state_status: 'BLOCKED',
+            ready_to_merge: false,
+            gate_reasons: ['required_checks_pending'],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 1,
+            checks_failed: 0,
+            required_checks_pending: 1,
+            required_checks_failed: 0,
+            updated_at: '2026-04-05T06:21:00.000Z',
+            merged_at: null
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Turn is still running.',
+        last_event_at: '2026-04-05T06:20:30.000Z',
+        updated_at: '2026-04-05T06:20:45.000Z',
+        linear_audit: null
+      },
+      now: () => '2026-04-05T06:21:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      kind: 'worker',
+      status: 'progressing',
+      stall_classification: 'progressing',
+      recovery_recommendation: 'continue_waiting'
+    });
+  });
+
   it('preserves merge closeout progress after a successful worker exit', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {
