@@ -130,6 +130,12 @@ async function writeCodexConfig(maxTurns: number): Promise<string> {
 }
 
 type ReadTrackedIssueInput = Parameters<ProviderLinearWorkerDependencies['readTrackedIssue']>[0];
+type PersistedSessionLogHydrationState = {
+  path: string;
+  offset_bytes: number;
+  trailing_text: string;
+  bootstrap_pending: boolean;
+};
 
 function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
   return {
@@ -162,6 +168,47 @@ function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): Li
     ],
     ...overrides
   };
+}
+
+function buildInProgressProof(
+  overrides: Partial<ProviderLinearWorkerProof> = {}
+): ProviderLinearWorkerProof {
+  return {
+    issue_id: 'lin-issue-1',
+    issue_identifier: 'CO-2',
+    attempt_started_at: '2026-03-21T09:00:00.000Z',
+    thread_id: 'thread-1',
+    latest_turn_id: null,
+    latest_session_id: null,
+    latest_session_id_source: null,
+    turn_count: 1,
+    last_event: 'item.completed',
+    last_message: null,
+    last_event_at: null,
+    tokens: {
+      input_tokens: null,
+      output_tokens: null,
+      total_tokens: null
+    },
+    rate_limits: null,
+    owner_phase: 'turn_running',
+    owner_status: 'in_progress',
+    workspace_path: tempRoot ?? '/tmp/workspace',
+    linear_audit: null,
+    end_reason: null,
+    updated_at: '2026-03-21T09:00:00.000Z',
+    ...overrides
+  };
+}
+
+function buildSessionLogHydrationPath(runDir: string): string {
+  return join(runDir, 'provider-linear-worker-session-log-hydration.json');
+}
+
+async function readPersistedSessionLogHydrationState(
+  hydrationPath: string
+): Promise<PersistedSessionLogHydrationState> {
+  return JSON.parse(await readFile(hydrationPath, 'utf8')) as PersistedSessionLogHydrationState;
 }
 
 function expectRefreshAuthHeaders(
@@ -1977,36 +2024,8 @@ describe('provider linear worker runner', () => {
   it('persists session-log hydration progress across repeated proof refreshes', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
-    const hydrationPath = join(runDir, 'provider-linear-worker-session-log-hydration.json');
-    await writeFile(
-      proofPath,
-      JSON.stringify({
-        issue_id: 'lin-issue-1',
-        issue_identifier: 'CO-2',
-        attempt_started_at: '2026-03-21T09:00:00.000Z',
-        thread_id: 'thread-1',
-        latest_turn_id: null,
-        latest_session_id: null,
-        latest_session_id_source: null,
-        turn_count: 1,
-        last_event: 'item.completed',
-        last_message: null,
-        last_event_at: null,
-        tokens: {
-          input_tokens: null,
-          output_tokens: null,
-          total_tokens: null
-        },
-        rate_limits: null,
-        owner_phase: 'turn_running',
-        owner_status: 'in_progress',
-        workspace_path: tempRoot,
-        linear_audit: null,
-        end_reason: null,
-        updated_at: '2026-03-21T09:00:00.000Z'
-      }),
-      'utf8'
-    );
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    await writeFile(proofPath, JSON.stringify(buildInProgressProof()), 'utf8');
 
     const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
     await mkdir(sessionDir, { recursive: true });
@@ -2061,12 +2080,7 @@ describe('provider linear worker runner', () => {
         CODEX_HOME: tempRoot!
       }
     );
-    const firstHydration = JSON.parse(await readFile(hydrationPath, 'utf8')) as {
-      path: string;
-      offset_bytes: number;
-      trailing_text: string;
-      bootstrap_pending: boolean;
-    };
+    const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
 
     expect(firstRefresh).toMatchObject({
       latest_turn_id: 'turn-1',
@@ -2120,12 +2134,7 @@ describe('provider linear worker runner', () => {
         CODEX_HOME: tempRoot!
       }
     );
-    const secondHydration = JSON.parse(await readFile(hydrationPath, 'utf8')) as {
-      path: string;
-      offset_bytes: number;
-      trailing_text: string;
-      bootstrap_pending: boolean;
-    };
+    const secondHydration = await readPersistedSessionLogHydrationState(hydrationPath);
 
     expect(secondRefresh).toMatchObject({
       latest_turn_id: 'turn-1',
@@ -2157,43 +2166,28 @@ describe('provider linear worker runner', () => {
   it('preserves unfinished session-log tails across refreshes until the line completes', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
-    const hydrationPath = join(runDir, 'provider-linear-worker-session-log-hydration.json');
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
     await writeFile(
       proofPath,
-      JSON.stringify({
-        issue_id: 'lin-issue-1',
-        issue_identifier: 'CO-2',
-        attempt_started_at: '2026-03-21T09:00:00.000Z',
-        thread_id: 'thread-1',
-        latest_turn_id: null,
-        latest_session_id: null,
-        latest_session_id_source: null,
-        turn_count: 1,
-        last_event: 'item.completed',
-        last_message: null,
-        last_event_at: null,
-        tokens: {
-          input_tokens: 12,
-          output_tokens: 8,
-          total_tokens: 20
-        },
-        rate_limits: {
-          primary: {
-            used_percent: 12.5,
-            window_minutes: 300
+      JSON.stringify(
+        buildInProgressProof({
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
           },
-          secondary: {
-            used_percent: 48,
-            window_minutes: 10080
+          rate_limits: {
+            primary: {
+              used_percent: 12.5,
+              window_minutes: 300
+            },
+            secondary: {
+              used_percent: 48,
+              window_minutes: 10080
+            }
           }
-        },
-        owner_phase: 'turn_running',
-        owner_status: 'in_progress',
-        workspace_path: tempRoot,
-        linear_audit: null,
-        end_reason: null,
-        updated_at: '2026-03-21T09:00:00.000Z'
-      }),
+        })
+      ),
       'utf8'
     );
 
@@ -2251,12 +2245,7 @@ describe('provider linear worker runner', () => {
         CODEX_HOME: tempRoot!
       }
     );
-    const firstHydration = JSON.parse(await readFile(hydrationPath, 'utf8')) as {
-      path: string;
-      offset_bytes: number;
-      trailing_text: string;
-      bootstrap_pending: boolean;
-    };
+    const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
 
     expect(firstRefresh).toMatchObject({
       latest_turn_id: 'turn-1',
@@ -2296,12 +2285,7 @@ describe('provider linear worker runner', () => {
         CODEX_HOME: tempRoot!
       }
     );
-    const secondHydration = JSON.parse(await readFile(hydrationPath, 'utf8')) as {
-      path: string;
-      offset_bytes: number;
-      trailing_text: string;
-      bootstrap_pending: boolean;
-    };
+    const secondHydration = await readPersistedSessionLogHydrationState(hydrationPath);
 
     expect(secondRefresh).toMatchObject({
       latest_turn_id: 'turn-1',
@@ -2332,36 +2316,8 @@ describe('provider linear worker runner', () => {
   it('falls back to a full reread when a persisted session log truncates', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
-    const hydrationPath = join(runDir, 'provider-linear-worker-session-log-hydration.json');
-    await writeFile(
-      proofPath,
-      JSON.stringify({
-        issue_id: 'lin-issue-1',
-        issue_identifier: 'CO-2',
-        attempt_started_at: '2026-03-21T09:00:00.000Z',
-        thread_id: 'thread-1',
-        latest_turn_id: null,
-        latest_session_id: null,
-        latest_session_id_source: null,
-        turn_count: 1,
-        last_event: 'item.completed',
-        last_message: null,
-        last_event_at: null,
-        tokens: {
-          input_tokens: null,
-          output_tokens: null,
-          total_tokens: null
-        },
-        rate_limits: null,
-        owner_phase: 'turn_running',
-        owner_status: 'in_progress',
-        workspace_path: tempRoot,
-        linear_audit: null,
-        end_reason: null,
-        updated_at: '2026-03-21T09:00:00.000Z'
-      }),
-      'utf8'
-    );
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    await writeFile(proofPath, JSON.stringify(buildInProgressProof()), 'utf8');
 
     const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
     await mkdir(sessionDir, { recursive: true });
@@ -2447,12 +2403,7 @@ describe('provider linear worker runner', () => {
         CODEX_HOME: tempRoot!
       }
     );
-    const hydrationAfterTruncation = JSON.parse(await readFile(hydrationPath, 'utf8')) as {
-      path: string;
-      offset_bytes: number;
-      trailing_text: string;
-      bootstrap_pending: boolean;
-    };
+    const hydrationAfterTruncation = await readPersistedSessionLogHydrationState(hydrationPath);
 
     expect(refreshedAfterTruncation).toMatchObject({
       latest_turn_id: 'turn-2',
@@ -2474,36 +2425,8 @@ describe('provider linear worker runner', () => {
   it('falls back to a fresh reread when session log discovery rotates to a newer file', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
-    const hydrationPath = join(runDir, 'provider-linear-worker-session-log-hydration.json');
-    await writeFile(
-      proofPath,
-      JSON.stringify({
-        issue_id: 'lin-issue-1',
-        issue_identifier: 'CO-2',
-        attempt_started_at: '2026-03-21T09:00:00.000Z',
-        thread_id: 'thread-1',
-        latest_turn_id: null,
-        latest_session_id: null,
-        latest_session_id_source: null,
-        turn_count: 1,
-        last_event: 'item.completed',
-        last_message: null,
-        last_event_at: null,
-        tokens: {
-          input_tokens: null,
-          output_tokens: null,
-          total_tokens: null
-        },
-        rate_limits: null,
-        owner_phase: 'turn_running',
-        owner_status: 'in_progress',
-        workspace_path: tempRoot,
-        linear_audit: null,
-        end_reason: null,
-        updated_at: '2026-03-21T09:00:00.000Z'
-      }),
-      'utf8'
-    );
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    await writeFile(proofPath, JSON.stringify(buildInProgressProof()), 'utf8');
 
     const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
     await mkdir(sessionDir, { recursive: true });
@@ -2594,12 +2517,7 @@ describe('provider linear worker runner', () => {
         CODEX_HOME: tempRoot!
       }
     );
-    const hydrationAfterRotation = JSON.parse(await readFile(hydrationPath, 'utf8')) as {
-      path: string;
-      offset_bytes: number;
-      trailing_text: string;
-      bootstrap_pending: boolean;
-    };
+    const hydrationAfterRotation = await readPersistedSessionLogHydrationState(hydrationPath);
 
     expect(refreshedAfterRotation).toMatchObject({
       latest_turn_id: 'turn-2',
