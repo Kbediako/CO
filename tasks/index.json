@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260405-attnres-fixed-model-memory-backlog-shaping",
+      "title": "AttnRes-Inspired Fixed-Model Memory + Autonomy Backlog Shaping",
+      "relates_to": "tasks/tasks-20260405-attnres-fixed-model-memory-backlog-shaping.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-05",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/20260405-attnres-fixed-model-memory-backlog-shaping.md",
+        "task": "tasks/tasks-20260405-attnres-fixed-model-memory-backlog-shaping.md",
+        "agent_task": ".agent/task/20260405-attnres-fixed-model-memory-backlog-shaping.md",
+        "docs": "docs/TECH_SPEC-attnres-fixed-model-memory-backlog-shaping.md"
+      }
+    },
+    {
       "id": "20260405-linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7",
       "title": "CO: Make Merging-stage merge closeout deterministic and watchdog-backed",
       "relates_to": "tasks/tasks-linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7.md",
