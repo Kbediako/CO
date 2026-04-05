@@ -1375,12 +1375,14 @@ export async function transitionProviderLinearIssueState(input: {
     return failure('transition', 'linear_state_transition_failed', 'Linear issue state transition did not succeed.', 503);
   }
 
+  const transitionedUpdatedAt = normalizeIso(issue?.updatedAt as string | null | undefined);
   if (cacheContext && canTrustCachedMutationContext) {
     await writeCachedIssueContextRecord(
       input.env,
       {
         ...cacheContext,
-        state: updatedState
+        state: updatedState,
+        updated_at: transitionedUpdatedAt
       },
       session.session.sourceSetup
     );
@@ -1393,7 +1395,7 @@ export async function transitionProviderLinearIssueState(input: {
       id: normalizeRequiredString(issue?.id)!,
       identifier: normalizeRequiredString(issue?.identifier)!,
       state: updatedState,
-      updated_at: normalizeIso(issue?.updatedAt as string | null | undefined)
+      updated_at: transitionedUpdatedAt
     },
     previous_state: summary.state,
     target_state: targetState,
@@ -2816,6 +2818,7 @@ function mergeCachedIssueContextSummary(
   return {
     ...issue,
     url: summary.url,
+    updated_at: summary.updated_at,
     workspace_id: summary.workspace_id,
     state: summary.state,
     team: summary.team,

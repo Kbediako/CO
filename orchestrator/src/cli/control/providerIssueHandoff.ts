@@ -377,6 +377,9 @@ export function createProviderIssueHandoffService(
       sourceSetup: resolveMergeCloseoutSourceSetup(),
       repoRoot
     });
+    if (mergeCloseout.reason === 'issue_no_longer_merging') {
+      return null;
+    }
     const claimState = resolveProviderMergeCloseoutClaimState(mergeCloseout);
     return await upsertProviderClaimAndPersist({
       ...input.claim,
@@ -598,6 +601,7 @@ export function createProviderIssueHandoffService(
       run_manifest_path: input.run.manifestPath,
       launch_source: PROVIDER_LAUNCH_SOURCE,
       launch_token: launchToken,
+      merge_closeout: null,
       ...buildProviderRetryLaunchFields({
         claim: input.claim,
         previousRun: input.run,
@@ -624,6 +628,7 @@ export function createProviderIssueHandoffService(
         run_manifest_path: input.run.manifestPath,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
+        merge_closeout: null,
         ...buildQueuedProviderRetryFields({
           claim: input.claim,
           previousRun: input.run,
@@ -659,6 +664,7 @@ export function createProviderIssueHandoffService(
       run_manifest_path: null,
       launch_source: PROVIDER_LAUNCH_SOURCE,
       launch_token: launchToken,
+      merge_closeout: null,
       ...buildProviderRetryLaunchFields({
         claim: input.claim,
         previousRun: input.previousRun ?? null,
@@ -693,6 +699,7 @@ export function createProviderIssueHandoffService(
         run_manifest_path: null,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
+        merge_closeout: null,
         ...buildQueuedProviderRetryFields({
           claim: input.claim,
           previousRun: input.previousRun ?? null,
@@ -715,6 +722,7 @@ export function createProviderIssueHandoffService(
           run_manifest_path: startedRun.manifestPath,
           launch_source: PROVIDER_LAUNCH_SOURCE,
           launch_token: launchToken,
+          merge_closeout: null,
           ...buildProviderRetryLaunchFields({
             claim: input.claim,
             previousRun: input.previousRun ?? null,
@@ -1018,34 +1026,21 @@ export function createProviderIssueHandoffService(
           didRunMatchClaimAttempt(claim, completedRun)
         )
       ) {
-        const queuedRetryFields = shouldQueuePostWorkerRetryClaim(claim)
-          ? buildQueuedProviderRetryFields({
-              claim,
-              previousRun: completedRun,
-              error: null,
-              preserveCurrentAttempt: claim.retry_queued === true,
-              preserveExistingDueAt: claim.retry_queued === true,
-              delayType: 'continuation'
-            })
-          : clearProviderRetryFields();
+        const completedState = buildProviderCompletedRunRehydrateState({
+          claim,
+          run: completedRun,
+          preserveCurrentAttempt: claim.retry_queued === true,
+          preserveExistingDueAt: claim.retry_queued === true,
+          queueContinuationRetry: shouldQueuePostWorkerRetryClaim(claim)
+        });
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
-          state: 'completed',
-          reason: 'provider_issue_rehydrated_completed_run',
-          task_id: completedRun.taskId,
-          run_id: completedRun.runId,
-          run_manifest_path: completedRun.manifestPath,
-          ...queuedRetryFields
+          ...completedState
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
           launch_source: undefined,
           launch_token: undefined,
-          task_id: completedRun.taskId,
-          state: 'completed',
-          reason: 'provider_issue_rehydrated_completed_run',
-          run_id: completedRun.runId,
-          run_manifest_path: completedRun.manifestPath,
-          ...queuedRetryFields,
+          ...completedState,
           updated_at: now
         });
         continue;
@@ -2196,14 +2191,20 @@ export function createProviderIssueHandoffService(
                     trackedIssueRefetch
                   })
                 : claim;
-            const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
-              claim: currentClaim,
-              trackedIssue: resolution.trackedIssue,
-              latestRun
-            });
-            if (mergeCloseoutClaim) {
-              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
-              continue;
+            if (
+              currentClaim.state !== 'starting' &&
+              currentClaim.state !== 'resuming' &&
+              latestRun?.status !== 'queued'
+            ) {
+              const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
+                claim: currentClaim,
+                trackedIssue: resolution.trackedIssue,
+                latestRun
+              });
+              if (mergeCloseoutClaim) {
+                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                continue;
+              }
             }
             await retainOwnedHandoffClaim({
               claim: currentClaim,
@@ -2317,37 +2318,25 @@ export function createProviderIssueHandoffService(
           }
 
           if (latestRun?.status === 'succeeded') {
-            const queuedRetryFields = buildQueuedProviderRetryFields({
+            const completedState = buildProviderCompletedRunRehydrateState({
               claim: currentClaim,
-              previousRun: latestRun,
-              error: null,
-              delayType: 'continuation'
+              run: latestRun
             });
             const transitioned = hasProviderClaimTransitioned(currentClaim, {
               ...buildTrackedIssueClaimFields(resolution.trackedIssue),
-              state: 'completed',
-              reason: 'provider_issue_rehydrated_completed_run',
-              task_id: latestRun.taskId,
-              run_id: latestRun.runId,
-              run_manifest_path: latestRun.manifestPath,
-              ...queuedRetryFields
+              ...completedState
             });
             const refreshCompletedSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
               ...currentClaim,
               ...buildTrackedIssueClaimFields(resolution.trackedIssue),
-              task_id: latestRun.taskId,
-              state: 'completed',
-              reason: 'provider_issue_rehydrated_completed_run',
-              run_id: latestRun.runId,
-              run_manifest_path: latestRun.manifestPath,
-              ...queuedRetryFields
+              ...completedState
             });
             if (transitioned) {
               await persistStateOrRollback(refreshCompletedSnapshot);
               options.publishRuntime?.('provider-intake.refresh');
             }
-            if (queuedRetryFields.retry_queued === true) {
+            if (completedState.retry_queued === true) {
               noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
             }
             continue;
@@ -3361,6 +3350,59 @@ function resolveProviderMergeCloseoutClaimState(
     default:
       return 'completed';
   }
+}
+
+function buildProviderCompletedRunRehydrateState(input: {
+  claim: ProviderIntakeClaimRecord;
+  run: ProviderIssueRunRecord;
+  preserveCurrentAttempt?: boolean;
+  preserveExistingDueAt?: boolean;
+  queueContinuationRetry?: boolean;
+}): Pick<
+  ProviderIntakeClaimRecord,
+  | 'task_id'
+  | 'state'
+  | 'reason'
+  | 'run_id'
+  | 'run_manifest_path'
+  | 'retry_queued'
+  | 'retry_attempt'
+  | 'retry_due_at'
+  | 'retry_error'
+> {
+  if (
+    input.claim.merge_closeout &&
+    resolveProviderMergeCloseoutClaimState(input.claim.merge_closeout) === 'handoff_failed'
+  ) {
+    return {
+      task_id: input.run.taskId,
+      state: 'handoff_failed',
+      reason: resolveProviderMergeCloseoutClaimReason(input.claim.merge_closeout),
+      run_id: input.run.runId,
+      run_manifest_path: input.run.manifestPath,
+      ...clearProviderRetryFields()
+    };
+  }
+
+  const queuedRetryFields = input.queueContinuationRetry !== false
+    ? buildQueuedProviderRetryFields({
+        claim: input.claim,
+        previousRun: input.run,
+        error: null,
+        preserveCurrentAttempt: input.preserveCurrentAttempt,
+        preserveExistingDueAt: input.preserveExistingDueAt,
+        delayType: 'continuation'
+      })
+    : clearProviderRetryFields();
+
+  return {
+    task_id: input.run.taskId,
+    state: 'completed',
+    reason: 'provider_issue_rehydrated_completed_run',
+    run_id: input.run.runId,
+    run_manifest_path: input.run.manifestPath,
+    ...queuedRetryFields
+  };
 }
 
 type ProviderRetryDelayType = 'continuation' | 'failure';

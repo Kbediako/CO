@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -6934,6 +6934,84 @@ describe('providerLinearWorkflowFacade', () => {
         id: 'state-human-review',
         name: 'Human Review'
       }
+    });
+  });
+
+  it('persists updated_at into the cached issue context after a successful transition', async () => {
+    const env = await createRunScopedEnv();
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        updated_at: '2026-03-22T10:00:00.000Z'
+      }),
+      {
+        recordedAt: new Date().toISOString()
+      }
+    );
+
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, string>;
+      };
+      if (body.query?.includes('ProviderLinearMoveIssue')) {
+        expect(body.variables).toEqual({
+          id: 'lin-issue-1',
+          stateId: 'state-human-review'
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: {
+                id: 'lin-issue-1',
+                identifier: 'CO-1',
+                updatedAt: '2026-03-22T10:10:00.000Z',
+                state: {
+                  id: 'state-human-review',
+                  name: 'Human Review',
+                  type: 'started'
+                }
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await transitionProviderLinearIssueState({
+      issueId: 'lin-issue-1',
+      stateName: 'human review',
+      env,
+      fetchImpl
+    });
+
+    const auditPath = env.CODEX_PROVIDER_LINEAR_AUDIT_PATH!;
+    const cachePath = join(dirname(auditPath), 'provider-linear-issue-context-cache.json');
+    const cacheRecord = JSON.parse(await readFile(cachePath, 'utf8')) as {
+      issue: {
+        updated_at: string | null;
+        state: { id: string; name: string; type: string };
+      };
+    };
+
+    expect(result).toMatchObject({
+      ok: true,
+      issue: {
+        updated_at: '2026-03-22T10:10:00.000Z',
+        state: {
+          id: 'state-human-review',
+          name: 'Human Review',
+          type: 'started'
+        }
+      }
+    });
+    expect(cacheRecord.issue.updated_at).toBe('2026-03-22T10:10:00.000Z');
+    expect(cacheRecord.issue.state).toEqual({
+      id: 'state-human-review',
+      name: 'Human Review',
+      type: 'started'
     });
   });
 

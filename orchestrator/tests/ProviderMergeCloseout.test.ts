@@ -282,6 +282,64 @@ describe('runProviderDeterministicMergeCloseout', () => {
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
   });
 
+  it('does not arm deterministic merge closeout when the live Linear issue is no longer in Merging', async () => {
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn();
+    const transitionIssueState = vi.fn();
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-80',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-05T00:02:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-80',
+            title: 'Deterministic merge closeout',
+            description: null,
+            url: null,
+            updated_at: '2026-04-05T00:02:30.000Z',
+            workspace_id: null,
+            state: { id: 'state-review', name: 'In Review', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/357' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'issue_no_longer_merging',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-05T00:02:30.000Z'
+    });
+    expect(fetchSnapshot).not.toHaveBeenCalled();
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(runCommand).toHaveBeenCalledTimes(1);
+  });
+
   it('accepts ssh shared-root GitHub origins whose repo names contain dots', async () => {
     const runCommand = vi
       .fn()

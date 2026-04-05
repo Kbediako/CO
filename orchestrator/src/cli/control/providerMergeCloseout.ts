@@ -246,6 +246,18 @@ export async function runProviderDeterministicMergeCloseout(
     attached_pr_urls: [...attachedPrUrls]
   };
 
+  if (normalizeProviderMergeCloseoutIssueState(currentIssueState) !== 'merging') {
+    return {
+      ...baseWithContext,
+      status: 'action_required',
+      reason: 'issue_no_longer_merging',
+      summary:
+        currentIssueState && currentIssueState.trim().length > 0
+          ? `Live Linear issue state is ${currentIssueState}, so deterministic merge closeout is not armed.`
+          : 'Live Linear issue state is no longer Merging, so deterministic merge closeout is not armed.'
+    };
+  }
+
   if (sameRepoPrs.length === 0) {
     return {
       ...baseWithContext,
@@ -719,6 +731,11 @@ function normalizePrNumber(value: string | null | undefined): number | null {
 
 function normalizeOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function normalizeProviderMergeCloseoutIssueState(value: string | null | undefined): string | null {
+  const normalized = normalizeOptionalString(value);
+  return normalized ? normalized.toLowerCase() : null;
 }
 
 function normalizeOptionalNumber(value: unknown): number | null {

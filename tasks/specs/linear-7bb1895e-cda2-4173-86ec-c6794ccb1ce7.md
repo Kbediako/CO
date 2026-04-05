@@ -121,29 +121,23 @@ last_review: 2026-04-05
   - existing control-host refresh/watchdog lifecycle
 
 ## Validation Plan
-- Tests / checks:
-  - audited `linear child-stream --pipeline docs-review --stream co-80-docs-review`
-  - focused regressions in the provider worker / handoff / PR readiness suites for:
-    - merge-closeout proof structure
-    - restart/recovery of merge-ready `Merging` issues
-    - explicit action-required outcomes when merge readiness is not sustained
-  - `node scripts/delegation-guard.mjs`
-  - `node scripts/spec-guard.mjs --dry-run`
-  - `npm run build`
-  - `npm run lint`
-  - `npm run test`
-  - `npm run docs:check`
-  - `npm run docs:freshness`
-  - `node scripts/diff-budget.mjs`
-  - `FORCE_CODEX_REVIEW=1 npm run review`
-  - `npm run pack:smoke`
-- Rollout verification:
-  - merge-closeout artifacts show arming, attempt, result, shared-root reconciliation, and final Linear transition fields
-  - control-host restart/recovery can relaunch a clean merge-ready `Merging` issue without another operator flip
-  - non-mergeable cases fail explicitly with action-required evidence instead of silent idle `Merging`
-- Monitoring / alerts:
-  - rely on provider proof plus existing control-runtime/observability surfaces
-  - rely on the new bounded merge-closeout watchdog signal rather than operator polling alone
+- [x] Audited `linear child-stream --pipeline docs-review --stream co-80-docs-review`. Evidence: `.runs/linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7-co-80-docs-review/cli/2026-04-04T15-45-52-765Z-8416294b/manifest.json`.
+- [x] Focused regressions cover merge-closeout proof structure, restart/recovery of merge-ready `Merging` issues, and explicit action-required outcomes when merge readiness is not sustained. Evidence: `orchestrator/tests/ProviderMergeCloseout.test.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`, `orchestrator/tests/ControlServerStartupInputPreparation.test.ts`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: local run on 2026-04-05 reported `Delegation guard: OK (1 subagent manifest(s) found).`
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: local run on 2026-04-05 after the review-driven fixes.
+- [x] `npm run build`. Evidence: local run on 2026-04-05 after the review-driven fixes.
+- [x] `npm run lint`. Evidence: local run on 2026-04-05 after the review-driven fixes.
+- [x] `npm run test`. Evidence: local run on 2026-04-05 reported `312` files and `2972` tests passed.
+- [x] `npm run docs:check`. Evidence: local run on 2026-04-05 after the stale-review-date refresh.
+- [x] `npm run docs:freshness`. Evidence: local run on 2026-04-05 after the stale-review-date refresh.
+- [x] `node scripts/diff-budget.mjs`. Evidence: local run on 2026-04-05 after the review-driven fixes.
+- [x] `FORCE_CODEX_REVIEW=1 npm run review`. Evidence: `.runs/linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7/cli/2026-04-05T01-13-22-125Z-24a60b65/manifest.json`; the latest 2026-04-05 rerun ended with `review_outcome: failed-boundary` / `termination_boundary: command-intent`, so final handoff uses the manual diff review fallback plus explicit elegance pass recorded in Linear workpad comment `2283d72b-14d9-4964-b4b1-d4feabc775bc`.
+- [x] `npm run pack:smoke`. Evidence: local run on 2026-04-05 reported `pack smoke passed`.
+- [x] Merge-closeout artifacts show arming, attempt, result, shared-root reconciliation, and final Linear transition fields. Evidence: `orchestrator/src/cli/control/providerMergeCloseout.ts`, `orchestrator/tests/ProviderMergeCloseout.test.ts`.
+- [x] Control-host restart/recovery can relaunch a clean merge-ready `Merging` issue without another operator flip. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`.
+- [x] Non-mergeable cases fail explicitly with action-required evidence instead of silent idle `Merging`. Evidence: `orchestrator/src/cli/control/providerMergeCloseout.ts`, `orchestrator/tests/ProviderMergeCloseout.test.ts`.
+- [x] Monitoring relies on provider proof plus existing control-runtime/observability surfaces. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/src/cli/control/providerMergeCloseout.ts`.
+- [x] Monitoring relies on the new bounded merge-closeout watchdog signal rather than operator polling alone. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`.
 
 ## Open Questions
 - Resolved on 2026-04-05: keep merge-closeout truth on both the proof sidecar and the compact intake-claim `merge_closeout` snapshot. The claim-level record is required for control-host refresh correctness, while the proof remains the detailed worker artifact.
