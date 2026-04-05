@@ -306,36 +306,11 @@ export async function runProviderDeterministicMergeCloseout(
   const alreadyMerged = snapshot.merged_at !== null || snapshot.state === 'MERGED';
 
   if (!alreadyMerged && !snapshot.ready_to_merge) {
-    if (snapshot.state === 'CLOSED') {
-      return {
-        ...baseWithContext,
-        pr,
-        snapshot,
-        status: 'action_required',
-        reason: 'pr_closed_unmerged',
-        summary: `Attached PR #${pr.number} is closed without merging; reopen it or attach a replacement PR.`
-      };
-    }
-    if (snapshot.action_required_reasons.length > 0) {
-      return {
-        ...baseWithContext,
-        pr,
-        snapshot,
-        status: 'action_required',
-        reason: snapshot.action_required_reasons[0] ?? 'merge_action_required',
-        summary: `Merge closeout is blocked by: ${snapshot.action_required_reasons.join(', ')}.`
-      };
-    }
     return {
       ...baseWithContext,
       pr,
       snapshot,
-      status: 'watching',
-      reason: snapshot.gate_reasons[0] ?? 'waiting_for_merge_ready',
-      summary:
-        snapshot.gate_reasons.length > 0
-          ? `Merge closeout is waiting for readiness gates to clear: ${snapshot.gate_reasons.join(', ')}.`
-          : 'Merge closeout is waiting for the attached pull request to become merge-ready.'
+      ...classifyNonMergedSnapshot(snapshot, pr.number)!
     };
   }
 
@@ -385,6 +360,16 @@ export async function runProviderDeterministicMergeCloseout(
     }
 
     if (verificationSnapshot.merged_at === null && verificationSnapshot.state !== 'MERGED') {
+      const verificationOutcome = classifyNonMergedSnapshot(verificationSnapshot, pr.number);
+      if (verificationOutcome) {
+        return {
+          ...baseWithContext,
+          pr,
+          snapshot: verificationSnapshot,
+          merge_attempt: mergeAttempt,
+          ...verificationOutcome
+        };
+      }
       return {
         ...baseWithContext,
         pr,
@@ -608,13 +593,51 @@ function collectAttachedGitHubPrUrls(
   const urls: string[] = [];
   for (const attachment of attachments) {
     const parsed = parseGitHubPullRequestUrl(attachment?.url);
-    if (!parsed || seen.has(parsed.url)) {
+    const comparisonKey = parsed
+      ? `${parsed.owner.toLowerCase()}/${parsed.repo.toLowerCase()}#${parsed.number}`
+      : null;
+    if (!parsed || !comparisonKey || seen.has(comparisonKey)) {
       continue;
     }
-    seen.add(parsed.url);
+    seen.add(comparisonKey);
     urls.push(parsed.url);
   }
   return urls;
+}
+
+function classifyNonMergedSnapshot(
+  snapshot: ProviderMergeCloseoutSnapshotRecord,
+  prNumber: number
+): {
+  status: 'watching' | 'action_required';
+  reason: string;
+  summary: string;
+} | null {
+  if (snapshot.state === 'CLOSED') {
+    return {
+      status: 'action_required',
+      reason: 'pr_closed_unmerged',
+      summary: `Attached PR #${prNumber} is closed without merging; reopen it or attach a replacement PR.`
+    };
+  }
+  if (snapshot.action_required_reasons.length > 0) {
+    return {
+      status: 'action_required',
+      reason: snapshot.action_required_reasons[0] ?? 'merge_action_required',
+      summary: `Merge closeout is blocked by: ${snapshot.action_required_reasons.join(', ')}.`
+    };
+  }
+  if (snapshot.gate_reasons.length > 0 || !snapshot.ready_to_merge) {
+    return {
+      status: 'watching',
+      reason: snapshot.gate_reasons[0] ?? 'waiting_for_merge_ready',
+      summary:
+        snapshot.gate_reasons.length > 0
+          ? `Merge closeout is waiting for readiness gates to clear: ${snapshot.gate_reasons.join(', ')}.`
+          : 'Merge closeout is waiting for the attached pull request to become merge-ready.'
+    };
+  }
+  return null;
 }
 
 function mapSnapshotRecord(

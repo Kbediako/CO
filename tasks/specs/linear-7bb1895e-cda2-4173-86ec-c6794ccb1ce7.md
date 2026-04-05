@@ -132,6 +132,7 @@ last_review: 2026-04-05
 - [x] `npm run docs:freshness`. Evidence: local run on 2026-04-05 after the stale-review-date refresh.
 - [x] `node scripts/diff-budget.mjs`. Evidence: local run on 2026-04-05 after the review-driven fixes.
 - [x] `FORCE_CODEX_REVIEW=1 npm run review`. Evidence: `.runs/linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7/cli/2026-04-05T01-13-22-125Z-24a60b65/manifest.json`; the latest 2026-04-05 rerun ended with `review_outcome: failed-boundary` / `termination_boundary: command-intent`, so final handoff uses the manual diff review fallback plus explicit elegance pass recorded in Linear workpad comment `2283d72b-14d9-4964-b4b1-d4feabc775bc`.
+- [ ] Unresolved actionable review threads: `0` (or waiver recorded with evidence). Evidence before review handoff: GitHub PR `#364` review-thread query plus explicit reply/resolve records for each actionable thread.
 - [x] `npm run pack:smoke`. Evidence: local run on 2026-04-05 reported `pack smoke passed`.
 - [x] Merge-closeout artifacts show arming, attempt, result, shared-root reconciliation, and final Linear transition fields. Evidence: `orchestrator/src/cli/control/providerMergeCloseout.ts`, `orchestrator/tests/ProviderMergeCloseout.test.ts`.
 - [x] Control-host restart/recovery can relaunch a clean merge-ready `Merging` issue without another operator flip. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts`, `orchestrator/tests/ProviderIssueHandoff.test.ts`.
