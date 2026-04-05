@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260405-linear-736c3631-341a-4250-875f-e8808ef2a31b",
+      "title": "CO: Add authoritative provider-worker progress and stall observability for self-repair and external debugging",
+      "relates_to": "tasks/tasks-linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-05",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
+        "task": "tasks/tasks-linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
+        "agent_task": ".agent/task/linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
+        "docs": "docs/TECH_SPEC-linear-736c3631-341a-4250-875f-e8808ef2a31b.md"
+      }
+    },
+    {
       "id": "20260405-linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7",
       "title": "CO: Make Merging-stage merge closeout deterministic and watchdog-backed",
       "relates_to": "tasks/tasks-linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7.md",

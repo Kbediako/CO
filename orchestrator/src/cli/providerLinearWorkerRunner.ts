@@ -37,6 +37,10 @@ import {
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import { deriveDeterministicProviderMutationSuppressions } from './control/providerLinearWorkerTruth.js';
+import {
+  deriveProviderLinearWorkerProgressSnapshot,
+  type ProviderLinearWorkerProgressSnapshot
+} from './control/providerIssueObservability.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
 import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
@@ -233,6 +237,7 @@ export interface ProviderLinearWorkerProof {
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
   child_lanes?: ProviderLinearWorkerChildLaneRecord[];
+  progress?: ProviderLinearWorkerProgressSnapshot | null;
   linear_budget?: LinearBudgetStatus | null;
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
   end_reason: string | null;
@@ -2066,12 +2071,19 @@ async function writeProofSnapshot(
 ): Promise<ProviderLinearWorkerProof> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
-    const hydratedProof = {
+    const proofWithHydratedSources = {
       ...proof,
       linear_audit: await summarizeProviderLinearAuditPath(auditPath),
       child_streams: await readProviderLinearWorkerChildStreams(runDir),
       child_lanes: await readProviderLinearWorkerChildLanes(runDir),
       linear_budget: linearBudget
+    };
+    const hydratedProof = {
+      ...proofWithHydratedSources,
+      progress: deriveProviderLinearWorkerProgressSnapshot({
+        proof: proofWithHydratedSources,
+        now: deps.now
+      })
     };
     await deps.writeProof(buildProofPath(runDir), hydratedProof);
     return hydratedProof;
@@ -2099,13 +2111,20 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     }
     const parsed = JSON.parse(raw) as ProviderLinearWorkerProof;
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
-    const hydrated: ProviderLinearWorkerProof = {
+    const proofWithHydratedSources: ProviderLinearWorkerProof = {
       ...parsed,
       linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
       child_streams: await readProviderLinearWorkerChildStreams(runDir),
       child_lanes: await readProviderLinearWorkerChildLanes(runDir),
       linear_budget: linearBudget,
       updated_at: now()
+    };
+    const hydrated: ProviderLinearWorkerProof = {
+      ...proofWithHydratedSources,
+      progress: deriveProviderLinearWorkerProgressSnapshot({
+        proof: proofWithHydratedSources,
+        now
+      })
     };
     await writeProof(proofPath, hydrated);
     return hydrated;
@@ -2173,14 +2192,33 @@ export async function runProviderLinearWorker(
     linear_audit: null,
     child_streams: [],
     child_lanes: [],
+    progress: null,
     tracked_issue_error: null,
     linear_budget: null,
     end_reason: null,
     updated_at: attemptStartedAt
   };
+  let lastProgressSignature: string | null = null;
+
+  const emitSemanticProgressIfChanged = (proof: ProviderLinearWorkerProof): void => {
+    const progress = proof.progress ?? null;
+    const signature = progress ? JSON.stringify(progress) : null;
+    if (!signature || signature === lastProgressSignature) {
+      return;
+    }
+    lastProgressSignature = signature;
+    deps.log.info(
+      `[provider-linear-worker-progress] ${JSON.stringify({
+        issue_id: proof.issue_id,
+        issue_identifier: proof.issue_identifier,
+        progress
+      })}`
+    );
+  };
 
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
     const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+    emitSemanticProgressIfChanged(hydratedProof);
     await requestProviderControlHostRefresh({
       currentManifestPath: context.manifestPath,
       env,
@@ -2339,6 +2377,7 @@ export async function runProviderLinearWorker(
           rate_limits: liveParseState.rateLimits ?? finalProof.rate_limits,
           owner_phase: 'turn_running',
           owner_status: 'in_progress',
+          progress: finalProof.progress ?? null,
           updated_at: deps.now()
         };
         const signature = JSON.stringify({
@@ -2474,9 +2513,9 @@ export async function runProviderLinearWorker(
       turnId = parsed.turnId ?? turnId;
       const session = deriveLatestTurnSessionId({ threadId, turnId });
 
-      finalProof = {
-        issue_id: context.issueId,
-        issue_identifier: context.issueIdentifier,
+        finalProof = {
+          issue_id: context.issueId,
+          issue_identifier: context.issueIdentifier,
         attempt_started_at: finalProof.attempt_started_at,
         pid: workerPid,
         thread_id: threadId,
@@ -2492,12 +2531,15 @@ export async function runProviderLinearWorker(
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
         owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
         workspace_path: context.workspacePath,
-        source_setup: context.sourceSetup,
-        linear_audit: finalProof.linear_audit,
-        tracked_issue_error: null,
-        end_reason: null,
-        updated_at: deps.now()
-      };
+          source_setup: context.sourceSetup,
+          linear_audit: finalProof.linear_audit,
+          child_streams: finalProof.child_streams,
+          child_lanes: finalProof.child_lanes,
+          progress: finalProof.progress ?? null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: deps.now()
+        };
       finalProof = await persistProof(finalProof);
 
       if (execResult.exitCode !== 0) {

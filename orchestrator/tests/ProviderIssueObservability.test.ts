@@ -1,0 +1,135 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  buildProviderIssueDebugSnapshot,
+  deriveProviderLinearWorkerProgressSnapshot
+} from '../src/cli/control/providerIssueObservability.js';
+
+describe('provider issue observability', () => {
+  it('classifies merge closeout lanes from one authoritative snapshot', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-04-05T06:00:00.000Z'
+      },
+      rehydrated_at: '2026-04-05T05:50:00.000Z',
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        updated_at: '2026-04-05T05:50:00.000Z',
+        run_id: 'run-82',
+        merge_closeout: {
+          recorded_at: '2026-04-05T06:02:00.000Z',
+          status: 'watching',
+          reason: 'checks_pending',
+          summary: 'Waiting for required checks before merge.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/82',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 82
+          },
+          snapshot: {
+            review_decision: 'APPROVED',
+            merge_state_status: 'BLOCKED',
+            ready_to_merge: false,
+            gate_reasons: ['required_checks_pending'],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 2,
+            checks_failed: 0,
+            required_checks_pending: 2,
+            required_checks_failed: 0,
+            updated_at: '2026-04-05T06:02:00.000Z',
+            merged_at: null
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'turn_completed',
+        owner_status: 'in_progress',
+        last_event: 'task_complete',
+        last_message: 'Waiting for checks.',
+        last_event_at: '2026-04-05T06:01:00.000Z',
+        updated_at: '2026-04-05T06:02:05.000Z',
+        linear_audit: {
+          path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+          attempted_count: 2,
+          success_count: 2,
+          failure_count: 0,
+          latest_recorded_at: '2026-04-05T06:01:30.000Z',
+          latest_by_operation: {
+            'attach-pr': {
+              recorded_at: '2026-04-05T06:01:30.000Z',
+              operation: 'attach-pr',
+              ok: true,
+              issue_id: 'lin-issue-82',
+              issue_identifier: 'CO-82',
+              source_setup: null,
+              action: 'attached',
+              via: null,
+              state: 'Merging',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: 'attachment-82',
+              error_code: null,
+              error_message: null
+            }
+          }
+        }
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      claim: {
+        freshness: 'rehydrated',
+        is_rehydrated: true
+      },
+      pull_request: {
+        number: 82,
+        merge_closeout_status: 'watching',
+        required_checks_pending: 2
+      },
+      progress: {
+        phase: 'waiting_on_checks',
+        kind: 'merge_closeout',
+        status: 'waiting',
+        stall_classification: 'waiting_on_checks',
+        recovery_recommendation: 'wait_for_checks'
+      },
+      last_audit_operation: {
+        operation: 'attach-pr'
+      },
+      stall_classification: 'waiting_on_checks',
+      recovery_recommendation: 'wait_for_checks'
+    });
+    expect(snapshot?.last_semantic_progress_at).toBe('2026-04-05T06:02:00.000Z');
+  });
+
+  it('classifies active worker lanes as stalled when semantic progress stops moving', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Turn active.',
+        last_event_at: '2026-04-05T05:40:00.000Z',
+        updated_at: '2026-04-05T06:00:00.000Z',
+        linear_audit: null
+      },
+      now: () => '2026-04-05T06:00:30.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'stalled',
+      stall_classification: 'stalled',
+      recovery_recommendation: 'inspect_worker_logs'
+    });
+    expect(progress?.stall_reason).toBe('no_semantic_progress_since:2026-04-05T05:40:00.000Z');
+  });
+});

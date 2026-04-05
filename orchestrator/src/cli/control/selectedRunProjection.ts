@@ -31,6 +31,10 @@ import {
   selectProviderIntakeClaim
 } from './providerIntakeState.js';
 import {
+  buildProviderIssueDebugSnapshot,
+  type ControlProviderDebugSnapshot
+} from './providerIssueObservability.js';
+import {
   buildProviderLinearWorkerTerminalSummary,
   deriveDeterministicProviderMutationSuppressions,
   formatDeterministicProviderMutationDegradationSummary,
@@ -218,7 +222,8 @@ async function buildSelectedRunContextFromSnapshot(
     parts,
     resolveRunsRootFromRunDir(context.paths.runDir),
     controlWorkspacePath,
-    providerClaim
+    providerClaim,
+    context.providerIntakeState ?? null
   );
 }
 
@@ -236,7 +241,8 @@ async function buildCompatibilitySourceContextFromSnapshot(
     parts,
     resolveRunsRootFromRunDir(context.paths.runDir),
     controlWorkspacePath,
-    providerClaim
+    providerClaim,
+    context.providerIntakeState ?? null
   );
 }
 
@@ -245,7 +251,8 @@ function buildProjectionContextFromParts(
   parts: ProjectionContextParts,
   controlRunsRoot: string | null,
   controlWorkspacePath: string | null,
-  providerClaim: ProviderIntakeClaimRecord | null = null
+  providerClaim: ProviderIntakeClaimRecord | null = null,
+  providerIntakeState: ProviderIntakeState | null = null
 ): SelectedRunContext | null {
   if (!snapshot) {
     return null;
@@ -313,11 +320,18 @@ function buildProjectionContextFromParts(
     questionSummary
   });
   const tracked = buildTrackedLinearPayload(parts.trackedIssue);
+  const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
+    tracked_issue: parts.trackedIssue,
+    claim: providerClaim,
+    proof: parts.providerLinearWorkerProof,
+    rehydrated_at: providerIntakeState?.rehydrated_at ?? null
+  });
   const latestEvent = buildSelectedRunLatestEvent({
     controlAction: control.latest_action ?? null,
     updatedAt,
     summary,
-    fallbackEvent: rawStatus
+    fallbackEvent: rawStatus,
+    providerDebugSnapshot
   });
   const lastError =
     rawStatus === 'failed'
@@ -353,6 +367,7 @@ function buildProjectionContextFromParts(
     tracked,
     compatibilityState: resolveCompatibilityState(parts.trackedIssue, providerClaim),
     providerLinearWorkerProof: parts.providerLinearWorkerProof,
+    providerDebugSnapshot,
     providerRetryState: buildProviderRetryState(providerClaim)
   };
 }
@@ -484,7 +499,24 @@ function buildSelectedRunLatestEvent(input: {
   updatedAt: string | null;
   summary: string | null;
   fallbackEvent: string;
+  providerDebugSnapshot: ControlProviderDebugSnapshot | null;
 }): SelectedRunLatestEvent | null {
+  if (
+    !input.controlAction &&
+    input.providerDebugSnapshot?.progress &&
+    shouldPreferProviderDebugProgressEvent(input.fallbackEvent)
+  ) {
+    return {
+      at:
+        input.providerDebugSnapshot.progress.last_semantic_progress_at ??
+        input.providerDebugSnapshot.last_semantic_progress_at ??
+        input.updatedAt,
+      event: input.providerDebugSnapshot.progress.phase,
+      message: input.providerDebugSnapshot.progress.summary ?? input.summary,
+      requestedBy: null,
+      reason: input.providerDebugSnapshot.progress.stall_reason ?? null
+    };
+  }
   if (!input.controlAction && !input.updatedAt && !input.summary) {
     return null;
   }
@@ -495,6 +527,15 @@ function buildSelectedRunLatestEvent(input: {
     requestedBy: input.controlAction?.requested_by ?? null,
     reason: input.controlAction?.reason ?? null
   };
+}
+
+function shouldPreferProviderDebugProgressEvent(fallbackEvent: string): boolean {
+  return (
+    fallbackEvent === 'in_progress' ||
+    fallbackEvent === 'running' ||
+    fallbackEvent === 'started' ||
+    fallbackEvent === 'resuming'
+  );
 }
 
 function resolveSelectedRunDisplaySummary(input: {
@@ -772,7 +813,8 @@ async function readTaskCompatibilityContexts(
       },
       resolveRunsRootFromRunDir(runDir),
       options.controlWorkspacePath ?? resolveSafeLegacyWorkspacePathFromRunDir(runDir),
-      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot)
+      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot),
+      options.providerIntakeState ?? null
     );
     if (context) {
       discovered.push({
@@ -918,6 +960,10 @@ async function buildProviderRetryContextFromClaim(
       tracked: null,
       compatibilityState: claim.issue_state,
       providerLinearWorkerProof: null,
+      providerDebugSnapshot: buildProviderIssueDebugSnapshot({
+        claim,
+        rehydrated_at: context.providerIntakeState?.rehydrated_at ?? null
+      }),
       providerRetryState: buildProviderRetryState(claim)
     };
   }
@@ -929,7 +975,8 @@ async function buildProviderRetryContextFromClaim(
       parts,
       resolveRunsRootFromRunDir(context.paths.runDir),
       controlWorkspacePath,
-      claim
+      claim,
+      context.providerIntakeState ?? null
     ) ??
     null;
   if (!base) {

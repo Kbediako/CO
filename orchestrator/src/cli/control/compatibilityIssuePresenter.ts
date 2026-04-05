@@ -330,6 +330,9 @@ export function buildCompatibilityIssuePayload(input: {
     ...(input.source.providerLinearWorkerProof
       ? { provider_linear_worker_proof: input.source.providerLinearWorkerProof }
       : {}),
+    ...(input.source.providerDebugSnapshot
+      ? { provider_debug_snapshot: input.source.providerDebugSnapshot }
+      : {}),
     ...(input.dispatchPilotSummary ? { dispatch_pilot: input.dispatchPilotSummary } : {})
   };
 }

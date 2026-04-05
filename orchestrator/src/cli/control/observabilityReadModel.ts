@@ -3,6 +3,7 @@ import type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
 import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
+import type { ControlProviderDebugSnapshot } from './providerIssueObservability.js';
 
 export type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 
@@ -120,6 +121,7 @@ interface SharedSelectedProjectionFields {
   tracked: ControlTrackedPayload | null;
   compatibilityState?: string | null;
   providerLinearWorkerProof?: ProviderLinearWorkerProof | null;
+  providerDebugSnapshot?: ControlProviderDebugSnapshot | null;
   providerRetryState?: ControlProviderRetryState | null;
 }
 
@@ -164,6 +166,7 @@ export interface ControlSelectedRunPayload {
   question_summary: ControlQuestionSummaryPayload;
   tracked: ControlTrackedPayload;
   provider_linear_worker_proof?: ProviderLinearWorkerProof;
+  provider_debug_snapshot?: ControlProviderDebugSnapshot | null;
 }
 
 export interface ControlTokenUsagePayload {
@@ -310,6 +313,7 @@ export interface ControlIssuePayload {
   last_error: string | null;
   tracked: ControlTrackedPayload;
   provider_linear_worker_proof?: ProviderLinearWorkerProof | null;
+  provider_debug_snapshot?: ControlProviderDebugSnapshot | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
 }
 
@@ -413,6 +417,11 @@ export function buildProjectionSelectedPayload(
       ? {
           provider_linear_worker_proof: selected.providerLinearWorkerProof
         }
+      : {}),
+    ...(selected.providerDebugSnapshot
+      ? {
+          provider_debug_snapshot: selected.providerDebugSnapshot
+        }
       : {})
   };
 }
@@ -446,6 +455,7 @@ export function buildSelectedRunRuntimeFingerprintInput(
               }
             : null,
           provider_linear_worker_proof: selected.providerLinearWorkerProof ?? null,
+          provider_debug_snapshot: selected.providerDebugSnapshot ?? null,
           provider_retry_state: selected.providerRetryState ?? null,
           question_summary: questionSummary
             ? {
@@ -479,7 +489,9 @@ export function buildSelectedRunRuntimeFingerprintInput(
           task_id: providerIntake.task_id,
           state: providerIntake.state,
           reason: providerIntake.reason,
-          run_id: providerIntake.run_id
+          run_id: providerIntake.run_id,
+          freshness: providerIntake.freshness,
+          rehydrated_at: providerIntake.rehydrated_at
         }
       : null,
     provider_workflow: providerWorkflow

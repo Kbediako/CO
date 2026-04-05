@@ -1068,6 +1068,11 @@ describe('provider linear worker runner', () => {
           stderr: ''
         };
       });
+    const log = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn()
+    };
 
     const proof = await runProviderLinearWorker(
       {
@@ -1085,7 +1090,7 @@ describe('provider linear worker runner', () => {
           .fn()
           .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
           .mockReturnValue('2026-03-21T09:00:01.000Z'),
-        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        log
       }
     );
 
@@ -1169,6 +1174,13 @@ describe('provider linear worker runner', () => {
           ]
         })
       })]),
+      progress: {
+        phase: 'completed',
+        kind: 'worker',
+        status: 'completed',
+        stall_classification: 'completed',
+        recovery_recommendation: 'no_action'
+      },
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
     });
@@ -1240,8 +1252,18 @@ describe('provider linear worker runner', () => {
           ]
         })
       })]),
+      progress: {
+        phase: 'completed',
+        kind: 'worker',
+        status: 'completed'
+      },
       end_reason: 'issue_inactive'
     });
+    expect(
+      log.info.mock.calls.some(([message]) =>
+        typeof message === 'string' && message.includes('[provider-linear-worker-progress]')
+      )
+    ).toBe(true);
   });
 
   it('passes env-backed Linear scope bindings into tracked issue refreshes', async () => {
@@ -1589,6 +1611,11 @@ describe('provider linear worker runner', () => {
         requests: {
           remaining: 1
         }
+      },
+      progress: {
+        phase: 'unknown',
+        kind: 'worker',
+        status: 'progressing'
       }
     });
   });
