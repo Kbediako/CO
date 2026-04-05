@@ -528,6 +528,102 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('keeps the generic latest event when stale claim merge-closeout data is the only provider evidence', async () => {
+    const { paths } = await createHostPaths();
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'stale',
+      reason: 'provider_issue_stale',
+      updated_at: '2026-03-20T01:14:28.970Z',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      merge_closeout: {
+        recorded_at: '2026-03-20T01:16:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-20T01:16:20.000Z',
+        status: 'watching',
+        reason: 'checks_pending',
+        summary: 'Waiting for required checks before merge.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          ready_to_merge: false,
+          gate_reasons: ['required_checks_pending'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 2,
+          checks_failed: 0,
+          required_checks_pending: 2,
+          required_checks_failed: 0,
+          updated_at: '2026-03-20T01:16:20.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-2',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      claim: {
+        freshness: 'stale'
+      },
+      pull_request: {
+        number: 82
+      },
+      progress: {
+        phase: 'waiting_on_checks',
+        kind: 'merge_closeout',
+        status: 'waiting'
+      }
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'in_progress',
+      message: 'Tracked issue is active.'
+    });
+  });
+
   it('does not borrow provider claims from same-issue sibling runs', async () => {
     const { root } = await createHostPaths();
     const childEnv = {

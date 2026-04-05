@@ -533,12 +533,16 @@ function buildSelectedRunLatestEvent(input: {
 function hasAuthoritativeProviderDebugEvidence(
   providerDebugSnapshot: ControlProviderDebugSnapshot
 ): boolean {
-  const hasFreshClaim =
-    providerDebugSnapshot.claim !== null && providerDebugSnapshot.claim.freshness !== 'stale';
+  const claimIsStale = providerDebugSnapshot.claim?.freshness === 'stale';
+  if (claimIsStale && providerDebugSnapshot.progress?.kind === 'merge_closeout') {
+    return false;
+  }
+  const hasFreshClaim = providerDebugSnapshot.claim !== null && !claimIsStale;
+  const hasFreshPullRequest = providerDebugSnapshot.pull_request !== null && !claimIsStale;
   return Boolean(
     hasFreshClaim ||
       providerDebugSnapshot.worker ||
-      providerDebugSnapshot.pull_request ||
+      hasFreshPullRequest ||
       providerDebugSnapshot.last_audit_operation
   );
 }
