@@ -591,6 +591,14 @@ function deriveMergeCloseoutProgressSnapshot(
   const summary =
     normalizeOptionalString(mergeCloseout.summary) ??
     'Merge closeout status updated.';
+  const reviewBlockerReason = resolveMergeCloseoutReviewBlockerReason({
+    unresolvedThreadCount,
+    actionRequiredReasons
+  });
+  const checksFailedReason = resolveMergeCloseoutChecksFailedReason({
+    checksFailed,
+    actionRequiredReasons
+  });
 
   if (mergeStatus === 'merged' || normalizeOptionalString(snapshot?.merged_at)) {
     return {
@@ -619,10 +627,8 @@ function deriveMergeCloseoutProgressSnapshot(
   }
 
   if (
-    mergeStatus === 'action_required' ||
-    (checksFailed ?? 0) > 0 ||
-    (unresolvedThreadCount ?? 0) > 0 ||
-    actionRequiredReasons.length > 0
+    reviewBlockerReason
+    || (unresolvedThreadCount ?? 0) > 0
   ) {
     return {
       phase: 'waiting_on_review',
@@ -631,10 +637,21 @@ function deriveMergeCloseoutProgressSnapshot(
       summary,
       last_semantic_progress_at: lastSemanticProgressAt,
       stall_classification: 'waiting_on_review',
-      stall_reason:
-        actionRequiredReasons[0] ??
-        (unresolvedThreadCount && unresolvedThreadCount > 0 ? 'unresolved_review_threads' : 'review_action_required'),
+      stall_reason: reviewBlockerReason,
       recovery_recommendation: 'address_review_feedback'
+    };
+  }
+
+  if (checksFailedReason) {
+    return {
+      phase: 'waiting_on_checks',
+      kind: 'merge_closeout',
+      status: 'stalled',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'stalled',
+      stall_reason: checksFailedReason,
+      recovery_recommendation: 'inspect_merge_closeout'
     };
   }
 
@@ -664,6 +681,19 @@ function deriveMergeCloseoutProgressSnapshot(
     };
   }
 
+  if (mergeStatus === 'action_required' || actionRequiredReasons.length > 0) {
+    return {
+      phase: 'watching_merge',
+      kind: 'merge_closeout',
+      status: 'stalled',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'stalled',
+      stall_reason: actionRequiredReasons[0] ?? normalizeOptionalString(mergeCloseout.reason) ?? 'merge_action_required',
+      recovery_recommendation: 'inspect_merge_closeout'
+    };
+  }
+
   return {
     phase: mergeStatus === 'action_required' ? 'waiting_on_review' : 'watching_merge',
     kind: 'merge_closeout',
@@ -676,6 +706,48 @@ function deriveMergeCloseoutProgressSnapshot(
     recovery_recommendation:
       mergeStatus === 'action_required' ? 'address_review_feedback' : 'continue_waiting'
   };
+}
+
+function resolveMergeCloseoutReviewBlockerReason(input: {
+  unresolvedThreadCount: number | null;
+  actionRequiredReasons: string[];
+}): string | null {
+  const reviewReason = input.actionRequiredReasons.find((reason) => isMergeCloseoutReviewBlockerReason(reason));
+  if (reviewReason) {
+    return reviewReason;
+  }
+  if ((input.unresolvedThreadCount ?? 0) > 0) {
+    return 'unresolved_review_threads';
+  }
+  return null;
+}
+
+function resolveMergeCloseoutChecksFailedReason(input: {
+  checksFailed: number | null;
+  actionRequiredReasons: string[];
+}): string | null {
+  const failedChecksReason = input.actionRequiredReasons.find((reason) => isMergeCloseoutChecksFailedReason(reason));
+  if (failedChecksReason) {
+    return failedChecksReason;
+  }
+  if ((input.checksFailed ?? 0) > 0) {
+    return 'checks_failed';
+  }
+  return null;
+}
+
+function isMergeCloseoutReviewBlockerReason(reason: string): boolean {
+  return (
+    reason === 'changes_requested' ||
+    reason === 'review_required' ||
+    reason.startsWith('review=') ||
+    reason.startsWith('unresolved_threads=') ||
+    reason.startsWith('unacknowledged_bot_feedback=')
+  );
+}
+
+function isMergeCloseoutChecksFailedReason(reason: string): boolean {
+  return reason.startsWith('required_checks_failed=') || reason.startsWith('checks_failed=');
 }
 
 function buildProviderDebugPullRequestSnapshot(

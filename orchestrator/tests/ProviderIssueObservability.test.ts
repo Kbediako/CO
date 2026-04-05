@@ -189,6 +189,62 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('classifies failed required checks as a stalled merge-closeout blocker', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-04-05T06:15:00.000Z'
+      },
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_active_run',
+        updated_at: '2026-04-05T06:14:00.000Z',
+        run_id: 'run-82-checks-failed',
+        merge_closeout: {
+          recorded_at: '2026-04-05T06:16:00.000Z',
+          status: 'action_required',
+          reason: 'required_checks_failed=1',
+          summary: 'Required checks failed during merge closeout.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/82',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 82
+          },
+          snapshot: {
+            review_decision: 'APPROVED',
+            merge_state_status: 'BLOCKED',
+            ready_to_merge: false,
+            gate_reasons: ['required_checks_failed=1'],
+            action_required_reasons: ['required_checks_failed=1'],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 1,
+            required_checks_pending: 0,
+            required_checks_failed: 1,
+            updated_at: '2026-04-05T06:16:00.000Z',
+            merged_at: null
+          }
+        }
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      progress: {
+        phase: 'waiting_on_checks',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        stall_classification: 'stalled',
+        stall_reason: 'required_checks_failed=1',
+        recovery_recommendation: 'inspect_merge_closeout'
+      },
+      stall_classification: 'stalled',
+      recovery_recommendation: 'inspect_merge_closeout'
+    });
+  });
+
   it('does not let merge closeout state mask a failed worker proof', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {
