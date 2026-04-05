@@ -30,6 +30,7 @@ import {
   readProviderIntakeClaim,
   selectProviderIntakeClaim
 } from './providerIntakeState.js';
+import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 import {
   buildProviderLinearWorkerTerminalSummary,
   deriveDeterministicProviderMutationSuppressions,
@@ -307,10 +308,12 @@ function buildProjectionContextFromParts(
   });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
+  const compatibilityState = resolveCompatibilityState(parts.trackedIssue, providerClaim);
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
     rawStatus,
     latestAction,
-    questionSummary
+    questionSummary,
+    compatibilityState
   });
   const tracked = buildTrackedLinearPayload(parts.trackedIssue);
   const latestEvent = buildSelectedRunLatestEvent({
@@ -351,7 +354,7 @@ function buildProjectionContextFromParts(
     runDir: snapshot.runDir,
     questionSummary,
     tracked,
-    compatibilityState: resolveCompatibilityState(parts.trackedIssue, providerClaim),
+    compatibilityState,
     providerLinearWorkerProof: parts.providerLinearWorkerProof,
     providerRetryState: buildProviderRetryState(providerClaim)
   };
@@ -466,6 +469,7 @@ function resolveSelectedRunDisplayStatus(input: {
   rawStatus: string;
   latestAction: ControlAction['action'] | null;
   questionSummary: SelectedRunQuestionSummary;
+  compatibilityState: string | null;
 }): { displayStatus: string; statusReason: string | null } {
   if (input.rawStatus === 'in_progress' && input.latestAction === 'pause') {
     return {
@@ -476,7 +480,32 @@ function resolveSelectedRunDisplayStatus(input: {
   if (input.rawStatus === 'in_progress' && input.questionSummary.queuedCount > 0) {
     return { displayStatus: 'awaiting_input', statusReason: 'queued_questions' };
   }
+  if (input.rawStatus === 'in_progress') {
+    const operatorVisibleState = resolveOperatorVisibleRunningState(input.compatibilityState);
+    if (operatorVisibleState) {
+      return { displayStatus: operatorVisibleState, statusReason: null };
+    }
+  }
   return { displayStatus: input.rawStatus, statusReason: null };
+}
+
+function resolveOperatorVisibleRunningState(compatibilityState: string | null): string | null {
+  const normalized = compatibilityState?.trim();
+  if (!normalized) {
+    return null;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: normalized,
+    state_type: null
+  });
+  if (workflowState.isTodo || workflowState.isTerminal) {
+    return null;
+  }
+  const stateKey = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (stateKey === 'inprogress' || stateKey === 'running' || stateKey === 'started') {
+    return 'running';
+  }
+  return normalized;
 }
 
 function buildSelectedRunLatestEvent(input: {

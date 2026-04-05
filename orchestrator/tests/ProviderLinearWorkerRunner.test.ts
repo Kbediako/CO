@@ -797,6 +797,47 @@ describe('provider linear worker runner', () => {
     expect(parsed.lastEvent).toBe('turn.completed');
   });
 
+  it('parses appserver method telemetry into proof event/message semantics', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"notification","method":"thread/tokenUsage/updated","params":{"tokenUsage":{"total":{"inputTokens":12,"outputTokens":4,"totalTokens":16}}},"timestamp":"2026-03-21T09:00:00.100Z"}',
+        '{"type":"notification","method":"item/completed","params":{"item":{"type":"fileChange","status":"completed"}},"timestamp":"2026-03-21T09:00:00.200Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 12,
+      output_tokens: 4,
+      total_tokens: 16
+    });
+    expect(parsed.lastEvent).toBe('item/completed');
+    expect(parsed.finalMessage).toBe('item completed: file change');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.200Z');
+  });
+
+  it('parses Codex usage-window rate limits without a legacy limit id', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":12.5,"windowDurationMins":300},"secondary":{"usedPercent":48,"windowDurationMins":10080}}},"timestamp":"2026-03-21T09:00:00.500Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.rateLimits).toEqual({
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300
+      },
+      secondary: {
+        usedPercent: 48,
+        windowDurationMins: 10080
+      }
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.500Z');
+  });
+
   it('waits for child close before resolving piped stdio capture', async () => {
     vi.resetModules();
     const stdout = new PassThrough();
