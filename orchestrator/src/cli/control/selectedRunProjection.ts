@@ -96,6 +96,11 @@ interface ProjectionContextParts {
   providerLinearWorkerProof: ProviderLinearWorkerProof | null;
 }
 
+interface ResolvedCompatibilityState {
+  state: string | null;
+  stateType: string | null;
+}
+
 interface LinearAdvisoryStateSnapshot {
   tracked_issue?: LiveLinearTrackedIssue | null;
 }
@@ -354,7 +359,7 @@ function buildProjectionContextFromParts(
     runDir: snapshot.runDir,
     questionSummary,
     tracked,
-    compatibilityState,
+    compatibilityState: compatibilityState?.state ?? null,
     providerLinearWorkerProof: parts.providerLinearWorkerProof,
     providerRetryState: buildProviderRetryState(providerClaim)
   };
@@ -382,8 +387,16 @@ function resolveSelectedRunWorkspacePath(input: {
 function resolveCompatibilityState(
   trackedIssue: LiveLinearTrackedIssue | null,
   providerClaim: ProviderIntakeClaimRecord | null
-): string | null {
-  return trackedIssue?.state ?? providerClaim?.issue_state ?? null;
+): ResolvedCompatibilityState | null {
+  const state = trackedIssue?.state ?? providerClaim?.issue_state ?? null;
+  const stateType = trackedIssue?.state_type ?? providerClaim?.issue_state_type ?? null;
+  if (!state && !stateType) {
+    return null;
+  }
+  return {
+    state,
+    stateType
+  };
 }
 
 function isCliRunManifestPathWithinRunsRoot(manifestPath: string, runsRoot: string): boolean {
@@ -469,7 +482,7 @@ function resolveSelectedRunDisplayStatus(input: {
   rawStatus: string;
   latestAction: ControlAction['action'] | null;
   questionSummary: SelectedRunQuestionSummary;
-  compatibilityState: string | null;
+  compatibilityState: ResolvedCompatibilityState | null;
 }): { displayStatus: string; statusReason: string | null } {
   if (input.rawStatus === 'in_progress' && input.latestAction === 'pause') {
     return {
@@ -489,23 +502,32 @@ function resolveSelectedRunDisplayStatus(input: {
   return { displayStatus: input.rawStatus, statusReason: null };
 }
 
-function resolveOperatorVisibleRunningState(compatibilityState: string | null): string | null {
-  const normalized = compatibilityState?.trim();
-  if (!normalized) {
+function resolveOperatorVisibleRunningState(
+  compatibilityState: ResolvedCompatibilityState | null
+): string | null {
+  const normalizedState = compatibilityState?.state?.trim() ?? null;
+  const normalizedStateType = compatibilityState?.stateType?.trim().toLowerCase() ?? null;
+  if (!normalizedState) {
     return null;
   }
   const workflowState = classifyProviderLinearWorkflowState({
-    state: normalized,
-    state_type: null
+    state: normalizedState,
+    state_type: normalizedStateType
   });
-  if (workflowState.isTodo || workflowState.isTerminal) {
+  if (
+    workflowState.isTodo ||
+    workflowState.isTerminal ||
+    normalizedStateType === 'triage' ||
+    normalizedStateType === 'backlog' ||
+    normalizedStateType === 'unstarted'
+  ) {
     return null;
   }
-  const stateKey = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const stateKey = normalizedState.toLowerCase().replace(/[^a-z0-9]+/g, '');
   if (stateKey === 'inprogress' || stateKey === 'running' || stateKey === 'started') {
     return 'running';
   }
-  return normalized;
+  return normalizedState;
 }
 
 function buildSelectedRunLatestEvent(input: {

@@ -2126,6 +2126,56 @@ describe('ControlRuntime', () => {
     expect(sameIssueRecord?.payload.running?.display_state).toBe('in_progress');
   });
 
+  it('does not let custom unstarted state types override an active running display state', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1037-stage-custom-backlog',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-1037-stage-custom-backlog',
+          identifier: 'ISSUE-1037-STAGE-CUSTOM-BACKLOG',
+          title: 'Custom backlog label should not replace a live run',
+          state: 'Queued Up',
+          state_type: 'unstarted',
+          updated_at: '2026-03-07T00:29:45.000Z'
+        })
+      }
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-stage-custom-backlog',
+      issue_id: 'issue-1037-stage-custom-backlog',
+      issue_identifier: 'ISSUE-1037-STAGE-CUSTOM-BACKLOG',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'worker is still running'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-stage-custom-backlog',
+      issue_identifier: 'ISSUE-1037-STAGE-CUSTOM-BACKLOG',
+      pid: '4444',
+      turn_count: 2,
+      last_event: 'turn/completed',
+      last_message: 'turn completed (completed)',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1037-STAGE-CUSTOM-BACKLOG'
+    );
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-STAGE-CUSTOM-BACKLOG',
+        display_state: 'in_progress'
+      })
+    ]);
+    expect(sameIssueRecord?.payload.display_status).toBe('in_progress');
+    expect(sameIssueRecord?.payload.running?.display_state).toBe('in_progress');
+  });
+
   it('excludes completed sibling telemetry from runtime rows and codex totals', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
