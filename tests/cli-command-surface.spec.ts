@@ -102,7 +102,7 @@ async function runCli(
   });
 }
 
-function parseCliFailure(error: unknown): { stdout: string; exitCode: number } {
+function parseCliFailure(error: unknown): { stdout: string; stderr: string; exitCode: number } {
   const typed = error as NodeJS.ErrnoException & {
     stdout?: string | Buffer;
     stderr?: string | Buffer;
@@ -122,6 +122,7 @@ function parseCliFailure(error: unknown): { stdout: string; exitCode: number } {
         : NaN;
   return {
     stdout: typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '',
+    stderr: typeof typed.stderr === 'string' ? typed.stderr : typed.stderr?.toString() ?? '',
     exitCode: Number.isInteger(parsedExitCode) && Number.isFinite(parsedExitCode) ? parsedExitCode : 1
   };
 }
@@ -182,10 +183,19 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
-    await expect(runCli(['unknown-command'])).rejects.toMatchObject({
-      stderr: expect.stringContaining('Unknown command: unknown-command'),
-      stdout: expect.stringContaining('Usage: codex-orchestrator <command> [options]')
-    });
+    let stdout = '';
+    let stderr = '';
+    let exitCode = 0;
+    try {
+      await runCli(['unknown-command']);
+      throw new Error('expected unknown-command to exit non-zero');
+    } catch (error) {
+      ({ stdout, stderr, exitCode } = parseCliFailure(error));
+    }
+
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toContain('Unknown command: unknown-command');
+    expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
   }, CLI_BOOT_TIMEOUT);
 
   it('prints status help without requiring a run id', async () => {
