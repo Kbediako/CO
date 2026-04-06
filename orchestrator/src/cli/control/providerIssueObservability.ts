@@ -26,6 +26,7 @@ export type ProviderLinearWorkerProgressPhase =
   | 'waiting_on_review'
   | 'watching_merge'
   | 'attempting_merge'
+  | 'pending_shared_root_reconciliation'
   | 'review_handoff'
   | 'inactive'
   | 'completed'
@@ -115,6 +116,12 @@ interface ProviderIssueMergeCloseoutLike {
     merged_at?: string | null;
     head_oid?: string | null;
   } | null;
+  shared_root?: {
+    status?: string | null;
+    reason?: string | null;
+    before_status?: string | null;
+    after_status?: string | null;
+  } | null;
 }
 
 interface ProviderIssueChildStreamLike {
@@ -194,6 +201,10 @@ export interface ControlProviderDebugSnapshot {
     merge_closeout_status: string | null;
     reason: string | null;
     summary: string | null;
+    shared_root_status: string | null;
+    shared_root_reason: string | null;
+    shared_root_before_status: string | null;
+    shared_root_after_status: string | null;
     ready_to_merge: boolean | null;
     review_decision: string | null;
     merge_state_status: string | null;
@@ -574,6 +585,7 @@ function deriveMergeCloseoutProgressSnapshot(
 ): ProviderLinearWorkerProgressSnapshot {
   const mergeStatus = normalizeOptionalString(mergeCloseout.status);
   const snapshot = mergeCloseout.snapshot ?? null;
+  const sharedRoot = mergeCloseout.shared_root ?? null;
   const checksPending =
     normalizeOptionalInteger(snapshot?.required_checks_pending) ??
     normalizeOptionalInteger(snapshot?.checks_pending);
@@ -583,6 +595,11 @@ function deriveMergeCloseoutProgressSnapshot(
   const unresolvedThreadCount = normalizeOptionalInteger(snapshot?.unresolved_thread_count);
   const actionRequiredReasons = normalizeStringArray(snapshot?.action_required_reasons);
   const gateReasons = normalizeStringArray(snapshot?.gate_reasons);
+  const snapshotState = normalizeOptionalString(snapshot?.state);
+  const snapshotShowsMerged =
+    mergeStatus === 'merged' ||
+    Boolean(normalizeOptionalString(snapshot?.merged_at)) ||
+    snapshotState === 'MERGED';
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(mergeCloseout.recorded_at),
     normalizeOptionalString(snapshot?.updated_at),
@@ -600,7 +617,33 @@ function deriveMergeCloseoutProgressSnapshot(
     actionRequiredReasons
   });
 
-  if (mergeStatus === 'merged' || normalizeOptionalString(snapshot?.merged_at)) {
+  if (snapshotShowsMerged) {
+    if (normalizeOptionalString(sharedRoot?.status) === 'failed') {
+      return {
+        phase: 'failed',
+        kind: 'merge_closeout',
+        status: 'failed',
+        summary,
+        last_semantic_progress_at: lastSemanticProgressAt,
+        stall_classification: 'failed',
+        stall_reason:
+          normalizeOptionalString(sharedRoot?.reason) ?? 'shared_root_reconciliation_failed',
+        recovery_recommendation: 'inspect_merge_closeout'
+      };
+    }
+    if (normalizeOptionalString(sharedRoot?.status) === 'skipped') {
+      return {
+        phase: 'pending_shared_root_reconciliation',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        summary,
+        last_semantic_progress_at: lastSemanticProgressAt,
+        stall_classification: 'stalled',
+        stall_reason:
+          normalizeOptionalString(sharedRoot?.reason) ?? 'pending_shared_root_reconciliation',
+        recovery_recommendation: 'inspect_merge_closeout'
+      };
+    }
     return {
       phase: 'completed',
       kind: 'merge_closeout',
@@ -766,6 +809,10 @@ function buildProviderDebugPullRequestSnapshot(
     merge_closeout_status: normalizeOptionalString(mergeCloseout.status),
     reason: normalizeOptionalString(mergeCloseout.reason),
     summary: normalizeOptionalString(mergeCloseout.summary),
+    shared_root_status: normalizeOptionalString(mergeCloseout.shared_root?.status),
+    shared_root_reason: normalizeOptionalString(mergeCloseout.shared_root?.reason),
+    shared_root_before_status: normalizeOptionalString(mergeCloseout.shared_root?.before_status),
+    shared_root_after_status: normalizeOptionalString(mergeCloseout.shared_root?.after_status),
     ready_to_merge:
       typeof snapshot?.ready_to_merge === 'boolean' ? snapshot.ready_to_merge : null,
     review_decision: normalizeOptionalString(snapshot?.review_decision),
@@ -811,6 +858,8 @@ function defaultProgressSummaryForPhase(phase: ProviderLinearWorkerProgressPhase
       return 'Provider worker completed a turn and is evaluating next steps.';
     case 'turn_failed':
       return 'Provider worker turn failed.';
+    case 'pending_shared_root_reconciliation':
+      return 'Shared-root reconciliation is pending after merge closeout.';
     case 'completed':
       return 'Provider worker completed successfully.';
     default:

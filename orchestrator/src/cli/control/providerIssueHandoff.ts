@@ -46,6 +46,7 @@ import {
   runProviderTerminalCleanup,
   type ProviderTerminalCleanupConfig
 } from './providerTerminalCleanup.js';
+import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
 import type { ProviderMergeCloseoutRecord } from './providerMergeCloseout.js';
 
 export interface ProviderIssueLauncher {
@@ -94,6 +95,7 @@ interface ProviderIssueRunRecord {
   manifestPath: string;
   pipelineId: string | null;
   status: string | null;
+  proofTerminalStatus: 'failed' | 'succeeded' | null;
   summary: string | null;
   issueUpdatedAt: string | null;
   startedAt: string | null;
@@ -101,6 +103,7 @@ interface ProviderIssueRunRecord {
 }
 
 interface ProviderLinearWorkerProofRecord {
+  attempt_started_at?: unknown;
   owner_phase?: unknown;
   owner_status?: unknown;
   end_reason?: unknown;
@@ -396,6 +399,24 @@ export function createProviderIssueHandoffService(
     });
   };
 
+  const shouldAttemptDeterministicMergeCloseoutForRecoveredRun = (input: {
+    claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'merge_closeout'>;
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'state'> | null;
+    run: ProviderIssueRunRecord | null;
+  }): boolean =>
+    Boolean(
+      input.run &&
+      input.trackedIssue &&
+      input.run.proofTerminalStatus === 'succeeded' &&
+      (
+        input.claim.state === 'starting' ||
+        input.claim.state === 'resuming' ||
+        input.claim.reason === 'provider_issue_rehydrated_active_run' ||
+        isProviderMergeCloseoutWatchingClaim(input.claim)
+      ) &&
+      normalizeProviderLinearWorkflowState(input.trackedIssue.state) === 'merging'
+    );
+
   const scheduleBestEffortRehydrateWithRefreshLock = (
     attempt = 1
   ): void => {
@@ -404,7 +425,7 @@ export function createProviderIssueHandoffService(
     }
     bestEffortRehydrateTimer = setTimeout(() => {
       bestEffortRehydrateTimer = null;
-      void runWithRefreshLifecycleLock(rehydrateNow)
+      void runWithRefreshLifecycleLock(() => rehydrateNow({ refreshTrackedIssueMetadata: true }))
         .then((result) => {
           if (result.hasPendingClaims && attempt < BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS) {
             scheduleBestEffortRehydrateWithRefreshLock(attempt + 1);
@@ -487,6 +508,23 @@ export function createProviderIssueHandoffService(
     ...(trackedIssue.blocked_by === undefined ? {} : { issue_blocked_by: trackedIssue.blocked_by })
   });
 
+  const isTrackedIssueFreshEnoughForClaim = (
+    claim: Pick<ProviderIntakeClaimRecord, 'issue_updated_at'>,
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'updated_at'>
+  ): boolean => {
+    const freshness = compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: claim.issue_updated_at ?? null,
+      nextIssueUpdatedAt: trackedIssue.updated_at
+    });
+    if (freshness === 'older') {
+      return false;
+    }
+    if (freshness === 'unknown' && claim.issue_updated_at) {
+      return false;
+    }
+    return true;
+  };
+
   const buildFreshTrackedIssueClaimFields = (
     claim: Pick<ProviderIntakeClaimRecord, 'issue_updated_at'>,
     trackedIssue: Pick<
@@ -516,23 +554,17 @@ export function createProviderIssueHandoffService(
       | 'issue_blocked_by'
     >
   > => {
-    const freshness = compareTrackedIssueUpdatedAt({
-      existingIssueUpdatedAt: claim.issue_updated_at ?? null,
-      nextIssueUpdatedAt: trackedIssue.updated_at
-    });
-    if (freshness === 'older') {
-      return {};
-    }
-    if (freshness === 'unknown' && claim.issue_updated_at) {
+    if (!isTrackedIssueFreshEnoughForClaim(claim, trackedIssue)) {
       return {};
     }
     return buildTrackedIssueClaimFields(trackedIssue);
   };
 
-  const resolveFreshTrackedIssueClaimFieldsForActiveClaim = async (
+  const resolveFreshTrackedIssueForActiveClaim = async (
     claim: Pick<ProviderIntakeClaimRecord, 'provider' | 'issue_id' | 'issue_updated_at'>
-  ): Promise<
-    Partial<
+  ): Promise<{
+    trackedIssue: LiveLinearTrackedIssue | null;
+    claimFields: Partial<
       Pick<
         ProviderIntakeClaimRecord,
         | 'issue_identifier'
@@ -546,10 +578,10 @@ export function createProviderIssueHandoffService(
         | 'issue_assignee_name'
         | 'issue_blocked_by'
       >
-    >
-  > => {
+    >;
+  }> => {
     if (!options.resolveTrackedIssue) {
-      return {};
+      return { trackedIssue: null, claimFields: {} };
     }
 
     let resolution: Awaited<ReturnType<NonNullable<typeof options.resolveTrackedIssue>>>;
@@ -565,20 +597,27 @@ export function createProviderIssueHandoffService(
           claim.issue_id
         )}: ${(error as Error)?.message ?? String(error)}`
       );
-      return {};
+      return { trackedIssue: null, claimFields: {} };
     }
     if (resolution.kind !== 'ready') {
-      return {};
+      return { trackedIssue: null, claimFields: {} };
     }
 
     const eligibility = assessProviderTrackedIssueEligibility(resolution.trackedIssue, {
       hasExistingClaim: true
     });
     if (!eligibility.eligible) {
-      return {};
+      return { trackedIssue: null, claimFields: {} };
     }
 
-    return buildFreshTrackedIssueClaimFields(claim, resolution.trackedIssue);
+    if (!isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue)) {
+      return { trackedIssue: null, claimFields: {} };
+    }
+
+    return {
+      trackedIssue: resolution.trackedIssue,
+      claimFields: buildFreshTrackedIssueClaimFields(claim, resolution.trackedIssue)
+    };
   };
 
   const launchResumeForRun = async (input: {
@@ -950,9 +989,16 @@ export function createProviderIssueHandoffService(
 
       const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
-        const trackedIssueFields = input?.refreshTrackedIssueMetadata
-          ? await resolveFreshTrackedIssueClaimFieldsForActiveClaim(claim)
-          : {};
+        const preserveMergeCloseoutWatchingClaim = isProviderMergeCloseoutWatchingClaim(claim);
+        const freshTrackedIssue = input?.refreshTrackedIssueMetadata
+          ? await resolveFreshTrackedIssueForActiveClaim(claim)
+          : { trackedIssue: null, claimFields: {} };
+        const mergeTrackedIssue = freshTrackedIssue.trackedIssue;
+        if (preserveMergeCloseoutWatchingClaim && !mergeTrackedIssue) {
+          hasPendingClaims = true;
+          continue;
+        }
+        const trackedIssueFields = freshTrackedIssue.claimFields;
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           ...trackedIssueFields,
           state: 'running',
@@ -1026,6 +1072,30 @@ export function createProviderIssueHandoffService(
           didRunMatchClaimAttempt(claim, completedRun)
         )
       ) {
+        if (input?.refreshTrackedIssueMetadata) {
+          const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
+          if (
+            freshTrackedIssue.trackedIssue &&
+            shouldAttemptDeterministicMergeCloseoutForRecoveredRun({
+              claim,
+              trackedIssue: freshTrackedIssue.trackedIssue,
+              run: completedRun
+            })
+          ) {
+            const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
+              claim: {
+                ...claim,
+                ...freshTrackedIssue.claimFields
+              },
+              trackedIssue: freshTrackedIssue.trackedIssue,
+              latestRun: completedRun
+            });
+            if (mergeCloseoutClaim) {
+              hasPendingClaims = true;
+              continue;
+            }
+          }
+        }
         const completedState = buildProviderCompletedRunRehydrateState({
           claim,
           run: completedRun,
@@ -2153,6 +2223,13 @@ export function createProviderIssueHandoffService(
 
           if (resolution.kind === 'owned') {
             if (activeRun) {
+              const preserveMergeCloseoutWatchingClaim =
+                isProviderMergeCloseoutWatchingClaim(claim) &&
+                !isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue);
+              if (preserveMergeCloseoutWatchingClaim) {
+                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                continue;
+              }
               const trackedIssueFields = buildFreshTrackedIssueClaimFields(
                 claim,
                 resolution.trackedIssue
@@ -2226,6 +2303,13 @@ export function createProviderIssueHandoffService(
           }
 
           if (activeRun) {
+            const preserveMergeCloseoutWatchingClaim =
+              isProviderMergeCloseoutWatchingClaim(claim) &&
+              !isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue);
+            if (preserveMergeCloseoutWatchingClaim) {
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+              continue;
+            }
             const trackedIssueFields = buildFreshTrackedIssueClaimFields(
               claim,
               resolution.trackedIssue
@@ -3003,6 +3087,10 @@ export async function discoverProviderIssueRuns(
         manifestPath,
         pipelineId,
         status: resolveProviderIssueRunStatus(manifest, proof),
+        proofTerminalStatus: resolveAuthoritativeProviderLinearWorkerTerminalStatus(
+          manifest,
+          proof
+        ),
         summary: resolveProviderIssueRunSummary(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
         startedAt: readStringValue(manifest, 'started_at'),
@@ -3021,10 +3109,20 @@ function resolveProviderIssueRunStatus(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
   const manifestStatus = readStringValue(manifest, 'status');
-  const proofTerminalStatus = shouldUseProviderLinearWorkerTerminalProofForStatusOverride(manifest, proof)
+  const proofTerminalStatus = resolveAuthoritativeProviderLinearWorkerTerminalStatus(
+    manifest,
+    proof
+  );
+  return proofTerminalStatus ?? manifestStatus;
+}
+
+function resolveAuthoritativeProviderLinearWorkerTerminalStatus(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): 'failed' | 'succeeded' | null {
+  return shouldUseProviderLinearWorkerTerminalProofForStatusOverride(manifest, proof)
     ? resolveProviderLinearWorkerTerminalStatus(proof)
     : null;
-  return proofTerminalStatus ?? manifestStatus;
 }
 
 function resolveProviderIssueRunSummary(
@@ -3097,7 +3195,12 @@ function shouldUseProviderLinearWorkerTerminalProof(
   if (!resolveProviderLinearWorkerTerminalStatus(proof)) {
     return false;
   }
-  const proofUpdatedAt = readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at');
+  const proofRecord = (proof ?? {}) as Record<string, unknown>;
+  const runStartedAt = readStringValue(manifest, 'started_at');
+  if (runStartedAt && !isProviderLinearWorkerProofFreshForStage(proofRecord, runStartedAt)) {
+    return false;
+  }
+  const proofUpdatedAt = readStringValue(proofRecord, 'updated_at');
   if (!proofUpdatedAt) {
     return false;
   }
@@ -3121,10 +3224,14 @@ function shouldUseProviderLinearWorkerTerminalProofForStatusOverride(
   proof: ProviderLinearWorkerProofRecord | null
 ): boolean {
   const manifestStatus = readStringValue(manifest, 'status');
-  if (manifestStatus && manifestStatus !== 'in_progress') {
+  const proofTerminalStatus = resolveProviderLinearWorkerTerminalStatus(proof);
+  if (!proofTerminalStatus) {
     return false;
   }
-  return shouldUseProviderLinearWorkerTerminalProof(manifest, proof);
+  if (!manifestStatus || manifestStatus === 'in_progress' || manifestStatus === proofTerminalStatus) {
+    return shouldUseProviderLinearWorkerTerminalProof(manifest, proof);
+  }
+  return false;
 }
 
 function shouldUseProviderLinearWorkerTerminalProofForSummary(
@@ -3338,6 +3445,12 @@ function resolveProviderMergeCloseoutClaimReason(
     default:
       return 'provider_issue_merge_closeout_watching';
   }
+}
+
+function isProviderMergeCloseoutWatchingClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'reason' | 'merge_closeout'>
+): boolean {
+  return claim.reason === 'provider_issue_merge_closeout_watching' && claim.merge_closeout?.status === 'watching';
 }
 
 function resolveProviderMergeCloseoutClaimState(
@@ -3663,6 +3776,7 @@ function resolveProviderReleaseRun(
       manifestPath: claim.run_manifest_path,
       pipelineId: null,
       status: null,
+      proofTerminalStatus: null,
       summary: null,
       issueUpdatedAt: claim.issue_updated_at,
       startedAt: null,

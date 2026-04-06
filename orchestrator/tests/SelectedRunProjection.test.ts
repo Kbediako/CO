@@ -379,6 +379,248 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('surfaces pending shared-root reconciliation instead of terminal success after merge closeout', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-shared-root-pending');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-shared-root-pending',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        summary: 'Completed successfully'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          last_event: 'task_complete',
+          last_message: 'Worker exited after merge closeout.',
+          last_event_at: '2026-04-05T06:50:10.000Z',
+          updated_at: '2026-04-05T06:50:15.000Z',
+          end_reason: 'issue_inactive'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_action_required',
+      merge_closeout: {
+        recorded_at: '2026-04-05T06:50:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-05T06:50:30.000Z',
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        summary: 'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-05T06:50:30.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'skipped',
+          reason: 'shared_root_dirty',
+          before_status: '## main...origin/main\\n M tasks/index.json',
+          after_status: '## main...origin/main\\n M tasks/index.json'
+        },
+        linear_transition: null
+      }
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.displayStatus).toBe('pending_shared_root_reconciliation');
+    expect(selected?.rawStatus).toBe('succeeded');
+    expect(selected?.statusReason).toBe('shared_root_dirty');
+    expect(selected?.summary).toBe(
+      'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.'
+    );
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      progress: {
+        phase: 'pending_shared_root_reconciliation',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        stall_reason: 'shared_root_dirty'
+      }
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'pending_shared_root_reconciliation',
+      message:
+        'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+      reason: 'shared_root_dirty'
+    });
+  });
+
+  it('keeps failed shared-root reconciliation visible as lastError after merge closeout', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-shared-root-failed');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-shared-root-failed',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        summary: 'Completed successfully'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          last_event: 'task_complete',
+          last_message: 'Worker exited after merge closeout.',
+          last_event_at: '2026-04-05T06:50:10.000Z',
+          updated_at: '2026-04-05T06:50:15.000Z',
+          end_reason: 'issue_inactive'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      merge_closeout: {
+        recorded_at: '2026-04-05T06:50:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-04-05T06:50:30.000Z',
+        status: 'merged',
+        reason: 'shared_root_reconciliation_failed',
+        summary: 'Merged attached PR #82; shared-root reconciliation failed (shared_root_fast_forward_failed) after the Linear issue transitioned to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-05T06:50:30.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'failed',
+          reason: 'shared_root_fast_forward_failed',
+          before_status: '## main...origin/main [behind 1]',
+          after_status: null
+        },
+        linear_transition: {
+          status: 'transitioned',
+          attempted_at: '2026-04-05T06:50:20.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-05T06:50:30.000Z',
+          error: null
+        }
+      }
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.displayStatus).toBe('failed');
+    expect(selected?.rawStatus).toBe('succeeded');
+    expect(selected?.statusReason).toBe('shared_root_fast_forward_failed');
+    expect(selected?.summary).toBe(
+      'Merged attached PR #82; shared-root reconciliation failed (shared_root_fast_forward_failed) after the Linear issue transitioned to Done.'
+    );
+    expect(selected?.lastError).toBe('shared_root_fast_forward_failed');
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'failed',
+      reason: 'shared_root_fast_forward_failed'
+    });
+  });
+
   it('ignores stale terminal proof snapshots when the selected stage started later', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -621,6 +863,119 @@ describe('SelectedRunProjection', () => {
     expect(selected?.latestEvent).toMatchObject({
       event: 'in_progress',
       message: 'Tracked issue is active.'
+    });
+  });
+
+  it('keeps stale pending shared-root reconciliation visible until the live issue reaches a terminal state', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-stale-shared-root-pending');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stale-shared-root-pending',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        summary: 'Completed successfully'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-05T06:50:30.000Z',
+      state: 'stale',
+      reason: 'provider_issue_stale',
+      merge_closeout: {
+        recorded_at: '2026-04-05T06:50:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-05T06:50:30.000Z',
+        status: 'action_required',
+        reason: 'pending_shared_root_reconciliation',
+        summary: 'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-04-05T06:50:30.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'skipped',
+          reason: 'shared_root_dirty',
+          before_status: '## main...origin/main\\n M tasks/index.json',
+          after_status: '## main...origin/main\\n M tasks/index.json'
+        },
+        linear_transition: null
+      }
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-2',
+        title: 'Shared-root reconciliation is still pending.',
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-04-05T06:51:00.000Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      claim: {
+        freshness: 'stale'
+      },
+      progress: {
+        phase: 'pending_shared_root_reconciliation',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        stall_reason: 'shared_root_dirty'
+      }
+    });
+    expect(selected?.rawStatus).toBe('succeeded');
+    expect(selected?.displayStatus).toBe('pending_shared_root_reconciliation');
+    expect(selected?.statusReason).toBe('shared_root_dirty');
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'pending_shared_root_reconciliation',
+      message:
+        'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+      reason: 'shared_root_dirty'
     });
   });
 
