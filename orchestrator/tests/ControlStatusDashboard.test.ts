@@ -1297,6 +1297,66 @@ describe('control status dashboard', () => {
     expect(writes[writes.length - 1]).toBe('\n');
   });
 
+  it('accounts for wrapped terminal rows when rewriting the pinned primary attach frame', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let readCount = 0;
+    let columns = 120;
+
+    const handle = startAttachedControlStatusDashboard(
+      {
+        readDataset: async () =>
+          buildDataset({
+            running: [
+              {
+                ...buildDataset().running[0],
+                summary:
+                  'This is an intentionally long running summary to force wrapped rows in the pinned primary live region'
+              }
+            ],
+            totals: {
+              ...buildDataset().totals,
+              total_tokens: 217 + readCount++
+            }
+          }),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'attach-viewer',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          get columns() {
+            return columns;
+          },
+          isTTY: true
+        }
+      },
+      {
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    columns = 40;
+    const expectedWrappedRows = stripAnsi(writes[0] ?? '')
+      .split('\n')
+      .reduce((rowCount, line) => rowCount + Math.max(1, Math.ceil(line.length / columns)), 0);
+    expect(expectedWrappedRows).toBeGreaterThan(stripAnsi(writes[0] ?? '').split('\n').length);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(writes[1]).toContain(`\r\u001b[${expectedWrappedRows - 1}A\u001b[J`);
+    handle.stop();
+  });
+
   it('suppresses timed and runtime-triggered rerenders while paused until resumed', async () => {
     vi.useFakeTimers();
 

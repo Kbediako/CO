@@ -275,7 +275,7 @@ function startControlStatusViewer(
   const liveSurfaceMode: DashboardSurfaceMode = options.liveSurfaceMode ?? 'primary';
   const enablePinnedPrimaryLiveRegion = liveSurfaceMode === 'primary' && output.isTTY === true;
   let activeSurfaceMode: DashboardSurfaceMode = 'primary';
-  let activePrimaryFrameLineCount = 0;
+  let activePrimaryFrame: string | null = null;
   let primarySurfacePromptNeedsNewline = false;
   let frameState: DashboardFrameState = {
     paused: false,
@@ -389,10 +389,10 @@ function startControlStatusViewer(
       if (activeSurfaceMode === 'alternate') {
         output.write(`${ANSI_EXIT_ALT_SCREEN}${primarySurfacePromptNeedsNewline ? '\n' : ''}`);
         activeSurfaceMode = 'primary';
-      } else if (primarySurfacePromptNeedsNewline || activePrimaryFrameLineCount > 0) {
+      } else if (primarySurfacePromptNeedsNewline || activePrimaryFrame !== null) {
         output.write('\n');
       }
-      activePrimaryFrameLineCount = 0;
+      activePrimaryFrame = null;
       primarySurfacePromptNeedsNewline = false;
     },
     async flush() {
@@ -647,9 +647,8 @@ function startControlStatusViewer(
   }
 
   function writeFrame(frame: string): void {
-    const primaryFrameLineCount = countFrameLines(frame);
     if (frameState.surfaceMode === 'alternate') {
-      activePrimaryFrameLineCount = 0;
+      activePrimaryFrame = null;
       if (activeSurfaceMode !== 'alternate') {
         activeSurfaceMode = 'alternate';
         output.write(`${ANSI_ENTER_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}`);
@@ -661,7 +660,7 @@ function startControlStatusViewer(
 
     if (activeSurfaceMode === 'alternate') {
       activeSurfaceMode = 'primary';
-      activePrimaryFrameLineCount = 0;
+      activePrimaryFrame = null;
       primarySurfacePromptNeedsNewline = false;
       output.write(`${ANSI_EXIT_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}\n`);
       return;
@@ -669,28 +668,41 @@ function startControlStatusViewer(
 
     primarySurfacePromptNeedsNewline = true;
     if (enablePinnedPrimaryLiveRegion) {
-      if (activePrimaryFrameLineCount > 0) {
-        output.write(rewritePrimaryFrame(frame, activePrimaryFrameLineCount));
+      if (activePrimaryFrame !== null) {
+        output.write(rewritePrimaryFrame(frame, countFrameRows(activePrimaryFrame, output.columns ?? null)));
       } else {
         output.write(frame);
       }
-      activePrimaryFrameLineCount = primaryFrameLineCount;
+      activePrimaryFrame = frame;
       return;
     }
 
-    activePrimaryFrameLineCount = 0;
+    activePrimaryFrame = null;
     output.write(`${ANSI_CLEAR_HOME}${frame}`);
   }
 }
 
-function countFrameLines(frame: string): number {
-  return frame.length === 0 ? 0 : frame.split('\n').length;
+function countFrameRows(frame: string, terminalColumns: number | null | undefined): number {
+  if (frame.length === 0) {
+    return 0;
+  }
+  const columns = resolveTerminalColumns(terminalColumns);
+  return frame
+    .split('\n')
+    .reduce((rowCount, line) => rowCount + countWrappedTerminalRows(stripAnsiSequences(line), columns), 0);
 }
 
-function rewritePrimaryFrame(frame: string, previousLineCount: number): string {
+function countWrappedTerminalRows(line: string, terminalColumns: number): number {
+  if (terminalColumns <= 0) {
+    return 1;
+  }
+  return Math.max(1, Math.ceil(line.length / terminalColumns));
+}
+
+function rewritePrimaryFrame(frame: string, previousRowCount: number): string {
   let prefix = '\r';
-  if (previousLineCount > 1) {
-    prefix += `\u001b[${previousLineCount - 1}A`;
+  if (previousRowCount > 1) {
+    prefix += `\u001b[${previousRowCount - 1}A`;
   }
   return `${prefix}${ANSI_CLEAR_DOWN}${frame}`;
 }
