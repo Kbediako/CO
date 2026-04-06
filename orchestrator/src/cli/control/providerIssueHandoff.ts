@@ -1912,7 +1912,7 @@ export function createProviderIssueHandoffService(
         return { kind: 'ignored', reason: 'provider_issue_handoff_inflight', claim };
       }
 
-      const latestRun = attachableDiscoveredRuns[0] ?? null;
+      const latestRun = resolveLatestKnownProviderRun(attachableDiscoveredRuns);
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
         if (hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)) {
           const claim = await upsertProviderClaimAndPersist({
