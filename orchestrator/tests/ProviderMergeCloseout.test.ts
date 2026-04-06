@@ -652,14 +652,19 @@ describe('runProviderDeterministicMergeCloseout', () => {
     );
 
     expect(result).toMatchObject({
-      status: 'merged',
-      reason: 'merged_and_transitioned_done',
+      status: 'action_required',
+      reason: 'pending_shared_root_reconciliation',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
       shared_root: {
         status: 'skipped',
         reason: 'shared_root_not_ff_only_safe',
         before_status: '## main...origin/main [ahead 1]',
         after_status: '## main...origin/main [ahead 1]'
-      }
+      },
+      linear_transition: null,
+      summary:
+        'Merged attached PR #357; shared-root reconciliation is pending (shared_root_not_ff_only_safe) before the Linear issue can transition to Done.'
     });
     expect(runCommand).not.toHaveBeenCalledWith(
       expect.objectContaining({
@@ -774,14 +779,19 @@ describe('runProviderDeterministicMergeCloseout', () => {
     );
 
     expect(result).toMatchObject({
-      status: 'merged',
-      reason: 'merged_and_transitioned_done',
+      status: 'action_required',
+      reason: 'pending_shared_root_reconciliation',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
       shared_root: {
         status: 'skipped',
         reason: 'shared_root_not_on_main',
         before_status: '## main-fix...origin/main-fix',
         after_status: '## main-fix...origin/main-fix'
-      }
+      },
+      linear_transition: null,
+      summary:
+        'Merged attached PR #357; shared-root reconciliation is pending (shared_root_not_on_main) before the Linear issue can transition to Done.'
     });
   });
 

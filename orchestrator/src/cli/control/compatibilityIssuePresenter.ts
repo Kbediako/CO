@@ -490,6 +490,12 @@ function resolveCompatibilityIssueStatus(
   if (retry) {
     return 'retrying';
   }
+  if (
+    source.rawStatus === 'succeeded' &&
+    (source.displayStatus === 'pending_shared_root_reconciliation' || source.displayStatus === 'failed')
+  ) {
+    return source.displayStatus;
+  }
   return source.rawStatus;
 }
 

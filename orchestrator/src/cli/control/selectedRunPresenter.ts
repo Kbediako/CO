@@ -63,7 +63,9 @@ export function buildUiDataset(input: {
   const selectedSharedFields = selected ? buildUiSelectedRunSharedFields(selected) : null;
   const selectedUsesDistinctManifest =
     Boolean(selected?.manifestPath) && selected?.manifestPath !== input.paths.manifestPath;
-  const effectiveStatus = selected?.rawStatus ?? input.manifest.status;
+  const effectiveRawStatus = selected?.rawStatus ?? input.manifest.status;
+  const effectiveDisplayStatus = selected?.displayStatus ?? effectiveRawStatus;
+  const effectiveStatus = resolveUiDatasetStatus(effectiveRawStatus, effectiveDisplayStatus);
   const effectiveLatestAction = selectedUsesDistinctManifest
     ? normalizeBucketAction(selected?.latestAction)
     : normalizeBucketAction(selected?.latestAction ?? input.control.latest_action?.action);
@@ -116,8 +118,8 @@ export function buildUiDataset(input: {
     run_id: effectiveRunId,
     task_id: effectiveTaskId,
     status: effectiveStatus,
-    raw_status: effectiveStatus,
-    display_status: selected?.displayStatus ?? effectiveStatus,
+    raw_status: effectiveRawStatus,
+    display_status: effectiveDisplayStatus,
     status_reason: selected?.statusReason ?? null,
     started_at: effectiveStartedAt,
     updated_at: effectiveUpdatedAt,
@@ -144,8 +146,8 @@ export function buildUiDataset(input: {
     bucket: bucketInfo.bucket,
     bucket_reason: bucketInfo.reason,
     status: effectiveStatus,
-    raw_status: effectiveStatus,
-    display_status: selected?.displayStatus ?? effectiveStatus,
+    raw_status: effectiveRawStatus,
+    display_status: effectiveDisplayStatus,
     status_reason: selected?.statusReason ?? null,
     last_update: effectiveUpdatedAt,
     latest_run_id: effectiveRunId,
@@ -184,6 +186,9 @@ function classifyBucket(
   if (status === 'queued') {
     return { bucket: 'pending', reason: 'queued' };
   }
+  if (status === 'pending_shared_root_reconciliation') {
+    return { bucket: 'pending', reason: 'pending_shared_root_reconciliation' };
+  }
   if (status === 'in_progress') {
     if (latestAction === 'pause') {
       return { bucket: 'ongoing', reason: 'paused' };
@@ -194,6 +199,16 @@ function classifyBucket(
     return { bucket: 'complete', reason: 'terminal' };
   }
   return { bucket: 'pending', reason: 'unknown' };
+}
+
+function resolveUiDatasetStatus(rawStatus: string, displayStatus: string): string {
+  if (
+    rawStatus === 'succeeded' &&
+    (displayStatus === 'pending_shared_root_reconciliation' || displayStatus === 'failed')
+  ) {
+    return displayStatus;
+  }
+  return rawStatus;
 }
 
 function normalizeBucketAction(value: string | null | undefined): ControlAction['action'] | null {

@@ -34,7 +34,8 @@ import {
 import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 import {
   buildProviderIssueDebugSnapshot,
-  type ControlProviderDebugSnapshot
+  type ControlProviderDebugSnapshot,
+  type ProviderLinearWorkerProgressSnapshot
 } from './providerIssueObservability.js';
 import {
   buildProviderLinearWorkerTerminalSummary,
@@ -308,10 +309,21 @@ function buildProjectionContextFromParts(
                 )
         })
       : null;
+  const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
+    tracked_issue: parts.trackedIssue,
+    claim: providerClaim,
+    proof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null,
+    rehydrated_at: providerIntakeState?.rehydrated_at ?? null
+  });
+  const terminalMergeCloseoutProgress = resolveTerminalMergeCloseoutProgress({
+    rawStatus,
+    providerDebugSnapshot
+  });
   const summary = resolveSelectedRunDisplaySummary({
     manifestRecord,
     rawStatus,
-    summary: proofSummary ?? manifestSummary
+    summary: proofSummary ?? manifestSummary,
+    terminalMergeCloseoutProgress
   });
   const workspacePath = resolveSelectedRunWorkspacePath({
     manifestRecord,
@@ -326,24 +338,24 @@ function buildProjectionContextFromParts(
     rawStatus,
     latestAction,
     questionSummary,
-    compatibilityState
+    compatibilityState,
+    terminalMergeCloseoutProgress
   });
   const tracked = buildTrackedLinearPayload(parts.trackedIssue);
-  const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
-    tracked_issue: parts.trackedIssue,
-    claim: providerClaim,
-    proof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null,
-    rehydrated_at: providerIntakeState?.rehydrated_at ?? null
-  });
   const latestEvent = buildSelectedRunLatestEvent({
     controlAction: control.latest_action ?? null,
     updatedAt,
     summary,
     fallbackEvent: rawStatus,
-    providerDebugSnapshot
+    providerDebugSnapshot,
+    terminalMergeCloseoutProgress
   });
   const lastError =
-    rawStatus === 'failed'
+    terminalMergeCloseoutProgress?.status === 'failed'
+      ? terminalMergeCloseoutProgress.stall_reason ??
+        summary ??
+        'merge_closeout_failed'
+      : rawStatus === 'failed'
       ? summary ?? control.latest_action?.reason ?? 'run_failed'
       : latestAction === 'fail'
         ? control.latest_action?.reason ?? manifestSummary ?? 'run_failed'
@@ -499,7 +511,17 @@ function resolveSelectedRunDisplayStatus(input: {
   latestAction: ControlAction['action'] | null;
   questionSummary: SelectedRunQuestionSummary;
   compatibilityState: ResolvedCompatibilityState | null;
+  terminalMergeCloseoutProgress: ProviderLinearWorkerProgressSnapshot | null;
 }): { displayStatus: string; statusReason: string | null } {
+  if (input.terminalMergeCloseoutProgress) {
+    return {
+      displayStatus:
+        input.terminalMergeCloseoutProgress.phase === 'pending_shared_root_reconciliation'
+          ? 'pending_shared_root_reconciliation'
+          : 'failed',
+      statusReason: input.terminalMergeCloseoutProgress.stall_reason ?? null
+    };
+  }
   if (input.rawStatus === 'in_progress' && input.latestAction === 'pause') {
     return {
       displayStatus: 'paused',
@@ -552,7 +574,24 @@ function buildSelectedRunLatestEvent(input: {
   summary: string | null;
   fallbackEvent: string;
   providerDebugSnapshot: ControlProviderDebugSnapshot | null;
+  terminalMergeCloseoutProgress: ProviderLinearWorkerProgressSnapshot | null;
 }): SelectedRunLatestEvent | null {
+  if (
+    !input.controlAction &&
+    input.terminalMergeCloseoutProgress &&
+    input.providerDebugSnapshot?.progress
+  ) {
+    return {
+      at:
+        input.providerDebugSnapshot.progress.last_semantic_progress_at ??
+        input.providerDebugSnapshot.last_semantic_progress_at ??
+        input.updatedAt,
+      event: input.terminalMergeCloseoutProgress.phase,
+      message: input.terminalMergeCloseoutProgress.summary ?? input.summary,
+      requestedBy: null,
+      reason: input.terminalMergeCloseoutProgress.stall_reason ?? null
+    };
+  }
   if (
     !input.controlAction &&
     input.providerDebugSnapshot?.progress &&
@@ -612,7 +651,11 @@ function resolveSelectedRunDisplaySummary(input: {
   manifestRecord: Record<string, unknown>;
   rawStatus: string;
   summary: string | null;
+  terminalMergeCloseoutProgress: ProviderLinearWorkerProgressSnapshot | null;
 }): string | null {
+  if (input.terminalMergeCloseoutProgress?.summary) {
+    return input.terminalMergeCloseoutProgress.summary;
+  }
   if (
     input.rawStatus === 'succeeded' &&
     input.summary &&
@@ -623,6 +666,29 @@ function resolveSelectedRunDisplaySummary(input: {
     return filteredSummary ?? 'Completed successfully';
   }
   return input.summary;
+}
+
+function resolveTerminalMergeCloseoutProgress(input: {
+  rawStatus: string;
+  providerDebugSnapshot: ControlProviderDebugSnapshot | null;
+}): ProviderLinearWorkerProgressSnapshot | null {
+  const progress = input.providerDebugSnapshot?.progress ?? null;
+  if (
+    input.rawStatus !== 'succeeded' ||
+    !progress ||
+    progress.kind !== 'merge_closeout' ||
+    !input.providerDebugSnapshot ||
+    !hasAuthoritativeProviderDebugEvidence(input.providerDebugSnapshot)
+  ) {
+    return null;
+  }
+  if (
+    progress.phase === 'pending_shared_root_reconciliation' ||
+    progress.status === 'failed'
+  ) {
+    return progress;
+  }
+  return null;
 }
 
 function isTerminalRunStatus(status: string): boolean {

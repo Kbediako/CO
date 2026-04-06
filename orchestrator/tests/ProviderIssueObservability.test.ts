@@ -495,6 +495,160 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('surfaces skipped shared-root reconciliation as pending after merge closeout', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-04-05T06:50:00.000Z'
+      },
+      claim: {
+        state: 'handoff_failed',
+        reason: 'provider_issue_merge_closeout_action_required',
+        updated_at: '2026-04-05T06:49:00.000Z',
+        run_id: 'run-82-shared-root-pending',
+        merge_closeout: {
+          recorded_at: '2026-04-05T06:50:30.000Z',
+          status: 'action_required',
+          reason: 'pending_shared_root_reconciliation',
+          summary: 'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/82',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 82
+          },
+          snapshot: {
+            review_decision: 'APPROVED',
+            merge_state_status: 'UNKNOWN',
+            ready_to_merge: false,
+            gate_reasons: ['state=MERGED'],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-05T06:50:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'skipped',
+            reason: 'shared_root_dirty',
+            before_status: '## main...origin/main\\n M tasks/index.json',
+            after_status: '## main...origin/main\\n M tasks/index.json'
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        number: 82,
+        shared_root_status: 'skipped',
+        shared_root_reason: 'shared_root_dirty'
+      },
+      progress: {
+        phase: 'pending_shared_root_reconciliation',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        stall_classification: 'stalled',
+        stall_reason: 'shared_root_dirty',
+        recovery_recommendation: 'inspect_merge_closeout'
+      },
+      stall_classification: 'stalled',
+      recovery_recommendation: 'inspect_merge_closeout'
+    });
+  });
+
+  it('surfaces failed shared-root reconciliation as failed after merge closeout', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-05T06:50:00.000Z'
+      },
+      claim: {
+        state: 'completed',
+        reason: 'provider_issue_merge_closeout_merged',
+        updated_at: '2026-04-05T06:49:00.000Z',
+        run_id: 'run-82-shared-root-failed',
+        merge_closeout: {
+          recorded_at: '2026-04-05T06:50:30.000Z',
+          status: 'merged',
+          reason: 'shared_root_reconciliation_failed',
+          summary: 'Merged attached PR #82; shared-root reconciliation failed (shared_root_fast_forward_failed) after the Linear issue transitioned to Done.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/82',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 82
+          },
+          snapshot: {
+            review_decision: 'APPROVED',
+            merge_state_status: 'UNKNOWN',
+            ready_to_merge: false,
+            gate_reasons: ['state=MERGED'],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-05T06:50:30.000Z',
+            merged_at: '2026-04-05T06:50:00.000Z'
+          },
+          shared_root: {
+            status: 'failed',
+            reason: 'shared_root_fast_forward_failed',
+            before_status: '## main...origin/main [behind 1]',
+            after_status: null
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after merge closeout.',
+        last_event_at: '2026-04-05T06:50:10.000Z',
+        updated_at: '2026-04-05T06:50:15.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        number: 82,
+        shared_root_status: 'failed',
+        shared_root_reason: 'shared_root_fast_forward_failed'
+      },
+      progress: {
+        phase: 'failed',
+        kind: 'merge_closeout',
+        status: 'failed',
+        stall_classification: 'failed',
+        stall_reason: 'shared_root_fast_forward_failed',
+        recovery_recommendation: 'inspect_merge_closeout'
+      },
+      stall_classification: 'failed',
+      recovery_recommendation: 'inspect_merge_closeout'
+    });
+  });
+
   it('classifies max-turn exhaustion as stalled instead of completed', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       tracked_issue: {
