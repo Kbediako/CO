@@ -14,24 +14,10 @@ last_review: 2026-04-06
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`
 - Task checklist: `tasks/tasks-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`
 
-## Traceability
-- Linear issue: `CO-99` / `7f1931f8-cfd0-4698-951e-df1c3984a337`
-- Linear URL: https://linear.app/asabeko/issue/CO-99/co-status-bound-provider-proof-session-log-refresh-cost
-- Follow-up to: `CO-98` / `bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc`
-
-## Added by Bootstrap (refresh as needed)
-
 ## Summary
 - Objective: make repeated in-progress provider-proof session-log hydration incremental or equivalently bounded so root `CO STATUS` refreshes stop rereading the same `rollout-*.jsonl` bytes from zero for the same active worker.
-- Scope:
-  - trace the in-progress proof refresh path from `selectedRunProjection.ts` into `refreshProviderLinearWorkerProofSnapshot(...)`
-  - add the smallest safe persisted hydration state or equivalent bounded mechanism for the same active session-log file
-  - preserve authoritative runtime telemetry for `Tokens`, `SESSION`, `Throughput`, and Codex `5-hour` / `weekly`
-  - add focused repeated-refresh regression coverage
-- Constraints:
-  - no cadence-throttling-only mitigation
-  - no heuristic tail read that can miss authoritative telemetry updates
-  - no schema churn outside the bounded hydration state this optimization needs
+- Scope: trace the in-progress proof refresh path from `selectedRunProjection.ts` into `refreshProviderLinearWorkerProofSnapshot(...)`, add the smallest safe persisted hydration state for the same active session-log file, preserve authoritative runtime telemetry for `Tokens`, `SESSION`, `Throughput`, and Codex `5-hour` / `weekly`, and add focused repeated-refresh regression coverage.
+- Constraints: no cadence-throttling-only mitigation, no heuristic tail read that can miss authoritative telemetry updates, and no schema churn outside the bounded hydration state this optimization needs.
 
 ## Technical Requirements
 - Functional requirements:
@@ -51,7 +37,7 @@ last_review: 2026-04-06
 
 ## Architecture & Data
 - Architecture / design adjustments:
-  - persist an opaque hydration cursor for the current session-log file so `refreshProviderLinearWorkerProofSnapshot(...)` can resume parsing from the last consumed byte instead of recreating a zero-offset tail state each time
+  - persist an opaque hydration cursor for the current session-log file so `refreshProviderLinearWorkerProofSnapshot(...)` can resume parsing from the last consumed byte instead of recreating a zero-offset tail state each time, and track a proof-signature drift guard so stale cursor state is not replayed onto a newer proof snapshot
   - key cursor reuse to the current discovered session-log path and reset it when the file path, size progression, or other trust signals indicate rotation/truncation/mismatch
   - keep the existing parser and telemetry derivation authoritative; the bounded change is in how much of the file each refresh must revisit
 - Data model changes / migrations:
@@ -76,19 +62,9 @@ last_review: 2026-04-06
   - unrelated provider-proof or UI redesign work
 
 ## Validation Plan
-- Tests / checks:
-  - audited `linear child-stream --pipeline docs-review`
-  - focused repeated-refresh regressions in the provider-worker / projection test suite
-  - required repo validation floor before review handoff
-- Rollout verification:
-  - verify the refreshed proof/projection path still publishes truthful telemetry for the protected root `CO STATUS` fields
-  - confirm the implementation reuses bounded hydration state instead of repeating byte-zero rereads in the stable-file case
-- Monitoring / alerts:
-  - no new monitoring surface is required; focused tests and review evidence are sufficient for this bounded follow-up
-
-## Open Questions
-- Should the bounded hydration cursor live directly inside `provider-linear-worker-proof.json`, or is there an existing internal sub-structure better suited for opaque refresh state?
-- Which file metadata checks are sufficient to fail closed on log rotation/truncation without overcomplicating the proof schema?
+- Tests / checks: audited `linear child-stream --pipeline docs-review`, focused repeated-refresh regressions in the provider-worker / projection test suite, and the required repo validation floor before review handoff.
+- Rollout verification: verify the refreshed proof/projection path still publishes truthful telemetry for the protected root `CO STATUS` fields and reuses bounded hydration state instead of repeating byte-zero rereads in the stable-file case.
+- Monitoring / alerts: no new monitoring surface is required; focused tests and review evidence are sufficient for this bounded follow-up.
 
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review`

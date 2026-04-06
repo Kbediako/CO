@@ -302,6 +302,7 @@ interface ProviderWorkerSessionLogHydrationState {
   offset_bytes: number;
   trailing_text: string;
   bootstrap_pending: boolean;
+  proof_signature: string;
 }
 
 interface ProviderControlHostManifestTarget {
@@ -1028,6 +1029,50 @@ function hasProviderWorkerTokenUsage(value: ProviderLinearWorkerTokenUsage): boo
   return value.input_tokens !== null || value.output_tokens !== null || value.total_tokens !== null;
 }
 
+function maxProviderWorkerNullableNumber(left: number | null, right: number | null): number | null {
+  if (left === null) {
+    return right;
+  }
+  if (right === null) {
+    return left;
+  }
+  return Math.max(left, right);
+}
+
+function mergeProviderWorkerTokenUsageFloor(
+  current: ProviderLinearWorkerTokenUsage,
+  observed: ProviderLinearWorkerTokenUsage
+): ProviderLinearWorkerTokenUsage {
+  return {
+    input_tokens: maxProviderWorkerNullableNumber(current.input_tokens, observed.input_tokens),
+    output_tokens: maxProviderWorkerNullableNumber(current.output_tokens, observed.output_tokens),
+    total_tokens: maxProviderWorkerNullableNumber(current.total_tokens, observed.total_tokens)
+  };
+}
+
+function providerWorkerTokenUsageFallsBehindFloor(
+  current: ProviderLinearWorkerTokenUsage,
+  observed: ProviderLinearWorkerTokenUsage | null
+): boolean {
+  return (
+    observed !== null &&
+    current.total_tokens !== null &&
+    observed.total_tokens !== null &&
+    observed.total_tokens < current.total_tokens
+  );
+}
+
+function providerWorkerTokenUsageAdvancesFloor(
+  current: ProviderLinearWorkerTokenUsage,
+  observed: ProviderLinearWorkerTokenUsage | null
+): boolean {
+  return (
+    observed !== null &&
+    observed.total_tokens !== null &&
+    (current.total_tokens === null || observed.total_tokens > current.total_tokens)
+  );
+}
+
 function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
   event: string | null;
   message: string | null;
@@ -1613,7 +1658,8 @@ function normalizeProviderWorkerSessionLogHydrationState(
     path,
     offset_bytes: offsetBytes,
     trailing_text: typeof value.trailing_text === 'string' ? value.trailing_text : '',
-    bootstrap_pending: typeof value.bootstrap_pending === 'boolean' ? value.bootstrap_pending : true
+    bootstrap_pending: typeof value.bootstrap_pending === 'boolean' ? value.bootstrap_pending : true,
+    proof_signature: typeof value.proof_signature === 'string' ? value.proof_signature : ''
   };
 }
 
@@ -1647,8 +1693,25 @@ function snapshotProviderWorkerSessionLogTailState(
     path: state.path,
     offset_bytes: state.offsetBytes,
     trailing_text: state.trailingText,
-    bootstrap_pending: state.bootstrapPending
+    bootstrap_pending: state.bootstrapPending,
+    proof_signature: ''
   };
+}
+
+function buildProviderWorkerSessionLogHydrationProofSignature(
+  proof: ProviderLinearWorkerProof
+): string {
+  return JSON.stringify({
+    thread_id: proof.thread_id ?? null,
+    latest_turn_id: proof.latest_turn_id ?? null,
+    latest_session_id: proof.latest_session_id ?? null,
+    latest_session_id_source: proof.latest_session_id_source ?? null,
+    last_event: proof.last_event ?? null,
+    last_message: proof.last_message ?? null,
+    last_event_at: proof.last_event_at ?? null,
+    tokens: proof.tokens ?? null,
+    rate_limits: proof.rate_limits ?? null
+  });
 }
 
 async function readProviderWorkerSessionLogDelta(
@@ -1921,7 +1984,24 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
     rateLimits: proof.rate_limits
   };
-  const tailState = buildProviderWorkerSessionLogTailState(sessionLogPath, hydrationState);
+  let tailState = buildProviderWorkerSessionLogTailState(sessionLogPath, hydrationState);
+  let preserveProofTelemetryFloor = false;
+  if (hydrationState && hydrationState.path === sessionLogPath) {
+    const proofSignature = buildProviderWorkerSessionLogHydrationProofSignature(proof);
+    if (hydrationState.proof_signature !== proofSignature) {
+      const fileStat = await stat(sessionLogPath).catch(() => null);
+      if (fileStat?.isFile() && fileStat.size <= tailState.offsetBytes) {
+        tailState = {
+          path: sessionLogPath,
+          offsetBytes: fileStat.size,
+          trailingText: '',
+          bootstrapPending: false
+        };
+      } else {
+        preserveProofTelemetryFloor = true;
+      }
+    }
+  }
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
@@ -1934,6 +2014,18 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       hydrationState: null
     };
   }
+  if (
+    preserveProofTelemetryFloor &&
+    providerWorkerTokenUsageFallsBehindFloor(proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(), parseState.tokens)
+  ) {
+    parseState.threadId = proof.thread_id;
+    parseState.turnId = proof.latest_turn_id;
+    parseState.tokens = mergeProviderWorkerTokenUsageFloor(
+      proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
+      parseState.tokens
+    );
+    parseState.rateLimits = proof.rate_limits;
+  }
 
   const liveThreadId = parseState.threadId ?? proof.thread_id;
   const liveTurnId = parseState.turnId ?? proof.latest_turn_id;
@@ -1942,21 +2034,37 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     threadId: liveThreadId,
     turnId: liveTurnId
   });
+  const proofTokenFloor = proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage();
+  const preferProofRateLimits =
+    preserveProofTelemetryFloor &&
+    proof.rate_limits !== null &&
+    parseState.rateLimits !== null &&
+    !providerWorkerTokenUsageAdvancesFloor(proofTokenFloor, parseState.tokens);
+  const persistedTailState = snapshotProviderWorkerSessionLogTailState(tailState);
+  const hydratedProof: ProviderLinearWorkerProof = {
+    ...proof,
+    thread_id: liveThreadId,
+    latest_turn_id: liveTurnId,
+    latest_session_id: session.sessionId ?? proof.latest_session_id,
+    latest_session_id_source: session.source ?? proof.latest_session_id_source,
+    tokens: hasProviderWorkerTokenUsage(parseState.tokens)
+      ? parseState.tokens
+      : liveTurnChanged
+        ? buildEmptyProviderLinearWorkerTokenUsage()
+        : proof.tokens,
+    rate_limits: preferProofRateLimits
+      ? proof.rate_limits
+      : parseState.rateLimits ?? (liveTurnChanged ? null : proof.rate_limits)
+  };
   return {
-    proof: {
-      ...proof,
-      thread_id: liveThreadId,
-      latest_turn_id: liveTurnId,
-      latest_session_id: session.sessionId ?? proof.latest_session_id,
-      latest_session_id_source: session.source ?? proof.latest_session_id_source,
-      tokens: hasProviderWorkerTokenUsage(parseState.tokens)
-        ? parseState.tokens
-        : liveTurnChanged
-          ? buildEmptyProviderLinearWorkerTokenUsage()
-          : proof.tokens,
-      rate_limits: parseState.rateLimits ?? (liveTurnChanged ? null : proof.rate_limits)
-    },
-    hydrationState: snapshotProviderWorkerSessionLogTailState(tailState)
+    proof: hydratedProof,
+    hydrationState:
+      persistedTailState === null
+        ? null
+        : {
+            ...persistedTailState,
+            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydratedProof)
+          }
   };
 }
 

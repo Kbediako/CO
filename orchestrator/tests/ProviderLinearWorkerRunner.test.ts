@@ -135,6 +135,7 @@ type PersistedSessionLogHydrationState = {
   offset_bytes: number;
   trailing_text: string;
   bootstrap_pending: boolean;
+  proof_signature: string;
 };
 
 function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
@@ -2094,7 +2095,8 @@ describe('provider linear worker runner', () => {
       path: sessionLogPath,
       offset_bytes: Buffer.byteLength(firstSessionLog, 'utf8'),
       trailing_text: '',
-      bootstrap_pending: false
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
     });
 
     const secondSessionLog = [
@@ -2158,7 +2160,8 @@ describe('provider linear worker runner', () => {
       path: sessionLogPath,
       offset_bytes: Buffer.byteLength(secondSessionLog, 'utf8'),
       trailing_text: '',
-      bootstrap_pending: false
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
     });
     expect(secondHydration.offset_bytes).toBeGreaterThan(firstHydration.offset_bytes);
   });
@@ -2270,7 +2273,8 @@ describe('provider linear worker runner', () => {
       offset_bytes: Buffer.byteLength(firstSessionLog, 'utf8'),
       trailing_text:
         '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":18,"output_tokens":12,"total_tokens":30}},"rate_limits":{"primary":{"used_percent":18,"window_minutes":300},"secondary":{"used_percent":50',
-      bootstrap_pending: false
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
     });
 
     const secondSessionLog = `${firstSessionLog},"window_minutes":10080}}}}\n`;
@@ -2309,7 +2313,95 @@ describe('provider linear worker runner', () => {
       path: sessionLogPath,
       offset_bytes: Buffer.byteLength(secondSessionLog, 'utf8'),
       trailing_text: '',
-      bootstrap_pending: false
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
+    });
+  });
+
+  it('does not replay stale hydration cursors onto newer proofs', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const firstSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-1' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 12, output_tokens: 8, total_tokens: 20 } } }
+      })
+    ].join('\n');
+    const sessionLog = [
+      firstSessionLog,
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-2' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 18, output_tokens: 12, total_tokens: 30 } },
+          rate_limits: {
+            primary: { used_percent: 18, window_minutes: 300 },
+            secondary: { used_percent: 50, window_minutes: 10080 }
+          }
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, sessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          tokens: { input_tokens: 18, output_tokens: 12, total_tokens: 30 },
+          rate_limits: null,
+          updated_at: '2026-03-21T09:00:30.000Z'
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: Buffer.byteLength(firstSessionLog, 'utf8'),
+        trailing_text: '',
+        bootstrap_pending: false,
+        proof_signature: 'stale-proof-signature'
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(runDir, null, () => '2026-03-21T09:00:40.000Z', undefined, {
+      CODEX_HOME: tempRoot!
+    });
+    const hydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(refreshed).toMatchObject({
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-1-turn-2',
+      tokens: { input_tokens: 18, output_tokens: 12, total_tokens: 30 },
+      rate_limits: {
+        primary: { used_percent: 18, window_minutes: 300 },
+        secondary: { used_percent: 50, window_minutes: 10080 }
+      }
+    });
+    expect(hydration).toEqual({
+      path: sessionLogPath,
+      offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+      trailing_text: '',
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
     });
   });
 
@@ -2418,7 +2510,8 @@ describe('provider linear worker runner', () => {
       path: sessionLogPath,
       offset_bytes: Buffer.byteLength(truncatedSessionLog, 'utf8'),
       trailing_text: '',
-      bootstrap_pending: false
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
     });
   });
 
@@ -2532,7 +2625,8 @@ describe('provider linear worker runner', () => {
       path: rotatedSessionLogPath,
       offset_bytes: Buffer.byteLength(rotatedSessionLog, 'utf8'),
       trailing_text: '',
-      bootstrap_pending: false
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
     });
   });
 

@@ -1,14 +1,8 @@
 # ACTION_PLAN - CO STATUS: bound provider proof session-log refresh cost
 
-## Added by Bootstrap 2026-04-06
-
 ## Summary
 - Goal: bound repeated provider-proof session-log hydration work for active root `CO STATUS` refreshes without regressing the authoritative runtime telemetry restored in `CO-98`.
-- Scope: docs-first packet, single Linear workpad, audited docs-review child stream, bounded proof-refresh implementation, focused regressions, and the required validation/review gates.
-- Assumptions:
-  - the main correctness issue was already fixed in `CO-98`
-  - the remaining gap is the repeated byte-zero reread inside `refreshProviderLinearWorkerProofSnapshot(...)`
-  - the smallest safe fix is likely additive proof-side hydration state plus fail-closed fallback
+- Scope: docs-first packet, one workpad, docs-review, bounded proof-refresh implementation, focused regressions, and review gates.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward: preserve `CO STATUS`, `provider-linear-worker-proof.json`, `refreshProviderLinearWorkerProofSnapshot`, `selectedRunProjection`, `rollout-*.jsonl`, authoritative runtime telemetry, incremental or bounded refresh hydration, `Tokens`, `SESSION`, `Throughput`, `5-hour`, and `weekly`.
@@ -19,33 +13,17 @@
 - Pre-implementation issue-quality review: approved as one bounded proof-refresh optimization lane over the authoritative root control-host telemetry path, not a refresh-throttling or UI lane.
 
 ## Milestones & Sequencing
-- [x] Register the `linear-7f1931f8-cfd0-4698-951e-df1c3984a337` docs packet, registry mirrors, `.agent` mirror, and initial workpad source. Evidence: `docs/PRD-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`, `docs/TECH_SPEC-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`, `docs/ACTION_PLAN-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`, `tasks/specs/linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`, `tasks/tasks-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`, `.agent/task/linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`, `out/linear-7f1931f8-cfd0-4698-951e-df1c3984a337/manual/workpad.md`.
-- [ ] Run the audited `docs-review` child stream and fold back any packet fixes before implementation. Evidence: pending.
-- [ ] Confirm the smallest safe bounded-refresh contract for a stable `rollout-*.jsonl` file and explicit reset conditions for mismatch/rotation/truncation. Evidence: pending.
-- [ ] Implement the bounded session-log hydration change in the provider-proof refresh path. Evidence: pending.
-- [ ] Add focused repeated-refresh regression coverage for both the growing-log steady state and fail-closed rotation/truncation reset paths, then revalidate the protected telemetry fields. Evidence: pending.
-- [ ] Run the required validation floor plus standalone/elegance review and refresh the workpad for PR/review handoff. Evidence: pending.
-
-## Dependencies
-- `orchestrator/src/cli/providerLinearWorkerRunner.ts`
-- `orchestrator/src/cli/control/selectedRunProjection.ts`
-- `provider-linear-worker-proof.json`
-- active provider-worker `rollout-*.jsonl` session logs
+- [x] Register the `linear-7f1931f8-cfd0-4698-951e-df1c3984a337` docs packet, registry mirrors, `.agent` mirror, and workpad source.
+- [x] Run the audited `docs-review` child stream and fold back any packet fixes before implementation. Evidence: `.runs/linear-7f1931f8-cfd0-4698-951e-df1c3984a337-co-99-docs-review-r2/cli/2026-04-05T23-12-59-925Z-cae6b004/manifest.json`, `.runs/linear-7f1931f8-cfd0-4698-951e-df1c3984a337-co-99-docs-review-r2/cli/2026-04-05T23-12-59-925Z-cae6b004/review/telemetry.json`.
+- [x] Confirm the smallest safe bounded-refresh contract for a stable `rollout-*.jsonl` file and explicit reset conditions for mismatch/rotation/truncation. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `tasks/specs/linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md`.
+- [x] Implement the bounded session-log hydration change in the provider-proof refresh path. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`.
+- [x] Add focused repeated-refresh regression coverage for both the growing-log steady state and fail-closed rotation/truncation reset paths, then revalidate the protected telemetry fields. Evidence: `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
+- [ ] Run the required validation floor plus standalone/elegance review and refresh the workpad for PR/review handoff. Evidence: `out/linear-7f1931f8-cfd0-4698-951e-df1c3984a337/manual/workpad.md` records clean CO-99-local reruns plus the remaining repo-wide `spec-guard` / `docs:freshness` blockers and pending PR drain.
 
 ## Validation
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 node dist/bin/codex-orchestrator.js linear child-stream --pipeline docs-review --stream co-99-docs-review --format json`.
-- [ ] Focused repeated-refresh regressions for `refreshProviderLinearWorkerProofSnapshot` and the selected-run proof refresh path, including fail-closed coverage for rotated or truncated session logs.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 node scripts/delegation-guard.mjs`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 node scripts/spec-guard.mjs --dry-run`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 npm run build`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 npm run lint`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 npm run test`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 npm run docs:check`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 npm run docs:freshness`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 node scripts/diff-budget.mjs`.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 FORCE_CODEX_REVIEW=1 npm run review`.
-- [ ] Explicit elegance/minimality pass recorded after standalone review findings are addressed.
-- [ ] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 npm run pack:smoke`.
+- [x] `MCP_RUNNER_TASK_ID=linear-7f1931f8-cfd0-4698-951e-df1c3984a337 node dist/bin/codex-orchestrator.js linear child-stream --pipeline docs-review --stream co-99-docs-review --format json`. Evidence: `.runs/linear-7f1931f8-cfd0-4698-951e-df1c3984a337-co-99-docs-review-r2/cli/2026-04-05T23-12-59-925Z-cae6b004/manifest.json`, `.runs/linear-7f1931f8-cfd0-4698-951e-df1c3984a337-co-99-docs-review-r2/cli/2026-04-05T23-12-59-925Z-cae6b004/review/telemetry.json`.
+- [x] Focused repeated-refresh regressions for `refreshProviderLinearWorkerProofSnapshot` and the selected-run proof refresh path, including fail-closed coverage for rotated or truncated session logs. Evidence: `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
+- [ ] Validation floor: delegation/spec guard, build, lint, test, docs:check, docs:freshness, diff-budget, standalone review, elegance pass, and `npm run pack:smoke`. Evidence: `out/linear-7f1931f8-cfd0-4698-951e-df1c3984a337/manual/workpad.md` records clean reruns for the CO-99-local checks, a documented standalone-review fallback, and the remaining repo-wide `spec-guard` / `docs:freshness` blockers.
 
 ## Risks & Mitigations
 - Risk: a bounded tail cursor could carry stale state across log rotation or truncation.
