@@ -1,9 +1,9 @@
-# ACTION_PLAN - CO: Recover provider-worker claims cleanly after missing control-host manifest and shared-budget cooldown
+# ACTION_PLAN - CO: Recover truthful intake and claim reattach after missing control-host manifest and expired shared-budget cooldown
 
 ## Added by Bootstrap 2026-04-04
 
 ## Summary
-- Goal: land one bounded provider recovery fix so missing control-host manifests and shared-budget cooldown pressure do not break claim truth or post-cooldown reclaim.
+- Goal: land one bounded provider recovery fix so missing control-host manifests and expired shared-budget cooldown pressure do not break truthful intake, claim reattach, or post-cooldown reclaim.
 - Scope: docs-first packet, audited docs-review child stream, provider/control-host audit, bounded recovery implementation, focused regressions, required validation, and review-handoff preparation.
 - Assumptions:
   - `ProviderLinearWorkerRunner` owns the worker-side refresh request

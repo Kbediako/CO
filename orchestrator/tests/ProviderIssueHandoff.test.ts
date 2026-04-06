@@ -11888,6 +11888,127 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
+  it('relaunches a stale running claim when the only in-progress proof sidecar predates the manifest start', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-stale-proof-reclaim'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-stale-proof-reclaim');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stale-proof-reclaim',
+        task_id: 'task-1303-stale-proof-reclaim',
+        status: 'in_progress',
+        summary: 'worker resumed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        started_at: '2026-03-19T04:30:00.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        attempt_started_at: '2026-03-19T04:29:00.000Z',
+        updated_at: '2026-03-19T04:29:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-03-19T04:10:00.000Z',
+      task_id: 'task-1303-stale-proof-reclaim',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-stale-proof-reclaim',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-stale-proof-reclaim',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-reclaimed',
+        manifestPath: '/tmp/provider-run/run-reclaimed.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:35:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2',
+      issueUpdatedAt: '2026-03-19T04:35:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    const expectedClaim = {
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:35:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-reclaimed',
+      run_manifest_path: '/tmp/provider-run/run-reclaimed.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+  });
+
   it('keeps an active running claim when a terminal failed proof sidecar is older than the manifest', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
@@ -11990,6 +12111,105 @@ describe('createProviderIssueHandoffService', () => {
       issue_updated_at: '2026-03-19T04:25:00.000Z',
       task_id: 'task-1303-failed',
       run_id: 'run-failed',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: null,
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+  });
+
+  it('demotes a stale running claim to accepted during explicit restart rehydrate when the only in-progress proof sidecar predates the manifest start', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-stale-proof-rehydrate'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-stale-proof-rehydrate');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stale-proof-rehydrate',
+        task_id: 'task-1303-stale-proof-rehydrate',
+        status: 'in_progress',
+        summary: 'worker resumed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        started_at: '2026-03-19T04:30:00.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        attempt_started_at: '2026-03-19T04:29:00.000Z',
+        updated_at: '2026-03-19T04:29:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      task_id: 'task-1303-stale-proof-rehydrate',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-stale-proof-rehydrate',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-stale-proof-rehydrate',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    await service.rehydrate();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    const expectedClaim = {
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      task_id: 'task-1303-stale-proof-rehydrate',
+      run_id: 'run-stale-proof-rehydrate',
       run_manifest_path: childPaths.manifestPath,
       retry_queued: null,
       retry_error: null
