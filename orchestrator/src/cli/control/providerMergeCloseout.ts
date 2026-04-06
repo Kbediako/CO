@@ -402,6 +402,21 @@ export async function runProviderDeterministicMergeCloseout(
     };
   }
 
+  if (sharedRoot.status === 'skipped') {
+    return {
+      ...baseWithContext,
+      pr,
+      snapshot: verificationSnapshot,
+      merge_attempt: mergeAttempt,
+      shared_root: sharedRoot,
+      status: 'action_required',
+      reason: 'pending_shared_root_reconciliation',
+      summary: alreadyMerged
+        ? `Attached PR #${pr.number} was already merged; shared-root reconciliation is pending (${sharedRoot.reason}) before the Linear issue can transition to Done.`
+        : `Merged attached PR #${pr.number}; shared-root reconciliation is pending (${sharedRoot.reason}) before the Linear issue can transition to Done.`
+    };
+  }
+
   const transitionAttemptedAt = now();
   const transitionResult = await transitionIssueState({
     issueId: input.issueId,
@@ -456,15 +471,13 @@ export async function runProviderDeterministicMergeCloseout(
     shared_root: sharedRoot,
     linear_transition: linearTransition,
     status: 'merged',
-    reason: alreadyMerged ? 'merged_and_transitioned_done_after_recovery' : 'merged_and_transitioned_done',
+    reason: alreadyMerged
+      ? 'merged_and_transitioned_done_after_recovery'
+      : 'merged_and_transitioned_done',
     summary:
-      sharedRoot.status === 'skipped'
-        ? alreadyMerged
-          ? `Attached PR #${pr.number} was already merged; recorded shared-root skip and transitioned the Linear issue to Done.`
-          : `Merged attached PR #${pr.number}, recorded shared-root skip, and transitioned the Linear issue to Done.`
-        : alreadyMerged
-          ? `Attached PR #${pr.number} was already merged; reconciled shared root and transitioned the Linear issue to Done.`
-          : `Merged attached PR #${pr.number}, reconciled shared root, and transitioned the Linear issue to Done.`
+      alreadyMerged
+        ? `Attached PR #${pr.number} was already merged; reconciled shared root and transitioned the Linear issue to Done.`
+        : `Merged attached PR #${pr.number}, reconciled shared root, and transitioned the Linear issue to Done.`
   };
 }
 
