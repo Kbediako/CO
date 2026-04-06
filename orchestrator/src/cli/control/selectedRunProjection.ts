@@ -317,7 +317,8 @@ function buildProjectionContextFromParts(
   });
   const terminalMergeCloseoutProgress = resolveTerminalMergeCloseoutProgress({
     rawStatus,
-    providerDebugSnapshot
+    providerDebugSnapshot,
+    trackedIssue: parts.trackedIssue
   });
   const summary = resolveSelectedRunDisplaySummary({
     manifestRecord,
@@ -671,24 +672,33 @@ function resolveSelectedRunDisplaySummary(input: {
 function resolveTerminalMergeCloseoutProgress(input: {
   rawStatus: string;
   providerDebugSnapshot: ControlProviderDebugSnapshot | null;
+  trackedIssue: LiveLinearTrackedIssue | null;
 }): ProviderLinearWorkerProgressSnapshot | null {
   const progress = input.providerDebugSnapshot?.progress ?? null;
   if (
     input.rawStatus !== 'succeeded' ||
     !progress ||
     progress.kind !== 'merge_closeout' ||
-    !input.providerDebugSnapshot ||
-    !hasAuthoritativeProviderDebugEvidence(input.providerDebugSnapshot)
+    !input.providerDebugSnapshot
   ) {
     return null;
   }
-  if (
+  const isTerminalMergeCloseoutProgress =
     progress.phase === 'pending_shared_root_reconciliation' ||
-    progress.status === 'failed'
-  ) {
+    progress.status === 'failed';
+  if (!isTerminalMergeCloseoutProgress) {
+    return null;
+  }
+  if (hasAuthoritativeProviderDebugEvidence(input.providerDebugSnapshot)) {
     return progress;
   }
-  return null;
+  if (input.providerDebugSnapshot.claim?.freshness !== 'stale') {
+    return null;
+  }
+  if (input.trackedIssue && classifyProviderLinearWorkflowState(input.trackedIssue).isTerminal) {
+    return null;
+  }
+  return progress;
 }
 
 function isTerminalRunStatus(status: string): boolean {
