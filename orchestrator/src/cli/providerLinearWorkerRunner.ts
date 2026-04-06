@@ -1757,7 +1757,12 @@ function parseProviderWorkerSessionJsonlLine(line: string): Record<string, unkno
   }
 }
 
-function selectProviderWorkerSessionBootstrapLines(lines: string[]): string[] {
+function selectProviderWorkerSessionBootstrapLines(
+  lines: string[],
+  options: {
+    requireTurnContext: boolean;
+  } = { requireTurnContext: false }
+): string[] {
   let latestSessionMetaIndex = -1;
   let latestTurnContextIndex = -1;
   let latestTurnId: string | null = null;
@@ -1786,6 +1791,9 @@ function selectProviderWorkerSessionBootstrapLines(lines: string[]): string[] {
     }
   }
   if (latestTurnContextIndex < 0) {
+    if (options.requireTurnContext) {
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    }
     return lines;
   }
   if (latestTurnCompleted) {
@@ -1810,16 +1818,17 @@ function applyProviderWorkerSessionLogDelta(
     lines.push(tailState.trailingText);
     tailState.trailingText = '';
   }
+  const requireTurnContext = tailState.bootstrapPending && parseState.turnId === null;
   const linesToApply =
     tailState.bootstrapPending && lines.length > 0
-      ? selectProviderWorkerSessionBootstrapLines(lines)
+      ? selectProviderWorkerSessionBootstrapLines(lines, { requireTurnContext })
       : lines;
-  if (lines.length > 0) {
-    tailState.bootstrapPending = false;
-  }
   let changed = false;
   for (const line of linesToApply) {
     changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line) || changed;
+  }
+  if (tailState.bootstrapPending && lines.length > 0) {
+    tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
   return changed;
 }
@@ -1838,13 +1847,16 @@ function flushProviderWorkerSessionLogTail(
   }
   tailState.trailingText = '';
   const shouldBootstrap = tailState.bootstrapPending;
-  tailState.bootstrapPending = false;
+  const requireTurnContext = shouldBootstrap && parseState.turnId === null;
   const trailingLines = shouldBootstrap
-    ? selectProviderWorkerSessionBootstrapLines([trailingLine])
+    ? selectProviderWorkerSessionBootstrapLines([trailingLine], { requireTurnContext })
     : [trailingLine];
   let changed = false;
   for (const line of trailingLines) {
     changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line) || changed;
+  }
+  if (shouldBootstrap) {
+    tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
   return changed;
 }
@@ -1997,7 +2009,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           path: sessionLogPath,
           offsetBytes: fileStat.size,
           trailingText: tailState.trailingText,
-          bootstrapPending: tailState.bootstrapPending
+          bootstrapPending: true
         };
       } else if (fileStat.size < tailState.offsetBytes) {
         tailState = {
@@ -2008,6 +2020,10 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
         };
       } else {
         preserveProofTelemetryFloor = true;
+        tailState = {
+          ...tailState,
+          bootstrapPending: true
+        };
       }
     }
   }
@@ -2055,7 +2071,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     preserveProofTelemetryFloor &&
     proof.rate_limits !== null &&
     parseState.rateLimits !== null &&
-    !providerWorkerTokenUsageAdvancesFloor(proofTokenFloor, parseState.tokens);
+    providerWorkerTokenUsageFallsBehindFloor(proofTokenFloor, parseState.tokens);
   const persistedTailState = snapshotProviderWorkerSessionLogTailState(tailState);
   const hydratedProof: ProviderLinearWorkerProof = {
     ...proof,
