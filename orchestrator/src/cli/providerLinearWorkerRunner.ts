@@ -1990,12 +1990,12 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     const proofSignature = buildProviderWorkerSessionLogHydrationProofSignature(proof);
     if (hydrationState.proof_signature !== proofSignature) {
       const fileStat = await stat(sessionLogPath).catch(() => null);
-      if (fileStat?.isFile() && fileStat.size <= tailState.offsetBytes) {
+      if (fileStat?.isFile() && fileStat.size === tailState.offsetBytes) {
         tailState = {
           path: sessionLogPath,
           offsetBytes: fileStat.size,
-          trailingText: '',
-          bootstrapPending: false
+          trailingText: tailState.trailingText,
+          bootstrapPending: tailState.bootstrapPending
         };
       } else {
         preserveProofTelemetryFloor = true;

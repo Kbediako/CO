@@ -37,7 +37,7 @@ last_review: 2026-04-06
 
 ## Architecture & Data
 - Architecture / design adjustments:
-  - persist an opaque hydration cursor for the current session-log file so `refreshProviderLinearWorkerProofSnapshot(...)` can resume parsing from the last consumed byte instead of recreating a zero-offset tail state each time, and track a proof-signature drift guard so stale cursor state is not replayed onto a newer proof snapshot
+  - persist an opaque hydration cursor for the current session-log file, so `refreshProviderLinearWorkerProofSnapshot(...)` can resume parsing from the last consumed byte instead of recreating a zero-offset tail state each time, and track a proof-signature drift guard so stale cursor state is not replayed onto a newer proof snapshot
   - key cursor reuse to the current discovered session-log path and reset it when the file path, size progression, or other trust signals indicate rotation/truncation/mismatch
   - keep the existing parser and telemetry derivation authoritative; the bounded change is in how much of the file each refresh must revisit
 - Data model changes / migrations:
