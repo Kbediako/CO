@@ -51,4 +51,5 @@
 - [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
 - [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks green and actionable feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
+- [ ] Unresolved actionable review threads are `0`, or a waiver is recorded with evidence before review-state transition. Evidence: pending.
 - [x] Issue remains active until review handoff prerequisites are complete. Evidence: Linear state remains `In Progress` while review/elegance/PR handoff work is still open.

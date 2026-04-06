@@ -16,7 +16,7 @@
   - `Spec guard`: stale `last_review` frontmatter on `1001` and `1009`-`1031`.
   - `docs:freshness`: the separate `stale docs: 19` registry cohort rooted in `.agent/SOPs/instruction-stamps.md` plus the `0932`-`0934` packet family.
 - The lane refreshed those exact surfaces and reran the gates to green: `docs-review` child stream, `delegation-guard`, `spec-guard --dry-run`, `docs:freshness`, `docs:check`, `build`, `lint`, and `test`.
-- Remaining work is limited to PR creation, branch sync before handoff, the `pr ready-review` drain, and review-handoff mechanics.
+- PR `#370` is open with the required diff-budget override metadata; remaining work is limited to the rerun checks, clearing actionable feedback to `0` unresolved review threads (or recording a waiver with evidence), reconfirming branch sync before handoff, and completing the `pr ready-review` drain plus review-state transition.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
