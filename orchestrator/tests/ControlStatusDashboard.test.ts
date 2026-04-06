@@ -17,6 +17,8 @@ import {
 const ANSI_PATTERN = new RegExp(`${String.fromCharCode(0x1b)}(?:\\[[0-?]*[ -/]*[@-~]|[@-Z\\\\-_])`, 'g');
 const ANSI_ALT_SCREEN_ENTER = '\u001b[?1049h';
 const ANSI_ALT_SCREEN_EXIT = '\u001b[?1049l';
+const ANSI_CLEAR_HOME = '\u001b[H\u001b[2J';
+const ANSI_CLEAR_DOWN = '\u001b[J';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -25,6 +27,44 @@ afterEach(() => {
 
 function stripAnsi(value: string): string {
   return value.replace(ANSI_PATTERN, '');
+}
+
+function countTerminalRows(value: string, columns: number): number {
+  return value
+    .split('\n')
+    .reduce((rowCount, line) => rowCount + Math.max(1, Math.ceil(measureTerminalWidth(line) / columns)), 0);
+}
+
+function measureTerminalWidth(value: string): number {
+  let width = 0;
+  for (const char of value) {
+    width += isFullwidthCodePoint(char.codePointAt(0) ?? 0) ? 2 : 1;
+  }
+  return width;
+}
+
+function isFullwidthCodePoint(codePoint: number): boolean {
+  return (
+    codePoint >= 0x1100 &&
+    (
+      codePoint <= 0x115f ||
+      codePoint === 0x2329 ||
+      codePoint === 0x232a ||
+      (codePoint >= 0x2e80 && codePoint <= 0x3247 && codePoint !== 0x303f) ||
+      (codePoint >= 0x3250 && codePoint <= 0x4dbf) ||
+      (codePoint >= 0x4e00 && codePoint <= 0xa4c6) ||
+      (codePoint >= 0xa960 && codePoint <= 0xa97c) ||
+      (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+      (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+      (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
+      (codePoint >= 0xfe30 && codePoint <= 0xfe6b) ||
+      (codePoint >= 0xff01 && codePoint <= 0xff60) ||
+      (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
+      (codePoint >= 0x1b000 && codePoint <= 0x1b001) ||
+      (codePoint >= 0x1f200 && codePoint <= 0x1f251) ||
+      (codePoint >= 0x20000 && codePoint <= 0x3fffd)
+    )
+  );
 }
 
 function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): OperatorDashboardDataset {
@@ -82,6 +122,7 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
         issue_id: 'issue-26',
         task_id: 'linear-a861',
         run_id: 'run-26',
+        summary: 'Terminal dashboard renderer in progress',
         display_state: 'running',
         status_reason: null,
         pid: '4242',
@@ -107,6 +148,7 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
         issue_id: 'issue-27',
         task_id: 'linear-b27',
         run_id: 'run-27',
+        summary: 'Waiting for retry backoff',
         display_state: 'retrying',
         status_reason: 'rate_limited',
         session_id: 'session-27',
@@ -340,7 +382,9 @@ describe('control status dashboard', () => {
 
     expect(frame).toContain('\u001b[1m╭─ CO STATUS\u001b[0m');
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toBe([
+    const lines = plainFrame.split('\n');
+    expect(lines).toHaveLength(23);
+    expect(lines.slice(0, 10)).toEqual([
       '╭─ CO STATUS',
       '│ Agents: 1/2 tracked',
       '│ Throughput: 1,842 tps',
@@ -350,21 +394,8 @@ describe('control status dashboard', () => {
       '│ Project: CO Control and Advisory',
       '│ Dashboard: http://127.0.0.1:4100',
       '│ Next refresh: 15s',
-      '├─ Running',
-      '│',
-      '│   ID         STAGE        PID      AGE / TURN   TOKENS     SESSION        EVENT                                       ',
-      '│   ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────',
-      '│ ● CO-26      running      4242     15m 0s / 4          217 session-26     Worker turn active                          ',
-      '│',
-      '├─ Backoff queue',
-      '│',
-      '│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded',
-      '│',
-      '│ Controls: p freeze live redraw | c compact inspect | s snapshot export',
-      '│ Inspect: live | alternate screen | full frame',
-      '│ Snapshot: press s to export a stable frame under run dir',
-      '╰─'
-    ].join('\n'));
+      '├─ Running'
+    ]);
     expect(plainFrame).toContain('│ Agents: 1/2 tracked');
     expect(plainFrame).toContain('│ Throughput: 1,842 tps');
     expect(plainFrame).toContain('│ Tokens: in 100 | out 117 | total 217');
@@ -372,7 +403,8 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('│ Dashboard: http://127.0.0.1:4100');
     expect(plainFrame).toContain('│   ID         STAGE        PID');
     expect(plainFrame).toContain('│ ● CO-26      running      4242');
-    expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded');
+    expect(plainFrame).toContain('Terminal dashboard renderer in progress');
+    expect(plainFrame).toContain('│  ↻ CO-27 retry scheduled in 1m | attempt 2 | rate limit exceeded');
     expect(plainFrame).toContain('│ Inspect: live | alternate screen | full frame');
   });
 
@@ -392,6 +424,60 @@ describe('control status dashboard', () => {
     expect(stripAnsi(frame)).toContain('│ Inspect: live | primary scrollback | full frame');
   });
 
+  it('adds recency context when the running event falls back to a generic phase token', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        running: [
+          {
+            ...buildDataset().running[0],
+            summary: null,
+            last_event: 'turn_running',
+            last_message: 'Provider worker turn is active.',
+            last_event_at: '2026-03-30T01:00:00.000Z'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'attach-viewer',
+      terminalColumns: 120,
+      throughputTps: 1842.7,
+      surfaceMode: 'primary'
+    });
+
+    expect(stripAnsi(frame)).toContain('turn running (15m ago)');
+  });
+
+  it('lets a high-signal status reason outrank the generic aged event fallback', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        running: [
+          {
+            ...buildDataset().running[0],
+            summary: null,
+            status_reason: 'queued_questions',
+            last_event: 'turn_running',
+            last_message: 'Provider worker turn is active.',
+            last_event_at: '2026-03-30T01:00:00.000Z'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'attach-viewer',
+      terminalColumns: 120,
+      throughputTps: 1842.7,
+      surfaceMode: 'primary'
+    });
+
+    expect(stripAnsi(frame)).toContain('queued questions');
+    expect(stripAnsi(frame)).not.toContain('turn running (15m ago)');
+  });
+
   it('renders narrow terminals with an explicit reduced running table and sorted retry queue', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
@@ -406,6 +492,7 @@ describe('control status dashboard', () => {
             issue_id: 'issue-31',
             task_id: 'linear-c31',
             run_id: 'run-31',
+            summary: 'Network retry pending',
             display_state: 'retrying',
             status_reason: 'network',
             session_id: 'session-31',
@@ -426,6 +513,7 @@ describe('control status dashboard', () => {
             issue_id: 'issue-30',
             task_id: 'linear-c30',
             run_id: 'run-30',
+            summary: 'Rate-limit retry pending',
             display_state: 'retrying',
             status_reason: 'rate_limited',
             session_id: 'session-30',
@@ -446,6 +534,7 @@ describe('control status dashboard', () => {
             issue_id: 'issue-32',
             task_id: 'linear-c32',
             run_id: 'run-32',
+            summary: 'Worker restart pending',
             display_state: 'retrying',
             status_reason: 'provider_error',
             session_id: 'session-32',
@@ -477,9 +566,11 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits...');
     expect(plainFrame).toContain('│   ID        STAGE      PID');
     expect(plainFrame).toContain('│ ● CO-26     running    4242');
-    expect(plainFrame).toContain('│  ↻ CO-30 attempt=1 in 1.500s error=error with \\nnewline');
-    expect(plainFrame).toContain('│  ↻ CO-31 attempt=4 in 4.250s error=network timeout');
-    expect(plainFrame).toContain('│  ↻ CO-32 attempt=2 in 9.000s error=worker crashed restarting cleanly');
+    expect(plainFrame).toContain('│  ↻ CO-30 retry scheduled in 2s | attempt 1 | error with \\nnewline');
+    expect(plainFrame).toContain('│  ↻ CO-31 retry scheduled in 5s | attempt 4 | network timeout');
+    expect(plainFrame).toContain(
+      '│  ↻ CO-32 retry scheduled in 9s | attempt 2 | worker crashed restarting cleanly'
+    );
     for (const line of plainFrame.split('\n')) {
       expect(line.length).toBeLessThanOrEqual(84);
     }
@@ -509,7 +600,7 @@ describe('control status dashboard', () => {
       .split('\n')
       .find((line) => line.includes('↻ CO-27'));
     expect(retryLine).toBeDefined();
-    expect(retryLine).toContain('error=');
+    expect(retryLine).toContain('provider timeout w...');
     expect(retryLine?.length ?? 0).toBeLessThanOrEqual(68);
   });
 
@@ -565,8 +656,8 @@ describe('control status dashboard', () => {
       '│ Status: 1/2 tracked | 15m 12s | next 15s',
       '│ Tokens: in 100 | out 117 | total 217',
       '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
-      '│ Running: CO-26 | running | Worker turn active',
-      '│ Retry: CO-27 | in 60.000s | rate limit exceeded',
+      '│ Running: CO-26 | running | Terminal dashboard renderer in progress',
+      '│ Retry: CO-27 | retry scheduled in 1m | rate limit exceeded',
       '│ Controls: p resume live redraw | c full frame | s snapshot export',
       '│ Inspect: paused | primary snapshot | compact inspect | updates waiting',
       '│ Snapshot: saved | /repo/.runs/local-mcp/cli/control-host/co-status-snapshots/co-status-20260331T093000Z.txt',
@@ -624,6 +715,48 @@ describe('control status dashboard', () => {
     expect(stripAnsi(frame)).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 1m');
   });
 
+  it('renders higher-order countdowns and age values for long live windows', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        totals: {
+          ...buildDataset().totals,
+          seconds_running: 18_725
+        },
+        polling: {
+          ...buildDataset().polling!,
+          next_poll_in_ms: (5 * 3600 + 2 * 60) * 1000
+        },
+        rate_limits: {
+          limit_id: 'gpt-5',
+          primary: {
+            remaining: 19,
+            limit: 30,
+            reset_at: '2026-03-30T06:45:00.000Z'
+          }
+        },
+        running: [
+          {
+            ...buildDataset().running[0],
+            started_at: '2026-03-27T21:15:00.000Z'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Runtime: 5h 12m');
+    expect(plainFrame).toContain('│ Next refresh: 5h 2m');
+    expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 5h 30m');
+    expect(plainFrame).toContain('2d 4h / 4');
+  });
+
   it('renders Codex usage-window rate limits with explicit 5-hour and weekly labels', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
@@ -648,7 +781,7 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain(
-      '│ Rate Limits: Codex | 5-hour 12.5% / 300m | weekly 48% / 10,080m'
+      '│ Rate Limits: Codex | 5-hour 87.5% / 5h | weekly 52% / 7d'
     );
   });
 
@@ -676,7 +809,7 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain(
-      '│ Rate Limits: Codex | 5-hour 12.5% / 300m | weekly 48% / 10,080m'
+      '│ Rate Limits: Codex | 5-hour 87.5% / 5h | weekly 52% / 7d'
     );
   });
 
@@ -753,8 +886,13 @@ describe('control status dashboard', () => {
         .find((line) => line.startsWith('│ Rate Limits: '));
       expect(rateLimitLine).toBeDefined();
       expect(rateLimitLine).toContain('gpt-5 p19/30 42s s3/5 7s cr1234.50');
-      expect(rateLimitLine).toContain('Linear cooldown 2m req19/30 42s cx180/200 7s');
-      expect(rateLimitLine).not.toContain('...');
+      expect(rateLimitLine).toContain('Linear cooldown 2m req 19/30 42s');
+      if (terminalColumns === 96) {
+        expect(rateLimitLine).toContain('cx 180/2...');
+      } else {
+        expect(rateLimitLine).toContain('Linear cooldown 2m req 19/30 42s cx 180/200 7s');
+        expect(rateLimitLine).not.toContain('...');
+      }
       expect(rateLimitLine?.length ?? 0).toBeLessThanOrEqual(terminalColumns);
     }
   );
@@ -831,8 +969,8 @@ describe('control status dashboard', () => {
       .split('\n')
       .find((line) => line.startsWith('│ Rate Limits: '));
     expect(rateLimitLine).toBeDefined();
-    expect(rateLimitLine).toContain('Codex req1/30 1m');
-    expect(rateLimitLine).toContain('Linear cooldown 2m req19/30 42s cx180/200 7s');
+    expect(rateLimitLine).toContain('Codex req 1/30 1m');
+    expect(rateLimitLine).toContain('Linear cooldown 2m req 19/30 42s cx 180/200 7s');
     expect(rateLimitLine).not.toContain('legacy-proof');
   });
 
@@ -875,7 +1013,7 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50');
     expect(plainFrame).toContain('│ ● CO-26      running');
     expect(plainFrame).toContain('worker link active');
-    expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=oops red next line');
+    expect(plainFrame).toContain('│  ↻ CO-27 retry scheduled in 1m | attempt 2 | oops red next line');
   });
 
   it('preserves literal backslashes while normalizing real newlines', () => {
@@ -897,7 +1035,7 @@ describe('control status dashboard', () => {
       throughputTps: 0
     });
 
-    expect(stripAnsi(frame)).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=C:\\runs\\retry next line');
+    expect(stripAnsi(frame)).toContain('│  ↻ CO-27 retry scheduled in 1m | attempt 2 | C:\\runs\\retry next line');
   });
 
   it('renders unknown token usage as unavailable instead of numeric zero', () => {
@@ -932,7 +1070,7 @@ describe('control status dashboard', () => {
     const plainFrame = stripAnsi(frame);
     expect(plainFrame).toContain('│ Tokens: in n/a | out n/a | total n/a');
     expect(plainFrame).toContain('│ ● CO-26      running      4242');
-    expect(plainFrame).toContain('15m 0s / 4          n/a session-26');
+    expect(plainFrame).toContain('15m / 4             n/a session-26');
   });
 
   it('clamps dashboard error frames to the active terminal width', async () => {
@@ -1205,6 +1343,7 @@ describe('control status dashboard', () => {
     await handle.flush();
     expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_ENTER);
     expect(writes[0]).not.toContain(ANSI_ALT_SCREEN_EXIT);
+    expect(writes[0]).not.toContain(ANSI_CLEAR_HOME);
     expect(stripAnsi(writes[0] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
     expect(stripAnsi(writes[0] ?? '')).not.toContain('│ Dashboard: ');
 
@@ -1213,9 +1352,233 @@ describe('control status dashboard', () => {
     expect(writes).toHaveLength(2);
     expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_ENTER);
     expect(writes[1]).not.toContain(ANSI_ALT_SCREEN_EXIT);
+    expect(writes[1]).not.toContain(ANSI_CLEAR_HOME);
+    expect(writes[1]).toContain(ANSI_CLEAR_DOWN);
+    expect(writes[1]).toMatch(new RegExp(String.raw`\r\u001b\[\d+A\u001b\[J`));
     expect(stripAnsi(writes[1] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
     expect(stripAnsi(writes[1] ?? '')).not.toContain('│ Dashboard: ');
+    expect(stripAnsi(writes[1] ?? '')).toContain('│ Tokens: in 100 | out 117 | total 218');
 
+    handle.stop();
+    expect(writes[writes.length - 1]).toBe('\n');
+  });
+
+  it('accounts for wrapped terminal rows when rewriting the pinned primary attach frame', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let readCount = 0;
+    let columns = 120;
+
+    const handle = startAttachedControlStatusDashboard(
+      {
+        readDataset: async () =>
+          buildDataset({
+            running: [
+              {
+                ...buildDataset().running[0],
+                summary:
+                  'This is an intentionally long running summary to force wrapped rows in the pinned primary live region'
+              }
+            ],
+            totals: {
+              ...buildDataset().totals,
+              total_tokens: 217 + readCount++
+            }
+          }),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'attach-viewer',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          get columns() {
+            return columns;
+          },
+          isTTY: true
+        }
+      },
+      {
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    columns = 40;
+    const expectedWrappedRows = stripAnsi(writes[0] ?? '')
+      .split('\n')
+      .reduce((rowCount, line) => rowCount + Math.max(1, Math.ceil(line.length / columns)), 0);
+    expect(expectedWrappedRows).toBeGreaterThan(stripAnsi(writes[0] ?? '').split('\n').length);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(writes[1]).toContain(`\r\u001b[${expectedWrappedRows - 1}A\u001b[J`);
+    handle.stop();
+  });
+
+  it('counts wide CJK cells when rewriting the pinned primary attach frame', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let readCount = 0;
+    let columns = 120;
+
+    const handle = startAttachedControlStatusDashboard(
+      {
+        readDataset: async () =>
+          buildDataset({
+            running: [
+              {
+                ...buildDataset().running[0],
+                summary: `Wide glyph regression ${'漢'.repeat(28)}`
+              }
+            ],
+            totals: {
+              ...buildDataset().totals,
+              total_tokens: 217 + readCount++
+            }
+          }),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'attach-viewer',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          get columns() {
+            return columns;
+          },
+          isTTY: true
+        }
+      },
+      {
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    columns = 40;
+
+    const strippedFrame = stripAnsi(writes[0] ?? '');
+    const expectedWrappedRows = countTerminalRows(strippedFrame, columns);
+    const naiveWrappedRows = strippedFrame
+      .split('\n')
+      .reduce((rowCount, line) => rowCount + Math.max(1, Math.ceil(line.length / columns)), 0);
+    expect(expectedWrappedRows).toBeGreaterThan(naiveWrappedRows);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(writes[1]).toContain(`\r\u001b[${expectedWrappedRows - 1}A\u001b[J`);
+    handle.stop();
+  });
+
+  it('falls back to a fresh full-screen rewrite when either pinned frame exceeds the viewport', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let readCount = 0;
+    let readIndex = 0;
+    const shortDataset = () =>
+      buildDataset({
+        counts: {
+          running: 0,
+          retrying: 0,
+          issues: 0
+        },
+        running: [],
+        retrying: []
+      });
+
+    const tallDataset = () =>
+      buildDataset({
+        counts: {
+          running: 8,
+          retrying: 4,
+          issues: 12
+        },
+        running: Array.from({ length: 8 }, (_, index) => ({
+          ...buildDataset().running[0],
+          issue_identifier: `CO-${26 + index}`,
+          issue_id: `issue-${26 + index}`,
+          task_id: `linear-${26 + index}`,
+          run_id: `run-${26 + index}`,
+          session_id: `session-${26 + index}`,
+          thread_id: `thread-${26 + index}`,
+          summary: `Tall pinned frame row ${index + 1}`,
+          tokens: {
+            ...buildDataset().running[0].tokens,
+            total_tokens: 217 + readCount
+          }
+        })),
+        retrying: Array.from({ length: 4 }, (_, index) => ({
+          ...buildDataset().retrying[0],
+          issue_identifier: `CO-${40 + index}`,
+          issue_id: `issue-${40 + index}`,
+          task_id: `linear-${40 + index}`,
+          run_id: `run-${40 + index}`,
+          summary: `Queued retry row ${index + 1}`
+        })),
+        totals: {
+          ...buildDataset().totals,
+          total_tokens: 217 + readCount++
+        }
+      });
+
+    const handle = startAttachedControlStatusDashboard(
+      {
+        readDataset: async () => (readIndex++ === 0 ? shortDataset() : tallDataset()),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'attach-viewer',
+        refreshIntervalMs: 1000,
+        output: {
+          rows: 23,
+          columns: 120,
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          isTTY: true
+        }
+      },
+      {
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    expect(stripAnsi(writes[0] ?? '').split('\n').length).toBeLessThanOrEqual(23);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(stripAnsi(writes[1] ?? '').split('\n').length).toBeGreaterThan(23);
+    expect(writes[1]).toContain(ANSI_CLEAR_HOME);
+    expect(writes[1]).not.toContain(ANSI_CLEAR_DOWN);
+    expect(writes[1]).not.toMatch(new RegExp(String.raw`\r\u001b\[\d+A\u001b\[J`));
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(writes[2]).toContain(ANSI_CLEAR_HOME);
+    expect(writes[2]).not.toContain(ANSI_CLEAR_DOWN);
+    expect(writes[2]).not.toMatch(new RegExp(String.raw`\r\u001b\[\d+A\u001b\[J`));
     handle.stop();
   });
 
@@ -1945,8 +2308,8 @@ describe('control status dashboard', () => {
     await handle.flush();
 
     const plainFrame = stripAnsi(writes[0] ?? '');
-    expect(plainFrame).toContain('│ ● CO-26      running      4242     15m 0s / 4');
-    expect(plainFrame).toContain('│  ↻ CO-27 attempt=2 in 60.000s error=rate limit exceeded');
+    expect(plainFrame).toContain('│ ● CO-26      running      4242     15m / 4');
+    expect(plainFrame).toContain('│  ↻ CO-27 retry scheduled in 1m | attempt 2 | rate limit exceeded');
 
     handle.stop();
   });

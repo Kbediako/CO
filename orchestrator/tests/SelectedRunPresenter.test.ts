@@ -574,6 +574,58 @@ describe('OperatorDashboardPresenter', () => {
     ]);
   });
 
+  it('keeps running and retry summaries pinned to stable issue identity before identifier fallback', () => {
+    const projection = buildProjection();
+    const runningIssue = projection.issues.find((issue) => issue.payload.issue_id === 'issue-7');
+    expect(runningIssue).toBeTruthy();
+    if (!runningIssue) {
+      return;
+    }
+
+    const siblingAliasIssue = buildIssueRecord({
+      issue_identifier: 'CO-7',
+      issue_id: 'issue-7-sibling',
+      task_id: 'linear-e52-sibling',
+      run_id: 'run-7-sibling',
+      summary: 'Sibling summary should not leak into the active run',
+      workspace: {
+        path: '/repo/.workspaces/co-7-sibling'
+      }
+    });
+    projection.issues = [runningIssue, siblingAliasIssue];
+    projection.retrying = [
+      {
+        ...projection.retrying[0]!,
+        issue_identifier: 'CO-7',
+        issue_id: 'issue-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry'
+      }
+    ];
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-7',
+        task_id: 'linear-e52',
+        run_id: 'run-7',
+        summary: 'Waiting on operator input'
+      })
+    ]);
+    expect(dataset.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-7',
+        task_id: 'linear-e52-retry',
+        run_id: 'run-7-retry',
+        summary: 'Waiting on operator input'
+      })
+    ]);
+  });
+
   it('falls back to provider proof workspace paths when the issue payload is missing one', () => {
     const projection = buildProjection();
     const runningIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-7');

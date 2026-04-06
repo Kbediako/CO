@@ -27,6 +27,7 @@ export interface OperatorDashboardSessionPayload {
   issue_id: string | null;
   task_id: string | null;
   run_id: string | null;
+  summary: string | null;
   display_state: string;
   status_reason: string | null;
   pid: string | null;
@@ -47,6 +48,7 @@ export interface OperatorDashboardRetryPayload {
   issue_id: string | null;
   task_id: string | null;
   run_id: string | null;
+  summary: string | null;
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
@@ -134,6 +136,12 @@ export function buildUiDataset(input: {
   const generatedAt = input.generatedAt ?? isoTimestamp();
   const selectedIssueIdentifier = input.projection.selected?.issue_identifier ?? null;
   const issuePayloads = input.projection.issues.map((record) => record.payload);
+  const issuesById = new Map(
+    issuePayloads.flatMap((issue) => (issue.issue_id === null ? [] : [[issue.issue_id, issue] as const]))
+  );
+  const issuesByRunId = new Map(
+    issuePayloads.flatMap((issue) => (issue.run_id === null ? [] : [[issue.run_id, issue] as const]))
+  );
   const issuesByIdentifier = new Map(issuePayloads.map((issue) => [issue.issue_identifier, issue] as const));
 
   return {
@@ -152,10 +160,10 @@ export function buildUiDataset(input: {
     selected_issue_identifier: selectedIssueIdentifier,
     selected: input.projection.selected,
     running: input.projection.running.map((entry) =>
-      buildRunningSessionPayload(entry, issuesByIdentifier.get(entry.issue_identifier) ?? null)
+      buildRunningSessionPayload(entry, resolveRunningIssuePayload(entry, issuesById, issuesByIdentifier))
     ),
     retrying: input.projection.retrying.map((entry) =>
-      buildRetryQueuePayload(entry, issuesByIdentifier.get(entry.issue_identifier) ?? null)
+      buildRetryQueuePayload(entry, resolveRetryIssuePayload(entry, issuesByRunId, issuesById, issuesByIdentifier))
     ),
     issues: issuePayloads.map((issue) => buildIssuePayload(issue, issue.issue_identifier === selectedIssueIdentifier)),
     ...(input.projection.providerWorkflow ? { provider_workflow: input.projection.providerWorkflow } : {}),
@@ -233,6 +241,7 @@ function buildRunningSessionPayload(
     issue_id: entry.issue_id,
     task_id: issue?.task_id ?? null,
     run_id: issue?.run_id ?? null,
+    summary: issue?.summary ?? null,
     display_state: entry.display_state,
     status_reason: entry.status_reason,
     pid: proof === null ? (entry.pid ?? null) : (proof.pid ?? null),
@@ -258,6 +267,7 @@ function buildRetryQueuePayload(
     issue_id: entry.issue_id,
     task_id: entry.task_id ?? issue?.task_id ?? null,
     run_id: entry.run_id ?? issue?.run_id ?? null,
+    summary: issue?.summary ?? null,
     display_state: entry.display_state,
     status_reason: entry.status_reason,
     session_id: entry.session_id,
@@ -273,6 +283,41 @@ function buildRetryQueuePayload(
     started_at: entry.started_at,
     last_event_at: entry.last_event_at
   };
+}
+
+function resolveRunningIssuePayload(
+  entry: ControlRunningPayload,
+  issuesById: ReadonlyMap<string, ControlIssuePayload>,
+  issuesByIdentifier: ReadonlyMap<string, ControlIssuePayload>
+): ControlIssuePayload | null {
+  if (entry.issue_id !== null) {
+    const issueById = issuesById.get(entry.issue_id);
+    if (issueById) {
+      return issueById;
+    }
+  }
+  return issuesByIdentifier.get(entry.issue_identifier) ?? null;
+}
+
+function resolveRetryIssuePayload(
+  entry: ControlRetryPayload,
+  issuesByRunId: ReadonlyMap<string, ControlIssuePayload>,
+  issuesById: ReadonlyMap<string, ControlIssuePayload>,
+  issuesByIdentifier: ReadonlyMap<string, ControlIssuePayload>
+): ControlIssuePayload | null {
+  if (entry.run_id) {
+    const issueByRunId = issuesByRunId.get(entry.run_id);
+    if (issueByRunId) {
+      return issueByRunId;
+    }
+  }
+  if (entry.issue_id !== null) {
+    const issueById = issuesById.get(entry.issue_id);
+    if (issueById) {
+      return issueById;
+    }
+  }
+  return issuesByIdentifier.get(entry.issue_identifier) ?? null;
 }
 
 function normalizeRecentAgentActivity(
