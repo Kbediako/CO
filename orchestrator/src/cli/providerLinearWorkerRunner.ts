@@ -1990,12 +1990,21 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     const proofSignature = buildProviderWorkerSessionLogHydrationProofSignature(proof);
     if (hydrationState.proof_signature !== proofSignature) {
       const fileStat = await stat(sessionLogPath).catch(() => null);
-      if (fileStat?.isFile() && fileStat.size === tailState.offsetBytes) {
+      if (!fileStat?.isFile()) {
+        preserveProofTelemetryFloor = true;
+      } else if (fileStat.size === tailState.offsetBytes) {
         tailState = {
           path: sessionLogPath,
           offsetBytes: fileStat.size,
           trailingText: tailState.trailingText,
           bootstrapPending: tailState.bootstrapPending
+        };
+      } else if (fileStat.size < tailState.offsetBytes) {
+        tailState = {
+          path: sessionLogPath,
+          offsetBytes: 0,
+          trailingText: '',
+          bootstrapPending: true
         };
       } else {
         preserveProofTelemetryFloor = true;
