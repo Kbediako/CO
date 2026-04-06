@@ -15,7 +15,7 @@
 - Desired Outcome: a merged issue either leaves the shared root reconciled to `origin/main` automatically or records an explicit durable pending/skipped/failed shared-root reconciliation outcome with the exact reason. Resumed `Merging` `activeRun` recovery must not bypass deterministic merge closeout, and one authoritative operator-visible surface must expose the shared-root truth directly.
 
 ## User Request Translation (Context Anchor)
-- User intent / needs (in your own words): finish the closeout seam left after `CO-80` and the `CO-98` incident so operators can trust that a successfully merged issue makes the shared root immediately usable, or tells them exactly why it is not yet usable, without manual repo babysitting or inference from stale runtime state.
+- User intent / needs (in your own words): finish the closeout seam left after `CO-80` and the `CO-98` incident, so operators can trust that a successfully merged issue makes the shared root immediately usable, or tells them exactly why it is not yet usable, without manual repo babysitting or inference from stale runtime state.
 - Success criteria / acceptance:
   - deterministic merge closeout preserves the existing dirty/non-`main` safety guard while recording a durable pending shared-root reconciliation outcome when sync is skipped
   - refresh / rehydrate for `Merging` issues cannot keep a resumed `activeRun` claim alive in a way that bypasses deterministic merge closeout

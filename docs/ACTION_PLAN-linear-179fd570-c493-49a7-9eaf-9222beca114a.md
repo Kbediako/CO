@@ -69,7 +69,7 @@
 
 ## Risks & Mitigations
 - Risk: changing refresh ordering could disturb legitimate active `Merging` ownership paths.
-  - Mitigation: keep the change scoped to live `Merging` issues where deterministic merge closeout is authoritative and test the exact resumed-active-run recovery shape.
+  - Mitigation: keep the change scoped to live `Merging` issues where deterministic merge closeout is authoritative, and test the exact resumed-active-run recovery shape.
 - Risk: operator-facing status could overcorrect and mark reconciled merges as pending.
   - Mitigation: derive pending only from explicit `shared_root.status === skipped` or failure states, and cover reconciled vs skipped in observability tests.
 - Risk: machine consumers still infer intent from summaries instead of structured reasons.

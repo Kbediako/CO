@@ -36,7 +36,7 @@
 - [x] `node scripts/diff-budget.mjs`. Evidence: `.runs/linear-179fd570-c493-49a7-9eaf-9222beca114a-stable8/cli/2026-04-06T02-36-50-981Z-756c3dd6/manifest.json` with `DIFF_BUDGET_OVERRIDE_REASON`.
 - [x] Manifest-backed standalone review wrapper executed truthfully. Evidence: `.runs/linear-179fd570-c493-49a7-9eaf-9222beca114a-stable7/cli/2026-04-06T02-15-22-819Z-037c2529/manifest.json` (`review_outcome: clean-success` on the pre-follow-up diff), plus `.runs/linear-179fd570-c493-49a7-9eaf-9222beca114a-stable8/cli/2026-04-06T02-36-50-981Z-756c3dd6/manifest.json` and `review/output.log` showing the forced wrapper ran on the refreshed diff before stalling and triggering the recorded manual fallback review.
 - [x] Explicit elegance review recorded after review findings were addressed. Evidence: recorded in `out/linear-179fd570-c493-49a7-9eaf-9222beca114a/manual/workpad.md` and the Linear workpad comment.
-- [x] `npm run pack:smoke`. Evidence: local final validation run.
+- [x] `npm run pack:smoke`. Evidence: `out/linear-179fd570-c493-49a7-9eaf-9222beca114a/manual/pack-smoke.log`.
 
 ## Handoff
 - [x] Exactly one persistent `## Codex Workpad` comment is kept current on the Linear issue. Evidence: Linear workpad comment `0264e157-7269-49cb-ba84-2ee0090bfba7` (`https://linear.app/asabeko/issue/CO-100/co-make-shared-root-reconciliation-deterministic-after-merged-closeout#comment-0264e157`).

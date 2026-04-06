@@ -595,6 +595,11 @@ function deriveMergeCloseoutProgressSnapshot(
   const unresolvedThreadCount = normalizeOptionalInteger(snapshot?.unresolved_thread_count);
   const actionRequiredReasons = normalizeStringArray(snapshot?.action_required_reasons);
   const gateReasons = normalizeStringArray(snapshot?.gate_reasons);
+  const snapshotState = normalizeOptionalString(snapshot?.state);
+  const snapshotShowsMerged =
+    mergeStatus === 'merged' ||
+    Boolean(normalizeOptionalString(snapshot?.merged_at)) ||
+    snapshotState === 'MERGED';
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(mergeCloseout.recorded_at),
     normalizeOptionalString(snapshot?.updated_at),
@@ -612,7 +617,7 @@ function deriveMergeCloseoutProgressSnapshot(
     actionRequiredReasons
   });
 
-  if (mergeStatus === 'merged' || normalizeOptionalString(snapshot?.merged_at)) {
+  if (snapshotShowsMerged) {
     if (normalizeOptionalString(sharedRoot?.status) === 'failed') {
       return {
         phase: 'failed',

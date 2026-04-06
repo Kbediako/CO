@@ -12548,7 +12548,17 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(getPersistedState().claims[0]).toMatchObject({
       state: 'completed',
-      reason: 'provider_issue_merge_closeout_merged'
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      task_id: 'task-1303-merge-closeout-rehydrate',
+      run_id: 'run-merge-closeout-rehydrate',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_transitioned_done'
     });
   });
 
@@ -12576,6 +12586,7 @@ describe('createProviderIssueHandoffService', () => {
           run_id: `run-merge-closeout-${claimState}-rehydrate`,
           task_id: `task-1303-merge-closeout-${claimState}-rehydrate`,
           status: 'in_progress',
+          started_at: '2026-03-19T04:20:00.000Z',
           summary: 'worker still running',
           issue_provider: 'linear',
           issue_id: 'lin-issue-1',
@@ -12593,6 +12604,7 @@ describe('createProviderIssueHandoffService', () => {
           owner_phase: 'ended',
           owner_status: 'succeeded',
           end_reason: 'max_turns_reached_issue_still_active',
+          attempt_started_at: '2026-03-19T04:20:00.000Z',
           updated_at: '2026-03-19T04:30:00.000Z'
         }),
         'utf8'
@@ -12735,7 +12747,17 @@ describe('createProviderIssueHandoffService', () => {
       });
       expect(getPersistedState().claims[0]).toMatchObject({
         state: 'completed',
-        reason: 'provider_issue_merge_closeout_merged'
+        reason: 'provider_issue_merge_closeout_merged',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        task_id: `task-1303-merge-closeout-${claimState}-rehydrate`,
+        run_id: `run-merge-closeout-${claimState}-rehydrate`,
+        run_manifest_path: childPaths.manifestPath
+      });
+      expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+        status: 'merged',
+        reason: 'merged_and_transitioned_done'
       });
     }
   );
@@ -12759,6 +12781,7 @@ describe('createProviderIssueHandoffService', () => {
         run_id: 'run-merge-closeout-succeeded-manifest-rehydrate',
         task_id: 'task-1303-merge-closeout-succeeded-manifest-rehydrate',
         status: 'succeeded',
+        started_at: '2026-03-19T04:20:00.000Z',
         summary: 'worker completed successfully',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',
@@ -12776,6 +12799,7 @@ describe('createProviderIssueHandoffService', () => {
         owner_phase: 'ended',
         owner_status: 'succeeded',
         end_reason: 'max_turns_reached_issue_still_active',
+        attempt_started_at: '2026-03-19T04:20:00.000Z',
         updated_at: '2026-03-19T04:30:00.000Z'
       }),
       'utf8'
@@ -12918,7 +12942,17 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(getPersistedState().claims[0]).toMatchObject({
       state: 'completed',
-      reason: 'provider_issue_merge_closeout_merged'
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      task_id: 'task-1303-merge-closeout-succeeded-manifest-rehydrate',
+      run_id: 'run-merge-closeout-succeeded-manifest-rehydrate',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_transitioned_done_after_recovery'
     });
   });
 
@@ -14104,6 +14138,126 @@ describe('createProviderIssueHandoffService', () => {
       issue_assignee_name: null,
       task_id: 'task-1303-stale-proof-live-merge',
       run_id: 'run-stale-proof-live-merge',
+      run_manifest_path: childPaths.manifestPath
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+  });
+
+  it('does not treat a proof without attempt_started_at as terminal for a live Merging run', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-proof-missing-attempt-started-at'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-proof-missing-attempt-started-at');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-proof-missing-attempt-started-at',
+        task_id: 'task-1303-proof-missing-attempt-started-at',
+        status: 'in_progress',
+        started_at: '2026-03-19T04:29:45.000Z',
+        summary: 'worker resumed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:25:00.000Z',
+        updated_at: '2026-03-19T04:29:50.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        updated_at: '2026-03-19T04:29:55.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-proof-missing-attempt-started-at',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-proof-missing-attempt-started-at',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-proof-missing-attempt-started-at',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => {
+      throw new Error('runMergeCloseout should not be called when attempt_started_at is missing.');
+    });
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:30:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    const expectedClaim = {
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-proof-missing-attempt-started-at',
+      run_id: 'run-proof-missing-attempt-started-at',
       run_manifest_path: childPaths.manifestPath
     };
     expect(state.claims[0]).toMatchObject(expectedClaim);

@@ -458,7 +458,7 @@ describe('SelectedRunProjection', () => {
           required_checks_pending: 0,
           required_checks_failed: 0,
           updated_at: '2026-04-05T06:50:30.000Z',
-          merged_at: '2026-04-05T06:50:00.000Z',
+          merged_at: null,
           head_oid: 'head-oid-82'
         },
         merge_attempt: null,
@@ -479,6 +479,7 @@ describe('SelectedRunProjection', () => {
     ).buildSelectedRunContext();
 
     expect(selected?.displayStatus).toBe('pending_shared_root_reconciliation');
+    expect(selected?.rawStatus).toBe('succeeded');
     expect(selected?.statusReason).toBe('shared_root_dirty');
     expect(selected?.summary).toBe(
       'Merged attached PR #82; shared-root reconciliation is pending (shared_root_dirty) before the Linear issue can transition to Done.'
@@ -578,7 +579,7 @@ describe('SelectedRunProjection', () => {
           required_checks_pending: 0,
           required_checks_failed: 0,
           updated_at: '2026-04-05T06:50:30.000Z',
-          merged_at: '2026-04-05T06:50:00.000Z',
+          merged_at: null,
           head_oid: 'head-oid-82'
         },
         merge_attempt: null,
@@ -608,6 +609,7 @@ describe('SelectedRunProjection', () => {
     ).buildSelectedRunContext();
 
     expect(selected?.displayStatus).toBe('failed');
+    expect(selected?.rawStatus).toBe('succeeded');
     expect(selected?.statusReason).toBe('shared_root_fast_forward_failed');
     expect(selected?.summary).toBe(
       'Merged attached PR #82; shared-root reconciliation failed (shared_root_fast_forward_failed) after the Linear issue transitioned to Done.'

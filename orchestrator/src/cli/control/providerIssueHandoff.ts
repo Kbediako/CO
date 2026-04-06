@@ -102,6 +102,7 @@ interface ProviderIssueRunRecord {
 }
 
 interface ProviderLinearWorkerProofRecord {
+  attempt_started_at?: unknown;
   owner_phase?: unknown;
   owner_status?: unknown;
   end_reason?: unknown;
@@ -3193,7 +3194,22 @@ function shouldUseProviderLinearWorkerTerminalProof(
   if (!resolveProviderLinearWorkerTerminalStatus(proof)) {
     return false;
   }
-  const proofUpdatedAt = readStringValue((proof ?? {}) as Record<string, unknown>, 'updated_at');
+  const proofRecord = (proof ?? {}) as Record<string, unknown>;
+  const runStartedAt = readStringValue(manifest, 'started_at');
+  if (runStartedAt) {
+    const runStartedTimestamp = Date.parse(runStartedAt);
+    if (!Number.isNaN(runStartedTimestamp)) {
+      const proofAttemptStartedAt = readStringValue(proofRecord, 'attempt_started_at');
+      const proofAttemptStartedTimestamp = Date.parse(proofAttemptStartedAt ?? '');
+      if (!proofAttemptStartedAt || Number.isNaN(proofAttemptStartedTimestamp)) {
+        return false;
+      }
+      if (proofAttemptStartedTimestamp < runStartedTimestamp) {
+        return false;
+      }
+    }
+  }
+  const proofUpdatedAt = readStringValue(proofRecord, 'updated_at');
   if (!proofUpdatedAt) {
     return false;
   }
