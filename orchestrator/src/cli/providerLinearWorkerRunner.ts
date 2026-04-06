@@ -2014,16 +2014,24 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       hydrationState: null
     };
   }
+  const proofTokenFloor = proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage();
   if (
     preserveProofTelemetryFloor &&
-    providerWorkerTokenUsageFallsBehindFloor(proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(), parseState.tokens)
+    proof.latest_turn_id !== null &&
+    parseState.turnId !== null &&
+    parseState.turnId !== proof.latest_turn_id &&
+    !providerWorkerTokenUsageAdvancesFloor(proofTokenFloor, parseState.tokens)
   ) {
     parseState.threadId = proof.thread_id;
     parseState.turnId = proof.latest_turn_id;
-    parseState.tokens = mergeProviderWorkerTokenUsageFloor(
-      proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
-      parseState.tokens
-    );
+  }
+  if (
+    preserveProofTelemetryFloor &&
+    providerWorkerTokenUsageFallsBehindFloor(proofTokenFloor, parseState.tokens)
+  ) {
+    parseState.threadId = proof.thread_id;
+    parseState.turnId = proof.latest_turn_id;
+    parseState.tokens = mergeProviderWorkerTokenUsageFloor(proofTokenFloor, parseState.tokens);
     parseState.rateLimits = proof.rate_limits;
   }
 
@@ -2034,7 +2042,6 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     threadId: liveThreadId,
     turnId: liveTurnId
   });
-  const proofTokenFloor = proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage();
   const preferProofRateLimits =
     preserveProofTelemetryFloor &&
     proof.rate_limits !== null &&
