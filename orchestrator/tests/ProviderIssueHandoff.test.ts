@@ -14144,7 +14144,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
-  it('does not treat a proof without attempt_started_at as terminal for a live Merging run', async () => {
+  it('does not treat a stale proof without attempt_started_at as terminal for a live Merging run', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
 
@@ -14181,7 +14181,7 @@ describe('createProviderIssueHandoffService', () => {
         owner_phase: 'ended',
         owner_status: 'succeeded',
         end_reason: 'issue_review_handoff',
-        updated_at: '2026-03-19T04:29:55.000Z'
+        updated_at: '2026-03-19T04:29:40.000Z'
       }),
       'utf8'
     );
@@ -14264,7 +14264,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
-  it('routes a recovered Merging run with authoritative terminal proof through deterministic merge closeout', async () => {
+  it('routes a recovered Merging run with authoritative terminal proof through deterministic merge closeout via updated_at fallback', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
 
@@ -14283,6 +14283,7 @@ describe('createProviderIssueHandoffService', () => {
         run_id: 'run-review-completed',
         task_id: 'task-1303-review-completed',
         status: 'in_progress',
+        started_at: '2026-03-19T04:29:45.000Z',
         summary: 'worker resumed',
         issue_provider: 'linear',
         issue_id: 'lin-issue-1',

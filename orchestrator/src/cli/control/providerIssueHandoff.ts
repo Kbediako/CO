@@ -46,6 +46,7 @@ import {
   runProviderTerminalCleanup,
   type ProviderTerminalCleanupConfig
 } from './providerTerminalCleanup.js';
+import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
 import type { ProviderMergeCloseoutRecord } from './providerMergeCloseout.js';
 
 export interface ProviderIssueLauncher {
@@ -3196,18 +3197,8 @@ function shouldUseProviderLinearWorkerTerminalProof(
   }
   const proofRecord = (proof ?? {}) as Record<string, unknown>;
   const runStartedAt = readStringValue(manifest, 'started_at');
-  if (runStartedAt) {
-    const runStartedTimestamp = Date.parse(runStartedAt);
-    if (!Number.isNaN(runStartedTimestamp)) {
-      const proofAttemptStartedAt = readStringValue(proofRecord, 'attempt_started_at');
-      const proofAttemptStartedTimestamp = Date.parse(proofAttemptStartedAt ?? '');
-      if (!proofAttemptStartedAt || Number.isNaN(proofAttemptStartedTimestamp)) {
-        return false;
-      }
-      if (proofAttemptStartedTimestamp < runStartedTimestamp) {
-        return false;
-      }
-    }
+  if (runStartedAt && !isProviderLinearWorkerProofFreshForStage(proofRecord, runStartedAt)) {
+    return false;
   }
   const proofUpdatedAt = readStringValue(proofRecord, 'updated_at');
   if (!proofUpdatedAt) {
