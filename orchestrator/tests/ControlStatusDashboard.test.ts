@@ -1485,48 +1485,61 @@ describe('control status dashboard', () => {
     handle.stop();
   });
 
-  it('falls back to a fresh full-screen rewrite when the pinned frame is taller than the viewport', async () => {
+  it('falls back to a fresh full-screen rewrite when either pinned frame exceeds the viewport', async () => {
     vi.useFakeTimers();
 
     const writes: string[] = [];
     let readCount = 0;
+    let readIndex = 0;
+    const shortDataset = () =>
+      buildDataset({
+        counts: {
+          running: 0,
+          retrying: 0,
+          issues: 0
+        },
+        running: [],
+        retrying: []
+      });
+
+    const tallDataset = () =>
+      buildDataset({
+        counts: {
+          running: 8,
+          retrying: 4,
+          issues: 12
+        },
+        running: Array.from({ length: 8 }, (_, index) => ({
+          ...buildDataset().running[0],
+          issue_identifier: `CO-${26 + index}`,
+          issue_id: `issue-${26 + index}`,
+          task_id: `linear-${26 + index}`,
+          run_id: `run-${26 + index}`,
+          session_id: `session-${26 + index}`,
+          thread_id: `thread-${26 + index}`,
+          summary: `Tall pinned frame row ${index + 1}`,
+          tokens: {
+            ...buildDataset().running[0].tokens,
+            total_tokens: 217 + readCount
+          }
+        })),
+        retrying: Array.from({ length: 4 }, (_, index) => ({
+          ...buildDataset().retrying[0],
+          issue_identifier: `CO-${40 + index}`,
+          issue_id: `issue-${40 + index}`,
+          task_id: `linear-${40 + index}`,
+          run_id: `run-${40 + index}`,
+          summary: `Queued retry row ${index + 1}`
+        })),
+        totals: {
+          ...buildDataset().totals,
+          total_tokens: 217 + readCount++
+        }
+      });
 
     const handle = startAttachedControlStatusDashboard(
       {
-        readDataset: async () =>
-          buildDataset({
-            counts: {
-              running: 8,
-              retrying: 4,
-              issues: 12
-            },
-            running: Array.from({ length: 8 }, (_, index) => ({
-              ...buildDataset().running[0],
-              issue_identifier: `CO-${26 + index}`,
-              issue_id: `issue-${26 + index}`,
-              task_id: `linear-${26 + index}`,
-              run_id: `run-${26 + index}`,
-              session_id: `session-${26 + index}`,
-              thread_id: `thread-${26 + index}`,
-              summary: `Tall pinned frame row ${index + 1}`,
-              tokens: {
-                ...buildDataset().running[0].tokens,
-                total_tokens: 217 + readCount
-              }
-            })),
-            retrying: Array.from({ length: 4 }, (_, index) => ({
-              ...buildDataset().retrying[0],
-              issue_identifier: `CO-${40 + index}`,
-              issue_id: `issue-${40 + index}`,
-              task_id: `linear-${40 + index}`,
-              run_id: `run-${40 + index}`,
-              summary: `Queued retry row ${index + 1}`
-            })),
-            totals: {
-              ...buildDataset().totals,
-              total_tokens: 217 + readCount++
-            }
-          }),
+        readDataset: async () => (readIndex++ === 0 ? shortDataset() : tallDataset()),
         baseUrl: 'http://127.0.0.1:4100',
         taskId: 'local-mcp',
         runId: 'control-host',
@@ -1534,7 +1547,7 @@ describe('control status dashboard', () => {
         startPipelineId: 'attach-viewer',
         refreshIntervalMs: 1000,
         output: {
-          rows: 12,
+          rows: 23,
           columns: 120,
           write(chunk: string) {
             writes.push(chunk);
@@ -1550,14 +1563,22 @@ describe('control status dashboard', () => {
     );
 
     await handle.flush();
-    expect(stripAnsi(writes[0] ?? '').split('\n').length).toBeGreaterThan(12);
+    expect(stripAnsi(writes[0] ?? '').split('\n').length).toBeLessThanOrEqual(23);
 
     await vi.advanceTimersByTimeAsync(1000);
     await handle.flush();
 
+    expect(stripAnsi(writes[1] ?? '').split('\n').length).toBeGreaterThan(23);
     expect(writes[1]).toContain(ANSI_CLEAR_HOME);
     expect(writes[1]).not.toContain(ANSI_CLEAR_DOWN);
     expect(writes[1]).not.toMatch(new RegExp(String.raw`\r\u001b\[\d+A\u001b\[J`));
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(writes[2]).toContain(ANSI_CLEAR_HOME);
+    expect(writes[2]).not.toContain(ANSI_CLEAR_DOWN);
+    expect(writes[2]).not.toMatch(new RegExp(String.raw`\r\u001b\[\d+A\u001b\[J`));
     handle.stop();
   });
 

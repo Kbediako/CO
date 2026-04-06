@@ -677,8 +677,10 @@ function startControlStatusViewer(
     primarySurfacePromptNeedsNewline = true;
     if (enablePinnedPrimaryLiveRegion) {
       if (activePrimaryFrame !== null) {
+        const viewportRows = resolveTerminalRows(output.rows ?? null);
         const previousRowCount = countFrameRows(activePrimaryFrame, output.columns ?? null);
-        if (previousRowCount > resolveTerminalRows(output.rows ?? null)) {
+        const currentRowCount = countFrameRows(frame, output.columns ?? null);
+        if (previousRowCount > viewportRows || currentRowCount > viewportRows) {
           output.write(`${ANSI_CLEAR_HOME}${frame}`);
         } else {
           output.write(rewritePrimaryFrame(frame, previousRowCount));
