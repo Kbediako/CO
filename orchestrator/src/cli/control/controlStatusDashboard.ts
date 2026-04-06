@@ -66,6 +66,14 @@ interface RenderedDashboardState {
   throughputTps: number;
 }
 
+const graphemeSegmenter =
+  typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : null;
+const combiningMarkPattern = /^\p{Mark}$/u;
+const extendedPictographicPattern = /\p{Extended_Pictographic}/u;
+const keycapPattern = /^[0-9#*]\uFE0F?\u20E3$/u;
+
 export interface StartControlStatusDashboardOptions {
   runtime: ControlRuntime;
   baseUrl: string;
@@ -701,7 +709,95 @@ function countWrappedTerminalRows(line: string, terminalColumns: number): number
   if (terminalColumns <= 0) {
     return 1;
   }
-  return Math.max(1, Math.ceil(line.length / terminalColumns));
+  return Math.max(1, Math.ceil(measureTerminalDisplayWidth(line) / terminalColumns));
+}
+
+function measureTerminalDisplayWidth(line: string): number {
+  if (line.length === 0) {
+    return 0;
+  }
+  if (graphemeSegmenter === null) {
+    return Array.from(line).reduce((width, grapheme) => width + measureTerminalGraphemeWidth(grapheme), 0);
+  }
+
+  let width = 0;
+  for (const { segment } of graphemeSegmenter.segment(line)) {
+    width += measureTerminalGraphemeWidth(segment);
+  }
+  return width;
+}
+
+function measureTerminalGraphemeWidth(grapheme: string): number {
+  if (grapheme.length === 0) {
+    return 0;
+  }
+  if (containsExtendedPictographic(grapheme) || isRegionalIndicatorCluster(grapheme) || isKeycapCluster(grapheme)) {
+    return 2;
+  }
+
+  let width = 0;
+  for (const char of grapheme) {
+    width += measureTerminalCodePointWidth(char);
+  }
+  return width;
+}
+
+function measureTerminalCodePointWidth(char: string): number {
+  const codePoint = char.codePointAt(0);
+  if (codePoint === undefined || isZeroWidthCodePoint(codePoint) || combiningMarkPattern.test(char)) {
+    return 0;
+  }
+  return isFullwidthCodePoint(codePoint) ? 2 : 1;
+}
+
+function containsExtendedPictographic(value: string): boolean {
+  return extendedPictographicPattern.test(value);
+}
+
+function isRegionalIndicatorCluster(value: string): boolean {
+  const codePoints = Array.from(value, (char) => char.codePointAt(0) ?? 0);
+  return codePoints.length > 0 && codePoints.every((codePoint) => codePoint >= 0x1f1e6 && codePoint <= 0x1f1ff);
+}
+
+function isKeycapCluster(value: string): boolean {
+  return keycapPattern.test(value);
+}
+
+function isZeroWidthCodePoint(codePoint: number): boolean {
+  return (
+    codePoint < 0x20 ||
+    (codePoint >= 0x7f && codePoint < 0xa0) ||
+    codePoint === 0x200b ||
+    codePoint === 0x200c ||
+    codePoint === 0x200d ||
+    codePoint === 0x2060 ||
+    (codePoint >= 0xfe00 && codePoint <= 0xfe0f) ||
+    (codePoint >= 0xe0100 && codePoint <= 0xe01ef)
+  );
+}
+
+function isFullwidthCodePoint(codePoint: number): boolean {
+  return (
+    codePoint >= 0x1100 &&
+    (
+      codePoint <= 0x115f ||
+      codePoint === 0x2329 ||
+      codePoint === 0x232a ||
+      (codePoint >= 0x2e80 && codePoint <= 0x3247 && codePoint !== 0x303f) ||
+      (codePoint >= 0x3250 && codePoint <= 0x4dbf) ||
+      (codePoint >= 0x4e00 && codePoint <= 0xa4c6) ||
+      (codePoint >= 0xa960 && codePoint <= 0xa97c) ||
+      (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+      (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+      (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
+      (codePoint >= 0xfe30 && codePoint <= 0xfe6b) ||
+      (codePoint >= 0xff01 && codePoint <= 0xff60) ||
+      (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
+      (codePoint >= 0x1b000 && codePoint <= 0x1b001) ||
+      (codePoint >= 0x1f200 && codePoint <= 0x1f251) ||
+      (codePoint >= 0x20000 && codePoint <= 0x3fffd)
+    )
+  );
 }
 
 function rewritePrimaryFrame(frame: string, previousRowCount: number): string {

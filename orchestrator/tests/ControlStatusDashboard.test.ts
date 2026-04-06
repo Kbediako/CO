@@ -29,6 +29,44 @@ function stripAnsi(value: string): string {
   return value.replace(ANSI_PATTERN, '');
 }
 
+function countTerminalRows(value: string, columns: number): number {
+  return value
+    .split('\n')
+    .reduce((rowCount, line) => rowCount + Math.max(1, Math.ceil(measureTerminalWidth(line) / columns)), 0);
+}
+
+function measureTerminalWidth(value: string): number {
+  let width = 0;
+  for (const char of value) {
+    width += isFullwidthCodePoint(char.codePointAt(0) ?? 0) ? 2 : 1;
+  }
+  return width;
+}
+
+function isFullwidthCodePoint(codePoint: number): boolean {
+  return (
+    codePoint >= 0x1100 &&
+    (
+      codePoint <= 0x115f ||
+      codePoint === 0x2329 ||
+      codePoint === 0x232a ||
+      (codePoint >= 0x2e80 && codePoint <= 0x3247 && codePoint !== 0x303f) ||
+      (codePoint >= 0x3250 && codePoint <= 0x4dbf) ||
+      (codePoint >= 0x4e00 && codePoint <= 0xa4c6) ||
+      (codePoint >= 0xa960 && codePoint <= 0xa97c) ||
+      (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+      (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+      (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
+      (codePoint >= 0xfe30 && codePoint <= 0xfe6b) ||
+      (codePoint >= 0xff01 && codePoint <= 0xff60) ||
+      (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
+      (codePoint >= 0x1b000 && codePoint <= 0x1b001) ||
+      (codePoint >= 0x1f200 && codePoint <= 0x1f251) ||
+      (codePoint >= 0x20000 && codePoint <= 0x3fffd)
+    )
+  );
+}
+
 function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): OperatorDashboardDataset {
   return {
     generated_at: '2026-03-30T01:15:00.000Z',
@@ -1377,6 +1415,68 @@ describe('control status dashboard', () => {
       .split('\n')
       .reduce((rowCount, line) => rowCount + Math.max(1, Math.ceil(line.length / columns)), 0);
     expect(expectedWrappedRows).toBeGreaterThan(stripAnsi(writes[0] ?? '').split('\n').length);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await handle.flush();
+
+    expect(writes[1]).toContain(`\r\u001b[${expectedWrappedRows - 1}A\u001b[J`);
+    handle.stop();
+  });
+
+  it('counts wide CJK cells when rewriting the pinned primary attach frame', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    let readCount = 0;
+    let columns = 120;
+
+    const handle = startAttachedControlStatusDashboard(
+      {
+        readDataset: async () =>
+          buildDataset({
+            running: [
+              {
+                ...buildDataset().running[0],
+                summary: `Wide glyph regression ${'漢'.repeat(28)}`
+              }
+            ],
+            totals: {
+              ...buildDataset().totals,
+              total_tokens: 217 + readCount++
+            }
+          }),
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'attach-viewer',
+        refreshIntervalMs: 1000,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          get columns() {
+            return columns;
+          },
+          isTTY: true
+        }
+      },
+      {
+        setTimeout,
+        clearTimeout
+      }
+    );
+
+    await handle.flush();
+    columns = 40;
+
+    const strippedFrame = stripAnsi(writes[0] ?? '');
+    const expectedWrappedRows = countTerminalRows(strippedFrame, columns);
+    const naiveWrappedRows = strippedFrame
+      .split('\n')
+      .reduce((rowCount, line) => rowCount + Math.max(1, Math.ceil(line.length / columns)), 0);
+    expect(expectedWrappedRows).toBeGreaterThan(naiveWrappedRows);
 
     await vi.advanceTimersByTimeAsync(1000);
     await handle.flush();
