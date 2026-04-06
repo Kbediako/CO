@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260406-linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2",
+      "title": "CO STATUS: make live attach scrolling work without accumulated full-frame history",
+      "relates_to": "tasks/tasks-linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-06",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-06",
+          "manifest": ".runs/linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2-co-97-docs-review/cli/2026-04-06T09-58-42-515Z-642faafe/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2.md",
+        "task": "tasks/tasks-linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2.md",
+        "agent_task": ".agent/task/linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2.md",
+        "docs": "docs/TECH_SPEC-linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2.md"
+      }
+    },
+    {
       "id": "20260406-linear-f0d312eb-055f-4926-80df-8fcaaf56839c",
       "title": "CO workflow: unblock repo-wide spec/docs freshness review blockers",
       "relates_to": "tasks/tasks-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",

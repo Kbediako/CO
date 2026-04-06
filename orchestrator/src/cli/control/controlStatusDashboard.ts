@@ -141,6 +141,7 @@ export interface ControlStatusDashboardGateInput {
 }
 
 const ANSI_CLEAR_HOME = '\u001b[H\u001b[2J';
+const ANSI_CLEAR_DOWN = '\u001b[J';
 const ANSI_ENTER_ALT_SCREEN = '\u001b[?1049h';
 const ANSI_EXIT_ALT_SCREEN = '\u001b[?1049l';
 const ANSI_RESET = '\u001b[0m';
@@ -272,8 +273,10 @@ function startControlStatusViewer(
   let renderedState: RenderedDashboardState | null = null;
   let escapeSequenceState: 'idle' | 'escape' | 'control' = 'idle';
   const liveSurfaceMode: DashboardSurfaceMode = options.liveSurfaceMode ?? 'primary';
+  const enablePinnedPrimaryLiveRegion = liveSurfaceMode === 'primary' && output.isTTY === true;
   let activeSurfaceMode: DashboardSurfaceMode = 'primary';
-  let pausedPrimaryPromptNeedsNewline = false;
+  let activePrimaryFrameLineCount = 0;
+  let primarySurfacePromptNeedsNewline = false;
   let frameState: DashboardFrameState = {
     paused: false,
     viewMode: 'full',
@@ -384,12 +387,13 @@ function startControlStatusViewer(
       detachInput();
       unsubscribe();
       if (activeSurfaceMode === 'alternate') {
-        output.write(`${ANSI_EXIT_ALT_SCREEN}${pausedPrimaryPromptNeedsNewline ? '\n' : ''}`);
+        output.write(`${ANSI_EXIT_ALT_SCREEN}${primarySurfacePromptNeedsNewline ? '\n' : ''}`);
         activeSurfaceMode = 'primary';
-      } else if (pausedPrimaryPromptNeedsNewline) {
+      } else if (primarySurfacePromptNeedsNewline || activePrimaryFrameLineCount > 0) {
         output.write('\n');
       }
-      pausedPrimaryPromptNeedsNewline = false;
+      activePrimaryFrameLineCount = 0;
+      primarySurfacePromptNeedsNewline = false;
     },
     async flush() {
       await activeRender;
@@ -643,7 +647,9 @@ function startControlStatusViewer(
   }
 
   function writeFrame(frame: string): void {
+    const primaryFrameLineCount = countFrameLines(frame);
     if (frameState.surfaceMode === 'alternate') {
+      activePrimaryFrameLineCount = 0;
       if (activeSurfaceMode !== 'alternate') {
         activeSurfaceMode = 'alternate';
         output.write(`${ANSI_ENTER_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}`);
@@ -655,14 +661,38 @@ function startControlStatusViewer(
 
     if (activeSurfaceMode === 'alternate') {
       activeSurfaceMode = 'primary';
-      pausedPrimaryPromptNeedsNewline = false;
+      activePrimaryFrameLineCount = 0;
+      primarySurfacePromptNeedsNewline = false;
       output.write(`${ANSI_EXIT_ALT_SCREEN}${ANSI_CLEAR_HOME}${frame}\n`);
       return;
     }
 
-    pausedPrimaryPromptNeedsNewline = frameState.paused;
+    primarySurfacePromptNeedsNewline = true;
+    if (enablePinnedPrimaryLiveRegion) {
+      if (activePrimaryFrameLineCount > 0) {
+        output.write(rewritePrimaryFrame(frame, activePrimaryFrameLineCount));
+      } else {
+        output.write(frame);
+      }
+      activePrimaryFrameLineCount = primaryFrameLineCount;
+      return;
+    }
+
+    activePrimaryFrameLineCount = 0;
     output.write(`${ANSI_CLEAR_HOME}${frame}`);
   }
+}
+
+function countFrameLines(frame: string): number {
+  return frame.length === 0 ? 0 : frame.split('\n').length;
+}
+
+function rewritePrimaryFrame(frame: string, previousLineCount: number): string {
+  let prefix = '\r';
+  if (previousLineCount > 1) {
+    prefix += `\u001b[${previousLineCount - 1}A`;
+  }
+  return `${prefix}${ANSI_CLEAR_DOWN}${frame}`;
 }
 
 export function renderControlStatusFrame(input: RenderControlStatusFrameInput): string {
@@ -878,10 +908,9 @@ function renderNextRefreshLine(dataset: OperatorDashboardDataset, terminalColumn
     );
   }
   if (typeof polling?.next_poll_in_ms === 'number' && Number.isFinite(polling.next_poll_in_ms)) {
-    const seconds = Math.max(0, Math.ceil(polling.next_poll_in_ms / 1000));
     return renderSummaryLine(
       'Next refresh',
-      [{ text: `${seconds}s`, color: ANSI_CYAN }],
+      [{ text: formatCountdownMs(polling.next_poll_in_ms), color: ANSI_CYAN }],
       terminalColumns
     );
   }
@@ -896,7 +925,7 @@ function renderCompactStatusLine(
   const refreshText = dataset.polling?.checking
     ? 'checking now...'
     : typeof dataset.polling?.next_poll_in_ms === 'number' && Number.isFinite(dataset.polling.next_poll_in_ms)
-      ? `next ${Math.max(0, Math.ceil(dataset.polling.next_poll_in_ms / 1000))}s`
+      ? `next ${formatCountdownMs(dataset.polling.next_poll_in_ms)}`
       : 'next n/a';
   return renderSummaryLine(
     'Status',
@@ -927,7 +956,7 @@ function renderCompactRunningLine(
       { text: ' | ', color: ANSI_GRAY },
       { text: sanitizeDisplayValue(entry.display_state), color: resolveRunningAccent(entry) },
       { text: ' | ', color: ANSI_GRAY },
-      { text: summarizeRunningEvent(entry), color: ANSI_GRAY, truncateMode: 'end' }
+      { text: summarizeRunningEvent(entry, referenceTime), color: ANSI_GRAY, truncateMode: 'end' }
     ],
     terminalColumns
   );
@@ -947,9 +976,9 @@ function renderCompactRetryLine(
     [
       { text: sanitizeDisplayValue(entry.issue_identifier), color: ANSI_RED },
       { text: ' | ', color: ANSI_GRAY },
-      { text: `in ${formatRelativeDue(entry.due_at, referenceTime)}`, color: ANSI_CYAN },
+      { text: `${summarizeRetryHeadline(entry)} in ${formatRelativeDue(entry.due_at, referenceTime)}`, color: ANSI_CYAN },
       { text: ' | ', color: ANSI_GRAY },
-      { text: sanitizeDisplayValue(entry.error ?? entry.status_reason ?? 'n/a'), color: ANSI_GRAY, truncateMode: 'end' }
+      { text: summarizeRetryDetail(entry), color: ANSI_GRAY, truncateMode: 'end' }
     ],
     terminalColumns
   );
@@ -1103,18 +1132,23 @@ function renderRetryRow(
   const issueIdentifier = sanitizeDisplayValue(entry.issue_identifier);
   const attempt = formatNullable(entry.attempt);
   const relativeDue = formatRelativeDue(entry.due_at, referenceTime);
-  const prefixText = `${issueIdentifier} attempt=${attempt} in ${relativeDue}`;
-  const availableErrorWidth = Math.max(0, terminalColumns - 5 - prefixText.length);
-  const error = formatRetryError(entry.error, availableErrorWidth);
-  return (
-    `│  ${colorize('↻', ANSI_YELLOW)} ` +
-    colorize(issueIdentifier, ANSI_RED) +
-    ' ' +
-    colorize(`attempt=${attempt}`, ANSI_YELLOW) +
-    colorize(' in ', ANSI_DIM) +
-    colorize(relativeDue, ANSI_CYAN) +
-    error
-  );
+  const plainPrefix = `│  ↻ ${issueIdentifier} `;
+  const coloredPrefix = `│  ${colorize('↻', ANSI_YELLOW)} ${colorize(issueIdentifier, ANSI_RED)} `;
+  const detail = summarizeRetryDetail(entry);
+  const segments: SummarySegment[] = [
+    { text: summarizeRetryHeadline(entry), color: ANSI_YELLOW },
+    { text: ' in ', color: ANSI_DIM },
+    { text: relativeDue, color: ANSI_CYAN }
+  ];
+  if (attempt !== '-') {
+    segments.push({ text: ' | ', color: ANSI_GRAY });
+    segments.push({ text: `attempt ${attempt}`, color: ANSI_YELLOW });
+  }
+  if (detail !== 'n/a') {
+    segments.push({ text: ' | ', color: ANSI_GRAY });
+    segments.push({ text: detail, color: ANSI_GRAY, truncateMode: 'end' });
+  }
+  return coloredPrefix + colorizeSummarySegments(segments, Math.max(0, terminalColumns - plainPrefix.length));
 }
 
 function resolveRunningAccent(entry: OperatorDashboardSessionPayload): string {
@@ -1157,24 +1191,73 @@ function formatRunningColumnValue(
     case 'session':
       return compactSessionId(entry.session_id);
     case 'event':
-      return summarizeRunningEvent(entry);
+      return summarizeRunningEvent(entry, referenceTime);
     default:
       return 'n/a';
   }
 }
 
-function summarizeRunningEvent(entry: OperatorDashboardSessionPayload): string {
+function summarizeRunningEvent(entry: OperatorDashboardSessionPayload, referenceTime: Date): string {
   const lastMessage = sanitizeDisplayValue(entry.last_message);
   const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
-  if (lastMessage !== '-' && lastMessage.toLowerCase() !== displayState) {
+  if (isHighSignalStatusText(lastMessage, displayState)) {
     return lastMessage;
   }
+  const summary = sanitizeDisplayValue(entry.summary);
+  if (isHighSignalStatusText(summary, displayState) && !sameStatusText(summary, lastMessage)) {
+    return summary;
+  }
   const humanizedEvent = humanizeRunningEvent(entry.last_event);
-  if (humanizedEvent !== 'n/a' && humanizedEvent.toLowerCase() !== displayState) {
+  const eventAge = formatRelativePast(entry.last_event_at, referenceTime);
+  if (isHighSignalStatusText(humanizedEvent, displayState)) {
     return humanizedEvent;
   }
+  if (humanizedEvent !== 'n/a' && eventAge !== null) {
+    return `${humanizedEvent} (${eventAge} ago)`;
+  }
   const statusReason = humanizeRunningEvent(entry.status_reason);
-  if (statusReason !== 'n/a' && statusReason.toLowerCase() !== displayState) {
+  if (isHighSignalStatusText(statusReason, displayState)) {
+    return statusReason;
+  }
+  if (summary !== '-') {
+    return summary;
+  }
+  if (lastMessage !== '-') {
+    return eventAge === null ? lastMessage : `${lastMessage} (${eventAge} ago)`;
+  }
+  return 'n/a';
+}
+
+function summarizeRetryHeadline(entry: OperatorDashboardRetryPayload): string {
+  const lastEvent = humanizeRunningEvent(entry.last_event);
+  if (lastEvent !== 'n/a') {
+    return lastEvent;
+  }
+  const statusReason = humanizeRunningEvent(entry.status_reason);
+  if (statusReason !== 'n/a') {
+    return statusReason;
+  }
+  const displayState = sanitizeDisplayValue(entry.display_state);
+  return displayState === '-' ? 'retrying' : displayState;
+}
+
+function summarizeRetryDetail(entry: OperatorDashboardRetryPayload): string {
+  const headline = summarizeRetryHeadline(entry).toLowerCase();
+  const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
+  const error = sanitizeDisplayValue(entry.error);
+  if (isHighSignalStatusText(error, displayState) && !sameStatusText(error, headline)) {
+    return error;
+  }
+  const summary = sanitizeDisplayValue(entry.summary);
+  if (isHighSignalStatusText(summary, displayState) && !sameStatusText(summary, headline)) {
+    return summary;
+  }
+  const lastMessage = sanitizeDisplayValue(entry.last_message);
+  if (isHighSignalStatusText(lastMessage, displayState) && !sameStatusText(lastMessage, headline)) {
+    return lastMessage;
+  }
+  const statusReason = humanizeRunningEvent(entry.status_reason);
+  if (isHighSignalStatusText(statusReason, displayState) && !sameStatusText(statusReason, headline)) {
     return statusReason;
   }
   return 'n/a';
@@ -1292,17 +1375,16 @@ function formatRelativeDue(dueAt: string | null | undefined, referenceTime: Date
     return 'n/a';
   }
   const remainingMs = Math.max(0, dueTimestamp - referenceTime.getTime());
-  const seconds = Math.floor(remainingMs / 1000);
-  const milliseconds = remainingMs % 1000;
-  return `${seconds}.${String(milliseconds).padStart(3, '0')}s`;
+  return formatCountdownMs(remainingMs);
 }
 
-function formatRetryError(error: string | null | undefined, maxWidth = 96): string {
-  const sanitized = sanitizeDisplayValue(error);
-  if (sanitized === '-' || maxWidth <= 0) {
-    return '';
+function formatRelativePast(timestamp: string | null | undefined, referenceTime: Date): string | null {
+  const parsedTimestamp = parseTimestamp(timestamp);
+  if (parsedTimestamp === null) {
+    return null;
   }
-  return colorize(truncatePlain(` error=${sanitized}`, maxWidth), ANSI_DIM);
+  const elapsedSeconds = Math.max(0, Math.floor((referenceTime.getTime() - parsedTimestamp) / 1000));
+  return formatHumanDurationShort(elapsedSeconds);
 }
 
 function formatRuntimeAndTurns(
@@ -1323,9 +1405,7 @@ function formatRuntimeAndTurns(
 }
 
 function formatRuntimeSeconds(value: number | null | undefined): string {
-  const seconds = Math.max(0, Math.floor(normalizeFiniteNumber(value)));
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}m ${seconds % 60}s`;
+  return formatHumanDurationShort(Math.max(0, Math.floor(normalizeFiniteNumber(value))));
 }
 
 function formatTps(value: number | null | undefined): string {
@@ -1450,13 +1530,13 @@ function formatCompactCodexRateLimitSegments(
     const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];
     if (requests) {
       pieces.push({
-        text: ` req${formatCompactRateLimitBucket(requests, referenceTime)}`,
+        text: ` req ${formatCompactRateLimitBucket(requests, referenceTime)}`,
         color: ANSI_CYAN
       });
     }
     if (endpointRequests) {
       pieces.push({
-        text: ` ep-req${formatCompactRateLimitBucket(endpointRequests, referenceTime)}`,
+        text: ` ep-req ${formatCompactRateLimitBucket(endpointRequests, referenceTime)}`,
         color: ANSI_CYAN
       });
     }
@@ -1672,25 +1752,25 @@ function formatCompactLinearBudgetSegments(
   }
   if (requests) {
     pieces.push({
-      text: ` req${formatCompactRateLimitBucket(requests, referenceTime)}`,
+      text: ` req ${formatCompactRateLimitBucket(requests, referenceTime)}`,
       color: ANSI_CYAN
     });
   }
   if (endpointRequests) {
     pieces.push({
-      text: ` ep-req${formatCompactRateLimitBucket(endpointRequests, referenceTime)}`,
+      text: ` ep-req ${formatCompactRateLimitBucket(endpointRequests, referenceTime)}`,
       color: ANSI_CYAN
     });
   }
   if (complexity) {
     pieces.push({
-      text: ` cx${formatCompactRateLimitBucket(complexity, referenceTime)}`,
+      text: ` cx ${formatCompactRateLimitBucket(complexity, referenceTime)}`,
       color: ANSI_CYAN
     });
   }
   if (endpointComplexity) {
     pieces.push({
-      text: ` ep-cx${formatCompactRateLimitBucket(endpointComplexity, referenceTime)}`,
+      text: ` ep-cx ${formatCompactRateLimitBucket(endpointComplexity, referenceTime)}`,
       color: ANSI_CYAN
     });
   }
@@ -1705,10 +1785,10 @@ function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: D
     'window_minutes'
   ]);
   if (usedPercent !== null && windowDurationMins !== null) {
-    return `${formatPercent(usedPercent)} / ${formatCount(windowDurationMins)}m`;
+    return `${formatRemainingPercent(usedPercent)} / ${formatHumanDurationShort(windowDurationMins * 60)}`;
   }
   if (usedPercent !== null) {
-    return `${formatPercent(usedPercent)} used`;
+    return `${formatRemainingPercent(usedPercent)} remaining`;
   }
   const remaining = readRecordNumber(bucket, ['remaining']);
   const limit = readRecordNumber(bucket, ['limit']);
@@ -1742,10 +1822,10 @@ function formatCompactRateLimitBucket(bucket: Record<string, unknown>, reference
     'window_minutes'
   ]);
   if (usedPercent !== null && windowDurationMins !== null) {
-    return `${formatPercent(usedPercent)}/${formatCount(windowDurationMins)}m`;
+    return `${formatRemainingPercent(usedPercent)} / ${formatHumanDurationShort(windowDurationMins * 60)}`;
   }
   if (usedPercent !== null) {
-    return formatPercent(usedPercent);
+    return formatRemainingPercent(usedPercent);
   }
   const remaining = readRecordNumber(bucket, ['remaining']);
   const limit = readRecordNumber(bucket, ['limit']);
@@ -1802,6 +1882,11 @@ function formatCompactRateLimitCredits(credits: Record<string, unknown>): string
 function formatPercent(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1).replace(/\.0$/, '')}%`;
+}
+
+function formatRemainingPercent(usedPercent: number): string {
+  const remainingPercent = Math.min(100, Math.max(0, 100 - usedPercent));
+  return formatPercent(remainingPercent);
 }
 
 function formatRecord(value: Record<string, unknown>): string {
@@ -1960,6 +2045,28 @@ function humanizeRunningEvent(event: string | null | undefined): string {
   }
 }
 
+function isHighSignalStatusText(value: string, displayState: string): boolean {
+  if (value === '-' || value.toLowerCase() === displayState) {
+    return false;
+  }
+  const normalized = value.toLowerCase();
+  if (
+    normalized === 'retry queued' ||
+    normalized === 'turn running' ||
+    normalized === 'worker turn active' ||
+    normalized === 'provider worker turn is active.' ||
+    normalized === 'provider worker turn is active' ||
+    normalized === 'turn active'
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function sameStatusText(left: string, right: string): boolean {
+  return left.toLowerCase() === right.toLowerCase();
+}
+
 function normalizeRunningEventKey(value: string | null | undefined): string | null {
   const sanitized = sanitizeDisplayValue(value);
   if (sanitized === '-') {
@@ -1976,9 +2083,13 @@ function normalizeRunningEventKey(value: string | null | undefined): string | nu
 
 function formatHumanDurationShort(valueSeconds: number): string {
   const totalSeconds = Math.max(0, Math.floor(normalizeFiniteNumber(valueSeconds)));
+  const days = Math.floor(totalSeconds / 86_400);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+  if (days > 0) {
+    return hours % 24 > 0 ? `${days}d ${hours % 24}h` : `${days}d`;
+  }
   if (hours > 0) {
     return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
   }
@@ -1986,6 +2097,16 @@ function formatHumanDurationShort(valueSeconds: number): string {
     return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
   }
   return `${seconds}s`;
+}
+
+function formatCountdownMs(valueMs: number): string {
+  if (!Number.isFinite(valueMs)) {
+    return 'n/a';
+  }
+  if (valueMs <= 0) {
+    return 'now';
+  }
+  return formatHumanDurationShort(Math.ceil(valueMs / 1000));
 }
 
 function truncate(value: string, maxLength: number): string {

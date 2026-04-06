@@ -27,6 +27,7 @@ export interface OperatorDashboardSessionPayload {
   issue_id: string | null;
   task_id: string | null;
   run_id: string | null;
+  summary: string | null;
   display_state: string;
   status_reason: string | null;
   pid: string | null;
@@ -47,6 +48,7 @@ export interface OperatorDashboardRetryPayload {
   issue_id: string | null;
   task_id: string | null;
   run_id: string | null;
+  summary: string | null;
   display_state: string;
   status_reason: string | null;
   session_id: string | null;
@@ -233,6 +235,7 @@ function buildRunningSessionPayload(
     issue_id: entry.issue_id,
     task_id: issue?.task_id ?? null,
     run_id: issue?.run_id ?? null,
+    summary: issue?.summary ?? null,
     display_state: entry.display_state,
     status_reason: entry.status_reason,
     pid: proof === null ? (entry.pid ?? null) : (proof.pid ?? null),
@@ -258,6 +261,7 @@ function buildRetryQueuePayload(
     issue_id: entry.issue_id,
     task_id: entry.task_id ?? issue?.task_id ?? null,
     run_id: entry.run_id ?? issue?.run_id ?? null,
+    summary: issue?.summary ?? null,
     display_state: entry.display_state,
     status_reason: entry.status_reason,
     session_id: entry.session_id,
