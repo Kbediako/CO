@@ -42,7 +42,7 @@
 
 ## Dependencies
 - Current workspace branch `linear/co-102-spec-docs-freshness-blockers`
-- `node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear ...` helper surface
+- `node dist/bin/codex-orchestrator.js linear ...` helper surface
 - `scripts/spec-guard.mjs`
 - `scripts/docs-freshness.mjs`
 - stale task/spec packet cohort rooted in `1001` and `1009`-`1031`
