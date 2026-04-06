@@ -1248,6 +1248,29 @@ export function createProviderIssueHandoffService(
           updated_at: now
         });
       }
+
+      if (claim.state === 'running' || claim.state === 'resumable') {
+        publishRuntime ||= hasProviderClaimTransitioned(claim, {
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          task_id: claim.task_id,
+          run_id: claim.run_id,
+          run_manifest_path: claim.run_manifest_path,
+          retry_queued: claim.retry_queued ?? null,
+          retry_attempt: claim.retry_attempt ?? null,
+          retry_due_at: claim.retry_due_at ?? null,
+          retry_error: claim.retry_error ?? null
+        });
+        upsertProviderIntakeClaim(options.state, {
+          ...claim,
+          launch_source: undefined,
+          launch_token: undefined,
+          state: 'accepted',
+          reason: 'provider_issue_rehydration_pending_revalidation',
+          updated_at: now
+        });
+        continue;
+      }
     }
 
     markProviderIntakeRehydrated(options.state, now);
@@ -1496,7 +1519,7 @@ export function createProviderIssueHandoffService(
         return;
       }
 
-      const latestRun = attachableClaimRuns[0] ?? null;
+      const latestRun = resolveLatestKnownProviderRun(attachableClaimRuns);
       const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
       const resolution = await resolveRetryDispatchResolution(claim);
 
@@ -1889,7 +1912,7 @@ export function createProviderIssueHandoffService(
         return { kind: 'ignored', reason: 'provider_issue_handoff_inflight', claim };
       }
 
-      const latestRun = attachableDiscoveredRuns[0] ?? null;
+      const latestRun = resolveLatestKnownProviderRun(attachableDiscoveredRuns);
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
         if (hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)) {
           const claim = await upsertProviderClaimAndPersist({
@@ -2142,7 +2165,7 @@ export function createProviderIssueHandoffService(
           );
           const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress') ?? null;
           const releaseRun = resolveProviderReleaseRun(claim, attachableClaimRuns);
-          const latestRun = attachableClaimRuns[0] ?? null;
+          const latestRun = resolveLatestKnownProviderRun(attachableClaimRuns);
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
             trackedIssuesByKey,
@@ -3109,11 +3132,39 @@ function resolveProviderIssueRunStatus(
   proof: ProviderLinearWorkerProofRecord | null
 ): string | null {
   const manifestStatus = readStringValue(manifest, 'status');
+  if (
+    manifestStatus === 'in_progress' &&
+    hasStaleProviderLinearWorkerInProgressProof(manifest, proof)
+  ) {
+    return null;
+  }
   const proofTerminalStatus = resolveAuthoritativeProviderLinearWorkerTerminalStatus(
     manifest,
     proof
   );
   return proofTerminalStatus ?? manifestStatus;
+}
+
+function hasStaleProviderLinearWorkerInProgressProof(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): boolean {
+  if (!proof) {
+    return false;
+  }
+  const proofRecord = proof as Record<string, unknown>;
+  if (readStringValue(proofRecord, 'owner_status') !== 'in_progress') {
+    return false;
+  }
+  const ownerPhase = readStringValue(proofRecord, 'owner_phase');
+  if (!ownerPhase || ownerPhase === 'ended') {
+    return false;
+  }
+  const runStartedAt = readStringValue(manifest, 'started_at');
+  if (!runStartedAt) {
+    return false;
+  }
+  return !isProviderLinearWorkerProofFreshForStage(proofRecord, runStartedAt);
 }
 
 function resolveAuthoritativeProviderLinearWorkerTerminalStatus(
@@ -3800,6 +3851,12 @@ function resolveProviderClaimRunIdentity(
     return claimRuns.find((run) => run.runId === claim.run_id) ?? null;
   }
   return null;
+}
+
+function resolveLatestKnownProviderRun(
+  claimRuns: ProviderIssueRunRecord[]
+): ProviderIssueRunRecord | null {
+  return claimRuns.find((run) => run.status !== null) ?? null;
 }
 
 function shouldQueuePostWorkerRetryClaim(
