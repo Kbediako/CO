@@ -412,6 +412,34 @@ describe('control status dashboard', () => {
     expect(stripAnsi(frame)).toContain('turn running (15m ago)');
   });
 
+  it('lets a high-signal status reason outrank the generic aged event fallback', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        running: [
+          {
+            ...buildDataset().running[0],
+            summary: null,
+            status_reason: 'queued_questions',
+            last_event: 'turn_running',
+            last_message: 'Provider worker turn is active.',
+            last_event_at: '2026-03-30T01:00:00.000Z'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'attach-viewer',
+      terminalColumns: 120,
+      throughputTps: 1842.7,
+      surfaceMode: 'primary'
+    });
+
+    expect(stripAnsi(frame)).toContain('queued questions');
+    expect(stripAnsi(frame)).not.toContain('turn running (15m ago)');
+  });
+
   it('renders narrow terminals with an explicit reduced running table and sorted retry queue', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({

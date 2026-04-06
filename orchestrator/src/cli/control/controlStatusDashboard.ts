@@ -1224,12 +1224,12 @@ function summarizeRunningEvent(entry: OperatorDashboardSessionPayload, reference
   if (isHighSignalStatusText(humanizedEvent, displayState)) {
     return humanizedEvent;
   }
-  if (humanizedEvent !== 'n/a' && eventAge !== null) {
-    return `${humanizedEvent} (${eventAge} ago)`;
-  }
   const statusReason = humanizeRunningEvent(entry.status_reason);
   if (isHighSignalStatusText(statusReason, displayState)) {
     return statusReason;
+  }
+  if (humanizedEvent !== 'n/a' && eventAge !== null) {
+    return `${humanizedEvent} (${eventAge} ago)`;
   }
   if (summary !== '-') {
     return summary;
@@ -2058,7 +2058,7 @@ function humanizeRunningEvent(event: string | null | undefined): string {
 }
 
 function isHighSignalStatusText(value: string, displayState: string): boolean {
-  if (value === '-' || value.toLowerCase() === displayState) {
+  if (value === '-' || value === 'n/a' || value.toLowerCase() === displayState) {
     return false;
   }
   const normalized = value.toLowerCase();
