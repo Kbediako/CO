@@ -2403,6 +2403,9 @@ describe('provider linear worker runner', () => {
       bootstrap_pending: false,
       proof_signature: expect.any(String)
     });
+    expect(typeof hydration?.proof_signature).toBe('string');
+    expect(hydration?.proof_signature).not.toBe('');
+    expect(hydration?.proof_signature).not.toBe('stale-proof-signature');
   });
 
   it('preserves buffered partial tails when proof signatures diverge at EOF', async () => {
@@ -2446,6 +2449,9 @@ describe('provider linear worker runner', () => {
 
     const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
     expect(firstHydration?.trailing_text).toContain('"window_minutes":300');
+    const staleProofSignature = firstHydration?.proof_signature;
+    expect(typeof staleProofSignature).toBe('string');
+    expect(staleProofSignature).not.toBe('');
 
     await writeFile(
       proofPath,
@@ -2485,6 +2491,9 @@ describe('provider linear worker runner', () => {
       bootstrap_pending: false,
       proof_signature: expect.any(String)
     });
+    expect(typeof secondHydration?.proof_signature).toBe('string');
+    expect(secondHydration?.proof_signature).not.toBe('');
+    expect(secondHydration?.proof_signature).not.toBe(staleProofSignature);
 
     const secondSessionLog = `${firstSessionLog},"window_minutes":10080}}}}\n`;
     await writeFile(sessionLogPath, secondSessionLog, 'utf8');
@@ -2516,6 +2525,9 @@ describe('provider linear worker runner', () => {
       bootstrap_pending: false,
       proof_signature: expect.any(String)
     });
+    expect(typeof thirdHydration?.proof_signature).toBe('string');
+    expect(thirdHydration?.proof_signature).not.toBe('');
+    expect(thirdHydration?.proof_signature).not.toBe(staleProofSignature);
   });
 
   it('does not rewind turn identity when stale cursor bytes only match the proof token floor', async () => {
@@ -2584,6 +2596,9 @@ describe('provider linear worker runner', () => {
       bootstrap_pending: false,
       proof_signature: expect.any(String)
     });
+    expect(typeof hydration?.proof_signature).toBe('string');
+    expect(hydration?.proof_signature).not.toBe('');
+    expect(hydration?.proof_signature).not.toBe('stale-proof-signature');
   });
 
   it('falls back to a full reread when a persisted session log truncates', async () => {
