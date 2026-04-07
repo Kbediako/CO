@@ -807,6 +807,19 @@ function adoptPersistedScope(
   };
 }
 
+function clonePersistedLinearBudgetStatus(
+  value: PersistedLinearBudgetStatus
+): PersistedLinearBudgetStatus {
+  return {
+    ...value,
+    token_fingerprints: [...value.token_fingerprints],
+    requests: cloneBucket(value.requests),
+    complexity: cloneBucket(value.complexity),
+    endpoints: clonePersistedEndpoints(value.endpoints),
+    reservations: value.reservations.map((entry) => ({ ...entry }))
+  };
+}
+
 function clonePersistedEndpoints(
   value: Record<string, PersistedLinearBudgetEndpointStatus>
 ): Record<string, PersistedLinearBudgetEndpointStatus> {
@@ -885,6 +898,26 @@ function resolvePersistedEndpointTargetKey(
     }
   }
   return observation.key;
+}
+
+function mergePersistedLinearBudgetReservations(
+  existing: PersistedLinearBudgetReservationStatus[],
+  candidate: PersistedLinearBudgetReservationStatus[]
+): PersistedLinearBudgetReservationStatus[] {
+  const merged = new Map<string, PersistedLinearBudgetReservationStatus>();
+  for (const entry of [...existing, ...candidate].sort(comparePersistedReservationCreatedAt)) {
+    merged.set(entry.id, { ...entry });
+  }
+  return [...merged.values()].sort(comparePersistedReservationCreatedAt);
+}
+
+function comparePersistedReservationCreatedAt(
+  left: PersistedLinearBudgetReservationStatus,
+  right: PersistedLinearBudgetReservationStatus
+): number {
+  const leftCreatedAtMs = parseIsoToMs(left.created_at) ?? Number.NEGATIVE_INFINITY;
+  const rightCreatedAtMs = parseIsoToMs(right.created_at) ?? Number.NEGATIVE_INFINITY;
+  return leftCreatedAtMs - rightCreatedAtMs;
 }
 
 function hydrateLinearBudgetStatus(
@@ -1418,23 +1451,88 @@ async function readNewestPersistedLinearBudgetStatus(
     );
   }
 
-  let selected: PersistedLinearBudgetStatus | null = null;
+  const candidates: PersistedLinearBudgetStatus[] = [];
   for (const candidatePath of candidatePaths) {
     const persisted = await readPersistedLinearBudgetStatus(candidatePath, paths.tokenFingerprint);
     if (!persisted) {
       continue;
     }
-    if (!selected) {
-      selected = persisted;
-      continue;
-    }
-    const selectedObservedAtMs = parseIsoToMs(selected.observed_at) ?? Number.NEGATIVE_INFINITY;
-    const persistedObservedAtMs = parseIsoToMs(persisted.observed_at) ?? Number.NEGATIVE_INFINITY;
-    if (persistedObservedAtMs >= selectedObservedAtMs) {
-      selected = persisted;
-    }
+    candidates.push(persisted);
   }
-  return selected;
+  return mergePersistedLinearBudgetCandidates(candidates);
+}
+
+function mergePersistedLinearBudgetCandidates(
+  candidates: PersistedLinearBudgetStatus[]
+): PersistedLinearBudgetStatus | null {
+  if (candidates.length === 0) {
+    return null;
+  }
+  const sorted = [...candidates].sort(comparePersistedLinearBudgetObservedAt);
+  const preferredUserScope =
+    [...sorted]
+      .reverse()
+      .find((candidate) => candidate.scope_kind === 'user' && candidate.viewer_id) ?? null;
+  let merged = clonePersistedLinearBudgetStatus(sorted[0]);
+  for (const candidate of sorted.slice(1)) {
+    merged = mergePersistedLinearBudgetCandidate(merged, candidate);
+  }
+  if (!preferredUserScope) {
+    return merged;
+  }
+  return {
+    ...merged,
+    scope_kind: preferredUserScope.scope_kind,
+    scope_key: preferredUserScope.scope_key,
+    viewer_id: preferredUserScope.viewer_id,
+    workspace_id: preferredUserScope.workspace_id
+  };
+}
+
+function comparePersistedLinearBudgetObservedAt(
+  left: PersistedLinearBudgetStatus,
+  right: PersistedLinearBudgetStatus
+): number {
+  const leftObservedAtMs = parseIsoToMs(left.observed_at) ?? Number.NEGATIVE_INFINITY;
+  const rightObservedAtMs = parseIsoToMs(right.observed_at) ?? Number.NEGATIVE_INFINITY;
+  return leftObservedAtMs - rightObservedAtMs;
+}
+
+function mergePersistedLinearBudgetCandidate(
+  existing: PersistedLinearBudgetStatus,
+  candidate: PersistedLinearBudgetStatus
+): PersistedLinearBudgetStatus {
+  const endpoints = clonePersistedEndpoints(existing.endpoints);
+  for (const [key, endpoint] of Object.entries(candidate.endpoints)) {
+    upsertPersistedEndpointObservation(endpoints, {
+      key,
+      endpoint_name: endpoint.endpoint_name,
+      aliases: [...endpoint.aliases],
+      observed_at: endpoint.observed_at,
+      requests: cloneBucket(endpoint.requests),
+      complexity: cloneBucket(endpoint.complexity),
+      request_complexity: endpoint.request_complexity,
+      assume_unknown_resets_exhausted: false
+    });
+  }
+
+  const selectedEndpointKey = candidate.selected_endpoint_key ?? existing.selected_endpoint_key;
+  return {
+    ...clonePersistedLinearBudgetStatus(existing),
+    observed_at: maxIsoTimestamp(existing.observed_at, candidate.observed_at) ?? candidate.observed_at,
+    source: candidate.source,
+    request_id: candidate.request_id ?? existing.request_id,
+    retry_after_seconds: candidate.retry_after_seconds ?? existing.retry_after_seconds,
+    cooldown_until: candidate.cooldown_until ?? existing.cooldown_until,
+    requests: mergeLinearBudgetBucket(existing.requests, candidate.requests),
+    complexity: mergeLinearBudgetBucket(existing.complexity, candidate.complexity),
+    request_complexity: candidate.request_complexity ?? existing.request_complexity,
+    selected_endpoint_key:
+      selectedEndpointKey && !endpoints[selectedEndpointKey] ? null : selectedEndpointKey,
+    token_fingerprints: uniqueStrings([...existing.token_fingerprints, ...candidate.token_fingerprints]),
+    endpoints,
+    reservations: mergePersistedLinearBudgetReservations(existing.reservations, candidate.reservations)
+  };
 }
 
 async function readPersistedLinearBudgetStatus(
