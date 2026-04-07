@@ -536,63 +536,77 @@ describe('linearBudgetState', () => {
   });
 
   it('uses the later retry-after timestamp when it outlasts the bucket reset', async () => {
-    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
-    tempDirs.push(codexHome);
-    const env = createEnv(codexHome);
-    const observedAt = '2026-04-07T09:00:00.000Z';
-    const requestResetAt = '2026-04-07T09:00:30.000Z';
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-07T09:00:00.000Z'));
 
-    await recordLinearBudgetRateLimitObservation({
-      env,
-      source: 'dispatch_source_issue_by_id',
-      observedAt,
-      rateLimit: {
-        code: 'linear_rate_limited',
-        message: 'Linear API rate limit exceeded.',
-        status: 429,
-        retryable: true,
-        details: {
-          retry_after_seconds: 90,
-          requests_limit: 100,
-          requests_remaining: 0,
-          requests_reset_at: requestResetAt
+    try {
+      const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+      tempDirs.push(codexHome);
+      const env = createEnv(codexHome);
+      const observedAt = new Date(Date.now()).toISOString();
+      const requestResetAt = new Date(Date.now() + 30_000).toISOString();
+
+      await recordLinearBudgetRateLimitObservation({
+        env,
+        source: 'dispatch_source_issue_by_id',
+        observedAt,
+        rateLimit: {
+          code: 'linear_rate_limited',
+          message: 'Linear API rate limit exceeded.',
+          status: 429,
+          retryable: true,
+          details: {
+            retry_after_seconds: 90,
+            requests_limit: 100,
+            requests_remaining: 0,
+            requests_reset_at: requestResetAt
+          }
         }
-      }
-    });
+      });
 
-    await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
-      cooldown_until: '2026-04-07T09:01:30.000Z'
-    });
+      await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
+        cooldown_until: new Date(Date.now() + 90_000).toISOString()
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('uses the later exhausted reset timestamp when it outlasts retry-after', async () => {
-    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
-    tempDirs.push(codexHome);
-    const env = createEnv(codexHome);
-    const observedAt = '2026-04-07T09:00:00.000Z';
-    const requestResetAt = '2026-04-07T09:02:00.000Z';
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-07T09:00:00.000Z'));
 
-    await recordLinearBudgetRateLimitObservation({
-      env,
-      source: 'dispatch_source_issue_by_id',
-      observedAt,
-      rateLimit: {
-        code: 'linear_rate_limited',
-        message: 'Linear API rate limit exceeded.',
-        status: 429,
-        retryable: true,
-        details: {
-          retry_after_seconds: 30,
-          requests_limit: 100,
-          requests_remaining: 0,
-          requests_reset_at: requestResetAt
+    try {
+      const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+      tempDirs.push(codexHome);
+      const env = createEnv(codexHome);
+      const observedAt = new Date(Date.now()).toISOString();
+      const requestResetAt = new Date(Date.now() + 120_000).toISOString();
+
+      await recordLinearBudgetRateLimitObservation({
+        env,
+        source: 'dispatch_source_issue_by_id',
+        observedAt,
+        rateLimit: {
+          code: 'linear_rate_limited',
+          message: 'Linear API rate limit exceeded.',
+          status: 429,
+          retryable: true,
+          details: {
+            retry_after_seconds: 30,
+            requests_limit: 100,
+            requests_remaining: 0,
+            requests_reset_at: requestResetAt
+          }
         }
-      }
-    });
+      });
 
-    await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
-      cooldown_until: requestResetAt
-    });
+      await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
+        cooldown_until: requestResetAt
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reserves request units across concurrent callers and releases them cleanly', async () => {
