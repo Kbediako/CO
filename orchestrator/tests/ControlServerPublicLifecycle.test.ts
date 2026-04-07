@@ -951,6 +951,7 @@ describe('startControlServerPublicLifecycle', () => {
     } as const;
     vi.mocked(resolveLinearPollingInterval)
       .mockImplementationOnce(() => cooldownSchedule)
+      .mockImplementationOnce(() => cooldownSchedule)
       .mockImplementationOnce(() => healthySchedule)
       .mockImplementation(() => healthySchedule);
 
@@ -1003,6 +1004,13 @@ describe('startControlServerPublicLifecycle', () => {
 
     expect(providerIssueHandoff.poll).not.toHaveBeenCalled();
     expect(providerIssueHandoff.refresh).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      next_refresh_state: 'cooldown',
+      next_refresh_at: cooldownSchedule.linear_budget.cooldown_until,
+      next_refresh_in_ms: 15_000,
+      reason: 'linear_budget_shared_cooldown'
+    });
 
     await vi.advanceTimersByTimeAsync(15_000);
 

@@ -1041,18 +1041,18 @@ function renderProjectLine(dataset: OperatorDashboardDataset, terminalColumns: n
 }
 
 function renderNextRefreshLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
-  const polling = dataset.polling;
-  if (polling?.checking) {
+  const nextRefreshText = resolveNextRefreshSummaryText(dataset.polling);
+  if (nextRefreshText === 'checking now...') {
     return renderSummaryLine(
       'Next refresh',
       [{ text: 'checking now...', color: ANSI_CYAN }],
       terminalColumns
     );
   }
-  if (typeof polling?.next_poll_in_ms === 'number' && Number.isFinite(polling.next_poll_in_ms)) {
+  if (nextRefreshText) {
     return renderSummaryLine(
       'Next refresh',
-      [{ text: formatCountdownMs(polling.next_poll_in_ms), color: ANSI_CYAN }],
+      [{ text: nextRefreshText, color: ANSI_CYAN }],
       terminalColumns
     );
   }
@@ -1066,11 +1066,13 @@ function renderCompactStatusLine(
   terminalColumns: number
 ): string {
   const maxAllowed = resolveMaxAllowedAgents(dataset);
-  const refreshText = dataset.polling?.checking
-    ? 'checking now...'
-    : typeof dataset.polling?.next_poll_in_ms === 'number' && Number.isFinite(dataset.polling.next_poll_in_ms)
-      ? `next ${formatCountdownMs(dataset.polling.next_poll_in_ms)}`
-      : 'next n/a';
+  const nextRefreshText = resolveNextRefreshSummaryText(dataset.polling);
+  const refreshText =
+    nextRefreshText === null
+      ? 'next n/a'
+      : nextRefreshText === 'checking now...'
+        ? nextRefreshText
+        : `next ${nextRefreshText}`;
   return renderSummaryLine(
     'Status',
     [
@@ -1085,6 +1087,52 @@ function renderCompactStatusLine(
     ],
     terminalColumns
   );
+}
+
+function resolveNextRefreshSummaryText(
+  polling: OperatorDashboardDataset['polling']
+): string | null {
+  const hasProjectedState =
+    polling?.next_refresh_state !== undefined && polling?.next_refresh_state !== null;
+  const projectedState =
+    polling?.next_refresh_state === 'cooldown' ||
+    polling?.next_refresh_state === 'checking' ||
+    polling?.next_refresh_state === 'scheduled' ||
+    polling?.next_refresh_state === 'unknown'
+      ? polling.next_refresh_state
+      : null;
+  const projectedCountdown =
+    typeof polling?.next_refresh_in_ms === 'number' &&
+    Number.isFinite(polling.next_refresh_in_ms) &&
+    polling.next_refresh_in_ms >= 0
+      ? polling.next_refresh_in_ms
+      : null;
+  if (projectedState === 'checking') {
+    return 'checking now...';
+  }
+  if (projectedState === 'unknown') {
+    return null;
+  }
+  if (
+    (projectedState === 'cooldown' || projectedState === 'scheduled') &&
+    projectedCountdown !== null
+  ) {
+    return formatCountdownMs(projectedCountdown);
+  }
+  if (hasProjectedState) {
+    return null;
+  }
+  if (polling?.checking) {
+    return 'checking now...';
+  }
+  if (
+    typeof polling?.next_poll_in_ms === 'number' &&
+    Number.isFinite(polling.next_poll_in_ms) &&
+    polling.next_poll_in_ms >= 0
+  ) {
+    return formatCountdownMs(polling.next_poll_in_ms);
+  }
+  return null;
 }
 
 function renderCompactRunningLine(

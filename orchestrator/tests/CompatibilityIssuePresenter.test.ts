@@ -252,4 +252,304 @@ describe('CompatibilityIssuePresenter', () => {
       'linear requests exhausted; next tracked-issue refresh at 43s'
     );
   });
+
+  it('prefers the projected next refresh countdown over stale raw scheduled polling for requests exhaustion', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_poll_in_ms: (58 * 60 + 11) * 1000,
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T03:04:32.000Z',
+        next_refresh_in_ms: (29 * 60 + 32) * 1000
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 29m 32s'
+    );
+  });
+
+  it('uses the projected next refresh countdown for complexity exhaustion when available', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T03:04:32.000Z',
+        next_refresh_in_ms: (29 * 60 + 32) * 1000,
+        linear_budget: {
+          ...buildExhaustedLinearPolling()!.linear_budget!,
+          requests: {
+            remaining: 7,
+            limit: 30,
+            reset_at: '2026-04-06T02:40:00.000Z'
+          },
+          complexity: {
+            remaining: 0,
+            limit: 200,
+            reset_at: '2026-04-06T03:04:32.000Z'
+          }
+        }
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear complexity budget exhausted; next tracked-issue refresh at 29m 32s'
+    );
+  });
+
+  it('falls back to retry_after_seconds instead of stale raw scheduling when projected state exists without a countdown', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_poll_in_ms: (58 * 60 + 11) * 1000,
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T03:04:32.000Z',
+        next_refresh_in_ms: null
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('prefers retry_after_seconds over legacy next_poll_in_ms when projection fields are absent', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_poll_in_ms: (58 * 60 + 11) * 1000,
+        next_refresh_at: null,
+        next_refresh_in_ms: null
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('prefers the authoritative proof retry-after over a stale polling projection', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'session-3',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'linear requests exhausted; polling deferred until reset',
+          last_message: null,
+          last_event_at: '2026-04-06T02:35:43.000Z',
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'worker_turn',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          linear_budget: {
+            ...buildExhaustedLinearPolling()!.linear_budget!,
+            observed_at: '2026-04-06T02:35:43.000Z',
+            source: 'provider-linear-worker-proof',
+            retry_after_seconds: 43
+          },
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:43.000Z'
+        }
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T03:04:32.000Z',
+        next_refresh_in_ms: (29 * 60 + 32) * 1000,
+        linear_budget: {
+          ...buildExhaustedLinearPolling()!.linear_budget!,
+          observed_at: '2026-04-06T02:35:00.000Z',
+          retry_after_seconds: (29 * 60) + 32
+        }
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('keeps projected shared polling exhaustion visible during cooldown despite stale checking and endpoint-only proof exhaustion', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'session-3',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'account/ratelimits/updated',
+          last_message: 'rate limits updated',
+          last_event_at: '2026-04-06T02:35:43.000Z',
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'worker_turn',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          linear_budget: {
+            ...buildExhaustedLinearPolling()!.linear_budget!,
+            observed_at: '2026-04-06T02:35:43.000Z',
+            source: 'provider-linear-worker-proof',
+            suppression: 'none',
+            suppression_reason: null,
+            retry_after_seconds: null,
+            cooldown_until: null,
+            cooldown_active: false,
+            requests: {
+              remaining: 8,
+              limit: 30,
+              reset_at: '2026-04-06T02:36:13.000Z'
+            },
+            endpoint_requests: {
+              remaining: 0,
+              limit: 12,
+              reset_at: '2026-04-06T02:35:44.000Z'
+            }
+          },
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:43.000Z'
+        }
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        checking: true,
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T02:35:43.000Z',
+        next_refresh_in_ms: 43_000
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('drops polling exhaustion once the shared cooldown has transitioned into a real poll attempt', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'session-3',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'account/ratelimits/updated',
+          last_message: 'rate limits updated',
+          last_event_at: '2026-04-06T02:35:44.000Z',
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'worker_turn',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          linear_budget: {
+            ...buildExhaustedLinearPolling()!.linear_budget!,
+            observed_at: '2026-04-06T02:35:44.000Z',
+            source: 'provider-linear-worker-proof',
+            suppression: 'none',
+            suppression_reason: null,
+            retry_after_seconds: null,
+            cooldown_until: null,
+            cooldown_active: false,
+            requests: {
+              remaining: 8,
+              limit: 30,
+              reset_at: '2026-04-06T02:36:14.000Z'
+            }
+          },
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:44.000Z'
+        }
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        checking: true,
+        next_refresh_state: 'checking',
+        next_refresh_at: null,
+        next_refresh_in_ms: null
+      }
+    );
+
+    expect(runningEntry.display_event).toBe('rate limits updated');
+  });
+
+  it('drops polling exhaustion once the projected state has moved to an ordinary scheduled poll', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_refresh_state: 'scheduled',
+        next_refresh_at: '2026-04-06T02:35:43.000Z',
+        next_refresh_in_ms: 43_000
+      }
+    );
+
+    expect(runningEntry.display_event).toBeNull();
+  });
 });
