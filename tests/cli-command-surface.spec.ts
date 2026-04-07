@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
@@ -54,6 +54,16 @@ async function runCli(
   timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
   explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
+  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+    env: buildCliEnv(env, explicitProviderOverrideKeys),
+    timeout: timeoutMs
+  });
+}
+
+function buildCliEnv(
+  env?: NodeJS.ProcessEnv,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
+): NodeJS.ProcessEnv {
   const mergedEnv = sanitizeProviderOverrideEnv({
     ...process.env,
     ...(env ?? {})
@@ -90,16 +100,68 @@ async function runCli(
   for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
     delete mergedEnv[key];
   }
-  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
-    env: {
-      ...mergedEnv,
-      ...DEFAULT_RUNTIME_TEST_ENV,
-      ...DEFAULT_REPO_CONFIG_TEST_ENV,
-      NODE_NO_WARNINGS: '1',
-      ...explicitProviderOverrides,
-      ...explicitRuntimeOverrides
-    },
-    timeout: timeoutMs
+  return {
+    ...mergedEnv,
+    ...DEFAULT_RUNTIME_TEST_ENV,
+    ...DEFAULT_REPO_CONFIG_TEST_ENV,
+    NODE_NO_WARNINGS: '1',
+    ...explicitProviderOverrides,
+    ...explicitRuntimeOverrides
+  };
+}
+
+async function runCliWithExit(
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+  timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+      env: buildCliEnv(env, explicitProviderOverrideKeys),
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+
+    const settle = (fn: () => void): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeoutHandle);
+      fn();
+    };
+
+    const timeoutHandle = setTimeout(() => {
+      child.kill('SIGTERM');
+      settle(() => {
+        reject(new Error(`CLI timed out after ${timeoutMs}ms: ${args.join(' ')}`));
+      });
+    }, timeoutMs);
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+
+    child.once('error', (error) => {
+      settle(() => reject(error));
+    });
+    child.once('close', (code, signal) => {
+      settle(() => {
+        if (signal) {
+          reject(new Error(`CLI terminated via ${signal}: ${args.join(' ')}`));
+          return;
+        }
+        resolve({ stdout, stderr, exitCode: code ?? 1 });
+      });
+    });
   });
 }
 
@@ -184,16 +246,7 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
-    let stdout = '';
-    let stderr = '';
-    let exitCode = 0;
-    try {
-      await runCli(['unknown-command']);
-      throw new Error('expected unknown-command to exit non-zero');
-    } catch (error) {
-      ({ stdout, stderr, exitCode } = parseCliFailure(error));
-    }
-
+    const { stdout, stderr, exitCode } = await runCliWithExit(['unknown-command'], undefined, CLI_BOOT_TIMEOUT);
     expect(exitCode).not.toBe(0);
     expect(`${stderr}${stdout}`).toContain('Unknown command: unknown-command');
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
