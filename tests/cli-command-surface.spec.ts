@@ -108,6 +108,7 @@ function parseCliFailure(error: unknown): { stdout: string; stderr: string; exit
     stdout?: string | Buffer;
     stderr?: string | Buffer;
     code?: number | string;
+    message?: string;
   };
   const hasCliFailureShape =
     typed &&
@@ -115,6 +116,11 @@ function parseCliFailure(error: unknown): { stdout: string; stderr: string; exit
   if (!hasCliFailureShape) {
     throw error;
   }
+  const stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
+  const stderr = typeof typed.stderr === 'string' ? typed.stderr : typed.stderr?.toString() ?? '';
+  const messageDetailStart = typeof typed.message === 'string' ? typed.message.indexOf('\n') : -1;
+  const messageDetail =
+    messageDetailStart >= 0 ? typed.message?.slice(messageDetailStart + 1).trim() ?? '' : '';
   const parsedExitCode =
     typeof typed.code === 'number'
       ? typed.code
@@ -122,8 +128,8 @@ function parseCliFailure(error: unknown): { stdout: string; stderr: string; exit
         ? Number(typed.code)
         : NaN;
   return {
-    stdout: typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '',
-    stderr: typeof typed.stderr === 'string' ? typed.stderr : typed.stderr?.toString() ?? '',
+    stdout,
+    stderr: stderr || messageDetail,
     exitCode: Number.isInteger(parsedExitCode) && Number.isFinite(parsedExitCode) ? parsedExitCode : 1
   };
 }
@@ -198,6 +204,21 @@ describe('codex-orchestrator command surface', () => {
     expect(stderr).toContain('Unknown command: unknown-command');
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
   }, CLI_BOOT_TIMEOUT);
+
+  it('falls back to exec failure message detail when stderr is empty', () => {
+    const parsed = parseCliFailure({
+      code: 1,
+      stdout: 'Usage: codex-orchestrator <command> [options]\n',
+      stderr: '',
+      message:
+        'Command failed: node --loader ts-node/esm bin/codex-orchestrator.ts unknown-command\n' +
+        'Unknown command: unknown-command\n'
+    });
+
+    expect(parsed.exitCode).toBe(1);
+    expect(parsed.stderr).toContain('Unknown command: unknown-command');
+    expect(parsed.stdout).toContain('Usage: codex-orchestrator <command> [options]');
+  });
 
   it('prints status help without requiring a run id', async () => {
     const { stdout } = await runCli(['status', '--help'], undefined, CLI_BOOT_TIMEOUT);
