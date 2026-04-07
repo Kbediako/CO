@@ -213,6 +213,7 @@ export async function resolveProviderLinearScreenshotProof(
   }
 
   const outputPath = resolvedOutputPathResult.output_path;
+  const outputDirectory = dirname(outputPath);
   const mediaType = resolvedOutputPathResult.media_type;
   const fileUrl = pathToFileURL(outputPath).toString();
   const embedMarkdown = buildScreenshotEmbedMarkdown(fileUrl);
@@ -221,12 +222,6 @@ export async function resolveProviderLinearScreenshotProof(
     displayId,
     windowId,
     openPreview
-  });
-
-  await dependencies.mkdir(dirname(outputPath), { recursive: true });
-  const captureResult = await dependencies.runCommand({
-    command: captureCommand.executable,
-    args: captureCommand.args
   });
   const baseCapture = buildBaseCaptureRecord({
     mode,
@@ -238,6 +233,30 @@ export async function resolveProviderLinearScreenshotProof(
     embedMarkdown,
     command: captureCommand,
     mediaType
+  });
+
+  try {
+    await dependencies.mkdir(outputDirectory, { recursive: true });
+  } catch (error) {
+    const directoryError = error as NodeJS.ErrnoException;
+    return failureWithCapture(
+      baseCapture,
+      buildSkippedCleanup('Capture cleanup was skipped because the screenshot output directory could not be prepared.'),
+      'screenshot_proof_output_directory_prepare_failed',
+      `Screenshot output directory "${outputDirectory}" could not be prepared before capture.`,
+      422,
+      {
+        output_path: outputPath,
+        output_directory: outputDirectory,
+        error_code: directoryError.code ?? null,
+        error_message: normalizeOptionalString(directoryError.message)
+      }
+    );
+  }
+
+  const captureResult = await dependencies.runCommand({
+    command: captureCommand.executable,
+    args: captureCommand.args
   });
 
   if (captureResult.command_missing) {

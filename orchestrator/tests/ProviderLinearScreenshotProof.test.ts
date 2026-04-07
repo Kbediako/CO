@@ -133,6 +133,43 @@ it('rejects --window-id=0 before invoking macOS capture tools', async () => {
   });
 });
 
+it('returns a structured failure when the screenshot output directory cannot be prepared', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-screenshot-proof-'));
+  tempDirs.push(tempDir);
+
+  const result = await resolveProviderLinearScreenshotProof(
+    {
+      cwd: tempDir,
+      outputPath: 'proofs/proof.png'
+    },
+    {
+      platform: 'darwin',
+      mkdir: async () => {
+        const error = new Error('EACCES: permission denied');
+        (error as NodeJS.ErrnoException).code = 'EACCES';
+        throw error;
+      },
+      runCommand: async () => {
+        throw new Error('runCommand should not execute when output directory preparation fails');
+      }
+    }
+  );
+
+  expect(result).toMatchObject({
+    ok: false,
+    error: {
+      code: 'screenshot_proof_output_directory_prepare_failed',
+      message: `Screenshot output directory "${join(tempDir, 'proofs')}" could not be prepared before capture.`
+    },
+    capture: {
+      output_path: join(tempDir, 'proofs/proof.png'),
+      cleanup: {
+        status: 'skipped'
+      }
+    }
+  });
+});
+
 it('wraps local file markdown in angle brackets when the output name contains parentheses', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-screenshot-proof-'));
   tempDirs.push(tempDir);
