@@ -25,6 +25,8 @@ describe('provider issue observability', () => {
           reason: 'checks_pending',
           summary: 'Waiting for required checks before merge.',
           attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+          ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/80'],
+          conflicting_attached_pr_urls: ['https://github.com/asabeko/CO/pull/83'],
           pr: {
             url: 'https://github.com/asabeko/CO/pull/82',
             owner: 'asabeko',
@@ -90,6 +92,8 @@ describe('provider issue observability', () => {
         is_rehydrated: true
       },
       pull_request: {
+        ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/80'],
+        conflicting_attached_pr_urls: ['https://github.com/asabeko/CO/pull/83'],
         number: 82,
         merge_closeout_status: 'watching',
         required_checks_pending: 2
