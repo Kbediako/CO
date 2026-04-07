@@ -755,20 +755,40 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
     }
   }
 
-  if (mergedCandidates.length === 1 && nonMergedCandidates.length > 0) {
-    const selectedCandidate = mergedCandidates[0]!;
-    const staleUnmergedCandidates = nonMergedCandidates.filter((candidate) =>
-      isSnapshotStrictlyOlderThanSelection(candidate.snapshot, selectedCandidate.snapshot)
+  const selectedMergedCandidate = mergedCandidates.reduce<
+    | {
+        pr: ProviderMergeCloseoutPullRequestRecord;
+        snapshot: ProviderMergeCloseoutSnapshotRecord;
+      }
+    | null
+  >(
+    (currentNewest, candidate) =>
+      !currentNewest || isSnapshotStrictlyOlderThanSelection(currentNewest.snapshot, candidate.snapshot)
+        ? candidate
+        : currentNewest,
+    null
+  );
+  if (selectedMergedCandidate) {
+    const otherMergedCandidates = mergedCandidates.filter(
+      (candidate) => candidate.pr.url !== selectedMergedCandidate.pr.url
     );
-    if (staleUnmergedCandidates.length === nonMergedCandidates.length) {
+    const ignoredHistoricalMergedCandidates = otherMergedCandidates.filter((candidate) =>
+      isSnapshotStrictlyOlderThanSelection(candidate.snapshot, selectedMergedCandidate.snapshot)
+    );
+    const staleUnmergedCandidates = nonMergedCandidates.filter((candidate) =>
+      isSnapshotStrictlyOlderThanSelection(candidate.snapshot, selectedMergedCandidate.snapshot)
+    );
+    if (
+      ignoredHistoricalMergedCandidates.length === otherMergedCandidates.length &&
+      staleUnmergedCandidates.length === nonMergedCandidates.length
+    ) {
+      const ignoredHistoricalPrUrls = ignoredHistoricalMergedCandidates.map((candidate) => candidate.pr.url);
       return {
-        selected_pr: selectedCandidate.pr,
-        selected_snapshot: selectedCandidate.snapshot,
-        ignored_historical_pr_urls: [],
+        selected_pr: selectedMergedCandidate.pr,
+        selected_snapshot: selectedMergedCandidate.snapshot,
+        ignored_historical_pr_urls: ignoredHistoricalPrUrls,
         conflicting_attached_pr_urls: [],
-        selection_note: `Selected already-merged PR ${selectedCandidate.pr.url} because the remaining attached same-repo PR URLs are older and unmerged: ${staleUnmergedCandidates
-          .map((candidate) => candidate.pr.url)
-          .join(', ')}.`
+        selection_note: `Selected already-merged PR ${selectedMergedCandidate.pr.url} because all remaining attached same-repo PR URLs are older.${ignoredHistoricalPrUrls.length > 0 ? ` Ignored older merged PR URLs: ${ignoredHistoricalPrUrls.join(', ')}.` : ''}${staleUnmergedCandidates.length > 0 ? ` Older unmerged PR URLs: ${staleUnmergedCandidates.map((candidate) => candidate.pr.url).join(', ')}.` : ''}`
       };
     }
   }

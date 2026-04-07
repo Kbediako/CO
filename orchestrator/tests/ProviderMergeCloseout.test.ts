@@ -1016,7 +1016,7 @@ describe('runProviderDeterministicMergeCloseout', () => {
     );
   });
 
-  it('recovers the already-merged replacement PR when the only other same-repo attachment is an older unmerged stale PR', async () => {
+  it('recovers the newest merged replacement PR when older merged historical and older unmerged stale same-repo attachments remain', async () => {
     const runCommand = vi
       .fn()
       .mockResolvedValueOnce({
@@ -1050,6 +1050,21 @@ describe('runProviderDeterministicMergeCloseout', () => {
         stderr: ''
       });
     const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 355) {
+        return {
+          state: 'MERGED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=MERGED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-05T18:00:00.000Z',
+          mergedAt: '2026-04-05T18:00:00.000Z',
+          headOid: 'old355',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
       if (prNumber === 360) {
         return {
           state: 'OPEN',
@@ -1113,6 +1128,7 @@ describe('runProviderDeterministicMergeCloseout', () => {
             project: null,
             comments: [],
             attachments: [
+              { id: 'att-355', title: 'Historical merged PR', url: 'https://github.com/asabeko/CO/pull/355' },
               { id: 'att-360', title: 'Stale PR', url: 'https://github.com/asabeko/CO/pull/360' },
               { id: 'att-372', title: 'Merged replacement PR', url: 'https://github.com/asabeko/CO/pull/372' }
             ],
@@ -1144,10 +1160,11 @@ describe('runProviderDeterministicMergeCloseout', () => {
       status: 'merged',
       reason: 'merged_and_transitioned_done_after_recovery',
       attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/355',
         'https://github.com/asabeko/CO/pull/360',
         'https://github.com/asabeko/CO/pull/372'
       ],
-      ignored_historical_pr_urls: [],
+      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/355'],
       conflicting_attached_pr_urls: [],
       pr: {
         owner: 'asabeko',
@@ -1156,9 +1173,11 @@ describe('runProviderDeterministicMergeCloseout', () => {
       }
     });
     expect(result.summary).toContain('already merged');
-    expect(result.summary).toContain('older and unmerged');
+    expect(result.summary).toContain('Ignored older merged PR URLs');
+    expect(result.summary).toContain('Older unmerged PR URLs');
+    expect(result.summary).toContain('https://github.com/asabeko/CO/pull/355');
     expect(result.summary).toContain('https://github.com/asabeko/CO/pull/360');
-    expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+    expect(fetchSnapshot).toHaveBeenCalledTimes(3);
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
   });
 

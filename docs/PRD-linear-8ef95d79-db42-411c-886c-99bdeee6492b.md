@@ -16,7 +16,7 @@
 - Success criteria:
   - one historical merged same-repo PR plus one current replacement PR no longer stalls on generic `multiple_attached_prs`
   - only deterministically historical merged attachments are ignored
-  - `merge_closeout` and `provider-intake-state.json` preserve the selected PR plus ignored historical and conflicting attached PR URLs
+  - `merge_closeout`, `provider-intake-state.json`, and provider debug snapshots preserve the selected PR plus ignored historical and conflicting attached PR URLs
   - repo-mismatch and no-attached-PR behavior stay unchanged
 - Constraints: do not reopen `CO-81` stale-proof recovery, `CO-100` shared-root reconciliation, or the broader attachment lifecycle; do not make manual cleanup the intended steady-state path.
 
