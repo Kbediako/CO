@@ -901,14 +901,16 @@ function resolvePersistedEndpointTargetKey(
 }
 
 function mergePersistedLinearBudgetReservations(
-  existing: PersistedLinearBudgetReservationStatus[],
-  candidate: PersistedLinearBudgetReservationStatus[]
+  existing: PersistedLinearBudgetStatus,
+  candidate: PersistedLinearBudgetStatus
 ): PersistedLinearBudgetReservationStatus[] {
-  const merged = new Map<string, PersistedLinearBudgetReservationStatus>();
-  for (const entry of [...existing, ...candidate].sort(comparePersistedReservationCreatedAt)) {
-    merged.set(entry.id, { ...entry });
+  if (candidate.scope_kind === 'user') {
+    return clonePersistedLinearBudgetReservations(candidate.reservations);
   }
-  return [...merged.values()].sort(comparePersistedReservationCreatedAt);
+  if (existing.scope_kind === 'user') {
+    return clonePersistedLinearBudgetReservations(existing.reservations);
+  }
+  return clonePersistedLinearBudgetReservations(candidate.reservations);
 }
 
 function comparePersistedReservationCreatedAt(
@@ -918,6 +920,12 @@ function comparePersistedReservationCreatedAt(
   const leftCreatedAtMs = parseIsoToMs(left.created_at) ?? Number.NEGATIVE_INFINITY;
   const rightCreatedAtMs = parseIsoToMs(right.created_at) ?? Number.NEGATIVE_INFINITY;
   return leftCreatedAtMs - rightCreatedAtMs;
+}
+
+function clonePersistedLinearBudgetReservations(
+  value: PersistedLinearBudgetReservationStatus[]
+): PersistedLinearBudgetReservationStatus[] {
+  return value.map((entry) => ({ ...entry })).sort(comparePersistedReservationCreatedAt);
 }
 
 function hydrateLinearBudgetStatus(
@@ -1304,24 +1312,50 @@ function resolveCooldownUntil(input: {
   persisted: PersistedLinearBudgetStatus;
   observation: LinearBudgetObservation;
 }): string | null {
-  const observedAtMs = parseIsoToMs(input.observation.observed_at);
-  if (observedAtMs === null) {
-    return null;
+  const candidateMs = collectPersistedLinearBudgetCooldownCandidates({
+    persisted: input.persisted,
+    observedAt: input.observation.observed_at,
+    retryAfterSeconds: input.observation.retry_after_seconds
+  });
+  if (input.observation.assume_unknown_resets_exhausted) {
+    maybeCollectResetCandidate(candidateMs, input.observation.requests, true);
+    maybeCollectResetCandidate(candidateMs, input.observation.complexity, true);
   }
+  return finalizeCooldownCandidateMs(candidateMs);
+}
 
+function resolvePersistedLinearBudgetCooldownUntil(input: {
+  persisted: PersistedLinearBudgetStatus;
+  observedAt: string;
+  retryAfterSeconds: number | null;
+}): string | null {
+  return finalizeCooldownCandidateMs(
+    collectPersistedLinearBudgetCooldownCandidates({
+      persisted: input.persisted,
+      observedAt: input.observedAt,
+      retryAfterSeconds: input.retryAfterSeconds
+    })
+  );
+}
+
+function collectPersistedLinearBudgetCooldownCandidates(input: {
+  persisted: PersistedLinearBudgetStatus;
+  observedAt: string;
+  retryAfterSeconds: number | null;
+}): number[] {
   const candidateMs: number[] = [];
-  if (input.observation.retry_after_seconds !== null && input.observation.retry_after_seconds >= 0) {
-    candidateMs.push(observedAtMs + input.observation.retry_after_seconds * 1000);
+  const observedAtMs = parseIsoToMs(input.observedAt);
+  if (observedAtMs !== null && input.retryAfterSeconds !== null && input.retryAfterSeconds >= 0) {
+    candidateMs.push(observedAtMs + input.retryAfterSeconds * 1000);
   }
 
   for (const bucket of [input.persisted.requests, input.persisted.complexity]) {
     maybeCollectResetCandidate(candidateMs, bucket, false);
   }
-  if (input.observation.assume_unknown_resets_exhausted) {
-    maybeCollectResetCandidate(candidateMs, input.observation.requests, true);
-    maybeCollectResetCandidate(candidateMs, input.observation.complexity, true);
-  }
+  return candidateMs;
+}
 
+function finalizeCooldownCandidateMs(candidateMs: number[]): string | null {
   if (candidateMs.length === 0) {
     return null;
   }
@@ -1517,13 +1551,13 @@ function mergePersistedLinearBudgetCandidate(
   }
 
   const selectedEndpointKey = candidate.selected_endpoint_key ?? existing.selected_endpoint_key;
-  return {
+  const merged: PersistedLinearBudgetStatus = {
     ...clonePersistedLinearBudgetStatus(existing),
     observed_at: maxIsoTimestamp(existing.observed_at, candidate.observed_at) ?? candidate.observed_at,
     source: candidate.source,
     request_id: candidate.request_id ?? existing.request_id,
-    retry_after_seconds: candidate.retry_after_seconds ?? existing.retry_after_seconds,
-    cooldown_until: candidate.cooldown_until ?? existing.cooldown_until,
+    retry_after_seconds: candidate.retry_after_seconds,
+    cooldown_until: null,
     requests: mergeLinearBudgetBucket(existing.requests, candidate.requests),
     complexity: mergeLinearBudgetBucket(existing.complexity, candidate.complexity),
     request_complexity: candidate.request_complexity ?? existing.request_complexity,
@@ -1531,8 +1565,14 @@ function mergePersistedLinearBudgetCandidate(
       selectedEndpointKey && !endpoints[selectedEndpointKey] ? null : selectedEndpointKey,
     token_fingerprints: uniqueStrings([...existing.token_fingerprints, ...candidate.token_fingerprints]),
     endpoints,
-    reservations: mergePersistedLinearBudgetReservations(existing.reservations, candidate.reservations)
+    reservations: mergePersistedLinearBudgetReservations(existing, candidate)
   };
+  merged.cooldown_until = resolvePersistedLinearBudgetCooldownUntil({
+    persisted: merged,
+    observedAt: candidate.observed_at,
+    retryAfterSeconds: candidate.retry_after_seconds
+  });
+  return merged;
 }
 
 async function readPersistedLinearBudgetStatus(

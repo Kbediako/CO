@@ -281,6 +281,122 @@ describe('linearBudgetState', () => {
     }
   });
 
+  it('lets a newer scoped snapshot clear stale legacy cooldown state during mixed-file reads', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-07T09:00:00.000Z'));
+
+    try {
+      const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+      tempDirs.push(codexHome);
+      const env = createEnv(codexHome);
+      const legacyObservedAt = new Date(Date.now()).toISOString();
+      const scopedObservedAt = new Date(Date.now() + 5_000).toISOString();
+
+      await recordLinearBudgetHeadersObservation({
+        env,
+        source: 'dispatch_source_issue_by_id',
+        observedAt: legacyObservedAt,
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+        }
+      });
+
+      await recordLinearBudgetHeadersObservation({
+        env,
+        source: 'provider-linear:issue-context:read-issue-context',
+        observedAt: scopedObservedAt,
+        scope: {
+          workspaceId: 'workspace-1',
+          viewerId: 'viewer-1'
+        },
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '50'
+        }
+      });
+
+      await expect(readSharedLinearBudgetStatus(env)).resolves.toMatchObject({
+        scope_kind: 'user',
+        viewer_id: 'viewer-1',
+        workspace_id: 'workspace-1',
+        cooldown_until: null,
+        cooldown_active: false,
+        requests: {
+          limit: 100,
+          remaining: 50
+        }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not resurrect released reservations from the legacy migration file', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = createEnv(codexHome);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'dispatch_source_tracked_issues',
+      observedAt: '2026-04-07T09:00:00.000Z',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '2'
+      }
+    });
+
+    const reserved = await reserveLinearBudgetReservation({
+      env,
+      operation: 'dispatch_source_tracked_issues'
+    });
+    expect(reserved.ok).toBe(true);
+
+    try {
+      await recordLinearBudgetHeadersObservation({
+        env,
+        source: 'dispatch_source_tracked_issues',
+        observedAt: '2026-04-07T09:05:00.000Z',
+        scope: {
+          workspaceId: 'workspace-1',
+          viewerId: 'viewer-1'
+        },
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '2'
+        }
+      });
+
+      await expect(
+        readSharedLinearBudgetStatus(env, {
+          operation: 'dispatch_source_tracked_issues'
+        })
+      ).resolves.toMatchObject({
+        scope_kind: 'user',
+        reservations_active: 1
+      });
+    } finally {
+      if (reserved.ok) {
+        await reserved.reservation?.release();
+      }
+    }
+
+    const afterRelease = await readSharedLinearBudgetStatus(env, {
+      operation: 'dispatch_source_tracked_issues'
+    });
+    expect(afterRelease).toMatchObject({
+      scope_kind: 'user',
+      viewer_id: 'viewer-1',
+      workspace_id: 'workspace-1',
+      reservations_active: 0
+    });
+    expect(afterRelease).toMatchObject({
+      reservations: []
+    });
+  });
+
   it('serializes reservations across tokens that share a user-scoped budget', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
