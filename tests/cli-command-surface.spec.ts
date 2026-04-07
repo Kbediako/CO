@@ -54,6 +54,17 @@ async function runCli(
   timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
   explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
+  const cliEnv = buildCliEnv(env, explicitProviderOverrideKeys);
+  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+    env: cliEnv,
+    timeout: timeoutMs
+  });
+}
+
+function buildCliEnv(
+  env?: NodeJS.ProcessEnv,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
+): NodeJS.ProcessEnv {
   const mergedEnv = sanitizeProviderOverrideEnv({
     ...process.env,
     ...(env ?? {})
@@ -90,17 +101,14 @@ async function runCli(
   for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
     delete mergedEnv[key];
   }
-  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
-    env: {
-      ...mergedEnv,
-      ...DEFAULT_RUNTIME_TEST_ENV,
-      ...DEFAULT_REPO_CONFIG_TEST_ENV,
-      NODE_NO_WARNINGS: '1',
-      ...explicitProviderOverrides,
-      ...explicitRuntimeOverrides
-    },
-    timeout: timeoutMs
-  });
+  return {
+    ...mergedEnv,
+    ...DEFAULT_RUNTIME_TEST_ENV,
+    ...DEFAULT_REPO_CONFIG_TEST_ENV,
+    NODE_NO_WARNINGS: '1',
+    ...explicitProviderOverrides,
+    ...explicitRuntimeOverrides
+  };
 }
 
 function parseCliFailure(error: unknown): { stdout: string; stderr: string; exitCode: number } {
@@ -184,18 +192,36 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
-    let stdout = '';
-    let stderr = '';
-    let exitCode = 0;
-    try {
-      await runCli(['unknown-command']);
-      throw new Error('expected unknown-command to exit non-zero');
-    } catch (error) {
-      ({ stdout, stderr, exitCode } = parseCliFailure(error));
-    }
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-unknown-command-'));
+    const stdoutPath = join(tempDir, 'stdout.txt');
+    const stderrPath = join(tempDir, 'stderr.txt');
+    const exitCodePath = join(tempDir, 'exit-code.txt');
+
+    await execFileAsync(
+      '/bin/sh',
+      [
+        '-c',
+        '"$NODE_BIN" --loader ts-node/esm "$CLI_ENTRY_PATH" unknown-command >"$CLI_STDOUT_PATH" 2>"$CLI_STDERR_PATH"; printf "%s" "$?" >"$CLI_EXIT_CODE_PATH"'
+      ],
+      {
+        env: {
+          ...buildCliEnv(),
+          NODE_BIN: process.execPath,
+          CLI_ENTRY_PATH: CLI_ENTRY,
+          CLI_STDOUT_PATH: stdoutPath,
+          CLI_STDERR_PATH: stderrPath,
+          CLI_EXIT_CODE_PATH: exitCodePath
+        },
+        timeout: CLI_BOOT_TIMEOUT
+      }
+    );
+
+    const stdout = await readFile(stdoutPath, 'utf8');
+    const stderr = await readFile(stderrPath, 'utf8');
+    const exitCode = Number((await readFile(exitCodePath, 'utf8')).trim());
 
     expect(exitCode).not.toBe(0);
-    expect(`${stderr}${stdout}`).toContain('Unknown command: unknown-command');
+    expect(stderr).toContain('Unknown command: unknown-command');
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
   }, CLI_BOOT_TIMEOUT);
 
