@@ -5889,7 +5889,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1050-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
         "task": "tasks/tasks-1050-coordinator-symphony-aligned-confirmation-list-controller-extraction.md",
@@ -5905,7 +5905,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
         "task": "tasks/tasks-1049-coordinator-symphony-aligned-confirmation-approve-controller-extraction.md",
@@ -5921,7 +5921,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1048-coordinator-symphony-aligned-confirmation-create-controller-extraction.md",
         "task": "tasks/tasks-1048-coordinator-symphony-aligned-confirmation-create-controller-extraction.md",
@@ -5937,7 +5937,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1047-coordinator-symphony-aligned-confirmation-validate-controller-extraction.md",
         "task": "tasks/tasks-1047-coordinator-symphony-aligned-confirmation-validate-controller-extraction.md",
@@ -5953,7 +5953,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1046-coordinator-symphony-aligned-confirmation-issue-consume-controller-extraction.md",
         "task": "tasks/tasks-1046-coordinator-symphony-aligned-confirmation-issue-consume-controller-extraction.md",
@@ -5969,7 +5969,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
         "task": "tasks/tasks-1045-coordinator-symphony-aligned-delegation-register-controller-extraction.md",
@@ -5985,7 +5985,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1044-coordinator-symphony-aligned-security-violation-controller-extraction.md",
         "task": "tasks/tasks-1044-coordinator-symphony-aligned-security-violation-controller-extraction.md",
@@ -6001,7 +6001,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1043-coordinator-symphony-aligned-question-queue-controller-extraction.md",
         "task": "tasks/tasks-1043-coordinator-symphony-aligned-question-queue-controller-extraction.md",
@@ -6017,7 +6017,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1042-coordinator-symphony-aligned-events-sse-controller-extraction.md",
         "task": "tasks/tasks-1042-coordinator-symphony-aligned-events-sse-controller-extraction.md",
@@ -6033,7 +6033,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md",
         "task": "tasks/tasks-1041-coordinator-symphony-aligned-linear-webhook-controller-extraction.md",
@@ -6049,7 +6049,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
         "task": "tasks/tasks-1040-coordinator-symphony-aligned-ui-session-controller-extraction.md",
@@ -6065,7 +6065,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1039-coordinator-symphony-aligned-ui-data-controller-extraction.md",
         "task": "tasks/tasks-1039-coordinator-symphony-aligned-ui-data-controller-extraction.md",
@@ -6081,7 +6081,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
         "task": "tasks/tasks-1038-coordinator-symphony-aligned-observability-api-controller-extraction.md",
@@ -9642,7 +9642,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md",
         "task": "tasks/tasks-1037-coordinator-symphony-aligned-selected-run-presenter-extraction.md",
@@ -9658,7 +9658,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md",
         "task": "tasks/tasks-1036-coordinator-symphony-aligned-compatibility-issue-index-extraction.md",
@@ -9674,7 +9674,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md",
         "task": "tasks/tasks-1035-coordinator-symphony-aligned-compatibility-issue-identity-and-multi-run-policy.md",
@@ -9690,7 +9690,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md",
         "task": "tasks/tasks-1034-coordinator-symphony-aligned-runtime-compatibility-collection-discovery.md",
@@ -9706,7 +9706,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md",
         "task": "tasks/tasks-1033-coordinator-symphony-aligned-runtime-compatibility-snapshot-source.md",
@@ -9722,7 +9722,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-07",
+      "last_review": "2026-04-07",
       "paths": {
         "spec": "tasks/specs/1032-coordinator-symphony-aligned-collection-backed-compatibility-projection.md",
         "task": "tasks/tasks-1032-coordinator-symphony-aligned-collection-backed-compatibility-projection.md",

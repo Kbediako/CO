@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-confirmation-list-controller-e
 risk: medium
 owners:
   - Codex
-last_review: 2026-03-07
+last_review: 2026-04-07
 ---
 
 # TECH_SPEC - Coordinator Symphony-Aligned Confirmation List Controller Extraction
