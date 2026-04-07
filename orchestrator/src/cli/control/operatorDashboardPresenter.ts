@@ -38,6 +38,7 @@ export interface OperatorDashboardSessionPayload {
   host: string;
   last_event: string | null;
   last_message: string | null;
+  display_event?: string | null;
   started_at: string | null;
   last_event_at: string | null;
   tokens: ControlRunningPayload['tokens'];
@@ -252,6 +253,7 @@ function buildRunningSessionPayload(
     host: LOCAL_HOSTNAME,
     last_event: entry.last_event,
     last_message: entry.last_message,
+    display_event: entry.display_event ?? null,
     started_at: entry.started_at,
     last_event_at: entry.last_event_at,
     tokens: proof?.tokens ?? entry.tokens

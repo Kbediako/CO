@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs';
+import { existsSync, writeSync } from 'node:fs';
 import { opendir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
@@ -82,6 +82,20 @@ interface RunOutputPayload {
   cloud_fallback_reason: string | null;
   issue_log: DoctorIssueLogResult | null;
   issue_log_error: string | null;
+}
+
+function writeStderrLine(message: string): void {
+  const line = `${message}\n`;
+  const stderrFd = process.stderr.fd;
+  if (typeof stderrFd === 'number') {
+    try {
+      writeSync(stderrFd, line);
+      return;
+    } catch {
+      // Fall through to the standard stream write when direct fd access is unavailable.
+    }
+  }
+  process.stderr.write(line);
 }
 
 async function main(): Promise<void> {
@@ -174,12 +188,12 @@ async function main(): Promise<void> {
         printVersion();
         break;
       default:
-        console.error(`Unknown command: ${command}`);
+        writeStderrLine(`Unknown command: ${command}`);
         printHelp();
         process.exitCode = 1;
     }
   } catch (error) {
-    console.error((error as Error)?.message ?? String(error));
+    writeStderrLine((error as Error)?.message ?? String(error));
     process.exitCode = 1;
   }
 }

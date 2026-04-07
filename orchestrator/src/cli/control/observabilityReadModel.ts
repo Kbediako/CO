@@ -197,6 +197,7 @@ export interface ControlRunningPayload {
   turn_count: number | null;
   last_event: string | null;
   last_message: string | null;
+  display_event?: string | null;
   started_at: string | null;
   last_event_at: string | null;
   tokens: ControlTokenUsagePayload;

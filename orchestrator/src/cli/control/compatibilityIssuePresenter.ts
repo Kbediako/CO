@@ -5,6 +5,7 @@ import type {
   ControlCompatibilitySourceContext,
   ControlDispatchPilotPayload,
   ControlIssuePayload,
+  ControlPollingHealthPayload,
   ControlRetryPayload,
   ControlRunningPayload
 } from './observabilityReadModel.js';
@@ -13,6 +14,7 @@ import {
   buildTrackedPayloadEnvelope,
   buildSelectedRunLatestEventPayload
 } from './observabilityReadModel.js';
+import type { LinearBudgetStatus } from './linearBudgetState.js';
 
 export interface CompatibilityIssueSourceRecord {
   issueIdentifier: string;
@@ -60,9 +62,17 @@ export function buildCompatibilityProjectionSnapshot(
   });
 
   const issuesByIdentifier = new Map(index.issues.map((issue) => [issue.issueIdentifier, issue] as const));
+  const pollingBudgetOwner = resolveCompatibilityPollingBudgetOwner(snapshot);
   const running = index.runningOrder.flatMap((issueIdentifier) => {
     const source = issuesByIdentifier.get(issueIdentifier)?.runningSource;
-    return source ? [buildCompatibilityRunningEntry(source)] : [];
+    return source
+      ? [
+          buildCompatibilityRunningEntry(
+            source,
+            resolveCompatibilityRunningPolling(source, snapshot.polling ?? null, pollingBudgetOwner)
+          )
+        ]
+      : [];
   });
   const retrying = index.retryOrder.flatMap((issueIdentifier) => {
     const source = issuesByIdentifier.get(issueIdentifier)?.retrySource;
@@ -217,6 +227,46 @@ export function buildCompatibilityIssueIndex<
   };
 }
 
+interface CompatibilityPollingBudgetOwner {
+  issueId: string | null;
+  issueIdentifier: string | null;
+}
+
+function resolveCompatibilityPollingBudgetOwner(
+  snapshot: Pick<ControlCompatibilityRuntimeSnapshot, 'selected' | 'tracked'>
+): CompatibilityPollingBudgetOwner | null {
+  const trackedLinear = snapshot.tracked?.linear ?? snapshot.selected?.tracked?.linear ?? null;
+  if (!trackedLinear) {
+    return null;
+  }
+  const issueId = trackedLinear.id ?? null;
+  const issueIdentifier = trackedLinear.identifier ?? null;
+  if (!issueId && !issueIdentifier) {
+    return null;
+  }
+  return {
+    issueId,
+    issueIdentifier
+  };
+}
+
+function resolveCompatibilityRunningPolling(
+  source: Pick<ControlCompatibilitySourceContext, 'issueId' | 'issueIdentifier'>,
+  polling: ControlPollingHealthPayload | null,
+  owner: CompatibilityPollingBudgetOwner | null
+): ControlPollingHealthPayload | null {
+  if (!polling || !owner) {
+    return null;
+  }
+  if (owner.issueId && source.issueId) {
+    return owner.issueId === source.issueId ? polling : null;
+  }
+  if (owner.issueIdentifier && owner.issueIdentifier === source.issueIdentifier) {
+    return polling;
+  }
+  return null;
+}
+
 export function findCompatibilityIssueLike<TIssue extends { issueIdentifier: string; aliases: string[] }>(
   issues: TIssue[],
   issueIdentifier: string
@@ -235,7 +285,8 @@ export function findCompatibilityIssueLike<TIssue extends { issueIdentifier: str
 }
 
 export function buildCompatibilityRunningEntry(
-  selected: ControlCompatibilitySourceContext
+  selected: ControlCompatibilitySourceContext,
+  polling: ControlPollingHealthPayload | null = null
 ): ControlRunningPayload {
   const proof = selected.providerLinearWorkerProof ?? null;
   const runningEvent = selectRunningEvent({
@@ -262,6 +313,12 @@ export function buildCompatibilityRunningEntry(
     : preserveLatestControlActionContext
       ? selected.latestEvent?.at ?? selected.updatedAt
       : selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt;
+  const displayEvent = resolveCompatibilityRunningDisplayEvent({
+    selected,
+    runningEvent: runningEvent.event,
+    runningMessage,
+    polling
+  });
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -273,6 +330,7 @@ export function buildCompatibilityRunningEntry(
     turn_count: proof?.turn_count ?? null,
     last_event: runningEvent.event,
     last_message: runningMessage,
+    display_event: displayEvent,
     started_at: selected.startedAt,
     last_event_at: runningEventAt,
     tokens: proof?.tokens ?? buildEmptyTokenUsage()
@@ -371,6 +429,322 @@ function buildEmptyTokenUsage(): ControlRunningPayload['tokens'] {
     output_tokens: null,
     total_tokens: null
   };
+}
+
+function resolveCompatibilityRunningDisplayEvent(input: {
+  selected: ControlCompatibilitySourceContext;
+  runningEvent: string | null;
+  runningMessage: string | null;
+  polling: ControlPollingHealthPayload | null;
+}): string | null {
+  const proof = input.selected.providerLinearWorkerProof ?? null;
+  const codexBudgetEvent = resolveCodexBudgetExhaustionEvent(proof?.rate_limits ?? null);
+  if (codexBudgetEvent) {
+    return codexBudgetEvent;
+  }
+
+  const pollingLinearBudgetEvent = resolveLinearBudgetExhaustionEvent(input.polling?.linear_budget ?? null, {
+    nextPollInMs: input.polling?.next_poll_in_ms ?? null
+  });
+  if (pollingLinearBudgetEvent) {
+    return pollingLinearBudgetEvent;
+  }
+
+  const authoritativeLinearBudget = resolveAuthoritativeLinearBudget({
+    selected: input.selected,
+    polling: input.polling
+  });
+  const linearBudgetEvent = resolveLinearBudgetExhaustionEvent(
+    authoritativeLinearBudget,
+    {
+      nextPollInMs: input.polling?.next_poll_in_ms ?? null
+    }
+  );
+  if (linearBudgetEvent) {
+    return linearBudgetEvent;
+  }
+
+  const displayState = input.selected.displayStatus;
+  const progressSummary =
+    normalizeCompatibilityMessage(input.selected.providerDebugSnapshot?.progress?.summary) ??
+    normalizeCompatibilityMessage(proof?.progress?.summary) ??
+    null;
+  const candidates = [
+    normalizeCompatibilityMessage(input.runningMessage),
+    progressSummary,
+    normalizeCompatibilityMessage(input.selected.latestEvent?.message),
+    normalizeCompatibilityMessage(input.selected.summary)
+  ];
+  for (const candidate of candidates) {
+    if (isHighSignalCompatibilityText(candidate, displayState)) {
+      return candidate;
+    }
+  }
+
+  const humanizedEvent = humanizeCompatibilityRunningEvent(input.runningEvent);
+  if (isHighSignalCompatibilityText(humanizedEvent, displayState)) {
+    return humanizedEvent;
+  }
+  const humanizedStatusReason = humanizeCompatibilityRunningEvent(input.selected.statusReason);
+  if (isHighSignalCompatibilityText(humanizedStatusReason, displayState)) {
+    return humanizedStatusReason;
+  }
+  return null;
+}
+
+function resolveAuthoritativeLinearBudget(input: {
+  selected: ControlCompatibilitySourceContext;
+  polling: ControlPollingHealthPayload | null;
+}): LinearBudgetStatus | null {
+  const proof = input.selected.providerLinearWorkerProof ?? null;
+  const proofBudget = proof?.linear_budget ?? null;
+  const pollingBudget = input.polling?.linear_budget ?? null;
+  if (!proofBudget) {
+    return pollingBudget;
+  }
+  if (!pollingBudget) {
+    return proofBudget;
+  }
+  const proofTimestamp =
+    Date.parse(proofBudget.observed_at ?? proof?.updated_at ?? input.selected.updatedAt ?? '') ||
+    Number.NEGATIVE_INFINITY;
+  const pollingTimestamp =
+    Date.parse(pollingBudget.observed_at ?? input.polling?.updated_at ?? '') ||
+    Number.NEGATIVE_INFINITY;
+  return pollingTimestamp >= proofTimestamp ? pollingBudget : proofBudget;
+}
+
+function resolveCodexBudgetExhaustionEvent(
+  rateLimits: Record<string, unknown> | null | undefined
+): string | null {
+  const codex = asCompatibilityRecord(rateLimits?.codex) ?? asCompatibilityRecord(rateLimits);
+  if (!codex) {
+    return null;
+  }
+  const buckets: Array<[string, Record<string, unknown> | null]> = [
+    [resolveCodexRateLimitBucketLabel(asCompatibilityRecord(codex.primary)) ?? 'primary', asCompatibilityRecord(codex.primary)],
+    [resolveCodexRateLimitBucketLabel(asCompatibilityRecord(codex.secondary)) ?? 'secondary', asCompatibilityRecord(codex.secondary)],
+    ['requests', asCompatibilityRecord(codex.requests)],
+    ['requests', asCompatibilityRecord(codex.endpoint_requests)]
+  ];
+  for (const [label, bucket] of buckets) {
+    if (bucket && isCompatibilityBucketExhausted(bucket)) {
+      return `codex ${label} bucket exhausted; worker paused until reset`;
+    }
+  }
+  return null;
+}
+
+function resolveLinearBudgetExhaustionEvent(
+  budget:
+    | {
+        retry_after_seconds?: number | null;
+        requests?: { remaining?: number | null } | null;
+        endpoint_requests?: { remaining?: number | null } | null;
+        complexity?: { remaining?: number | null } | null;
+        endpoint_complexity?: { remaining?: number | null } | null;
+      }
+    | null
+    | undefined,
+  options: {
+    nextPollInMs?: number | null;
+  } = {}
+): string | null {
+  if (isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'requests')) {
+    const nextRefresh = formatCompatibilityCountdownMs(
+      resolveCompatibilityLinearBudgetCountdownMs(budget, options.nextPollInMs ?? null)
+    );
+    return nextRefresh
+      ? `linear requests exhausted; next tracked-issue refresh at ${nextRefresh}`
+      : 'linear requests exhausted; polling deferred until reset';
+  }
+  if (isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'complexity')) {
+    return 'linear complexity budget exhausted; polling deferred until reset';
+  }
+  return null;
+}
+
+function isCompatibilityLinearBudgetBucketFamilyExhausted(
+  budget:
+    | {
+        requests?: { remaining?: number | null } | null;
+        endpoint_requests?: { remaining?: number | null } | null;
+        complexity?: { remaining?: number | null } | null;
+        endpoint_complexity?: { remaining?: number | null } | null;
+      }
+    | null
+    | undefined,
+  family: 'requests' | 'complexity'
+): boolean {
+  const primaryBucket = family === 'requests' ? budget?.requests : budget?.complexity;
+  const endpointBucket = family === 'requests' ? budget?.endpoint_requests : budget?.endpoint_complexity;
+  return (
+    isCompatibilityLinearBudgetBucketExhausted(primaryBucket) ||
+    isCompatibilityLinearBudgetBucketExhausted(endpointBucket)
+  );
+}
+
+function isCompatibilityLinearBudgetBucketExhausted(
+  bucket: { remaining?: number | null } | null | undefined
+): boolean {
+  const remaining = normalizeCompatibilityRemaining(bucket?.remaining);
+  return remaining !== null && remaining <= 0;
+}
+
+function resolveCompatibilityLinearBudgetCountdownMs(
+  budget:
+    | {
+        retry_after_seconds?: number | null;
+      }
+    | null
+    | undefined,
+  fallbackMs: number | null
+): number | null {
+  const retryAfterSeconds = normalizeCompatibilityRemaining(budget?.retry_after_seconds);
+  if (retryAfterSeconds !== null) {
+    return Math.max(0, Math.ceil(retryAfterSeconds * 1000));
+  }
+  return typeof fallbackMs === 'number' && Number.isFinite(fallbackMs) && fallbackMs >= 0
+    ? fallbackMs
+    : null;
+}
+
+function normalizeCompatibilityRemaining(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function isCompatibilityBucketExhausted(bucket: Record<string, unknown>): boolean {
+  const remaining = readCompatibilityRecordNumber(bucket, ['remaining']);
+  if (remaining !== null) {
+    return remaining <= 0;
+  }
+  const usedPercent = readCompatibilityRecordNumber(bucket, ['usedPercent', 'used_percent']);
+  if (usedPercent !== null) {
+    return usedPercent >= 100;
+  }
+  return false;
+}
+
+function resolveCodexRateLimitBucketLabel(bucket: Record<string, unknown> | null): string | null {
+  if (!bucket) {
+    return null;
+  }
+  const windowDurationMins = readCompatibilityRecordNumber(bucket, [
+    'windowDurationMins',
+    'window_duration_mins',
+    'window_minutes'
+  ]);
+  const normalizedWindowMinutes =
+    windowDurationMins !== null && Number.isFinite(windowDurationMins)
+      ? Math.max(0, Math.trunc(windowDurationMins))
+      : null;
+  if (normalizedWindowMinutes === 300) {
+    return '5-hour';
+  }
+  if (normalizedWindowMinutes === 10_080) {
+    return 'weekly';
+  }
+  return null;
+}
+
+function formatCompatibilityCountdownMs(valueMs: number | null | undefined): string | null {
+  if (typeof valueMs !== 'number' || !Number.isFinite(valueMs) || valueMs < 0) {
+    return null;
+  }
+  return formatCompatibilityDurationSeconds(Math.ceil(valueMs / 1000));
+}
+
+function formatCompatibilityDurationSeconds(valueSeconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(valueSeconds));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours < 24) {
+    return remainingMinutes === 0 ? `${hours}h` : `${hours}h ${remainingMinutes}m`;
+  }
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours === 0 ? `${days}d` : `${days}d ${remainingHours}h`;
+}
+
+function humanizeCompatibilityRunningEvent(value: string | null | undefined): string | null {
+  const normalized = normalizeCompatibilityEventKey(value);
+  if (!normalized) {
+    return null;
+  }
+  switch (normalized) {
+    case 'task_started':
+      return 'session started';
+    case 'task_complete':
+    case 'turn_completed':
+      return 'turn completed';
+    case 'turn_started':
+      return 'turn started';
+    case 'turn_failed':
+      return 'turn failed';
+    case 'turn_cancelled':
+      return 'turn cancelled';
+    case 'thread_tokenusage_updated':
+      return 'token usage updated';
+    case 'account_ratelimits_updated':
+      return 'rate limits updated';
+    case 'queued_questions':
+      return 'queued questions';
+    case 'review_handoff':
+      return 'review handoff ready';
+    default:
+      return normalized.replace(/_/g, ' ');
+  }
+}
+
+function isHighSignalCompatibilityText(
+  value: string | null,
+  displayState: string | null | undefined
+): value is string {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  const normalizedDisplayState = normalizeCompatibilityMessage(displayState)?.toLowerCase() ?? '';
+  if (normalized.length === 0 || normalized === normalizedDisplayState || normalized === 'n/a') {
+    return false;
+  }
+  return !GENERIC_COMPATIBILITY_RUNNING_TEXT.has(normalized);
+}
+
+const GENERIC_COMPATIBILITY_RUNNING_TEXT = new Set([
+  'retry queued',
+  'turn running',
+  'worker turn active',
+  'provider worker turn is active.',
+  'provider worker turn is active',
+  'turn active',
+  'provider run active',
+  'issue is active but worker progress has not been observed yet.'
+]);
+
+function asCompatibilityRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function readCompatibilityRecordNumber(
+  record: Record<string, unknown>,
+  keys: string[]
+): number | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return null;
 }
 
 function selectRunningEvent(input: {

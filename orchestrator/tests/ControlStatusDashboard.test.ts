@@ -384,27 +384,26 @@ describe('control status dashboard', () => {
     const plainFrame = stripAnsi(frame);
     const lines = plainFrame.split('\n');
     expect(lines).toHaveLength(23);
-    expect(lines.slice(0, 10)).toEqual([
+    expect(lines.slice(0, 9)).toEqual([
       '╭─ CO STATUS',
       '│ Agents: 1/2 tracked',
       '│ Throughput: 1,842 tps',
       '│ Runtime: 15m 12s',
       '│ Tokens: in 100 | out 117 | total 217',
-      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
+      '│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50',
       '│ Project: CO Control and Advisory',
-      '│ Dashboard: http://127.0.0.1:4100',
       '│ Next refresh: 15s',
       '├─ Running'
     ]);
     expect(plainFrame).toContain('│ Agents: 1/2 tracked');
     expect(plainFrame).toContain('│ Throughput: 1,842 tps');
     expect(plainFrame).toContain('│ Tokens: in 100 | out 117 | total 217');
-    expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50');
-    expect(plainFrame).toContain('│ Dashboard: http://127.0.0.1:4100');
+    expect(plainFrame).toContain('│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50');
     expect(plainFrame).toContain('│   ID         STAGE        PID');
     expect(plainFrame).toContain('│ ● CO-26      running      4242');
     expect(plainFrame).toContain('Terminal dashboard renderer in progress');
     expect(plainFrame).toContain('│  ↻ CO-27 retry scheduled in 1m | attempt 2 | rate limit exceeded');
+    expect(plainFrame).toContain('├─ Status controls');
     expect(plainFrame).toContain('│ Inspect: live | alternate screen | full frame');
   });
 
@@ -448,6 +447,34 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain('turn running (15m ago)');
+  });
+
+  it('prefers projection-authored running event text over renderer fallbacks', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        running: [
+          {
+            ...buildDataset().running[0],
+            summary: null,
+            display_event: 'linear requests exhausted; next tracked-issue refresh at 43s',
+            last_event: 'turn_running',
+            last_message: 'Provider worker turn is active.',
+            last_event_at: '2026-03-30T01:00:00.000Z'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'attach-viewer',
+      terminalColumns: 120,
+      throughputTps: 1842.7,
+      surfaceMode: 'primary'
+    });
+
+    expect(stripAnsi(frame)).toContain('linear requests exhausted; next tracked-i...');
+    expect(stripAnsi(frame)).not.toContain('turn running (15m ago)');
   });
 
   it('lets a high-signal status reason outrank the generic aged event fallback', () => {
@@ -563,7 +590,7 @@ describe('control status dashboard', () => {
 
     const plainFrame = stripAnsi(frame);
     expect(plainFrame).toContain('│ Throughput: 15 tps');
-    expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits...');
+    expect(plainFrame).toContain('│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50');
     expect(plainFrame).toContain('│   ID        STAGE      PID');
     expect(plainFrame).toContain('│ ● CO-26     running    4242');
     expect(plainFrame).toContain('│  ↻ CO-30 retry scheduled in 2s | attempt 1 | error with \\nnewline');
@@ -655,7 +682,7 @@ describe('control status dashboard', () => {
       '╭─ CO STATUS',
       '│ Status: 1/2 tracked | 15m 12s | next 15s',
       '│ Tokens: in 100 | out 117 | total 217',
-      '│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50',
+      '│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50',
       '│ Running: CO-26 | running | Terminal dashboard renderer in progress',
       '│ Retry: CO-27 | retry scheduled in 1m | rate limit exceeded',
       '│ Controls: p resume live redraw | c full frame | s snapshot export',
@@ -697,7 +724,7 @@ describe('control status dashboard', () => {
         rate_limits: {
           limit_id: 'gpt-5',
           primary: {
-            remaining: 19,
+            remaining: 0,
             limit: 30,
             reset_at: '2026-03-30T01:16:00.000Z'
           }
@@ -712,7 +739,7 @@ describe('control status dashboard', () => {
       throughputTps: 0
     });
 
-    expect(stripAnsi(frame)).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 1m');
+    expect(stripAnsi(frame)).toContain('│ Rate Limits: Codex primary resets 1m');
   });
 
   it('renders higher-order countdowns and age values for long live windows', () => {
@@ -729,7 +756,7 @@ describe('control status dashboard', () => {
         rate_limits: {
           limit_id: 'gpt-5',
           primary: {
-            remaining: 19,
+            remaining: 0,
             limit: 30,
             reset_at: '2026-03-30T06:45:00.000Z'
           }
@@ -753,7 +780,7 @@ describe('control status dashboard', () => {
     const plainFrame = stripAnsi(frame);
     expect(plainFrame).toContain('│ Runtime: 5h 12m');
     expect(plainFrame).toContain('│ Next refresh: 5h 2m');
-    expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 5h 30m');
+    expect(plainFrame).toContain('│ Rate Limits: Codex primary resets 5h 30m');
     expect(plainFrame).toContain('2d 4h / 4');
   });
 
@@ -781,7 +808,7 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain(
-      '│ Rate Limits: Codex | 5-hour 87.5% / 5h | weekly 52% / 7d'
+      '│ Rate Limits: Codex 5-hour 87.5% | weekly 52%'
     );
   });
 
@@ -809,8 +836,39 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain(
-      '│ Rate Limits: Codex | 5-hour 87.5% / 5h | weekly 52% / 7d'
+      '│ Rate Limits: Codex 5-hour 87.5% | weekly 52%'
     );
+  });
+
+  it('falls back to percent remaining when an exhausted Codex usage window lacks reset metadata', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          primary: {
+            usedPercent: 100,
+            windowDurationMins: 300
+          },
+          secondary: {
+            usedPercent: 48,
+            windowDurationMins: 10080
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex 5-hour 0% | weekly 52%');
+    expect(rateLimitLine).not.toContain('resets soon');
   });
 
   it('renders authoritative Linear budget snapshots instead of falling back to unavailable', () => {
@@ -842,7 +900,7 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain(
-      '│ Rate Limits: Linear | requests 19/30 reset 42s | complexity 180/200 reset 7s | state low'
+      '│ Rate Limits: Linear requests 63.3% | complexity 90%'
     );
   });
 
@@ -885,17 +943,107 @@ describe('control status dashboard', () => {
         .split('\n')
         .find((line) => line.startsWith('│ Rate Limits: '));
       expect(rateLimitLine).toBeDefined();
-      expect(rateLimitLine).toContain('gpt-5 p19/30 42s s3/5 7s cr1234.50');
-      expect(rateLimitLine).toContain('Linear cooldown 2m req 19/30 42s');
+      expect(rateLimitLine).toContain('Codex primary 63.3% | secondary 60% | credits 1234.50 ||');
+      expect(rateLimitLine).toContain('Linear requests 63.3%');
       if (terminalColumns === 96) {
-        expect(rateLimitLine).toContain('cx 180/2...');
+        expect(rateLimitLine).toContain('Linear requests 63.3%...');
       } else {
-        expect(rateLimitLine).toContain('Linear cooldown 2m req 19/30 42s cx 180/200 7s');
+        expect(rateLimitLine).toContain('Linear requests 63.3% | complexity 90%');
         expect(rateLimitLine).not.toContain('...');
       }
       expect(rateLimitLine?.length ?? 0).toBeLessThanOrEqual(terminalColumns);
     }
   );
+
+  it('surfaces exhausted endpoint Linear buckets in the compact Rate Limits row even when shared buckets still have headroom', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          codex: buildDataset().rate_limits,
+          linear_budget: {
+            observed_at: '2026-03-30T01:15:00.000Z',
+            source: 'linear-budget-state',
+            suppression: 'cooldown',
+            retry_after_seconds: 120,
+            requests: {
+              remaining: 19,
+              limit: 30,
+              reset_at: '2026-03-30T01:15:42.000Z'
+            },
+            endpoint_requests: {
+              remaining: 0,
+              limit: 12,
+              reset_at: '2026-03-30T01:17:00.000Z'
+            },
+            complexity: {
+              remaining: 180,
+              limit: 200,
+              reset_at: '2026-03-30T01:15:07.000Z'
+            }
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 140,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Linear requests resets 2m | complexity 90%');
+    expect(rateLimitLine).not.toContain('Linear requests 63.3%');
+  });
+
+  it('uses the later exhausted Linear bucket reset when both shared and endpoint request buckets are exhausted', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          codex: buildDataset().rate_limits,
+          linear_budget: {
+            observed_at: '2026-03-30T01:15:00.000Z',
+            source: 'linear-budget-state',
+            suppression: 'cooldown',
+            retry_after_seconds: 300,
+            requests: {
+              remaining: 0,
+              limit: 30,
+              reset_at: '2026-03-30T01:16:00.000Z'
+            },
+            endpoint_requests: {
+              remaining: 0,
+              limit: 12,
+              reset_at: '2026-03-30T01:20:00.000Z'
+            },
+            complexity: {
+              remaining: 180,
+              limit: 200,
+              reset_at: '2026-03-30T01:15:07.000Z'
+            }
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 140,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Linear requests resets 5m | complexity 90%');
+    expect(rateLimitLine).not.toContain('Linear requests resets 1m');
+  });
 
   it('surfaces legacy Codex request limits without leaking raw source labels', () => {
     const frame = renderControlStatusFrame({
@@ -919,8 +1067,108 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Rate Limits: Codex | requests 1/30 reset 1m');
+    expect(plainFrame).toContain('│ Rate Limits: Codex requests 3.3%');
     expect(plainFrame).not.toContain('legacy-proof');
+  });
+
+  it('surfaces exhausted legacy Codex endpoint requests when the shared bucket still has headroom', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 19,
+            limit: 30,
+            reset_at: '2026-03-30T01:15:42.000Z'
+          },
+          endpoint_requests: {
+            remaining: 0,
+            limit: 12,
+            reset_at: '2026-03-30T01:17:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex requests resets 2m');
+    expect(rateLimitLine).not.toContain('Codex requests 63.3%');
+  });
+
+  it('prefers the known later reset for exhausted legacy Codex request buckets', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 0,
+            limit: 30
+          },
+          endpoint_requests: {
+            remaining: 0,
+            limit: 12,
+            reset_at: '2026-03-30T01:20:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex requests resets 5m');
+    expect(rateLimitLine).not.toContain('Codex requests resets soon');
+  });
+
+  it('accepts legacy reset timestamp aliases when choosing the visible exhausted Codex request bucket', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 0,
+            limit: 30
+          },
+          endpoint_requests: {
+            remaining: 0,
+            limit: 12,
+            resets_at: '2026-03-30T01:20:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex requests resets 5m');
+    expect(rateLimitLine).not.toContain('Codex requests resets soon');
   });
 
   it('keeps legacy Codex request limits visible when combined with Linear budget', () => {
@@ -969,8 +1217,7 @@ describe('control status dashboard', () => {
       .split('\n')
       .find((line) => line.startsWith('│ Rate Limits: '));
     expect(rateLimitLine).toBeDefined();
-    expect(rateLimitLine).toContain('Codex req 1/30 1m');
-    expect(rateLimitLine).toContain('Linear cooldown 2m req 19/30 42s cx 180/200 7s');
+    expect(rateLimitLine).toContain('Codex requests 3.3% || Linear requests 63.3% | complexity 90%');
     expect(rateLimitLine).not.toContain('legacy-proof');
   });
 
@@ -1009,8 +1256,8 @@ describe('control status dashboard', () => {
 
     const plainFrame = stripAnsi(frame);
     expect(plainFrame).not.toContain('\u0007');
-    expect(plainFrame).toContain('│ Dashboard: http://127.0.0.1:4100');
-    expect(plainFrame).toContain('│ Rate Limits: gpt-5 | primary 19/30 reset 42s | secondary 3/5 reset 7s | credits 1234.50');
+    expect(plainFrame).not.toContain('│ Dashboard: http://127.0.0.1:4100');
+    expect(plainFrame).toContain('│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50');
     expect(plainFrame).toContain('│ ● CO-26      running');
     expect(plainFrame).toContain('worker link active');
     expect(plainFrame).toContain('│  ↻ CO-27 retry scheduled in 1m | attempt 2 | oops red next line');
@@ -1117,7 +1364,7 @@ describe('control status dashboard', () => {
     await handle.flush();
 
     const plainFrame = stripAnsi(writes[0] ?? '');
-    expect(plainFrame).toContain('│ Dashboard: ');
+    expect(plainFrame).not.toContain('│ Dashboard: ');
     expect(plainFrame).toContain('│ Pipeline: ');
     expect(plainFrame).toContain('│ Dashboard error: ');
     for (const line of plainFrame.split('\n')) {
