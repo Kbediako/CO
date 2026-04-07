@@ -971,9 +971,14 @@ function resolveLinearBudgetOperationView(
   const matchedEndpointKeys = normalizedOperation
     ? resolveMatchingEndpointKeys(budget.endpoints, normalizedOperation)
     : null;
-  const selectedEndpointKey = resolveSelectedEndpointKey(budget, normalizedOperation, matchedEndpointKeys);
-  const selectedEndpoint = selectedEndpointKey ? budget.endpoints[selectedEndpointKey] ?? null : null;
   const reservations = budget.reservations.filter((entry) => isFutureIsoTimestamp(entry.expires_at));
+  const selectedEndpointKey = resolveSelectedEndpointKey(
+    budget,
+    normalizedOperation,
+    matchedEndpointKeys,
+    reservations
+  );
+  const selectedEndpoint = selectedEndpointKey ? budget.endpoints[selectedEndpointKey] ?? null : null;
   const globalRequestsReserved = reservations.reduce((sum, entry) => sum + entry.requests, 0);
   const globalComplexityReserved = reservations.reduce(
     (sum, entry) => sum + (entry.complexity ?? 0),
@@ -1012,10 +1017,11 @@ function resolveLinearBudgetOperationView(
 function resolveSelectedEndpointKey(
   budget: LinearBudgetStatus,
   operation: string | null,
-  matchedEndpointKeys: string[] | null = null
+  matchedEndpointKeys: string[] | null = null,
+  reservations: LinearBudgetReservationStatus[] = []
 ): string | null {
   if (operation) {
-    return selectMostConstrainedEndpointKey(budget.endpoints, matchedEndpointKeys ?? []);
+    return selectMostConstrainedEndpointKey(budget.endpoints, matchedEndpointKeys ?? [], reservations);
   }
   if (budget.selected_endpoint_key && budget.endpoints[budget.selected_endpoint_key]) {
     return budget.selected_endpoint_key;
@@ -1025,22 +1031,34 @@ function resolveSelectedEndpointKey(
 
 function selectMostConstrainedEndpointKey(
   endpoints: Record<string, LinearBudgetEndpointStatus>,
-  candidateKeys: string[] = Object.keys(endpoints)
+  candidateKeys: string[] = Object.keys(endpoints),
+  reservations: LinearBudgetReservationStatus[] = []
 ): string | null {
   let selected: {
     key: string | null;
     rank: number;
-  } = { key: null, rank: -1 };
+    headroom: number;
+  } = { key: null, rank: -1, headroom: Number.POSITIVE_INFINITY };
   for (const key of candidateKeys) {
     const endpoint = endpoints[key];
     if (!endpoint) {
       continue;
     }
-    const pressure = resolveEndpointPressure(endpoint);
-    if (pressure.rank > selected.rank) {
+    const endpointReservations = reservations.filter((entry) => entry.endpoint_key === key);
+    const requestsReserved = endpointReservations.reduce((sum, entry) => sum + entry.requests, 0);
+    const complexityReserved = endpointReservations.reduce((sum, entry) => sum + (entry.complexity ?? 0), 0);
+    const pressure = resolveEndpointPressure({
+      requests: subtractReservationFromBucket(endpoint.requests, requestsReserved),
+      complexity: subtractReservationFromBucket(endpoint.complexity, complexityReserved)
+    });
+    if (
+      pressure.rank > selected.rank ||
+      (pressure.rank === selected.rank && pressure.headroom < selected.headroom)
+    ) {
       selected = {
         key,
-        rank: pressure.rank
+        rank: pressure.rank,
+        headroom: pressure.headroom
       };
     }
   }
@@ -1104,10 +1122,14 @@ function resolveMaterializedBudgetPressure(
   return selected;
 }
 
-function resolveEndpointPressure(endpoint: LinearBudgetEndpointStatus): {
+function resolveEndpointPressure(endpoint: {
+  requests: LinearBudgetBucketPayload | null;
+  complexity: LinearBudgetBucketPayload | null;
+}): {
   rank: number;
+  headroom: number;
 } {
-  return [
+  const selected = [
     resolveBucketPressure('endpoint_requests', endpoint.requests, true),
     resolveBucketPressure('endpoint_complexity', endpoint.complexity, true)
   ].reduce((selected, next) => (next.rank > selected.rank ? next : selected), {
@@ -1116,6 +1138,20 @@ function resolveEndpointPressure(endpoint: LinearBudgetEndpointStatus): {
     reason: null,
     endpoint_specific: true
   });
+  return {
+    rank: selected.rank,
+    headroom: resolveEndpointHeadroom(endpoint.requests, endpoint.complexity)
+  };
+}
+
+function resolveEndpointHeadroom(
+  requests: LinearBudgetBucketPayload | null,
+  complexity: LinearBudgetBucketPayload | null
+): number {
+  const candidates = [requests?.remaining ?? null, complexity?.remaining ?? null].filter(
+    (value): value is number => value !== null
+  );
+  return candidates.length > 0 ? Math.min(...candidates) : Number.POSITIVE_INFINITY;
 }
 
 function resolveBucketPressure(

@@ -395,6 +395,9 @@ function normalizeLinearBudgetSnapshot(value: unknown): LinearBudgetStatus | nul
       typeof value.request_complexity === 'number' && Number.isFinite(value.request_complexity)
         ? value.request_complexity
         : null,
+    // `endpoints: {}` and `reservations: []` are intentionally discarded here:
+    // runtime state is rebuilt from live budget data and only metadata such as
+    // `reservations_active` is preserved from persisted snapshots.
     endpoints: {},
     reservations: [],
     reservations_active:

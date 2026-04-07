@@ -476,6 +476,65 @@ describe('linearBudgetState', () => {
     ).toEqual({ ok: true });
   });
 
+  it('selects the reservation-adjusted bottleneck endpoint for multi-step operations', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = createEnv(codexHome);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:attach-pr:step-a',
+      headers: {
+        'x-ratelimit-endpoint-name': 'AttachPrStepA',
+        'x-ratelimit-endpoint-requests-limit': '10',
+        'x-ratelimit-endpoint-requests-remaining': '5'
+      }
+    });
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:attach-pr:step-b',
+      headers: {
+        'x-ratelimit-endpoint-name': 'AttachPrStepB',
+        'x-ratelimit-endpoint-requests-limit': '10',
+        'x-ratelimit-endpoint-requests-remaining': '5'
+      }
+    });
+
+    const reserved = await reserveLinearBudgetReservation({
+      env,
+      operation: 'provider-linear:attach-pr:step-b',
+      request_units: 5
+    });
+    expect(reserved.ok).toBe(true);
+
+    const budget = await readSharedLinearBudgetStatus(env, {
+      operation: 'provider-linear:attach-pr'
+    });
+    expect(budget?.selected_endpoint_key).toBe('endpoint:attachprstepb');
+    expect(budget?.endpoint_requests).toMatchObject({
+      remaining: 0
+    });
+    expect(
+      resolveLinearBudgetPreflight({
+        budget,
+        operation: 'provider-linear:attach-pr',
+        minimum_requests_remaining: 1
+      })
+    ).toMatchObject({
+      ok: false,
+      error: {
+        details: {
+          shortfall_bucket: 'endpoint_requests',
+          shortfall_remaining: 0
+        }
+      }
+    });
+
+    if (reserved.ok) {
+      await reserved.reservation?.release();
+    }
+  });
+
   it('uses the later retry-after timestamp when it outlasts the bucket reset', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
