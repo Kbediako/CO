@@ -36,6 +36,7 @@ import {
   type ObservabilityUpdateListener,
   type ObservabilityUpdateNotifier
 } from './observabilityUpdateNotifier.js';
+import { resolveProviderPollDispatchLimits } from './providerAgentCapacity.js';
 import type { QuestionRecord } from './questions.js';
 import {
   createSelectedRunProjectionReader,
@@ -223,6 +224,8 @@ function createControlRuntimeSnapshot(
         selected,
         running,
         retrying,
+        maxConcurrentAgents: resolveProviderPollDispatchLimits(context.controlStore.snapshot().feature_toggles)
+          .maxConcurrentAgents,
         codexTotals,
         rateLimits,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,

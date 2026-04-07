@@ -115,6 +115,7 @@ export interface OperatorDashboardDataset {
     running: number;
     retrying: number;
     issues: number;
+    max_allowed?: number | null;
   };
   totals: ControlCodexTotalsPayload;
   rate_limits: Record<string, unknown> | null;
@@ -153,7 +154,8 @@ export function buildUiDataset(input: {
     counts: {
       running: input.projection.running.length,
       retrying: input.projection.retrying.length,
-      issues: issuePayloads.length
+      issues: issuePayloads.length,
+      max_allowed: input.projection.maxConcurrentAgents ?? null
     },
     totals: input.projection.codexTotals,
     rate_limits: input.projection.rateLimits,

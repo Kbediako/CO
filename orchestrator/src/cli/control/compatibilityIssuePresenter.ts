@@ -103,6 +103,7 @@ export function buildCompatibilityProjectionSnapshot(
   return {
     running,
     retrying,
+    maxConcurrentAgents: snapshot.maxConcurrentAgents ?? null,
     codexTotals: snapshot.codexTotals,
     rateLimits: snapshot.rateLimits,
     issues,

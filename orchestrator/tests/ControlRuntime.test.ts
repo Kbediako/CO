@@ -311,6 +311,22 @@ function buildLiveLinearGraphqlResponse(): Response {
 }
 
 describe('ControlRuntime', () => {
+  it('reads max concurrent agents from control feature toggles into the compatibility projection', async () => {
+    const fixture = await createFixture({
+      featureToggles: {
+        coordinator: {
+          agent: {
+            max_concurrent_agents: 7
+          }
+        }
+      }
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+    expect(compatibilityProjection.maxConcurrentAgents).toBe(7);
+  });
+
   it('reuses the cached snapshot across repeated reads until invalidated', async () => {
     const fixture = await createFixture();
     const initialSnapshot = fixture.runtime.snapshot();
