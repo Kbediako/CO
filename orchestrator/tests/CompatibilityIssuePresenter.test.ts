@@ -49,7 +49,7 @@ function buildCompatibilitySource(
 }
 
 function buildCompatibilityRuntime(
-  selected: ControlCompatibilitySourceContext
+  selected: ControlCompatibilitySourceContext | null
 ): ControlCompatibilityRuntimeSnapshot {
   return {
     selected,
@@ -68,6 +68,30 @@ function buildCompatibilityRuntime(
     providerWorkflow: null,
     polling: null
   };
+}
+
+function buildExhaustedLinearPolling() {
+  return {
+    next_poll_in_ms: 43_000,
+    linear_budget: {
+      observed_at: '2026-04-06T02:35:00.000Z',
+      source: 'control-host-polling',
+      suppression: 'cooldown',
+      suppression_reason: 'linear_budget_shared_cooldown',
+      retry_after_seconds: 43,
+      cooldown_until: '2026-04-06T02:35:43.000Z',
+      cooldown_active: true,
+      request_id: 'polling-budget-owner',
+      requests: {
+        remaining: 0,
+        limit: 30,
+        reset_at: '2026-04-06T02:35:43.000Z'
+      },
+      endpoint_requests: null,
+      complexity: null,
+      endpoint_complexity: null
+    }
+  } as ControlCompatibilityRuntimeSnapshot['polling'];
 }
 
 describe('CompatibilityIssuePresenter', () => {
@@ -141,5 +165,57 @@ describe('CompatibilityIssuePresenter', () => {
     );
 
     expect(runningEntry.display_event).toBe('updated TECH_SPEC + validating status parity');
+  });
+
+  it('does not assign shared Linear polling ownership when no tracked Linear issue exists', () => {
+    const source = buildCompatibilitySource({
+      issueProvider: 'local',
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      summary: 'Provider worker turn is active.'
+    });
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(source),
+      running: [source],
+      polling: buildExhaustedLinearPolling()
+    });
+
+    expect(projection.running[0]?.display_event).not.toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('does not fall back to issueIdentifier when the tracked Linear owner issueId mismatches the running row', () => {
+    const selected = buildCompatibilitySource({
+      issueProvider: 'linear',
+      issueId: 'issue-owner',
+      issueIdentifier: 'CO-100',
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      tracked: {
+        linear: {
+          id: 'issue-owner',
+          identifier: 'CO-100'
+        } as NonNullable<ControlCompatibilitySourceContext['tracked']>['linear']
+      }
+    });
+    const runningSource = buildCompatibilitySource({
+      issueProvider: 'linear',
+      issueId: 'issue-sibling',
+      issueIdentifier: 'CO-100',
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      summary: 'Provider worker turn is active.'
+    });
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(selected),
+      running: [runningSource],
+      polling: buildExhaustedLinearPolling()
+    });
+
+    expect(projection.running[0]?.issue_id).toBe('issue-sibling');
+    expect(projection.running[0]?.display_event).not.toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
   });
 });

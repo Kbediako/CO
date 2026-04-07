@@ -236,8 +236,11 @@ function resolveCompatibilityPollingBudgetOwner(
   snapshot: Pick<ControlCompatibilityRuntimeSnapshot, 'selected' | 'tracked'>
 ): CompatibilityPollingBudgetOwner | null {
   const trackedLinear = snapshot.tracked?.linear ?? snapshot.selected?.tracked?.linear ?? null;
-  const issueId = trackedLinear?.id ?? snapshot.selected?.issueId ?? null;
-  const issueIdentifier = trackedLinear?.identifier ?? snapshot.selected?.issueIdentifier ?? null;
+  if (!trackedLinear) {
+    return null;
+  }
+  const issueId = trackedLinear.id ?? null;
+  const issueIdentifier = trackedLinear.identifier ?? null;
   if (!issueId && !issueIdentifier) {
     return null;
   }
@@ -255,8 +258,8 @@ function resolveCompatibilityRunningPolling(
   if (!polling || !owner) {
     return null;
   }
-  if (owner.issueId && source.issueId && owner.issueId === source.issueId) {
-    return polling;
+  if (owner.issueId || source.issueId) {
+    return owner.issueId && source.issueId && owner.issueId === source.issueId ? polling : null;
   }
   if (owner.issueIdentifier && owner.issueIdentifier === source.issueIdentifier) {
     return polling;
