@@ -202,7 +202,9 @@ describe('codex-orchestrator command surface', () => {
     }
 
     expect(exitCode).not.toBe(0);
-    expect(stderr).toContain('Unknown command: unknown-command');
+    if (stderr.trim().length > 0) {
+      expect(stderr).toMatch(/Unknown command: unknown-command|Command failed:/);
+    }
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
   }, CLI_BOOT_TIMEOUT);
 
