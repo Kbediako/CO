@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   readSharedLinearBudgetStatus,
@@ -660,6 +660,50 @@ describe('linearBudgetState', () => {
     expect(afterRelease.ok).toBe(true);
     if (afterRelease.ok) {
       await afterRelease.reservation?.release();
+    }
+  });
+
+  it('defaults reservation TTL to the configured Linear request timeout plus grace', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-07T09:00:00.000Z'));
+
+    try {
+      const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+      tempDirs.push(codexHome);
+      const env = {
+        ...createEnv(codexHome),
+        CO_LINEAR_REQUEST_TIMEOUT_MS: '45000'
+      };
+
+      await recordLinearBudgetHeadersObservation({
+        env,
+        source: 'dispatch_source_tracked_issues',
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '1'
+        }
+      });
+
+      const reserved = await reserveLinearBudgetReservation({
+        env,
+        operation: 'dispatch_source_tracked_issues'
+      });
+      expect(reserved.ok).toBe(true);
+
+      const budget = await readSharedLinearBudgetStatus(env, {
+        operation: 'dispatch_source_tracked_issues'
+      });
+      expect(budget?.reservations).toHaveLength(1);
+      expect(budget?.reservations[0]).toMatchObject({
+        created_at: '2026-04-07T09:00:00.000Z',
+        expires_at: '2026-04-07T09:00:50.000Z'
+      });
+
+      if (reserved.ok) {
+        await reserved.reservation?.release();
+      }
+    } finally {
+      vi.useRealTimers();
     }
   });
 

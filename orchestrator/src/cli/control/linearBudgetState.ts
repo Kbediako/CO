@@ -6,7 +6,7 @@ import process from 'node:process';
 import { acquireLockWithRetry, type LockRetryOptions } from '../../persistence/lockFile.js';
 import { writeJsonAtomic } from '../utils/fs.js';
 import { resolveCodexOrchestratorHome } from '../utils/codexPaths.js';
-import { resolveLinearApiTokenFingerprint } from './linearGraphqlClient.js';
+import { resolveLinearApiTokenFingerprint, resolveLinearRequestTimeoutMs } from './linearGraphqlClient.js';
 import type { LinearRateLimitDetails, LinearRateLimitErrorLike } from './linearRateLimit.js';
 import { extractLinearRateLimitDetailsFromHeaders } from './linearRateLimit.js';
 
@@ -414,7 +414,9 @@ export async function reserveLinearBudgetReservation(input: {
   }
 
   const requestUnits = normalizePositiveInteger(input.request_units) ?? 1;
-  const reservationTtlMs = normalizePositiveInteger(input.ttl_ms) ?? 30_000 + LINEAR_BUDGET_RESERVATION_DEFAULT_TTL_GRACE_MS;
+  const reservationTtlMs =
+    normalizePositiveInteger(input.ttl_ms) ??
+    resolveLinearRequestTimeoutMs(env) + LINEAR_BUDGET_RESERVATION_DEFAULT_TTL_GRACE_MS;
   const lockScopeKey = await resolveLinearBudgetLockScopeKey(paths);
 
   return await withLinearBudgetStateLock(paths, async () => {
