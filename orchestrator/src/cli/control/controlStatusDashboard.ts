@@ -1654,16 +1654,11 @@ function formatOperatorCodexRateLimitSegments(
       return null;
     }
     const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];
-    if (requests) {
+    const displayRequests = selectOperatorVisibleBudgetBucket(requests, endpointRequests, referenceTime);
+    if (displayRequests) {
       appendOperatorRateLimitSegment(
         pieces,
-        `requests ${options.formatBucket(requests, referenceTime)}`,
-        ANSI_CYAN
-      );
-    } else if (endpointRequests) {
-      appendOperatorRateLimitSegment(
-        pieces,
-        `requests ${options.formatBucket(endpointRequests, referenceTime)}`,
+        `requests ${options.formatBucket(displayRequests, referenceTime)}`,
         ANSI_CYAN
       );
     }
@@ -1746,7 +1741,7 @@ function formatOperatorLinearBudgetSegments(
   }
 
   const pieces: SummarySegment[] = [{ text: 'Linear', color: ANSI_YELLOW }];
-  const displayRequests = selectOperatorVisibleLinearBudgetBucket(
+  const displayRequests = selectOperatorVisibleBudgetBucket(
     requests,
     endpointRequests,
     referenceTime
@@ -1754,7 +1749,7 @@ function formatOperatorLinearBudgetSegments(
   if (displayRequests) {
     appendOperatorRateLimitSegment(pieces, `requests ${formatBucket(displayRequests, referenceTime)}`, ANSI_CYAN);
   }
-  const displayComplexity = selectOperatorVisibleLinearBudgetBucket(
+  const displayComplexity = selectOperatorVisibleBudgetBucket(
     complexity,
     endpointComplexity,
     referenceTime
@@ -1765,7 +1760,7 @@ function formatOperatorLinearBudgetSegments(
   return pieces;
 }
 
-function selectOperatorVisibleLinearBudgetBucket(
+function selectOperatorVisibleBudgetBucket(
   primary: Record<string, unknown> | null,
   endpoint: Record<string, unknown> | null,
   referenceTime: Date
@@ -1833,8 +1828,14 @@ function compareOperatorRateLimitBucketResetMs(
 ): number {
   const leftMs = resolveOperatorRateLimitBucketResetMs(left, referenceTime);
   const rightMs = resolveOperatorRateLimitBucketResetMs(right, referenceTime);
-  if (leftMs === null || rightMs === null) {
+  if (leftMs === null && rightMs === null) {
     return 0;
+  }
+  if (leftMs === null) {
+    return -1;
+  }
+  if (rightMs === null) {
+    return 1;
   }
   return leftMs - rightMs;
 }

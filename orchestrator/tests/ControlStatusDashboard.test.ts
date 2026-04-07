@@ -1040,6 +1040,73 @@ describe('control status dashboard', () => {
     expect(plainFrame).not.toContain('legacy-proof');
   });
 
+  it('surfaces exhausted legacy Codex endpoint requests when the shared bucket still has headroom', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 19,
+            limit: 30,
+            reset_at: '2026-03-30T01:15:42.000Z'
+          },
+          endpoint_requests: {
+            remaining: 0,
+            limit: 12,
+            reset_at: '2026-03-30T01:17:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex requests resets 2m');
+    expect(rateLimitLine).not.toContain('Codex requests 63.3%');
+  });
+
+  it('prefers the known later reset for exhausted legacy Codex request buckets', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 0,
+            limit: 30
+          },
+          endpoint_requests: {
+            remaining: 0,
+            limit: 12,
+            reset_at: '2026-03-30T01:20:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex requests resets 5m');
+    expect(rateLimitLine).not.toContain('Codex requests resets soon');
+  });
+
   it('keeps legacy Codex request limits visible when combined with Linear budget', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
