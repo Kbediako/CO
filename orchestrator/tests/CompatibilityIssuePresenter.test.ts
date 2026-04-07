@@ -252,4 +252,30 @@ describe('CompatibilityIssuePresenter', () => {
       'linear requests exhausted; next tracked-issue refresh at 43s'
     );
   });
+
+  it('propagates maxConcurrentAgents from the runtime snapshot into the projection', () => {
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      maxConcurrentAgents: 7
+    });
+
+    expect(projection.maxConcurrentAgents).toBe(7);
+  });
+
+  it('propagates null maxConcurrentAgents when the snapshot field is absent', () => {
+    const snapshot = buildCompatibilityRuntime(null);
+    // omit the optional field entirely
+    const projection = buildCompatibilityProjectionSnapshot(snapshot);
+
+    expect(projection.maxConcurrentAgents).toBeNull();
+  });
+
+  it('propagates null maxConcurrentAgents when the snapshot field is explicitly null', () => {
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      maxConcurrentAgents: null
+    });
+
+    expect(projection.maxConcurrentAgents).toBeNull();
+  });
 });
