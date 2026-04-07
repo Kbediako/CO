@@ -27,6 +27,6 @@
 
 ## Handoff
 - [x] The issue is in the live team started state and exactly one persistent `## Codex Workpad` comment is kept current on the issue. Evidence: Linear transition to `In Progress`; Linear workpad comment `e7384fba-b111-415e-8820-68f2bffe72a6`.
-- [ ] A PR is attached before any review-state handoff. Evidence: pending.
+- [x] A PR is attached before any review-state handoff. Evidence: PR `#377`.
 - [ ] Latest `origin/main` is merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks are green, actionable review feedback is handled or explicitly pushed back, `pr ready-review` drains cleanly, and the issue moves to `In Review` only after coding stops. Evidence: pending.

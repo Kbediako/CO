@@ -52,7 +52,7 @@
 - Rollout verification:
   - prove `Agents` matches `running/max_allowed`
   - prove cached-frame runtime/age/recency text advances over wall-clock time
-  - prove message/progress text wins over generic fallback on `EVENT`
+  - prove message/progress text wins over generic fallback to `EVENT`
   - embed real-device screenshots directly in the Linear workpad
 
 ## Risks & Mitigations
