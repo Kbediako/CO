@@ -1107,6 +1107,39 @@ describe('control status dashboard', () => {
     expect(rateLimitLine).not.toContain('Codex requests resets soon');
   });
 
+  it('accepts legacy reset timestamp aliases when choosing the visible exhausted Codex request bucket', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          source: 'legacy-proof',
+          requests: {
+            remaining: 0,
+            limit: 30
+          },
+          endpoint_requests: {
+            remaining: 0,
+            limit: 12,
+            resets_at: '2026-03-30T01:20:00.000Z'
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex requests resets 5m');
+    expect(rateLimitLine).not.toContain('Codex requests resets soon');
+  });
+
   it('keeps legacy Codex request limits visible when combined with Linear budget', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({

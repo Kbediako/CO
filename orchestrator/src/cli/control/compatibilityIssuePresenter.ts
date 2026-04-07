@@ -521,7 +521,8 @@ function resolveCodexBudgetExhaustionEvent(
   const buckets: Array<[string, Record<string, unknown> | null]> = [
     [resolveCodexRateLimitBucketLabel(asCompatibilityRecord(codex.primary)) ?? 'primary', asCompatibilityRecord(codex.primary)],
     [resolveCodexRateLimitBucketLabel(asCompatibilityRecord(codex.secondary)) ?? 'secondary', asCompatibilityRecord(codex.secondary)],
-    ['requests', asCompatibilityRecord(codex.requests)]
+    ['requests', asCompatibilityRecord(codex.requests)],
+    ['requests', asCompatibilityRecord(codex.endpoint_requests)]
   ];
   for (const [label, bucket] of buckets) {
     if (bucket && isCompatibilityBucketExhausted(bucket)) {

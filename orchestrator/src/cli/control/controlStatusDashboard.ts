@@ -1844,7 +1844,7 @@ function resolveOperatorRateLimitBucketResetMs(
   bucket: Record<string, unknown>,
   referenceTime: Date
 ): number | null {
-  const resetAt = readRecordString(bucket, ['reset_at', 'resetAt']);
+  const resetAt = readRecordString(bucket, ['reset_at', 'resetAt', 'resets_at', 'resetsAt']);
   if (resetAt) {
     const parsed = Date.parse(resetAt);
     if (Number.isFinite(parsed)) {

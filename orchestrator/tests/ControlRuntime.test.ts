@@ -2384,6 +2384,54 @@ describe('ControlRuntime', () => {
     ]);
   });
 
+  it('surfaces endpoint-specific legacy Codex request exhaustion with the operator-facing codex budget event text', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1037-codex-endpoint-budget-event'
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-codex-endpoint-budget-event',
+      issue_id: 'issue-1037-codex-endpoint-budget-event',
+      issue_identifier: 'ISSUE-1037-CODEX-ENDPOINT-BUDGET-EVENT',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'provider worker turn is active'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-codex-endpoint-budget-event',
+      issue_identifier: 'ISSUE-1037-CODEX-ENDPOINT-BUDGET-EVENT',
+      pid: '4242',
+      turn_count: 3,
+      last_event: 'account/ratelimits/updated',
+      last_message: 'rate limits updated',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      rate_limits: {
+        source: 'legacy-proof',
+        requests: {
+          remaining: 12,
+          limit: 30,
+          reset_at: '2026-03-07T00:30:50.000Z'
+        },
+        endpoint_requests: {
+          remaining: 0,
+          limit: 12,
+          reset_at: '2026-03-07T00:30:13.000Z'
+        }
+      },
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-CODEX-ENDPOINT-BUDGET-EVENT',
+        display_event: 'codex requests bucket exhausted; worker paused until reset'
+      })
+    ]);
+  });
+
   it('preserves active Linear stage labels instead of collapsing them to generic running', async () => {
     const fixture = await createFixture({
       taskId: 'task-1037-stage-active',
