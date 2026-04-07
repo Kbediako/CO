@@ -328,6 +328,26 @@ describe('CompatibilityIssuePresenter', () => {
     );
   });
 
+  it('prefers retry_after_seconds over legacy next_poll_in_ms when projection fields are absent', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_poll_in_ms: (58 * 60 + 11) * 1000,
+        next_refresh_at: null,
+        next_refresh_in_ms: null
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
   it('prefers the authoritative proof retry-after over a stale polling projection', () => {
     const runningEntry = buildCompatibilityRunningEntry(
       buildCompatibilitySource({

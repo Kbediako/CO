@@ -444,6 +444,9 @@ function resolveCompatibilityRunningDisplayEvent(input: {
   }
 
   const nextRefreshInMs = resolveCompatibilityNextRefreshCountdownMs(input.polling);
+  const hasProjectedNextRefreshState =
+    input.polling?.next_refresh_state !== undefined &&
+    input.polling?.next_refresh_state !== null;
   const pollingLinearBudgetEvent = resolveCompatibilityPollingLinearBudgetExhaustionEvent(
     input.selected,
     input.polling,
@@ -467,7 +470,10 @@ function resolveCompatibilityRunningDisplayEvent(input: {
   const linearBudgetEvent = resolveLinearBudgetExhaustionEvent(
     authoritativeLinearBudgetForEvent,
     {
-      nextRefreshInMs: authoritativeNextRefreshInMs
+      nextRefreshInMs: authoritativeNextRefreshInMs,
+      preferProjectedCountdown:
+        authoritativeLinearBudgetForEvent === input.polling?.linear_budget &&
+        hasProjectedNextRefreshState
     }
   );
   if (linearBudgetEvent) {
@@ -541,7 +547,9 @@ function resolveCompatibilityPollingLinearBudgetExhaustionEvent(
     return null;
   }
   return resolveLinearBudgetExhaustionEvent(pollingBudget, {
-    nextRefreshInMs
+    nextRefreshInMs,
+    preferProjectedCountdown:
+      polling?.next_refresh_state !== undefined && polling?.next_refresh_state !== null
   });
 }
 
@@ -611,11 +619,16 @@ function resolveLinearBudgetExhaustionEvent(
     | undefined,
   options: {
     nextRefreshInMs?: number | null;
+    preferProjectedCountdown?: boolean;
   } = {}
 ): string | null {
   if (isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'requests')) {
     const nextRefresh = formatCompatibilityCountdownMs(
-      resolveCompatibilityLinearBudgetCountdownMs(budget, options.nextRefreshInMs ?? null)
+      resolveCompatibilityLinearBudgetCountdownMs(
+        budget,
+        options.nextRefreshInMs ?? null,
+        options.preferProjectedCountdown === true
+      )
     );
     return nextRefresh
       ? `linear requests exhausted; next tracked-issue refresh at ${nextRefresh}`
@@ -623,7 +636,11 @@ function resolveLinearBudgetExhaustionEvent(
   }
   if (isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'complexity')) {
     const nextRefresh = formatCompatibilityCountdownMs(
-      resolveCompatibilityLinearBudgetCountdownMs(budget, options.nextRefreshInMs ?? null)
+      resolveCompatibilityLinearBudgetCountdownMs(
+        budget,
+        options.nextRefreshInMs ?? null,
+        options.preferProjectedCountdown === true
+      )
     );
     return nextRefresh
       ? `linear complexity budget exhausted; next tracked-issue refresh at ${nextRefresh}`
@@ -681,16 +698,21 @@ function resolveCompatibilityLinearBudgetCountdownMs(
       }
     | null
     | undefined,
-  projectedMs: number | null
+  projectedMs: number | null,
+  preferProjectedCountdown: boolean
 ): number | null {
-  if (typeof projectedMs === 'number' && Number.isFinite(projectedMs) && projectedMs >= 0) {
-    return projectedMs;
-  }
+  const normalizedProjectedMs =
+    typeof projectedMs === 'number' && Number.isFinite(projectedMs) && projectedMs >= 0
+      ? projectedMs
+      : null;
   const retryAfterSeconds = normalizeCompatibilityRemaining(budget?.retry_after_seconds);
+  if (preferProjectedCountdown && normalizedProjectedMs !== null) {
+    return normalizedProjectedMs;
+  }
   if (retryAfterSeconds !== null) {
     return Math.max(0, Math.ceil(retryAfterSeconds * 1000));
   }
-  return null;
+  return normalizedProjectedMs;
 }
 
 function normalizeCompatibilityRemaining(value: number | null | undefined): number | null {
