@@ -52,6 +52,7 @@ type DashboardSurfaceMode = 'primary' | 'alternate';
 
 interface DashboardFrameState {
   paused: boolean;
+  pausedLiveReferenceTime: Date | null;
   viewMode: DashboardViewMode;
   surfaceMode: DashboardSurfaceMode;
   pendingUpdate: boolean;
@@ -63,6 +64,7 @@ interface DashboardFrameState {
 interface RenderedDashboardState {
   dataset: OperatorDashboardDataset;
   referenceTime: Date;
+  liveClockStartedAt: Date;
   throughputTps: number;
 }
 
@@ -131,6 +133,7 @@ export interface RenderControlStatusFrameInput {
   terminalRows?: number | null;
   throughputTps?: number | null;
   referenceTime?: Date;
+  liveReferenceTime?: Date;
   paused?: boolean;
   viewMode?: DashboardViewMode;
   surfaceMode?: DashboardSurfaceMode;
@@ -287,6 +290,7 @@ function startControlStatusViewer(
   let primarySurfacePromptNeedsNewline = false;
   let frameState: DashboardFrameState = {
     paused: false,
+    pausedLiveReferenceTime: null,
     viewMode: 'full',
     surfaceMode: liveSurfaceMode,
     pendingUpdate: false,
@@ -473,16 +477,20 @@ function startControlStatusViewer(
         frameState = {
           ...frameState,
           paused: enteringPaused,
+          pausedLiveReferenceTime:
+            enteringPaused && renderedState ? deriveLiveReferenceTime(renderedState, deps.now()) : null,
           surfaceMode: enteringPaused ? 'primary' : liveSurfaceMode
         };
         if (frameState.paused) {
           if (activeRender) {
             const hadQueuedRender = clearQueuedRenderState();
-            if (hadQueuedRender) {
-              frameState = {
-                ...frameState,
-                pendingUpdate: true
-              };
+            frameState = {
+              ...frameState,
+              pendingUpdate: frameState.pendingUpdate || hadQueuedRender
+            };
+            if (renderedState) {
+              queuedRender = true;
+              queuedUseCachedFrame = true;
             }
             continue;
           }
@@ -536,6 +544,7 @@ function startControlStatusViewer(
         terminalRows: output.rows ?? null,
         throughputTps: renderedState.throughputTps,
         referenceTime: renderedState.referenceTime,
+        liveReferenceTime: resolveDisplayedLiveReferenceTime(renderedState, frameState, deps.now()),
         paused: frameState.paused,
         viewMode: frameState.viewMode,
         surfaceMode: frameState.surfaceMode,
@@ -576,6 +585,7 @@ function startControlStatusViewer(
           terminalRows: output.rows ?? null,
           throughputTps: renderedState.throughputTps,
           referenceTime: renderedState.referenceTime,
+          liveReferenceTime: resolveDisplayedLiveReferenceTime(renderedState, frameState, deps.now()),
           paused: frameState.paused,
           viewMode: frameState.viewMode,
           surfaceMode: frameState.surfaceMode,
@@ -605,15 +615,36 @@ function startControlStatusViewer(
       }
       const now = deps.now();
       const referenceTime = resolveReferenceTime(undefined, dataset.generated_at, now);
+      const liveClockStartedAt =
+        renderedState && renderedState.dataset.generated_at === dataset.generated_at
+          ? renderedState.liveClockStartedAt
+          : now;
       tokenSamples = appendTokenSample(tokenSamples, now.getTime(), dataset.totals.total_tokens);
       const throughputTps = rollingTokensPerSecond(tokenSamples);
-      renderedState = {
+      const nextRenderedState: RenderedDashboardState = {
         dataset,
         referenceTime,
+        liveClockStartedAt,
         throughputTps
       };
+      if (frameState.paused && renderedState) {
+        frameState = {
+          ...frameState,
+          pendingUpdate: true
+        };
+        return;
+      }
+      const liveReferenceTime =
+        frameState.paused && frameState.pausedLiveReferenceTime === null
+          ? deriveLiveReferenceTime(nextRenderedState, now)
+          : resolveDisplayedLiveReferenceTime(nextRenderedState, frameState, now);
+      renderedState = nextRenderedState;
       frameState = {
         ...frameState,
+        pausedLiveReferenceTime:
+          frameState.paused && frameState.pausedLiveReferenceTime === null
+            ? liveReferenceTime
+            : frameState.pausedLiveReferenceTime,
         pendingUpdate: frameState.paused ? frameState.pendingUpdate : false
       };
       const frame = renderControlStatusFrame({
@@ -628,6 +659,7 @@ function startControlStatusViewer(
         terminalRows: output.rows ?? null,
         throughputTps,
         referenceTime,
+        liveReferenceTime,
         paused: frameState.paused,
         viewMode: frameState.viewMode,
         surfaceMode: frameState.surfaceMode,
@@ -812,10 +844,12 @@ function rewritePrimaryFrame(frame: string, previousRowCount: number): string {
 
 export function renderControlStatusFrame(input: RenderControlStatusFrameInput): string {
   const referenceTime = resolveReferenceTime(input.referenceTime, input.dataset.generated_at);
+  const liveReferenceTime = resolveLiveReferenceTime(input.liveReferenceTime, referenceTime);
   const terminalColumns = resolveTerminalColumns(input.terminalColumns);
   const terminalRows = resolveTerminalRows(input.terminalRows);
   const frameState: DashboardFrameState = {
     paused: input.paused === true,
+    pausedLiveReferenceTime: null,
     viewMode: input.viewMode ?? 'full',
     surfaceMode: input.surfaceMode ?? (input.paused === true ? 'primary' : 'alternate'),
     pendingUpdate: input.pendingUpdate === true,
@@ -824,14 +858,21 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
     snapshotMessage: input.snapshotMessage ?? null
   };
   if (frameState.viewMode === 'compact') {
-    return renderCompactControlStatusFrame(input, referenceTime, terminalColumns, terminalRows, frameState);
+    return renderCompactControlStatusFrame(
+      input,
+      referenceTime,
+      liveReferenceTime,
+      terminalColumns,
+      terminalRows,
+      frameState
+    );
   }
   const runningColumns = selectRunningColumns(terminalColumns);
   const lines: string[] = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
     renderAgentsLine(input.dataset, terminalColumns),
     renderThroughputLine(input.throughputTps ?? 0, terminalColumns),
-    renderRuntimeLine(input.dataset, terminalColumns),
+    renderRuntimeLine(input.dataset, referenceTime, liveReferenceTime, terminalColumns),
     renderTokensLine(input.dataset, terminalColumns),
     renderRateLimitsLine(input.dataset, referenceTime, terminalColumns),
     renderProjectLine(input.dataset, terminalColumns),
@@ -842,7 +883,7 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
     renderRunningSeparatorRow(runningColumns)
   ];
 
-  lines.push(...renderRunningRows(input.dataset.running, runningColumns, referenceTime));
+  lines.push(...renderRunningRows(input.dataset.running, runningColumns, liveReferenceTime));
   lines.push('│');
   lines.push(colorize('├─ Backoff queue', ANSI_BOLD));
   lines.push('│');
@@ -866,16 +907,17 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
 function renderCompactControlStatusFrame(
   input: RenderControlStatusFrameInput,
   referenceTime: Date,
+  liveReferenceTime: Date,
   terminalColumns: number,
   terminalRows: number,
   frameState: DashboardFrameState
 ): string {
   const lines: string[] = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
-    renderCompactStatusLine(input.dataset, referenceTime, terminalColumns),
+    renderCompactStatusLine(input.dataset, referenceTime, liveReferenceTime, terminalColumns),
     renderTokensLine(input.dataset, terminalColumns),
     renderRateLimitsLine(input.dataset, referenceTime, terminalColumns),
-    renderCompactRunningLine(input.dataset.running, referenceTime, terminalColumns),
+    renderCompactRunningLine(input.dataset.running, liveReferenceTime, terminalColumns),
     renderCompactRetryLine(input.dataset.retrying, referenceTime, terminalColumns),
     renderControlsLine(terminalColumns, frameState),
     renderInspectLine(
@@ -930,12 +972,13 @@ function renderControlStatusErrorFrame(
 }
 
 function renderAgentsLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
+  const maxAllowed = resolveMaxAllowedAgents(dataset);
   return renderSummaryLine(
     'Agents',
     [
       { text: formatCount(dataset.counts.running), color: ANSI_GREEN },
       { text: '/', color: ANSI_GRAY },
-      { text: `${formatCount(dataset.counts.issues)} tracked`, color: ANSI_GRAY }
+      { text: `${formatOptionalCount(maxAllowed)} max allowed`, color: ANSI_GRAY }
     ],
     terminalColumns
   );
@@ -949,10 +992,15 @@ function renderThroughputLine(throughputTps: number, terminalColumns: number): s
   );
 }
 
-function renderRuntimeLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
+function renderRuntimeLine(
+  dataset: OperatorDashboardDataset,
+  referenceTime: Date,
+  liveReferenceTime: Date,
+  terminalColumns: number
+): string {
   return renderSummaryLine(
     'Runtime',
-    [{ text: formatRuntimeSeconds(dataset.totals.seconds_running), color: ANSI_MAGENTA }],
+    [{ text: formatLiveRuntimeSeconds(dataset, referenceTime, liveReferenceTime), color: ANSI_MAGENTA }],
     terminalColumns
   );
 }
@@ -993,18 +1041,18 @@ function renderProjectLine(dataset: OperatorDashboardDataset, terminalColumns: n
 }
 
 function renderNextRefreshLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
-  const polling = dataset.polling;
-  if (polling?.checking) {
+  const nextRefreshText = resolveNextRefreshSummaryText(dataset.polling);
+  if (nextRefreshText === 'checking now...') {
     return renderSummaryLine(
       'Next refresh',
       [{ text: 'checking now...', color: ANSI_CYAN }],
       terminalColumns
     );
   }
-  if (typeof polling?.next_poll_in_ms === 'number' && Number.isFinite(polling.next_poll_in_ms)) {
+  if (nextRefreshText) {
     return renderSummaryLine(
       'Next refresh',
-      [{ text: formatCountdownMs(polling.next_poll_in_ms), color: ANSI_CYAN }],
+      [{ text: nextRefreshText, color: ANSI_CYAN }],
       terminalColumns
     );
   }
@@ -1014,24 +1062,77 @@ function renderNextRefreshLine(dataset: OperatorDashboardDataset, terminalColumn
 function renderCompactStatusLine(
   dataset: OperatorDashboardDataset,
   referenceTime: Date,
+  liveReferenceTime: Date,
   terminalColumns: number
 ): string {
-  const refreshText = dataset.polling?.checking
-    ? 'checking now...'
-    : typeof dataset.polling?.next_poll_in_ms === 'number' && Number.isFinite(dataset.polling.next_poll_in_ms)
-      ? `next ${formatCountdownMs(dataset.polling.next_poll_in_ms)}`
-      : 'next n/a';
+  const maxAllowed = resolveMaxAllowedAgents(dataset);
+  const nextRefreshText = resolveNextRefreshSummaryText(dataset.polling);
+  const refreshText =
+    nextRefreshText === null
+      ? 'next n/a'
+      : nextRefreshText === 'checking now...'
+        ? nextRefreshText
+        : `next ${nextRefreshText}`;
   return renderSummaryLine(
     'Status',
     [
-      { text: `${formatCount(dataset.counts.running)}/${formatCount(dataset.counts.issues)} tracked`, color: ANSI_GREEN },
+      {
+        text: `${formatCount(dataset.counts.running)}/${formatOptionalCount(maxAllowed)} max allowed`,
+        color: ANSI_GREEN
+      },
       { text: ' | ', color: ANSI_GRAY },
-      { text: formatRuntimeSeconds(dataset.totals.seconds_running), color: ANSI_MAGENTA },
+      { text: formatLiveRuntimeSeconds(dataset, referenceTime, liveReferenceTime), color: ANSI_MAGENTA },
       { text: ' | ', color: ANSI_GRAY },
       { text: refreshText, color: ANSI_CYAN }
     ],
     terminalColumns
   );
+}
+
+function resolveNextRefreshSummaryText(
+  polling: OperatorDashboardDataset['polling']
+): string | null {
+  const hasProjectedState =
+    polling?.next_refresh_state !== undefined && polling?.next_refresh_state !== null;
+  const projectedState =
+    polling?.next_refresh_state === 'cooldown' ||
+    polling?.next_refresh_state === 'checking' ||
+    polling?.next_refresh_state === 'scheduled' ||
+    polling?.next_refresh_state === 'unknown'
+      ? polling.next_refresh_state
+      : null;
+  const projectedCountdown =
+    typeof polling?.next_refresh_in_ms === 'number' &&
+    Number.isFinite(polling.next_refresh_in_ms) &&
+    polling.next_refresh_in_ms >= 0
+      ? polling.next_refresh_in_ms
+      : null;
+  if (projectedState === 'checking') {
+    return 'checking now...';
+  }
+  if (projectedState === 'unknown') {
+    return null;
+  }
+  if (
+    (projectedState === 'cooldown' || projectedState === 'scheduled') &&
+    projectedCountdown !== null
+  ) {
+    return formatCountdownMs(projectedCountdown);
+  }
+  if (hasProjectedState) {
+    return null;
+  }
+  if (polling?.checking) {
+    return 'checking now...';
+  }
+  if (
+    typeof polling?.next_poll_in_ms === 'number' &&
+    Number.isFinite(polling.next_poll_in_ms) &&
+    polling.next_poll_in_ms >= 0
+  ) {
+    return formatCountdownMs(polling.next_poll_in_ms);
+  }
+  return null;
 }
 
 function renderCompactRunningLine(
@@ -1292,11 +1393,11 @@ function formatRunningColumnValue(
 }
 
 function summarizeRunningEvent(entry: OperatorDashboardSessionPayload, referenceTime: Date): string {
-  const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
   const displayEvent = sanitizeDisplayValue(entry.display_event);
-  if (isHighSignalStatusText(displayEvent, displayState)) {
+  if (displayEvent !== '-') {
     return displayEvent;
   }
+  const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
   const lastMessage = sanitizeDisplayValue(entry.last_message);
   if (isHighSignalStatusText(lastMessage, displayState)) {
     return lastMessage;
@@ -1504,6 +1605,15 @@ function formatRuntimeAndTurns(
 
 function formatRuntimeSeconds(value: number | null | undefined): string {
   return formatHumanDurationShort(Math.max(0, Math.floor(normalizeFiniteNumber(value))));
+}
+
+function formatLiveRuntimeSeconds(
+  dataset: OperatorDashboardDataset,
+  referenceTime: Date,
+  liveReferenceTime: Date
+): string {
+  const liveDeltaSeconds = Math.max(0, (liveReferenceTime.getTime() - referenceTime.getTime()) / 1000);
+  return formatRuntimeSeconds(normalizeFiniteNumber(dataset.totals.seconds_running) + liveDeltaSeconds);
 }
 
 function formatTps(value: number | null | undefined): string {
@@ -2198,6 +2308,37 @@ function resolveReferenceTime(
   }
   const parsed = parseTimestamp(generatedAt);
   return parsed === null ? fallbackTime : new Date(parsed);
+}
+
+function resolveLiveReferenceTime(liveReferenceTime: Date | undefined, fallbackTime: Date): Date {
+  if (liveReferenceTime instanceof Date && Number.isFinite(liveReferenceTime.getTime())) {
+    return liveReferenceTime;
+  }
+  return fallbackTime;
+}
+
+function deriveLiveReferenceTime(renderedState: RenderedDashboardState, now: Date): Date {
+  const elapsedMs = Math.max(0, now.getTime() - renderedState.liveClockStartedAt.getTime());
+  return new Date(renderedState.referenceTime.getTime() + elapsedMs);
+}
+
+function resolveDisplayedLiveReferenceTime(
+  renderedState: RenderedDashboardState,
+  frameState: DashboardFrameState,
+  now: Date
+): Date {
+  if (frameState.paused && frameState.pausedLiveReferenceTime) {
+    return frameState.pausedLiveReferenceTime;
+  }
+  return deriveLiveReferenceTime(renderedState, now);
+}
+
+function resolveMaxAllowedAgents(dataset: OperatorDashboardDataset): number | null {
+  const value = dataset.counts.max_allowed;
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  return null;
 }
 
 function resolveTerminalColumns(value: number | null | undefined): number {

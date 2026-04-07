@@ -1114,6 +1114,55 @@ describe('linearBudgetState', () => {
     expect(schedule.interval_ms).toBeLessThanOrEqual(66_000);
   });
 
+  it('uses the active shared cooldown window as the next polling delay when it exceeds the default interval', () => {
+    const schedule = resolveLinearPollingInterval({
+      budget: {
+        observed_at: '2026-04-08T00:00:00.000Z',
+        source: 'dispatch_source_tracked_issues',
+        request_id: 'req-cooldown-window',
+        retry_after_seconds: 90,
+        cooldown_until: '2026-04-08T00:01:30.000Z',
+        cooldown_active: true,
+        suppression: 'cooldown',
+        suppression_reason: 'linear_budget_shared_cooldown',
+        scope_kind: 'token',
+        scope_key: 'legacy',
+        viewer_id: null,
+        workspace_id: null,
+        token_fingerprints: [],
+        requests: {
+          limit: 100,
+          remaining: 0,
+          reset_at: '2026-04-08T00:01:30.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          limit: 200,
+          remaining: 75,
+          reset_at: '2026-04-08T00:00:45.000Z'
+        },
+        endpoint_complexity: null,
+        endpoint_name: null,
+        selected_endpoint_key: null,
+        request_complexity: null,
+        endpoints: {},
+        reservations: [],
+        reservations_active: 0
+      },
+      default_interval_ms: 15_000,
+      nowMs: Date.parse('2026-04-08T00:00:00.000Z')
+    });
+
+    expect(schedule).toMatchObject({
+      reason: 'linear_budget_shared_cooldown',
+      interval_ms: 90_000,
+      linear_budget: {
+        cooldown_until: '2026-04-08T00:01:30.000Z',
+        suppression: 'cooldown'
+      }
+    });
+  });
+
   it('stretches polling more aggressively when the matching endpoint budget is constrained', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);

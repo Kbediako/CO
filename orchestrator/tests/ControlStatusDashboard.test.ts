@@ -76,7 +76,8 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
     counts: {
       running: 1,
       retrying: 1,
-      issues: 2
+      issues: 2,
+      max_allowed: 4
     },
     totals: {
       input_tokens: 100,
@@ -386,7 +387,7 @@ describe('control status dashboard', () => {
     expect(lines).toHaveLength(23);
     expect(lines.slice(0, 9)).toEqual([
       '╭─ CO STATUS',
-      '│ Agents: 1/2 tracked',
+      '│ Agents: 1/4 max allowed',
       '│ Throughput: 1,842 tps',
       '│ Runtime: 15m 12s',
       '│ Tokens: in 100 | out 117 | total 217',
@@ -395,7 +396,7 @@ describe('control status dashboard', () => {
       '│ Next refresh: 15s',
       '├─ Running'
     ]);
-    expect(plainFrame).toContain('│ Agents: 1/2 tracked');
+    expect(plainFrame).toContain('│ Agents: 1/4 max allowed');
     expect(plainFrame).toContain('│ Throughput: 1,842 tps');
     expect(plainFrame).toContain('│ Tokens: in 100 | out 117 | total 217');
     expect(plainFrame).toContain('│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50');
@@ -447,6 +448,38 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain('turn running (15m ago)');
+  });
+
+  it('advances runtime, AGE / TURN, and fallback event recency against a live local clock', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        running: [
+          {
+            ...buildDataset().running[0],
+            summary: null,
+            display_event: null,
+            last_event: 'turn_running',
+            last_message: 'Provider worker turn is active.',
+            last_event_at: '2026-03-30T01:14:55.000Z'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'attach-viewer',
+      terminalColumns: 120,
+      throughputTps: 1842.7,
+      surfaceMode: 'primary',
+      referenceTime: new Date('2026-03-30T01:15:00.000Z'),
+      liveReferenceTime: new Date('2026-03-30T01:15:05.000Z')
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Runtime: 15m 17s');
+    expect(plainFrame).toContain('15m 5s / 4');
+    expect(plainFrame).toContain('turn running (10s ago)');
   });
 
   it('prefers projection-authored running event text over renderer fallbacks', () => {
@@ -511,7 +544,8 @@ describe('control status dashboard', () => {
         counts: {
           running: 1,
           retrying: 3,
-          issues: 4
+          issues: 4,
+          max_allowed: 4
         },
         retrying: [
           {
@@ -634,7 +668,7 @@ describe('control status dashboard', () => {
   it('renders empty sections cleanly', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
-        counts: { running: 0, retrying: 0, issues: 0 },
+        counts: { running: 0, retrying: 0, issues: 0, max_allowed: 4 },
         running: [],
         retrying: [],
         issues: [],
@@ -650,11 +684,55 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Agents: 0/0 tracked');
+    expect(plainFrame).toContain('│ Agents: 0/4 max allowed');
     expect(plainFrame).toContain('│ Project: n/a');
     expect(plainFrame).toContain('│   ID         STAGE        PID');
     expect(plainFrame).toContain('│  No active agents');
     expect(plainFrame).toContain('│  No queued retries');
+  });
+
+  it('renders unavailable max allowed capacity without fabricating a tracked-issue ceiling', () => {
+    const dataset = buildDataset({
+      counts: {
+        ...buildDataset().counts,
+        issues: 9,
+        max_allowed: null
+      }
+    });
+
+    const fullFrame = stripAnsi(
+      renderControlStatusFrame({
+        dataset,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        terminalColumns: 120,
+        throughputTps: 0
+      })
+    );
+    const compactFrame = stripAnsi(
+      renderControlStatusFrame({
+        dataset,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        terminalColumns: 120,
+        terminalRows: 10,
+        throughputTps: 0,
+        paused: true,
+        viewMode: 'compact',
+        pendingUpdate: false
+      })
+    );
+
+    expect(fullFrame).toContain('│ Agents: 1/n/a max allowed');
+    expect(fullFrame).not.toContain('│ Agents: 1/9 max allowed');
+    expect(compactFrame).toContain('│ Status: 1/n/a max allowed | 15m 12s | next 15s');
+    expect(compactFrame).not.toContain('│ Status: 1/9 max allowed | 15m 12s | next 15s');
   });
 
   it('renders compact inspect mode as a short-terminal summary frame', () => {
@@ -680,7 +758,7 @@ describe('control status dashboard', () => {
     const plainFrame = stripAnsi(frame);
     expect(plainFrame).toBe([
       '╭─ CO STATUS',
-      '│ Status: 1/2 tracked | 15m 12s | next 15s',
+      '│ Status: 1/4 max allowed | 15m 12s | next 15s',
       '│ Tokens: in 100 | out 117 | total 217',
       '│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50',
       '│ Running: CO-26 | running | Terminal dashboard renderer in progress',
@@ -699,6 +777,7 @@ describe('control status dashboard', () => {
         polling: {
           ...buildDataset().polling,
           checking: true,
+          next_refresh_state: 'checking',
           next_poll_in_ms: 15000
         }
       }),
@@ -712,7 +791,79 @@ describe('control status dashboard', () => {
       viewMode: 'compact'
     });
 
-    expect(stripAnsi(frame)).toContain('│ Status: 1/2 tracked | 15m 12s | checking now...');
+    expect(stripAnsi(frame)).toContain('│ Status: 1/4 max allowed | 15m 12s | checking now...');
+  });
+
+  it('renders cooldown-suppressed next refresh from projected truth instead of raw checking or stale scheduling', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        polling: {
+          ...buildDataset().polling,
+          checking: true,
+          next_poll_in_ms: (58 * 60 + 11) * 1000,
+          next_refresh_state: 'cooldown',
+          next_refresh_at: '2026-03-30T01:44:32.000Z',
+          next_refresh_in_ms: (29 * 60 + 32) * 1000,
+          linear_budget: {
+            observed_at: '2026-03-30T01:15:00.000Z',
+            source: 'control-host-polling',
+            request_id: 'polling-budget-dashboard',
+            retry_after_seconds: 29 * 60 + 32,
+            cooldown_until: '2026-03-30T01:44:32.000Z',
+            cooldown_active: true,
+            suppression: 'cooldown',
+            suppression_reason: 'linear_budget_shared_cooldown',
+            requests: {
+              limit: 30,
+              remaining: 0,
+              reset_at: '2026-03-30T01:44:32.000Z'
+            },
+            endpoint_requests: null,
+            complexity: null,
+            endpoint_complexity: null
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Next refresh: 29m 32s');
+    expect(plainFrame).not.toContain('│ Next refresh: checking now...');
+    expect(plainFrame).not.toContain('│ Next refresh: 58m 11s');
+  });
+
+  it('does not fall back to raw checking or stale scheduling once projected state exists', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        polling: {
+          ...buildDataset().polling,
+          checking: true,
+          next_poll_in_ms: (58 * 60 + 11) * 1000,
+          next_refresh_state: 'cooldown',
+          next_refresh_at: '2026-03-30T01:44:32.000Z',
+          next_refresh_in_ms: null
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Next refresh: n/a');
+    expect(plainFrame).not.toContain('│ Next refresh: checking now...');
+    expect(plainFrame).not.toContain('│ Next refresh: 58m 11s');
   });
 
   it('renders absolute rate-limit reset timestamps against the dashboard snapshot time', () => {
@@ -1604,6 +1755,8 @@ describe('control status dashboard', () => {
     expect(writes[1]).toMatch(new RegExp(String.raw`\r\u001b\[\d+A\u001b\[J`));
     expect(stripAnsi(writes[1] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
     expect(stripAnsi(writes[1] ?? '')).not.toContain('│ Dashboard: ');
+    expect(stripAnsi(writes[1] ?? '')).toContain('│ Runtime: 15m 13s');
+    expect(stripAnsi(writes[1] ?? '')).toContain('15m 1s / 4');
     expect(stripAnsi(writes[1] ?? '')).toContain('│ Tokens: in 100 | out 117 | total 218');
 
     handle.stop();
@@ -1889,6 +2042,7 @@ describe('control status dashboard', () => {
     expect(writes.at(-1)?.startsWith(`${ANSI_ALT_SCREEN_EXIT}\u001b[H\u001b[2J`)).toBe(true);
     expect(writes.at(-1)?.endsWith('\n')).toBe(true);
     expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Runtime: 15m 12s');
 
     listener?.();
     await handle.flush();
@@ -1904,6 +2058,7 @@ describe('control status dashboard', () => {
     expect(stripAnsi(writes.at(-1) ?? '')).toContain(
       '│ Inspect: paused | primary snapshot | compact inspect | updates waiting'
     );
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Status: 1/4 max allowed | 15m 12s | next 15s');
     expect(writes.at(-1)?.startsWith('\u001b[H\u001b[2J')).toBe(true);
     expect(writes.at(-1)?.endsWith('\n')).toBe(false);
     expect(writes).toHaveLength(pausedWriteCount + 1);
@@ -2221,6 +2376,20 @@ describe('control status dashboard', () => {
       resolveSecondDataset = resolve;
     });
     let readCount = 0;
+    const updatedDataset = buildDataset({
+      generated_at: '2026-03-30T01:15:05.000Z',
+      totals: {
+        ...buildDataset().totals,
+        seconds_running: 930
+      },
+      running: [
+        {
+          ...buildDataset().running[0],
+          display_event: 'Worker turn updated after pause',
+          last_event_at: '2026-03-30T01:15:04.000Z'
+        }
+      ]
+    });
     const runtime = {
       requestRefresh: vi.fn(async () => undefined),
       subscribe: vi.fn((callback: () => void) => {
@@ -2277,15 +2446,111 @@ describe('control status dashboard', () => {
     input.emitText('p');
     await Promise.resolve();
 
-    resolveSecondDataset?.(buildDataset());
+    resolveSecondDataset?.(updatedDataset);
     await handle.flush();
 
     const pauseWrites = writes.slice(liveWriteCount);
     expect(pauseWrites).toHaveLength(1);
     expect(pauseWrites[0]?.startsWith(ANSI_ALT_SCREEN_EXIT)).toBe(true);
-    expect(stripAnsi(pauseWrites[0] ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(stripAnsi(pauseWrites[0] ?? '')).toContain(
+      '│ Inspect: paused | primary snapshot | full frame | updates waiting'
+    );
+    expect(stripAnsi(pauseWrites[0] ?? '')).toContain('│ Runtime: 15m 12s');
+    expect(stripAnsi(pauseWrites[0] ?? '')).not.toContain('│ Runtime: 15m 30s');
+    expect(stripAnsi(pauseWrites[0] ?? '')).not.toContain('Worker turn updated after pause');
     expect(pauseWrites[0]?.endsWith('\n')).toBe(true);
     expect(pauseWrites.filter((write) => write.endsWith('\n'))).toHaveLength(1);
+
+    handle.stop();
+  });
+
+  it('freezes paused runtime, AGE / TURN, and fallback event recency when pause lands before the first frame', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let resolveDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const pendingDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveDataset = resolve;
+    });
+    let currentTime = Date.parse('2026-03-30T01:15:30.000Z');
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => await pendingDataset,
+        setTimeout,
+        clearTimeout,
+        now: () => new Date(currentTime)
+      }
+    );
+
+    input.emitText('p');
+    await Promise.resolve();
+
+    resolveDataset?.(
+      buildDataset({
+        running: [
+          {
+            ...buildDataset().running[0],
+            summary: null,
+            display_event: null,
+            last_event: 'turn_running',
+            last_message: 'Provider worker turn is active.',
+            last_event_at: '2026-03-30T01:14:55.000Z'
+          }
+        ]
+      })
+    );
+    await handle.flush();
+
+    const pausedFrame = stripAnsi(writes.at(-1) ?? '');
+    expect(pausedFrame).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(pausedFrame).toContain('│ Runtime: 15m 12s');
+    expect(pausedFrame).toContain('15m / 4');
+    expect(pausedFrame).toContain('turn running (5s ago)');
+
+    currentTime += 5000;
+    input.emitText('c');
+    await handle.flush();
+    input.emitText('c');
+    await handle.flush();
+
+    const refrozenFrame = stripAnsi(writes.at(-1) ?? '');
+    expect(refrozenFrame).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(refrozenFrame).toContain('│ Runtime: 15m 12s');
+    expect(refrozenFrame).toContain('15m / 4');
+    expect(refrozenFrame).toContain('turn running (5s ago)');
+    expect(refrozenFrame).not.toContain('│ Runtime: 15m 17s');
+    expect(refrozenFrame).not.toContain('15m 5s / 4');
+    expect(refrozenFrame).not.toContain('turn running (10s ago)');
 
     handle.stop();
   });

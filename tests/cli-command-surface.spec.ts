@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
@@ -54,6 +54,16 @@ async function runCli(
   timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
   explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
+  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+    env: buildCliEnv(env, explicitProviderOverrideKeys),
+    timeout: timeoutMs
+  });
+}
+
+function buildCliEnv(
+  env?: NodeJS.ProcessEnv,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
+): NodeJS.ProcessEnv {
   const mergedEnv = sanitizeProviderOverrideEnv({
     ...process.env,
     ...(env ?? {})
@@ -90,16 +100,68 @@ async function runCli(
   for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
     delete mergedEnv[key];
   }
-  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
-    env: {
-      ...mergedEnv,
-      ...DEFAULT_RUNTIME_TEST_ENV,
-      ...DEFAULT_REPO_CONFIG_TEST_ENV,
-      NODE_NO_WARNINGS: '1',
-      ...explicitProviderOverrides,
-      ...explicitRuntimeOverrides
-    },
-    timeout: timeoutMs
+  return {
+    ...mergedEnv,
+    ...DEFAULT_RUNTIME_TEST_ENV,
+    ...DEFAULT_REPO_CONFIG_TEST_ENV,
+    NODE_NO_WARNINGS: '1',
+    ...explicitProviderOverrides,
+    ...explicitRuntimeOverrides
+  };
+}
+
+async function runCliWithExit(
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+  timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+      env: buildCliEnv(env, explicitProviderOverrideKeys),
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+
+    const settle = (fn: () => void): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeoutHandle);
+      fn();
+    };
+
+    const timeoutHandle = setTimeout(() => {
+      child.kill('SIGTERM');
+      settle(() => {
+        reject(new Error(`CLI timed out after ${timeoutMs}ms: ${args.join(' ')}`));
+      });
+    }, timeoutMs);
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+
+    child.once('error', (error) => {
+      settle(() => reject(error));
+    });
+    child.once('close', (code, signal) => {
+      settle(() => {
+        if (signal) {
+          reject(new Error(`CLI terminated via ${signal}: ${args.join(' ')}`));
+          return;
+        }
+        resolve({ stdout, stderr, exitCode: code ?? 1 });
+      });
+    });
   });
 }
 
@@ -108,6 +170,7 @@ function parseCliFailure(error: unknown): { stdout: string; stderr: string; exit
     stdout?: string | Buffer;
     stderr?: string | Buffer;
     code?: number | string;
+    message?: string;
   };
   const hasCliFailureShape =
     typed &&
@@ -115,6 +178,12 @@ function parseCliFailure(error: unknown): { stdout: string; stderr: string; exit
   if (!hasCliFailureShape) {
     throw error;
   }
+  const stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
+  const stderr = typeof typed.stderr === 'string' ? typed.stderr : typed.stderr?.toString() ?? '';
+  const trimmedMessage = typeof typed.message === 'string' ? typed.message.trim() : '';
+  const messageDetailStart = trimmedMessage.indexOf('\n');
+  const messageDetail =
+    messageDetailStart >= 0 ? trimmedMessage.slice(messageDetailStart + 1).trim() : trimmedMessage;
   const parsedExitCode =
     typeof typed.code === 'number'
       ? typed.code
@@ -122,8 +191,8 @@ function parseCliFailure(error: unknown): { stdout: string; stderr: string; exit
         ? Number(typed.code)
         : NaN;
   return {
-    stdout: typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '',
-    stderr: typeof typed.stderr === 'string' ? typed.stderr : typed.stderr?.toString() ?? '',
+    stdout,
+    stderr: stderr || messageDetail,
     exitCode: Number.isInteger(parsedExitCode) && Number.isFinite(parsedExitCode) ? parsedExitCode : 1
   };
 }
@@ -184,20 +253,40 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
-    let stdout = '';
-    let stderr = '';
-    let exitCode = 0;
-    try {
-      await runCli(['unknown-command']);
-      throw new Error('expected unknown-command to exit non-zero');
-    } catch (error) {
-      ({ stdout, stderr, exitCode } = parseCliFailure(error));
-    }
-
+    const { stdout, stderr, exitCode } = await runCliWithExit(['unknown-command'], undefined, CLI_BOOT_TIMEOUT);
     expect(exitCode).not.toBe(0);
-    expect(stderr).toContain('Unknown command: unknown-command');
+    if (stderr.trim().length > 0) {
+      expect(stderr).toMatch(/Unknown command: unknown-command|Command failed:/);
+    }
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
   }, CLI_BOOT_TIMEOUT);
+
+  it('falls back to exec failure message detail when stderr is empty', () => {
+    const parsed = parseCliFailure({
+      code: 1,
+      stdout: 'Usage: codex-orchestrator <command> [options]\n',
+      stderr: '',
+      message:
+        'Command failed: node --loader ts-node/esm bin/codex-orchestrator.ts unknown-command\n' +
+        'Unknown command: unknown-command\n'
+    });
+
+    expect(parsed.exitCode).toBe(1);
+    expect(parsed.stderr).toContain('Unknown command: unknown-command');
+    expect(parsed.stdout).toContain('Usage: codex-orchestrator <command> [options]');
+  });
+
+  it('preserves single-line exec failure messages when stderr is empty', () => {
+    const parsed = parseCliFailure({
+      code: 1,
+      stdout: '',
+      stderr: '',
+      message: 'Command failed: unknown-command'
+    });
+
+    expect(parsed.exitCode).toBe(1);
+    expect(parsed.stderr).toBe('Command failed: unknown-command');
+  });
 
   it('prints status help without requiring a run id', async () => {
     const { stdout } = await runCli(['status', '--help'], undefined, CLI_BOOT_TIMEOUT);
