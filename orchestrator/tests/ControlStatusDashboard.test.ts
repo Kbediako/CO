@@ -76,7 +76,8 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
     counts: {
       running: 1,
       retrying: 1,
-      issues: 2
+      issues: 2,
+      max_allowed: 4
     },
     totals: {
       input_tokens: 100,
@@ -386,7 +387,7 @@ describe('control status dashboard', () => {
     expect(lines).toHaveLength(23);
     expect(lines.slice(0, 9)).toEqual([
       '╭─ CO STATUS',
-      '│ Agents: 1/2 tracked',
+      '│ Agents: 1/4 max allowed',
       '│ Throughput: 1,842 tps',
       '│ Runtime: 15m 12s',
       '│ Tokens: in 100 | out 117 | total 217',
@@ -395,7 +396,7 @@ describe('control status dashboard', () => {
       '│ Next refresh: 15s',
       '├─ Running'
     ]);
-    expect(plainFrame).toContain('│ Agents: 1/2 tracked');
+    expect(plainFrame).toContain('│ Agents: 1/4 max allowed');
     expect(plainFrame).toContain('│ Throughput: 1,842 tps');
     expect(plainFrame).toContain('│ Tokens: in 100 | out 117 | total 217');
     expect(plainFrame).toContain('│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50');
@@ -447,6 +448,38 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain('turn running (15m ago)');
+  });
+
+  it('advances runtime, AGE / TURN, and fallback event recency against a live local clock', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        running: [
+          {
+            ...buildDataset().running[0],
+            summary: null,
+            display_event: null,
+            last_event: 'turn_running',
+            last_message: 'Provider worker turn is active.',
+            last_event_at: '2026-03-30T01:14:55.000Z'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'attach-viewer',
+      terminalColumns: 120,
+      throughputTps: 1842.7,
+      surfaceMode: 'primary',
+      referenceTime: new Date('2026-03-30T01:15:00.000Z'),
+      liveReferenceTime: new Date('2026-03-30T01:15:05.000Z')
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Runtime: 15m 17s');
+    expect(plainFrame).toContain('15m 5s / 4');
+    expect(plainFrame).toContain('turn running (10s ago)');
   });
 
   it('prefers projection-authored running event text over renderer fallbacks', () => {
@@ -511,7 +544,8 @@ describe('control status dashboard', () => {
         counts: {
           running: 1,
           retrying: 3,
-          issues: 4
+          issues: 4,
+          max_allowed: 4
         },
         retrying: [
           {
@@ -634,7 +668,7 @@ describe('control status dashboard', () => {
   it('renders empty sections cleanly', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({
-        counts: { running: 0, retrying: 0, issues: 0 },
+        counts: { running: 0, retrying: 0, issues: 0, max_allowed: 4 },
         running: [],
         retrying: [],
         issues: [],
@@ -650,7 +684,7 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Agents: 0/0 tracked');
+    expect(plainFrame).toContain('│ Agents: 0/4 max allowed');
     expect(plainFrame).toContain('│ Project: n/a');
     expect(plainFrame).toContain('│   ID         STAGE        PID');
     expect(plainFrame).toContain('│  No active agents');
@@ -680,7 +714,7 @@ describe('control status dashboard', () => {
     const plainFrame = stripAnsi(frame);
     expect(plainFrame).toBe([
       '╭─ CO STATUS',
-      '│ Status: 1/2 tracked | 15m 12s | next 15s',
+      '│ Status: 1/4 max allowed | 15m 12s | next 15s',
       '│ Tokens: in 100 | out 117 | total 217',
       '│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50',
       '│ Running: CO-26 | running | Terminal dashboard renderer in progress',
@@ -712,7 +746,7 @@ describe('control status dashboard', () => {
       viewMode: 'compact'
     });
 
-    expect(stripAnsi(frame)).toContain('│ Status: 1/2 tracked | 15m 12s | checking now...');
+    expect(stripAnsi(frame)).toContain('│ Status: 1/4 max allowed | 15m 12s | checking now...');
   });
 
   it('renders absolute rate-limit reset timestamps against the dashboard snapshot time', () => {
@@ -1604,6 +1638,8 @@ describe('control status dashboard', () => {
     expect(writes[1]).toMatch(new RegExp(String.raw`\r\u001b\[\d+A\u001b\[J`));
     expect(stripAnsi(writes[1] ?? '')).toContain('│ Inspect: live | primary scrollback | full frame');
     expect(stripAnsi(writes[1] ?? '')).not.toContain('│ Dashboard: ');
+    expect(stripAnsi(writes[1] ?? '')).toContain('│ Runtime: 15m 13s');
+    expect(stripAnsi(writes[1] ?? '')).toContain('15m 1s / 4');
     expect(stripAnsi(writes[1] ?? '')).toContain('│ Tokens: in 100 | out 117 | total 218');
 
     handle.stop();
@@ -1889,6 +1925,7 @@ describe('control status dashboard', () => {
     expect(writes.at(-1)?.startsWith(`${ANSI_ALT_SCREEN_EXIT}\u001b[H\u001b[2J`)).toBe(true);
     expect(writes.at(-1)?.endsWith('\n')).toBe(true);
     expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Runtime: 15m 12s');
 
     listener?.();
     await handle.flush();
@@ -1904,6 +1941,7 @@ describe('control status dashboard', () => {
     expect(stripAnsi(writes.at(-1) ?? '')).toContain(
       '│ Inspect: paused | primary snapshot | compact inspect | updates waiting'
     );
+    expect(stripAnsi(writes.at(-1) ?? '')).toContain('│ Status: 1/4 max allowed | 15m 12s | next 15s');
     expect(writes.at(-1)?.startsWith('\u001b[H\u001b[2J')).toBe(true);
     expect(writes.at(-1)?.endsWith('\n')).toBe(false);
     expect(writes).toHaveLength(pausedWriteCount + 1);

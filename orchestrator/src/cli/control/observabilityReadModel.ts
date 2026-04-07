@@ -257,6 +257,7 @@ export interface ControlCompatibilityRuntimeSnapshot {
   selected: ControlCompatibilitySourceContext | null;
   running: ControlCompatibilitySourceContext[];
   retrying: ControlCompatibilitySourceContext[];
+  maxConcurrentAgents?: number | null;
   codexTotals: ControlCodexTotalsPayload;
   rateLimits: Record<string, unknown> | null;
   dispatchPilot: ControlDispatchPilotPayload | null;
@@ -275,6 +276,7 @@ export interface CompatibilityProjectionIssueRecord {
 export interface ControlCompatibilityProjectionSnapshot {
   running: ControlRunningPayload[];
   retrying: ControlRetryPayload[];
+  maxConcurrentAgents?: number | null;
   codexTotals: ControlCodexTotalsPayload;
   rateLimits: Record<string, unknown> | null;
   issues: CompatibilityProjectionIssueRecord[];
