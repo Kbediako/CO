@@ -10,12 +10,14 @@ const LINEAR_GRAPHQL_RELEVANT_RESPONSE_HEADERS = [
   'x-ratelimit-endpoint-requests-limit',
   'x-ratelimit-endpoint-requests-remaining',
   'x-ratelimit-endpoint-requests-reset',
+  'x-ratelimit-endpoint-name',
   'x-ratelimit-complexity-limit',
   'x-ratelimit-complexity-remaining',
   'x-ratelimit-complexity-reset',
   'x-ratelimit-endpoint-complexity-limit',
   'x-ratelimit-endpoint-complexity-remaining',
   'x-ratelimit-endpoint-complexity-reset',
+  'x-complexity',
   'x-request-id'
 ] as const;
 

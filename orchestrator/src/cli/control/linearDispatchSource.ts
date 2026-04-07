@@ -10,6 +10,7 @@ import {
   recordLinearBudgetHeadersObservation,
   recordLinearBudgetRateLimitObservation,
   readSharedLinearBudgetStatus,
+  reserveLinearBudgetReservation,
   resolveLinearBudgetPreflight
 } from './linearBudgetState.js';
 import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
@@ -675,7 +676,9 @@ async function executeLinearQuery(input: {
       resolution: LiveLinearFailureResolution;
     }
 > {
-  const sharedBudget = await readSharedLinearBudgetStatus(input.env);
+  const sharedBudget = await readSharedLinearBudgetStatus(input.env, {
+    operation: input.source
+  });
   const preflight = resolveLinearBudgetPreflight({
     budget: sharedBudget,
     operation: input.source
@@ -695,44 +698,71 @@ async function executeLinearQuery(input: {
     };
   }
 
-  const result = await executeLinearGraphql<LinearIssueQueryResponse>({
-    token: input.token,
-    timeoutMs: input.timeoutMs,
-    fetchImpl: input.fetchImpl,
-    query: input.query,
-    variables: input.variables
+  const reservation = await reserveLinearBudgetReservation({
+    env: input.env,
+    operation: input.source
   });
-
-  if (!result.ok) {
-    await recordLinearBudgetHeadersObservation({
-      env: input.env,
-      headers: result.failure.headers ?? null,
-      source: input.source
-    }).catch(() => undefined);
-    const rateLimitFailure = mapLinearRateLimitedFailure(result.failure);
-    if (rateLimitFailure) {
-      await recordLinearBudgetRateLimitObservation({
-        env: input.env,
-        rateLimit: rateLimitFailure,
-        source: input.source
-      }).catch(() => undefined);
-    }
+  if (!reservation.ok) {
     return {
       ok: false,
-      resolution: mapLinearGraphqlFailureToDispatchResolution(result.failure)
+      resolution: unavailable('dispatch_source_provider_rate_limited', {
+        status: reservation.error.status,
+        message: reservation.error.message,
+        retryable: reservation.error.retryable,
+        details: {
+          error_code: reservation.error.code,
+          ...reservation.error.details
+        }
+      })
     };
   }
 
-  await recordLinearBudgetHeadersObservation({
-    env: input.env,
-    headers: result.headers ?? null,
-    source: input.source
-  }).catch(() => undefined);
+  try {
+    const result = await executeLinearGraphql<LinearIssueQueryResponse>({
+      token: input.token,
+      timeoutMs: input.timeoutMs,
+      fetchImpl: input.fetchImpl,
+      query: input.query,
+      variables: input.variables
+    });
 
-  return {
-    ok: true,
-    payload: result.payload
-  };
+    if (!result.ok) {
+      await recordLinearBudgetHeadersObservation({
+        env: input.env,
+        headers: result.failure.headers ?? null,
+        source: input.source
+      }).catch(() => undefined);
+      const rateLimitFailure = mapLinearRateLimitedFailure(result.failure);
+      if (rateLimitFailure) {
+        await recordLinearBudgetRateLimitObservation({
+          env: input.env,
+          rateLimit: rateLimitFailure,
+          source: input.source
+        }).catch(() => undefined);
+      }
+      return {
+        ok: false,
+        resolution: mapLinearGraphqlFailureToDispatchResolution(result.failure)
+      };
+    }
+
+    await recordLinearBudgetHeadersObservation({
+      env: input.env,
+      headers: result.headers ?? null,
+      source: input.source,
+      scope: {
+        workspaceId: result.payload.data?.viewer?.organization?.id?.trim() ?? null,
+        viewerId: result.payload.data?.viewer?.id?.trim() ?? null
+      }
+    }).catch(() => undefined);
+
+    return {
+      ok: true,
+      payload: result.payload
+    };
+  } finally {
+    await reservation.reservation?.release().catch(() => undefined);
+  }
 }
 
 function resolveLinearTrackedIssuesNextCursor(

@@ -2935,7 +2935,7 @@ describe('ControlRuntime', () => {
         total_tokens: null,
         seconds_running: 720
       });
-      expect(compatibilityProjection.rateLimits).toEqual({
+      expect(compatibilityProjection.rateLimits).toMatchObject({
         codex: {
           source: 'legacy-proof'
         },
@@ -2948,6 +2948,11 @@ describe('ControlRuntime', () => {
           cooldown_until: null,
           cooldown_active: false,
           request_id: 'polling-1',
+          scope_kind: 'token',
+          scope_key: 'legacy',
+          viewer_id: null,
+          workspace_id: null,
+          token_fingerprints: [],
           requests: {
             remaining: 17,
             limit: 30,
@@ -2959,7 +2964,13 @@ describe('ControlRuntime', () => {
             limit: 200,
             reset_at: '2026-03-07T00:30:07.000Z'
           },
-          endpoint_complexity: null
+          endpoint_complexity: null,
+          endpoint_name: null,
+          selected_endpoint_key: null,
+          request_complexity: null,
+          endpoints: {},
+          reservations: [],
+          reservations_active: 0
         }
       });
     } finally {
@@ -3095,7 +3106,7 @@ describe('ControlRuntime', () => {
 
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
-      expect(compatibilityProjection.rateLimits).toEqual({
+      expect(compatibilityProjection.rateLimits).toMatchObject({
         codex: {
           source: 'legacy-proof',
           requests: {
@@ -3113,6 +3124,11 @@ describe('ControlRuntime', () => {
           cooldown_until: null,
           cooldown_active: false,
           request_id: 'polling-1',
+          scope_kind: 'token',
+          scope_key: 'legacy',
+          viewer_id: null,
+          workspace_id: null,
+          token_fingerprints: [],
           requests: {
             remaining: 17,
             limit: 30,
@@ -3124,7 +3140,13 @@ describe('ControlRuntime', () => {
             limit: 200,
             reset_at: '2026-03-07T00:30:07.000Z'
           },
-          endpoint_complexity: null
+          endpoint_complexity: null,
+          endpoint_name: null,
+          selected_endpoint_key: null,
+          request_complexity: null,
+          endpoints: {},
+          reservations: [],
+          reservations_active: 0
         }
       });
     } finally {

@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260407-linear-95f1c334-e623-471e-a013-d7019feed423",
+      "title": "CO: Harden Linear rate-limit handling with user-scoped budgeting, endpoint-aware buckets, and complexity-aware preflight",
+      "relates_to": "tasks/tasks-linear-95f1c334-e623-471e-a013-d7019feed423.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-07",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-07",
+          "manifest": ".runs/linear-95f1c334-e623-471e-a013-d7019feed423-co-106-docs-review/cli/2026-04-07T09-52-07-514Z-cacb6199/manifest.json",
+          "override_reason": "The rerun docs-review child stream passed spec-guard and docs:check after the docs/TASKS line-budget fix, then failed on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 121`; Task Packet stale=90, Task Mirror stale=18, Report Only stale=13). The CO-106 packet is registered and not among the stale-entry failures, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-95f1c334-e623-471e-a013-d7019feed423.md",
+        "task": "tasks/tasks-linear-95f1c334-e623-471e-a013-d7019feed423.md",
+        "agent_task": ".agent/task/linear-95f1c334-e623-471e-a013-d7019feed423.md",
+        "docs": "docs/TECH_SPEC-linear-95f1c334-e623-471e-a013-d7019feed423.md"
+      }
+    },
+    {
       "id": "20260407-linear-f71992e3-ddda-4198-b43c-97ccb36908cf",
       "title": "CO STATUS: finish post-CO-97 rate-limit reset truth and Symphony-parity event/stage text",
       "relates_to": "tasks/tasks-linear-f71992e3-ddda-4198-b43c-97ccb36908cf.md",

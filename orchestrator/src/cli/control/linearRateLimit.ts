@@ -40,6 +40,7 @@ export function extractLinearRateLimitDetailsFromHeaders(
   const endpointRequestsResetAt = parseLinearRateLimitResetHeader(
     headers?.['x-ratelimit-endpoint-requests-reset']
   );
+  const endpointName = normalizeOptionalString(headers?.['x-ratelimit-endpoint-name']);
   const complexityRemaining = parseIntegerHeader(headers?.['x-ratelimit-complexity-remaining']);
   const complexityLimit = parsePositiveIntegerHeader(headers?.['x-ratelimit-complexity-limit']);
   const complexityResetAt = parseLinearRateLimitResetHeader(headers?.['x-ratelimit-complexity-reset']);
@@ -48,6 +49,7 @@ export function extractLinearRateLimitDetailsFromHeaders(
   const endpointComplexityResetAt = parseLinearRateLimitResetHeader(
     headers?.['x-ratelimit-endpoint-complexity-reset']
   );
+  const requestComplexity = parsePositiveIntegerHeader(headers?.['x-complexity']);
   const requestId = normalizeOptionalString(headers?.['x-request-id']);
   return {
     ...(retryAfterSeconds !== null ? { retry_after_seconds: retryAfterSeconds } : {}),
@@ -57,6 +59,7 @@ export function extractLinearRateLimitDetailsFromHeaders(
     ...(endpointRequestsRemaining !== null ? { endpoint_requests_remaining: endpointRequestsRemaining } : {}),
     ...(endpointRequestsLimit !== null ? { endpoint_requests_limit: endpointRequestsLimit } : {}),
     ...(endpointRequestsResetAt !== null ? { endpoint_requests_reset_at: endpointRequestsResetAt } : {}),
+    ...(endpointName ? { endpoint_name: endpointName } : {}),
     ...(complexityRemaining !== null ? { complexity_remaining: complexityRemaining } : {}),
     ...(complexityLimit !== null ? { complexity_limit: complexityLimit } : {}),
     ...(complexityResetAt !== null ? { complexity_reset_at: complexityResetAt } : {}),
@@ -65,6 +68,7 @@ export function extractLinearRateLimitDetailsFromHeaders(
       : {}),
     ...(endpointComplexityLimit !== null ? { endpoint_complexity_limit: endpointComplexityLimit } : {}),
     ...(endpointComplexityResetAt !== null ? { endpoint_complexity_reset_at: endpointComplexityResetAt } : {}),
+    ...(requestComplexity !== null ? { request_complexity: requestComplexity } : {}),
     ...(requestId ? { request_id: requestId } : {})
   };
 }

@@ -13,6 +13,7 @@ import {
   recordLinearBudgetHeadersObservation,
   recordLinearBudgetRateLimitObservation,
   readSharedLinearBudgetStatus,
+  reserveLinearBudgetReservation,
   resolveLinearBudgetPreflight
 } from './linearBudgetState.js';
 import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
@@ -474,6 +475,7 @@ export type ProviderLinearCreateFollowUpResult =
 
 interface LinearIssueContextQueryResponse {
   viewer?: {
+    id?: string | null;
     organization?: {
       id?: string | null;
     } | null;
@@ -546,6 +548,7 @@ interface LinearIssueAttachmentsQueryResponse {
 
 interface LinearIssueSummaryQueryResponse {
   viewer?: {
+    id?: string | null;
     organization?: {
       id?: string | null;
     } | null;
@@ -1910,7 +1913,9 @@ async function preflightProviderLinearBudget(input: {
   operation: ProviderLinearOperation;
   minimumRequestsRemaining?: number;
 }): Promise<ProviderLinearWorkflowError | null> {
-  const budget = await readSharedLinearBudgetStatus(input.session.env).catch(() => null);
+  const budget = await readSharedLinearBudgetStatus(input.session.env, {
+    operation: `provider-linear:${input.operation}`
+  }).catch(() => null);
   const preflight = resolveLinearBudgetPreflight({
     budget,
     operation: `provider-linear:${input.operation}`,
@@ -1937,10 +1942,13 @@ async function executeProviderLinearGraphql<TData>(input: {
         error: ProviderLinearWorkflowError;
       }
   > {
-  const budget = await readSharedLinearBudgetStatus(input.session.env).catch(() => null);
+  const operationName = `provider-linear:${input.operation}:${input.step}`;
+  const budget = await readSharedLinearBudgetStatus(input.session.env, {
+    operation: operationName
+  }).catch(() => null);
   const preflight = resolveLinearBudgetPreflight({
     budget,
-    operation: `provider-linear:${input.operation}:${input.step}`
+    operation: operationName
   });
   if (!preflight.ok) {
     return {
@@ -1949,45 +1957,75 @@ async function executeProviderLinearGraphql<TData>(input: {
     };
   }
 
-  const result = await executeLinearGraphql<TData>({
-    token: input.session.token,
-    timeoutMs: input.session.timeoutMs,
-    fetchImpl: input.session.fetchImpl,
-    query: input.query,
-    variables: input.variables
+  const reservation = await reserveLinearBudgetReservation({
+    env: input.session.env,
+    operation: operationName
   });
-
-  if (!result.ok) {
-    await recordLinearBudgetHeadersObservation({
-      env: input.session.env,
-      headers: result.failure.headers ?? null,
-      source: `provider-linear:${input.operation}:${input.step}`
-    }).catch(() => undefined);
-    const rateLimitFailure = mapLinearRateLimitedFailure(result.failure);
-    if (rateLimitFailure) {
-      await recordLinearBudgetRateLimitObservation({
-        env: input.session.env,
-        rateLimit: rateLimitFailure,
-        source: `provider-linear:${input.operation}:${input.step}`
-      }).catch(() => undefined);
-    }
+  if (!reservation.ok) {
     return {
       ok: false,
-      error: mapGraphqlFailure(result.failure)
+      error: reservation.error
     };
   }
 
-  await recordLinearBudgetHeadersObservation({
-    env: input.session.env,
-    headers: result.headers ?? null,
-    source: `provider-linear:${input.operation}:${input.step}`
-  }).catch(() => undefined);
+  try {
+    const result = await executeLinearGraphql<TData>({
+      token: input.session.token,
+      timeoutMs: input.session.timeoutMs,
+      fetchImpl: input.session.fetchImpl,
+      query: input.query,
+      variables: input.variables
+    });
 
-  return {
-    ok: true,
-    payload: result.payload,
-    ...(result.headers ? { headers: result.headers } : {})
-  };
+    if (!result.ok) {
+      await recordLinearBudgetHeadersObservation({
+        env: input.session.env,
+        headers: result.failure.headers ?? null,
+        source: operationName
+      }).catch(() => undefined);
+      const rateLimitFailure = mapLinearRateLimitedFailure(result.failure);
+      if (rateLimitFailure) {
+        await recordLinearBudgetRateLimitObservation({
+          env: input.session.env,
+          rateLimit: rateLimitFailure,
+          source: operationName
+        }).catch(() => undefined);
+      }
+      return {
+        ok: false,
+        error: mapGraphqlFailure(result.failure)
+      };
+    }
+
+    const payloadRecord =
+      result.payload.data && typeof result.payload.data === 'object'
+        ? (result.payload.data as {
+            viewer?: {
+              id?: string | null;
+              organization?: {
+                id?: string | null;
+              } | null;
+            } | null;
+          })
+        : null;
+    await recordLinearBudgetHeadersObservation({
+      env: input.session.env,
+      headers: result.headers ?? null,
+      source: operationName,
+      scope: {
+        workspaceId: normalizeOptionalString(payloadRecord?.viewer?.organization?.id ?? null),
+        viewerId: normalizeOptionalString(payloadRecord?.viewer?.id ?? null)
+      }
+    }).catch(() => undefined);
+
+    return {
+      ok: true,
+      payload: result.payload,
+      ...(result.headers ? { headers: result.headers } : {})
+    };
+  } finally {
+    await reservation.reservation?.release().catch(() => undefined);
+  }
 }
 
 async function resolveEmbeddedLinearWorkpadAssets(input: {
@@ -3661,6 +3699,7 @@ function buildIssueContextQuery(options: {
     : '';
   return `query ProviderLinearIssueContext($issueId: String!${commentsVariable}) {
     viewer {
+      id
       organization {
         id
       }
@@ -3702,6 +3741,7 @@ ${attachmentsSection}
 function buildIssueSummaryQuery(): string {
   return `query ProviderLinearIssueSummary($issueId: String!) {
     viewer {
+      id
       organization {
         id
       }

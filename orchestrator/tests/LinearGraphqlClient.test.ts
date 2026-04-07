@@ -95,7 +95,9 @@ describe('linearGraphqlClient', () => {
               'Content-Type': 'application/json',
               'x-ratelimit-requests-limit': '100',
               'x-ratelimit-requests-remaining': '42',
-              'x-ratelimit-requests-reset': '1774701380970'
+              'x-ratelimit-requests-reset': '1774701380970',
+              'x-ratelimit-endpoint-name': 'IssueContext',
+              'x-complexity': '7'
             }
           }
         )
@@ -115,7 +117,9 @@ describe('linearGraphqlClient', () => {
       headers: {
         'x-ratelimit-requests-limit': '100',
         'x-ratelimit-requests-remaining': '42',
-        'x-ratelimit-requests-reset': '1774701380970'
+        'x-ratelimit-requests-reset': '1774701380970',
+        'x-ratelimit-endpoint-name': 'IssueContext',
+        'x-complexity': '7'
       }
     });
   });
