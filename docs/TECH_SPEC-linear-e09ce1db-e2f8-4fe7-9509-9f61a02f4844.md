@@ -103,7 +103,6 @@ last_review: 2026-04-07
   - no new monitoring surface; rely on deterministic tests and reviewable payload assertions
 
 ## Open Questions
-- Whether `compatibilityIssuePresenter.ts` should upgrade complexity exhaustion text to include the projected next refresh when available.
 - Whether the projected timestamp should be used anywhere else besides budget event text and STATUS summary lines in this lane.
 
 ## Approvals

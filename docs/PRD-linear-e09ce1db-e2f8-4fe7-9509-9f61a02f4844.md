@@ -133,8 +133,7 @@
   - `orchestrator/tests/ControlStatusDashboard.test.ts`
 
 ## Open Questions
-- Is a small `next_refresh_state` plus `next_refresh_in_ms` projection enough, or does the operator surface also need an explicit projected timestamp field?
-- Should complexity exhaustion adopt the same explicit `next tracked-issue refresh at ...` wording when the projected countdown is known, or is summary-line truth alone sufficient for this lane?
+No open questions remain for this lane. `next_refresh_at` is part of the contract alongside `next_refresh_state` and `next_refresh_in_ms`, and complexity exhaustion now uses the projected countdown wording `next tracked-issue refresh at ...` when the countdown is known.
 
 ## Approvals
 - Product: Self-approved from the Linear issue scope

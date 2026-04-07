@@ -51,7 +51,7 @@
   - `FORCE_CODEX_REVIEW=1 MCP_RUNNER_TASK_ID=linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844 npm run review -- --manifest <manifest>`
   - `npm run pack:smoke`
 - Rollback plan:
-  - revert the additive next-refresh payload fields plus the bounded presenter or renderer changes if they misclassify cooldown, checking, or scheduled states
+  - revert the additive next-refresh payload fields plus the bounded presenter or renderer changes if they misclassify cooldown states, checking states, or scheduled states
 
 ## Risks & Mitigations
 - Risk: a renderer-only fix leaves projection and persisted snapshot truth inconsistent.
