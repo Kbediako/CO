@@ -174,7 +174,7 @@ export async function resolveProviderLinearScreenshotProof(
   }
 
   const displayId = normalizeOptionalDigits(input.displayId ?? null);
-  if (input.displayId != null && displayId == null) {
+  if (input.displayId != null && (displayId == null || displayId === '0')) {
     return failure(
       'screenshot_proof_display_id_invalid',
       '--display-id must be a positive integer when provided.',
@@ -183,7 +183,7 @@ export async function resolveProviderLinearScreenshotProof(
   }
 
   const windowId = normalizeOptionalDigits(input.windowId ?? null);
-  if (input.windowId != null && windowId == null) {
+  if (input.windowId != null && (windowId == null || windowId === '0')) {
     return failure(
       'screenshot_proof_window_id_invalid',
       '--window-id must be a positive integer when provided.',
@@ -376,9 +376,10 @@ function resolveScreenshotOutputPath(
       ok: false;
       error: ProviderLinearScreenshotProofError;
     } {
+  const normalizedOutputPath = normalizeOptionalString(outputPath);
   const resolved =
-    normalizeOptionalString(outputPath) != null
-      ? resolve(cwd, normalizeOptionalString(outputPath) as string)
+    normalizedOutputPath != null
+      ? resolve(cwd, normalizedOutputPath)
       : resolve(cwd, '.tmp', `linear-screenshot-proof-${sanitizeTimestamp(now)}.png`);
   const extension = extname(resolved).toLowerCase();
   const mediaType = SUPPORTED_SCREENSHOT_MEDIA_TYPES.get(extension);

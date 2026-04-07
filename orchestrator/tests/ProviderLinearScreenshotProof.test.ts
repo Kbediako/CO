@@ -81,6 +81,58 @@ it('captures a default macOS screenshot file and reports cleanup skipped when no
   expect(result.capture.embed_markdown).toContain('![Proof screenshot](file:///');
 });
 
+it('rejects --display-id=0 before invoking macOS capture tools', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-screenshot-proof-'));
+  tempDirs.push(tempDir);
+
+  const result = await resolveProviderLinearScreenshotProof(
+    {
+      cwd: tempDir,
+      displayId: '0'
+    },
+    {
+      platform: 'darwin',
+      runCommand: async () => {
+        throw new Error('runCommand should not execute for invalid display id');
+      }
+    }
+  );
+
+  expect(result).toMatchObject({
+    ok: false,
+    error: {
+      code: 'screenshot_proof_display_id_invalid',
+      message: '--display-id must be a positive integer when provided.'
+    }
+  });
+});
+
+it('rejects --window-id=0 before invoking macOS capture tools', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-screenshot-proof-'));
+  tempDirs.push(tempDir);
+
+  const result = await resolveProviderLinearScreenshotProof(
+    {
+      cwd: tempDir,
+      windowId: '0'
+    },
+    {
+      platform: 'darwin',
+      runCommand: async () => {
+        throw new Error('runCommand should not execute for invalid window id');
+      }
+    }
+  );
+
+  expect(result).toMatchObject({
+    ok: false,
+    error: {
+      code: 'screenshot_proof_window_id_invalid',
+      message: '--window-id must be a positive integer when provided.'
+    }
+  });
+});
+
 it('wraps local file markdown in angle brackets when the output name contains parentheses', async () => {
   const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-screenshot-proof-'));
   tempDirs.push(tempDir);
