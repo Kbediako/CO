@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260408-linear-8ef95d79-db42-411c-886c-99bdeee6492b",
+      "title": "CO: Disambiguate historical attached PRs during deterministic merge closeout for reopened issues",
+      "relates_to": "tasks/tasks-linear-8ef95d79-db42-411c-886c-99bdeee6492b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-08",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-08",
+          "manifest": ".runs/linear-8ef95d79-db42-411c-886c-99bdeee6492b-co-104-docs-review/cli/2026-04-07T14-47-56-051Z-248c4f90/manifest.json",
+          "override_reason": "The audited docs-review child stream passed spec-guard and docs:check after the task-archive line-budget repair and the missing `.agent/task` registry-entry fix, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 121`; Task Packet stale=90, Task Mirror stale=18, Report Only stale=13). The CO-104 packet is fully registered and no longer has missing registry entries, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker. See out/linear-8ef95d79-db42-411c-886c-99bdeee6492b/manual/20260407T144756Z-docs-review-fallback.md."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8ef95d79-db42-411c-886c-99bdeee6492b.md",
+        "task": "tasks/tasks-linear-8ef95d79-db42-411c-886c-99bdeee6492b.md",
+        "agent_task": ".agent/task/linear-8ef95d79-db42-411c-886c-99bdeee6492b.md",
+        "docs": "docs/TECH_SPEC-linear-8ef95d79-db42-411c-886c-99bdeee6492b.md"
+      }
+    },
+    {
       "id": "20260408-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e",
       "title": "CO STATUS: finish post-CO-103 Symphony parity for Agents, live runtime ticking, and EVENT truth",
       "relates_to": "tasks/tasks-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md",

@@ -13857,6 +13857,142 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('persists ignored historical and conflicting attached PR URL truth when merge closeout remains multiple_attached_prs action required', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-merge-closeout-multiple-attached-prs'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-merge-closeout-multiple-attached-prs');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-merge-closeout-multiple-attached-prs',
+        task_id: 'task-1303-merge-closeout-multiple-attached-prs',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        updated_at: '2026-03-19T04:30:30.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:25:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-merge-closeout-multiple-attached-prs',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-merge-closeout-multiple-attached-prs',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-merge-closeout-multiple-attached-prs',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => ({
+      recorded_at: '2026-03-19T04:30:30.000Z',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      status: 'action_required' as const,
+      reason: 'multiple_attached_prs',
+      summary:
+        'Multiple attached GitHub pull requests match asabeko/co; conflicting current candidate PR URLs: https://github.com/asabeko/CO/pull/372, https://github.com/asabeko/CO/pull/373. Ignored historical merged PR URLs: https://github.com/asabeko/CO/pull/360.',
+      attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/360',
+        'https://github.com/asabeko/CO/pull/372',
+        'https://github.com/asabeko/CO/pull/373'
+      ],
+      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/360'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/372',
+        'https://github.com/asabeko/CO/pull/373'
+      ],
+      pr: null,
+      snapshot: null,
+      merge_attempt: null,
+      shared_root: null,
+      linear_transition: null
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:30:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(runMergeCloseout).toHaveBeenCalledTimes(1);
+    expect(state.claims[0]).toMatchObject({
+      state: 'handoff_failed',
+      reason: 'provider_issue_merge_closeout_action_required',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z'
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'action_required',
+      reason: 'multiple_attached_prs',
+      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/360'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/372',
+        'https://github.com/asabeko/CO/pull/373'
+      ]
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'action_required',
+      reason: 'multiple_attached_prs',
+      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/360'],
+      conflicting_attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/372',
+        'https://github.com/asabeko/CO/pull/373'
+      ]
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('clears stale merge_closeout metadata when refresh launches a fresh attempt after action-required closeout', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
