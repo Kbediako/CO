@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260408-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f",
+      "title": "CO: Add a bounded macOS screenshot-proof capture path without external helper dependencies",
+      "relates_to": "tasks/tasks-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-08",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-08",
+          "manifest": ".runs/linear-1c361221-d50a-43bd-aeba-ce6bada3b07f-co-105-docs-review-rerun/cli/2026-04-07T14-53-48-499Z-d042023d/manifest.json",
+          "override_reason": "The initial docs-review child stream surfaced two packet-shape issues: a speculative missing path reference and a `docs/TASKS.md` line-budget overflow. After removing the missing-path reference and using the repo's `docs:archive-tasks` fallback to bring `docs/TASKS.md` from 451 lines down to 447, the rerun passed spec-guard and docs:check, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 121`; Task Packet stale=90, Task Mirror stale=18, Report Only stale=13). The CO-105 packet is registered and absent from the failure report, so the manifest-backed rerun is recorded as a truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md",
+        "task": "tasks/tasks-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md",
+        "agent_task": ".agent/task/linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md",
+        "docs": "docs/TECH_SPEC-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md"
+      }
+    },
+    {
       "id": "20260407-linear-95f1c334-e623-471e-a013-d7019feed423",
       "title": "CO: Harden Linear rate-limit handling with user-scoped budgeting, endpoint-aware buckets, and complexity-aware preflight",
       "relates_to": "tasks/tasks-linear-95f1c334-e623-471e-a013-d7019feed423.md",

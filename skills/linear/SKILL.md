@@ -40,7 +40,18 @@ codex-orchestrator linear upsert-workpad \
 
 The body must contain the `## Codex Workpad` marker.
 
-When a lane requires screenshot proof to be visible directly in Linear, embed the proof in the workpad body as markdown image syntax that points at a local file (prefer `file:///absolute/path/to/proof.png`; use `<file:///absolute/path/to/proof (1).png>` when the path contains spaces or parentheses). The helper uploads local PNG/JPG/JPEG/WEBP/GIF image references to Linear and rewrites them to Linear-hosted asset URLs before the workpad comment mutation lands. Use runtime-proof or external URLs only when reviewer-visible external proof is acceptable.
+When a lane needs a fresh screenshot on macOS, capture it through the repo-owned helper first:
+
+```bash
+codex-orchestrator linear screenshot-proof \
+  --issue-id "$ISSUE_ID" \
+  --output /absolute/path/to/proof.png \
+  --format json
+```
+
+Use `capture.embed_markdown` from that JSON directly in the workpad body. The helper keeps local capture outcomes separate from later Linear upload/embed outcomes.
+
+When a screenshot already exists locally, embed it in the workpad body as markdown image syntax that points at that file (prefer `file:///absolute/path/to/proof.png`; use `<file:///absolute/path/to/proof (1).png>` when the path contains spaces or parentheses). The helper uploads local PNG/JPG/JPEG/WEBP/GIF image references to Linear and rewrites them to Linear-hosted asset URLs before the workpad comment mutation lands. Use runtime-proof or external URLs only when reviewer-visible external proof is acceptable.
 
 Keep the workpad body in this exact top-level order, with every section non-empty:
 
@@ -93,7 +104,7 @@ codex-orchestrator linear attach-pr \
 
 ## Runtime Proof
 
-For app-touching lanes, use the runtime-proof helper to turn permit policy into an explicit screenshot / external-link / video posture and, when allowed, generate reviewer-usable workpad and PR markdown.
+For app-touching lanes, use the runtime-proof helper to turn permit policy into an explicit screenshot / external-link / video posture and, when allowed, generate reviewer-usable workpad and PR markdown. This is the reviewer-URL path, not the local macOS capture path.
 
 Inspect the current permit posture first:
 
@@ -182,6 +193,7 @@ codex-orchestrator linear create-follow-up \
   - check review summaries / decisions
   - resolve each actionable item or post explicit, justified pushback
 - For app-touching lanes, use `runtime-proof` before review handoff so the workpad and PR carry reviewer-usable proof links instead of local-only artifact paths. Add `--reachability-mode dns-public` only when worker-local DNS public-resolution evidence is worth the extra environment-dependent check.
+- Use `screenshot-proof` when you still need to create a local screenshot artifact on macOS. Use direct local-file workpad embedding when the screenshot already exists. Use `runtime-proof` when reviewers need an external proof URL rather than a workpad-embedded local capture.
 - After opening or updating a PR, run `codex-orchestrator pr ready-review --pr "$PR_NUMBER" --quiet-minutes <window>` and keep the issue out of review until that bounded automated-feedback drain exits cleanly or reveals a blocker you handle explicitly.
 - Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff before opening a new PR for review handoff, before updating an already attached PR for handoff, and before transitioning the issue to `Human Review` or `In Review`.
 - Use the repo heuristic for non-trivial work: about 2+ changed files or about 40+ changed lines, unless you record an explicit skip justification in the workpad.

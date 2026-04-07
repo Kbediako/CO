@@ -491,6 +491,9 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('`FORCE_CODEX_REVIEW=1`');
     expect(firstPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(firstPrompt).toContain(`\`${helperCommand} runtime-proof --issue-id lin-issue-1 --origin <app-url> --format json\``);
+    expect(firstPrompt).toContain(`\`${helperCommand} screenshot-proof --issue-id lin-issue-1 --output <path>.png --format json\``);
+    expect(firstPrompt).toContain('paste `capture.embed_markdown` into the workpad');
+    expect(firstPrompt).toContain('Use direct local-file workpad embedding only when the screenshot already exists and no new capture is needed.');
     expect(firstPrompt).toContain(
       'add `--reachability-mode dns-public` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.'
     );
@@ -548,6 +551,9 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('required parity matrix for parity/alignment follow-ups');
     expect(continuationPrompt).toContain('If a PR is already attached, run a full PR feedback sweep before any new implementation work');
     expect(continuationPrompt).toContain(`\`${helperCommand} runtime-proof --issue-id lin-issue-1 --origin <app-url> --format json\``);
+    expect(continuationPrompt).toContain(`\`${helperCommand} screenshot-proof --issue-id lin-issue-1 --output <path>.png --format json\``);
+    expect(continuationPrompt).toContain('paste `capture.embed_markdown` into the workpad');
+    expect(continuationPrompt).toContain('Use direct local-file workpad embedding only when the screenshot already exists and no new capture is needed.');
     expect(continuationPrompt).toContain(
       'add `--reachability-mode dns-public` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers.'
     );
