@@ -91,6 +91,8 @@ export interface ProviderMergeCloseoutRecord {
   reason: string;
   summary: string;
   attached_pr_urls: string[];
+  ignored_historical_pr_urls: string[];
+  conflicting_attached_pr_urls: string[];
   pr: ProviderMergeCloseoutPullRequestRecord | null;
   snapshot: ProviderMergeCloseoutSnapshotRecord | null;
   merge_attempt: ProviderMergeCloseoutAttemptRecord | null;
@@ -132,6 +134,14 @@ interface ProviderMergeCloseoutDependencies {
   ) => string[];
 }
 
+interface ProviderMergeCloseoutAttachedPrResolution {
+  selected_pr: ProviderMergeCloseoutPullRequestRecord | null;
+  selected_snapshot: ProviderMergeCloseoutSnapshotRecord | null;
+  ignored_historical_pr_urls: string[];
+  conflicting_attached_pr_urls: string[];
+  selection_note: string | null;
+}
+
 export async function runProviderDeterministicMergeCloseout(
   input: {
     issueId: string;
@@ -165,6 +175,8 @@ export async function runProviderDeterministicMergeCloseout(
     issue_state_type: normalizeOptionalString(input.issueStateType),
     issue_updated_at: normalizeOptionalString(input.issueUpdatedAt),
     attached_pr_urls: [] as string[],
+    ignored_historical_pr_urls: [] as string[],
+    conflicting_attached_pr_urls: [] as string[],
     pr: null as ProviderMergeCloseoutPullRequestRecord | null,
     snapshot: null as ProviderMergeCloseoutSnapshotRecord | null,
     merge_attempt: null as ProviderMergeCloseoutAttemptRecord | null,
@@ -270,35 +282,92 @@ export async function runProviderDeterministicMergeCloseout(
     };
   }
 
+  let ignoredHistoricalPrUrls: string[] = [];
+  let conflictingAttachedPrUrls: string[] = [];
+  let selectionNote: string | null = null;
+  let pr = sameRepoPrs[0]!;
+  let snapshot: ProviderMergeCloseoutSnapshotRecord | null = null;
+
   if (sameRepoPrs.length > 1) {
-    return {
-      ...baseWithContext,
-      status: 'action_required',
-      reason: 'multiple_attached_prs',
-      summary: `Multiple attached GitHub pull requests match ${repoKey}; merge closeout is not armed.`
-    };
+    let resolution: ProviderMergeCloseoutAttachedPrResolution;
+    try {
+      resolution = await resolveAttachedSameRepoPullRequestCandidate({
+        candidates: sameRepoPrs,
+        resolveSnapshot,
+        resolveSnapshotActionRequiredReasons
+      });
+    } catch (error) {
+      return {
+        ...baseWithContext,
+        status: 'merge_failed',
+        reason: 'snapshot_read_failed',
+        summary: `GitHub merge-readiness snapshot could not be loaded while disambiguating attached pull requests: ${(error as Error)?.message ?? String(error)}.`
+      };
+    }
+
+    ignoredHistoricalPrUrls = resolution.ignored_historical_pr_urls;
+    conflictingAttachedPrUrls = resolution.conflicting_attached_pr_urls;
+    selectionNote = resolution.selection_note;
+    if (!resolution.selected_pr) {
+      return {
+        ...baseWithContext,
+        ignored_historical_pr_urls: [...ignoredHistoricalPrUrls],
+        conflicting_attached_pr_urls: [...conflictingAttachedPrUrls],
+        status: 'action_required',
+        reason: 'multiple_attached_prs',
+        summary: buildMultipleAttachedPrsSummary({
+          repoKey,
+          ignoredHistoricalPrUrls,
+          conflictingAttachedPrUrls
+        })
+      };
+    }
+
+    pr = resolution.selected_pr;
+    snapshot = resolution.selected_snapshot;
   }
 
-  const pr = sameRepoPrs[0]!;
-  let snapshot: ProviderMergeCloseoutSnapshotRecord | null = null;
-  try {
-    const rawSnapshot = await resolveSnapshot({
-      owner: pr.owner,
-      repo: pr.repo,
-      prNumber: pr.number,
-      readinessMode: 'merge'
-    });
-    const actionRequiredReasons = resolveSnapshotActionRequiredReasons(rawSnapshot as never, {
-      readinessMode: 'merge'
-    });
-    snapshot = mapSnapshotRecord(rawSnapshot, actionRequiredReasons);
-  } catch (error) {
+  const baseWithResolution = {
+    ...baseWithContext,
+    ignored_historical_pr_urls: [...ignoredHistoricalPrUrls],
+    conflicting_attached_pr_urls: [...conflictingAttachedPrUrls]
+  };
+  const summarizeSelection = (summary: string): string =>
+    selectionNote ? `${summary} ${selectionNote}` : summary;
+
+  if (!snapshot) {
+    try {
+      const rawSnapshot = await resolveSnapshot({
+        owner: pr.owner,
+        repo: pr.repo,
+        prNumber: pr.number,
+        readinessMode: 'merge'
+      });
+      const actionRequiredReasons = resolveSnapshotActionRequiredReasons(rawSnapshot as never, {
+        readinessMode: 'merge'
+      });
+      snapshot = mapSnapshotRecord(rawSnapshot, actionRequiredReasons);
+    } catch (error) {
+      return {
+        ...baseWithResolution,
+        pr,
+        status: 'merge_failed',
+        reason: 'snapshot_read_failed',
+        summary: summarizeSelection(
+          `GitHub merge-readiness snapshot could not be loaded: ${(error as Error)?.message ?? String(error)}`
+        ),
+        snapshot: null
+      };
+    }
+  }
+
+  if (!snapshot) {
     return {
-      ...baseWithContext,
+      ...baseWithResolution,
       pr,
       status: 'merge_failed',
       reason: 'snapshot_read_failed',
-      summary: `GitHub merge-readiness snapshot could not be loaded: ${(error as Error)?.message ?? String(error)}`,
+      summary: summarizeSelection('GitHub merge-readiness snapshot could not be loaded.'),
       snapshot: null
     };
   }
@@ -306,11 +375,13 @@ export async function runProviderDeterministicMergeCloseout(
   const alreadyMerged = snapshot.merged_at !== null || snapshot.state === 'MERGED';
 
   if (!alreadyMerged && !snapshot.ready_to_merge) {
+    const nonMergedOutcome = classifyNonMergedSnapshot(snapshot, pr.number)!;
     return {
-      ...baseWithContext,
+      ...baseWithResolution,
       pr,
       snapshot,
-      ...classifyNonMergedSnapshot(snapshot, pr.number)!
+      ...nonMergedOutcome,
+      summary: summarizeSelection(nonMergedOutcome.summary)
     };
   }
 
@@ -363,23 +434,26 @@ export async function runProviderDeterministicMergeCloseout(
       const verificationOutcome = classifyNonMergedSnapshot(verificationSnapshot, pr.number);
       if (verificationOutcome) {
         return {
-          ...baseWithContext,
+          ...baseWithResolution,
           pr,
           snapshot: verificationSnapshot,
           merge_attempt: mergeAttempt,
-          ...verificationOutcome
+          ...verificationOutcome,
+          summary: summarizeSelection(verificationOutcome.summary)
         };
       }
       return {
-        ...baseWithContext,
+        ...baseWithResolution,
         pr,
         snapshot: verificationSnapshot,
         merge_attempt: mergeAttempt,
         status: 'merge_failed',
         reason: mergeResult.ok ? 'merge_not_confirmed' : 'merge_command_failed',
-        summary: mergeResult.ok
-          ? 'GitHub merge command exited successfully, but the pull request did not report a merged timestamp.'
-          : 'GitHub merge command failed before the pull request was confirmed merged.'
+        summary: summarizeSelection(
+          mergeResult.ok
+            ? 'GitHub merge command exited successfully, but the pull request did not report a merged timestamp.'
+            : 'GitHub merge command failed before the pull request was confirmed merged.'
+        )
       };
     }
   }
@@ -391,29 +465,31 @@ export async function runProviderDeterministicMergeCloseout(
   });
   if (sharedRoot.status === 'failed') {
     return {
-      ...baseWithContext,
+      ...baseWithResolution,
       pr,
       snapshot: verificationSnapshot,
       merge_attempt: mergeAttempt,
       shared_root: sharedRoot,
       status: 'merge_failed',
       reason: 'shared_root_reconciliation_failed',
-      summary: 'The pull request merged, but shared-root reconciliation failed.'
+      summary: summarizeSelection('The pull request merged, but shared-root reconciliation failed.')
     };
   }
 
   if (sharedRoot.status === 'skipped') {
     return {
-      ...baseWithContext,
+      ...baseWithResolution,
       pr,
       snapshot: verificationSnapshot,
       merge_attempt: mergeAttempt,
       shared_root: sharedRoot,
       status: 'action_required',
       reason: 'pending_shared_root_reconciliation',
-      summary: alreadyMerged
-        ? `Attached PR #${pr.number} was already merged; shared-root reconciliation is pending (${sharedRoot.reason}) before the Linear issue can transition to Done.`
-        : `Merged attached PR #${pr.number}; shared-root reconciliation is pending (${sharedRoot.reason}) before the Linear issue can transition to Done.`
+      summary: summarizeSelection(
+        alreadyMerged
+          ? `Attached PR #${pr.number} was already merged; shared-root reconciliation is pending (${sharedRoot.reason}) before the Linear issue can transition to Done.`
+          : `Merged attached PR #${pr.number}; shared-root reconciliation is pending (${sharedRoot.reason}) before the Linear issue can transition to Done.`
+      )
     };
   }
 
@@ -448,7 +524,7 @@ export async function runProviderDeterministicMergeCloseout(
 
   if (!transitionResult.ok) {
     return {
-      ...baseWithContext,
+      ...baseWithResolution,
       pr,
       snapshot: verificationSnapshot,
       merge_attempt: mergeAttempt,
@@ -456,12 +532,12 @@ export async function runProviderDeterministicMergeCloseout(
       linear_transition: linearTransition,
       status: 'transition_failed',
       reason: 'linear_done_transition_failed',
-      summary: 'The pull request merged, but the Linear issue could not transition to Done.'
+      summary: summarizeSelection('The pull request merged, but the Linear issue could not transition to Done.')
     };
   }
 
   return {
-    ...baseWithContext,
+    ...baseWithResolution,
     issue_state: linearTransition.issue_state,
     issue_state_type: linearTransition.issue_state_type,
     issue_updated_at: linearTransition.issue_updated_at,
@@ -474,10 +550,11 @@ export async function runProviderDeterministicMergeCloseout(
     reason: alreadyMerged
       ? 'merged_and_transitioned_done_after_recovery'
       : 'merged_and_transitioned_done',
-    summary:
+    summary: summarizeSelection(
       alreadyMerged
         ? `Attached PR #${pr.number} was already merged; reconciled shared root and transitioned the Linear issue to Done.`
         : `Merged attached PR #${pr.number}, reconciled shared root, and transitioned the Linear issue to Done.`
+    )
   };
 }
 
@@ -618,6 +695,121 @@ function collectAttachedGitHubPrUrls(
   return urls;
 }
 
+async function resolveAttachedSameRepoPullRequestCandidate(input: {
+  candidates: ProviderMergeCloseoutPullRequestRecord[];
+  resolveSnapshot: (
+    input: ProviderPrSnapshotReaderInput
+  ) => Promise<ProviderPrSnapshotRecord>;
+  resolveSnapshotActionRequiredReasons: (
+    snapshot: ProviderPrSnapshotRecord,
+    options?: { readinessMode?: 'merge' | 'review' }
+  ) => string[];
+}): Promise<ProviderMergeCloseoutAttachedPrResolution> {
+  const inspectedCandidates: Array<{
+    pr: ProviderMergeCloseoutPullRequestRecord;
+    snapshot: ProviderMergeCloseoutSnapshotRecord;
+  }> = [];
+
+  for (const pr of input.candidates) {
+    const rawSnapshot = await input.resolveSnapshot({
+      owner: pr.owner,
+      repo: pr.repo,
+      prNumber: pr.number,
+      readinessMode: 'merge'
+    });
+    inspectedCandidates.push({
+      pr,
+      snapshot: mapSnapshotRecord(
+        rawSnapshot,
+        input.resolveSnapshotActionRequiredReasons(rawSnapshot as never, {
+          readinessMode: 'merge'
+        })
+      )
+    });
+  }
+
+  const mergedCandidates = inspectedCandidates.filter((candidate) =>
+    isMergedPullRequestSnapshot(candidate.snapshot)
+  );
+  const nonMergedCandidates = inspectedCandidates.filter(
+    (candidate) => !isMergedPullRequestSnapshot(candidate.snapshot)
+  );
+
+  if (mergedCandidates.length > 0 && nonMergedCandidates.length === 1) {
+    const selectedCandidate = nonMergedCandidates[0]!;
+    const ignoredHistoricalCandidates = mergedCandidates.filter((candidate) =>
+      isSnapshotStrictlyOlderThanSelection(candidate.snapshot, selectedCandidate.snapshot)
+    );
+    if (ignoredHistoricalCandidates.length === mergedCandidates.length) {
+      const ignoredHistoricalPrUrls = ignoredHistoricalCandidates.map((candidate) => candidate.pr.url);
+      return {
+        selected_pr: selectedCandidate.pr,
+        selected_snapshot: selectedCandidate.snapshot,
+        ignored_historical_pr_urls: ignoredHistoricalPrUrls,
+        conflicting_attached_pr_urls: [],
+        selection_note:
+          ignoredHistoricalPrUrls.length > 0
+            ? `Ignored historical merged PR URLs: ${ignoredHistoricalPrUrls.join(', ')}.`
+            : null
+      };
+    }
+  }
+
+  if (mergedCandidates.length === 1 && nonMergedCandidates.length > 0) {
+    const selectedCandidate = mergedCandidates[0]!;
+    const staleUnmergedCandidates = nonMergedCandidates.filter((candidate) =>
+      isSnapshotStrictlyOlderThanSelection(candidate.snapshot, selectedCandidate.snapshot)
+    );
+    if (staleUnmergedCandidates.length === nonMergedCandidates.length) {
+      return {
+        selected_pr: selectedCandidate.pr,
+        selected_snapshot: selectedCandidate.snapshot,
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        selection_note: `Selected already-merged PR ${selectedCandidate.pr.url} because the remaining attached same-repo PR URLs are older and unmerged: ${staleUnmergedCandidates
+          .map((candidate) => candidate.pr.url)
+          .join(', ')}.`
+      };
+    }
+  }
+
+  const ignoredHistoricalCandidates =
+    nonMergedCandidates.length > 0
+      ? mergedCandidates.filter((candidate) =>
+          nonMergedCandidates.every((currentCandidate) =>
+            isSnapshotStrictlyOlderThanSelection(candidate.snapshot, currentCandidate.snapshot)
+          )
+        )
+      : [];
+  const ignoredHistoricalPrUrls = ignoredHistoricalCandidates.map((candidate) => candidate.pr.url);
+  const ignoredHistoricalUrlSet = new Set(ignoredHistoricalPrUrls);
+
+  return {
+    selected_pr: null,
+    selected_snapshot: null,
+    ignored_historical_pr_urls: ignoredHistoricalPrUrls,
+    conflicting_attached_pr_urls: inspectedCandidates
+      .filter((candidate) => !ignoredHistoricalUrlSet.has(candidate.pr.url))
+      .map((candidate) => candidate.pr.url),
+    selection_note: null
+  };
+}
+
+function buildMultipleAttachedPrsSummary(input: {
+  repoKey: string;
+  ignoredHistoricalPrUrls: string[];
+  conflictingAttachedPrUrls: string[];
+}): string {
+  const ignoredHistoricalSummary =
+    input.ignoredHistoricalPrUrls.length > 0
+      ? ` Ignored historical merged PR URLs: ${input.ignoredHistoricalPrUrls.join(', ')}.`
+      : '';
+  if (input.conflictingAttachedPrUrls.length === 0) {
+    return `Attached GitHub pull requests match ${input.repoKey}, but no current merge candidate remains after historical filtering; merge closeout is not armed.${ignoredHistoricalSummary}`;
+  }
+  return `Multiple attached GitHub pull requests match ${input.repoKey}; conflicting attached PR URLs still require deterministic disambiguation: ${input.conflictingAttachedPrUrls.join(', ')}.${ignoredHistoricalSummary}`;
+}
+
 function classifyNonMergedSnapshot(
   snapshot: ProviderMergeCloseoutSnapshotRecord,
   prNumber: number
@@ -651,6 +843,34 @@ function classifyNonMergedSnapshot(
     };
   }
   return null;
+}
+
+function isMergedPullRequestSnapshot(
+  snapshot: ProviderMergeCloseoutSnapshotRecord
+): boolean {
+  return snapshot.merged_at !== null || snapshot.state === 'MERGED';
+}
+
+function isSnapshotStrictlyOlderThanSelection(
+  candidate: ProviderMergeCloseoutSnapshotRecord,
+  selected: ProviderMergeCloseoutSnapshotRecord
+): boolean {
+  const candidateTimestamp = resolveSnapshotDisambiguationTimestamp(candidate);
+  const selectedTimestamp = resolveSnapshotDisambiguationTimestamp(selected);
+  if (candidateTimestamp === null || selectedTimestamp === null) {
+    return false;
+  }
+  return candidateTimestamp < selectedTimestamp;
+}
+
+function resolveSnapshotDisambiguationTimestamp(
+  snapshot: ProviderMergeCloseoutSnapshotRecord
+): number | null {
+  const preferredTimestamp = isMergedPullRequestSnapshot(snapshot)
+    ? snapshot.merged_at ?? snapshot.updated_at
+    : snapshot.updated_at;
+  const parsed = Date.parse(preferredTimestamp ?? '');
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function mapSnapshotRecord(

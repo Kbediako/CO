@@ -94,6 +94,8 @@ interface ProviderIssueMergeCloseoutLike {
   reason?: string | null;
   summary?: string | null;
   attached_pr_urls?: string[] | null;
+  ignored_historical_pr_urls?: string[] | null;
+  conflicting_attached_pr_urls?: string[] | null;
   pr?: {
     url?: string | null;
     owner?: string | null;
@@ -194,6 +196,8 @@ export interface ControlProviderDebugSnapshot {
   } | null;
   pull_request: {
     attached_pr_urls: string[];
+    ignored_historical_pr_urls: string[];
+    conflicting_attached_pr_urls: string[];
     url: string | null;
     owner: string | null;
     repo: string | null;
@@ -802,6 +806,8 @@ function buildProviderDebugPullRequestSnapshot(
   const snapshot = mergeCloseout.snapshot ?? null;
   return {
     attached_pr_urls: normalizeStringArray(mergeCloseout.attached_pr_urls),
+    ignored_historical_pr_urls: normalizeStringArray(mergeCloseout.ignored_historical_pr_urls),
+    conflicting_attached_pr_urls: normalizeStringArray(mergeCloseout.conflicting_attached_pr_urls),
     url: normalizeOptionalString(mergeCloseout.pr?.url),
     owner: normalizeOptionalString(mergeCloseout.pr?.owner),
     repo: normalizeOptionalString(mergeCloseout.pr?.repo),
