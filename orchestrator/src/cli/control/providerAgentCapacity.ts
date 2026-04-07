@@ -67,7 +67,7 @@ function readPositiveIntegerValue(
     }
     if (typeof value === 'string') {
       const trimmed = value.trim();
-      if (!trimmed) {
+      if (!trimmed || !/^\d+$/.test(trimmed)) {
         continue;
       }
       const parsed = Number.parseInt(trimmed, 10);

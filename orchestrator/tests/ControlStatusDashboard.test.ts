@@ -691,6 +691,50 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('│  No queued retries');
   });
 
+  it('renders unavailable max allowed capacity without fabricating a tracked-issue ceiling', () => {
+    const dataset = buildDataset({
+      counts: {
+        ...buildDataset().counts,
+        issues: 9,
+        max_allowed: null
+      }
+    });
+
+    const fullFrame = stripAnsi(
+      renderControlStatusFrame({
+        dataset,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        terminalColumns: 120,
+        throughputTps: 0
+      })
+    );
+    const compactFrame = stripAnsi(
+      renderControlStatusFrame({
+        dataset,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        terminalColumns: 120,
+        terminalRows: 10,
+        throughputTps: 0,
+        paused: true,
+        viewMode: 'compact',
+        pendingUpdate: false
+      })
+    );
+
+    expect(fullFrame).toContain('│ Agents: 1/n/a max allowed');
+    expect(fullFrame).not.toContain('│ Agents: 1/9 max allowed');
+    expect(compactFrame).toContain('│ Status: 1/n/a max allowed | 15m 12s | next 15s');
+    expect(compactFrame).not.toContain('│ Status: 1/9 max allowed | 15m 12s | next 15s');
+  });
+
   it('renders compact inspect mode as a short-terminal summary frame', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset(),
@@ -2259,6 +2303,20 @@ describe('control status dashboard', () => {
       resolveSecondDataset = resolve;
     });
     let readCount = 0;
+    const updatedDataset = buildDataset({
+      generated_at: '2026-03-30T01:15:05.000Z',
+      totals: {
+        ...buildDataset().totals,
+        seconds_running: 930
+      },
+      running: [
+        {
+          ...buildDataset().running[0],
+          display_event: 'Worker turn updated after pause',
+          last_event_at: '2026-03-30T01:15:04.000Z'
+        }
+      ]
+    });
     const runtime = {
       requestRefresh: vi.fn(async () => undefined),
       subscribe: vi.fn((callback: () => void) => {
@@ -2315,13 +2373,18 @@ describe('control status dashboard', () => {
     input.emitText('p');
     await Promise.resolve();
 
-    resolveSecondDataset?.(buildDataset());
+    resolveSecondDataset?.(updatedDataset);
     await handle.flush();
 
     const pauseWrites = writes.slice(liveWriteCount);
     expect(pauseWrites).toHaveLength(1);
     expect(pauseWrites[0]?.startsWith(ANSI_ALT_SCREEN_EXIT)).toBe(true);
-    expect(stripAnsi(pauseWrites[0] ?? '')).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(stripAnsi(pauseWrites[0] ?? '')).toContain(
+      '│ Inspect: paused | primary snapshot | full frame | updates waiting'
+    );
+    expect(stripAnsi(pauseWrites[0] ?? '')).toContain('│ Runtime: 15m 12s');
+    expect(stripAnsi(pauseWrites[0] ?? '')).not.toContain('│ Runtime: 15m 30s');
+    expect(stripAnsi(pauseWrites[0] ?? '')).not.toContain('Worker turn updated after pause');
     expect(pauseWrites[0]?.endsWith('\n')).toBe(true);
     expect(pauseWrites.filter((write) => write.endsWith('\n'))).toHaveLength(1);
 

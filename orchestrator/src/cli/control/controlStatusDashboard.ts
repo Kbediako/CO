@@ -484,11 +484,13 @@ function startControlStatusViewer(
         if (frameState.paused) {
           if (activeRender) {
             const hadQueuedRender = clearQueuedRenderState();
-            if (hadQueuedRender) {
-              frameState = {
-                ...frameState,
-                pendingUpdate: true
-              };
+            frameState = {
+              ...frameState,
+              pendingUpdate: frameState.pendingUpdate || hadQueuedRender
+            };
+            if (renderedState) {
+              queuedRender = true;
+              queuedUseCachedFrame = true;
             }
             continue;
           }
@@ -619,12 +621,20 @@ function startControlStatusViewer(
           : now;
       tokenSamples = appendTokenSample(tokenSamples, now.getTime(), dataset.totals.total_tokens);
       const throughputTps = rollingTokensPerSecond(tokenSamples);
-      renderedState = {
+      const nextRenderedState: RenderedDashboardState = {
         dataset,
         referenceTime,
         liveClockStartedAt,
         throughputTps
       };
+      if (frameState.paused && renderedState) {
+        frameState = {
+          ...frameState,
+          pendingUpdate: true
+        };
+        return;
+      }
+      renderedState = nextRenderedState;
       frameState = {
         ...frameState,
         pendingUpdate: frameState.paused ? frameState.pendingUpdate : false
@@ -641,15 +651,7 @@ function startControlStatusViewer(
         terminalRows: output.rows ?? null,
         throughputTps,
         referenceTime,
-        liveReferenceTime: deriveLiveReferenceTime(
-          {
-            dataset,
-            referenceTime,
-            liveClockStartedAt,
-            throughputTps
-          },
-          now
-        ),
+        liveReferenceTime: resolveDisplayedLiveReferenceTime(nextRenderedState, frameState, now),
         paused: frameState.paused,
         viewMode: frameState.viewMode,
         surfaceMode: frameState.surfaceMode,
@@ -968,7 +970,7 @@ function renderAgentsLine(dataset: OperatorDashboardDataset, terminalColumns: nu
     [
       { text: formatCount(dataset.counts.running), color: ANSI_GREEN },
       { text: '/', color: ANSI_GRAY },
-      { text: `${formatCount(maxAllowed)} max allowed`, color: ANSI_GRAY }
+      { text: `${formatOptionalCount(maxAllowed)} max allowed`, color: ANSI_GRAY }
     ],
     terminalColumns
   );
@@ -1064,7 +1066,10 @@ function renderCompactStatusLine(
   return renderSummaryLine(
     'Status',
     [
-      { text: `${formatCount(dataset.counts.running)}/${formatCount(maxAllowed)} max allowed`, color: ANSI_GREEN },
+      {
+        text: `${formatCount(dataset.counts.running)}/${formatOptionalCount(maxAllowed)} max allowed`,
+        color: ANSI_GREEN
+      },
       { text: ' | ', color: ANSI_GRAY },
       { text: formatLiveRuntimeSeconds(dataset, referenceTime, liveReferenceTime), color: ANSI_MAGENTA },
       { text: ' | ', color: ANSI_GRAY },
@@ -2272,12 +2277,12 @@ function resolveDisplayedLiveReferenceTime(
   return deriveLiveReferenceTime(renderedState, now);
 }
 
-function resolveMaxAllowedAgents(dataset: OperatorDashboardDataset): number {
+function resolveMaxAllowedAgents(dataset: OperatorDashboardDataset): number | null {
   const value = dataset.counts.max_allowed;
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
     return Math.floor(value);
   }
-  return dataset.counts.issues;
+  return null;
 }
 
 function resolveTerminalColumns(value: number | null | undefined): number {
