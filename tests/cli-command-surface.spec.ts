@@ -118,9 +118,10 @@ function parseCliFailure(error: unknown): { stdout: string; stderr: string; exit
   }
   const stdout = typeof typed.stdout === 'string' ? typed.stdout : typed.stdout?.toString() ?? '';
   const stderr = typeof typed.stderr === 'string' ? typed.stderr : typed.stderr?.toString() ?? '';
-  const messageDetailStart = typeof typed.message === 'string' ? typed.message.indexOf('\n') : -1;
+  const trimmedMessage = typeof typed.message === 'string' ? typed.message.trim() : '';
+  const messageDetailStart = trimmedMessage.indexOf('\n');
   const messageDetail =
-    messageDetailStart >= 0 ? typed.message?.slice(messageDetailStart + 1).trim() ?? '' : '';
+    messageDetailStart >= 0 ? trimmedMessage.slice(messageDetailStart + 1).trim() : trimmedMessage;
   const parsedExitCode =
     typeof typed.code === 'number'
       ? typed.code
@@ -218,6 +219,18 @@ describe('codex-orchestrator command surface', () => {
     expect(parsed.exitCode).toBe(1);
     expect(parsed.stderr).toContain('Unknown command: unknown-command');
     expect(parsed.stdout).toContain('Usage: codex-orchestrator <command> [options]');
+  });
+
+  it('preserves single-line exec failure messages when stderr is empty', () => {
+    const parsed = parseCliFailure({
+      code: 1,
+      stdout: '',
+      stderr: '',
+      message: 'Command failed: unknown-command'
+    });
+
+    expect(parsed.exitCode).toBe(1);
+    expect(parsed.stderr).toBe('Command failed: unknown-command');
   });
 
   it('prints status help without requiring a run id', async () => {
