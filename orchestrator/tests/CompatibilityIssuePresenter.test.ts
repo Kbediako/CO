@@ -386,7 +386,7 @@ describe('CompatibilityIssuePresenter', () => {
     );
   });
 
-  it('keeps projected polling exhaustion visible during shared cooldown even when a newer proof budget looks healthy', () => {
+  it('keeps projected shared polling exhaustion visible during cooldown despite stale checking and endpoint-only proof exhaustion', () => {
     const runningEntry = buildCompatibilityRunningEntry(
       buildCompatibilitySource({
         rawStatus: 'in_progress',
@@ -428,6 +428,11 @@ describe('CompatibilityIssuePresenter', () => {
               remaining: 8,
               limit: 30,
               reset_at: '2026-04-06T02:36:13.000Z'
+            },
+            endpoint_requests: {
+              remaining: 0,
+              limit: 12,
+              reset_at: '2026-04-06T02:35:44.000Z'
             }
           },
           tracked_issue_error: null,
@@ -437,6 +442,7 @@ describe('CompatibilityIssuePresenter', () => {
       }),
       {
         ...buildExhaustedLinearPolling(),
+        checking: true,
         next_refresh_state: 'cooldown',
         next_refresh_at: '2026-04-06T02:35:43.000Z',
         next_refresh_in_ms: 43_000

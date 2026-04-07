@@ -525,11 +525,15 @@ function resolveCompatibilityPollingLinearBudgetExhaustionEvent(
   nextRefreshInMs: number | null
 ): string | null {
   const pollingBudget = polling?.linear_budget ?? null;
-  if (polling?.checking || !isCompatibilityLinearBudgetExhausted(pollingBudget)) {
+  if (
+    !isCompatibilityLinearBudgetSharedExhausted(pollingBudget) ||
+    polling?.next_refresh_state === 'checking' ||
+    polling?.next_refresh_state === 'unknown'
+  ) {
     return null;
   }
   const proofBudget = selected.providerLinearWorkerProof?.linear_budget ?? null;
-  if (isCompatibilityLinearBudgetExhausted(proofBudget)) {
+  if (isCompatibilityLinearBudgetSharedExhausted(proofBudget)) {
     return null;
   }
   return resolveLinearBudgetExhaustionEvent(pollingBudget, {
@@ -648,6 +652,21 @@ function isCompatibilityLinearBudgetExhausted(
   return (
     isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'requests') ||
     isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'complexity')
+  );
+}
+
+function isCompatibilityLinearBudgetSharedExhausted(
+  budget:
+    | {
+        requests?: { remaining?: number | null } | null;
+        complexity?: { remaining?: number | null } | null;
+      }
+    | null
+    | undefined
+): boolean {
+  return (
+    isCompatibilityLinearBudgetBucketExhausted(budget?.requests) ||
+    isCompatibilityLinearBudgetBucketExhausted(budget?.complexity)
   );
 }
 
