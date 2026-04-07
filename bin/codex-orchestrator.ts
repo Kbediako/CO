@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs';
+import { existsSync, writeSync } from 'node:fs';
 import { opendir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import process from 'node:process';
@@ -85,7 +85,17 @@ interface RunOutputPayload {
 }
 
 function writeStderrLine(message: string): void {
-  process.stderr.write(`${message}\n`);
+  const line = `${message}\n`;
+  const stderrFd = process.stderr.fd;
+  if (typeof stderrFd === 'number') {
+    try {
+      writeSync(stderrFd, line);
+      return;
+    } catch {
+      // Fall through to the standard stream write when direct fd access is unavailable.
+    }
+  }
+  process.stderr.write(line);
 }
 
 async function main(): Promise<void> {
