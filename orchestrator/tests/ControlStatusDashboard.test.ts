@@ -840,6 +840,37 @@ describe('control status dashboard', () => {
     );
   });
 
+  it('falls back to percent remaining when an exhausted Codex usage window lacks reset metadata', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        rate_limits: {
+          primary: {
+            usedPercent: 100,
+            windowDurationMins: 300
+          },
+          secondary: {
+            usedPercent: 48,
+            windowDurationMins: 10080
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const rateLimitLine = stripAnsi(frame)
+      .split('\n')
+      .find((line) => line.startsWith('│ Rate Limits: '));
+    expect(rateLimitLine).toBeDefined();
+    expect(rateLimitLine).toContain('Codex 5-hour 0% | weekly 52%');
+    expect(rateLimitLine).not.toContain('resets soon');
+  });
+
   it('renders authoritative Linear budget snapshots instead of falling back to unavailable', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({

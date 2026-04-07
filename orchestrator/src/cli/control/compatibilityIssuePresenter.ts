@@ -258,8 +258,8 @@ function resolveCompatibilityRunningPolling(
   if (!polling || !owner) {
     return null;
   }
-  if (owner.issueId || source.issueId) {
-    return owner.issueId && source.issueId && owner.issueId === source.issueId ? polling : null;
+  if (owner.issueId && source.issueId) {
+    return owner.issueId === source.issueId ? polling : null;
   }
   if (owner.issueIdentifier && owner.issueIdentifier === source.issueIdentifier) {
     return polling;

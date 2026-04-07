@@ -1874,7 +1874,9 @@ function appendOperatorRateLimitSegment(
 function formatOperatorRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
   if (isRateLimitBucketExhausted(bucket)) {
     const resetSeconds = resolveRateLimitBucketResetSeconds(bucket, referenceTime);
-    return resetSeconds !== null ? `resets ${formatHumanDurationShort(resetSeconds)}` : 'resets soon';
+    if (resetSeconds !== null) {
+      return `resets ${formatHumanDurationShort(resetSeconds)}`;
+    }
   }
   const remainingPercent = resolveRateLimitBucketRemainingPercent(bucket);
   if (remainingPercent !== null) {

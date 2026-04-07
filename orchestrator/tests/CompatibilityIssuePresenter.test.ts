@@ -218,4 +218,38 @@ describe('CompatibilityIssuePresenter', () => {
       'linear requests exhausted; next tracked-issue refresh at 43s'
     );
   });
+
+  it('falls back to issueIdentifier when the tracked Linear owner has an issueId but the running row is legacy id-less', () => {
+    const selected = buildCompatibilitySource({
+      issueProvider: 'linear',
+      issueId: 'issue-owner',
+      issueIdentifier: 'CO-100',
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      tracked: {
+        linear: {
+          id: 'issue-owner',
+          identifier: 'CO-100'
+        } as NonNullable<ControlCompatibilitySourceContext['tracked']>['linear']
+      }
+    });
+    const runningSource = buildCompatibilitySource({
+      issueProvider: 'linear',
+      issueId: null,
+      issueIdentifier: 'CO-100',
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      summary: 'Provider worker turn is active.'
+    });
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(selected),
+      running: [runningSource],
+      polling: buildExhaustedLinearPolling()
+    });
+
+    expect(projection.running[0]?.issue_id).toBeNull();
+    expect(projection.running[0]?.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
 });
