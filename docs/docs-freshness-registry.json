@@ -39,6 +39,12 @@
     },
     {
       "path": "tasks/tasks-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-08",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
