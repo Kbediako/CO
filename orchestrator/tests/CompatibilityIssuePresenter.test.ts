@@ -385,4 +385,127 @@ describe('CompatibilityIssuePresenter', () => {
       'linear requests exhausted; next tracked-issue refresh at 43s'
     );
   });
+
+  it('keeps projected polling exhaustion visible during shared cooldown even when a newer proof budget looks healthy', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'session-3',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'account/ratelimits/updated',
+          last_message: 'rate limits updated',
+          last_event_at: '2026-04-06T02:35:43.000Z',
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'worker_turn',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          linear_budget: {
+            ...buildExhaustedLinearPolling()!.linear_budget!,
+            observed_at: '2026-04-06T02:35:43.000Z',
+            source: 'provider-linear-worker-proof',
+            suppression: 'none',
+            suppression_reason: null,
+            retry_after_seconds: null,
+            cooldown_until: null,
+            cooldown_active: false,
+            requests: {
+              remaining: 8,
+              limit: 30,
+              reset_at: '2026-04-06T02:36:13.000Z'
+            }
+          },
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:43.000Z'
+        }
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T02:35:43.000Z',
+        next_refresh_in_ms: 43_000
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('drops polling exhaustion once the shared cooldown has transitioned into a real poll attempt', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'session-3',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'account/ratelimits/updated',
+          last_message: 'rate limits updated',
+          last_event_at: '2026-04-06T02:35:44.000Z',
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'worker_turn',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          linear_budget: {
+            ...buildExhaustedLinearPolling()!.linear_budget!,
+            observed_at: '2026-04-06T02:35:44.000Z',
+            source: 'provider-linear-worker-proof',
+            suppression: 'none',
+            suppression_reason: null,
+            retry_after_seconds: null,
+            cooldown_until: null,
+            cooldown_active: false,
+            requests: {
+              remaining: 8,
+              limit: 30,
+              reset_at: '2026-04-06T02:36:14.000Z'
+            }
+          },
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:44.000Z'
+        }
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        checking: true,
+        next_refresh_state: 'checking',
+        next_refresh_at: null,
+        next_refresh_in_ms: null
+      }
+    );
+
+    expect(runningEntry.display_event).toBe('rate limits updated');
+  });
 });

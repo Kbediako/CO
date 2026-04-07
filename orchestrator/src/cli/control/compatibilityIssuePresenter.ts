@@ -444,6 +444,15 @@ function resolveCompatibilityRunningDisplayEvent(input: {
   }
 
   const nextRefreshInMs = resolveCompatibilityNextRefreshCountdownMs(input.polling);
+  const pollingLinearBudgetEvent = resolveCompatibilityPollingLinearBudgetExhaustionEvent(
+    input.selected,
+    input.polling,
+    nextRefreshInMs
+  );
+  if (pollingLinearBudgetEvent) {
+    return pollingLinearBudgetEvent;
+  }
+
   const authoritativeLinearBudget = resolveAuthoritativeLinearBudget({
     selected: input.selected,
     polling: input.polling
@@ -508,6 +517,24 @@ function resolveCompatibilityNextRefreshCountdownMs(
     polling.next_poll_in_ms >= 0
     ? polling.next_poll_in_ms
     : null;
+}
+
+function resolveCompatibilityPollingLinearBudgetExhaustionEvent(
+  selected: ControlCompatibilitySourceContext,
+  polling: ControlPollingHealthPayload | null,
+  nextRefreshInMs: number | null
+): string | null {
+  const pollingBudget = polling?.linear_budget ?? null;
+  if (polling?.checking || !isCompatibilityLinearBudgetExhausted(pollingBudget)) {
+    return null;
+  }
+  const proofBudget = selected.providerLinearWorkerProof?.linear_budget ?? null;
+  if (isCompatibilityLinearBudgetExhausted(proofBudget)) {
+    return null;
+  }
+  return resolveLinearBudgetExhaustionEvent(pollingBudget, {
+    nextRefreshInMs
+  });
 }
 
 function resolveAuthoritativeLinearBudget(input: {
@@ -604,6 +631,23 @@ function isCompatibilityLinearBudgetBucketFamilyExhausted(
   return (
     isCompatibilityLinearBudgetBucketExhausted(primaryBucket) ||
     isCompatibilityLinearBudgetBucketExhausted(endpointBucket)
+  );
+}
+
+function isCompatibilityLinearBudgetExhausted(
+  budget:
+    | {
+        requests?: { remaining?: number | null } | null;
+        endpoint_requests?: { remaining?: number | null } | null;
+        complexity?: { remaining?: number | null } | null;
+        endpoint_complexity?: { remaining?: number | null } | null;
+      }
+    | null
+    | undefined
+): boolean {
+  return (
+    isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'requests') ||
+    isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'complexity')
   );
 }
 
