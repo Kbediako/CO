@@ -444,9 +444,15 @@ function resolveCompatibilityRunningDisplayEvent(input: {
     return codexBudgetEvent;
   }
 
-  const pollingLinearBudgetEvent = resolveLinearBudgetExhaustionEvent(input.polling?.linear_budget ?? null, {
-    nextPollInMs: input.polling?.next_poll_in_ms ?? null
-  });
+  const nextRefreshInMs = resolveCompatibilityNextRefreshCountdownMs(input.polling);
+  const hasProjectedNextRefreshState =
+    input.polling?.next_refresh_state !== undefined &&
+    input.polling?.next_refresh_state !== null;
+  const pollingLinearBudgetEvent = resolveCompatibilityPollingLinearBudgetExhaustionEvent(
+    input.selected,
+    input.polling,
+    nextRefreshInMs
+  );
   if (pollingLinearBudgetEvent) {
     return pollingLinearBudgetEvent;
   }
@@ -455,10 +461,20 @@ function resolveCompatibilityRunningDisplayEvent(input: {
     selected: input.selected,
     polling: input.polling
   });
+  const authoritativeLinearBudgetForEvent =
+    authoritativeLinearBudget === input.polling?.linear_budget &&
+    !shouldUseCompatibilityPollingCooldownState(input.polling)
+      ? null
+      : authoritativeLinearBudget;
+  const authoritativeNextRefreshInMs =
+    authoritativeLinearBudgetForEvent === input.polling?.linear_budget ? nextRefreshInMs : null;
   const linearBudgetEvent = resolveLinearBudgetExhaustionEvent(
-    authoritativeLinearBudget,
+    authoritativeLinearBudgetForEvent,
     {
-      nextPollInMs: input.polling?.next_poll_in_ms ?? null
+      nextRefreshInMs: authoritativeNextRefreshInMs,
+      preferProjectedCountdown:
+        authoritativeLinearBudgetForEvent === input.polling?.linear_budget &&
+        hasProjectedNextRefreshState
     }
   );
   if (linearBudgetEvent) {
@@ -491,6 +507,61 @@ function resolveCompatibilityRunningDisplayEvent(input: {
     return humanizedStatusReason;
   }
   return null;
+}
+
+function resolveCompatibilityNextRefreshCountdownMs(
+  polling: ControlPollingHealthPayload | null
+): number | null {
+  if (
+    typeof polling?.next_refresh_in_ms === 'number' &&
+    Number.isFinite(polling.next_refresh_in_ms) &&
+    polling.next_refresh_in_ms >= 0
+  ) {
+    return polling.next_refresh_in_ms;
+  }
+  const hasProjectedState =
+    polling?.next_refresh_state !== undefined && polling?.next_refresh_state !== null;
+  if (hasProjectedState) {
+    return null;
+  }
+  return typeof polling?.next_poll_in_ms === 'number' &&
+    Number.isFinite(polling.next_poll_in_ms) &&
+    polling.next_poll_in_ms >= 0
+    ? polling.next_poll_in_ms
+    : null;
+}
+
+function resolveCompatibilityPollingLinearBudgetExhaustionEvent(
+  selected: ControlCompatibilitySourceContext,
+  polling: ControlPollingHealthPayload | null,
+  nextRefreshInMs: number | null
+): string | null {
+  const pollingBudget = polling?.linear_budget ?? null;
+  if (
+    !shouldUseCompatibilityPollingCooldownState(polling) ||
+    !isCompatibilityLinearBudgetSharedExhausted(pollingBudget)
+  ) {
+    return null;
+  }
+  const proofBudget = selected.providerLinearWorkerProof?.linear_budget ?? null;
+  if (isCompatibilityLinearBudgetSharedExhausted(proofBudget)) {
+    return null;
+  }
+  return resolveLinearBudgetExhaustionEvent(pollingBudget, {
+    nextRefreshInMs,
+    preferProjectedCountdown:
+      polling?.next_refresh_state !== undefined && polling?.next_refresh_state !== null
+  });
+}
+
+function shouldUseCompatibilityPollingCooldownState(
+  polling: ControlPollingHealthPayload | null
+): boolean {
+  return (
+    polling?.next_refresh_state === undefined ||
+    polling?.next_refresh_state === null ||
+    polling.next_refresh_state === 'cooldown'
+  );
 }
 
 function resolveAuthoritativeLinearBudget(input: {
@@ -548,19 +619,33 @@ function resolveLinearBudgetExhaustionEvent(
     | null
     | undefined,
   options: {
-    nextPollInMs?: number | null;
+    nextRefreshInMs?: number | null;
+    preferProjectedCountdown?: boolean;
   } = {}
 ): string | null {
   if (isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'requests')) {
     const nextRefresh = formatCompatibilityCountdownMs(
-      resolveCompatibilityLinearBudgetCountdownMs(budget, options.nextPollInMs ?? null)
+      resolveCompatibilityLinearBudgetCountdownMs(
+        budget,
+        options.nextRefreshInMs ?? null,
+        options.preferProjectedCountdown === true
+      )
     );
     return nextRefresh
       ? `linear requests exhausted; next tracked-issue refresh at ${nextRefresh}`
       : 'linear requests exhausted; polling deferred until reset';
   }
   if (isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'complexity')) {
-    return 'linear complexity budget exhausted; polling deferred until reset';
+    const nextRefresh = formatCompatibilityCountdownMs(
+      resolveCompatibilityLinearBudgetCountdownMs(
+        budget,
+        options.nextRefreshInMs ?? null,
+        options.preferProjectedCountdown === true
+      )
+    );
+    return nextRefresh
+      ? `linear complexity budget exhausted; next tracked-issue refresh at ${nextRefresh}`
+      : 'linear complexity budget exhausted; polling deferred until reset';
   }
   return null;
 }
@@ -585,6 +670,21 @@ function isCompatibilityLinearBudgetBucketFamilyExhausted(
   );
 }
 
+function isCompatibilityLinearBudgetSharedExhausted(
+  budget:
+    | {
+        requests?: { remaining?: number | null } | null;
+        complexity?: { remaining?: number | null } | null;
+      }
+    | null
+    | undefined
+): boolean {
+  return (
+    isCompatibilityLinearBudgetBucketExhausted(budget?.requests) ||
+    isCompatibilityLinearBudgetBucketExhausted(budget?.complexity)
+  );
+}
+
 function isCompatibilityLinearBudgetBucketExhausted(
   bucket: { remaining?: number | null } | null | undefined
 ): boolean {
@@ -599,15 +699,21 @@ function resolveCompatibilityLinearBudgetCountdownMs(
       }
     | null
     | undefined,
-  fallbackMs: number | null
+  projectedMs: number | null,
+  preferProjectedCountdown: boolean
 ): number | null {
+  const normalizedProjectedMs =
+    typeof projectedMs === 'number' && Number.isFinite(projectedMs) && projectedMs >= 0
+      ? projectedMs
+      : null;
   const retryAfterSeconds = normalizeCompatibilityRemaining(budget?.retry_after_seconds);
+  if (preferProjectedCountdown && normalizedProjectedMs !== null) {
+    return normalizedProjectedMs;
+  }
   if (retryAfterSeconds !== null) {
     return Math.max(0, Math.ceil(retryAfterSeconds * 1000));
   }
-  return typeof fallbackMs === 'number' && Number.isFinite(fallbackMs) && fallbackMs >= 0
-    ? fallbackMs
-    : null;
+  return normalizedProjectedMs;
 }
 
 function normalizeCompatibilityRemaining(value: number | null | undefined): number | null {

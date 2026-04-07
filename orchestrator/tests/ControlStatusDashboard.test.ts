@@ -777,6 +777,7 @@ describe('control status dashboard', () => {
         polling: {
           ...buildDataset().polling,
           checking: true,
+          next_refresh_state: 'checking',
           next_poll_in_ms: 15000
         }
       }),
@@ -791,6 +792,78 @@ describe('control status dashboard', () => {
     });
 
     expect(stripAnsi(frame)).toContain('│ Status: 1/4 max allowed | 15m 12s | checking now...');
+  });
+
+  it('renders cooldown-suppressed next refresh from projected truth instead of raw checking or stale scheduling', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        polling: {
+          ...buildDataset().polling,
+          checking: true,
+          next_poll_in_ms: (58 * 60 + 11) * 1000,
+          next_refresh_state: 'cooldown',
+          next_refresh_at: '2026-03-30T01:44:32.000Z',
+          next_refresh_in_ms: (29 * 60 + 32) * 1000,
+          linear_budget: {
+            observed_at: '2026-03-30T01:15:00.000Z',
+            source: 'control-host-polling',
+            request_id: 'polling-budget-dashboard',
+            retry_after_seconds: 29 * 60 + 32,
+            cooldown_until: '2026-03-30T01:44:32.000Z',
+            cooldown_active: true,
+            suppression: 'cooldown',
+            suppression_reason: 'linear_budget_shared_cooldown',
+            requests: {
+              limit: 30,
+              remaining: 0,
+              reset_at: '2026-03-30T01:44:32.000Z'
+            },
+            endpoint_requests: null,
+            complexity: null,
+            endpoint_complexity: null
+          }
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Next refresh: 29m 32s');
+    expect(plainFrame).not.toContain('│ Next refresh: checking now...');
+    expect(plainFrame).not.toContain('│ Next refresh: 58m 11s');
+  });
+
+  it('does not fall back to raw checking or stale scheduling once projected state exists', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        polling: {
+          ...buildDataset().polling,
+          checking: true,
+          next_poll_in_ms: (58 * 60 + 11) * 1000,
+          next_refresh_state: 'cooldown',
+          next_refresh_at: '2026-03-30T01:44:32.000Z',
+          next_refresh_in_ms: null
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Next refresh: n/a');
+    expect(plainFrame).not.toContain('│ Next refresh: checking now...');
+    expect(plainFrame).not.toContain('│ Next refresh: 58m 11s');
   });
 
   it('renders absolute rate-limit reset timestamps against the dashboard snapshot time', () => {

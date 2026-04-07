@@ -226,7 +226,6 @@ describe('codex-orchestrator command surface', () => {
     const stdout = await readFile(stdoutPath, 'utf8');
     const stderr = await readFile(stderrPath, 'utf8');
     const exitCode = Number((await readFile(exitCodePath, 'utf8')).trim());
-
     expect(exitCode).not.toBe(0);
     if (stderr.trim().length > 0) {
       expect(stderr).toMatch(/Unknown command: unknown-command|Command failed:/);
