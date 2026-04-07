@@ -327,4 +327,62 @@ describe('CompatibilityIssuePresenter', () => {
       'linear requests exhausted; next tracked-issue refresh at 43s'
     );
   });
+
+  it('prefers the authoritative proof retry-after over a stale polling projection', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'session-3',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'linear requests exhausted; polling deferred until reset',
+          last_message: null,
+          last_event_at: '2026-04-06T02:35:43.000Z',
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'worker_turn',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          linear_budget: {
+            ...buildExhaustedLinearPolling()!.linear_budget!,
+            observed_at: '2026-04-06T02:35:43.000Z',
+            source: 'provider-linear-worker-proof',
+            retry_after_seconds: 43
+          },
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:43.000Z'
+        }
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T03:04:32.000Z',
+        next_refresh_in_ms: (29 * 60 + 32) * 1000,
+        linear_budget: {
+          ...buildExhaustedLinearPolling()!.linear_budget!,
+          observed_at: '2026-04-06T02:35:00.000Z',
+          retry_after_seconds: (29 * 60) + 32
+        }
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
 });

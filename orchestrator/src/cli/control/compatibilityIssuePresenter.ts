@@ -444,21 +444,16 @@ function resolveCompatibilityRunningDisplayEvent(input: {
   }
 
   const nextRefreshInMs = resolveCompatibilityNextRefreshCountdownMs(input.polling);
-  const pollingLinearBudgetEvent = resolveLinearBudgetExhaustionEvent(input.polling?.linear_budget ?? null, {
-    nextRefreshInMs
-  });
-  if (pollingLinearBudgetEvent) {
-    return pollingLinearBudgetEvent;
-  }
-
   const authoritativeLinearBudget = resolveAuthoritativeLinearBudget({
     selected: input.selected,
     polling: input.polling
   });
+  const authoritativeNextRefreshInMs =
+    authoritativeLinearBudget === input.polling?.linear_budget ? nextRefreshInMs : null;
   const linearBudgetEvent = resolveLinearBudgetExhaustionEvent(
     authoritativeLinearBudget,
     {
-      nextRefreshInMs
+      nextRefreshInMs: authoritativeNextRefreshInMs
     }
   );
   if (linearBudgetEvent) {
