@@ -2928,4 +2928,137 @@ describe('SelectedRunProjection', () => {
       summary: 'current task remains selected'
     });
   });
+
+  it('preserves the active Linear state verbatim in displayStatus instead of collapsing it to running', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-04-07T00:10:00.000Z',
+        summary: 'Active work in progress'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.rawStatus).toBe('in_progress');
+    expect(selected?.displayStatus).toBe('In Progress');
+  });
+
+  it('preserves a started state named Running verbatim in displayStatus', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-04-07T00:11:00.000Z',
+        summary: 'Active work in progress'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_state: 'running',
+      issue_state_type: 'started',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.rawStatus).toBe('in_progress');
+    expect(selected?.displayStatus).toBe('running');
+  });
+
+  it('returns the raw in_progress status when no compatible Linear state is available', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-04-07T00:12:00.000Z',
+        summary: 'Active work in progress'
+      }),
+      'utf8'
+    );
+
+    // No issue_state provided - compatibilityState will be null
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_state: undefined as unknown as string,
+      issue_state_type: undefined as unknown as string,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.rawStatus).toBe('in_progress');
+    expect(selected?.displayStatus).toBe('in_progress');
+  });
 });
