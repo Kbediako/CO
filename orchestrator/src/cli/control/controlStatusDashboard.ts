@@ -634,9 +634,17 @@ function startControlStatusViewer(
         };
         return;
       }
+      const liveReferenceTime =
+        frameState.paused && frameState.pausedLiveReferenceTime === null
+          ? deriveLiveReferenceTime(nextRenderedState, now)
+          : resolveDisplayedLiveReferenceTime(nextRenderedState, frameState, now);
       renderedState = nextRenderedState;
       frameState = {
         ...frameState,
+        pausedLiveReferenceTime:
+          frameState.paused && frameState.pausedLiveReferenceTime === null
+            ? liveReferenceTime
+            : frameState.pausedLiveReferenceTime,
         pendingUpdate: frameState.paused ? frameState.pendingUpdate : false
       };
       const frame = renderControlStatusFrame({
@@ -651,7 +659,7 @@ function startControlStatusViewer(
         terminalRows: output.rows ?? null,
         throughputTps,
         referenceTime,
-        liveReferenceTime: resolveDisplayedLiveReferenceTime(nextRenderedState, frameState, now),
+        liveReferenceTime,
         paused: frameState.paused,
         viewMode: frameState.viewMode,
         surfaceMode: frameState.surfaceMode,

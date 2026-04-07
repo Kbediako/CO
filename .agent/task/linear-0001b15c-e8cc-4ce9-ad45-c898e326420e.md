@@ -3,7 +3,8 @@
 - Linear Issue: `CO-107` / `0001b15c-e8cc-4ce9-ad45-c898e326420e`
 - MCP Task ID: `linear-0001b15c-e8cc-4ce9-ad45-c898e326420e`
 - Primary PRD: `docs/PRD-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md`
-- TECH_SPEC: `tasks/specs/linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md`
+- TECH_SPEC: `docs/TECH_SPEC-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md`
+- Task Spec: `tasks/specs/linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md`
 
 ## Docs-First

@@ -2391,6 +2391,97 @@ describe('control status dashboard', () => {
     handle.stop();
   });
 
+  it('freezes paused runtime, AGE / TURN, and fallback event recency when pause lands before the first frame', async () => {
+    vi.useFakeTimers();
+
+    const writes: string[] = [];
+    const input = new MockDashboardInput();
+    let resolveDataset: ((dataset: OperatorDashboardDataset) => void) | null = null;
+    const pendingDataset = new Promise<OperatorDashboardDataset>((resolve) => {
+      resolveDataset = resolve;
+    });
+    let currentTime = Date.parse('2026-03-30T01:15:30.000Z');
+    const runtime = {
+      requestRefresh: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined),
+      snapshot: vi.fn(() => ({
+        readCompatibilityProjection: vi.fn(async () => {
+          throw new Error('unexpected readCompatibilityProjection call in test');
+        })
+      }))
+    } as unknown as ControlRuntime;
+
+    const handle = startControlStatusDashboard(
+      {
+        runtime,
+        baseUrl: 'http://127.0.0.1:4100',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        startPipelineId: 'provider-linear-worker',
+        refreshIntervalMs: 1000,
+        input,
+        output: {
+          write(chunk: string) {
+            writes.push(chunk);
+            return true;
+          },
+          columns: 120,
+          rows: 10,
+          isTTY: true
+        }
+      },
+      {
+        readDataset: async () => await pendingDataset,
+        setTimeout,
+        clearTimeout,
+        now: () => new Date(currentTime)
+      }
+    );
+
+    input.emitText('p');
+    await Promise.resolve();
+
+    resolveDataset?.(
+      buildDataset({
+        running: [
+          {
+            ...buildDataset().running[0],
+            summary: null,
+            display_event: null,
+            last_event: 'turn_running',
+            last_message: 'Provider worker turn is active.',
+            last_event_at: '2026-03-30T01:14:55.000Z'
+          }
+        ]
+      })
+    );
+    await handle.flush();
+
+    const pausedFrame = stripAnsi(writes.at(-1) ?? '');
+    expect(pausedFrame).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(pausedFrame).toContain('│ Runtime: 15m 12s');
+    expect(pausedFrame).toContain('15m / 4');
+    expect(pausedFrame).toContain('turn running (5s ago)');
+
+    currentTime += 5000;
+    input.emitText('c');
+    await handle.flush();
+    input.emitText('c');
+    await handle.flush();
+
+    const refrozenFrame = stripAnsi(writes.at(-1) ?? '');
+    expect(refrozenFrame).toContain('│ Inspect: paused | primary snapshot | full frame');
+    expect(refrozenFrame).toContain('│ Runtime: 15m 12s');
+    expect(refrozenFrame).toContain('15m / 4');
+    expect(refrozenFrame).toContain('turn running (5s ago)');
+    expect(refrozenFrame).not.toContain('│ Runtime: 15m 17s');
+    expect(refrozenFrame).not.toContain('15m 5s / 4');
+    expect(refrozenFrame).not.toContain('turn running (10s ago)');
+
+    handle.stop();
+  });
+
   it('warns when the rendered full frame exceeds the visible terminal height by a single row', () => {
     const unconstrainedFrame = stripAnsi(
       renderControlStatusFrame({
