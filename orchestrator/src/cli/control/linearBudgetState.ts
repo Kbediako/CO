@@ -415,6 +415,7 @@ export async function reserveLinearBudgetReservation(input: {
 
   const requestUnits = normalizePositiveInteger(input.request_units) ?? 1;
   const reservationTtlMs = normalizePositiveInteger(input.ttl_ms) ?? 30_000 + LINEAR_BUDGET_RESERVATION_DEFAULT_TTL_GRACE_MS;
+  const lockScopeKey = await resolveLinearBudgetLockScopeKey(paths);
 
   return await withLinearBudgetStateLock(paths, async () => {
     const persisted = await readNewestPersistedLinearBudgetStatus(paths, null);
@@ -497,7 +498,7 @@ export async function reserveLinearBudgetReservation(input: {
         }
       }
     };
-  });
+  }, lockScopeKey);
 }
 
 export async function releaseLinearBudgetReservation(input: {
@@ -513,6 +514,7 @@ export async function releaseLinearBudgetReservation(input: {
   if (!paths) {
     return;
   }
+  const lockScopeKey = await resolveLinearBudgetLockScopeKey(paths);
   await withLinearBudgetStateLock(paths, async () => {
     const persisted = await readNewestPersistedLinearBudgetStatus(paths, null);
     if (!persisted) {
@@ -526,7 +528,7 @@ export async function releaseLinearBudgetReservation(input: {
       ...persisted,
       reservations: nextReservations
     });
-  });
+  }, lockScopeKey);
 }
 
 export function resolveLinearPollingInterval(input: {
@@ -654,6 +656,7 @@ async function recordLinearBudgetObservation(input: {
     observedAt,
     assumeUnknownResetsExhausted: input.assumeUnknownResetsExhausted
   });
+  const lockScopeKey = await resolveLinearBudgetLockScopeKey(paths, input.scope);
 
   return await withLinearBudgetStateLock(paths, async () => {
     const existing = await readNewestPersistedLinearBudgetStatus(paths, normalizeScopeHint(input.scope));
@@ -664,7 +667,7 @@ async function recordLinearBudgetObservation(input: {
       await writePersistedLinearBudgetAlias(paths, scope);
     }
     return hydrateLinearBudgetStatus(merged);
-  });
+  }, lockScopeKey);
 }
 
 function buildLinearBudgetObservation(input: {
@@ -1243,18 +1246,9 @@ function resolveCooldownUntil(input: {
   for (const bucket of [input.persisted.requests, input.persisted.complexity]) {
     maybeCollectResetCandidate(candidateMs, bucket, false);
   }
-  for (const endpoint of Object.values(input.persisted.endpoints)) {
-    maybeCollectResetCandidate(candidateMs, endpoint.requests, false);
-    maybeCollectResetCandidate(candidateMs, endpoint.complexity, false);
-  }
-
   if (input.observation.assume_unknown_resets_exhausted) {
     maybeCollectResetCandidate(candidateMs, input.observation.requests, true);
     maybeCollectResetCandidate(candidateMs, input.observation.complexity, true);
-    if (input.observation.endpoint) {
-      maybeCollectResetCandidate(candidateMs, input.observation.endpoint.requests, true);
-      maybeCollectResetCandidate(candidateMs, input.observation.endpoint.complexity, true);
-    }
   }
 
   if (candidateMs.length === 0) {
@@ -1324,14 +1318,15 @@ function resolveLinearBudgetStatePaths(env: NodeJS.ProcessEnv): LinearBudgetStat
 
 async function withLinearBudgetStateLock<T>(
   paths: LinearBudgetStatePaths,
-  callback: () => Promise<T>
+  callback: () => Promise<T>,
+  lockScopeKey: string = paths.tokenFingerprint
 ): Promise<T> {
   const lock = await acquireLockWithRetry({
-    taskId: `linear-budget-${paths.tokenFingerprint.slice(0, 12)}`,
-    lockPath: paths.lockPath,
+    taskId: `linear-budget-${lockScopeKey.slice(0, 12)}`,
+    lockPath: resolveLinearBudgetLockPath(paths, lockScopeKey),
     retry: LINEAR_BUDGET_LOCK_RETRY,
     ensureDirectory: async () => {
-      await mkdir(dirname(paths.lockPath), { recursive: true });
+      await mkdir(dirname(resolveLinearBudgetLockPath(paths, lockScopeKey)), { recursive: true });
     },
     createError: (taskId, attempts) =>
       new Error(`Failed to acquire Linear budget state lock for ${taskId} after ${attempts} attempts.`)
@@ -1341,6 +1336,30 @@ async function withLinearBudgetStateLock<T>(
   } finally {
     await lock.release();
   }
+}
+
+async function resolveLinearBudgetLockScopeKey(
+  paths: LinearBudgetStatePaths,
+  scopeHint:
+    | {
+        viewerId?: string | null;
+        workspaceId?: string | null;
+      }
+    | undefined = undefined
+): Promise<string> {
+  const normalizedHint = normalizeScopeHint(scopeHint);
+  if (normalizedHint?.viewer_id) {
+    return resolveUserScopeKey(normalizedHint.viewer_id, normalizedHint.workspace_id);
+  }
+  const alias = await readPersistedLinearBudgetAlias(paths.aliasPath, paths.tokenFingerprint);
+  if (alias?.scope_kind === 'user') {
+    return alias.scope_key;
+  }
+  return paths.tokenFingerprint;
+}
+
+function resolveLinearBudgetLockPath(paths: LinearBudgetStatePaths, lockScopeKey: string): string {
+  return join(paths.directory, `${lockScopeKey}.lock`);
 }
 
 async function readNewestPersistedLinearBudgetStatus(

@@ -187,6 +187,59 @@ describe('linearBudgetState', () => {
     await expect(readdir(join(codexHome, 'orchestrator', 'linear-budget', 'scopes'))).resolves.toHaveLength(1);
   });
 
+  it('serializes reservations across tokens that share a user-scoped budget', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const envA = createEnv(codexHome, 'lin-api-token-a');
+    const envB = createEnv(codexHome, 'lin-api-token-b');
+
+    for (const env of [envA, envB]) {
+      await recordLinearBudgetHeadersObservation({
+        env,
+        source: 'dispatch_source_tracked_issues',
+        scope: {
+          workspaceId: 'workspace-1',
+          viewerId: 'viewer-1'
+        },
+        headers: {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '1'
+        }
+      });
+    }
+
+    const [first, second] = await Promise.all([
+      reserveLinearBudgetReservation({
+        env: envA,
+        operation: 'dispatch_source_tracked_issues'
+      }),
+      reserveLinearBudgetReservation({
+        env: envB,
+        operation: 'dispatch_source_tracked_issues'
+      })
+    ]);
+
+    expect([first.ok, second.ok].filter(Boolean)).toHaveLength(1);
+    expect([first.ok, second.ok].filter((value) => !value)).toHaveLength(1);
+    const budget = await readSharedLinearBudgetStatus(envA, {
+      operation: 'dispatch_source_tracked_issues'
+    });
+    expect(budget).toMatchObject({
+      scope_kind: 'user',
+      reservations_active: 1,
+      requests: {
+        remaining: 0
+      }
+    });
+
+    if (first.ok) {
+      await first.reservation?.release();
+    }
+    if (second.ok) {
+      await second.reservation?.release();
+    }
+  });
+
   it('stores endpoint-specific buckets by endpoint identity and preserves x-complexity', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
@@ -243,6 +296,7 @@ describe('linearBudgetState', () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
     const env = createEnv(codexHome);
+    const resetAtMs = Date.now() + 60_000;
 
     await recordLinearBudgetHeadersObservation({
       env,
@@ -251,6 +305,7 @@ describe('linearBudgetState', () => {
         'x-ratelimit-endpoint-name': 'IssueContext',
         'x-ratelimit-endpoint-requests-limit': '20',
         'x-ratelimit-endpoint-requests-remaining': '0',
+        'x-ratelimit-endpoint-requests-reset': String(resetAtMs),
         'x-complexity': '7'
       }
     });
@@ -259,6 +314,7 @@ describe('linearBudgetState', () => {
       operation: 'provider-linear:attach-pr'
     });
     expect(budget?.selected_endpoint_key).toBe('endpoint:issuecontext');
+    expect(budget?.cooldown_active).toBe(false);
     expect(budget?.endpoint_requests).toMatchObject({
       limit: 20,
       remaining: 0
@@ -285,6 +341,7 @@ describe('linearBudgetState', () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
     const env = createEnv(codexHome);
+    const resetAtMs = Date.now() + 60_000;
 
     await recordLinearBudgetHeadersObservation({
       env,
@@ -292,13 +349,15 @@ describe('linearBudgetState', () => {
       headers: {
         'x-ratelimit-endpoint-name': 'IssueContext',
         'x-ratelimit-endpoint-requests-limit': '20',
-        'x-ratelimit-endpoint-requests-remaining': '0'
+        'x-ratelimit-endpoint-requests-remaining': '0',
+        'x-ratelimit-endpoint-requests-reset': String(resetAtMs)
       }
     });
 
     const budget = await readSharedLinearBudgetStatus(env, {
       operation: 'provider-linear:attach-pr'
     });
+    expect(budget?.cooldown_active).toBe(false);
     expect(budget?.selected_endpoint_key).toBeNull();
     expect(budget?.endpoint_requests).toBeNull();
     expect(
