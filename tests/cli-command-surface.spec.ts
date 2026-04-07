@@ -95,6 +95,7 @@ async function runCli(
       ...mergedEnv,
       ...DEFAULT_RUNTIME_TEST_ENV,
       ...DEFAULT_REPO_CONFIG_TEST_ENV,
+      NODE_NO_WARNINGS: '1',
       ...explicitProviderOverrides,
       ...explicitRuntimeOverrides
     },

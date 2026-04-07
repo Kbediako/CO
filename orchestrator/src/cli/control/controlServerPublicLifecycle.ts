@@ -340,8 +340,11 @@ function createProviderRefreshCoordinator(
     linear_budget: Awaited<ReturnType<typeof readSharedLinearBudgetStatus>>;
   }> =>
     resolveLinearPollingInterval({
-      budget: await readSharedLinearBudgetStatus(process.env).catch(() => null),
-      default_interval_ms: PROVIDER_REFRESH_INTERVAL_MS
+      budget: await readSharedLinearBudgetStatus(process.env, {
+        operation: 'dispatch_source_tracked_issues'
+      }).catch(() => null),
+      default_interval_ms: PROVIDER_REFRESH_INTERVAL_MS,
+      operation: 'dispatch_source_tracked_issues'
     });
 
   const resolveWatchdogDelayMs = (): number => {

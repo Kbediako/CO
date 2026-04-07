@@ -377,10 +377,33 @@ function normalizeLinearBudgetSnapshot(value: unknown): LinearBudgetStatus | nul
         ? value.suppression
         : 'none',
     suppression_reason: typeof value.suppression_reason === 'string' ? value.suppression_reason : null,
+    scope_kind: value.scope_kind === 'user' ? 'user' : 'token',
+    scope_key:
+      typeof value.scope_key === 'string' && value.scope_key.trim().length > 0 ? value.scope_key : 'legacy',
+    viewer_id: typeof value.viewer_id === 'string' ? value.viewer_id : null,
+    workspace_id: typeof value.workspace_id === 'string' ? value.workspace_id : null,
+    token_fingerprints: Array.isArray(value.token_fingerprints)
+      ? value.token_fingerprints.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+      : [],
     requests: normalizeLinearBudgetBucketSnapshot(value.requests),
     endpoint_requests: normalizeLinearBudgetBucketSnapshot(value.endpoint_requests),
     complexity: normalizeLinearBudgetBucketSnapshot(value.complexity),
-    endpoint_complexity: normalizeLinearBudgetBucketSnapshot(value.endpoint_complexity)
+    endpoint_complexity: normalizeLinearBudgetBucketSnapshot(value.endpoint_complexity),
+    endpoint_name: typeof value.endpoint_name === 'string' ? value.endpoint_name : null,
+    selected_endpoint_key: typeof value.selected_endpoint_key === 'string' ? value.selected_endpoint_key : null,
+    request_complexity:
+      typeof value.request_complexity === 'number' && Number.isFinite(value.request_complexity)
+        ? value.request_complexity
+        : null,
+    // `endpoints: {}` and `reservations: []` are intentionally discarded here:
+    // runtime state is rebuilt from live budget data and only metadata such as
+    // `reservations_active` is preserved from persisted snapshots.
+    endpoints: {},
+    reservations: [],
+    reservations_active:
+      typeof value.reservations_active === 'number' && Number.isFinite(value.reservations_active)
+        ? value.reservations_active
+        : 0
   };
 }
 
