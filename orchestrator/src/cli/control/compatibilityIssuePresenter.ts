@@ -638,23 +638,6 @@ function isCompatibilityLinearBudgetBucketFamilyExhausted(
   );
 }
 
-function isCompatibilityLinearBudgetExhausted(
-  budget:
-    | {
-        requests?: { remaining?: number | null } | null;
-        endpoint_requests?: { remaining?: number | null } | null;
-        complexity?: { remaining?: number | null } | null;
-        endpoint_complexity?: { remaining?: number | null } | null;
-      }
-    | null
-    | undefined
-): boolean {
-  return (
-    isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'requests') ||
-    isCompatibilityLinearBudgetBucketFamilyExhausted(budget, 'complexity')
-  );
-}
-
 function isCompatibilityLinearBudgetSharedExhausted(
   budget:
     | {
