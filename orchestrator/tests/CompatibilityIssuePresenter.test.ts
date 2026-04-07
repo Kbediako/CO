@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildCompatibilityProjectionSnapshot } from '../src/cli/control/compatibilityIssuePresenter.js';
+import {
+  buildCompatibilityProjectionSnapshot,
+  buildCompatibilityRunningEntry
+} from '../src/cli/control/compatibilityIssuePresenter.js';
 import type {
   ControlCompatibilityRuntimeSnapshot,
   ControlCompatibilitySourceContext
@@ -103,4 +106,40 @@ describe('CompatibilityIssuePresenter', () => {
       });
     }
   );
+
+  it('prefers scoped debug progress summaries over stale proof progress summaries for display_event', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          progress: {
+            kind: 'worker',
+            phase: 'worker_turn',
+            summary: 'stale proof progress summary',
+            status: 'active',
+            source: 'provider_linear_worker_proof',
+            last_semantic_progress_at: '2026-04-06T02:34:00.000Z',
+            stall_reason: null,
+            recorded_at: '2026-04-06T02:34:00.000Z'
+          }
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>,
+        providerDebugSnapshot: {
+          progress: {
+            kind: 'worker',
+            phase: 'worker_turn',
+            summary: 'updated TECH_SPEC + validating status parity',
+            status: 'active',
+            source: 'provider_debug_snapshot',
+            last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+            stall_reason: null,
+            recorded_at: '2026-04-06T02:35:00.000Z'
+          }
+        } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+      })
+    );
+
+    expect(runningEntry.display_event).toBe('updated TECH_SPEC + validating status parity');
+  });
 });

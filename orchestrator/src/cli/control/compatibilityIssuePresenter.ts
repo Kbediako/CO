@@ -463,8 +463,8 @@ function resolveCompatibilityRunningDisplayEvent(input: {
 
   const displayState = input.selected.displayStatus;
   const progressSummary =
-    normalizeCompatibilityMessage(proof?.progress?.summary) ??
     normalizeCompatibilityMessage(input.selected.providerDebugSnapshot?.progress?.summary) ??
+    normalizeCompatibilityMessage(proof?.progress?.summary) ??
     null;
   const candidates = [
     normalizeCompatibilityMessage(input.runningMessage),

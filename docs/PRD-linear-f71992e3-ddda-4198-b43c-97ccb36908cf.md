@@ -165,5 +165,5 @@
 
 ## Approvals
 - Product: Self-approved from the Linear issue scope
-- Engineering: pending docs-review child stream for `linear-f71992e3-ddda-4198-b43c-97ccb36908cf`
+- Engineering: `codex-orchestrator docs-review` child stream failed on the repo-wide `docs:freshness` stale-doc baseline after `docs:check`; manual fallback accepted for `linear-f71992e3-ddda-4198-b43c-97ccb36908cf`
 - Design: N/A
