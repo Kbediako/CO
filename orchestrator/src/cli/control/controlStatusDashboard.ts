@@ -231,7 +231,7 @@ export function startControlStatusDashboard(
       output: options.output,
       input: options.input,
       liveSurfaceMode: liveOutput.isTTY === true ? 'alternate' : 'primary',
-      showDashboardLine: true
+      showDashboardLine: false
     },
     deps
   );
@@ -841,9 +841,6 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
     renderRunningHeaderRow(runningColumns),
     renderRunningSeparatorRow(runningColumns)
   ];
-  if (input.showDashboardLine !== false) {
-    lines.splice(7, 0, renderDashboardLine(input.baseUrl, terminalColumns));
-  }
 
   lines.push(...renderRunningRows(input.dataset.running, runningColumns, referenceTime));
   lines.push('│');
@@ -851,6 +848,7 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
   lines.push('│');
   lines.push(...renderRetryRows(input.dataset.retrying, referenceTime, terminalColumns));
   lines.push('│');
+  lines.push(colorize('├─ Status controls', ANSI_BOLD));
   lines.push(renderControlsLine(terminalColumns, frameState));
   lines.push(
     renderInspectLine(
@@ -928,17 +926,6 @@ function renderControlStatusErrorFrame(
     renderSummaryLine('Dashboard error', [{ text: safe(message), color: ANSI_RED }], columns),
     '╰─'
   ];
-  if (input.showDashboardLine !== false) {
-    lines.splice(
-      2,
-      0,
-      renderSummaryLine(
-        'Dashboard',
-        [{ text: safe(input.baseUrl), color: ANSI_CYAN, truncateMode: 'middle' }],
-        columns
-      )
-    );
-  }
   return lines.join('\n');
 }
 
@@ -1001,14 +988,6 @@ function renderProjectLine(dataset: OperatorDashboardDataset, terminalColumns: n
   return renderSummaryLine(
     'Project',
     [{ text: project, color: project === 'n/a' ? ANSI_GRAY : ANSI_CYAN }],
-    terminalColumns
-  );
-}
-
-function renderDashboardLine(baseUrl: string, terminalColumns: number): string {
-  return renderSummaryLine(
-    'Dashboard',
-    [{ text: sanitizeDisplayValue(baseUrl), color: ANSI_CYAN, truncateMode: 'middle' }],
     terminalColumns
   );
 }
@@ -1313,8 +1292,12 @@ function formatRunningColumnValue(
 }
 
 function summarizeRunningEvent(entry: OperatorDashboardSessionPayload, referenceTime: Date): string {
-  const lastMessage = sanitizeDisplayValue(entry.last_message);
   const displayState = sanitizeDisplayValue(entry.display_state).toLowerCase();
+  const displayEvent = sanitizeDisplayValue(entry.display_event);
+  if (isHighSignalStatusText(displayEvent, displayState)) {
+    return displayEvent;
+  }
+  const lastMessage = sanitizeDisplayValue(entry.last_message);
   if (isHighSignalStatusText(lastMessage, displayState)) {
     return lastMessage;
   }
@@ -1611,7 +1594,7 @@ function formatCombinedRateLimitSegments(
   const linearPieces = formatCompactLinearBudgetSegments(linearBudget, referenceTime);
   if (linearPieces) {
     if (pieces.length > 0) {
-      pieces.push({ text: ' | ', color: ANSI_GRAY });
+      pieces.push({ text: ' || ', color: ANSI_GRAY });
     }
     pieces.push(...linearPieces);
   }
@@ -1623,73 +1606,33 @@ function formatCompactCodexRateLimitSegments(
   referenceTime: Date,
   options: { allowLegacyMetadata?: boolean } = {}
 ): SummarySegment[] | null {
-  const limitId = readRecordString(value, ['limit_id', 'limitId', 'limit_name', 'limitName']);
-  const primary = asRecord(value.primary);
-  const secondary = asRecord(value.secondary);
-  const credits = asRecord(value.credits);
-  const requests = asRecord(value.requests);
-  const endpointRequests = asRecord(value.endpoint_requests);
-  const observedAt = readRecordString(value, ['observed_at', 'observedAt']);
-  const suppression = readRecordString(value, ['suppression']);
-  const retryAfterSeconds = readRecordNumber(value, ['retry_after_seconds', 'retryAfterSeconds']);
-  if (!limitId && !primary && !secondary && !credits) {
-    if (!requests && !endpointRequests) {
-      return null;
-    }
-    if (
-      options.allowLegacyMetadata !== true &&
-      (observedAt !== null || suppression !== null || retryAfterSeconds !== null)
-    ) {
-      return null;
-    }
-    const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];
-    if (requests) {
-      pieces.push({
-        text: ` req ${formatCompactRateLimitBucket(requests, referenceTime)}`,
-        color: ANSI_CYAN
-      });
-    }
-    if (endpointRequests) {
-      pieces.push({
-        text: ` ep-req ${formatCompactRateLimitBucket(endpointRequests, referenceTime)}`,
-        color: ANSI_CYAN
-      });
-    }
-    return pieces;
-  }
-  const pieces: SummarySegment[] = [
-    { text: sanitizeDisplayValue(limitId ?? 'Codex'), color: ANSI_YELLOW }
-  ];
-  if (primary) {
-    const label = resolveCodexRateLimitBucketLabel(primary);
-    pieces.push({
-      text:
-        label === null
-          ? ` p${formatCompactRateLimitBucket(primary, referenceTime)}`
-          : ` ${label} ${formatCompactRateLimitBucket(primary, referenceTime)}`,
-      color: ANSI_CYAN
-    });
-  }
-  if (secondary) {
-    const label = resolveCodexRateLimitBucketLabel(secondary);
-    pieces.push({
-      text:
-        label === null
-          ? ` s${formatCompactRateLimitBucket(secondary, referenceTime)}`
-          : ` ${label} ${formatCompactRateLimitBucket(secondary, referenceTime)}`,
-      color: ANSI_CYAN
-    });
-  }
-  if (credits) {
-    pieces.push({ text: ` ${formatCompactRateLimitCredits(credits)}`, color: ANSI_GREEN });
-  }
-  return pieces;
+  return formatOperatorCodexRateLimitSegments(value, referenceTime, {
+    allowLegacyMetadata: options.allowLegacyMetadata,
+    formatBucket: formatCompactRateLimitBucket,
+    formatCredits: formatCompactRateLimitCredits
+  });
 }
 
 function formatCodexRateLimitSegments(
   value: Record<string, unknown>,
   referenceTime: Date,
   options: { allowLegacyMetadata?: boolean } = {}
+): SummarySegment[] | null {
+  return formatOperatorCodexRateLimitSegments(value, referenceTime, {
+    allowLegacyMetadata: options.allowLegacyMetadata,
+    formatBucket: formatRateLimitBucket,
+    formatCredits: formatRateLimitCredits
+  });
+}
+
+function formatOperatorCodexRateLimitSegments(
+  value: Record<string, unknown>,
+  referenceTime: Date,
+  options: {
+    allowLegacyMetadata?: boolean;
+    formatBucket: (bucket: Record<string, unknown>, referenceTime: Date) => string;
+    formatCredits: (credits: Record<string, unknown>) => string;
+  }
 ): SummarySegment[] | null {
   const limitId = readRecordString(value, ['limit_id', 'limitId', 'limit_name', 'limitName']);
   const primary = asRecord(value.primary);
@@ -1712,41 +1655,37 @@ function formatCodexRateLimitSegments(
     }
     const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];
     if (requests) {
-      pieces.push({ text: ' | ', color: ANSI_GRAY });
-      pieces.push({
-        text: `requests ${formatRateLimitBucket(requests, referenceTime)}`,
-        color: ANSI_CYAN
-      });
-    }
-    if (endpointRequests) {
-      pieces.push({ text: ' | ', color: ANSI_GRAY });
-      pieces.push({
-        text: `ep requests ${formatRateLimitBucket(endpointRequests, referenceTime)}`,
-        color: ANSI_CYAN
-      });
+      appendOperatorRateLimitSegment(
+        pieces,
+        `requests ${options.formatBucket(requests, referenceTime)}`,
+        ANSI_CYAN
+      );
+    } else if (endpointRequests) {
+      appendOperatorRateLimitSegment(
+        pieces,
+        `requests ${options.formatBucket(endpointRequests, referenceTime)}`,
+        ANSI_CYAN
+      );
     }
     return pieces;
   }
-  const pieces: SummarySegment[] = [
-    { text: sanitizeDisplayValue(limitId ?? 'Codex'), color: ANSI_YELLOW }
-  ];
+  const pieces: SummarySegment[] = [{ text: 'Codex', color: ANSI_YELLOW }];
   if (primary) {
-    pieces.push({ text: ' | ', color: ANSI_GRAY });
-    pieces.push({
-      text: `${resolveCodexRateLimitBucketLabel(primary) ?? 'primary'} ${formatRateLimitBucket(primary, referenceTime)}`,
-      color: ANSI_CYAN
-    });
+    appendOperatorRateLimitSegment(
+      pieces,
+      `${resolveCodexRateLimitBucketLabel(primary) ?? 'primary'} ${options.formatBucket(primary, referenceTime)}`,
+      ANSI_CYAN
+    );
   }
   if (secondary) {
-    pieces.push({ text: ' | ', color: ANSI_GRAY });
-    pieces.push({
-      text: `${resolveCodexRateLimitBucketLabel(secondary) ?? 'secondary'} ${formatRateLimitBucket(secondary, referenceTime)}`,
-      color: ANSI_CYAN
-    });
+    appendOperatorRateLimitSegment(
+      pieces,
+      `${resolveCodexRateLimitBucketLabel(secondary) ?? 'secondary'} ${options.formatBucket(secondary, referenceTime)}`,
+      ANSI_CYAN
+    );
   }
   if (credits) {
-    pieces.push({ text: ' | ', color: ANSI_GRAY });
-    pieces.push({ text: formatRateLimitCredits(credits), color: ANSI_GREEN });
+    appendOperatorRateLimitSegment(pieces, options.formatCredits(credits), ANSI_GREEN);
   }
   return pieces;
 }
@@ -1774,73 +1713,24 @@ function formatLinearBudgetSegments(
   value: Record<string, unknown>,
   referenceTime: Date
 ): SummarySegment[] | null {
-  const buckets: Array<[label: string, bucket: Record<string, unknown>]> = [];
-  const requests = asRecord(value.requests);
-  if (requests) {
-    buckets.push(['requests', requests]);
-  }
-  const endpointRequests = asRecord(value.endpoint_requests);
-  if (endpointRequests) {
-    buckets.push(['ep req', endpointRequests]);
-  }
-  const complexity = asRecord(value.complexity);
-  if (complexity) {
-    buckets.push(['complexity', complexity]);
-  }
-  const endpointComplexity = asRecord(value.endpoint_complexity);
-  if (endpointComplexity) {
-    buckets.push(['ep complexity', endpointComplexity]);
-  }
-  const observedAt = readRecordString(value, ['observed_at', 'observedAt']);
-  const source = readRecordString(value, ['source']);
-  const suppression = readRecordString(value, ['suppression']);
-  const retryAfterSeconds = readRecordNumber(value, ['retry_after_seconds', 'retryAfterSeconds']);
-  const looksLikeLinearBudget =
-    observedAt !== null ||
-    suppression !== null ||
-    retryAfterSeconds !== null ||
-    source?.toLowerCase().startsWith('linear') === true;
-  if (!looksLikeLinearBudget) {
-    return null;
-  }
-
-  const pieces: SummarySegment[] = [
-    {
-      text: 'Linear',
-      color: ANSI_YELLOW
-    }
-  ];
-  for (const [label, bucket] of buckets) {
-    pieces.push({ text: ' | ', color: ANSI_GRAY });
-    pieces.push({
-      text: `${label} ${formatRateLimitBucket(bucket, referenceTime)}`,
-      color: ANSI_CYAN
-    });
-  }
-  if (suppression && suppression !== 'none') {
-    pieces.push({ text: ' | ', color: ANSI_GRAY });
-    pieces.push({
-      text: `state ${sanitizeDisplayValue(suppression)}`,
-      color: suppression === 'cooldown' || suppression === 'exhausted' ? ANSI_RED : ANSI_YELLOW
-    });
-  }
-  if (retryAfterSeconds !== null) {
-    pieces.push({ text: ' | ', color: ANSI_GRAY });
-    pieces.push({
-      text: `retry ${formatHumanDurationShort(retryAfterSeconds)}`,
-      color: ANSI_MAGENTA
-    });
-  }
-  return pieces;
+  return formatOperatorLinearBudgetSegments(value, referenceTime, formatRateLimitBucket);
 }
 
 function formatCompactLinearBudgetSegments(
   value: Record<string, unknown>,
   referenceTime: Date
 ): SummarySegment[] | null {
+  return formatOperatorLinearBudgetSegments(value, referenceTime, formatCompactRateLimitBucket);
+}
+
+function formatOperatorLinearBudgetSegments(
+  value: Record<string, unknown>,
+  referenceTime: Date,
+  formatBucket: (bucket: Record<string, unknown>, referenceTime: Date) => string
+): SummarySegment[] | null {
   const requests = asRecord(value.requests);
-  const endpointRequests = asRecord(value.endpoint_requests);
   const complexity = asRecord(value.complexity);
+  const endpointRequests = asRecord(value.endpoint_requests);
   const endpointComplexity = asRecord(value.endpoint_complexity);
   const observedAt = readRecordString(value, ['observed_at', 'observedAt']);
   const source = readRecordString(value, ['source']);
@@ -1856,114 +1746,58 @@ function formatCompactLinearBudgetSegments(
   }
 
   const pieces: SummarySegment[] = [{ text: 'Linear', color: ANSI_YELLOW }];
-  if (suppression && suppression !== 'none') {
-    pieces.push({
-      text: ` ${sanitizeDisplayValue(suppression)}`,
-      color: suppression === 'cooldown' || suppression === 'exhausted' ? ANSI_RED : ANSI_YELLOW
-    });
+  const displayRequests = selectOperatorVisibleLinearBudgetBucket(
+    requests,
+    endpointRequests,
+    referenceTime
+  );
+  if (displayRequests) {
+    appendOperatorRateLimitSegment(pieces, `requests ${formatBucket(displayRequests, referenceTime)}`, ANSI_CYAN);
   }
-  if (retryAfterSeconds !== null) {
-    pieces.push({ text: ` ${formatHumanDurationShort(retryAfterSeconds)}`, color: ANSI_MAGENTA });
-  }
-  if (requests) {
-    pieces.push({
-      text: ` req ${formatCompactRateLimitBucket(requests, referenceTime)}`,
-      color: ANSI_CYAN
-    });
-  }
-  if (endpointRequests) {
-    pieces.push({
-      text: ` ep-req ${formatCompactRateLimitBucket(endpointRequests, referenceTime)}`,
-      color: ANSI_CYAN
-    });
-  }
-  if (complexity) {
-    pieces.push({
-      text: ` cx ${formatCompactRateLimitBucket(complexity, referenceTime)}`,
-      color: ANSI_CYAN
-    });
-  }
-  if (endpointComplexity) {
-    pieces.push({
-      text: ` ep-cx ${formatCompactRateLimitBucket(endpointComplexity, referenceTime)}`,
-      color: ANSI_CYAN
-    });
+  const displayComplexity = selectOperatorVisibleLinearBudgetBucket(
+    complexity,
+    endpointComplexity,
+    referenceTime
+  );
+  if (displayComplexity) {
+    appendOperatorRateLimitSegment(pieces, `complexity ${formatBucket(displayComplexity, referenceTime)}`, ANSI_CYAN);
   }
   return pieces;
 }
 
+function selectOperatorVisibleLinearBudgetBucket(
+  primary: Record<string, unknown> | null,
+  endpoint: Record<string, unknown> | null,
+  referenceTime: Date
+): Record<string, unknown> | null {
+  if (!primary) {
+    return endpoint;
+  }
+  if (!endpoint) {
+    return primary;
+  }
+  const primaryExhausted = isOperatorRateLimitBucketExhausted(primary);
+  const endpointExhausted = isOperatorRateLimitBucketExhausted(endpoint);
+  if (endpointExhausted && !primaryExhausted) {
+    return endpoint;
+  }
+  if (primaryExhausted && !endpointExhausted) {
+    return primary;
+  }
+  if (primaryExhausted && endpointExhausted) {
+    return compareOperatorRateLimitBucketResetMs(primary, endpoint, referenceTime) >= 0
+      ? primary
+      : endpoint;
+  }
+  return primary;
+}
+
 function formatRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
-  const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
-  const windowDurationMins = readRecordNumber(bucket, [
-    'windowDurationMins',
-    'window_duration_mins',
-    'window_minutes'
-  ]);
-  if (usedPercent !== null && windowDurationMins !== null) {
-    return `${formatRemainingPercent(usedPercent)} / ${formatHumanDurationShort(windowDurationMins * 60)}`;
-  }
-  if (usedPercent !== null) {
-    return `${formatRemainingPercent(usedPercent)} remaining`;
-  }
-  const remaining = readRecordNumber(bucket, ['remaining']);
-  const limit = readRecordNumber(bucket, ['limit']);
-  const resetSeconds =
-    readRecordNumber(bucket, ['reset_in_seconds', 'resetInSeconds']) ??
-    secondsUntilTimestamp(
-      readRecordString(bucket, ['reset_at', 'resetAt', 'resets_at', 'resetsAt']),
-      referenceTime
-    );
-
-  let base = 'n/a';
-  if (remaining !== null && limit !== null) {
-    base = `${formatCount(remaining)}/${formatCount(limit)}`;
-  } else if (remaining !== null) {
-    base = `remaining ${formatCount(remaining)}`;
-  } else if (limit !== null) {
-    base = `limit ${formatCount(limit)}`;
-  }
-
-  if (resetSeconds !== null) {
-    return `${base} reset ${formatHumanDurationShort(resetSeconds)}`;
-  }
-  return base;
+  return formatOperatorRateLimitBucket(bucket, referenceTime);
 }
 
 function formatCompactRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
-  const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
-  const windowDurationMins = readRecordNumber(bucket, [
-    'windowDurationMins',
-    'window_duration_mins',
-    'window_minutes'
-  ]);
-  if (usedPercent !== null && windowDurationMins !== null) {
-    return `${formatRemainingPercent(usedPercent)} / ${formatHumanDurationShort(windowDurationMins * 60)}`;
-  }
-  if (usedPercent !== null) {
-    return formatRemainingPercent(usedPercent);
-  }
-  const remaining = readRecordNumber(bucket, ['remaining']);
-  const limit = readRecordNumber(bucket, ['limit']);
-  const resetSeconds =
-    readRecordNumber(bucket, ['reset_in_seconds', 'resetInSeconds']) ??
-    secondsUntilTimestamp(
-      readRecordString(bucket, ['reset_at', 'resetAt', 'resets_at', 'resetsAt']),
-      referenceTime
-    );
-
-  let base = 'n/a';
-  if (remaining !== null && limit !== null) {
-    base = `${formatCount(remaining)}/${formatCount(limit)}`;
-  } else if (remaining !== null) {
-    base = `rem${formatCount(remaining)}`;
-  } else if (limit !== null) {
-    base = `lim${formatCount(limit)}`;
-  }
-
-  if (resetSeconds !== null) {
-    return `${base} ${formatHumanDurationShort(resetSeconds)}`;
-  }
-  return base;
+  return formatOperatorRateLimitBucket(bucket, referenceTime);
 }
 
 function formatRateLimitCredits(credits: Record<string, unknown>): string {
@@ -1980,28 +1814,123 @@ function formatRateLimitCredits(credits: Record<string, unknown>): string {
   return 'credits available';
 }
 
+function isOperatorRateLimitBucketExhausted(bucket: Record<string, unknown>): boolean {
+  const remaining = readRecordNumber(bucket, ['remaining']);
+  if (remaining !== null) {
+    return remaining <= 0;
+  }
+  const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
+  if (usedPercent !== null) {
+    return usedPercent >= 100;
+  }
+  return false;
+}
+
+function compareOperatorRateLimitBucketResetMs(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+  referenceTime: Date
+): number {
+  const leftMs = resolveOperatorRateLimitBucketResetMs(left, referenceTime);
+  const rightMs = resolveOperatorRateLimitBucketResetMs(right, referenceTime);
+  if (leftMs === null || rightMs === null) {
+    return 0;
+  }
+  return leftMs - rightMs;
+}
+
+function resolveOperatorRateLimitBucketResetMs(
+  bucket: Record<string, unknown>,
+  referenceTime: Date
+): number | null {
+  const resetAt = readRecordString(bucket, ['reset_at', 'resetAt']);
+  if (resetAt) {
+    const parsed = Date.parse(resetAt);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  const resetInSeconds = readRecordNumber(bucket, ['reset_in_seconds', 'resetInSeconds']);
+  if (resetInSeconds !== null) {
+    return referenceTime.getTime() + Math.max(0, resetInSeconds) * 1000;
+  }
+  return null;
+}
+
 function formatCompactRateLimitCredits(credits: Record<string, unknown>): string {
-  if (readRecordBoolean(credits, ['unlimited']) === true) {
-    return 'cr unlimited';
+  return formatRateLimitCredits(credits);
+}
+
+function appendOperatorRateLimitSegment(
+  pieces: SummarySegment[],
+  text: string,
+  color: string
+): void {
+  pieces.push({ text: pieces.length === 1 ? ' ' : ' | ', color: ANSI_GRAY });
+  pieces.push({ text, color });
+}
+
+function formatOperatorRateLimitBucket(bucket: Record<string, unknown>, referenceTime: Date): string {
+  if (isRateLimitBucketExhausted(bucket)) {
+    const resetSeconds = resolveRateLimitBucketResetSeconds(bucket, referenceTime);
+    return resetSeconds !== null ? `resets ${formatHumanDurationShort(resetSeconds)}` : 'resets soon';
   }
-  if (readRecordBoolean(credits, ['has_credits', 'hasCredits']) === false) {
-    return 'cr none';
+  const remainingPercent = resolveRateLimitBucketRemainingPercent(bucket);
+  if (remainingPercent !== null) {
+    return formatPercent(remainingPercent);
   }
-  const balance = readRecordNumber(credits, ['balance']);
-  if (balance !== null) {
-    return `cr${balance.toFixed(2)}`;
+  const remaining = readRecordNumber(bucket, ['remaining']);
+  const limit = readRecordNumber(bucket, ['limit']);
+  if (remaining !== null && limit !== null) {
+    return `${formatCount(remaining)}/${formatCount(limit)}`;
   }
-  return 'cr available';
+  if (remaining !== null) {
+    return `remaining ${formatCount(remaining)}`;
+  }
+  if (limit !== null) {
+    return `limit ${formatCount(limit)}`;
+  }
+  return 'n/a';
+}
+
+function resolveRateLimitBucketRemainingPercent(bucket: Record<string, unknown>): number | null {
+  const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
+  if (usedPercent !== null) {
+    return Math.min(100, Math.max(0, 100 - usedPercent));
+  }
+  const remaining = readRecordNumber(bucket, ['remaining']);
+  const limit = readRecordNumber(bucket, ['limit']);
+  if (remaining !== null && limit !== null && limit > 0) {
+    return Math.min(100, Math.max(0, (remaining / limit) * 100));
+  }
+  return null;
+}
+
+function isRateLimitBucketExhausted(bucket: Record<string, unknown>): boolean {
+  const remaining = readRecordNumber(bucket, ['remaining']);
+  if (remaining !== null) {
+    return remaining <= 0;
+  }
+  const usedPercent = readRecordNumber(bucket, ['usedPercent', 'used_percent']);
+  return usedPercent !== null ? usedPercent >= 100 : false;
+}
+
+function resolveRateLimitBucketResetSeconds(
+  bucket: Record<string, unknown>,
+  referenceTime: Date
+): number | null {
+  return (
+    readRecordNumber(bucket, ['reset_in_seconds', 'resetInSeconds']) ??
+    secondsUntilTimestamp(
+      readRecordString(bucket, ['reset_at', 'resetAt', 'resets_at', 'resetsAt']),
+      referenceTime
+    )
+  );
 }
 
 function formatPercent(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1).replace(/\.0$/, '')}%`;
-}
-
-function formatRemainingPercent(usedPercent: number): string {
-  const remainingPercent = Math.min(100, Math.max(0, 100 - usedPercent));
-  return formatPercent(remainingPercent);
 }
 
 function formatRecord(value: Record<string, unknown>): string {
@@ -2131,7 +2060,7 @@ function humanizeRunningEvent(event: string | null | undefined): string {
     case 'agent_message':
       return 'agent message';
     case 'task_started':
-      return 'task started';
+      return 'session started';
     case 'task_complete':
     case 'turn_completed':
       return 'turn completed';
@@ -2145,6 +2074,8 @@ function humanizeRunningEvent(event: string | null | undefined): string {
       return 'token usage updated';
     case 'account_ratelimits_updated':
       return 'rate limits updated';
+    case 'queued_questions':
+      return 'queued questions';
     case 'notification':
       return 'notification';
     case 'item_started':

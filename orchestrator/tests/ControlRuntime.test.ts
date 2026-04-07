@@ -2027,6 +2027,413 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('projects authoritative budget exhaustion event text into running rows', async () => {
+    const providerIntakeState = createProviderIntakeState();
+    providerIntakeState.polling = {
+      next_poll_in_ms: 43_000,
+      linear_budget: {
+        observed_at: '2026-03-07T00:29:45.000Z',
+        source: 'control-host-polling',
+        suppression: 'cooldown',
+        suppression_reason: 'linear_budget_shared_cooldown',
+        retry_after_seconds: 43,
+        cooldown_until: '2026-03-07T00:30:28.000Z',
+        cooldown_active: true,
+        request_id: 'polling-budget-1',
+        requests: {
+          remaining: 0,
+          limit: 30,
+          reset_at: '2026-03-07T00:30:28.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          remaining: 180,
+          limit: 200,
+          reset_at: '2026-03-07T00:30:07.000Z'
+        },
+        endpoint_complexity: null
+      }
+    };
+    const fixture = await createFixture({
+      taskId: 'task-1037-budget-event',
+      providerIntakeState,
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-1037-budget-event',
+          identifier: 'ISSUE-1037-BUDGET-EVENT',
+          title: 'Polling is paused by Linear request exhaustion',
+          updated_at: '2026-03-07T00:29:45.000Z'
+        })
+      }
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-budget-event',
+      issue_id: 'issue-1037-budget-event',
+      issue_identifier: 'ISSUE-1037-BUDGET-EVENT',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'provider worker turn is active'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-budget-event',
+      issue_identifier: 'ISSUE-1037-BUDGET-EVENT',
+      pid: '4242',
+      turn_count: 3,
+      last_event: 'account/ratelimits/updated',
+      last_message: 'rate limits updated',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1037-BUDGET-EVENT'
+    );
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-BUDGET-EVENT',
+        display_event: 'linear requests exhausted; next tracked-issue refresh at 43s'
+      })
+    ]);
+    expect(sameIssueRecord?.payload.running?.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('limits shared polling exhaustion events to the tracked running issue', async () => {
+    const providerIntakeState = createProviderIntakeState();
+    providerIntakeState.polling = {
+      next_poll_in_ms: 43_000,
+      linear_budget: {
+        observed_at: '2026-03-07T00:29:45.000Z',
+        source: 'control-host-polling',
+        suppression: 'cooldown',
+        suppression_reason: 'linear_budget_shared_cooldown',
+        retry_after_seconds: 43,
+        cooldown_until: '2026-03-07T00:30:28.000Z',
+        cooldown_active: true,
+        request_id: 'polling-budget-owner',
+        requests: {
+          remaining: 0,
+          limit: 30,
+          reset_at: '2026-03-07T00:30:28.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          remaining: 180,
+          limit: 200,
+          reset_at: '2026-03-07T00:30:07.000Z'
+        },
+        endpoint_complexity: null
+      }
+    };
+    const fixture = await createFixture({
+      taskId: 'task-1037-budget-owner',
+      providerIntakeState,
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-1037-budget-owner',
+          identifier: 'ISSUE-1037-BUDGET-OWNER',
+          title: 'Tracked refresh is paused by Linear request exhaustion',
+          updated_at: '2026-03-07T00:29:45.000Z'
+        })
+      }
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-budget-owner',
+      issue_id: 'issue-1037-budget-owner',
+      issue_identifier: 'ISSUE-1037-BUDGET-OWNER',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'provider worker turn is active'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-budget-owner',
+      issue_identifier: 'ISSUE-1037-BUDGET-OWNER',
+      pid: '4242',
+      turn_count: 3,
+      last_event: 'account/ratelimits/updated',
+      last_message: 'rate limits updated',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      linear_budget: {
+        observed_at: '2026-03-07T00:29:00.000Z',
+        source: 'worker-proof',
+        suppression: 'none',
+        suppression_reason: null,
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        request_id: 'worker-budget-owner',
+        requests: {
+          remaining: 8,
+          limit: 30,
+          reset_at: '2026-03-07T00:31:00.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          remaining: 180,
+          limit: 200,
+          reset_at: '2026-03-07T00:30:07.000Z'
+        },
+        endpoint_complexity: null
+      },
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const sibling = await createSiblingRun(fixture.root, 'task-1037-budget-sibling', 'run-2', {
+      manifest: {
+        task_id: 'task-1037-budget-sibling',
+        issue_id: 'issue-1037-budget-sibling',
+        issue_identifier: 'ISSUE-1037-BUDGET-SIBLING',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:26:00.000Z',
+        updated_at: '2026-03-07T00:29:10.000Z',
+        summary: 'adjacent provider work is active'
+      }
+    });
+    await seedProviderLinearWorkerProof(sibling, {
+      issue_id: 'issue-1037-budget-sibling',
+      issue_identifier: 'ISSUE-1037-BUDGET-SIBLING',
+      pid: '5252',
+      turn_count: 1,
+      last_event: 'turn.started',
+      last_message: 'turn started',
+      last_event_at: '2026-03-07T00:29:35.000Z',
+      updated_at: '2026-03-07T00:29:35.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const trackedEntry = compatibilityProjection.running.find(
+      (entry) => entry.issue_identifier === 'ISSUE-1037-BUDGET-OWNER'
+    );
+    const siblingEntry = compatibilityProjection.running.find(
+      (entry) => entry.issue_identifier === 'ISSUE-1037-BUDGET-SIBLING'
+    );
+
+    expect(trackedEntry?.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+    expect(siblingEntry?.display_event).not.toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('keeps shared polling exhaustion visible even when a newer worker proof reports healthier Linear budget', async () => {
+    const providerIntakeState = createProviderIntakeState();
+    providerIntakeState.polling = {
+      next_poll_in_ms: 43_000,
+      linear_budget: {
+        observed_at: '2026-03-07T00:29:00.000Z',
+        source: 'control-host-polling',
+        suppression: 'cooldown',
+        suppression_reason: 'linear_budget_shared_cooldown',
+        retry_after_seconds: 43,
+        cooldown_until: '2026-03-07T00:29:43.000Z',
+        cooldown_active: true,
+        request_id: 'polling-budget-shared-authoritative',
+        requests: {
+          remaining: 0,
+          limit: 30,
+          reset_at: '2026-03-07T00:29:43.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          remaining: 180,
+          limit: 200,
+          reset_at: '2026-03-07T00:30:07.000Z'
+        },
+        endpoint_complexity: null
+      }
+    };
+    const fixture = await createFixture({
+      taskId: 'task-1037-shared-polling-authoritative',
+      providerIntakeState,
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-1037-shared-polling-authoritative',
+          identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
+          title: 'Tracked refresh is paused by shared Linear cooldown',
+          updated_at: '2026-03-07T00:29:00.000Z'
+        })
+      }
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-shared-polling-authoritative',
+      issue_id: 'issue-1037-shared-polling-authoritative',
+      issue_identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:30.000Z',
+      summary: 'tracked issue is still running while refresh is paused'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-shared-polling-authoritative',
+      issue_identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
+      pid: '4242',
+      turn_count: 3,
+      last_event: 'account/ratelimits/updated',
+      last_message: 'rate limits updated',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      rate_limits: {
+        source: 'seeded-proof'
+      },
+      linear_budget: {
+        observed_at: '2026-03-07T00:29:30.000Z',
+        source: 'worker-proof',
+        suppression: 'none',
+        suppression_reason: null,
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        request_id: 'worker-budget-shared-authoritative',
+        requests: {
+          remaining: 12,
+          limit: 30,
+          reset_at: '2026-03-07T00:31:00.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          remaining: 180,
+          limit: 200,
+          reset_at: '2026-03-07T00:30:07.000Z'
+        },
+        endpoint_complexity: null
+      },
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const runningEntry = compatibilityProjection.running.find(
+      (entry) => entry.issue_identifier === 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE'
+    );
+
+    expect(runningEntry?.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
+
+  it('surfaces endpoint-specific Linear request exhaustion with the operator-facing requests event text', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1037-endpoint-budget-event'
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-endpoint-budget-event',
+      issue_id: 'issue-1037-endpoint-budget-event',
+      issue_identifier: 'ISSUE-1037-ENDPOINT-BUDGET-EVENT',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'provider worker turn is active'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-endpoint-budget-event',
+      issue_identifier: 'ISSUE-1037-ENDPOINT-BUDGET-EVENT',
+      pid: '4242',
+      turn_count: 3,
+      last_event: 'account/ratelimits/updated',
+      last_message: 'rate limits updated',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      rate_limits: {
+        source: 'seeded-proof'
+      },
+      linear_budget: {
+        observed_at: '2026-03-07T00:29:30.000Z',
+        source: 'worker-proof',
+        suppression: 'cooldown',
+        suppression_reason: 'linear_budget_endpoint_requests_exhausted',
+        retry_after_seconds: 43,
+        cooldown_until: '2026-03-07T00:30:13.000Z',
+        cooldown_active: true,
+        request_id: 'worker-endpoint-budget',
+        requests: {
+          remaining: 12,
+          limit: 30,
+          reset_at: '2026-03-07T00:30:50.000Z'
+        },
+        endpoint_requests: {
+          remaining: 0,
+          limit: 12,
+          reset_at: '2026-03-07T00:30:13.000Z'
+        },
+        complexity: {
+          remaining: 180,
+          limit: 200,
+          reset_at: '2026-03-07T00:30:07.000Z'
+        },
+        endpoint_complexity: null
+      },
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-ENDPOINT-BUDGET-EVENT',
+        display_event: 'linear requests exhausted; next tracked-issue refresh at 43s'
+      })
+    ]);
+  });
+
+  it('preserves active Linear stage labels instead of collapsing them to generic running', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-1037-stage-active',
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-1037-stage-active',
+          identifier: 'ISSUE-1037-STAGE-ACTIVE',
+          title: 'Implementation work is still in progress',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-03-07T00:29:45.000Z'
+        })
+      }
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-1037-stage-active',
+      issue_id: 'issue-1037-stage-active',
+      issue_identifier: 'ISSUE-1037-STAGE-ACTIVE',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:25:00.000Z',
+      updated_at: '2026-03-07T00:29:00.000Z',
+      summary: 'implementation is active'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-1037-stage-active',
+      issue_identifier: 'ISSUE-1037-STAGE-ACTIVE',
+      pid: '4242',
+      turn_count: 3,
+      last_event: 'turn/completed',
+      last_message: 'turn completed (completed)',
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      updated_at: '2026-03-07T00:29:30.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const sameIssueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-1037-STAGE-ACTIVE'
+    );
+
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-1037-STAGE-ACTIVE',
+        display_state: 'In Progress'
+      })
+    ]);
+    expect(sameIssueRecord?.payload.display_status).toBe('In Progress');
+    expect(sameIssueRecord?.payload.running?.display_state).toBe('In Progress');
+  });
+
   it('projects operator-visible workflow phase into running display state', async () => {
     const fixture = await createFixture({
       taskId: 'task-1037-stage-current',

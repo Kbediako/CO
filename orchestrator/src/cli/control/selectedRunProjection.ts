@@ -563,8 +563,8 @@ function resolveOperatorVisibleRunningState(
     return null;
   }
   const stateKey = normalizedState.toLowerCase().replace(/[^a-z0-9]+/g, '');
-  if (stateKey === 'inprogress' || stateKey === 'running' || stateKey === 'started') {
-    return 'running';
+  if (stateKey === 'running' || stateKey === 'started') {
+    return normalizedState;
   }
   return normalizedState;
 }
