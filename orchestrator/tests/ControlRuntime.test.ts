@@ -2280,98 +2280,104 @@ describe('ControlRuntime', () => {
   });
 
   it('keeps shared polling exhaustion visible even when a newer worker proof reports healthier Linear budget', async () => {
-    const providerIntakeState = createProviderIntakeState();
-    providerIntakeState.polling = {
-      next_poll_in_ms: 43_000,
-      linear_budget: {
-        observed_at: '2026-03-07T00:29:00.000Z',
-        source: 'control-host-polling',
-        suppression: 'cooldown',
-        suppression_reason: 'linear_budget_shared_cooldown',
-        retry_after_seconds: 43,
-        cooldown_until: '2026-03-07T00:29:43.000Z',
-        cooldown_active: true,
-        request_id: 'polling-budget-shared-authoritative',
-        requests: {
-          remaining: 0,
-          limit: 30,
-          reset_at: '2026-03-07T00:29:43.000Z'
-        },
-        endpoint_requests: null,
-        complexity: {
-          remaining: 180,
-          limit: 200,
-          reset_at: '2026-03-07T00:30:07.000Z'
-        },
-        endpoint_complexity: null
-      }
-    };
-    const fixture = await createFixture({
-      taskId: 'task-1037-shared-polling-authoritative',
-      providerIntakeState,
-      linearAdvisoryState: {
-        tracked_issue: createTrackedIssue({
-          id: 'issue-1037-shared-polling-authoritative',
-          identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
-          title: 'Tracked refresh is paused by shared Linear cooldown',
-          updated_at: '2026-03-07T00:29:00.000Z'
-        })
-      }
-    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:29:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState();
+      providerIntakeState.polling = {
+        next_poll_in_ms: 43_000,
+        linear_budget: {
+          observed_at: '2026-03-07T00:29:00.000Z',
+          source: 'control-host-polling',
+          suppression: 'cooldown',
+          suppression_reason: 'linear_budget_shared_cooldown',
+          retry_after_seconds: 43,
+          cooldown_until: '2026-03-07T00:29:43.000Z',
+          cooldown_active: true,
+          request_id: 'polling-budget-shared-authoritative',
+          requests: {
+            remaining: 0,
+            limit: 30,
+            reset_at: '2026-03-07T00:29:43.000Z'
+          },
+          endpoint_requests: null,
+          complexity: {
+            remaining: 180,
+            limit: 200,
+            reset_at: '2026-03-07T00:30:07.000Z'
+          },
+          endpoint_complexity: null
+        }
+      };
+      const fixture = await createFixture({
+        taskId: 'task-1037-shared-polling-authoritative',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'issue-1037-shared-polling-authoritative',
+            identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
+            title: 'Tracked refresh is paused by shared Linear cooldown',
+            updated_at: '2026-03-07T00:29:00.000Z'
+          })
+        }
+      });
 
-    await seedManifest(fixture.paths, {
-      task_id: 'task-1037-shared-polling-authoritative',
-      issue_id: 'issue-1037-shared-polling-authoritative',
-      issue_identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
-      status: 'in_progress',
-      started_at: '2026-03-07T00:25:00.000Z',
-      updated_at: '2026-03-07T00:29:30.000Z',
-      summary: 'tracked issue is still running while refresh is paused'
-    });
-    await seedProviderLinearWorkerProof(fixture.paths, {
-      issue_id: 'issue-1037-shared-polling-authoritative',
-      issue_identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
-      pid: '4242',
-      turn_count: 3,
-      last_event: 'account/ratelimits/updated',
-      last_message: 'rate limits updated',
-      last_event_at: '2026-03-07T00:29:30.000Z',
-      rate_limits: {
-        source: 'seeded-proof'
-      },
-      linear_budget: {
-        observed_at: '2026-03-07T00:29:30.000Z',
-        source: 'worker-proof',
-        suppression: 'none',
-        suppression_reason: null,
-        retry_after_seconds: null,
-        cooldown_until: null,
-        cooldown_active: false,
-        request_id: 'worker-budget-shared-authoritative',
-        requests: {
-          remaining: 12,
-          limit: 30,
-          reset_at: '2026-03-07T00:31:00.000Z'
+      await seedManifest(fixture.paths, {
+        task_id: 'task-1037-shared-polling-authoritative',
+        issue_id: 'issue-1037-shared-polling-authoritative',
+        issue_identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:30.000Z',
+        summary: 'tracked issue is still running while refresh is paused'
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'issue-1037-shared-polling-authoritative',
+        issue_identifier: 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE',
+        pid: '4242',
+        turn_count: 3,
+        last_event: 'account/ratelimits/updated',
+        last_message: 'rate limits updated',
+        last_event_at: '2026-03-07T00:29:30.000Z',
+        rate_limits: {
+          source: 'seeded-proof'
         },
-        endpoint_requests: null,
-        complexity: {
-          remaining: 180,
-          limit: 200,
-          reset_at: '2026-03-07T00:30:07.000Z'
+        linear_budget: {
+          observed_at: '2026-03-07T00:29:30.000Z',
+          source: 'worker-proof',
+          suppression: 'none',
+          suppression_reason: null,
+          retry_after_seconds: null,
+          cooldown_until: null,
+          cooldown_active: false,
+          request_id: 'worker-budget-shared-authoritative',
+          requests: {
+            remaining: 12,
+            limit: 30,
+            reset_at: '2026-03-07T00:31:00.000Z'
+          },
+          endpoint_requests: null,
+          complexity: {
+            remaining: 180,
+            limit: 200,
+            reset_at: '2026-03-07T00:30:07.000Z'
+          },
+          endpoint_complexity: null
         },
-        endpoint_complexity: null
-      },
-      updated_at: '2026-03-07T00:29:30.000Z'
-    });
+        updated_at: '2026-03-07T00:29:30.000Z'
+      });
 
-    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
-    const runningEntry = compatibilityProjection.running.find(
-      (entry) => entry.issue_identifier === 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE'
-    );
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const runningEntry = compatibilityProjection.running.find(
+        (entry) => entry.issue_identifier === 'ISSUE-1037-SHARED-POLLING-AUTHORITATIVE'
+      );
 
-    expect(runningEntry?.display_event).toBe(
-      'linear requests exhausted; next tracked-issue refresh at 43s'
-    );
+      expect(runningEntry?.display_event).toBe(
+        'linear requests exhausted; next tracked-issue refresh at 43s'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('surfaces endpoint-specific Linear request exhaustion with the operator-facing requests event text', async () => {

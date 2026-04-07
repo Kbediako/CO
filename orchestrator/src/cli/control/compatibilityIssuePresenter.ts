@@ -457,10 +457,15 @@ function resolveCompatibilityRunningDisplayEvent(input: {
     selected: input.selected,
     polling: input.polling
   });
+  const authoritativeLinearBudgetForEvent =
+    authoritativeLinearBudget === input.polling?.linear_budget &&
+    !shouldUseCompatibilityPollingCooldownState(input.polling)
+      ? null
+      : authoritativeLinearBudget;
   const authoritativeNextRefreshInMs =
-    authoritativeLinearBudget === input.polling?.linear_budget ? nextRefreshInMs : null;
+    authoritativeLinearBudgetForEvent === input.polling?.linear_budget ? nextRefreshInMs : null;
   const linearBudgetEvent = resolveLinearBudgetExhaustionEvent(
-    authoritativeLinearBudget,
+    authoritativeLinearBudgetForEvent,
     {
       nextRefreshInMs: authoritativeNextRefreshInMs
     }
@@ -526,9 +531,8 @@ function resolveCompatibilityPollingLinearBudgetExhaustionEvent(
 ): string | null {
   const pollingBudget = polling?.linear_budget ?? null;
   if (
-    !isCompatibilityLinearBudgetSharedExhausted(pollingBudget) ||
-    polling?.next_refresh_state === 'checking' ||
-    polling?.next_refresh_state === 'unknown'
+    !shouldUseCompatibilityPollingCooldownState(polling) ||
+    !isCompatibilityLinearBudgetSharedExhausted(pollingBudget)
   ) {
     return null;
   }
@@ -539,6 +543,16 @@ function resolveCompatibilityPollingLinearBudgetExhaustionEvent(
   return resolveLinearBudgetExhaustionEvent(pollingBudget, {
     nextRefreshInMs
   });
+}
+
+function shouldUseCompatibilityPollingCooldownState(
+  polling: ControlPollingHealthPayload | null
+): boolean {
+  return (
+    polling?.next_refresh_state === undefined ||
+    polling?.next_refresh_state === null ||
+    polling.next_refresh_state === 'cooldown'
+  );
 }
 
 function resolveAuthoritativeLinearBudget(input: {

@@ -514,4 +514,22 @@ describe('CompatibilityIssuePresenter', () => {
 
     expect(runningEntry.display_event).toBe('rate limits updated');
   });
+
+  it('drops polling exhaustion once the projected state has moved to an ordinary scheduled poll', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_refresh_state: 'scheduled',
+        next_refresh_at: '2026-04-06T02:35:43.000Z',
+        next_refresh_in_ms: 43_000
+      }
+    );
+
+    expect(runningEntry.display_event).toBeNull();
+  });
 });
