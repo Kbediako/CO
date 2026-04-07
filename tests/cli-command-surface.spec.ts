@@ -193,9 +193,8 @@ describe('codex-orchestrator command surface', () => {
       ({ stdout, stderr, exitCode } = parseCliFailure(error));
     }
 
-    const combinedOutput = `${stderr}\n${stdout}`;
     expect(exitCode).not.toBe(0);
-    expect(combinedOutput).toContain('Unknown command: unknown-command');
+    expect(stderr).toContain('Unknown command: unknown-command');
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
   }, CLI_BOOT_TIMEOUT);
 

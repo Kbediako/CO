@@ -84,6 +84,10 @@ interface RunOutputPayload {
   issue_log_error: string | null;
 }
 
+function writeStderrLine(message: string): void {
+  process.stderr.write(`${message}\n`);
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const command = args.shift();
@@ -174,12 +178,12 @@ async function main(): Promise<void> {
         printVersion();
         break;
       default:
-        console.error(`Unknown command: ${command}`);
+        writeStderrLine(`Unknown command: ${command}`);
         printHelp();
         process.exitCode = 1;
     }
   } catch (error) {
-    console.error((error as Error)?.message ?? String(error));
+    writeStderrLine((error as Error)?.message ?? String(error));
     process.exitCode = 1;
   }
 }
