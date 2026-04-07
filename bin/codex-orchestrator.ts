@@ -86,8 +86,14 @@ interface RunOutputPayload {
 
 function writeStderrLine(message: string): void {
   const line = `${message}\n`;
+  try {
+    writeSync(2, line);
+    return;
+  } catch {
+    // Fall through when stderr fd 2 is unavailable in the current runtime.
+  }
   const stderrFd = process.stderr.fd;
-  if (typeof stderrFd === 'number') {
+  if (typeof stderrFd === 'number' && stderrFd !== 2) {
     try {
       writeSync(stderrFd, line);
       return;
