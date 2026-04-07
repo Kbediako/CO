@@ -1040,6 +1040,8 @@ function renderCompactStatusLine(
 function resolveNextRefreshSummaryText(
   polling: OperatorDashboardDataset['polling']
 ): string | null {
+  const hasProjectedState =
+    polling?.next_refresh_state !== undefined && polling?.next_refresh_state !== null;
   const projectedState =
     polling?.next_refresh_state === 'cooldown' ||
     polling?.next_refresh_state === 'checking' ||
@@ -1056,11 +1058,17 @@ function resolveNextRefreshSummaryText(
   if (projectedState === 'checking') {
     return 'checking now...';
   }
+  if (projectedState === 'unknown') {
+    return null;
+  }
   if (
     (projectedState === 'cooldown' || projectedState === 'scheduled') &&
     projectedCountdown !== null
   ) {
     return formatCountdownMs(projectedCountdown);
+  }
+  if (hasProjectedState) {
+    return null;
   }
   if (polling?.checking) {
     return 'checking now...';

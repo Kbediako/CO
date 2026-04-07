@@ -761,6 +761,33 @@ describe('control status dashboard', () => {
     expect(plainFrame).not.toContain('│ Next refresh: 58m 11s');
   });
 
+  it('does not fall back to raw checking or stale scheduling once projected state exists', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        polling: {
+          ...buildDataset().polling,
+          checking: true,
+          next_poll_in_ms: (58 * 60 + 11) * 1000,
+          next_refresh_state: 'cooldown',
+          next_refresh_at: '2026-03-30T01:44:32.000Z',
+          next_refresh_in_ms: null
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 0
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('│ Next refresh: n/a');
+    expect(plainFrame).not.toContain('│ Next refresh: checking now...');
+    expect(plainFrame).not.toContain('│ Next refresh: 58m 11s');
+  });
+
   it('renders absolute rate-limit reset timestamps against the dashboard snapshot time', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-30T02:00:00.000Z'));

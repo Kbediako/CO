@@ -503,6 +503,11 @@ function resolveCompatibilityNextRefreshCountdownMs(
   ) {
     return polling.next_refresh_in_ms;
   }
+  const hasProjectedState =
+    polling?.next_refresh_state !== undefined && polling?.next_refresh_state !== null;
+  if (hasProjectedState) {
+    return null;
+  }
   return typeof polling?.next_poll_in_ms === 'number' &&
     Number.isFinite(polling.next_poll_in_ms) &&
     polling.next_poll_in_ms >= 0

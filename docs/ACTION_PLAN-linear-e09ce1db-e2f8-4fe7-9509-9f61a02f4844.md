@@ -62,5 +62,5 @@
   - Mitigation: restrict presenter changes to reusing the projected next-refresh countdown for existing Linear budget exhaustion semantics.
 
 ## Approvals
-- Reviewer: pending `codex-orchestrator linear child-stream --pipeline docs-review`
-- Date: 2026-04-08
+- Reviewer: `codex-orchestrator docs-review (failed-other, manual fallback accepted)`
+- Date: 2026-04-07

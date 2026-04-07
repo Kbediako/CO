@@ -3,11 +3,12 @@
 - Linear Issue: `CO-108` / `e09ce1db-e2f8-4fe7-9509-9f61a02f4844`
 - MCP Task ID: `linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844`
 - Primary PRD: `docs/PRD-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
-- TECH_SPEC: `tasks/specs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
+- TECH_SPEC: `docs/TECH_SPEC-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
+- Task spec: `tasks/specs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
 
 ## Docs-First
-- [x] PRD, TECH_SPEC, ACTION_PLAN, task spec, task checklist, `.agent` mirror, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` were drafted or refreshed for `CO-108`. Evidence: bootstrap packet created in the current workspace on 2026-04-08.
+- [x] PRD, TECH_SPEC, ACTION_PLAN, task spec, task checklist, `.agent` mirror, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` were drafted or refreshed for `CO-108`. Evidence: bootstrap packet created in the current workspace on 2026-04-07.
 - [x] Standalone pre-implementation self-review notes were captured in the spec packet before coding. Evidence: `tasks/specs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`.
 - [x] Docs-review delegation evidence was captured and the repo `docs/TASKS.md` line-budget failure was recorded truthfully as manual fallback rather than blocking the lane. Evidence: `/Users/kbediako/Code/CO/.workspaces/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844/.runs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844-co-108-docs-review/cli/2026-04-07T14-43-58-099Z-9d3f8f3c/manifest.json`, `out/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844/manual/20260407T144358Z-docs-review-fallback.md`.
 
@@ -26,6 +27,6 @@
 
 ## Handoff
 - [x] Exactly one persistent `## Codex Workpad` comment is kept current on the issue. Evidence: `linear upsert-workpad` updated comment `079a9ceb-09f0-4fac-a850-57a09da0eeb2` on 2026-04-07T15:14Z.
-- [ ] A PR is attached before any review-state handoff. Evidence: pending.
+- [x] A PR is attached before any review-state handoff. Evidence: PR `#376` (`https://github.com/Kbediako/CO/pull/376`) is attached to Linear issue `CO-108` via existing attachment `f7b7af22-8cb2-4181-87e7-9d97c8cfd128`.
 - [ ] Latest `origin/main` is merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks are green, actionable review feedback is handled or explicitly pushed back, `pr ready-review` drains cleanly, and the issue moves to `Human Review` / `In Review` only after coding stops. Evidence: pending.

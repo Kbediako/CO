@@ -1,6 +1,6 @@
 # PRD - CO STATUS: make Next refresh truthful under Linear cooldown and shared-budget poll suppression
 
-## Added by Bootstrap 2026-04-08
+## Added by Bootstrap 2026-04-07
 
 ## Traceability
 - Linear issue: `CO-108` / `e09ce1db-e2f8-4fe7-9509-9f61a02f4844`

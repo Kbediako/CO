@@ -1,18 +1,18 @@
 {
   "items": [
     {
-      "id": "20260408-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844",
+      "id": "20260407-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844",
       "title": "CO STATUS: make Next refresh truthful under Linear cooldown and shared-budget poll suppression",
       "relates_to": "tasks/tasks-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-08",
+      "last_review": "2026-04-07",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
-          "date": "2026-04-08",
+          "date": "2026-04-07",
           "manifest": ".runs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844-co-108-docs-review/cli/2026-04-07T14-43-58-099Z-9d3f8f3c/manifest.json",
           "override_reason": "The audited docs-review child stream preserved delegation evidence and passed spec-guard, but failed on the repo docs/TASKS line-budget guard after the new CO-108 snapshot entry pushed the file to 451 lines (`max=450`). The CO-108 packet itself is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so this result is recorded as truthful manual fallback rather than a packet-shape blocker."
         }

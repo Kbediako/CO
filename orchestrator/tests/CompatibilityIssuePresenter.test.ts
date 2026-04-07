@@ -306,4 +306,25 @@ describe('CompatibilityIssuePresenter', () => {
       'linear complexity budget exhausted; next tracked-issue refresh at 29m 32s'
     );
   });
+
+  it('falls back to retry_after_seconds instead of stale raw scheduling when projected state exists without a countdown', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_poll_in_ms: (58 * 60 + 11) * 1000,
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T03:04:32.000Z',
+        next_refresh_in_ms: null
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 43s'
+    );
+  });
 });

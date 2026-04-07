@@ -1,15 +1,16 @@
 ---
-id: 20260408-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844
+id: 20260407-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844
 title: CO STATUS: make Next refresh truthful under Linear cooldown and shared-budget poll suppression
 relates_to: docs/PRD-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-08
+last_review: 2026-04-07
 ---
 
 ## Canonical Reference
-- Canonical TECH_SPEC: `tasks/specs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
+- Canonical TECH_SPEC: `docs/TECH_SPEC-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
+- Task spec: `tasks/specs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
 - PRD: `docs/PRD-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
 - Task checklist: `tasks/tasks-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md`
@@ -107,6 +108,6 @@ last_review: 2026-04-08
 
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review` child stream failed only on the repo `docs/TASKS.md` line-budget guard after `spec-guard` passed; manual fallback accepted
-- Date: 2026-04-08
+- Date: 2026-04-07
 - Manifest: `/Users/kbediako/Code/CO/.workspaces/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844/.runs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844-co-108-docs-review/cli/2026-04-07T14-43-58-099Z-9d3f8f3c/manifest.json`
 - Review telemetry: fallback note at `out/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844/manual/20260407T144358Z-docs-review-fallback.md`
