@@ -4,7 +4,10 @@ import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
-import { readProviderPollingHealth } from './providerPollingHealth.js';
+import {
+  readProviderPollingHealth,
+  resolveControlPollingNextRefreshProjection
+} from './providerPollingHealth.js';
 import {
   buildProviderIntakeSummary,
   isRecordLike,
@@ -312,6 +315,18 @@ function normalizePersistedProviderPollingSnapshot(
   if (!isRecordLike(polling)) {
     return null;
   }
+  const linearBudget = normalizeLinearBudgetSnapshot(polling.linear_budget);
+  const nextRefresh = resolveControlPollingNextRefreshProjection({
+    checking: polling.checking === true,
+    nextPollAt: typeof polling.next_poll_at === 'string' ? polling.next_poll_at : null,
+    nextPollInMs:
+      typeof polling.next_poll_in_ms === 'number' && Number.isFinite(polling.next_poll_in_ms)
+        ? polling.next_poll_in_ms
+        : null,
+    operationStartedAt:
+      typeof polling.operation_started_at === 'string' ? polling.operation_started_at : null,
+    linearBudget
+  });
   return {
     enabled: polling.enabled !== false,
     interval_ms:
@@ -333,6 +348,9 @@ function normalizePersistedProviderPollingSnapshot(
       typeof polling.next_poll_in_ms === 'number' && Number.isFinite(polling.next_poll_in_ms)
         ? polling.next_poll_in_ms
         : null,
+    next_refresh_state: nextRefresh.state,
+    next_refresh_at: nextRefresh.at,
+    next_refresh_in_ms: nextRefresh.in_ms,
     updated_at: typeof polling.updated_at === 'string' ? polling.updated_at : null,
     operation_started_at:
       typeof polling.operation_started_at === 'string' ? polling.operation_started_at : null,
@@ -348,7 +366,7 @@ function normalizePersistedProviderPollingSnapshot(
     stuck_since_at: typeof polling.stuck_since_at === 'string' ? polling.stuck_since_at : null,
     restart_required: polling.restart_required === true,
     reason: typeof polling.reason === 'string' ? polling.reason : null,
-    linear_budget: normalizeLinearBudgetSnapshot(polling.linear_budget)
+    linear_budget: linearBudget
   };
 }
 

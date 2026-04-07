@@ -3,6 +3,7 @@ import { logger } from '../../logger.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 
 export type ControlPollingMode = 'poll' | 'refresh';
+export type ControlNextRefreshState = 'cooldown' | 'checking' | 'scheduled' | 'unknown';
 
 export interface ControlPollingHealthPayload {
   enabled: boolean;
@@ -17,6 +18,9 @@ export interface ControlPollingHealthPayload {
   last_error: string | null;
   next_poll_at: string | null;
   next_poll_in_ms: number | null;
+  next_refresh_state?: ControlNextRefreshState | null;
+  next_refresh_at?: string | null;
+  next_refresh_in_ms?: number | null;
   updated_at: string | null;
   operation_started_at: string | null;
   operation_elapsed_ms: number | null;
@@ -217,6 +221,38 @@ export function readProviderPollingHealth(
   return buildProviderPollingHealthPayload(state, nowMs);
 }
 
+export function resolveControlPollingNextRefreshProjection(input: {
+  checking: boolean;
+  nextPollAt?: string | null;
+  nextPollInMs?: number | null;
+  operationStartedAt?: string | null;
+  linearBudget?: LinearBudgetStatus | null;
+  nowMs?: number;
+}): {
+  state: ControlNextRefreshState;
+  at: string | null;
+  in_ms: number | null;
+} {
+  const nowMs = input.nowMs ?? Date.now();
+  const nextPollAtMs =
+    parseIsoToMs(input.nextPollAt) ??
+    (typeof input.nextPollInMs === 'number' && Number.isFinite(input.nextPollInMs)
+      ? nowMs + Math.max(0, input.nextPollInMs)
+      : null);
+  const projection = resolveControlPollingNextRefreshProjectionFromMs({
+    checking: input.checking,
+    nextPollAtMs,
+    operationStartedAtMs: parseIsoToMs(input.operationStartedAt),
+    linearBudget: input.linearBudget ?? null,
+    nowMs
+  });
+  return {
+    state: projection.state,
+    at: toIsoTimestamp(projection.atMs),
+    in_ms: projection.inMs
+  };
+}
+
 function buildProviderPollingHealthPayload(
   state: MutableProviderPollingHealthState,
   nowMs: number
@@ -227,6 +263,13 @@ function buildProviderPollingHealthPayload(
       : null;
   const stuck = state.stuckAtMs !== null;
   const reason = state.reason ?? (stuck ? buildProviderPollingStuckReason(state) : null);
+  const nextRefresh = resolveControlPollingNextRefreshProjectionFromMs({
+    checking: state.checking,
+    nextPollAtMs: state.nextPollAtMs,
+    operationStartedAtMs: state.operationStartedAtMs,
+    linearBudget: state.linearBudget,
+    nowMs
+  });
   return {
     enabled: true,
     interval_ms: state.intervalMs,
@@ -241,6 +284,9 @@ function buildProviderPollingHealthPayload(
     next_poll_at: toIsoTimestamp(state.nextPollAtMs),
     next_poll_in_ms:
       state.nextPollAtMs === null ? null : Math.max(0, state.nextPollAtMs - nowMs),
+    next_refresh_state: nextRefresh.state,
+    next_refresh_at: toIsoTimestamp(nextRefresh.atMs),
+    next_refresh_in_ms: nextRefresh.inMs,
     updated_at: toIsoTimestamp(state.updatedAtMs),
     operation_started_at: toIsoTimestamp(state.operationStartedAtMs),
     operation_elapsed_ms: operationElapsedMs,
@@ -251,6 +297,76 @@ function buildProviderPollingHealthPayload(
     reason,
     linear_budget: state.linearBudget
   };
+}
+
+function resolveControlPollingNextRefreshProjectionFromMs(input: {
+  checking: boolean;
+  nextPollAtMs: number | null;
+  operationStartedAtMs: number | null;
+  linearBudget: LinearBudgetStatus | null;
+  nowMs: number;
+}): {
+  state: ControlNextRefreshState;
+  atMs: number | null;
+  inMs: number | null;
+} {
+  const cooldownUntilMs = resolveActiveLinearBudgetCooldownUntilMs(input.linearBudget, input.nowMs);
+  if (cooldownUntilMs !== null) {
+    return {
+      state: 'cooldown',
+      atMs: cooldownUntilMs,
+      inMs: Math.max(0, cooldownUntilMs - input.nowMs)
+    };
+  }
+  if (input.checking && input.operationStartedAtMs !== null) {
+    return {
+      state: 'checking',
+      atMs: null,
+      inMs: null
+    };
+  }
+  if (input.nextPollAtMs !== null && Number.isFinite(input.nextPollAtMs)) {
+    return {
+      state: 'scheduled',
+      atMs: input.nextPollAtMs,
+      inMs: Math.max(0, input.nextPollAtMs - input.nowMs)
+    };
+  }
+  return {
+    state: 'unknown',
+    atMs: null,
+    inMs: null
+  };
+}
+
+function resolveActiveLinearBudgetCooldownUntilMs(
+  budget: LinearBudgetStatus | null,
+  nowMs: number
+): number | null {
+  const cooldownUntilMs = resolveLinearBudgetCooldownUntilMs(budget);
+  return cooldownUntilMs !== null && cooldownUntilMs > nowMs ? cooldownUntilMs : null;
+}
+
+function resolveLinearBudgetCooldownUntilMs(
+  budget: LinearBudgetStatus | null
+): number | null {
+  if (!budget) {
+    return null;
+  }
+  const cooldownUntilMs = parseIsoToMs(budget.cooldown_until);
+  if (cooldownUntilMs !== null) {
+    return cooldownUntilMs;
+  }
+  if (
+    typeof budget.retry_after_seconds === 'number' &&
+    Number.isFinite(budget.retry_after_seconds)
+  ) {
+    const observedAtMs = parseIsoToMs(budget.observed_at);
+    if (observedAtMs !== null) {
+      return observedAtMs + Math.max(0, Math.ceil(budget.retry_after_seconds * 1000));
+    }
+  }
+  return null;
 }
 
 function getOrCreateProviderPollingHealthState(
@@ -352,6 +468,14 @@ function toIsoTimestamp(value: number | null): string | null {
     return null;
   }
   return new Date(value).toISOString();
+}
+
+function parseIsoToMs(value: string | null | undefined): number | null {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function normalizePollingError(error: unknown): string {

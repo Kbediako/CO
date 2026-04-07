@@ -2105,6 +2105,60 @@ describe('ControlRuntime', () => {
     );
   });
 
+  it('derives cooldown next-refresh projection from persisted shared-budget state even when raw scheduling overstates it', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:00:00.000Z'));
+
+    try {
+      const fixture = await createFixture({
+        providerIntakeState: {
+          ...createProviderIntakeState(),
+          polling: {
+            enabled: true,
+            interval_ms: 15_000,
+            checking: true,
+            queued: false,
+            last_mode: 'poll',
+            last_requested_at: '2026-03-07T00:00:00.000Z',
+            next_poll_at: '2026-03-07T00:58:11.000Z',
+            next_poll_in_ms: (58 * 60 + 11) * 1000,
+            updated_at: '2026-03-07T00:00:00.000Z',
+            operation_started_at: '2026-03-07T00:00:00.000Z',
+            linear_budget: {
+              observed_at: '2026-03-07T00:00:00.000Z',
+              source: 'control-host-polling',
+              suppression: 'cooldown',
+              suppression_reason: 'linear_budget_shared_cooldown',
+              retry_after_seconds: 29 * 60 + 32,
+              cooldown_until: '2026-03-07T00:29:32.000Z',
+              cooldown_active: true,
+              request_id: 'polling-budget-rehydrate',
+              requests: {
+                remaining: 0,
+                limit: 30,
+                reset_at: '2026-03-07T00:29:32.000Z'
+              },
+              endpoint_requests: null,
+              complexity: null,
+              endpoint_complexity: null
+            }
+          }
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      expect(compatibilityProjection.polling).toMatchObject({
+        checking: true,
+        next_poll_in_ms: (58 * 60 + 11) * 1000,
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-03-07T00:29:32.000Z',
+        next_refresh_in_ms: (29 * 60 + 32) * 1000
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('limits shared polling exhaustion events to the tracked running issue', async () => {
     const providerIntakeState = createProviderIntakeState();
     providerIntakeState.polling = {

@@ -252,4 +252,58 @@ describe('CompatibilityIssuePresenter', () => {
       'linear requests exhausted; next tracked-issue refresh at 43s'
     );
   });
+
+  it('prefers the projected next refresh countdown over stale raw scheduled polling for requests exhaustion', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_poll_in_ms: (58 * 60 + 11) * 1000,
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T03:04:32.000Z',
+        next_refresh_in_ms: (29 * 60 + 32) * 1000
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear requests exhausted; next tracked-issue refresh at 29m 32s'
+    );
+  });
+
+  it('uses the projected next refresh countdown for complexity exhaustion when available', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.'
+      }),
+      {
+        ...buildExhaustedLinearPolling(),
+        next_refresh_state: 'cooldown',
+        next_refresh_at: '2026-04-06T03:04:32.000Z',
+        next_refresh_in_ms: (29 * 60 + 32) * 1000,
+        linear_budget: {
+          ...buildExhaustedLinearPolling()!.linear_budget!,
+          requests: {
+            remaining: 7,
+            limit: 30,
+            reset_at: '2026-04-06T02:40:00.000Z'
+          },
+          complexity: {
+            remaining: 0,
+            limit: 200,
+            reset_at: '2026-04-06T03:04:32.000Z'
+          }
+        }
+      }
+    );
+
+    expect(runningEntry.display_event).toBe(
+      'linear complexity budget exhausted; next tracked-issue refresh at 29m 32s'
+    );
+  });
 });
