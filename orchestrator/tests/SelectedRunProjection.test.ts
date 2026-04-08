@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createSelectedRunProjectionReader,
@@ -13,6 +13,7 @@ import {
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
 import {
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  type ProviderLinearWorkerChildStreamRecord,
   type ProviderLinearWorkerChildLaneRecord,
   type ProviderLinearWorkerProof
 } from '../src/cli/providerLinearWorkerRunner.js';
@@ -21,6 +22,7 @@ import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 const cleanupRoots: string[] = [];
 
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -377,6 +379,163 @@ describe('SelectedRunProjection', () => {
       event: 'waiting_on_checks',
       message: 'Waiting for required checks before merge.',
       at: '2026-03-20T01:16:20.000Z'
+    });
+  });
+
+  it('uses the displayed child summary timestamp for latestEvent when newer child activity has no summary', async () => {
+    const { root, paths } = await createHostPaths();
+    const baseTimestampMs = Date.parse('2026-03-30T01:15:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(baseTimestampMs));
+    const attemptStartedAt = new Date(baseTimestampMs - 5 * 60 * 1000).toISOString();
+    const childStreamLaunchedAt = new Date(baseTimestampMs - 4 * 60 * 1000).toISOString();
+    const childStreamRecordedAt = new Date(baseTimestampMs - 3.5 * 60 * 1000).toISOString();
+    const childLaneLaunchAt = new Date(baseTimestampMs - 3 * 60 * 1000).toISOString();
+    const childLaneDecisionAt = new Date(baseTimestampMs - 2 * 60 * 1000).toISOString();
+    const updatedAt = new Date(baseTimestampMs - 60 * 1000).toISOString();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child-summary-fallback');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child-summary-fallback',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: updatedAt,
+        summary: 'provider run active'
+      }),
+      'utf8'
+    );
+    const childStreams: ProviderLinearWorkerChildStreamRecord[] = [
+      {
+        stream: 'co-109-docs-review',
+        pipeline_id: 'docs-review',
+        task_id: 'linear-co-109-docs-review',
+        run_id: 'run-child-stream-109',
+        status: 'failed',
+        manifest_path: join(childPaths.runDir, 'docs-review-manifest.json'),
+        artifact_root: join(childPaths.runDir, 'docs-review-artifacts'),
+        log_path: null,
+        summary: 'docs-review failed at docs:freshness after spec-guard passed',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: null,
+        source_setup: null,
+        launched_at: childStreamLaunchedAt,
+        recorded_at: childStreamRecordedAt
+      }
+    ];
+    const childLanes: ProviderLinearWorkerChildLaneRecord[] = [
+      {
+        stream: 'event-truth',
+        pipeline_id: 'implementation-gate',
+        task_id: 'linear-co-109-event-truth',
+        run_id: 'run-child-lane-109',
+        status: 'completed',
+        manifest_path: join(childPaths.runDir, 'event-truth-manifest.json'),
+        artifact_root: join(childPaths.runDir, 'event-truth-artifacts'),
+        log_path: null,
+        summary: null,
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: null,
+        source_setup: null,
+        launched_at: childLaneLaunchAt,
+        purpose: 'Tighten authoritative EVENT truth.',
+        instructions: null,
+        scope: {
+          files: ['orchestrator/src/cli/control/providerIssueObservability.ts'],
+          phases: ['implementation']
+        },
+        parent_snapshot: {
+          base_sha: null,
+          issue_updated_at: attemptStartedAt,
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          captured_at: childLaneLaunchAt
+        },
+        lane_workspace_path: null,
+        patch_artifact_path: null,
+        decision: 'accepted',
+        in_flight_action: null,
+        decision_at: childLaneDecisionAt,
+        decision_reason: null
+      }
+    ];
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: attemptStartedAt,
+          current_turn_started_at: attemptStartedAt,
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'turn_started',
+          last_message: 'Provider worker turn is active.',
+          last_event_at: attemptStartedAt,
+          rate_limits: {
+            primary: {
+              used_percent: 18,
+              window_minutes: 300
+            },
+            secondary: {
+              used_percent: 52,
+              window_minutes: 10080
+            }
+          },
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: root,
+          end_reason: null,
+          updated_at: updatedAt,
+          child_streams: childStreams,
+          child_lanes: childLanes
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'running',
+      reason: 'provider_issue_active_run',
+      updated_at: updatedAt,
+      run_id: 'run-child-summary-fallback'
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      progress: {
+        phase: 'turn_running',
+        kind: 'worker',
+        status: 'progressing',
+        summary: 'docs-review failed at docs:freshness after spec-guard passed',
+        summary_recorded_at: childStreamRecordedAt,
+        last_semantic_progress_at: childLaneDecisionAt
+      }
+    });
+    expect(selected?.latestEvent).toMatchObject({
+      event: 'turn_running',
+      message: 'docs-review failed at docs:freshness after spec-guard passed',
+      at: childStreamRecordedAt
     });
   });
 

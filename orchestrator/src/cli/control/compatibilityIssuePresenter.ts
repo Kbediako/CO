@@ -1009,7 +1009,10 @@ function compareCompatibilitySourcePriority<TSource extends CompatibilityIssueSo
   right: TSource
 ): number {
   const timestampComparison =
-    compareIsoTimestamp(left.latestEvent?.at, right.latestEvent?.at) ||
+    compareIsoTimestamp(
+      resolveCompatibilitySourcePriorityTimestamp(left),
+      resolveCompatibilitySourcePriorityTimestamp(right)
+    ) ||
     compareIsoTimestamp(left.updatedAt, right.updatedAt) ||
     compareIsoTimestamp(left.startedAt, right.startedAt) ||
     compareIsoTimestamp(left.completedAt, right.completedAt);
@@ -1020,6 +1023,23 @@ function compareCompatibilitySourcePriority<TSource extends CompatibilityIssueSo
     compareLexical(left.runId, right.runId) ||
     compareLexical(left.taskId, right.taskId) ||
     compareLexical(left.issueIdentifier, right.issueIdentifier)
+  );
+}
+
+function resolveCompatibilitySourcePriorityTimestamp(source: CompatibilityIssueSourceRecord): string | null {
+  const sourceRecord = source as CompatibilityIssueSourceRecord & {
+    providerDebugSnapshot?: {
+      last_semantic_progress_at?: string | null;
+      progress?: {
+        last_semantic_progress_at?: string | null;
+      } | null;
+    } | null;
+  };
+  return (
+    sourceRecord.providerDebugSnapshot?.progress?.last_semantic_progress_at ??
+    sourceRecord.providerDebugSnapshot?.last_semantic_progress_at ??
+    source.latestEvent?.at ??
+    null
   );
 }
 
