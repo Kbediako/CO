@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createSelectedRunProjectionReader,
@@ -22,6 +22,7 @@ import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 const cleanupRoots: string[] = [];
 
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -383,12 +384,15 @@ describe('SelectedRunProjection', () => {
 
   it('uses the displayed child summary timestamp for latestEvent when newer child activity has no summary', async () => {
     const { root, paths } = await createHostPaths();
-    const attemptStartedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const childStreamLaunchedAt = new Date(Date.now() - 4 * 60 * 1000).toISOString();
-    const childStreamRecordedAt = new Date(Date.now() - 3.5 * 60 * 1000).toISOString();
-    const childLaneLaunchAt = new Date(Date.now() - 3 * 60 * 1000).toISOString();
-    const childLaneDecisionAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const updatedAt = new Date(Date.now() - 60 * 1000).toISOString();
+    const baseTimestampMs = Date.parse('2026-03-30T01:15:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(baseTimestampMs));
+    const attemptStartedAt = new Date(baseTimestampMs - 5 * 60 * 1000).toISOString();
+    const childStreamLaunchedAt = new Date(baseTimestampMs - 4 * 60 * 1000).toISOString();
+    const childStreamRecordedAt = new Date(baseTimestampMs - 3.5 * 60 * 1000).toISOString();
+    const childLaneLaunchAt = new Date(baseTimestampMs - 3 * 60 * 1000).toISOString();
+    const childLaneDecisionAt = new Date(baseTimestampMs - 2 * 60 * 1000).toISOString();
+    const updatedAt = new Date(baseTimestampMs - 60 * 1000).toISOString();
     const childEnv = {
       repoRoot: root,
       runsRoot: join(root, '.runs'),

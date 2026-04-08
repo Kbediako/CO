@@ -33,7 +33,7 @@ last_review: 2026-04-08
 ## Implementation Boundary
 - Read-model / projection:
   - keep `compatibilityIssuePresenter.ts` authoritative for `display_event`
-  - add the smallest explicit freshness surface needed so operators can distinguish local rerender cadence from source freshness
+  - add the smallest explicit freshness surface needed, so operators can distinguish local rerender cadence from source freshness
 - Polling health:
   - extend `providerPollingHealth.ts` only as needed to expose truthful source freshness for shared Linear budget or refresh telemetry
 - Dashboard:
