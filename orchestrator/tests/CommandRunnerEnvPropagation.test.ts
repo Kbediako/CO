@@ -6,6 +6,8 @@ import process from 'node:process';
 
 const mockState = vi.hoisted(() => ({
   lastRunInput: null as {
+    command?: string;
+    args?: string[];
     env?: NodeJS.ProcessEnv;
   } | null
 }));
@@ -18,7 +20,7 @@ vi.mock('../src/cli/services/execRuntime.js', () => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    async run(input: { env?: NodeJS.ProcessEnv }) {
+    async run(input: { command?: string; args?: string[]; env?: NodeJS.ProcessEnv }) {
       mockState.lastRunInput = input;
       return {
         correlationId: 'corr-env-propagation',
@@ -108,6 +110,7 @@ describe('runCommandStage environment propagation', () => {
   it('sets MCP_RUNNER_TASK_ID to the manifest task id', async () => {
     const baseEnv = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const env = { ...baseEnv, taskId: 'delegation-stream-task' };
+    const stagePath = '/tmp/provider-worker-path';
     const pipeline: PipelineDefinition = {
       id: 'pipeline-env',
       title: 'Env Propagation',
@@ -116,7 +119,8 @@ describe('runCommandStage environment propagation', () => {
           kind: 'command',
           id: 'stage-env',
           title: 'Echo',
-          command: 'echo ok'
+          command: 'echo ok',
+          env: { PATH: stagePath }
         }
       ]
     };
@@ -135,5 +139,42 @@ describe('runCommandStage environment propagation', () => {
     expect(manifest.task_id).toBe('delegation-stream-task');
     expect(mockState.lastRunInput?.env?.MCP_RUNNER_TASK_ID).toBe('delegation-stream-task');
     expect(mockState.lastRunInput?.env?.CODEX_ORCHESTRATOR_TASK_ID).toBe('delegation-stream-task');
+    expect(mockState.lastRunInput?.env?.CODEX_ORCHESTRATOR_NODE_BIN).toBe(process.execPath);
+    expect(mockState.lastRunInput?.env?.PATH).toBe(stagePath);
+  });
+
+  it('launches the provider worker stage with explicit node argv semantics', async () => {
+    const baseEnv = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const env = { ...baseEnv, taskId: 'provider-worker-task' };
+    const pipeline: PipelineDefinition = {
+      id: 'provider-linear-worker',
+      title: 'Provider Worker',
+      stages: [
+        {
+          kind: 'command',
+          id: 'provider-linear-worker',
+          title: 'Run provider linear worker',
+          command: 'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js"'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-provider-worker', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    const stage = pipeline.stages[0] as CommandStage;
+    await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(mockState.lastRunInput?.command).toBe(process.execPath);
+    expect(mockState.lastRunInput?.args).toHaveLength(1);
+    expect(mockState.lastRunInput?.args?.[0]?.replaceAll('\\', '/')).toContain(
+      'dist/orchestrator/src/cli/providerLinearWorkerRunner.js'
+    );
+    expect(mockState.lastRunInput?.env?.CODEX_ORCHESTRATOR_NODE_BIN).toBe(process.execPath);
   });
 });
