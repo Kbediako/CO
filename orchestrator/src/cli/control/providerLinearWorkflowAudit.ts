@@ -126,7 +126,10 @@ export function readProviderLinearParallelizationSnapshots(
   return selectProviderLinearParallelizationEntries(audit)
     .filter((entry) => entry.ok)
     .filter((entry) => !issueId || entry.issue_id === issueId)
-    .filter((entry) => !recordedAtNotBefore || entry.recorded_at >= recordedAtNotBefore)
+    .filter(
+      (entry) =>
+        !recordedAtNotBefore || compareIsoTimestamp(entry.recorded_at, recordedAtNotBefore) >= 0
+    )
     .flatMap((entry) => {
       const decision = normalizeOptionalString(entry.action);
       const reason = normalizeOptionalString(entry.state);
@@ -144,7 +147,7 @@ export function readProviderLinearParallelizationSnapshots(
         recorded_at: entry.recorded_at
       }];
     })
-    .sort((left, right) => left.recorded_at.localeCompare(right.recorded_at));
+    .sort((left, right) => compareIsoTimestamp(left.recorded_at, right.recorded_at));
 }
 
 export function readProviderLinearParallelizationSnapshot(
@@ -311,4 +314,30 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
+  const leftValue = normalizeOptionalString(left);
+  const rightValue = normalizeOptionalString(right);
+  if (leftValue === rightValue) {
+    return 0;
+  }
+  if (!leftValue) {
+    return -1;
+  }
+  if (!rightValue) {
+    return 1;
+  }
+  const leftMs = Date.parse(leftValue);
+  const rightMs = Date.parse(rightValue);
+  if (Number.isFinite(leftMs) && Number.isFinite(rightMs)) {
+    return leftMs - rightMs;
+  }
+  if (Number.isFinite(leftMs)) {
+    return 1;
+  }
+  if (Number.isFinite(rightMs)) {
+    return -1;
+  }
+  return leftValue.localeCompare(rightValue);
 }

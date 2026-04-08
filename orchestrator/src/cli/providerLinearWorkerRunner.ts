@@ -753,7 +753,7 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
   return [
     `- Ordinary eligible same-issue child-lane parallelisation is a runtime contract in this lane, not optional prompt advice. During every active turn, record exactly one explicit decision with \`${helperCommand} parallelization --issue-id ${issueId} --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>\`.`,
     `- Allowed decision and reason-code pairs: ${buildParallelizationReasonCodesSummary()}.`,
-    `- If you record \`parallelize_now\`, you must actually launch at least one same-issue child lane in that turn with \`${helperCommand} child-lane --action launch ...\`; otherwise the provider worker fails closed.`,
+    `- If you record \`parallelize_now\`, you must actually launch at least one same-issue child lane in that turn with \`${helperCommand} child-lane --action launch ...\`, and at least one of those lanes must complete successfully before the turn ends; otherwise the provider worker fails closed.`,
     '- If you record `stay_serial` or `forbid_parallel`, choose the bounded reason code that truthfully explains why `child_lanes: []` is acceptable for this turn so the proof and debug surfaces are explicit rather than silent.'
   ];
 }
@@ -1938,7 +1938,7 @@ function deriveProviderLinearWorkerParallelizationRecord(input: {
   }
   return {
     ...snapshot,
-    child_lane_count: Array.isArray(input.childLanes) ? input.childLanes.length : 0
+    child_lane_count: selectCurrentTurnChildLanes(input.childLanes, input.currentTurnStartedAt).length
   };
 }
 
@@ -1966,34 +1966,36 @@ function buildProviderLinearWorkerTurnBootstrapProof(
   };
 }
 
+function selectCurrentTurnChildLanes(
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined,
+  currentTurnStartedAt: string | null | undefined
+): ProviderLinearWorkerChildLaneRecord[] {
+  const normalizedCurrentTurnStartedAt = normalizeOptionalString(currentTurnStartedAt);
+  if (!Array.isArray(childLanes)) {
+    return [];
+  }
+  if (!normalizedCurrentTurnStartedAt) {
+    return childLanes;
+  }
+  return childLanes.filter(
+    (childLane) => compareIsoTimestamp(childLane.launched_at, normalizedCurrentTurnStartedAt) >= 0
+  );
+}
+
 function hasCurrentTurnChildLaneLaunch(
-  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined
-,
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined,
   currentTurnStartedAt: string | null | undefined
 ): boolean {
-  const normalizedCurrentTurnStartedAt = normalizeOptionalString(currentTurnStartedAt);
-  return Array.isArray(childLanes)
-    ? childLanes.some((childLane) => {
-        if (!normalizedCurrentTurnStartedAt) {
-          return true;
-        }
-        return compareIsoTimestamp(childLane.launched_at, normalizedCurrentTurnStartedAt) >= 0;
-      })
-    : false;
+  return selectCurrentTurnChildLanes(childLanes, currentTurnStartedAt).length > 0;
 }
 
 function hasCurrentTurnSuccessfulChildLaneLaunch(
   childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined,
   currentTurnStartedAt: string | null | undefined
 ): boolean {
-  return Array.isArray(childLanes)
-    ? childLanes.some((childLane) => {
-        if (childLane.status !== 'succeeded') {
-          return false;
-        }
-        return hasCurrentTurnChildLaneLaunch([childLane], currentTurnStartedAt);
-      })
-    : false;
+  return selectCurrentTurnChildLanes(childLanes, currentTurnStartedAt).some(
+    (childLane) => childLane.status === 'succeeded'
+  );
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
@@ -2008,13 +2010,18 @@ function compareIsoTimestamp(left: string | null | undefined, right: string | nu
   if (!rightValue) {
     return 1;
   }
-  if (leftValue > rightValue) {
+  const leftMs = Date.parse(leftValue);
+  const rightMs = Date.parse(rightValue);
+  if (Number.isFinite(leftMs) && Number.isFinite(rightMs)) {
+    return leftMs - rightMs;
+  }
+  if (Number.isFinite(leftMs)) {
     return 1;
   }
-  if (leftValue < rightValue) {
+  if (Number.isFinite(rightMs)) {
     return -1;
   }
-  return 0;
+  return leftValue.localeCompare(rightValue);
 }
 
 function resolveProviderLinearWorkerParallelizationFailure(input: {

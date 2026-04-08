@@ -12,29 +12,29 @@
 - [x] Exactly one persistent Linear workpad comment is current. Evidence: Linear comment `e5f14bce-7a82-4b55-b609-0b74bb8f07cc`.
 
 ## Implementation
-- [ ] Packaged `linear` CLI exposes one parent-only ordinary-worker parallelisation decision helper with bounded decision and reason codes.
-- [ ] Provider-worker proof hydration reconstructs the latest decision from existing audit truth and keeps live proof refreshes deterministic.
-- [ ] `provider_debug_snapshot` exposes the current decision, reason, summary, and recorded child-lane count so explicit serial/no-go truth is visible when `child_lanes` is empty.
-- [ ] Ordinary provider-worker turn completion fails closed when no decision exists or when `parallelize_now` records no child lane.
-- [ ] Worker prompt contract explicitly requires the current-turn decision and ties `parallelize_now` to actual child-lane launch.
+- [x] Packaged `linear` CLI exposes one parent-only ordinary-worker parallelisation decision helper with bounded decision and reason codes. Evidence: `orchestrator/src/cli/linearCliShell.ts`, `orchestrator/src/cli/control/providerLinearWorkflowAudit.ts`.
+- [x] Provider-worker proof hydration reconstructs the latest decision from existing audit truth and keeps live proof refreshes deterministic. Evidence: `orchestrator/src/cli/linearCliShell.ts`, `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `orchestrator/src/cli/control/providerLinearWorkflowAudit.ts`.
+- [x] `provider_debug_snapshot` exposes the current decision, reason, summary, and recorded child-lane count so explicit serial/no-go truth is visible when `child_lanes` is empty. Evidence: `orchestrator/src/cli/control/providerIssueObservability.ts`, `orchestrator/tests/ProviderIssueObservability.test.ts`.
+- [x] Ordinary provider-worker turn completion fails closed when no decision exists or when `parallelize_now` records no child lane. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
+- [x] Worker prompt contract explicitly requires the current-turn decision and ties `parallelize_now` to actual child-lane launch. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `orchestrator/tests/LinearCliShell.test.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
 
 ## Validation
-- [ ] Focused regressions cover decision validation, proof hydration, debug projection, and fail-closed launch/non-launch behavior.
-- [ ] Ordinary replay artifacts prove both `parallelize_now` and explicit serial/no-go outcomes.
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `FORCE_CODEX_REVIEW=1 npm run review`
-- [ ] Explicit elegance pass recorded before review handoff.
-- [ ] `npm run pack:smoke`
+- [x] Focused regressions cover decision validation, proof hydration, debug projection, fail-closed launch/non-launch behavior, current-turn child-lane counts, resumed-turn decision fixtures, forbid-parallel conflicts, and mixed-ISO audit filtering. Evidence: `npm run test:orchestrator -- orchestrator/tests/ProviderLinearWorkflowAudit.test.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ProviderIssueObservability.test.ts orchestrator/tests/LinearCliShell.test.ts` (`171/171` passed).
+- [x] Ordinary replay artifacts prove both `parallelize_now` and explicit serial/no-go outcomes. Evidence: `out/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd/manual/20260408T132700Z-ordinary-provider-worker-parallelization-replay/summary.json`, `.runs/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd/cli/20260408T132700Z-parallelize-now/provider-linear-worker-proof.json`, `.runs/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd/cli/20260408T132700Z-stay-serial/provider-linear-worker-proof.json`.
+- [x] `node scripts/delegation-guard.mjs`
+- [x] `node scripts/spec-guard.mjs --dry-run`
+- [x] `npm run build`
+- [x] `npm run lint`
+- [x] `npm run test`
+- [x] `npm run docs:check`
+- [ ] `npm run docs:freshness` still fails only on the standing repo-wide stale-doc baseline (`282` stale docs total: `Task Packet 205`, `Task Mirror 41`, `Report Only 36`).
+- [x] `node scripts/diff-budget.mjs`
+- [x] `FORCE_CODEX_REVIEW=1 npm run review` completed with clean review telemetry. Evidence: `/Users/kbediako/Code/CO/.runs/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd/cli/2026-04-08T02-19-00-813Z-7a146cac/review/telemetry.json` (`status: succeeded`, `review_outcome: clean-success`).
+- [x] Explicit elegance pass recorded before review handoff. Evidence: manual elegance pass kept the fix local to the existing provider worker/audit/observability seams and did not add a new artifact family or scheduler abstraction.
+- [x] `npm run pack:smoke`
 
 ## Handoff
-- [ ] PR attached to the issue.
+- [x] PR attached to the issue. Evidence: `https://github.com/Kbediako/CO/pull/381`
 - [ ] Latest `origin/main` merged into the branch before review-state transition.
 - [ ] PR checks green and `pr ready-review` drain clean before review-state transition.
 - [ ] Unresolved actionable review threads: `0` (or explicit waiver plus evidence recorded here before handoff).

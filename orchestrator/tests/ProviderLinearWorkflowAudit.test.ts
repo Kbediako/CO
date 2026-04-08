@@ -212,3 +212,41 @@ it('filters parallelization snapshots by issue id instead of trusting the latest
     })
   ).toBeNull();
 });
+
+it('treats mixed ISO timestamp formats as the same timeline when filtering current-turn snapshots', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-audit-'));
+  tempDirs.push(tempDir);
+  const auditPath = join(tempDir, 'provider-linear-audit.jsonl');
+
+  await appendProviderLinearAuditEntry(auditPath, {
+    recorded_at: '2026-04-08T07:00:02.050Z',
+    operation: 'parallelization',
+    ok: true,
+    issue_id: 'lin-issue-1',
+    issue_identifier: 'CO-101',
+    source_setup: null,
+    action: 'parallelize_now',
+    via: 'Launch a bounded child lane now.',
+    state: 'independent_scope_available',
+    follow_up_issue_id: null,
+    follow_up_issue_identifier: null,
+    failed_relation_type: null,
+    comment_id: null,
+    attachment_id: null,
+    error_code: null,
+    error_message: null
+  });
+
+  const summary = await summarizeProviderLinearAuditPath(auditPath);
+
+  expect(
+    readProviderLinearParallelizationSnapshot(summary, {
+      issueId: 'lin-issue-1',
+      recordedAtNotBefore: '2026-04-08T07:00:02Z'
+    })
+  ).toMatchObject({
+    decision: 'parallelize_now',
+    reason: 'independent_scope_available',
+    recorded_at: '2026-04-08T07:00:02.050Z'
+  });
+});

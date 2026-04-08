@@ -377,6 +377,13 @@ function resolveProviderParallelizationSnapshot(
   proof: ProviderIssueProofLike | null
 ): (ProviderLinearParallelizationSnapshot & { child_lane_count: number | null }) | null {
   const currentTurnStartedAt = normalizeOptionalString(proof?.current_turn_started_at);
+  const currentTurnChildLanes = Array.isArray(proof?.child_lanes)
+    ? !currentTurnStartedAt
+      ? proof.child_lanes
+      : proof.child_lanes.filter(
+          (childLane) => compareIsoTimestamp(childLane.launched_at ?? null, currentTurnStartedAt) >= 0
+        )
+    : null;
   const hydrated = proof?.parallelization ?? null;
   if (hydrated) {
     if (
@@ -385,7 +392,10 @@ function resolveProviderParallelizationSnapshot(
     ) {
       return {
         ...hydrated,
-        child_lane_count: normalizeOptionalInteger(hydrated.child_lane_count)
+        child_lane_count:
+          currentTurnChildLanes !== null
+            ? currentTurnChildLanes.length
+            : normalizeOptionalInteger(hydrated.child_lane_count)
       };
     }
   }
@@ -398,7 +408,7 @@ function resolveProviderParallelizationSnapshot(
   }
   return {
     ...fromAudit,
-    child_lane_count: Array.isArray(proof?.child_lanes) ? proof.child_lanes.length : 0
+    child_lane_count: currentTurnChildLanes !== null ? currentTurnChildLanes.length : 0
   };
 }
 

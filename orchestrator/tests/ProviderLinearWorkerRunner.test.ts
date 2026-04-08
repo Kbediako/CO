@@ -266,26 +266,26 @@ async function appendParallelizationDecisionAudit(
   runDir: string,
   input: {
     turnIndex?: number;
-    decision?: ProviderLinearParallelizationDecision;
-    reason?: ProviderLinearParallelizationReason;
+    decision: ProviderLinearParallelizationDecision;
+    reason: ProviderLinearParallelizationReason;
     summary?: string | null;
     recordedAt?: string;
     issueId?: string;
     issueIdentifier?: string | null;
-  } = {}
+  }
 ): Promise<void> {
   const turnIndex = input.turnIndex ?? 1;
-  const minute = String(Math.max(turnIndex - 1, 0)).padStart(2, '0');
+  const second = String(Math.max(turnIndex, 1)).padStart(2, '0');
   await appendProviderLinearAuditEntry(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME), {
-    recorded_at: input.recordedAt ?? `2026-03-21T09:${minute}:01.200Z`,
+    recorded_at: input.recordedAt ?? `2026-03-21T09:00:${second}.200Z`,
     operation: 'parallelization',
     ok: true,
     issue_id: input.issueId ?? 'lin-issue-1',
     issue_identifier: input.issueIdentifier ?? 'CO-2',
     source_setup: null,
-    action: input.decision ?? 'stay_serial',
+    action: input.decision,
     via: input.summary ?? 'Single bounded change.',
-    state: input.reason ?? 'single_bounded_change',
+    state: input.reason,
     follow_up_issue_id: null,
     follow_up_issue_identifier: null,
     failed_relation_type: null,
@@ -300,30 +300,30 @@ async function appendParallelizationDecisionAuditForRequest(
   request: { env: NodeJS.ProcessEnv },
   input: {
     turnIndex?: number;
-    decision?: ProviderLinearParallelizationDecision;
-    reason?: ProviderLinearParallelizationReason;
+    decision: ProviderLinearParallelizationDecision;
+    reason: ProviderLinearParallelizationReason;
     summary?: string | null;
     recordedAt?: string;
     issueId?: string;
     issueIdentifier?: string | null;
-  } = {}
+  }
 ): Promise<void> {
   const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
   if (typeof auditPath !== 'string' || auditPath.length === 0) {
     throw new Error('expected provider linear audit path in exec request env');
   }
   const turnIndex = input.turnIndex ?? 1;
-  const minute = String(Math.max(turnIndex - 1, 0)).padStart(2, '0');
+  const second = String(Math.max(turnIndex, 1)).padStart(2, '0');
   await appendProviderLinearAuditEntry(auditPath, {
-    recorded_at: input.recordedAt ?? `2026-03-21T09:${minute}:01.200Z`,
+    recorded_at: input.recordedAt ?? `2026-03-21T09:00:${second}.200Z`,
     operation: 'parallelization',
     ok: true,
     issue_id: input.issueId ?? 'lin-issue-1',
     issue_identifier: input.issueIdentifier ?? 'CO-2',
     source_setup: null,
-    action: input.decision ?? 'stay_serial',
+    action: input.decision,
     via: input.summary ?? 'Single bounded change.',
-    state: input.reason ?? 'single_bounded_change',
+    state: input.reason,
     follow_up_issue_id: null,
     follow_up_issue_identifier: null,
     failed_relation_type: null,
@@ -331,6 +331,34 @@ async function appendParallelizationDecisionAuditForRequest(
     attachment_id: null,
     error_code: null,
     error_message: null
+  });
+}
+
+async function appendStaySerialParallelizationDecisionAudit(
+  runDir: string,
+  input: Omit<
+    Parameters<typeof appendParallelizationDecisionAudit>[1],
+    'decision' | 'reason'
+  > = {}
+): Promise<void> {
+  await appendParallelizationDecisionAudit(runDir, {
+    ...input,
+    decision: 'stay_serial',
+    reason: 'single_bounded_change'
+  });
+}
+
+async function appendStaySerialParallelizationDecisionAuditForRequest(
+  request: { env: NodeJS.ProcessEnv },
+  input: Omit<
+    Parameters<typeof appendParallelizationDecisionAuditForRequest>[1],
+    'decision' | 'reason'
+  > = {}
+): Promise<void> {
+  await appendParallelizationDecisionAuditForRequest(request, {
+    ...input,
+    decision: 'stay_serial',
+    reason: 'single_bounded_change'
   });
 }
 
@@ -1382,7 +1410,7 @@ describe('provider linear worker runner', () => {
           error_code: null,
           error_message: null
         });
-        await appendParallelizationDecisionAuditForRequest(request, {
+        await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 1,
           recordedAt: '2026-03-21T09:00:01.050Z'
         });
@@ -1437,7 +1465,7 @@ describe('provider linear worker runner', () => {
           error_code: null,
           error_message: null
         });
-        await appendParallelizationDecisionAuditForRequest(request, {
+        await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 2,
           recordedAt: '2026-03-21T09:00:01.150Z'
         });
@@ -1670,7 +1698,7 @@ describe('provider linear worker runner', () => {
         })
       );
     const execRunner = vi.fn(async (request) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       return {
         exitCode: 0,
         stdout: [
@@ -3239,7 +3267,7 @@ describe('provider linear worker runner', () => {
         })
       );
     const execRunner = vi.fn(async (request) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       return {
         exitCode: 0,
         stdout: [
@@ -3330,7 +3358,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -3403,7 +3431,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -3482,7 +3510,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -3579,7 +3607,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -3673,7 +3701,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -3750,7 +3778,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -3798,7 +3826,7 @@ describe('provider linear worker runner', () => {
           ),
         resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
         execRunner: vi.fn(async (request) => {
-          await appendParallelizationDecisionAuditForRequest(request);
+          await appendStaySerialParallelizationDecisionAuditForRequest(request);
           return {
             exitCode: 0,
             stdout: [
@@ -3851,7 +3879,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -3923,7 +3951,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -4013,7 +4041,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4095,7 +4123,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4180,7 +4208,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4266,7 +4294,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4352,7 +4380,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4440,7 +4468,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4528,7 +4556,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4619,7 +4647,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4715,7 +4743,7 @@ describe('provider linear worker runner', () => {
             readTrackedIssue: vi.fn(async () => createTrackedIssue()),
             resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
             execRunner: vi.fn(async (request) => {
-              await appendParallelizationDecisionAuditForRequest(request);
+              await appendStaySerialParallelizationDecisionAuditForRequest(request);
               return {
               exitCode: 2,
               stdout: [
@@ -4816,7 +4844,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -4912,7 +4940,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -4992,7 +5020,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -5068,7 +5096,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 2,
             stdout: [
@@ -5147,7 +5175,7 @@ describe('provider linear worker runner', () => {
     const execRunner = vi.fn(async (request) => {
       execCallCount += 1;
       if (execCallCount === 1) {
-        await appendParallelizationDecisionAuditForRequest(request, {
+        await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 1
         });
         return {
@@ -5221,7 +5249,7 @@ describe('provider linear worker runner', () => {
       async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
         execCallCount += 1;
         if (execCallCount === 1) {
-          await appendParallelizationDecisionAuditForRequest(request, {
+          await appendStaySerialParallelizationDecisionAuditForRequest(request, {
             turnIndex: 1
           });
           return {
@@ -5378,7 +5406,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 0,
             stdout: '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
@@ -5704,6 +5732,125 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('treats an unfractional same-second child-lane timestamp as earlier than the current turn start', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      stream: 'impl-a',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: 'linear-lin-issue-1-impl-a',
+      run_id: 'child-run-1',
+      status: 'pending',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        'linear-lin-issue-1-impl-a',
+        'cli',
+        'child-run-1',
+        'manifest.json'
+      ),
+      artifact_root: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1',
+      log_path: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1/run.log',
+      summary: 'child lane still running',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-21T09:00:03Z',
+      purpose: 'Implement bounded same-issue child lanes',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/src/cli/providerLinearWorkerRunner.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-21T09:00:03Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-21T09:00:03Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+      patch_artifact_path: null,
+      patch_bytes: null,
+      decision: 'pending',
+      decision_at: null,
+      decision_reason: null
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendParallelizationDecisionAuditForRequest(request, {
+              decision: 'parallelize_now',
+              reason: 'independent_scope_available',
+              summary: 'Assume the prior child lane is enough.',
+              recordedAt: '2026-03-21T09:00:03.100Z'
+            });
+            await transactProviderLinearWorkerChildLanes(runDir, async (records) => ({
+              records: records.map((record) =>
+                record.stream === 'impl-a'
+                  ? {
+                      ...record,
+                      status: 'succeeded',
+                      summary: 'previous-turn child lane finished'
+                    }
+                  : record
+              ),
+              result: null
+            }));
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:04.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:03.050Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow(
+      'provider-linear-worker recorded `parallelize_now` for the current turn, but no same-issue child lane launched during that turn completed successfully.'
+    );
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'parallelization_launch_missing',
+      parallelization: {
+        decision: 'parallelize_now',
+        reason: 'independent_scope_available'
+      },
+      child_lanes: expect.arrayContaining([
+        expect.objectContaining({
+          stream: 'impl-a',
+          status: 'succeeded',
+          launched_at: '2026-03-21T09:00:03Z'
+        })
+      ])
+    });
+  });
+
   it('fails closed when the current-turn parallelization audit row belongs to another issue', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
 
@@ -5875,6 +6022,112 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('fails closed when forbid_parallel still launches a same-turn child lane', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendParallelizationDecisionAuditForRequest(request, {
+              decision: 'forbid_parallel',
+              reason: 'blocked_by_dependency',
+              summary: 'Dependent work blocks safe parallel execution.',
+              recordedAt: '2026-03-21T09:00:03.050Z'
+            });
+            await appendProviderLinearWorkerChildLaneRecord(runDir, {
+              stream: 'impl-a',
+              pipeline_id: 'provider-linear-child-lane',
+              task_id: 'linear-lin-issue-1-impl-a',
+              run_id: 'child-run-2',
+              status: 'succeeded',
+              manifest_path: join(
+                tempRoot ?? '',
+                '.runs',
+                'linear-lin-issue-1-impl-a',
+                'cli',
+                'child-run-2',
+                'manifest.json'
+              ),
+              artifact_root: '.runs/linear-lin-issue-1-impl-a/cli/child-run-2',
+              log_path: '.runs/linear-lin-issue-1-impl-a/cli/child-run-2/run.log',
+              summary: 'child lane unexpectedly launched',
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              workspace_path: tempRoot,
+              source_setup: null,
+              launched_at: '2026-03-21T09:00:03.150Z',
+              purpose: 'Implement bounded same-issue child lanes',
+              instructions: null,
+              scope: {
+                files: ['orchestrator/src/cli/providerLinearWorkerRunner.ts'],
+                phases: []
+              },
+              parent_snapshot: {
+                base_sha: 'parent-base-sha',
+                issue_updated_at: '2026-03-21T09:00:00.000Z',
+                issue_state: 'In Progress',
+                issue_state_type: 'started',
+                captured_at: '2026-03-21T09:00:03.150Z'
+              },
+              lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-2'),
+              patch_artifact_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-2.patch'),
+              patch_bytes: 42,
+              decision: 'pending',
+              decision_at: null,
+              decision_reason: null
+            });
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:04.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:03.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow(
+      'provider-linear-worker recorded `forbid_parallel` for the current turn, but same-issue child lanes were still launched during that turn.'
+    );
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'parallelization_serial_conflict',
+      parallelization: {
+        decision: 'forbid_parallel',
+        reason: 'blocked_by_dependency'
+      },
+      child_lanes: expect.arrayContaining([
+        expect.objectContaining({
+          stream: 'impl-a',
+          status: 'succeeded',
+          launched_at: '2026-03-21T09:00:03.150Z'
+        })
+      ])
+    });
+  });
+
   it('fails closed when the initial tracked issue lookup fails before turn 1', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const execRunner = vi.fn();
@@ -5922,7 +6175,7 @@ describe('provider linear worker runner', () => {
       .mockResolvedValueOnce(createTrackedIssue())
       .mockRejectedValueOnce(new Error('tracked issue lookup failed'));
     const execRunner = vi.fn(async (request) => {
-      await appendParallelizationDecisionAuditForRequest(request, {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
         recordedAt: '2026-03-21T09:00:03.100Z'
       });
       return {
@@ -5998,7 +6251,7 @@ describe('provider linear worker runner', () => {
         })
       );
     const execRunner = vi.fn(async (request) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       return {
         exitCode: 0,
         stdout: [
@@ -6033,8 +6286,7 @@ describe('provider linear worker runner', () => {
 
     expect(execRunner).toHaveBeenCalledTimes(1);
     expect(readTrackedIssue).toHaveBeenCalledTimes(3);
-    expect(waitForRateLimitReset).toHaveBeenCalledTimes(1);
-    expect(waitForRateLimitReset).toHaveBeenCalledWith(2000);
+    expect(waitForRateLimitReset.mock.calls.filter(([ms]) => ms === 2000)).toHaveLength(1);
     expect(proof).toMatchObject({
       owner_status: 'succeeded',
       end_reason: 'issue_inactive'
@@ -6075,7 +6327,7 @@ describe('provider linear worker runner', () => {
           })
         );
       const execRunner = vi.fn(async (request) => {
-        await appendParallelizationDecisionAuditForRequest(request);
+        await appendStaySerialParallelizationDecisionAuditForRequest(request);
         return {
           exitCode: 0,
           stdout: [
@@ -6109,8 +6361,7 @@ describe('provider linear worker runner', () => {
 
       expect(execRunner).toHaveBeenCalledTimes(1);
       expect(readTrackedIssue).toHaveBeenCalledTimes(3);
-      expect(waitForRateLimitReset).toHaveBeenCalledTimes(1);
-      expect(waitForRateLimitReset).toHaveBeenCalledWith(2000);
+      expect(waitForRateLimitReset.mock.calls.filter(([ms]) => ms === 2000)).toHaveLength(1);
       expect(proof).toMatchObject({
         owner_status: 'succeeded',
         end_reason: 'issue_inactive'
@@ -6152,13 +6403,13 @@ describe('provider linear worker runner', () => {
         .mockResolvedValueOnce(createTrackedIssue())
         .mockRejectedValueOnce(mixedBucketRateLimit)
         .mockImplementation(async () => {
-          if (waitForRateLimitReset.mock.calls[0]?.[0] === 12_000) {
+          if (waitForRateLimitReset.mock.calls.some(([ms]) => ms === 12_000)) {
             return lateResetIssue;
           }
           throw mixedBucketRateLimit;
         });
       const execRunner = vi.fn(async (request) => {
-        await appendParallelizationDecisionAuditForRequest(request);
+        await appendStaySerialParallelizationDecisionAuditForRequest(request);
         return {
           exitCode: 0,
           stdout: [
@@ -6191,8 +6442,7 @@ describe('provider linear worker runner', () => {
 
       expect(execRunner).toHaveBeenCalledTimes(1);
       expect(readTrackedIssue).toHaveBeenCalledTimes(3);
-      expect(waitForRateLimitReset).toHaveBeenCalledTimes(1);
-      expect(waitForRateLimitReset).toHaveBeenCalledWith(12_000);
+      expect(waitForRateLimitReset.mock.calls.filter(([ms]) => ms === 12_000)).toHaveLength(1);
       expect(proof).toMatchObject({
         owner_status: 'succeeded',
         end_reason: 'issue_inactive'
@@ -6225,7 +6475,7 @@ describe('provider linear worker runner', () => {
       .mockResolvedValueOnce(createTrackedIssue())
       .mockRejectedValueOnce(longWaitRateLimit);
     const execRunner = vi.fn(async (request) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       return {
         exitCode: 0,
         stdout: [
@@ -6260,7 +6510,7 @@ describe('provider linear worker runner', () => {
     ).rejects.toThrow('dispatch_source_provider_rate_limited');
 
     expect(execRunner).toHaveBeenCalledTimes(1);
-    expect(waitForRateLimitReset).not.toHaveBeenCalled();
+    expect(waitForRateLimitReset.mock.calls.some(([ms]) => ms === 3_600_000)).toBe(false);
     const written = JSON.parse(
       await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
     ) as Record<string, unknown>;
@@ -6403,7 +6653,7 @@ describe('provider linear worker runner', () => {
           })
         );
       const execRunner = vi.fn(async (request) => {
-        await appendParallelizationDecisionAuditForRequest(request);
+        await appendStaySerialParallelizationDecisionAuditForRequest(request);
         return {
           exitCode: 0,
           stdout: [
@@ -6476,7 +6726,7 @@ describe('provider linear worker runner', () => {
         })
       );
     const execRunner = vi.fn(async (request) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       return {
         exitCode: 0,
         stdout: [
@@ -6545,7 +6795,7 @@ describe('provider linear worker runner', () => {
         readTrackedIssue,
         resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
         execRunner: vi.fn(async (request) => {
-          await appendParallelizationDecisionAuditForRequest(request);
+          await appendStaySerialParallelizationDecisionAuditForRequest(request);
           return {
             exitCode: 0,
             stdout: [
@@ -6587,7 +6837,7 @@ describe('provider linear worker runner', () => {
     const { manifestPath } = await createManifestRoot();
     const writeProof = vi.fn(async () => undefined);
     const execRunner = vi.fn(async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
       request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
       request.onStdoutChunk?.(
@@ -6680,7 +6930,7 @@ describe('provider linear worker runner', () => {
 
     const writeProof = vi.fn(async () => undefined);
     const execRunner = vi.fn(async (request) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       await new Promise((resolve) => setTimeout(resolve, 50));
       return {
         exitCode: 0,
@@ -7279,7 +7529,7 @@ describe('provider linear worker runner', () => {
     const writeProof = vi.fn(async () => undefined);
     const execRunner = vi.fn(async (request) => {
       execCallCount += 1;
-      await appendParallelizationDecisionAuditForRequest(request, {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
         turnIndex: execCallCount
       });
       if (execCallCount === 1) {
@@ -7391,7 +7641,7 @@ describe('provider linear worker runner', () => {
     const writeProof = vi.fn(async () => undefined);
     const execRunner = vi.fn(async (request) => {
       execCallCount += 1;
-      await appendParallelizationDecisionAuditForRequest(request, {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
         turnIndex: execCallCount
       });
       if (execCallCount === 1) {
@@ -7558,7 +7808,7 @@ describe('provider linear worker runner', () => {
       }
     });
     const execRunner = vi.fn(async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
       request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
       request.onStdoutChunk?.(
@@ -7618,7 +7868,7 @@ describe('provider linear worker runner', () => {
     const { manifestPath } = await createManifestRoot();
     const writeProof = vi.fn(async () => undefined);
     const execRunner = vi.fn(async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
       request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
       request.onStdoutChunk?.(
@@ -7681,7 +7931,7 @@ describe('provider linear worker runner', () => {
         }>
       >()
       .mockImplementationOnce(async (request) => {
-        await appendParallelizationDecisionAuditForRequest(request, {
+        await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 1
         });
         request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
@@ -7698,7 +7948,7 @@ describe('provider linear worker runner', () => {
         };
       })
       .mockImplementationOnce(async (request) => {
-        await appendParallelizationDecisionAuditForRequest(request, {
+        await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 2
         });
         request.onStdoutChunk?.(
@@ -7812,7 +8062,7 @@ describe('provider linear worker runner', () => {
           })),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 0,
             stdout: [
@@ -7906,7 +8156,7 @@ describe('provider linear worker runner', () => {
           })),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             return {
             exitCode: 0,
             stdout: [
@@ -8011,7 +8261,7 @@ describe('provider linear worker runner', () => {
           })),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
             request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
             request.onStdoutChunk?.(
@@ -8162,7 +8412,7 @@ describe('provider linear worker runner', () => {
         })),
         resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
         execRunner: vi.fn(async (request) => {
-          await appendParallelizationDecisionAuditForRequest(request);
+          await appendStaySerialParallelizationDecisionAuditForRequest(request);
           request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
           request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
           request.onStdoutChunk?.(
@@ -8305,7 +8555,7 @@ describe('provider linear worker runner', () => {
           })),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            await appendParallelizationDecisionAuditForRequest(request);
+            await appendStaySerialParallelizationDecisionAuditForRequest(request);
             request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
             request.onStdoutChunk?.('{"type":"turn_context","payload":{"turn_id":"turn-1"}}\n');
             request.onStdoutChunk?.(
@@ -8460,7 +8710,7 @@ describe('provider linear worker runner', () => {
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
             runnerCallCount += 1;
-            await appendParallelizationDecisionAuditForRequest(request, {
+            await appendStaySerialParallelizationDecisionAuditForRequest(request, {
               turnIndex: runnerCallCount
             });
             const currentTurnId = `turn-${runnerCallCount}`;
@@ -8597,7 +8847,7 @@ describe('provider linear worker runner', () => {
           )
         ).toBe(true);
       });
-      await appendParallelizationDecisionAudit(runDir, {
+      await appendStaySerialParallelizationDecisionAudit(runDir, {
         recordedAt: '2026-03-21T09:00:00.500Z'
       });
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 1_000);
@@ -8684,7 +8934,7 @@ describe('provider linear worker runner', () => {
         ).toBe(true);
       });
 
-      await appendParallelizationDecisionAudit(runDir, {
+      await appendStaySerialParallelizationDecisionAudit(runDir, {
         recordedAt: '2026-03-21T09:00:00.500Z'
       });
 
@@ -8820,7 +9070,7 @@ describe('provider linear worker runner', () => {
         readTrackedIssue,
         resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
         execRunner: vi.fn(async (request) => {
-          await appendParallelizationDecisionAuditForRequest(request);
+          await appendStaySerialParallelizationDecisionAuditForRequest(request);
           return {
           exitCode: 0,
           stdout: [
@@ -8869,7 +9119,7 @@ describe('provider linear worker runner', () => {
         })
       );
     const execRunner = vi.fn(async (request) => {
-      await appendParallelizationDecisionAuditForRequest(request);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
       return {
       exitCode: 0,
       stdout: [

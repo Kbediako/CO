@@ -28,20 +28,10 @@ last_review: 2026-04-08
 - Expose the hydrated decision, reason, summary, and recorded child-lane count in the debug snapshot so `child_lanes: []` becomes explicit rather than silent on control-host read surfaces.
 
 ## Validation
-- [ ] `linear child-stream --pipeline docs-review --stream co-101-docs-review`
-- [ ] Focused regressions across the new decision helper, ordinary-worker proof hydration, prompt/runner enforcement, and debug-snapshot projection
-- [ ] Ordinary-worker replay artifacts for both `parallelize_now` and explicit serial/no-go outcomes
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] `FORCE_CODEX_REVIEW=1 npm run review`
-- [ ] `npm run pack:smoke`
-
-## Approvals
-- Reviewer: pending `codex-orchestrator docs-review`
-- Date: pending
+Validation evidence for this lane belongs in `tasks/tasks-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md`,
+`.agent/task/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md`, and the Linear workpad.
+Required checks remain:
+- docs-review evidence for the docs-first packet
+- Focused regressions across the decision helper, proof hydration, prompt/runner enforcement, and debug-snapshot projection
+- Ordinary-worker replay artifacts for both `parallelize_now` and explicit serial/no-go outcomes
+- Standard repo validation and review gates before review handoff
