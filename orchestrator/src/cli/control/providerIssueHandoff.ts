@@ -444,13 +444,18 @@ export function createProviderIssueHandoffService(
   }): Promise<ProviderIntakeClaimRecord | null> => {
     const trackedIssueWorkflowState = normalizeProviderLinearWorkflowState(input.trackedIssue.state);
     const existingMergeCloseout = input.claim.merge_closeout ?? null;
-    if (
+    const canReuseExistingMergeCloseout =
       existingMergeCloseout &&
       existingMergeCloseout.status !== 'watching' &&
       (
-        trackedIssueWorkflowState === 'merging' ||
-        input.trackedIssue.state_type === 'completed'
-      )
+        input.trackedIssue.state_type === 'completed' ||
+        (
+          trackedIssueWorkflowState === 'merging' &&
+          isTrackedIssueFreshEnoughForMergeCloseout(existingMergeCloseout, input.trackedIssue)
+        )
+      );
+    if (
+      canReuseExistingMergeCloseout
     ) {
       return await persistRecoveredActiveRunMergeCloseout({
         claim: input.claim,
@@ -459,10 +464,19 @@ export function createProviderIssueHandoffService(
         mergeCloseout: existingMergeCloseout
       });
     }
+    const shouldReprobeRecoveredMergeCloseout =
+      trackedIssueWorkflowState === 'merging' &&
+      (
+        input.claim.reason === 'provider_issue_rehydrated_active_run' ||
+        (
+          existingMergeCloseout !== null &&
+          existingMergeCloseout.status !== 'watching' &&
+          !isTrackedIssueFreshEnoughForMergeCloseout(existingMergeCloseout, input.trackedIssue)
+        )
+      );
     if (
       !runMergeCloseout ||
-      trackedIssueWorkflowState !== 'merging' ||
-      input.claim.reason !== 'provider_issue_rehydrated_active_run'
+      !shouldReprobeRecoveredMergeCloseout
     ) {
       return null;
     }
@@ -1100,13 +1114,16 @@ export function createProviderIssueHandoffService(
           }
         }
         const trackedIssueFields = freshTrackedIssue.claimFields;
+        const reactivatedMergeCloseoutReset =
+          claim.reason === 'provider_issue_rehydrated_active_run' ? {} : { merge_closeout: null };
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           ...trackedIssueFields,
           state: 'running',
           reason: 'provider_issue_rehydrated_active_run',
           task_id: activeRun.taskId,
           run_id: activeRun.runId,
-          run_manifest_path: activeRun.manifestPath
+          run_manifest_path: activeRun.manifestPath,
+          ...reactivatedMergeCloseoutReset
         });
         upsertProviderIntakeClaim(options.state, {
           ...claim,
@@ -1118,6 +1135,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_rehydrated_active_run',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          ...reactivatedMergeCloseoutReset,
           updated_at: now
         });
         hasPendingClaims = true;
@@ -2376,13 +2394,16 @@ export function createProviderIssueHandoffService(
                 claim,
                 resolution.trackedIssue
               );
+              const reactivatedMergeCloseoutReset =
+                claim.reason === 'provider_issue_rehydrated_active_run' ? {} : { merge_closeout: null };
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'running',
                 reason: 'provider_issue_rehydrated_active_run',
                 task_id: activeRun.taskId,
                 run_id: activeRun.runId,
-                run_manifest_path: activeRun.manifestPath
+                run_manifest_path: activeRun.manifestPath,
+                ...reactivatedMergeCloseoutReset
               });
               const refreshActiveRunSnapshot = captureProviderStateSnapshot();
               upsertProviderIntakeClaim(options.state, {
@@ -2394,7 +2415,8 @@ export function createProviderIssueHandoffService(
                 state: 'running',
                 reason: 'provider_issue_rehydrated_active_run',
                 run_id: activeRun.runId,
-                run_manifest_path: activeRun.manifestPath
+                run_manifest_path: activeRun.manifestPath,
+                ...reactivatedMergeCloseoutReset
               });
               if (transitioned) {
                 await persistStateOrRollback(refreshActiveRunSnapshot);
@@ -2474,13 +2496,16 @@ export function createProviderIssueHandoffService(
               claim,
               resolution.trackedIssue
             );
+            const reactivatedMergeCloseoutReset =
+              claim.reason === 'provider_issue_rehydrated_active_run' ? {} : { merge_closeout: null };
             const transitioned = hasProviderClaimTransitioned(claim, {
               ...trackedIssueFields,
               state: 'running',
               reason: 'provider_issue_rehydrated_active_run',
               task_id: activeRun.taskId,
               run_id: activeRun.runId,
-              run_manifest_path: activeRun.manifestPath
+              run_manifest_path: activeRun.manifestPath,
+              ...reactivatedMergeCloseoutReset
             });
             const refreshActiveRunSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
@@ -2492,7 +2517,8 @@ export function createProviderIssueHandoffService(
               state: 'running',
               reason: 'provider_issue_rehydrated_active_run',
               run_id: activeRun.runId,
-              run_manifest_path: activeRun.manifestPath
+              run_manifest_path: activeRun.manifestPath,
+              ...reactivatedMergeCloseoutReset
             });
             if (transitioned) {
               await persistStateOrRollback(refreshActiveRunSnapshot);
@@ -2862,6 +2888,23 @@ function compareTrackedIssueUpdatedAt(input: {
     return 'equal';
   }
   return 'newer';
+}
+
+function isTrackedIssueFreshEnoughForMergeCloseout(
+  mergeCloseout: Pick<ProviderMergeCloseoutRecord, 'issue_updated_at'>,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'updated_at'>
+): boolean {
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: mergeCloseout.issue_updated_at ?? null,
+    nextIssueUpdatedAt: trackedIssue.updated_at
+  });
+  if (freshness === 'newer') {
+    return false;
+  }
+  if (freshness === 'unknown' && mergeCloseout.issue_updated_at) {
+    return false;
+  }
+  return true;
 }
 
 function assessProviderTrackedIssueEligibility(
