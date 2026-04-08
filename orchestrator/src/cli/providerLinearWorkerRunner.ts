@@ -33,7 +33,10 @@ import {
 } from './control/providerLinearWorkflowStates.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
+  readProviderLinearParallelizationSnapshot,
+  readProviderLinearParallelizationSnapshots,
   summarizeProviderLinearAuditPath,
+  type ProviderLinearParallelizationSnapshot,
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import { deriveDeterministicProviderMutationSuppressions } from './control/providerLinearWorkerTruth.js';
@@ -225,6 +228,7 @@ export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
   attempt_started_at?: string | null;
+  current_turn_started_at?: string | null;
   pid: string | null;
   thread_id: string | null;
   latest_turn_id: string | null;
@@ -243,11 +247,17 @@ export interface ProviderLinearWorkerProof {
   linear_audit: ProviderLinearAuditSummary | null;
   child_streams?: ProviderLinearWorkerChildStreamRecord[];
   child_lanes?: ProviderLinearWorkerChildLaneRecord[];
+  parallelization?: ProviderLinearWorkerParallelizationRecord | null;
   progress?: ProviderLinearWorkerProgressSnapshot | null;
   linear_budget?: LinearBudgetStatus | null;
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
   end_reason: string | null;
   updated_at: string;
+}
+
+export interface ProviderLinearWorkerParallelizationRecord
+  extends ProviderLinearParallelizationSnapshot {
+  child_lane_count: number;
 }
 
 export interface ProviderLinearTrackedIssueError {
@@ -731,6 +741,23 @@ function buildRuntimeProofGuidance(helperCommand: string, issueId: string): stri
   return `- For app-touching lanes, inspect permit posture with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --format json\`, then generate reviewer-usable handoff content with \`${helperCommand} runtime-proof --issue-id ${issueId} --origin <app-url> --kind <screenshot|external-link|video> --proof-url <reviewer-url> --title <label> --summary <what changed> --format json\`; add \`--reachability-mode dns-public\` only when you need explicit worker-local DNS public-resolution evidence. The default path stays deterministic and the helper fails closed when the permit disallows the origin or proof kind, when the proof URL is loopback/local-only, or when dns-public lookup yields non-public or unresolved answers. When the issue explicitly requires screenshot proof embedded directly in Linear, first capture it with \`${helperCommand} screenshot-proof --issue-id ${issueId} --output <path>.png --format json\` (optionally add \`--open-preview\` when you need the bounded Preview-open/cleanup path), then paste \`capture.embed_markdown\` into the workpad and refresh it with \`${helperCommand} upsert-workpad --issue-id ${issueId} --body-file <workpad.md>\`. Use direct local-file workpad embedding only when the screenshot already exists and no new capture is needed.`;
 }
 
+function buildParallelizationReasonCodesSummary(): string {
+  return [
+    '`parallelize_now`: `independent_scope_available`',
+    '`stay_serial`: `single_bounded_change`, `overlapping_scope`, `existing_child_lane_active`, `review_or_validation_only`',
+    '`forbid_parallel`: `parent_only_mutation`, `merge_or_handoff_state`, `blocked_by_dependency`'
+  ].join('; ');
+}
+
+function buildParallelizationGuidance(helperCommand: string, issueId: string): string[] {
+  return [
+    `- Ordinary eligible same-issue child-lane parallelisation is a runtime contract in this lane, not optional prompt advice. During every active turn, record exactly one explicit decision with \`${helperCommand} parallelization --issue-id ${issueId} --decision <parallelize_now|stay_serial|forbid_parallel> --reason <reason-code> --summary <why>\`.`,
+    `- Allowed decision and reason-code pairs: ${buildParallelizationReasonCodesSummary()}.`,
+    `- If you record \`parallelize_now\`, you must actually launch at least one same-issue child lane in that turn with \`${helperCommand} child-lane --action launch ...\`; otherwise the provider worker fails closed.`,
+    '- If you record `stay_serial` or `forbid_parallel`, choose the bounded reason code that truthfully explains why `child_lanes: []` is acceptable for this turn so the proof and debug surfaces are explicit rather than silent.'
+  ];
+}
+
 function buildDeterministicMutationSuppressionSection(
   audit: ProviderLinearAuditSummary | null,
   attemptStartedAt: string | null
@@ -782,6 +809,7 @@ export function buildProviderWorkerPrompt(
       buildRuntimeProofGuidance(helperCommand, issue.id),
       `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
       `- When the issue benefits from bounded same-issue implementation help, use parent-owned child lanes via \`${helperCommand} child-lane --action launch --stream <name> --purpose <goal> --files <csv> --phases <csv>\`, then accept, reject, or invalidate the resulting patch artifact from the parent lane.`,
+      ...buildParallelizationGuidance(helperCommand, issue.id),
       '- In provider-worker issue workspaces, valid audited child-stream and child-lane runs record manifests under the workspace-scoped artifact root; treat those manifests as the intended delegation evidence path and do not use blanket `DELEGATION_GUARD_OVERRIDE_REASON` text when they exist.',
       ...buildPreReviewHandoffGateSection(),
       ...buildReviewOutcomeGuidanceSection(),
@@ -820,6 +848,7 @@ export function buildProviderWorkerPrompt(
     buildRuntimeProofGuidance(helperCommand, issue.id),
     `- When you need bounded docs/review/planning help inside the same issue workspace, launch an audited child stream with \`${helperCommand} child-stream --pipeline <docs-review|implementation-gate|docs-relevance-advisory>\` instead of using blanket delegation-guard override text.`,
     `- When the issue benefits from bounded same-issue implementation help, use parent-owned child lanes via \`${helperCommand} child-lane --action launch --stream <name> --purpose <goal> --files <csv> --phases <csv>\`, then accept, reject, or invalidate the resulting patch artifact from the parent lane.`,
+    ...buildParallelizationGuidance(helperCommand, issue.id),
     '- In provider-worker issue workspaces, valid audited child-stream and child-lane runs record manifests under the workspace-scoped artifact root; treat those manifests as the intended delegation evidence path and do not use blanket `DELEGATION_GUARD_OVERRIDE_REASON` text when they exist.',
     ...buildPreReviewHandoffGateSection(),
     ...buildReviewOutcomeGuidanceSection(),
@@ -1866,6 +1895,7 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
 ): Record<string, unknown> {
   return {
     ...proof,
+    parallelization: proof.parallelization ?? null,
     progress: null,
     updated_at: null
   };
@@ -1893,6 +1923,25 @@ function selectProviderLinearWorkerProofTelemetryFields(
   };
 }
 
+function deriveProviderLinearWorkerParallelizationRecord(input: {
+  linearAudit: ProviderLinearAuditSummary | null | undefined;
+  issueId: string | null | undefined;
+  currentTurnStartedAt?: string | null | undefined;
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+}): ProviderLinearWorkerParallelizationRecord | null {
+  const snapshot = readProviderLinearParallelizationSnapshot(input.linearAudit, {
+    issueId: input.issueId,
+    recordedAtNotBefore: input.currentTurnStartedAt
+  });
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    ...snapshot,
+    child_lane_count: Array.isArray(input.childLanes) ? input.childLanes.length : 0
+  };
+}
+
 function buildProviderLinearWorkerTurnBootstrapProof(
   proof: ProviderLinearWorkerProof,
   turnCount: number,
@@ -1900,6 +1949,7 @@ function buildProviderLinearWorkerTurnBootstrapProof(
 ): ProviderLinearWorkerProof {
   return {
     ...proof,
+    current_turn_started_at: updatedAt,
     latest_turn_id: null,
     latest_session_id: null,
     latest_session_id_source: null,
@@ -1911,7 +1961,117 @@ function buildProviderLinearWorkerTurnBootstrapProof(
     owner_phase: 'turn_running',
     owner_status: 'in_progress',
     turn_count: turnCount,
+    parallelization: null,
     updated_at: updatedAt
+  };
+}
+
+function hasCurrentTurnChildLaneLaunch(
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined
+,
+  currentTurnStartedAt: string | null | undefined
+): boolean {
+  const normalizedCurrentTurnStartedAt = normalizeOptionalString(currentTurnStartedAt);
+  return Array.isArray(childLanes)
+    ? childLanes.some((childLane) => {
+        if (!normalizedCurrentTurnStartedAt) {
+          return true;
+        }
+        return compareIsoTimestamp(childLane.launched_at, normalizedCurrentTurnStartedAt) >= 0;
+      })
+    : false;
+}
+
+function hasCurrentTurnSuccessfulChildLaneLaunch(
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined,
+  currentTurnStartedAt: string | null | undefined
+): boolean {
+  return Array.isArray(childLanes)
+    ? childLanes.some((childLane) => {
+        if (childLane.status !== 'succeeded') {
+          return false;
+        }
+        return hasCurrentTurnChildLaneLaunch([childLane], currentTurnStartedAt);
+      })
+    : false;
+}
+
+function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
+  const leftValue = normalizeOptionalString(left);
+  const rightValue = normalizeOptionalString(right);
+  if (leftValue === rightValue) {
+    return 0;
+  }
+  if (!leftValue) {
+    return -1;
+  }
+  if (!rightValue) {
+    return 1;
+  }
+  if (leftValue > rightValue) {
+    return 1;
+  }
+  if (leftValue < rightValue) {
+    return -1;
+  }
+  return 0;
+}
+
+function resolveProviderLinearWorkerParallelizationFailure(input: {
+  proof: ProviderLinearWorkerProof;
+  parallelizationDecisionCountBeforeTurn: number;
+}): {
+  endReason:
+    | 'parallelization_decision_missing'
+    | 'parallelization_decision_multiple'
+    | 'parallelization_launch_missing'
+    | 'parallelization_serial_conflict';
+  message: string;
+} | null {
+  const currentTurnParallelizationDecisions = readProviderLinearParallelizationSnapshots(
+    input.proof.linear_audit,
+    {
+      issueId: input.proof.issue_id
+    }
+  ).slice(input.parallelizationDecisionCountBeforeTurn);
+  if (currentTurnParallelizationDecisions.length === 0) {
+    return {
+      endReason: 'parallelization_decision_missing',
+      message:
+        'provider-linear-worker requires an explicit current-turn parallelization decision via `linear parallelization` before an active turn can complete.'
+    };
+  }
+  if (currentTurnParallelizationDecisions.length > 1) {
+    return {
+      endReason: 'parallelization_decision_multiple',
+      message:
+        'provider-linear-worker requires exactly one current-turn same-issue parallelization decision; multiple `linear parallelization` entries were recorded.'
+    };
+  }
+  const parallelization = currentTurnParallelizationDecisions[0] ?? null;
+  if (parallelization.decision !== 'parallelize_now') {
+    if (!hasCurrentTurnChildLaneLaunch(
+      input.proof.child_lanes,
+      input.proof.current_turn_started_at
+    )) {
+      return null;
+    }
+    return {
+      endReason: 'parallelization_serial_conflict',
+      message:
+        `provider-linear-worker recorded \`${parallelization.decision}\` for the current turn, but same-issue child lanes were still launched during that turn.`
+    };
+  }
+  if (hasCurrentTurnSuccessfulChildLaneLaunch(
+    input.proof.child_lanes,
+    input.proof.current_turn_started_at
+  )) {
+    return null;
+  }
+  return {
+    endReason: 'parallelization_launch_missing',
+    message:
+      'provider-linear-worker recorded `parallelize_now` for the current turn, but no same-issue child lane launched during that turn completed successfully.'
   };
 }
 
@@ -3089,11 +3249,20 @@ async function writeProofSnapshot(
 ): Promise<ProviderLinearWorkerProof> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
+    const linearAudit = await summarizeProviderLinearAuditPath(auditPath);
+    const childStreams = await readProviderLinearWorkerChildStreams(runDir);
+    const childLanes = await readProviderLinearWorkerChildLanes(runDir);
     const proofWithHydratedSources = {
       ...proof,
-      linear_audit: await summarizeProviderLinearAuditPath(auditPath),
-      child_streams: await readProviderLinearWorkerChildStreams(runDir),
-      child_lanes: await readProviderLinearWorkerChildLanes(runDir),
+      linear_audit: linearAudit,
+      child_streams: childStreams,
+      child_lanes: childLanes,
+      parallelization: deriveProviderLinearWorkerParallelizationRecord({
+        linearAudit,
+        issueId: proof.issue_id,
+        currentTurnStartedAt: proof.current_turn_started_at,
+        childLanes
+      }),
       linear_budget: linearBudget
     };
     const hydratedProof = {
@@ -3133,11 +3302,20 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     }
     const parsed = JSON.parse(raw) as ProviderLinearWorkerProof;
     const linearBudget = await readSharedLinearBudgetStatus(env).catch(() => null);
+    const linearAudit = auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null;
+    const childStreams = await readProviderLinearWorkerChildStreams(runDir);
+    const childLanes = await readProviderLinearWorkerChildLanes(runDir);
     const proofWithHydratedSources: ProviderLinearWorkerProof = {
       ...parsed,
-      linear_audit: auditPath ? await summarizeProviderLinearAuditPath(auditPath) : parsed.linear_audit ?? null,
-      child_streams: await readProviderLinearWorkerChildStreams(runDir),
-      child_lanes: await readProviderLinearWorkerChildLanes(runDir),
+      linear_audit: linearAudit,
+      child_streams: childStreams,
+      child_lanes: childLanes,
+      parallelization: deriveProviderLinearWorkerParallelizationRecord({
+        linearAudit,
+        issueId: parsed.issue_id,
+        currentTurnStartedAt: parsed.current_turn_started_at,
+        childLanes
+      }),
       linear_budget: linearBudget,
       updated_at: parsed.updated_at ?? null
     };
@@ -3213,6 +3391,7 @@ export async function runProviderLinearWorker(
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
     attempt_started_at: attemptStartedAt,
+    current_turn_started_at: null,
     pid: workerPid,
     thread_id: null,
     latest_turn_id: null,
@@ -3231,6 +3410,7 @@ export async function runProviderLinearWorker(
     linear_audit: null,
     child_streams: [],
     child_lanes: [],
+    parallelization: null,
     progress: null,
     tracked_issue_error: null,
     linear_budget: null,
@@ -3605,11 +3785,18 @@ export async function runProviderLinearWorker(
         stopLiveSessionTailResolve?.();
       };
       const previousTurnProof = finalProof;
+      const turnStartedAt = deps.now();
+      const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
+        finalProof.linear_audit,
+        {
+          issueId: finalProof.issue_id
+        }
+      ).length;
       finalProof = await writeProofSnapshot(
         deps,
         context.runDir,
         auditPath,
-        buildProviderLinearWorkerTurnBootstrapProof(finalProof, turnNumber, deps.now()),
+        buildProviderLinearWorkerTurnBootstrapProof(finalProof, turnNumber, turnStartedAt),
         childEnv
       );
       emitSemanticProgressIfChanged(finalProof);
@@ -3727,10 +3914,11 @@ export async function runProviderLinearWorker(
       turnId = parsed.turnId ?? finalProof.latest_turn_id ?? turnId;
       const session = deriveLatestTurnSessionId({ threadId, turnId });
 
-        finalProof = {
-          issue_id: context.issueId,
-          issue_identifier: context.issueIdentifier,
+      finalProof = {
+        issue_id: context.issueId,
+        issue_identifier: context.issueIdentifier,
         attempt_started_at: finalProof.attempt_started_at,
+        current_turn_started_at: finalProof.current_turn_started_at ?? turnStartedAt,
         pid: workerPid,
         thread_id: threadId,
         latest_turn_id: turnId,
@@ -3745,15 +3933,16 @@ export async function runProviderLinearWorker(
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
         owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
         workspace_path: context.workspacePath,
-          source_setup: context.sourceSetup,
-          linear_audit: finalProof.linear_audit,
-          child_streams: finalProof.child_streams,
-          child_lanes: finalProof.child_lanes,
-          progress: finalProof.progress ?? null,
-          tracked_issue_error: null,
-          end_reason: null,
-          updated_at: deps.now()
-        };
+        source_setup: context.sourceSetup,
+        linear_audit: finalProof.linear_audit,
+        child_streams: finalProof.child_streams,
+        child_lanes: finalProof.child_lanes,
+        parallelization: finalProof.parallelization ?? null,
+        progress: finalProof.progress ?? null,
+        tracked_issue_error: null,
+        end_reason: null,
+        updated_at: deps.now()
+      };
       finalProof = await persistProof(finalProof);
 
       if (execResult.exitCode !== 0) {
@@ -3780,6 +3969,22 @@ export async function runProviderLinearWorker(
         };
         finalProof = await persistProof(finalProof);
         throw new Error('provider-linear-worker could not determine thread_id from Codex JSONL output.');
+      }
+
+      const parallelizationFailure = resolveProviderLinearWorkerParallelizationFailure({
+        proof: finalProof,
+        parallelizationDecisionCountBeforeTurn
+      });
+      if (parallelizationFailure) {
+        finalProof = {
+          ...finalProof,
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: parallelizationFailure.endReason,
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        throw new Error(parallelizationFailure.message);
       }
 
       issue = await readTrackedIssueWithFailClosedProof();

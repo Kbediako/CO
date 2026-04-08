@@ -11,11 +11,48 @@ export type ProviderLinearAuditOperation =
   | 'delete-workpad'
   | 'transition'
   | 'attach-pr'
+  | 'parallelization'
   | 'screenshot-proof'
   | 'runtime-proof'
   | 'create-follow-up'
   | 'child-stream'
   | 'child-lane';
+
+export type ProviderLinearParallelizationDecision =
+  | 'parallelize_now'
+  | 'stay_serial'
+  | 'forbid_parallel';
+
+export type ProviderLinearParallelizationReason =
+  | 'independent_scope_available'
+  | 'single_bounded_change'
+  | 'overlapping_scope'
+  | 'existing_child_lane_active'
+  | 'review_or_validation_only'
+  | 'parent_only_mutation'
+  | 'merge_or_handoff_state'
+  | 'blocked_by_dependency';
+
+export interface ProviderLinearParallelizationSnapshot {
+  decision: ProviderLinearParallelizationDecision;
+  reason: ProviderLinearParallelizationReason;
+  summary: string | null;
+  recorded_at: string;
+}
+
+const PROVIDER_LINEAR_PARALLELIZATION_REASONS = {
+  parallelize_now: ['independent_scope_available'],
+  stay_serial: [
+    'single_bounded_change',
+    'overlapping_scope',
+    'existing_child_lane_active',
+    'review_or_validation_only'
+  ],
+  forbid_parallel: ['parent_only_mutation', 'merge_or_handoff_state', 'blocked_by_dependency']
+} as const satisfies Record<
+  ProviderLinearParallelizationDecision,
+  readonly ProviderLinearParallelizationReason[]
+>;
 
 export interface ProviderLinearAuditEntry {
   recorded_at: string;
@@ -44,6 +81,80 @@ export interface ProviderLinearAuditSummary {
   failure_count: number;
   latest_recorded_at: string | null;
   latest_by_operation: Partial<Record<ProviderLinearAuditOperation, ProviderLinearAuditEntry>>;
+  parallelization_entries: ProviderLinearAuditEntry[];
+}
+
+export function isProviderLinearParallelizationDecision(
+  value: string | null | undefined
+): value is ProviderLinearParallelizationDecision {
+  return value === 'parallelize_now' || value === 'stay_serial' || value === 'forbid_parallel';
+}
+
+export function isProviderLinearParallelizationReason(
+  value: string | null | undefined
+): value is ProviderLinearParallelizationReason {
+  return (
+    value === 'independent_scope_available' ||
+    value === 'single_bounded_change' ||
+    value === 'overlapping_scope' ||
+    value === 'existing_child_lane_active' ||
+    value === 'review_or_validation_only' ||
+    value === 'parent_only_mutation' ||
+    value === 'merge_or_handoff_state' ||
+    value === 'blocked_by_dependency'
+  );
+}
+
+export function isProviderLinearParallelizationReasonAllowed(
+  decision: ProviderLinearParallelizationDecision,
+  reason: ProviderLinearParallelizationReason
+): boolean {
+  return (
+    PROVIDER_LINEAR_PARALLELIZATION_REASONS[decision] as readonly ProviderLinearParallelizationReason[]
+  ).includes(reason);
+}
+
+export function readProviderLinearParallelizationSnapshots(
+  audit: ProviderLinearAuditSummary | null | undefined,
+  options: {
+    issueId?: string | null;
+    recordedAtNotBefore?: string | null;
+  } = {}
+): ProviderLinearParallelizationSnapshot[] {
+  const issueId = normalizeOptionalString(options.issueId);
+  const recordedAtNotBefore = normalizeOptionalString(options.recordedAtNotBefore);
+  return selectProviderLinearParallelizationEntries(audit)
+    .filter((entry) => entry.ok)
+    .filter((entry) => !issueId || entry.issue_id === issueId)
+    .filter((entry) => !recordedAtNotBefore || entry.recorded_at >= recordedAtNotBefore)
+    .flatMap((entry) => {
+      const decision = normalizeOptionalString(entry.action);
+      const reason = normalizeOptionalString(entry.state);
+      if (
+        !isProviderLinearParallelizationDecision(decision) ||
+        !isProviderLinearParallelizationReason(reason) ||
+        !isProviderLinearParallelizationReasonAllowed(decision, reason)
+      ) {
+        return [];
+      }
+      return [{
+        decision,
+        reason,
+        summary: normalizeOptionalString(entry.via),
+        recorded_at: entry.recorded_at
+      }];
+    })
+    .sort((left, right) => left.recorded_at.localeCompare(right.recorded_at));
+}
+
+export function readProviderLinearParallelizationSnapshot(
+  audit: ProviderLinearAuditSummary | null | undefined,
+  options: {
+    issueId?: string | null;
+    recordedAtNotBefore?: string | null;
+  } = {}
+): ProviderLinearParallelizationSnapshot | null {
+  return readProviderLinearParallelizationSnapshots(audit, options).at(-1) ?? null;
 }
 
 export function resolveProviderLinearAuditPath(env: NodeJS.ProcessEnv): string | null {
@@ -95,6 +206,9 @@ export async function summarizeProviderLinearAuditPath(
       summary.failure_count += 1;
     }
     summary.latest_by_operation[entry.operation] = entry;
+    if (entry.operation === 'parallelization') {
+      summary.parallelization_entries.push(entry);
+    }
     summary.latest_recorded_at = entry.recorded_at;
   }
 
@@ -108,8 +222,19 @@ function buildEmptyProviderLinearAuditSummary(auditPath: string): ProviderLinear
     success_count: 0,
     failure_count: 0,
     latest_recorded_at: null,
-    latest_by_operation: {}
+    latest_by_operation: {},
+    parallelization_entries: []
   };
+}
+
+function selectProviderLinearParallelizationEntries(
+  audit: ProviderLinearAuditSummary | null | undefined
+): ProviderLinearAuditEntry[] {
+  if (Array.isArray(audit?.parallelization_entries) && audit.parallelization_entries.length > 0) {
+    return audit.parallelization_entries.filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry));
+  }
+  const latestEntry = audit?.latest_by_operation?.parallelization ?? null;
+  return latestEntry ? [latestEntry] : [];
 }
 
 function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditEntry | null {
@@ -124,6 +249,7 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
     && operation !== 'delete-workpad'
     && operation !== 'transition'
     && operation !== 'attach-pr'
+    && operation !== 'parallelization'
     && operation !== 'screenshot-proof'
     && operation !== 'runtime-proof'
     && operation !== 'create-follow-up'

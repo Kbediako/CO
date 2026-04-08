@@ -1209,6 +1209,152 @@ describe('runLinearCliShell', () => {
     expect(setExitCode).not.toHaveBeenCalled();
   });
 
+  it('refreshes the matching provider-worker proof snapshot after recording a parallelization decision', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const loadProviderLinearWorkerContextMock =
+      vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').loadProviderLinearWorkerContext>()
+        .mockResolvedValue({
+          pipelineId: 'provider-linear-worker',
+          issueId: 'lin-issue-1',
+          issueIdentifier: 'CO-101',
+          runDir: '/tmp/provider-run'
+        } as never);
+    const refreshProviderLinearWorkerProofSnapshotMock =
+      vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').refreshProviderLinearWorkerProofSnapshot>()
+        .mockResolvedValue({
+          issue_id: 'lin-issue-1'
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['parallelization'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          decision: 'stay_serial',
+          reason: 'single_bounded_change',
+          summary: 'One bounded file change.'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        getEnv: () => ({
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-04-08T07:10:00.000Z',
+        appendAuditEntry,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        refreshProviderLinearWorkerProofSnapshot: refreshProviderLinearWorkerProofSnapshotMock,
+        log
+      }
+    );
+
+    expect(loadProviderLinearWorkerContextMock).toHaveBeenCalledWith({
+      CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-04-08T07:10:00.000Z',
+      operation: 'parallelization',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-101',
+      source_setup: null,
+      action: 'stay_serial',
+      via: 'One bounded file change.',
+      state: 'single_bounded_change',
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: null,
+      error_message: null
+    });
+    expect(refreshProviderLinearWorkerProofSnapshotMock).toHaveBeenCalledWith(
+      '/tmp/provider-run',
+      '/tmp/provider-linear-audit.jsonl',
+      undefined,
+      undefined,
+      {
+        CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+      }
+    );
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'parallelization',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-101',
+      decision: 'stay_serial',
+      reason: 'single_bounded_change'
+    });
+  });
+
+  it('skips provider-worker proof refresh when the loaded worker context belongs to another issue', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const loadProviderLinearWorkerContextMock =
+      vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').loadProviderLinearWorkerContext>()
+        .mockResolvedValue({
+          pipelineId: 'provider-linear-worker',
+          issueId: 'lin-issue-2',
+          issueIdentifier: 'CO-102',
+          runDir: '/tmp/provider-run'
+        } as never);
+    const refreshProviderLinearWorkerProofSnapshotMock =
+      vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').refreshProviderLinearWorkerProofSnapshot>();
+
+    await runLinearCliShell(
+      {
+        positionals: ['parallelization'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          decision: 'stay_serial',
+          reason: 'single_bounded_change',
+          summary: 'One bounded file change.'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        getEnv: () => ({
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        now: () => '2026-04-08T07:11:00.000Z',
+        appendAuditEntry,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        refreshProviderLinearWorkerProofSnapshot: refreshProviderLinearWorkerProofSnapshotMock,
+        log
+      }
+    );
+
+    expect(refreshProviderLinearWorkerProofSnapshotMock).not.toHaveBeenCalled();
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-04-08T07:11:00.000Z',
+      operation: 'parallelization',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: 'stay_serial',
+      via: 'One bounded file change.',
+      state: 'single_bounded_change',
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: null,
+      error_message: null
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'parallelization',
+      issue_id: 'lin-issue-1',
+      issue_identifier: null
+    });
+  });
+
   it('routes child-stream into the provider worker launcher and audits the result', async () => {
     const log = vi.fn();
     const appendAuditEntry = vi.fn();

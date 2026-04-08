@@ -278,6 +278,7 @@ describe('SelectedRunProjection', () => {
             success_count: 1,
             failure_count: 0,
             latest_recorded_at: '2026-03-20T01:16:10.000Z',
+            parallelization_entries: [],
             latest_by_operation: {
               transition: {
                 recorded_at: '2026-03-20T01:16:10.000Z',
@@ -1429,6 +1430,7 @@ describe('SelectedRunProjection', () => {
             success_count: 0,
             failure_count: 1,
             latest_recorded_at: '2026-03-20T01:15:27.970Z',
+            parallelization_entries: [],
             latest_by_operation: {
               'create-follow-up': {
                 recorded_at: '2026-03-20T01:15:27.970Z',
@@ -1503,6 +1505,7 @@ describe('SelectedRunProjection', () => {
             success_count: 0,
             failure_count: 1,
             latest_recorded_at: '2026-03-20T01:15:27.970Z',
+            parallelization_entries: [],
             latest_by_operation: {
               'create-follow-up': {
                 recorded_at: '2026-03-20T01:15:27.970Z',

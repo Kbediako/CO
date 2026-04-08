@@ -779,6 +779,7 @@ describe('runCommandStage review evidence consistency', () => {
           success_count: 0,
           failure_count: 1,
           latest_recorded_at: priorAuditTimestamp,
+          parallelization_entries: [],
           latest_by_operation: {
             'create-follow-up': {
               recorded_at: priorAuditTimestamp,

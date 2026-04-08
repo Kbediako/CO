@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260408-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd",
+      "title": "CO: Make ordinary eligible provider-worker issues actually leverage parent-owned same-issue child-lane parallelisation",
+      "relates_to": "tasks/tasks-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-08",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md",
+        "task": "tasks/tasks-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md",
+        "agent_task": ".agent/task/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md",
+        "docs": "docs/TECH_SPEC-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md"
+      }
+    },
+    {
       "id": "20260408-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f",
       "title": "CO: Add a bounded macOS screenshot-proof capture path without external helper dependencies",
       "relates_to": "tasks/tasks-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md",

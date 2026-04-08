@@ -24,7 +24,12 @@ import {
 } from './control/providerLinearWorkflowFacade.js';
 import {
   appendProviderLinearAuditEntry,
+  isProviderLinearParallelizationDecision,
+  isProviderLinearParallelizationReason,
+  isProviderLinearParallelizationReasonAllowed,
   resolveProviderLinearAuditPath,
+  type ProviderLinearParallelizationDecision,
+  type ProviderLinearParallelizationReason,
   type ProviderLinearAuditEntry
 } from './control/providerLinearWorkflowAudit.js';
 import {
@@ -46,6 +51,10 @@ import {
   runProviderLinearChildLaneShell,
   type ProviderLinearChildLaneResult
 } from './providerLinearChildLaneShell.js';
+import {
+  loadProviderLinearWorkerContext,
+  refreshProviderLinearWorkerProofSnapshot
+} from './providerLinearWorkerRunner.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
 
 type ArgMap = Record<string, string | boolean>;
@@ -67,6 +76,8 @@ interface LinearCliShellDependencies {
   createProviderLinearFollowUpIssue: typeof createProviderLinearFollowUpIssue;
   resolveProviderLinearRuntimeProof: typeof resolveProviderLinearRuntimeProof;
   resolveProviderLinearScreenshotProof: typeof resolveProviderLinearScreenshotProof;
+  loadProviderLinearWorkerContext: typeof loadProviderLinearWorkerContext;
+  refreshProviderLinearWorkerProofSnapshot: typeof refreshProviderLinearWorkerProofSnapshot;
   appendAuditEntry: typeof appendProviderLinearAuditEntry;
   readTextFile: (path: string) => Promise<string>;
   getEnv: () => NodeJS.ProcessEnv;
@@ -145,6 +156,30 @@ type ProviderLinearScreenshotProofResult =
       error: ProviderLinearScreenshotProofError;
     };
 
+type ProviderLinearParallelizationResult =
+  | {
+      ok: true;
+      operation: 'parallelization';
+      issue_id: string;
+      issue_identifier: string | null;
+      source_setup: DispatchPilotSourceSetup | null;
+      decision: ProviderLinearParallelizationDecision;
+      reason: ProviderLinearParallelizationReason;
+      summary: string | null;
+    }
+  | {
+      ok: false;
+      operation: 'parallelization';
+      issue_id: string | null;
+      issue_identifier: string | null;
+      source_setup: DispatchPilotSourceSetup | null;
+      error: {
+        code: string;
+        message: string;
+        status: number;
+      };
+    };
+
 const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   getProviderLinearIssueContext,
   upsertProviderLinearWorkpadComment,
@@ -156,6 +191,8 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   createProviderLinearFollowUpIssue,
   resolveProviderLinearRuntimeProof,
   resolveProviderLinearScreenshotProof,
+  loadProviderLinearWorkerContext,
+  refreshProviderLinearWorkerProofSnapshot,
   appendAuditEntry: appendProviderLinearAuditEntry,
   readTextFile: async (path: string) => await readFile(path, 'utf8'),
   getEnv: () => process.env,
@@ -173,6 +210,7 @@ const LINEAR_MUTATING_SUBCOMMANDS = new Set([
   'delete-workpad',
   'transition',
   'attach-pr',
+  'parallelization',
   'create-follow-up',
   'child-stream',
   'child-lane'
@@ -291,6 +329,41 @@ export async function runLinearCliShell(
           env
         });
         await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'parallelization': {
+        assertAllowedFlags(params.flags, [
+          'format',
+          'issue-id',
+          'workspace-id',
+          'team-id',
+          'project-id',
+          'decision',
+          'reason',
+          'summary'
+        ]);
+        const issueId = requireFlag(params.flags, 'issue-id');
+        const decision = requireParallelizationDecision(params.flags);
+        const reason = requireParallelizationReason(params.flags, decision);
+        const proofRefreshContext = await resolveParallelizationProofRefreshContext(issueId, env, dependencies);
+        const result: ProviderLinearParallelizationResult = {
+          ok: true,
+          operation: 'parallelization',
+          issue_id: issueId,
+          issue_identifier: proofRefreshContext?.issueIdentifier ?? null,
+          source_setup: resolveAuditSourceSetup(params.flags, env),
+          decision,
+          reason,
+          summary: readRawStringFlag(params.flags, 'summary') ?? null
+        };
+        await recordAuditResult(result, params.flags, env, dependencies);
+        await refreshParallelizationProofSnapshotBestEffort(
+          result,
+          proofRefreshContext,
+          env,
+          dependencies
+        );
         emitJsonResult(result, dependencies);
         return;
       }
@@ -507,6 +580,64 @@ export async function runLinearCliShell(
   }
 }
 
+interface ParallelizationProofRefreshContext {
+  runDir: string;
+  issueId: string;
+  issueIdentifier: string;
+}
+
+async function resolveParallelizationProofRefreshContext(
+  issueId: string,
+  env: NodeJS.ProcessEnv,
+  dependencies: Pick<
+    LinearCliShellDependencies,
+    'loadProviderLinearWorkerContext'
+  >
+): Promise<ParallelizationProofRefreshContext | null> {
+  try {
+    const context = await dependencies.loadProviderLinearWorkerContext(env);
+    if (context.pipelineId !== 'provider-linear-worker' || context.issueId !== issueId) {
+      return null;
+    }
+    return {
+      runDir: context.runDir,
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function refreshParallelizationProofSnapshotBestEffort(
+  result: ProviderLinearParallelizationResult,
+  context: ParallelizationProofRefreshContext | null,
+  env: NodeJS.ProcessEnv,
+  dependencies: Pick<
+    LinearCliShellDependencies,
+    'refreshProviderLinearWorkerProofSnapshot' | 'warn'
+  >
+): Promise<void> {
+  if (!result.ok || !context) {
+    return;
+  }
+  const auditPath = resolveProviderLinearAuditPath(env);
+  try {
+    await dependencies.refreshProviderLinearWorkerProofSnapshot(
+      context.runDir,
+      auditPath,
+      undefined,
+      undefined,
+      env
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    dependencies.warn(
+      `linear parallelization warning: failed to refresh provider-linear-worker proof snapshot for ${context.issueIdentifier}: ${message}`
+    );
+  }
+}
+
 function emitJsonResult(
   result: { ok: boolean },
   dependencies: Pick<LinearCliShellDependencies, 'log' | 'setExitCode'>
@@ -562,6 +693,37 @@ function readBooleanFlag(flags: ArgMap, key: string): boolean {
   }
   const normalized = value.trim().toLowerCase();
   return ['1', 'true', 'yes', 'on'].includes(normalized);
+}
+
+function requireParallelizationDecision(flags: ArgMap): ProviderLinearParallelizationDecision {
+  const decision = readStringFlag(flags, 'decision');
+  if (!isProviderLinearParallelizationDecision(decision)) {
+    throw usageError(
+      'linear_parallelization_decision_invalid',
+      'linear parallelization requires --decision parallelize_now|stay_serial|forbid_parallel.'
+    );
+  }
+  return decision;
+}
+
+function requireParallelizationReason(
+  flags: ArgMap,
+  decision: ProviderLinearParallelizationDecision
+): ProviderLinearParallelizationReason {
+  const reason = readStringFlag(flags, 'reason');
+  if (!isProviderLinearParallelizationReason(reason)) {
+    throw usageError(
+      'linear_parallelization_reason_invalid',
+      'linear parallelization requires a recognized --reason code.'
+    );
+  }
+  if (!isProviderLinearParallelizationReasonAllowed(decision, reason)) {
+    throw usageError(
+      'linear_parallelization_reason_mismatch',
+      `linear parallelization reason ${reason} is not allowed for decision ${decision}.`
+    );
+  }
+  return reason;
 }
 
 function readCommaSeparatedFlag(flags: ArgMap, key: string): string[] {
@@ -797,6 +959,7 @@ type LinearCliResult =
   | ProviderLinearDeleteWorkpadResult
   | ProviderLinearTransitionResult
   | ProviderLinearAttachPrResult
+  | ProviderLinearParallelizationResult
   | ProviderLinearCreateFollowUpResult
   | ProviderLinearRuntimeProofResult
   | ProviderLinearScreenshotProofResult
@@ -997,6 +1160,23 @@ function buildAuditEntry(
         ...followUpAuditFields,
         comment_id: null,
         attachment_id: result.attachment.id,
+        error_code: null,
+        error_message: null
+      };
+    case 'parallelization':
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: true,
+        issue_id: result.issue_id,
+        issue_identifier: result.issue_identifier,
+        source_setup: result.source_setup,
+        action: result.decision,
+        via: result.summary,
+        state: result.reason,
+        ...followUpAuditFields,
+        comment_id: null,
+        attachment_id: null,
         error_code: null,
         error_message: null
       };
