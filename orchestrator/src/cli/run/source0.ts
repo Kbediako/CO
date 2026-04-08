@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 
 import type { CliManifest } from '../types.js';
@@ -272,6 +272,23 @@ export async function readRunSource0Payload(
   return parsed as unknown as RunSource0Payload;
 }
 
+async function canReuseInheritedSource0(
+  repoRoot: string,
+  descriptor: RunSource0Descriptor
+): Promise<boolean> {
+  const paths = resolveRunSource0Paths(repoRoot, descriptor);
+  try {
+    const [dirInfo, indexInfo, sourceInfo] = await Promise.all([
+      stat(paths.dirPath),
+      stat(paths.indexPath),
+      stat(paths.sourcePath)
+    ]);
+    return dirInfo.isDirectory() && indexInfo.isFile() && sourceInfo.isFile();
+  } catch {
+    return false;
+  }
+}
+
 function buildRunSource0Descriptor(params: {
   repoRoot: string;
   runDir: string;
@@ -299,6 +316,47 @@ function buildRunSource0Descriptor(params: {
   };
 }
 
+function buildCurrentRunLineage(manifest: CliManifest): RunSource0Lineage {
+  return {
+    run_id: manifest.run_id,
+    task_id: manifest.task_id,
+    manifest_path: join(manifest.artifact_root, 'manifest.json')
+  };
+}
+
+async function materializeFreshRunSource0(params: {
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  manifest: CliManifest;
+  targetDir: string;
+  inheritedFrom: RunSource0Lineage | null;
+}): Promise<RunMemoryContract> {
+  const payload = buildRunSource0Payload({
+    manifest: params.manifest
+  });
+  const contextObject = await buildContextObject({
+    source: {
+      type: 'text',
+      value: `${JSON.stringify(payload, null, 2)}\n`
+    },
+    targetDir: params.targetDir,
+    chunking: {
+      targetBytes: RUN_SOURCE0_CHUNK_TARGET_BYTES,
+      overlapBytes: RUN_SOURCE0_CHUNK_OVERLAP_BYTES,
+      strategy: 'byte'
+    }
+  });
+  return {
+    source_0: buildRunSource0Descriptor({
+      repoRoot: params.env.repoRoot,
+      runDir: params.targetDir,
+      contextObject,
+      origin: buildCurrentRunLineage(params.manifest),
+      inheritedFrom: params.inheritedFrom
+    })
+  };
+}
+
 export async function materializeRunSource0(params: {
   env: EnvironmentPaths;
   paths: RunPaths;
@@ -312,8 +370,14 @@ export async function materializeRunSource0(params: {
   const inheritedDescriptor = params.inheritedFrom
     ? readRunSource0Descriptor(params.inheritedFrom.manifest)
     : null;
+  const inheritedLineage = params.inheritedFrom
+    ? buildCurrentRunLineage(params.inheritedFrom.manifest)
+    : null;
 
-  if (inheritedDescriptor) {
+  if (
+    inheritedDescriptor &&
+    (await canReuseInheritedSource0(params.env.repoRoot, inheritedDescriptor))
+  ) {
     const inheritedPaths = resolveRunSource0Paths(params.env.repoRoot, inheritedDescriptor);
     const contextObject = await buildContextObject({
       source: { type: 'dir', value: inheritedPaths.dirPath },
@@ -324,49 +388,22 @@ export async function materializeRunSource0(params: {
         strategy: 'byte'
       }
     });
-    const inheritedFrom: RunSource0Lineage = {
-      run_id: params.inheritedFrom!.manifest.run_id,
-      task_id: params.inheritedFrom!.manifest.task_id,
-      manifest_path: join(params.inheritedFrom!.manifest.artifact_root, 'manifest.json')
-    };
     return {
       source_0: buildRunSource0Descriptor({
         repoRoot: params.env.repoRoot,
         runDir: targetDir,
         contextObject,
         origin: inheritedDescriptor.origin,
-        inheritedFrom
+        inheritedFrom: inheritedLineage
       })
     };
   }
 
-  const manifestPath = join(params.manifest.artifact_root, 'manifest.json');
-  const payload = buildRunSource0Payload({
-    manifest: params.manifest
-  });
-  const contextObject = await buildContextObject({
-    source: {
-      type: 'text',
-      value: `${JSON.stringify(payload, null, 2)}\n`
-    },
+  return await materializeFreshRunSource0({
+    env: params.env,
+    paths: params.paths,
+    manifest: params.manifest,
     targetDir,
-    chunking: {
-      targetBytes: RUN_SOURCE0_CHUNK_TARGET_BYTES,
-      overlapBytes: RUN_SOURCE0_CHUNK_OVERLAP_BYTES,
-      strategy: 'byte'
-    }
+    inheritedFrom: inheritedDescriptor ? inheritedLineage : null
   });
-  return {
-    source_0: buildRunSource0Descriptor({
-      repoRoot: params.env.repoRoot,
-      runDir: targetDir,
-      contextObject,
-      origin: {
-        run_id: params.manifest.run_id,
-        task_id: params.manifest.task_id,
-        manifest_path: manifestPath
-      },
-      inheritedFrom: null
-    })
-  };
 }

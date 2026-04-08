@@ -200,6 +200,72 @@ describe('bootstrapManifest', () => {
       await rm(repoRoot, { recursive: true, force: true });
     }
   });
+
+  it('falls back to a fresh child-local source_0 payload when inherited source artifacts are missing', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-missing-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+      const parentSource0 = parent.manifest.memory?.source_0;
+      expect(parentSource0).toBeTruthy();
+
+      if (parentSource0) {
+        await rm(join(repoRoot, parentSource0.dir_path), { recursive: true, force: true });
+      }
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+      const childSource0 = child.manifest.memory?.source_0;
+      expect(childSource0).toBeTruthy();
+      expect(childSource0?.object_id).not.toBe(parentSource0?.object_id);
+      expect(childSource0?.pointer).not.toBe(parentSource0?.pointer);
+      expect(childSource0?.origin).toEqual({
+        run_id: 'run-child',
+        task_id: 'task-child',
+        manifest_path: join('.runs', 'task-child', 'cli', 'run-child', 'manifest.json')
+      });
+      expect(childSource0?.inherited_from).toEqual({
+        run_id: 'run-parent',
+        task_id: 'task-parent',
+        manifest_path: join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
+      });
+
+      const payload = childSource0
+        ? await readRunSource0Payload(repoRoot, childSource0)
+        : null;
+      expect(payload?.kind).toBe('run_source_0');
+      expect(payload?.run_contract.run_id).toBe('run-child');
+      expect(payload?.artifacts.manifest_path).toBe(
+        join('.runs', 'task-child', 'cli', 'run-child', 'manifest.json')
+      );
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('loadManifest', () => {
