@@ -480,6 +480,74 @@
         }
       }
     },
+    "memory": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "source_0": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "kind",
+            "object_id",
+            "pointer",
+            "dir_path",
+            "index_path",
+            "source_path",
+            "byte_length",
+            "chunk_count",
+            "created_at",
+            "origin",
+            "inherited_from"
+          ],
+          "properties": {
+            "schema_version": { "type": "integer", "minimum": 1 },
+            "kind": { "type": "string", "const": "context_object" },
+            "object_id": { "type": "string", "minLength": 1 },
+            "pointer": { "type": "string", "minLength": 1 },
+            "dir_path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+            },
+            "index_path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+            },
+            "source_path": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+            },
+            "byte_length": { "type": "integer", "minimum": 0 },
+            "chunk_count": { "type": "integer", "minimum": 1 },
+            "created_at": { "type": "string", "minLength": 1 },
+            "origin": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["run_id", "task_id", "manifest_path"],
+              "properties": {
+                "run_id": { "type": "string", "minLength": 1 },
+                "task_id": { "type": "string", "minLength": 1 },
+                "manifest_path": { "type": "string", "minLength": 1 }
+              }
+            },
+            "inherited_from": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "required": ["run_id", "task_id", "manifest_path"],
+              "properties": {
+                "run_id": { "type": "string", "minLength": 1 },
+                "task_id": { "type": "string", "minLength": 1 },
+                "manifest_path": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    },
     "tfgrpo": {
       "type": ["object", "null"],
       "additionalProperties": false,

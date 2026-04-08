@@ -1,10 +1,11 @@
 import type { TaskContext, PlanItem } from '../../types.js';
 import type { CliManifest, PipelineDefinition, PromptPackManifestEntry } from '../types.js';
+import { buildRunSource0PromptLines, readRunSource0Descriptor } from '../run/source0.js';
 
 const MAX_CLOUD_PROMPT_EXPERIENCES = 3;
 const MAX_CLOUD_PROMPT_EXPERIENCE_CHARS = 320;
 
-export type CloudPromptManifest = Pick<CliManifest, 'prompt_packs'>;
+export type CloudPromptManifest = Pick<CliManifest, 'prompt_packs' | 'memory'>;
 
 function normalizePromptSnippet(value: string): string {
   return value.replace(/\s+/gu, ' ').trim();
@@ -148,6 +149,10 @@ export function buildCloudPrompt(params: {
       stage: params.stage
     })
   );
+  const source0PromptLines = buildRunSource0PromptLines(readRunSource0Descriptor(params.manifest));
+  if (source0PromptLines.length > 0) {
+    lines.push('', ...source0PromptLines);
+  }
 
   return lines.join('\n');
 }

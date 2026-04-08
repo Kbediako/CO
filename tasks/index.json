@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260409-linear-5f850884-855f-41ed-b593-6c2dee5815d2",
+      "title": "CO: Add source 0 to the run contract and shared memory-consumer read path",
+      "relates_to": "tasks/tasks-linear-5f850884-855f-41ed-b593-6c2dee5815d2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-5f850884-855f-41ed-b593-6c2dee5815d2-co-91-docs-review/cli/2026-04-08T14-55-38-137Z-305205e3/manifest.json",
+          "override_reason": "The audited docs-review child stream passed spec-guard and docs:check, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The detailed freshness report contains no `linear-5f850884-855f-41ed-b593-6c2dee5815d2` packet paths in `stale_entries`, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5f850884-855f-41ed-b593-6c2dee5815d2.md",
+        "task": "tasks/tasks-linear-5f850884-855f-41ed-b593-6c2dee5815d2.md",
+        "agent_task": ".agent/task/linear-5f850884-855f-41ed-b593-6c2dee5815d2.md",
+        "docs": "docs/TECH_SPEC-linear-5f850884-855f-41ed-b593-6c2dee5815d2.md"
+      }
+    },
+    {
       "id": "20260409-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade",
       "title": "CO: release rehydrated Merging claims after merged PR when live Linear reads are cooldown-suppressed",
       "relates_to": "tasks/tasks-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md",
