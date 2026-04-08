@@ -748,6 +748,7 @@ interface ProviderLinearIssueContextCacheRecord {
 export async function getProviderLinearIssueContext(input: {
   issueId: string;
   sourceSetup?: DispatchPilotSourceSetup | null;
+  fallbackToCacheOnFailure?: boolean;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }): Promise<ProviderLinearIssueContextResult> {
@@ -767,11 +768,44 @@ export async function getProviderLinearIssueContext(input: {
     minimumRequestsRemaining: 1
   });
   if (budgetError) {
+    if (input.fallbackToCacheOnFailure === true) {
+      const cachedRecord = await readCachedIssueContextRecord(
+        input.env,
+        issueId,
+        session.session.sourceSetup
+      );
+      if (cachedRecord) {
+        return {
+          ok: true,
+          operation: 'issue-context',
+          issue: cachedRecord.issue,
+          source_setup: session.session.sourceSetup
+        };
+      }
+    }
     return failureFromWorkflowError('issue-context', budgetError);
   }
 
   const context = await readIssueContext(session.session, 'issue-context', issueId);
   if (!context.ok) {
+    if (
+      input.fallbackToCacheOnFailure === true &&
+      shouldFallbackToCachedIssueContextFromWorkflowError(context.error)
+    ) {
+      const cachedRecord = await readCachedIssueContextRecord(
+        input.env,
+        issueId,
+        session.session.sourceSetup
+      );
+      if (cachedRecord) {
+        return {
+          ok: true,
+          operation: 'issue-context',
+          issue: cachedRecord.issue,
+          source_setup: session.session.sourceSetup
+        };
+      }
+    }
     return failureFromWorkflowError('issue-context', context.error);
   }
 
@@ -782,6 +816,12 @@ export async function getProviderLinearIssueContext(input: {
     issue: context.issue,
     source_setup: session.session.sourceSetup
   };
+}
+
+function shouldFallbackToCachedIssueContextFromWorkflowError(
+  error: ProviderLinearWorkflowError
+): boolean {
+  return error.code === 'linear_rate_limited';
 }
 
 export async function upsertProviderLinearWorkpadComment(input: {

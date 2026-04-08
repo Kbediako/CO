@@ -27,6 +27,8 @@ export type ProviderMergeCloseoutStatus =
   | 'merge_failed'
   | 'transition_failed';
 
+export type ProviderMergeCloseoutMode = 'full' | 'probe-merged-recovery';
+
 export interface ProviderMergeCloseoutPullRequestRecord {
   url: string;
   owner: string;
@@ -149,6 +151,7 @@ export async function runProviderDeterministicMergeCloseout(
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    mode?: ProviderMergeCloseoutMode;
     repoRoot: string;
     sourceSetup?: DispatchPilotSourceSetup | null;
     env?: NodeJS.ProcessEnv;
@@ -165,6 +168,7 @@ export async function runProviderDeterministicMergeCloseout(
     deps.resolveSnapshotActionRequiredReasons ??
     ((snapshot: ProviderPrSnapshotRecord, options?: { readinessMode?: 'merge' | 'review' }) =>
       resolveActionRequiredReasons(snapshot as PrWatchMergeSnapshot, options));
+  const mode = input.mode ?? 'full';
 
   const recordedAt = now();
   const base = {
@@ -225,7 +229,8 @@ export async function runProviderDeterministicMergeCloseout(
   const issueContext = await readIssueContext({
     issueId: input.issueId,
     env,
-    sourceSetup: input.sourceSetup
+    sourceSetup: input.sourceSetup,
+    fallbackToCacheOnFailure: true
   });
   if (!issueContext.ok) {
     return {
@@ -250,6 +255,9 @@ export async function runProviderDeterministicMergeCloseout(
   const currentIssueState = issueContext.issue.state?.name ?? base.issue_state;
   const currentIssueStateType = issueContext.issue.state?.type ?? base.issue_state_type;
   const currentIssueUpdatedAt = issueContext.issue.updated_at ?? base.issue_updated_at;
+  const currentIssueAlreadyCompleted = currentIssueStateType === 'completed';
+  const allowCompletedIssueRecovery =
+    mode === 'probe-merged-recovery' && currentIssueAlreadyCompleted;
   const baseWithContext = {
     ...base,
     issue_state: currentIssueState,
@@ -258,7 +266,10 @@ export async function runProviderDeterministicMergeCloseout(
     attached_pr_urls: [...attachedPrUrls]
   };
 
-  if (normalizeProviderMergeCloseoutIssueState(currentIssueState) !== 'merging') {
+  if (
+    normalizeProviderMergeCloseoutIssueState(currentIssueState) !== 'merging' &&
+    !allowCompletedIssueRecovery
+  ) {
     return {
       ...baseWithContext,
       status: 'action_required',
@@ -373,6 +384,19 @@ export async function runProviderDeterministicMergeCloseout(
   }
 
   const alreadyMerged = snapshot.merged_at !== null || snapshot.state === 'MERGED';
+
+  if (mode === 'probe-merged-recovery' && !alreadyMerged) {
+    return {
+      ...baseWithResolution,
+      pr,
+      snapshot,
+      status: 'watching',
+      reason: 'probe_pr_not_merged',
+      summary: summarizeSelection(
+        `Attached PR #${pr.number} is not merged yet, so merged recovery cannot retire the rehydrated Merging claim.`
+      )
+    };
+  }
 
   if (!alreadyMerged && !snapshot.ready_to_merge) {
     const nonMergedOutcome = classifyNonMergedSnapshot(snapshot, pr.number)!;
@@ -523,6 +547,21 @@ export async function runProviderDeterministicMergeCloseout(
       };
 
   if (!transitionResult.ok) {
+    if (alreadyMerged && transitionResult.error.code === 'linear_rate_limited') {
+      return {
+        ...baseWithResolution,
+        pr,
+        snapshot: verificationSnapshot,
+        merge_attempt: mergeAttempt,
+        shared_root: sharedRoot,
+        linear_transition: linearTransition,
+        status: 'merged',
+        reason: 'merged_and_shared_root_reconciled_transition_deferred',
+        summary: summarizeSelection(
+          `Attached PR #${pr.number} was already merged and the shared root is reconciled; local merge closeout is authoritative while the Linear Done transition is deferred by shared-budget cooldown.`
+        )
+      };
+    }
     return {
       ...baseWithResolution,
       pr,

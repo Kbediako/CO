@@ -1,10 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 
 import { logger } from '../../logger.js';
-import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../providerLinearWorkerRunner.js';
+import {
+  PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME
+} from '../providerLinearWorkerRunner.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
 import {
@@ -47,6 +50,7 @@ import {
   runProviderTerminalCleanup,
   type ProviderTerminalCleanupConfig
 } from './providerTerminalCleanup.js';
+import { PROVIDER_LINEAR_AUDIT_ENV_VAR } from './providerLinearWorkflowAudit.js';
 import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
 import type { ProviderMergeCloseoutRecord } from './providerMergeCloseout.js';
 
@@ -152,6 +156,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    mode?: 'full' | 'probe-merged-recovery';
     sourceSetup?: DispatchPilotSourceSetup | null;
     repoRoot: string;
     env?: NodeJS.ProcessEnv;
@@ -377,6 +382,7 @@ export function createProviderIssueHandoffService(
       issueStateType: input.trackedIssue.state_type,
       issueUpdatedAt: input.trackedIssue.updated_at,
       sourceSetup: resolveMergeCloseoutSourceSetup(),
+      env: buildMergeCloseoutEnv(input.latestRun?.manifestPath ?? input.claim.run_manifest_path),
       repoRoot
     });
     if (mergeCloseout.reason === 'issue_no_longer_merging') {
@@ -395,6 +401,90 @@ export function createProviderIssueHandoffService(
       run_manifest_path: input.latestRun?.manifestPath ?? input.claim.run_manifest_path,
       ...clearProviderRetryFields(),
       merge_closeout: mergeCloseout
+    });
+  };
+
+  const buildMergeCloseoutEnv = (
+    runManifestPath: string | null | undefined
+  ): NodeJS.ProcessEnv => {
+    if (typeof runManifestPath !== 'string' || runManifestPath.trim().length === 0) {
+      return process.env;
+    }
+    return {
+      ...process.env,
+      [PROVIDER_LINEAR_AUDIT_ENV_VAR]: join(
+        dirname(runManifestPath),
+        PROVIDER_LINEAR_WORKER_AUDIT_FILENAME
+      )
+    };
+  };
+
+  const persistRecoveredActiveRunMergeCloseout = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: LiveLinearTrackedIssue;
+    latestRun: ProviderIssueRunRecord;
+    mergeCloseout: ProviderMergeCloseoutRecord;
+  }): Promise<ProviderIntakeClaimRecord> =>
+    await upsertProviderClaimAndPersist({
+      ...input.claim,
+      ...buildTrackedIssueClaimFields(input.trackedIssue),
+      state: resolveProviderMergeCloseoutClaimState(input.mergeCloseout),
+      reason: resolveProviderMergeCloseoutClaimReason(input.mergeCloseout),
+      task_id: input.latestRun.taskId,
+      run_id: input.latestRun.runId,
+      run_manifest_path: input.latestRun.manifestPath,
+      ...clearProviderRetryFields(),
+      merge_closeout: input.mergeCloseout
+    });
+
+  const maybeHandleRecoveredActiveRunMergedCloseout = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: LiveLinearTrackedIssue;
+    latestRun: ProviderIssueRunRecord;
+  }): Promise<ProviderIntakeClaimRecord | null> => {
+    const trackedIssueWorkflowState = normalizeProviderLinearWorkflowState(input.trackedIssue.state);
+    const existingMergeCloseout = input.claim.merge_closeout ?? null;
+    if (
+      existingMergeCloseout &&
+      existingMergeCloseout.status !== 'watching' &&
+      (
+        trackedIssueWorkflowState === 'merging' ||
+        input.trackedIssue.state_type === 'completed'
+      )
+    ) {
+      return await persistRecoveredActiveRunMergeCloseout({
+        claim: input.claim,
+        trackedIssue: input.trackedIssue,
+        latestRun: input.latestRun,
+        mergeCloseout: existingMergeCloseout
+      });
+    }
+    if (
+      !runMergeCloseout ||
+      trackedIssueWorkflowState !== 'merging' ||
+      input.claim.reason !== 'provider_issue_rehydrated_active_run'
+    ) {
+      return null;
+    }
+    const mergeCloseout = await runMergeCloseout({
+      issueId: input.trackedIssue.id,
+      issueIdentifier: input.trackedIssue.identifier,
+      issueState: input.trackedIssue.state,
+      issueStateType: input.trackedIssue.state_type,
+      issueUpdatedAt: input.trackedIssue.updated_at,
+      sourceSetup: resolveMergeCloseoutSourceSetup(),
+      env: buildMergeCloseoutEnv(input.latestRun.manifestPath),
+      mode: 'probe-merged-recovery',
+      repoRoot
+    });
+    if (mergeCloseout.status === 'watching') {
+      return null;
+    }
+    return await persistRecoveredActiveRunMergeCloseout({
+      claim: input.claim,
+      trackedIssue: input.trackedIssue,
+      latestRun: input.latestRun,
+      mergeCloseout
     });
   };
 
@@ -422,7 +512,7 @@ export function createProviderIssueHandoffService(
     if (bestEffortRehydrateTimer) {
       return;
     }
-    bestEffortRehydrateTimer = setTimeout(() => {
+    bestEffortRehydrateTimer = globalThis.setTimeout(() => {
       bestEffortRehydrateTimer = null;
       void runWithRefreshLifecycleLock(() => rehydrateNow({ refreshTrackedIssueMetadata: true }))
         .then((result) => {
@@ -996,6 +1086,17 @@ export function createProviderIssueHandoffService(
         if (preserveMergeCloseoutWatchingClaim && !mergeTrackedIssue) {
           hasPendingClaims = true;
           continue;
+        }
+        if (mergeTrackedIssue && Object.keys(freshTrackedIssue.claimFields).length > 0) {
+          const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
+            claim,
+            trackedIssue: mergeTrackedIssue,
+            latestRun: activeRun
+          });
+          if (mergeCloseoutClaim) {
+            hasPendingClaims = true;
+            continue;
+          }
         }
         const trackedIssueFields = freshTrackedIssue.claimFields;
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
@@ -2252,6 +2353,17 @@ export function createProviderIssueHandoffService(
                 noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
                 continue;
               }
+              if (isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue)) {
+                const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
+                  claim,
+                  trackedIssue: resolution.trackedIssue,
+                  latestRun: activeRun
+                });
+                if (mergeCloseoutClaim) {
+                  noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                  continue;
+                }
+              }
               const trackedIssueFields = buildFreshTrackedIssueClaimFields(
                 claim,
                 resolution.trackedIssue
@@ -2331,6 +2443,17 @@ export function createProviderIssueHandoffService(
             if (preserveMergeCloseoutWatchingClaim) {
               noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
               continue;
+            }
+            if (isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue)) {
+              const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
+                claim,
+                trackedIssue: resolution.trackedIssue,
+                latestRun: activeRun
+              });
+              if (mergeCloseoutClaim) {
+                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                continue;
+              }
             }
             const trackedIssueFields = buildFreshTrackedIssueClaimFields(
               claim,
