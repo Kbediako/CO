@@ -424,10 +424,16 @@ export function createProviderIssueHandoffService(
     trackedIssue: LiveLinearTrackedIssue;
     latestRun: ProviderIssueRunRecord;
     mergeCloseout: ProviderMergeCloseoutRecord;
-  }): Promise<ProviderIntakeClaimRecord> =>
-    await upsertProviderClaimAndPersist({
+  }): Promise<ProviderIntakeClaimRecord> => {
+    const trackedIssueClaimFields = buildTrackedIssueClaimFields(input.trackedIssue);
+    return await upsertProviderClaimAndPersist({
       ...input.claim,
-      ...buildTrackedIssueClaimFields(input.trackedIssue),
+      ...trackedIssueClaimFields,
+      issue_state: input.mergeCloseout.issue_state ?? trackedIssueClaimFields.issue_state,
+      issue_state_type:
+        input.mergeCloseout.issue_state_type ?? trackedIssueClaimFields.issue_state_type,
+      issue_updated_at:
+        input.mergeCloseout.issue_updated_at ?? trackedIssueClaimFields.issue_updated_at,
       state: resolveProviderMergeCloseoutClaimState(input.mergeCloseout),
       reason: resolveProviderMergeCloseoutClaimReason(input.mergeCloseout),
       task_id: input.latestRun.taskId,
@@ -436,6 +442,21 @@ export function createProviderIssueHandoffService(
       ...clearProviderRetryFields(),
       merge_closeout: input.mergeCloseout
     });
+  };
+
+  const canRetireRecoveredActiveRunWithoutTerminalProof = (input: {
+    claim: ProviderIntakeClaimRecord;
+    latestRun: ProviderIssueRunRecord;
+    mergeCloseout: ProviderMergeCloseoutRecord;
+  }): boolean => {
+    if (input.latestRun.proofTerminalStatus === 'succeeded') {
+      return true;
+    }
+    if (input.claim.reason !== 'provider_issue_rehydrated_active_run') {
+      return true;
+    }
+    return input.mergeCloseout.status === 'merged';
+  };
 
   const maybeHandleRecoveredActiveRunMergedCloseout = async (input: {
     claim: ProviderIntakeClaimRecord;
@@ -492,6 +513,15 @@ export function createProviderIssueHandoffService(
       repoRoot
     });
     if (mergeCloseout.status === 'watching') {
+      return null;
+    }
+    if (
+      !canRetireRecoveredActiveRunWithoutTerminalProof({
+        claim: input.claim,
+        latestRun: input.latestRun,
+        mergeCloseout
+      })
+    ) {
       return null;
     }
     return await persistRecoveredActiveRunMergeCloseout({
