@@ -354,6 +354,8 @@ function normalizePersistedProviderPollingSnapshot(
     next_refresh_state: nextRefresh.state,
     next_refresh_at: nextRefresh.at,
     next_refresh_in_ms: nextRefresh.in_ms,
+    source_updated_at:
+      typeof polling.source_updated_at === 'string' ? polling.source_updated_at : null,
     updated_at: typeof polling.updated_at === 'string' ? polling.updated_at : null,
     operation_started_at:
       typeof polling.operation_started_at === 'string' ? polling.operation_started_at : null,

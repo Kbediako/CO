@@ -876,7 +876,7 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
     renderTokensLine(input.dataset, terminalColumns),
     renderRateLimitsLine(input.dataset, referenceTime, terminalColumns),
     renderProjectLine(input.dataset, terminalColumns),
-    renderNextRefreshLine(input.dataset, terminalColumns),
+    renderNextRefreshLine(input.dataset, liveReferenceTime, terminalColumns),
     colorize('├─ Running', ANSI_BOLD),
     '│',
     renderRunningHeaderRow(runningColumns),
@@ -1040,23 +1040,32 @@ function renderProjectLine(dataset: OperatorDashboardDataset, terminalColumns: n
   );
 }
 
-function renderNextRefreshLine(dataset: OperatorDashboardDataset, terminalColumns: number): string {
+function renderNextRefreshLine(
+  dataset: OperatorDashboardDataset,
+  liveReferenceTime: Date,
+  terminalColumns: number
+): string {
   const nextRefreshText = resolveNextRefreshSummaryText(dataset.polling);
+  const freshnessSegments = buildPollingFreshnessSegments(dataset.polling, liveReferenceTime);
   if (nextRefreshText === 'checking now...') {
     return renderSummaryLine(
       'Next refresh',
-      [{ text: 'checking now...', color: ANSI_CYAN }],
+      [{ text: 'checking now...', color: ANSI_CYAN }, ...freshnessSegments],
       terminalColumns
     );
   }
   if (nextRefreshText) {
     return renderSummaryLine(
       'Next refresh',
-      [{ text: nextRefreshText, color: ANSI_CYAN }],
+      [{ text: nextRefreshText, color: ANSI_CYAN }, ...freshnessSegments],
       terminalColumns
     );
   }
-  return renderSummaryLine('Next refresh', [{ text: 'n/a', color: ANSI_GRAY }], terminalColumns);
+  return renderSummaryLine(
+    'Next refresh',
+    [{ text: 'n/a', color: ANSI_GRAY }, ...freshnessSegments],
+    terminalColumns
+  );
 }
 
 function renderCompactStatusLine(
@@ -1067,12 +1076,14 @@ function renderCompactStatusLine(
 ): string {
   const maxAllowed = resolveMaxAllowedAgents(dataset);
   const nextRefreshText = resolveNextRefreshSummaryText(dataset.polling);
+  const sourceFreshnessText = resolvePollingSourceFreshnessText(dataset.polling, liveReferenceTime);
   const refreshText =
     nextRefreshText === null
       ? 'next n/a'
       : nextRefreshText === 'checking now...'
         ? nextRefreshText
         : `next ${nextRefreshText}`;
+  const freshnessColor = resolvePollingSourceFreshnessColor(dataset.polling, liveReferenceTime);
   return renderSummaryLine(
     'Status',
     [
@@ -1083,7 +1094,13 @@ function renderCompactStatusLine(
       { text: ' | ', color: ANSI_GRAY },
       { text: formatLiveRuntimeSeconds(dataset, referenceTime, liveReferenceTime), color: ANSI_MAGENTA },
       { text: ' | ', color: ANSI_GRAY },
-      { text: refreshText, color: ANSI_CYAN }
+      { text: refreshText, color: ANSI_CYAN },
+      ...(sourceFreshnessText
+        ? [
+            { text: ' | ', color: ANSI_GRAY } satisfies SummarySegment,
+            { text: sourceFreshnessText, color: freshnessColor } satisfies SummarySegment
+          ]
+        : [])
     ],
     terminalColumns
   );
@@ -1133,6 +1150,47 @@ function resolveNextRefreshSummaryText(
     return formatCountdownMs(polling.next_poll_in_ms);
   }
   return null;
+}
+
+function buildPollingFreshnessSegments(
+  polling: OperatorDashboardDataset['polling'],
+  liveReferenceTime: Date
+): SummarySegment[] {
+  const freshnessText = resolvePollingSourceFreshnessText(polling, liveReferenceTime);
+  if (!freshnessText) {
+    return [];
+  }
+  return [
+    { text: ' | ', color: ANSI_GRAY },
+    {
+      text: freshnessText,
+      color: resolvePollingSourceFreshnessColor(polling, liveReferenceTime)
+    }
+  ];
+}
+
+function resolvePollingSourceFreshnessText(
+  polling: OperatorDashboardDataset['polling'],
+  liveReferenceTime: Date
+): string | null {
+  const freshnessAge = formatRelativePast(polling?.source_updated_at ?? null, liveReferenceTime);
+  return freshnessAge === null ? null : `source ${freshnessAge} old`;
+}
+
+function resolvePollingSourceFreshnessColor(
+  polling: OperatorDashboardDataset['polling'],
+  liveReferenceTime: Date
+): string {
+  const sourceUpdatedAtMs = parseTimestamp(polling?.source_updated_at ?? null);
+  const intervalMs =
+    typeof polling?.interval_ms === 'number' && Number.isFinite(polling.interval_ms) && polling.interval_ms > 0
+      ? polling.interval_ms
+      : null;
+  const referenceMs = liveReferenceTime.getTime();
+  if (sourceUpdatedAtMs === null || intervalMs === null || !Number.isFinite(referenceMs)) {
+    return ANSI_GRAY;
+  }
+  return referenceMs - sourceUpdatedAtMs > intervalMs ? ANSI_YELLOW : ANSI_GRAY;
 }
 
 function renderCompactRunningLine(

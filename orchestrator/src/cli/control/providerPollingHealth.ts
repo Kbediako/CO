@@ -21,6 +21,7 @@ export interface ControlPollingHealthPayload {
   next_refresh_state?: ControlNextRefreshState | null;
   next_refresh_at?: string | null;
   next_refresh_in_ms?: number | null;
+  source_updated_at?: string | null;
   updated_at: string | null;
   operation_started_at: string | null;
   operation_elapsed_ms: number | null;
@@ -257,6 +258,10 @@ function buildProviderPollingHealthPayload(
   state: MutableProviderPollingHealthState,
   nowMs: number
 ): ControlPollingHealthPayload {
+  const sourceUpdatedAtMs = latestFiniteTimestampMs(
+    parseIsoToMs(state.linearBudget?.observed_at),
+    state.lastSuccessAtMs
+  );
   const operationElapsedMs =
     state.checking && state.operationStartedAtMs !== null
       ? Math.max(0, nowMs - state.operationStartedAtMs)
@@ -287,6 +292,7 @@ function buildProviderPollingHealthPayload(
     next_refresh_state: nextRefresh.state,
     next_refresh_at: toIsoTimestamp(nextRefresh.atMs),
     next_refresh_in_ms: nextRefresh.inMs,
+    source_updated_at: toIsoTimestamp(sourceUpdatedAtMs),
     updated_at: toIsoTimestamp(state.updatedAtMs),
     operation_started_at: toIsoTimestamp(state.operationStartedAtMs),
     operation_elapsed_ms: operationElapsedMs,
@@ -476,6 +482,14 @@ function parseIsoToMs(value: string | null | undefined): number | null {
   }
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function latestFiniteTimestampMs(...values: Array<number | null | undefined>): number | null {
+  const finiteValues = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  if (finiteValues.length === 0) {
+    return null;
+  }
+  return Math.max(...finiteValues);
 }
 
 function normalizePollingError(error: unknown): string {

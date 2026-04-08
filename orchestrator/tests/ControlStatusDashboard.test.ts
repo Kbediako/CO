@@ -113,7 +113,8 @@ function buildDataset(overrides: Partial<OperatorDashboardDataset> = {}): Operat
       last_error_at: null,
       last_error: null,
       next_poll_at: '2026-03-30T01:15:06.000Z',
-      next_poll_in_ms: 15000
+      next_poll_in_ms: 15000,
+      source_updated_at: '2026-03-30T01:14:51.000Z'
     },
     selected_issue_identifier: 'CO-26',
     selected: null,
@@ -393,7 +394,7 @@ describe('control status dashboard', () => {
       '│ Tokens: in 100 | out 117 | total 217',
       '│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50',
       '│ Project: CO Control and Advisory',
-      '│ Next refresh: 15s',
+      '│ Next refresh: 15s | source 9s old',
       '├─ Running'
     ]);
     expect(plainFrame).toContain('│ Agents: 1/4 max allowed');
@@ -731,8 +732,8 @@ describe('control status dashboard', () => {
 
     expect(fullFrame).toContain('│ Agents: 1/n/a max allowed');
     expect(fullFrame).not.toContain('│ Agents: 1/9 max allowed');
-    expect(compactFrame).toContain('│ Status: 1/n/a max allowed | 15m 12s | next 15s');
-    expect(compactFrame).not.toContain('│ Status: 1/9 max allowed | 15m 12s | next 15s');
+    expect(compactFrame).toContain('│ Status: 1/n/a max allowed | 15m 12s | next 15s | source 9s old');
+    expect(compactFrame).not.toContain('│ Status: 1/9 max allowed | 15m 12s | next 15s | source 9s old');
   });
 
   it('renders compact inspect mode as a short-terminal summary frame', () => {
@@ -758,7 +759,7 @@ describe('control status dashboard', () => {
     const plainFrame = stripAnsi(frame);
     expect(plainFrame).toBe([
       '╭─ CO STATUS',
-      '│ Status: 1/4 max allowed | 15m 12s | next 15s',
+      '│ Status: 1/4 max allowed | 15m 12s | next 15s | source 9s old',
       '│ Tokens: in 100 | out 117 | total 217',
       '│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50',
       '│ Running: CO-26 | running | Terminal dashboard renderer in progress',
@@ -791,7 +792,7 @@ describe('control status dashboard', () => {
       viewMode: 'compact'
     });
 
-    expect(stripAnsi(frame)).toContain('│ Status: 1/4 max allowed | 15m 12s | checking now...');
+    expect(stripAnsi(frame)).toContain('│ Status: 1/4 max allowed | 15m 12s | checking now... | source 9s old');
   });
 
   it('renders cooldown-suppressed next refresh from projected truth instead of raw checking or stale scheduling', () => {
@@ -804,6 +805,7 @@ describe('control status dashboard', () => {
           next_refresh_state: 'cooldown',
           next_refresh_at: '2026-03-30T01:44:32.000Z',
           next_refresh_in_ms: (29 * 60 + 32) * 1000,
+          source_updated_at: '2026-03-30T01:15:00.000Z',
           linear_budget: {
             observed_at: '2026-03-30T01:15:00.000Z',
             source: 'control-host-polling',
@@ -834,7 +836,7 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Next refresh: 29m 32s');
+    expect(plainFrame).toContain('│ Next refresh: 29m 32s | source 0s old');
     expect(plainFrame).not.toContain('│ Next refresh: checking now...');
     expect(plainFrame).not.toContain('│ Next refresh: 58m 11s');
   });
@@ -848,7 +850,8 @@ describe('control status dashboard', () => {
           next_poll_in_ms: (58 * 60 + 11) * 1000,
           next_refresh_state: 'cooldown',
           next_refresh_at: '2026-03-30T01:44:32.000Z',
-          next_refresh_in_ms: null
+          next_refresh_in_ms: null,
+          source_updated_at: '2026-03-30T01:15:00.000Z'
         }
       }),
       baseUrl: 'http://127.0.0.1:4100',
@@ -861,7 +864,7 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Next refresh: n/a');
+    expect(plainFrame).toContain('│ Next refresh: n/a | source 0s old');
     expect(plainFrame).not.toContain('│ Next refresh: checking now...');
     expect(plainFrame).not.toContain('│ Next refresh: 58m 11s');
   });

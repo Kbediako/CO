@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260408-linear-bb472787-be60-44e3-ac83-a3c297dab470",
+      "title": "CO STATUS: tighten post-CO-107 live EVENT truth and operator telemetry freshness",
+      "relates_to": "tasks/tasks-linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-08",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-08",
+          "manifest": ".runs/linear-bb472787-be60-44e3-ac83-a3c297dab470-co-109-docs-review/cli/2026-04-08T09-38-27-493Z-da4100bc/manifest.json",
+          "override_reason": "The audited docs-review child stream passed spec-guard and docs:check after the repo-supported docs/TASKS archive fallback returned the snapshot file to 450 lines, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The CO-109 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the manifest-backed run is recorded as a truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
+        "task": "tasks/tasks-linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
+        "agent_task": ".agent/task/linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
+        "docs": "docs/TECH_SPEC-linear-bb472787-be60-44e3-ac83-a3c297dab470.md"
+      }
+    },
+    {
       "id": "20260408-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd",
       "title": "CO: Make ordinary eligible provider-worker issues actually leverage parent-owned same-issue child-lane parallelisation",
       "relates_to": "tasks/tasks-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md",

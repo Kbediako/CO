@@ -3801,6 +3801,7 @@ describe('ControlRuntime', () => {
           queued: false,
           last_mode: 'refresh',
           last_requested_at: '2026-03-07T00:00:00.000Z',
+          source_updated_at: '2026-03-07T00:00:30.000Z',
           updated_at: '2026-03-07T00:00:45.000Z',
           operation_started_at: '2026-03-07T00:00:00.000Z',
           operation_elapsed_ms: 45000,
@@ -3822,6 +3823,7 @@ describe('ControlRuntime', () => {
       stuck: true,
       restart_required: true,
       reason: 'provider_refresh_lifecycle_stuck',
+      source_updated_at: '2026-03-07T00:00:30.000Z',
       updated_at: '2026-03-07T00:00:45.000Z'
     });
   });
