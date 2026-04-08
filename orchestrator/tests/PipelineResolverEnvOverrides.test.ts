@@ -302,7 +302,7 @@ describe('PipelineResolver env overrides', () => {
     expect(docsRelevanceEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(docsRelevanceEnv.FORCE_CODEX_REVIEW).toBe('');
     expect(providerWorkerStage?.command).toBe(
-      '"${CODEX_ORCHESTRATOR_NODE_BIN:-node}" "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js"'
+      'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js"'
     );
     expect(providerWorkerEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(providerWorkerEnv.FORCE_CODEX_REVIEW).toBe('1');

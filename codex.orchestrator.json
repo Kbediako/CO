@@ -283,7 +283,7 @@
           "kind": "command",
           "id": "provider-linear-worker",
           "title": "Run provider linear worker",
-          "command": "\"${CODEX_ORCHESTRATOR_NODE_BIN:-node}\" \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js\"",
+          "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js\"",
           "env": {
             "CODEX_REVIEW_NON_INTERACTIVE": "1",
             "FORCE_CODEX_REVIEW": "1"
