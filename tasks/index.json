@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260409-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827",
+      "title": "Reduce practical Linear request-bucket exhaustion under low-headroom single-issue operation",
+      "relates_to": "tasks/tasks-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827-docs-review-rerun/cli/2026-04-08T14-52-46-037Z-dc982d9a/manifest.json",
+          "override_reason": "The first audited docs-review child stream failed only because docs/TASKS.md exceeded the 450-line budget; after the repo-supported docs:archive-tasks fallback archived one historical snapshot and restored docs/TASKS.md to 450 lines, the rerun passed spec-guard and docs:check, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The CO-110 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the rerun is recorded as a truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md",
+        "task": "tasks/tasks-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md",
+        "agent_task": ".agent/task/linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md",
+        "docs": "docs/TECH_SPEC-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md"
+      }
+    },
+    {
       "id": "20260408-linear-bb472787-be60-44e3-ac83-a3c297dab470",
       "title": "CO STATUS: tighten post-CO-107 live EVENT truth and operator telemetry freshness",
       "relates_to": "tasks/tasks-linear-bb472787-be60-44e3-ac83-a3c297dab470.md",

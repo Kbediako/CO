@@ -14,7 +14,9 @@ import {
   recordLinearBudgetRateLimitObservation,
   readSharedLinearBudgetStatus,
   reserveLinearBudgetReservation,
-  resolveLinearBudgetPreflight
+  resolveLinearBudgetPreflight,
+  resolveLinearPollingInterval,
+  type LinearBudgetStatus
 } from './linearBudgetState.js';
 import { mapLinearRateLimitedFailure } from './linearRateLimit.js';
 import { resolveLinearSourceSetup } from './linearDispatchSource.js';
@@ -233,6 +235,8 @@ const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
 const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
 const PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS = 10_000;
+const PROVIDER_LINEAR_LOW_HEADROOM_READ_CACHE_MAX_AGE_MS = 60_000;
+const PROVIDER_LINEAR_LOW_HEADROOM_READ_DETECTION_INTERVAL_MS = 15_000;
 const LOCAL_IMAGE_CONTENT_TYPE_BY_EXTENSION = new Map<string, string>([
   ['.png', 'image/png'],
   ['.jpg', 'image/jpeg'],
@@ -761,13 +765,25 @@ export async function getProviderLinearIssueContext(input: {
     return failureFromWorkflowError('issue-context', session.error);
   }
 
-  const budgetError = await preflightProviderLinearBudget({
-    session: session.session,
-    operation: 'issue-context',
-    minimumRequestsRemaining: 1
+  const cachedRecord = await readCachedIssueContextRecord(input.env, issueId, session.session.sourceSetup);
+  const budget = await readSharedLinearBudgetStatus(session.session.env, {
+    operation: 'provider-linear:issue-context'
+  }).catch(() => null);
+  const preflight = resolveLinearBudgetPreflight({
+    budget,
+    operation: 'provider-linear:issue-context',
+    minimum_requests_remaining: 1
   });
-  if (budgetError) {
-    return failureFromWorkflowError('issue-context', budgetError);
+  if (!preflight.ok) {
+    return failureFromWorkflowError('issue-context', preflight.error);
+  }
+  if (cachedRecord && shouldReuseCachedIssueContextForRead(cachedRecord, budget)) {
+    return {
+      ok: true,
+      operation: 'issue-context',
+      issue: cachedRecord.issue,
+      source_setup: session.session.sourceSetup
+    };
   }
 
   const context = await readIssueContext(session.session, 'issue-context', issueId);
@@ -2893,13 +2909,36 @@ async function readCachedIssueContextRecord(
   }
 }
 
-function isIssueContextCacheRecordFresh(record: ProviderLinearIssueContextCacheRecord): boolean {
+function isIssueContextCacheRecordFresh(
+  record: ProviderLinearIssueContextCacheRecord,
+  maxAgeMs: number = PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS
+): boolean {
   const recordedAt = Date.parse(record.recorded_at);
   if (!Number.isFinite(recordedAt)) {
     return false;
   }
   const ageMs = Date.now() - recordedAt;
-  return ageMs >= 0 && ageMs <= PROVIDER_LINEAR_DIRECT_MUTATION_CACHE_MAX_AGE_MS;
+  return ageMs >= 0 && ageMs <= maxAgeMs;
+}
+
+function shouldReuseCachedIssueContextForRead(
+  record: ProviderLinearIssueContextCacheRecord,
+  budget: LinearBudgetStatus | null
+): boolean {
+  if (!budget || budget.cooldown_active) {
+    return false;
+  }
+  const requestPressure = resolveLinearPollingInterval({
+    budget,
+    default_interval_ms: PROVIDER_LINEAR_LOW_HEADROOM_READ_DETECTION_INTERVAL_MS
+  });
+  if (
+    !requestPressure.reason?.startsWith('linear_budget_requests_') &&
+    !requestPressure.reason?.startsWith('linear_budget_endpoint_requests_')
+  ) {
+    return false;
+  }
+  return isIssueContextCacheRecordFresh(record, PROVIDER_LINEAR_LOW_HEADROOM_READ_CACHE_MAX_AGE_MS);
 }
 
 async function writeCachedIssueContextRecord(

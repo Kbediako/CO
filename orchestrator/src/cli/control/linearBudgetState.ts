@@ -19,6 +19,10 @@ const LINEAR_BUDGET_DEFAULT_CONSTRAINED_POLL_INTERVAL_MS = 30_000;
 const LINEAR_BUDGET_DEFAULT_LOW_POLL_INTERVAL_MS = 60_000;
 const LINEAR_BUDGET_DEFAULT_ENDPOINT_CONSTRAINED_POLL_INTERVAL_MS = 45_000;
 const LINEAR_BUDGET_DEFAULT_ENDPOINT_LOW_POLL_INTERVAL_MS = 90_000;
+const LINEAR_BUDGET_REQUEST_HEADROOM_RESERVE_RATIO = 0.01;
+const LINEAR_BUDGET_REQUEST_HEADROOM_RESERVE_MAX = 50;
+const LINEAR_BUDGET_ENDPOINT_REQUEST_HEADROOM_RESERVE_RATIO = 0.05;
+const LINEAR_BUDGET_ENDPOINT_REQUEST_HEADROOM_RESERVE_MAX = 5;
 const LINEAR_BUDGET_UNKNOWN_RESET_EXHAUSTED_GRACE_MS = LINEAR_BUDGET_DEFAULT_LOW_POLL_INTERVAL_MS;
 const LINEAR_BUDGET_LOCK_RETRY: LockRetryOptions = {
   maxAttempts: 25,
@@ -565,7 +569,28 @@ export function resolveLinearPollingInterval(input: {
   }
 
   const pressure = resolveMaterializedBudgetPressure(budget);
+  const requestHeadroomGuard = resolveRequestPollingHeadroomGuard({
+    budget,
+    defaultIntervalMs: input.default_interval_ms,
+    nowMs
+  });
   if (pressure.suppression === 'none') {
+    if (requestHeadroomGuard) {
+      const intervalMs = applyDeterministicPositiveJitter(
+        requestHeadroomGuard.interval_ms,
+        `${requestHeadroomGuard.reason}|${budget.selected_endpoint_key ?? 'global'}|${budget.observed_at}`,
+        nowMs
+      );
+      return {
+        interval_ms: intervalMs,
+        reason: requestHeadroomGuard.reason,
+        linear_budget: {
+          ...budget,
+          suppression: requestHeadroomGuard.suppression,
+          suppression_reason: requestHeadroomGuard.reason
+        }
+      };
+    }
     return {
       interval_ms: input.default_interval_ms,
       reason: null,
@@ -589,19 +614,26 @@ export function resolveLinearPollingInterval(input: {
         : LINEAR_BUDGET_DEFAULT_LOW_POLL_INTERVAL_MS
     );
   }
+  let reason = pressure.reason;
+  let suppression = pressure.suppression;
+  if (requestHeadroomGuard && requestHeadroomGuard.interval_ms > baseIntervalMs) {
+    baseIntervalMs = requestHeadroomGuard.interval_ms;
+    reason = requestHeadroomGuard.reason;
+    suppression = requestHeadroomGuard.suppression;
+  }
 
   const intervalMs = applyDeterministicPositiveJitter(
     baseIntervalMs,
-    `${pressure.reason ?? 'linear_budget'}|${budget.selected_endpoint_key ?? 'global'}|${budget.observed_at}`,
+    `${reason ?? 'linear_budget'}|${budget.selected_endpoint_key ?? 'global'}|${budget.observed_at}`,
     nowMs
   );
   return {
     interval_ms: intervalMs,
-    reason: pressure.reason,
+    reason,
     linear_budget: {
       ...budget,
-      suppression: pressure.suppression,
-      suppression_reason: pressure.reason
+      suppression,
+      suppression_reason: reason
     }
   };
 }
@@ -1250,6 +1282,110 @@ function resolveBucketPressure(
   }
 
   return { rank: 0, suppression: 'none', reason: null, endpoint_specific: endpointSpecific };
+}
+
+function resolveRequestPollingHeadroomGuard(input: {
+  budget: LinearBudgetStatus;
+  defaultIntervalMs: number;
+  nowMs: number;
+}):
+  | {
+      interval_ms: number;
+      suppression: Exclude<LinearBudgetSuppression, 'none' | 'exhausted' | 'cooldown'>;
+      reason: string;
+      endpoint_specific: boolean;
+    }
+  | null {
+  let selected:
+    | {
+        interval_ms: number;
+        suppression: Exclude<LinearBudgetSuppression, 'none' | 'exhausted' | 'cooldown'>;
+        reason: string;
+        endpoint_specific: boolean;
+      }
+    | null = null;
+  for (const candidate of [
+    resolveRequestBucketPollingHeadroomGuard({
+      bucket: input.budget.requests,
+      bucketKey: 'requests',
+      endpointSpecific: false,
+      defaultIntervalMs: input.defaultIntervalMs,
+      nowMs: input.nowMs
+    }),
+    resolveRequestBucketPollingHeadroomGuard({
+      bucket: input.budget.endpoint_requests,
+      bucketKey: 'endpoint_requests',
+      endpointSpecific: true,
+      defaultIntervalMs: input.defaultIntervalMs,
+      nowMs: input.nowMs
+    })
+  ]) {
+    if (!candidate) {
+      continue;
+    }
+    if (!selected || candidate.interval_ms > selected.interval_ms) {
+      selected = candidate;
+    }
+  }
+  return selected;
+}
+
+function resolveRequestBucketPollingHeadroomGuard(input: {
+  bucket: LinearBudgetBucketPayload | null;
+  bucketKey: 'requests' | 'endpoint_requests';
+  endpointSpecific: boolean;
+  defaultIntervalMs: number;
+  nowMs: number;
+}):
+  | {
+      interval_ms: number;
+      suppression: Exclude<LinearBudgetSuppression, 'none' | 'exhausted' | 'cooldown'>;
+      reason: string;
+      endpoint_specific: boolean;
+    }
+  | null {
+  const bucket = input.bucket;
+  if (!bucket || bucket.remaining === null || bucket.remaining <= 0) {
+    return null;
+  }
+  const resetAtMs = parseIsoToMs(bucket.reset_at);
+  if (resetAtMs === null || resetAtMs <= input.nowMs) {
+    return null;
+  }
+
+  const reserve = resolveRequestPollingHeadroomReserve(bucket.limit, input.endpointSpecific);
+  const usableRemaining = Math.max(1, bucket.remaining - reserve);
+
+  const intervalFloorMs = Math.ceil((resetAtMs - input.nowMs) / usableRemaining);
+  if (!Number.isFinite(intervalFloorMs) || intervalFloorMs <= input.defaultIntervalMs) {
+    return null;
+  }
+
+  const lowIntervalMs = input.endpointSpecific
+    ? LINEAR_BUDGET_DEFAULT_ENDPOINT_LOW_POLL_INTERVAL_MS
+    : LINEAR_BUDGET_DEFAULT_LOW_POLL_INTERVAL_MS;
+  return {
+    interval_ms: intervalFloorMs,
+    suppression: intervalFloorMs >= lowIntervalMs ? 'low' : 'constrained',
+    reason: `linear_budget_${input.bucketKey}_reset_headroom`,
+    endpoint_specific: input.endpointSpecific
+  };
+}
+
+function resolveRequestPollingHeadroomReserve(
+  limit: number | null,
+  endpointSpecific: boolean
+): number {
+  if (limit === null || limit <= 0) {
+    return 1;
+  }
+  const ratio = endpointSpecific
+    ? LINEAR_BUDGET_ENDPOINT_REQUEST_HEADROOM_RESERVE_RATIO
+    : LINEAR_BUDGET_REQUEST_HEADROOM_RESERVE_RATIO;
+  const maxReserve = endpointSpecific
+    ? LINEAR_BUDGET_ENDPOINT_REQUEST_HEADROOM_RESERVE_MAX
+    : LINEAR_BUDGET_REQUEST_HEADROOM_RESERVE_MAX;
+  return Math.max(1, Math.min(maxReserve, Math.floor(limit * ratio)));
 }
 
 function inferOperationComplexityFloor(

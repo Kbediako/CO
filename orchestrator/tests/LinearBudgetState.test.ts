@@ -1083,10 +1083,147 @@ describe('linearBudgetState', () => {
     });
   });
 
+  it('keeps request exhaustion distinct when complexity headroom remains high', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
+    tempDirs.push(codexHome);
+    const env = createEnv(codexHome);
+    const resetAt = String(Date.now() + 60_000);
+
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '5000',
+        'x-ratelimit-requests-remaining': '0',
+        'x-ratelimit-requests-reset': resetAt,
+        'x-ratelimit-complexity-limit': '3000000',
+        'x-ratelimit-complexity-remaining': '2999592',
+        'x-ratelimit-complexity-reset': resetAt
+      }
+    });
+
+    const budget = await readSharedLinearBudgetStatus(env);
+    const preflight = resolveLinearBudgetPreflight({
+      budget,
+      operation: 'provider-linear:issue-context',
+      minimum_requests_remaining: 1
+    });
+
+    expect(preflight.ok).toBe(false);
+    expect(preflight.ok ? null : preflight.error).toMatchObject({
+      status: 429,
+      details: {
+        shared_budget_cooldown_active: true,
+        requests_remaining: 0,
+        complexity_remaining: 2999592
+      }
+    });
+    expect(preflight.ok ? null : preflight.error.message).not.toContain('complexity budget is insufficient');
+  });
+
+  it('stretches polling before static low thresholds when request headroom is running out before reset', () => {
+    const schedule = resolveLinearPollingInterval({
+      budget: {
+        observed_at: '2026-04-08T00:00:00.000Z',
+        source: 'dispatch_source_tracked_issues',
+        request_id: 'req-reset-headroom',
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        suppression: 'none',
+        suppression_reason: null,
+        scope_kind: 'user',
+        scope_key: 'viewer-scope',
+        viewer_id: 'viewer-1',
+        workspace_id: 'workspace-1',
+        token_fingerprints: [],
+        requests: {
+          limit: 5000,
+          remaining: 100,
+          reset_at: '2026-04-08T01:00:00.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          limit: 3000000,
+          remaining: 2999592,
+          reset_at: '2026-04-08T01:00:00.000Z'
+        },
+        endpoint_complexity: null,
+        endpoint_name: null,
+        selected_endpoint_key: 'source:dispatch-source-tracked-issues',
+        request_complexity: 207,
+        endpoints: {},
+        reservations: [],
+        reservations_active: 0
+      },
+      default_interval_ms: 15_000,
+      nowMs: Date.parse('2026-04-08T00:00:00.000Z'),
+      operation: 'dispatch_source_tracked_issues'
+    });
+
+    expect(schedule.reason).toBe('linear_budget_requests_reset_headroom');
+    expect(schedule.linear_budget).toMatchObject({
+      suppression: 'low',
+      suppression_reason: 'linear_budget_requests_reset_headroom'
+    });
+    expect(schedule.interval_ms).toBeGreaterThanOrEqual(72_000);
+    expect(schedule.interval_ms).toBeLessThanOrEqual(80_000);
+  });
+
+  it('keeps reset-aware slowdown active after remaining requests fall inside the reserve window', () => {
+    const schedule = resolveLinearPollingInterval({
+      budget: {
+        observed_at: '2026-04-08T00:00:00.000Z',
+        source: 'dispatch_source_tracked_issues',
+        request_id: 'req-reset-reserve-floor',
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        suppression: 'constrained',
+        suppression_reason: 'linear_budget_requests_constrained',
+        scope_kind: 'user',
+        scope_key: 'viewer-scope',
+        viewer_id: 'viewer-1',
+        workspace_id: 'workspace-1',
+        token_fingerprints: [],
+        requests: {
+          limit: 5000,
+          remaining: 49,
+          reset_at: '2026-04-08T01:00:00.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          limit: 3000000,
+          remaining: 2999592,
+          reset_at: '2026-04-08T01:00:00.000Z'
+        },
+        endpoint_complexity: null,
+        endpoint_name: null,
+        selected_endpoint_key: 'source:dispatch-source-tracked-issues',
+        request_complexity: 207,
+        endpoints: {},
+        reservations: [],
+        reservations_active: 0
+      },
+      default_interval_ms: 15_000,
+      nowMs: Date.parse('2026-04-08T00:00:00.000Z'),
+      operation: 'dispatch_source_tracked_issues'
+    });
+
+    expect(schedule.reason).toBe('linear_budget_requests_reset_headroom');
+    expect(schedule.linear_budget).toMatchObject({
+      suppression: 'low',
+      suppression_reason: 'linear_budget_requests_reset_headroom'
+    });
+    expect(schedule.interval_ms).toBeGreaterThanOrEqual(3_600_000);
+    expect(schedule.interval_ms).toBeLessThanOrEqual(3_960_000);
+  });
+
   it('stretches control-host polling when the shared budget is low but not yet exhausted', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
     const env = createEnv(codexHome);
+    const nowMs = Date.now();
 
     await recordLinearBudgetHeadersObservation({
       env,
@@ -1094,7 +1231,7 @@ describe('linearBudgetState', () => {
       headers: {
         'x-ratelimit-requests-limit': '100',
         'x-ratelimit-requests-remaining': '1',
-        'x-ratelimit-requests-reset': String(Date.now() + 60_000)
+        'x-ratelimit-requests-reset': String(nowMs + 60_000)
       }
     });
 
@@ -1102,12 +1239,13 @@ describe('linearBudgetState', () => {
     const schedule = resolveLinearPollingInterval({
       budget,
       default_interval_ms: 15_000,
-      nowMs: 1_700_000_000_000
+      nowMs
     });
 
     expect(schedule.reason).toBe('linear_budget_requests_low');
     expect(schedule.linear_budget).toMatchObject({
       suppression: 'low',
+      suppression_reason: 'linear_budget_requests_low',
       cooldown_active: false
     });
     expect(schedule.interval_ms).toBeGreaterThanOrEqual(60_000);
@@ -1167,6 +1305,7 @@ describe('linearBudgetState', () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
     const env = createEnv(codexHome);
+    const nowMs = Date.now();
 
     await recordLinearBudgetHeadersObservation({
       env,
@@ -1175,7 +1314,7 @@ describe('linearBudgetState', () => {
         'x-ratelimit-endpoint-name': 'TrackedIssues',
         'x-ratelimit-endpoint-requests-limit': '100',
         'x-ratelimit-endpoint-requests-remaining': '1',
-        'x-ratelimit-endpoint-requests-reset': String(Date.now() + 60_000)
+        'x-ratelimit-endpoint-requests-reset': String(nowMs + 60_000)
       }
     });
 
@@ -1185,7 +1324,7 @@ describe('linearBudgetState', () => {
     const schedule = resolveLinearPollingInterval({
       budget,
       default_interval_ms: 15_000,
-      nowMs: 1_700_000_000_000,
+      nowMs,
       operation: 'dispatch_source_tracked_issues'
     });
 
