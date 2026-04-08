@@ -95,6 +95,15 @@ describe('rlmRunner config parsing', () => {
     sandboxes.push(sandbox);
     const contextDir = join(sandbox, '.runs', 'task-1', 'cli', 'run-1', 'memory', 'source-0');
     await mkdir(contextDir, { recursive: true });
+    await writeFile(
+      join(contextDir, 'index.json'),
+      JSON.stringify({
+        object_id: 'sha256:source0',
+        source: { byte_length: 4096 }
+      }),
+      'utf8'
+    );
+    await writeFile(join(contextDir, 'source.txt'), 'source 0 payload', 'utf8');
     const manifestPath = join(sandbox, '.runs', 'task-1', 'cli', 'run-1', 'manifest.json');
     await writeFile(
       manifestPath,
@@ -137,6 +146,55 @@ describe('rlmRunner config parsing', () => {
       source: { type: 'dir', value: contextDir },
       bytes: 4096,
       explicit: true
+    });
+  });
+
+  it('falls back to goal text when manifest source_0 artifacts are missing', async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), 'rlm-runner-source0-missing-'));
+    sandboxes.push(sandbox);
+    const manifestDir = join(sandbox, '.runs', 'task-1', 'cli', 'run-1');
+    await mkdir(manifestDir, { recursive: true });
+    await writeFile(
+      join(manifestDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-1',
+        memory: {
+          source_0: {
+            schema_version: 1,
+            kind: 'context_object',
+            object_id: 'sha256:source0',
+            pointer: 'ctx:sha256:source0#chunk:c000001',
+            dir_path: '.runs/task-1/cli/run-1/memory/source-0',
+            index_path: '.runs/task-1/cli/run-1/memory/source-0/index.json',
+            source_path: '.runs/task-1/cli/run-1/memory/source-0/source.txt',
+            byte_length: 4096,
+            chunk_count: 1,
+            created_at: '2026-04-01T00:00:00.000Z',
+            origin: {
+              run_id: 'run-1',
+              task_id: 'task-1',
+              manifest_path: '.runs/task-1/cli/run-1/manifest.json'
+            },
+            inherited_from: null
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    const resolved = await resolveContextSource(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: '.runs/task-1/cli/run-1/manifest.json'
+      } as NodeJS.ProcessEnv,
+      sandbox,
+      'fallback goal text'
+    );
+
+    expect(resolved).toEqual({
+      source: { type: 'text', value: 'fallback goal text' },
+      bytes: Buffer.byteLength('fallback goal text', 'utf8'),
+      explicit: false
     });
   });
 });

@@ -296,12 +296,12 @@ export async function readRunSource0Payload(
   return parsed as unknown as RunSource0Payload;
 }
 
-async function canReuseInheritedSource0(
+export async function hasRunSource0Artifacts(
   repoRoot: string,
   descriptor: RunSource0Descriptor
 ): Promise<boolean> {
-  const paths = resolveRunSource0Paths(repoRoot, descriptor);
   try {
+    const paths = resolveRunSource0Paths(repoRoot, descriptor);
     const [dirInfo, indexInfo, sourceInfo] = await Promise.all([
       stat(paths.dirPath),
       stat(paths.indexPath),
@@ -400,7 +400,7 @@ export async function materializeRunSource0(params: {
 
   if (
     inheritedDescriptor &&
-    (await canReuseInheritedSource0(params.env.repoRoot, inheritedDescriptor))
+    (await hasRunSource0Artifacts(params.env.repoRoot, inheritedDescriptor))
   ) {
     const inheritedPaths = resolveRunSource0Paths(params.env.repoRoot, inheritedDescriptor);
     const contextObject = await buildContextObject({

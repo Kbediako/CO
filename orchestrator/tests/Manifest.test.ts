@@ -196,6 +196,23 @@ describe('bootstrapManifest', () => {
         task_id: 'task-parent',
         manifest_path: join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
       });
+
+      const childPayload = childSource0
+        ? await readRunSource0Payload(repoRoot, childSource0)
+        : null;
+      const childIndex = childSource0
+        ? (JSON.parse(await readFile(join(repoRoot, childSource0.index_path), 'utf8')) as {
+            object_id?: string;
+            source?: { byte_length?: number };
+          })
+        : null;
+      expect(childPayload?.kind).toBe('run_source_0');
+      expect(childPayload?.run_contract.run_id).toBe('run-parent');
+      expect(childPayload?.artifacts.manifest_path).toBe(
+        join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
+      );
+      expect(childIndex?.object_id).toBe(parentSource0?.object_id);
+      expect(childIndex?.source?.byte_length).toBe(parentSource0?.byte_length);
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }

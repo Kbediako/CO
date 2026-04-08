@@ -57,7 +57,7 @@ async function makeCloseoutBundle(
   return bundleDir;
 }
 
-function buildSource0Descriptor() {
+function buildSource0Descriptor(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     schema_version: 1,
     kind: 'context_object',
@@ -74,7 +74,8 @@ function buildSource0Descriptor() {
       task_id: 'sample-task',
       manifest_path: '.runs/sample-task/cli/sample-run/manifest.json'
     },
-    inherited_from: null
+    inherited_from: null,
+    ...overrides
   };
 }
 
@@ -175,7 +176,13 @@ describe('review-prompt-context', () => {
         run_id: 'sample-run',
         task_id: 'sample-task',
         memory: {
-          source_0: buildSource0Descriptor()
+          source_0: buildSource0Descriptor({
+            inherited_from: {
+              run_id: 'parent-run',
+              task_id: 'parent-task',
+              manifest_path: '.runs/parent-task/cli/parent-run/manifest.json'
+            }
+          })
         }
       }),
       'utf8'
@@ -196,5 +203,11 @@ describe('review-prompt-context', () => {
     expect(result.promptLines).toContain('Shared source 0 anchor:');
     expect(result.promptLines).toContain('- Pointer: `ctx:sha256:source0#chunk:c000001`');
     expect(result.promptLines).toContain('- Source payload: `.runs/sample-task/cli/sample-run/memory/source-0/source.txt`');
+    expect(result.promptLines).toContain(
+      '- Origin: run=`sample-run`, task=`sample-task`, manifest=`.runs/sample-task/cli/sample-run/manifest.json`'
+    );
+    expect(result.promptLines).toContain(
+      '- Inherited from: run=`parent-run`, task=`parent-task`, manifest=`.runs/parent-task/cli/parent-run/manifest.json`'
+    );
   });
 });

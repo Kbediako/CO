@@ -183,6 +183,7 @@ describe('buildCloudPrompt experience injection', () => {
     });
     expect(prompt).not.toContain('Relevant prior experiences');
     expect(prompt).not.toContain('Domain:');
+    expect(prompt).not.toContain('Shared source 0 anchor:');
   });
   it('caps experience snippets at three entries', () => {
     const prompt = invokeBuildCloudPrompt({

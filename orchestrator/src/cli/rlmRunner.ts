@@ -11,7 +11,11 @@ import { detectValidator } from './rlm/validator.js';
 import { buildRlmPrompt } from './rlm/prompt.js';
 import { runRlmLoop } from './rlm/runner.js';
 import { buildContextObject, ContextStore, type ContextSource } from './rlm/context.js';
-import { readRunSource0Descriptor, resolveRunSource0Paths } from './run/source0.js';
+import {
+  hasRunSource0Artifacts,
+  readRunSource0Descriptor,
+  resolveRunSource0Paths
+} from './run/source0.js';
 import { runSymbolicLoop, type SymbolicBudgets } from './rlm/symbolic.js';
 import {
   COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL,
@@ -353,7 +357,7 @@ async function resolveContextSource(
     const rawManifestPath = resolve(repoRoot, manifestPath);
     const rawManifest = JSON.parse(await readFile(rawManifestPath, 'utf8')) as Record<string, unknown>;
     const descriptor = readRunSource0Descriptor(rawManifest);
-    if (descriptor) {
+    if (descriptor && (await hasRunSource0Artifacts(repoRoot, descriptor))) {
       return {
         source: { type: 'dir', value: resolveRunSource0Paths(repoRoot, descriptor).dirPath },
         bytes: descriptor.byte_length,
