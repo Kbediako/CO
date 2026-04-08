@@ -12900,6 +12900,174 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('preserves a recovered merged claim during rehydrate when tracked issue refresh is stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-merge-closeout-stale-rehydrate'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-merge-closeout-stale-rehydrate');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-merge-closeout-stale-rehydrate',
+        task_id: 'task-1303-merge-closeout-stale-rehydrate',
+        status: 'in_progress',
+        summary: 'worker still appears live',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:25:00.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-merge-closeout-stale-rehydrate',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:30:40.000Z',
+      last_delivery_id: 'delivery-merge-closeout-stale-rehydrate',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-merge-closeout-stale-rehydrate',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-03-19T04:30:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        status: 'merged',
+        reason: 'merged_and_shared_root_reconciled_transition_deferred',
+        summary:
+          'Attached PR #357 was already merged and the shared root is reconciled; local merge closeout is authoritative while the Linear Done transition is deferred by shared-budget cooldown.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/357'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/357',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 357
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:30:30.000Z',
+          merged_at: '2026-03-19T04:30:30.000Z',
+          head_oid: 'abc123'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-03-19T04:30:20.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-03-19T04:30:25.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:30:30.000Z',
+          error: 'linear_rate_limited: Linear shared budget cooldown is active.'
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => {
+      throw new Error('runMergeCloseout should not rerun for a stale rehydrate refresh.');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:30:29.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z'
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z'
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred'
+    });
+  });
+
   it.each([
     ['starting', 'provider_issue_start_launched'],
     ['resuming', 'provider_issue_resume_launched']
@@ -15688,6 +15856,176 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
       status: 'watching',
       reason: 'checks_pending'
+    });
+  });
+
+  it('preserves a recovered merged claim during refresh when the poll snapshot is stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-stale-refresh-merged'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-stale-refresh-merged');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stale-refresh-merged',
+        task_id: 'task-1303-stale-refresh-merged',
+        status: 'in_progress',
+        summary: 'worker resumed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        updated_at: '2026-03-19T04:31:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-stale-refresh-merged',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-stale-refresh-merged',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-stale-refresh-merged',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-03-19T04:30:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:30:30.000Z',
+        status: 'merged',
+        reason: 'merged_and_shared_root_reconciled_transition_deferred',
+        summary:
+          'Attached PR #357 was already merged and the shared root is reconciled; local merge closeout is authoritative while the Linear Done transition is deferred by shared-budget cooldown.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/357'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/357',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 357
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:30:30.000Z',
+          merged_at: '2026-03-19T04:30:30.000Z',
+          head_oid: 'abc123'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-03-19T04:30:20.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-03-19T04:30:25.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-19T04:30:30.000Z',
+          error: 'linear_rate_limited: Linear shared budget cooldown is active.'
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => {
+      throw new Error('runMergeCloseout should not be called for a stale refresh snapshot.');
+    });
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:30:29.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    const expectedClaim = {
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:30:30.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-1303-stale-refresh-merged',
+      run_id: 'run-stale-refresh-merged',
+      run_manifest_path: childPaths.manifestPath
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred'
     });
   });
 

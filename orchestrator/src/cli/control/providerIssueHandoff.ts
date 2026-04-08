@@ -1078,12 +1078,13 @@ export function createProviderIssueHandoffService(
 
       const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
-        const preserveMergeCloseoutWatchingClaim = isProviderMergeCloseoutWatchingClaim(claim);
+        const preserveMergeCloseoutClaim =
+          isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
         const freshTrackedIssue = input?.refreshTrackedIssueMetadata
           ? await resolveFreshTrackedIssueForActiveClaim(claim)
           : { trackedIssue: null, claimFields: {} };
         const mergeTrackedIssue = freshTrackedIssue.trackedIssue;
-        if (preserveMergeCloseoutWatchingClaim && !mergeTrackedIssue) {
+        if (preserveMergeCloseoutClaim && !mergeTrackedIssue) {
           hasPendingClaims = true;
           continue;
         }
@@ -2346,14 +2347,21 @@ export function createProviderIssueHandoffService(
 
           if (resolution.kind === 'owned') {
             if (activeRun) {
-              const preserveMergeCloseoutWatchingClaim =
-                isProviderMergeCloseoutWatchingClaim(claim) &&
-                !isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue);
-              if (preserveMergeCloseoutWatchingClaim) {
+              const trackedIssueFreshEnoughForClaim = isTrackedIssueFreshEnoughForClaim(
+                claim,
+                resolution.trackedIssue
+              );
+              const preserveRecoveredMergeCloseoutClaim =
+                !trackedIssueFreshEnoughForClaim &&
+                (
+                  isProviderMergeCloseoutWatchingClaim(claim) ||
+                  isTerminalProviderMergeCloseoutClaim(claim)
+                );
+              if (preserveRecoveredMergeCloseoutClaim) {
                 noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
                 continue;
               }
-              if (isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue)) {
+              if (trackedIssueFreshEnoughForClaim) {
                 const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
                   claim,
                   trackedIssue: resolution.trackedIssue,
@@ -2437,14 +2445,21 @@ export function createProviderIssueHandoffService(
           }
 
           if (activeRun) {
-            const preserveMergeCloseoutWatchingClaim =
-              isProviderMergeCloseoutWatchingClaim(claim) &&
-              !isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue);
-            if (preserveMergeCloseoutWatchingClaim) {
+            const trackedIssueFreshEnoughForClaim = isTrackedIssueFreshEnoughForClaim(
+              claim,
+              resolution.trackedIssue
+            );
+            const preserveRecoveredMergeCloseoutClaim =
+              !trackedIssueFreshEnoughForClaim &&
+              (
+                isProviderMergeCloseoutWatchingClaim(claim) ||
+                isTerminalProviderMergeCloseoutClaim(claim)
+              );
+            if (preserveRecoveredMergeCloseoutClaim) {
               noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
               continue;
             }
-            if (isTrackedIssueFreshEnoughForClaim(claim, resolution.trackedIssue)) {
+            if (trackedIssueFreshEnoughForClaim) {
               const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
                 claim,
                 trackedIssue: resolution.trackedIssue,
@@ -3549,6 +3564,19 @@ function resolveProviderMergeCloseoutClaimState(
     default:
       return 'completed';
   }
+}
+
+function isTerminalProviderMergeCloseoutClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'merge_closeout'>
+): boolean {
+  const mergeCloseout = claim.merge_closeout;
+  if (!mergeCloseout || mergeCloseout.status === 'watching') {
+    return false;
+  }
+  return (
+    claim.state === resolveProviderMergeCloseoutClaimState(mergeCloseout) &&
+    claim.reason === resolveProviderMergeCloseoutClaimReason(mergeCloseout)
+  );
 }
 
 function buildProviderCompletedRunRehydrateState(input: {
