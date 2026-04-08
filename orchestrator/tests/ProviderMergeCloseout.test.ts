@@ -403,6 +403,56 @@ describe('runProviderDeterministicMergeCloseout', () => {
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
   });
 
+  it('keeps cache fallback scoped to probe-only merged recovery mode', async () => {
+    const readIssueContext = vi.fn(async () => ({
+      ok: false as const,
+      operation: 'issue-context' as const,
+      error: {
+        code: 'linear_rate_limited',
+        message: 'Linear shared budget cooldown is active.',
+        status: 429,
+        retryable: true
+      }
+    }));
+    const fetchSnapshot = vi.fn();
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-80',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-05T00:02:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-05T00:02:00.000Z'),
+        readIssueContext,
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState: vi.fn()
+      }
+    );
+
+    expect(readIssueContext).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-1',
+      fallbackToCacheOnFailure: false
+    }));
+    expect(result).toMatchObject({
+      status: 'merge_failed',
+      reason: 'linear_issue_context_failed',
+      summary: 'Linear issue context could not be loaded (linear_rate_limited).'
+    });
+    expect(fetchSnapshot).not.toHaveBeenCalled();
+  });
+
   it('keeps the completed-state exception scoped to probe-only merged recovery', async () => {
     const runCommand = vi.fn().mockResolvedValueOnce({
       ok: true,

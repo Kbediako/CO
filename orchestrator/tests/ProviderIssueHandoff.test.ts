@@ -14589,6 +14589,8 @@ describe('createProviderIssueHandoffService', () => {
     };
     expect(state.claims[0]).toMatchObject(expectedClaim);
     expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+    expect(state.claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(getPersistedState().claims[0]?.merge_closeout ?? null).toBeNull();
   });
 
   it('does not run deterministic merge closeout for a stale Merging snapshot older than the claim', async () => {
@@ -15038,6 +15040,48 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_merge_closeout_merged',
       issue_state: 'Merging',
       issue_state_type: 'started'
+    });
+
+    const rehydratedState = normalizeProviderIntakeState(
+      JSON.parse(JSON.stringify(getPersistedState()))
+    );
+    const { persist: rehydratedPersist, getPersistedState: getRehydratedPersistedState } =
+      createPersistSnapshotSpy(rehydratedState);
+    const restartedService = createProviderIssueHandoffService({
+      paths,
+      state: rehydratedState,
+      persist: rehydratedPersist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:31:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await restartedService.rehydrate();
+    await restartedService.refresh();
+
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    expect(rehydratedState.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:31:30.000Z'
+    });
+    expect(getRehydratedPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:31:30.000Z'
     });
   });
 

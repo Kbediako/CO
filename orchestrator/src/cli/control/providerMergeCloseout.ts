@@ -230,7 +230,7 @@ export async function runProviderDeterministicMergeCloseout(
     issueId: input.issueId,
     env,
     sourceSetup: input.sourceSetup,
-    fallbackToCacheOnFailure: true
+    fallbackToCacheOnFailure: mode === 'probe-merged-recovery'
   });
   if (!issueContext.ok) {
     return {
