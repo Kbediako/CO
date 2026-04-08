@@ -38,12 +38,12 @@
   - the reopened issue is explicitly about shared docs-baseline recurrence, so the implementation should stay on archive eligibility, truthful stale-doc reconciliation, and packet/workpad evidence rather than drifting into review-wrapper redesign
 
 ## Milestones & Sequencing
-1. Refresh the `CO-102` docs-first packet, registry dates, `docs/TASKS.md`, and the single Linear workpad so the reopened scope is truthful.
-2. Run an audited `docs-review` child stream on the refreshed packet before code edits.
-3. Patch `scripts/implementation-docs-archive.mjs` so completed task items using the current `tasks/index.json` vocabulary become eligible for archival under the existing policy.
-4. Add focused regression coverage in `tests/implementation-docs-archive.spec.ts` for the current completion vocabulary and any linked-doc archive behavior touched by the fix.
-5. Rerun archive discovery (`--dry-run`) and, if needed, execute the bounded archive or active-doc reconciliation steps required to clear `docs:freshness`.
-6. Rerun the required validation floor, then complete standalone review and an explicit elegance/minimality pass before PR handoff.
+- [x] Refresh the `CO-102` docs-first packet, registry dates, `docs/TASKS.md`, and the single Linear workpad so the reopened scope is truthful. Evidence: `docs/PRD-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md`, `tasks/index.json`, `docs/TASKS.md`, `out/linear-f0d312eb-055f-4926-80df-8fcaaf56839c/manual/workpad.md`.
+- [x] Run an audited `docs-review` child stream on the refreshed packet before code edits. Evidence: `.runs/linear-f0d312eb-055f-4926-80df-8fcaaf56839c-co-102-docs-review-r2/cli/2026-04-08T22-48-54-430Z-492ca414/manifest.json`.
+- [x] Patch `scripts/implementation-docs-archive.mjs` so completed task items using the current `tasks/index.json` vocabulary become eligible for archival under the existing policy. Evidence: `scripts/implementation-docs-archive.mjs`.
+- [x] Add focused regression coverage in `tests/implementation-docs-archive.spec.ts` for the current completion vocabulary and linked-doc/report-only archive behavior touched by the fix. Evidence: `tests/implementation-docs-archive.spec.ts`.
+- [x] Rerun archive discovery (`--dry-run`) and execute the bounded archive or active-doc reconciliation steps required to clear `docs:freshness`. Evidence: `out/linear-f0d312eb-055f-4926-80df-8fcaaf56839c/manual/workpad.md` (`Archived docs: 186`, post-fix dry-run `Archived docs: 0`).
+- [ ] Complete the final PR feedback sweep, quiet-window drain, and Linear review handoff once checks and review threads are clean. Evidence: pending PR closeout on `#387`.
 
 ## Dependencies
 - Current workspace branch `linear/co-102-docs-baseline-regression-prevention`
@@ -55,18 +55,8 @@
 - `tasks/index.json`
 
 ## Validation
-- Checks / tests:
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c node dist/bin/codex-orchestrator.js linear child-stream --pipeline docs-review --stream co-102-docs-review-r2 --format json`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c node scripts/delegation-guard.mjs`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c node scripts/spec-guard.mjs --dry-run`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c npm run docs:check`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c npm run docs:freshness`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c node scripts/implementation-docs-archive.mjs --dry-run`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c npm run build`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c npm run lint`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c npm run test`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c node scripts/diff-budget.mjs`
-  - `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c FORCE_CODEX_REVIEW=1 npm run review`
+- [x] Required validation floor completed for the repaired baseline packet: `docs-review`, `delegation-guard`, `spec-guard --dry-run`, `docs:check`, `docs:freshness`, `implementation-docs-archive --dry-run`, `build`, `lint`, `test`, `diff-budget`, and wrapper-led `review`. Evidence: `tasks/tasks-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md` (`## Validation`), `out/linear-f0d312eb-055f-4926-80df-8fcaaf56839c/manual/workpad.md`.
+- [ ] Post-PR-update quiet-window drain must still complete on the latest head before Linear handoff. Evidence: pending `pr ready-review` clean exit for `#387`.
 - Rollback plan:
   - revert the bounded archive-eligibility fix if it archives docs that are still meant to stay active
   - prefer explicit residual active-doc review or a tightly-scoped follow-up over silent status churn

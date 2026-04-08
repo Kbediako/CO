@@ -30,7 +30,7 @@
 - [x] Current `docs:check` baseline captured on the reopened branch. Evidence: `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c npm run docs:check` returned `docs:check: OK`.
 - [x] Current `docs:freshness` baseline captured on the reopened branch. Evidence: `MCP_RUNNER_TASK_ID=linear-f0d312eb-055f-4926-80df-8fcaaf56839c npm run docs:freshness` failed with `stale docs: 282` (`Task Packet=205`, `Task Mirror=41`, `Report Only=36`).
 - [x] Archive automation and local dry-run behavior captured for the reopened branch. Evidence: GitHub Actions `Implementation Docs Archive Automation` run `24117518124` succeeded on 2026-04-08, and local `node scripts/implementation-docs-archive.mjs --dry-run` reported `Archived docs: 0`, `Skipped docs: 313`, `Stray candidates: 146`.
-- [x] Root cause narrowed to the current completion-vocabulary mismatch in `scripts/implementation-docs-archive.mjs`. Evidence: the script currently requires `status === "succeeded"` plus `completed_at`, while `tasks/index.json` contains `59` completed items with `status: "completed"` plus `completed_at`.
+- [x] Root cause narrowed to the completion-vocabulary mismatch captured at baseline time in `scripts/implementation-docs-archive.mjs`. Evidence: at baseline capture time the script required `status === "succeeded"` plus `completed_at`, while `tasks/index.json` contained `59` completed items with `status: "completed"` plus `completed_at`.
 - [ ] Any out-of-scope residual stale-doc seam split into a same-project follow-up instead of silently expanding scope. Evidence: pending only if needed after the post-fix rerun.
 
 ## Implementation
