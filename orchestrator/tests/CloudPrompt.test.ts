@@ -29,7 +29,7 @@ function buildSource0Descriptor() {
     source_path: '.runs/task-1/cli/run-1/memory/source-0/source.txt',
     byte_length: 256,
     chunk_count: 1,
-    created_at: '2026-04-09T00:00:00.000Z',
+    created_at: '2026-04-01T00:00:00.000Z',
     origin: {
       run_id: 'run-1',
       task_id: 'task-1',

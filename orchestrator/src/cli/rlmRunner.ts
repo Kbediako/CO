@@ -350,7 +350,8 @@ async function resolveContextSource(
 
   const manifestPath = env.CODEX_ORCHESTRATOR_MANIFEST_PATH?.trim();
   if (manifestPath) {
-    const rawManifest = JSON.parse(await readFile(resolve(manifestPath), 'utf8')) as Record<string, unknown>;
+    const rawManifestPath = resolve(repoRoot, manifestPath);
+    const rawManifest = JSON.parse(await readFile(rawManifestPath, 'utf8')) as Record<string, unknown>;
     const descriptor = readRunSource0Descriptor(rawManifest);
     if (descriptor) {
       return {

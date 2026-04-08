@@ -112,7 +112,7 @@ describe('rlmRunner config parsing', () => {
             source_path: '.runs/task-1/cli/run-1/memory/source-0/source.txt',
             byte_length: 4096,
             chunk_count: 1,
-            created_at: '2026-04-09T00:00:00.000Z',
+            created_at: '2026-04-01T00:00:00.000Z',
             origin: {
               run_id: 'run-1',
               task_id: 'task-1',
@@ -127,7 +127,7 @@ describe('rlmRunner config parsing', () => {
 
     const resolved = await resolveContextSource(
       {
-        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: '.runs/task-1/cli/run-1/manifest.json'
       } as NodeJS.ProcessEnv,
       sandbox,
       'fallback goal text'

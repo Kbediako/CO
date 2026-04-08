@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { CliManifest } from '../types.js';
 import { buildContextObject } from '../rlm/context.js';
@@ -11,6 +11,7 @@ const RUN_SOURCE0_CONTEXT_KIND = 'context_object';
 const RUN_SOURCE0_PAYLOAD_KIND = 'run_source_0';
 const RUN_SOURCE0_CHUNK_TARGET_BYTES = 65_536;
 const RUN_SOURCE0_CHUNK_OVERLAP_BYTES = 4_096;
+const WINDOWS_DRIVE_ABSOLUTE_PATH_RE = /^[A-Za-z]:[\\/]/u;
 
 export interface RunSource0Lineage {
   run_id: string;
@@ -227,11 +228,34 @@ export function resolveRunSource0Paths(
   repoRoot: string,
   descriptor: RunSource0Descriptor
 ): ResolvedRunSource0Paths {
+  const resolvedRepoRoot = resolve(repoRoot);
   return {
-    dirPath: resolve(repoRoot, descriptor.dir_path),
-    indexPath: resolve(repoRoot, descriptor.index_path),
-    sourcePath: resolve(repoRoot, descriptor.source_path)
+    dirPath: resolveRepoRelativeSource0Path(resolvedRepoRoot, descriptor.dir_path, 'dir_path'),
+    indexPath: resolveRepoRelativeSource0Path(resolvedRepoRoot, descriptor.index_path, 'index_path'),
+    sourcePath: resolveRepoRelativeSource0Path(resolvedRepoRoot, descriptor.source_path, 'source_path')
   };
+}
+
+function resolveRepoRelativeSource0Path(repoRoot: string, candidate: string, field: string): string {
+  if (isAbsolute(candidate) || WINDOWS_DRIVE_ABSOLUTE_PATH_RE.test(candidate)) {
+    throw new Error(`source_0 ${field} must be repo-relative`);
+  }
+  const normalizedCandidate = candidate.replaceAll('\\', '/');
+  if (normalizedCandidate.split('/').some((segment) => segment === '..')) {
+    throw new Error(`source_0 ${field} must not traverse outside the repo root`);
+  }
+  const resolvedPath = resolve(repoRoot, candidate);
+  const relativePath = relative(repoRoot, resolvedPath);
+  if (
+    !relativePath ||
+    relativePath === '.' ||
+    isAbsolute(relativePath) ||
+    WINDOWS_DRIVE_ABSOLUTE_PATH_RE.test(relativePath) ||
+    relativePath.split(/[\\/]+/u).some((segment) => segment === '..')
+  ) {
+    throw new Error(`source_0 ${field} escapes the repo root`);
+  }
+  return resolvedPath;
 }
 
 export function buildRunSource0PromptLines(descriptor: RunSource0Descriptor | null): string[] {
