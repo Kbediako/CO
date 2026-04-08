@@ -1467,7 +1467,7 @@ describe('provider linear worker runner', () => {
         });
         await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 2,
-          recordedAt: '2026-03-21T09:00:01.150Z'
+          recordedAt: '2026-03-21T09:00:01.250Z'
         });
         return {
           exitCode: 0,
@@ -1565,7 +1565,7 @@ describe('provider linear worker runner', () => {
         attempted_count: 6,
         success_count: 5,
         failure_count: 1,
-        latest_recorded_at: '2026-03-21T09:00:01.150Z'
+        latest_recorded_at: '2026-03-21T09:00:01.250Z'
       },
       child_streams: expect.arrayContaining([expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review', run_id: 'docs-run-1', status: 'succeeded' }), expect.objectContaining({ stream: 'docs-review', task_id: 'linear-lin-issue-1-docs-review-alt', run_id: 'docs-run-1', status: 'succeeded' })]),
       child_lanes: expect.arrayContaining([expect.objectContaining({
@@ -1620,7 +1620,7 @@ describe('provider linear worker runner', () => {
         attempted_count: 6,
         success_count: 5,
         failure_count: 1,
-        latest_recorded_at: '2026-03-21T09:00:01.150Z',
+        latest_recorded_at: '2026-03-21T09:00:01.250Z',
         latest_by_operation: {
           'issue-context': {
             operation: 'issue-context',
@@ -5608,6 +5608,125 @@ describe('provider linear worker runner', () => {
         expect.objectContaining({
           stream: 'impl-a',
           status: 'failed'
+        })
+      ])
+    });
+  });
+
+  it('accepts parallelize_now when a same-turn child lane succeeds', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner: vi.fn(async (request) => {
+          await appendParallelizationDecisionAuditForRequest(request, {
+            decision: 'parallelize_now',
+            reason: 'independent_scope_available',
+            summary: 'Launch a bounded implementation child lane.',
+            recordedAt: '2026-03-21T09:00:03.050Z'
+          });
+          await appendProviderLinearWorkerChildLaneRecord(runDir, {
+            stream: 'impl-a',
+            pipeline_id: 'provider-linear-child-lane',
+            task_id: 'linear-lin-issue-1-impl-a',
+            run_id: 'child-run-1',
+            status: 'succeeded',
+            manifest_path: join(
+              tempRoot ?? '',
+              '.runs',
+              'linear-lin-issue-1-impl-a',
+              'cli',
+              'child-run-1',
+              'manifest.json'
+            ),
+            artifact_root: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1',
+            log_path: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1/run.log',
+            summary: 'child lane completed successfully',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-2',
+            workspace_path: tempRoot,
+            source_setup: null,
+            launched_at: '2026-03-21T09:00:03.150Z',
+            purpose: 'Implement bounded same-issue child lanes',
+            instructions: null,
+            scope: {
+              files: ['orchestrator/src/cli/providerLinearWorkerRunner.ts'],
+              phases: []
+            },
+            parent_snapshot: {
+              base_sha: 'parent-base-sha',
+              issue_updated_at: '2026-03-21T09:00:00.000Z',
+              issue_state: 'In Progress',
+              issue_state_type: 'started',
+              captured_at: '2026-03-21T09:00:03.150Z'
+            },
+            lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+            patch_artifact_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1.patch'),
+            patch_bytes: 42,
+            decision: 'accepted',
+            decision_at: '2026-03-21T09:00:03.200Z',
+            decision_reason: 'Applied bounded implementation patch.'
+          });
+          return {
+            exitCode: 0,
+            stdout: [
+              '{"type":"thread.started","thread_id":"thread-1"}',
+              '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+              '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:04.000Z"}}'
+            ].join('\n'),
+            stderr: ''
+          };
+        }),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:03.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active',
+      parallelization: {
+        decision: 'parallelize_now',
+        reason: 'independent_scope_available',
+        child_lane_count: 1
+      },
+      child_lanes: expect.arrayContaining([
+        expect.objectContaining({
+          stream: 'impl-a',
+          status: 'succeeded',
+          launched_at: '2026-03-21T09:00:03.150Z'
+        })
+      ])
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active',
+      parallelization: {
+        decision: 'parallelize_now',
+        reason: 'independent_scope_available',
+        child_lane_count: 1
+      },
+      child_lanes: expect.arrayContaining([
+        expect.objectContaining({
+          stream: 'impl-a',
+          status: 'succeeded',
+          launched_at: '2026-03-21T09:00:03.150Z'
         })
       ])
     });

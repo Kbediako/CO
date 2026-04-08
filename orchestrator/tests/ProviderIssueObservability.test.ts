@@ -261,6 +261,54 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('leaves child_lane_count unknown when audit fallback lacks current-turn child lane data', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      proof: {
+        issue_id: 'lin-issue-101',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-08T07:00:00.000Z',
+        updated_at: '2026-04-08T07:00:05.000Z',
+        linear_audit: {
+          path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+          attempted_count: 1,
+          success_count: 1,
+          failure_count: 0,
+          latest_recorded_at: '2026-04-08T07:00:02.000Z',
+          parallelization_entries: [
+            {
+              recorded_at: '2026-04-08T07:00:02.000Z',
+              operation: 'parallelization',
+              ok: true,
+              issue_id: 'lin-issue-101',
+              issue_identifier: 'CO-101',
+              source_setup: null,
+              action: 'parallelize_now',
+              via: 'Launch a bounded child lane now.',
+              state: 'independent_scope_available',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            }
+          ],
+          latest_by_operation: {}
+        }
+      }
+    });
+
+    expect(snapshot?.parallelization).toMatchObject({
+      decision: 'parallelize_now',
+      reason: 'independent_scope_available',
+      summary: 'Launch a bounded child lane now.',
+      recorded_at: '2026-04-08T07:00:02.000Z',
+      child_lane_count: null
+    });
+  });
+
   it('prioritizes action-required merge blockers over pending checks', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {

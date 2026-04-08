@@ -33,6 +33,7 @@ import {
 } from './control/providerLinearWorkflowStates.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
+  PROVIDER_LINEAR_PARALLELIZATION_REASONS,
   readProviderLinearParallelizationSnapshot,
   readProviderLinearParallelizationSnapshots,
   summarizeProviderLinearAuditPath,
@@ -742,11 +743,12 @@ function buildRuntimeProofGuidance(helperCommand: string, issueId: string): stri
 }
 
 function buildParallelizationReasonCodesSummary(): string {
-  return [
-    '`parallelize_now`: `independent_scope_available`',
-    '`stay_serial`: `single_bounded_change`, `overlapping_scope`, `existing_child_lane_active`, `review_or_validation_only`',
-    '`forbid_parallel`: `parent_only_mutation`, `merge_or_handoff_state`, `blocked_by_dependency`'
-  ].join('; ');
+  return Object.entries(PROVIDER_LINEAR_PARALLELIZATION_REASONS)
+    .map(
+      ([decision, reasons]) =>
+        `\`${decision}\`: ${reasons.map((reason) => `\`${reason}\``).join(', ')}`
+    )
+    .join('; ');
 }
 
 function buildParallelizationGuidance(helperCommand: string, issueId: string): string[] {

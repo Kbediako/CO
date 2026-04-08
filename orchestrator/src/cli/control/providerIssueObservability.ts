@@ -408,7 +408,7 @@ function resolveProviderParallelizationSnapshot(
   }
   return {
     ...fromAudit,
-    child_lane_count: currentTurnChildLanes !== null ? currentTurnChildLanes.length : 0
+    child_lane_count: currentTurnChildLanes !== null ? currentTurnChildLanes.length : null
   };
 }
 

@@ -40,7 +40,7 @@ export interface ProviderLinearParallelizationSnapshot {
   recorded_at: string;
 }
 
-const PROVIDER_LINEAR_PARALLELIZATION_REASONS = {
+export const PROVIDER_LINEAR_PARALLELIZATION_REASONS = {
   parallelize_now: ['independent_scope_available'],
   stay_serial: [
     'single_bounded_change',
