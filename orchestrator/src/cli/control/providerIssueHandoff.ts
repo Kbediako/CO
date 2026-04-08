@@ -445,14 +445,10 @@ export function createProviderIssueHandoffService(
   };
 
   const canRetireRecoveredActiveRunWithoutTerminalProof = (input: {
-    claim: ProviderIntakeClaimRecord;
     latestRun: ProviderIssueRunRecord;
     mergeCloseout: ProviderMergeCloseoutRecord;
   }): boolean => {
     if (input.latestRun.proofTerminalStatus === 'succeeded') {
-      return true;
-    }
-    if (input.claim.reason !== 'provider_issue_rehydrated_active_run') {
       return true;
     }
     return input.mergeCloseout.status === 'merged';
@@ -517,7 +513,6 @@ export function createProviderIssueHandoffService(
     }
     if (
       !canRetireRecoveredActiveRunWithoutTerminalProof({
-        claim: input.claim,
         latestRun: input.latestRun,
         mergeCloseout
       })
