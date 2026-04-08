@@ -1,5 +1,7 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
-import type {
+import {
+  readProviderLinearParallelizationSnapshot,
+  type ProviderLinearParallelizationSnapshot,
   ProviderLinearAuditEntry,
   ProviderLinearAuditSummary
 } from './providerLinearWorkflowAudit.js';
@@ -150,6 +152,8 @@ interface ProviderIssueChildLaneLike {
 
 interface ProviderIssueProofLike {
   attempt_started_at?: string | null;
+  current_turn_started_at?: string | null;
+  issue_id?: string | null;
   pid?: string | null;
   thread_id?: string | null;
   latest_session_id?: string | null;
@@ -163,6 +167,9 @@ interface ProviderIssueProofLike {
   linear_audit?: ProviderLinearAuditSummary | null;
   child_streams?: ProviderIssueChildStreamLike[] | null;
   child_lanes?: ProviderIssueChildLaneLike[] | null;
+  parallelization?: (ProviderLinearParallelizationSnapshot & {
+    child_lane_count?: number | null;
+  }) | null;
   end_reason?: string | null;
 }
 
@@ -193,6 +200,13 @@ export interface ControlProviderDebugSnapshot {
     last_event: string | null;
     last_event_at: string | null;
     updated_at: string | null;
+  } | null;
+  parallelization: {
+    decision: string | null;
+    reason: string | null;
+    summary: string | null;
+    recorded_at: string | null;
+    child_lane_count: number | null;
   } | null;
   pull_request: {
     attached_pr_urls: string[];
@@ -280,6 +294,7 @@ export function buildProviderIssueDebugSnapshot(input: {
   const claim = input.claim ?? null;
   const proof = input.proof ?? null;
   const latestAudit = selectLatestProviderLinearAuditEntry(proof?.linear_audit);
+  const parallelization = resolveProviderParallelizationSnapshot(proof);
   const progress = deriveProviderLinearWorkerProgressSnapshot({
     tracked_issue: trackedIssue,
     claim,
@@ -326,6 +341,15 @@ export function buildProviderIssueDebugSnapshot(input: {
           updated_at: normalizeOptionalString(proof.updated_at)
         }
       : null,
+    parallelization: parallelization
+      ? {
+          decision: parallelization.decision,
+          reason: parallelization.reason,
+          summary: parallelization.summary,
+          recorded_at: parallelization.recorded_at,
+          child_lane_count: parallelization.child_lane_count
+        }
+      : null,
     pull_request: pullRequest,
     progress,
     last_audit_operation: latestAudit
@@ -346,6 +370,45 @@ export function buildProviderIssueDebugSnapshot(input: {
     stall_classification: progress?.stall_classification ?? null,
     stall_reason: progress?.stall_reason ?? null,
     recovery_recommendation: progress?.recovery_recommendation ?? null
+  };
+}
+
+function resolveProviderParallelizationSnapshot(
+  proof: ProviderIssueProofLike | null
+): (ProviderLinearParallelizationSnapshot & { child_lane_count: number | null }) | null {
+  const currentTurnStartedAt = normalizeOptionalString(proof?.current_turn_started_at);
+  const currentTurnChildLanes = Array.isArray(proof?.child_lanes)
+    ? !currentTurnStartedAt
+      ? proof.child_lanes
+      : proof.child_lanes.filter(
+          (childLane) => compareIsoTimestamp(childLane.launched_at ?? null, currentTurnStartedAt) >= 0
+        )
+    : null;
+  const hydrated = proof?.parallelization ?? null;
+  if (hydrated) {
+    if (
+      !currentTurnStartedAt ||
+      compareIsoTimestamp(normalizeOptionalString(hydrated.recorded_at), currentTurnStartedAt) >= 0
+    ) {
+      return {
+        ...hydrated,
+        child_lane_count:
+          currentTurnChildLanes !== null
+            ? currentTurnChildLanes.length
+            : normalizeOptionalInteger(hydrated.child_lane_count)
+      };
+    }
+  }
+  const fromAudit = readProviderLinearParallelizationSnapshot(proof?.linear_audit, {
+    issueId: normalizeOptionalString(proof?.issue_id),
+    recordedAtNotBefore: currentTurnStartedAt
+  });
+  if (!fromAudit) {
+    return null;
+  }
+  return {
+    ...fromAudit,
+    child_lane_count: currentTurnChildLanes !== null ? currentTurnChildLanes.length : null
   };
 }
 

@@ -6,6 +6,7 @@ import { afterEach, expect, it } from 'vitest';
 
 import {
   appendProviderLinearAuditEntry,
+  readProviderLinearParallelizationSnapshot,
   summarizeProviderLinearAuditPath
 } from '../src/cli/control/providerLinearWorkflowAudit.js';
 
@@ -144,5 +145,108 @@ it('accepts screenshot-proof audit entries in summarized output', async () => {
         via: 'cleanup:skipped'
       }
     }
+  });
+});
+
+it('filters parallelization snapshots by issue id instead of trusting the latest row', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-audit-'));
+  tempDirs.push(tempDir);
+  const auditPath = join(tempDir, 'provider-linear-audit.jsonl');
+
+  await appendProviderLinearAuditEntry(auditPath, {
+    recorded_at: '2026-04-08T06:00:00.000Z',
+    operation: 'parallelization',
+    ok: true,
+    issue_id: 'lin-issue-1',
+    issue_identifier: 'CO-101',
+    source_setup: null,
+    action: 'stay_serial',
+    via: 'Single bounded change.',
+    state: 'single_bounded_change',
+    follow_up_issue_id: null,
+    follow_up_issue_identifier: null,
+    failed_relation_type: null,
+    comment_id: null,
+    attachment_id: null,
+    error_code: null,
+    error_message: null
+  });
+  await appendProviderLinearAuditEntry(auditPath, {
+    recorded_at: '2026-04-08T06:01:00.000Z',
+    operation: 'parallelization',
+    ok: true,
+    issue_id: 'lin-issue-2',
+    issue_identifier: 'CO-102',
+    source_setup: null,
+    action: 'forbid_parallel',
+    via: 'Parent-only mutation.',
+    state: 'parent_only_mutation',
+    follow_up_issue_id: null,
+    follow_up_issue_identifier: null,
+    failed_relation_type: null,
+    comment_id: null,
+    attachment_id: null,
+    error_code: null,
+    error_message: null
+  });
+
+  const summary = await summarizeProviderLinearAuditPath(auditPath);
+
+  expect(summary.parallelization_entries).toHaveLength(2);
+  expect(readProviderLinearParallelizationSnapshot(summary, { issueId: 'lin-issue-1' })).toMatchObject({
+    decision: 'stay_serial',
+    reason: 'single_bounded_change',
+    summary: 'Single bounded change.',
+    recorded_at: '2026-04-08T06:00:00.000Z'
+  });
+  expect(readProviderLinearParallelizationSnapshot(summary, { issueId: 'lin-issue-2' })).toMatchObject({
+    decision: 'forbid_parallel',
+    reason: 'parent_only_mutation',
+    summary: 'Parent-only mutation.',
+    recorded_at: '2026-04-08T06:01:00.000Z'
+  });
+  expect(
+    readProviderLinearParallelizationSnapshot(summary, {
+      issueId: 'lin-issue-1',
+      recordedAtNotBefore: '2026-04-08T06:00:30.000Z'
+    })
+  ).toBeNull();
+});
+
+it('treats mixed ISO timestamp formats as the same timeline when filtering current-turn snapshots', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'provider-linear-audit-'));
+  tempDirs.push(tempDir);
+  const auditPath = join(tempDir, 'provider-linear-audit.jsonl');
+
+  await appendProviderLinearAuditEntry(auditPath, {
+    recorded_at: '2026-04-08T07:00:02.050Z',
+    operation: 'parallelization',
+    ok: true,
+    issue_id: 'lin-issue-1',
+    issue_identifier: 'CO-101',
+    source_setup: null,
+    action: 'parallelize_now',
+    via: 'Launch a bounded child lane now.',
+    state: 'independent_scope_available',
+    follow_up_issue_id: null,
+    follow_up_issue_identifier: null,
+    failed_relation_type: null,
+    comment_id: null,
+    attachment_id: null,
+    error_code: null,
+    error_message: null
+  });
+
+  const summary = await summarizeProviderLinearAuditPath(auditPath);
+
+  expect(
+    readProviderLinearParallelizationSnapshot(summary, {
+      issueId: 'lin-issue-1',
+      recordedAtNotBefore: '2026-04-08T07:00:02Z'
+    })
+  ).toMatchObject({
+    decision: 'parallelize_now',
+    reason: 'independent_scope_available',
+    recorded_at: '2026-04-08T07:00:02.050Z'
   });
 });
