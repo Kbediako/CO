@@ -5,7 +5,8 @@ import { promisify } from 'node:util';
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
 import {
   getProviderLinearIssueContext,
-  transitionProviderLinearIssueState
+  transitionProviderLinearIssueState,
+  type ProviderLinearIssueContext
 } from './providerLinearWorkflowFacade.js';
 import { isoTimestamp } from '../utils/time.js';
 import {
@@ -248,6 +249,32 @@ export async function runProviderDeterministicMergeCloseout(
   }
 
   const attachedPrUrls = collectAttachedGitHubPrUrls(issueContext.issue.attachments);
+  const usedCachedIssueContext = issueContext.cache_fallback_used === true;
+  if (
+    mode === 'probe-merged-recovery' &&
+    usedCachedIssueContext &&
+    !isProbeRecoveryCacheContextFreshEnough({
+      issueState: input.issueState,
+      issueStateType: input.issueStateType,
+      issueUpdatedAt: input.issueUpdatedAt,
+      issueContext: issueContext.issue
+    })
+  ) {
+    return {
+      ...base,
+      attached_pr_urls: [...attachedPrUrls],
+      status: 'watching',
+      reason: 'probe_issue_context_cache_stale',
+      summary:
+        'Cached Linear issue context does not match the tracked issue metadata, so merged recovery will not transition the issue to Done until a fresh issue-context read succeeds.',
+      pr: null,
+      snapshot: null,
+      merge_attempt: null,
+      shared_root: null,
+      linear_transition: null
+    };
+  }
+
   const sameRepoPrs = attachedPrUrls
     .map((url) => parseGitHubPullRequestUrl(url))
     .filter((value): value is ProviderMergeCloseoutPullRequestRecord => Boolean(value))
@@ -1051,6 +1078,42 @@ function normalizeOptionalString(value: unknown): string | null {
 function normalizeProviderMergeCloseoutIssueState(value: string | null | undefined): string | null {
   const normalized = normalizeOptionalString(value);
   return normalized ? normalized.toLowerCase() : null;
+}
+
+function isProbeRecoveryCacheContextFreshEnough(input: {
+  issueState?: string | null;
+  issueStateType?: string | null;
+  issueUpdatedAt?: string | null;
+  issueContext: ProviderLinearIssueContext;
+}): boolean {
+  const expectedState = normalizeProviderMergeCloseoutIssueState(input.issueState);
+  const cachedState = normalizeProviderMergeCloseoutIssueState(input.issueContext.state?.name ?? null);
+  if (expectedState !== null && cachedState !== expectedState) {
+    return false;
+  }
+
+  const expectedStateType = normalizeOptionalString(input.issueStateType);
+  const cachedStateType = normalizeOptionalString(input.issueContext.state?.type ?? null);
+  if (expectedStateType !== null && cachedStateType !== expectedStateType) {
+    return false;
+  }
+
+  const expectedUpdatedAt = normalizeOptionalString(input.issueUpdatedAt);
+  if (expectedUpdatedAt === null) {
+    return true;
+  }
+  const cachedUpdatedAt = normalizeOptionalString(input.issueContext.updated_at);
+  if (cachedUpdatedAt === null) {
+    return false;
+  }
+
+  const expectedUpdatedAtMs = Date.parse(expectedUpdatedAt);
+  const cachedUpdatedAtMs = Date.parse(cachedUpdatedAt);
+  if (Number.isFinite(expectedUpdatedAtMs) && Number.isFinite(cachedUpdatedAtMs)) {
+    return cachedUpdatedAtMs >= expectedUpdatedAtMs;
+  }
+
+  return cachedUpdatedAt === expectedUpdatedAt;
 }
 
 function normalizeOptionalNumber(value: unknown): number | null {

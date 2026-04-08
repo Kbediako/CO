@@ -89,6 +89,7 @@ describe('runProviderDeterministicMergeCloseout', () => {
         readIssueContext: vi.fn(async () => ({
           ok: true,
           operation: 'issue-context',
+          cache_fallback_used: true,
           issue: {
             id: 'lin-issue-1',
             identifier: 'CO-80',
@@ -401,6 +402,68 @@ describe('runProviderDeterministicMergeCloseout', () => {
     });
     expect(fetchSnapshot).toHaveBeenCalledTimes(1);
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
+  });
+
+  it('keeps probe-mode merged recovery read-only when cached issue context predates the tracked issue metadata', async () => {
+    const fetchSnapshot = vi.fn();
+    const transitionIssueState = vi.fn();
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-80',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-05T00:02:00.000Z',
+        mode: 'probe-merged-recovery',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-05T00:02:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          cache_fallback_used: true,
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-80',
+            title: 'Deterministic merge closeout',
+            description: null,
+            url: null,
+            updated_at: '2026-04-05T00:01:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/357' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'watching',
+      reason: 'probe_issue_context_cache_stale',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-05T00:02:00.000Z',
+      attached_pr_urls: ['https://github.com/asabeko/CO/pull/357']
+    });
+    expect(fetchSnapshot).not.toHaveBeenCalled();
+    expect(transitionIssueState).not.toHaveBeenCalled();
   });
 
   it('keeps cache fallback scoped to probe-only merged recovery mode', async () => {

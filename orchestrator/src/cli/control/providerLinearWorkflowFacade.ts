@@ -361,6 +361,7 @@ export type ProviderLinearIssueContextResult =
       operation: 'issue-context';
       issue: ProviderLinearIssueContext;
       source_setup: DispatchPilotSourceSetup | null;
+      cache_fallback_used?: boolean;
     }
   | {
       ok: false;
@@ -779,7 +780,8 @@ export async function getProviderLinearIssueContext(input: {
           ok: true,
           operation: 'issue-context',
           issue: cachedRecord.issue,
-          source_setup: session.session.sourceSetup
+          source_setup: session.session.sourceSetup,
+          cache_fallback_used: true
         };
       }
     }
@@ -802,7 +804,8 @@ export async function getProviderLinearIssueContext(input: {
           ok: true,
           operation: 'issue-context',
           issue: cachedRecord.issue,
-          source_setup: session.session.sourceSetup
+          source_setup: session.session.sourceSetup,
+          cache_fallback_used: true
         };
       }
     }

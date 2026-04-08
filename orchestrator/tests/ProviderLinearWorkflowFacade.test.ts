@@ -552,6 +552,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(result).toMatchObject({
       ok: true,
       operation: 'issue-context',
+      cache_fallback_used: true,
       issue: {
         id: 'lin-issue-1',
         state: {
