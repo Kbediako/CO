@@ -63,5 +63,5 @@ last_review: 2026-04-08
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review` child stream failed only on the repo-wide `docs:freshness` stale-doc baseline after `spec-guard` and `docs:check` passed; manual fallback accepted
 - Date: 2026-04-08
-- Manifest: `/Users/kbediako/Code/CO/.workspaces/linear-bb472787-be60-44e3-ac83-a3c297dab470/.runs/linear-bb472787-be60-44e3-ac83-a3c297dab470-co-109-docs-review/cli/2026-04-08T09-38-27-493Z-da4100bc/manifest.json`
+- Manifest: `.runs/linear-bb472787-be60-44e3-ac83-a3c297dab470-co-109-docs-review/cli/2026-04-08T09-38-27-493Z-da4100bc/manifest.json`
 - Review telemetry: fallback note at `out/linear-bb472787-be60-44e3-ac83-a3c297dab470/manual/20260408T093827Z-docs-review-fallback.md`

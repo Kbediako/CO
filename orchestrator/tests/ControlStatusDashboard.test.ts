@@ -2537,6 +2537,7 @@ describe('control status dashboard', () => {
     const pausedFrame = stripAnsi(writes.at(-1) ?? '');
     expect(pausedFrame).toContain('│ Inspect: paused | primary snapshot | full frame');
     expect(pausedFrame).toContain('│ Runtime: 15m 12s');
+    expect(pausedFrame).toContain('│ Next refresh: 15s | source 9s old');
     expect(pausedFrame).toContain('15m / 4');
     expect(pausedFrame).toContain('turn running (5s ago)');
 
@@ -2549,9 +2550,11 @@ describe('control status dashboard', () => {
     const refrozenFrame = stripAnsi(writes.at(-1) ?? '');
     expect(refrozenFrame).toContain('│ Inspect: paused | primary snapshot | full frame');
     expect(refrozenFrame).toContain('│ Runtime: 15m 12s');
+    expect(refrozenFrame).toContain('│ Next refresh: 15s | source 9s old');
     expect(refrozenFrame).toContain('15m / 4');
     expect(refrozenFrame).toContain('turn running (5s ago)');
     expect(refrozenFrame).not.toContain('│ Runtime: 15m 17s');
+    expect(refrozenFrame).not.toContain('│ Next refresh: 10s | source 14s old');
     expect(refrozenFrame).not.toContain('15m 5s / 4');
     expect(refrozenFrame).not.toContain('turn running (10s ago)');
 

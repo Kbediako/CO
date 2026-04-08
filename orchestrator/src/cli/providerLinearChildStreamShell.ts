@@ -230,6 +230,7 @@ export async function runProviderLinearChildStreamShell(
     childTaskId,
     sourceSetup
   );
+  const childLaunchTimestamp = deps.now();
   let execResult: ProviderLinearWorkerExecResult;
   try {
     execResult = await deps.execRunner({
@@ -273,6 +274,7 @@ export async function runProviderLinearChildStreamShell(
       status: 502
     });
   }
+  const childRecordTimestamp = deps.now();
   try {
     await deps.appendChildStreamRecord(context.runDir, {
       stream,
@@ -288,7 +290,8 @@ export async function runProviderLinearChildStreamShell(
       issue_identifier: context.issueIdentifier,
       workspace_path: context.workspacePath,
       source_setup: sourceSetup,
-      launched_at: deps.now()
+      launched_at: childLaunchTimestamp,
+      recorded_at: childRecordTimestamp
     });
   } catch (error) {
     return failureResult({

@@ -584,6 +584,7 @@ function buildSelectedRunLatestEvent(input: {
   ) {
     return {
       at:
+        input.providerDebugSnapshot.progress.summary_recorded_at ??
         input.providerDebugSnapshot.progress.last_semantic_progress_at ??
         input.providerDebugSnapshot.last_semantic_progress_at ??
         input.updatedAt,
@@ -601,6 +602,7 @@ function buildSelectedRunLatestEvent(input: {
   ) {
     return {
       at:
+        input.providerDebugSnapshot.progress.summary_recorded_at ??
         input.providerDebugSnapshot.progress.last_semantic_progress_at ??
         input.providerDebugSnapshot.last_semantic_progress_at ??
         input.updatedAt,

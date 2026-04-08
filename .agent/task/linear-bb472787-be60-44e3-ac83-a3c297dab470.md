@@ -10,7 +10,7 @@
 ## Docs-First
 - [x] PRD, TECH_SPEC, ACTION_PLAN, task spec, task checklist, `.agent` mirror, `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, and the initial workpad source were drafted or refreshed for `CO-109`. Evidence: bootstrap packet created in the current workspace on 2026-04-08.
 - [x] Standalone pre-implementation self-review notes were captured in the spec packet before coding. Evidence: `tasks/specs/linear-bb472787-be60-44e3-ac83-a3c297dab470.md`.
-- [x] Docs-review delegation evidence is captured and the repo-wide `docs:freshness` baseline failure is recorded truthfully as manual fallback rather than as a packet-shape blocker. Evidence: `/Users/kbediako/Code/CO/.workspaces/linear-bb472787-be60-44e3-ac83-a3c297dab470/.runs/linear-bb472787-be60-44e3-ac83-a3c297dab470-co-109-docs-review/cli/2026-04-08T09-38-27-493Z-da4100bc/manifest.json`, `out/linear-bb472787-be60-44e3-ac83-a3c297dab470/manual/20260408T093827Z-docs-review-fallback.md`.
+- [x] Docs-review delegation evidence is captured and the repo-wide `docs:freshness` baseline failure is recorded truthfully as manual fallback rather than as a packet-shape blocker. Evidence: `.runs/linear-bb472787-be60-44e3-ac83-a3c297dab470-co-109-docs-review/cli/2026-04-08T09-38-27-493Z-da4100bc/manifest.json`, `out/linear-bb472787-be60-44e3-ac83-a3c297dab470/manual/20260408T093827Z-docs-review-fallback.md`.
 
 ## Implementation
 - [ ] Authoritative running `display_event` truth prefers richer worker, debug, or nearby child-stream or child-lane state over generic progress filler. Evidence: pending.
@@ -27,6 +27,6 @@
 
 ## Handoff
 - [x] The issue is in `In Progress`, and exactly one persistent `## Codex Workpad` comment is maintained for the issue. Evidence: Linear workpad comment `fa473099-faff-4434-b4ae-8e57a38f0820`, `out/linear-bb472787-be60-44e3-ac83-a3c297dab470/manual/workpad.md`.
-- [ ] A PR is attached before any review-state handoff. Evidence: pending.
+- [x] A PR is attached before any review-state handoff. Evidence: `PR #382`.
 - [ ] Latest `origin/main` is merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks are green, actionable review feedback is handled or explicitly pushed back, `pr ready-review` drains cleanly, and the issue moves to `In Review` only after coding stops. Evidence: pending.

@@ -157,11 +157,40 @@ describe('runProviderLinearChildStreamShell', () => {
         task_id: `${TASK_ID}-docs-review`,
         run_id: 'docs-run-1',
         status: 'succeeded',
-        launched_at: '2026-03-27T01:00:00.000Z'
+        launched_at: '2026-03-27T01:00:00.000Z',
+        recorded_at: '2026-03-27T01:00:00.000Z'
       })
     ]);
     expect(PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME).toBe('provider-linear-worker-child-streams.json');
   });
+
+  it('records child-stream launch and record timestamps separately', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const execRunner = vi.fn(async () => createExecResult('docs-review', 'docs-run-1', 'docs-review passed'));
+    const now = vi
+      .fn<() => string>()
+      .mockReturnValueOnce('2026-03-27T01:00:00.000Z')
+      .mockReturnValueOnce('2026-03-27T01:05:00.000Z');
+
+    const result = await runProviderLinearChildStreamShell(
+      {
+        pipelineId: 'docs-review',
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      { execRunner, now }
+    );
+
+    expect(result).toMatchObject({ ok: true, operation: 'child-stream' });
+    expect(await readProviderLinearWorkerChildStreams(runDir)).toEqual([
+      expect.objectContaining({
+        stream: 'docs-review',
+        run_id: 'docs-run-1',
+        launched_at: '2026-03-27T01:00:00.000Z',
+        recorded_at: '2026-03-27T01:05:00.000Z'
+      })
+    ]);
+  });
+
   it.each([
     ['rejects unsupported child pipelines before launching anything', 'diagnostics', {}, 'provider_worker_child_stream_pipeline_unsupported', 422],
     ['fails closed when provider control-host provenance is missing', 'docs-review', { CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'unexpected-host' }, 'provider_worker_child_stream_provenance_invalid', 412]

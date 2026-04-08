@@ -197,9 +197,91 @@ describe('provider issue observability', () => {
     expect(progress).toMatchObject({
       phase: 'turn_running',
       status: 'progressing',
-      summary: 'docs-review failed at docs:freshness after spec-guard passed'
+      summary: 'docs-review failed at docs:freshness after spec-guard passed',
+      summary_recorded_at: '2026-04-05T05:44:00.000Z'
     });
     expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:00.000Z');
+  });
+
+  it('prefers the latest child-lane summary over generic turn-running filler', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-05T05:40:00.000Z',
+        updated_at: '2026-04-05T05:45:00.000Z',
+        child_lanes: [
+          {
+            stream: 'event-truth',
+            task_id: 'linear-co-109-event-truth',
+            run_id: 'run-lane-109',
+            status: 'completed',
+            launched_at: '2026-04-05T05:43:30.000Z',
+            decision: 'completed',
+            decision_at: '2026-04-05T05:44:30.000Z',
+            summary: 'event-truth lane accepted the authoritative child-summary patch'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'event-truth lane accepted the authoritative child-summary patch'
+    });
+    expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:30.000Z');
+  });
+
+  it('uses the chosen non-empty child summary timestamp when newer child records have blank summaries', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-05T05:40:00.000Z',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-05T05:40:00.000Z',
+        updated_at: '2026-04-05T05:45:00.000Z',
+        child_streams: [
+          {
+            stream: 'co-109-docs-review',
+            task_id: 'linear-co-109-docs-review',
+            run_id: 'run-child-109',
+            status: 'failed',
+            launched_at: '2026-04-05T05:44:00.000Z',
+            recorded_at: '2026-04-05T05:44:10.000Z',
+            summary: 'docs-review failed at docs:freshness after spec-guard passed'
+          }
+        ],
+        child_lanes: [
+          {
+            stream: 'event-truth',
+            task_id: 'linear-co-109-event-truth',
+            run_id: 'run-lane-109',
+            status: 'completed',
+            launched_at: '2026-04-05T05:44:20.000Z',
+            decision: 'completed',
+            decision_at: '2026-04-05T05:44:30.000Z',
+            summary: '   '
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'docs-review failed at docs:freshness after spec-guard passed',
+      summary_recorded_at: '2026-04-05T05:44:10.000Z'
+    });
+    expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:30.000Z');
   });
 
   it('ignores previous-turn child-stream summaries when the current turn has not emitted richer child progress', () => {

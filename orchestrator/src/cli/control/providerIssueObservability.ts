@@ -74,10 +74,16 @@ export interface ProviderLinearWorkerProgressSnapshot {
   kind: ProviderLinearWorkerProgressKind;
   status: ProviderLinearWorkerProgressStatus;
   summary: string;
+  summary_recorded_at?: string | null;
   last_semantic_progress_at: string | null;
   stall_classification: ProviderLinearWorkerStallClassification;
   stall_reason: string | null;
   recovery_recommendation: ProviderLinearWorkerRecoveryRecommendation;
+}
+
+interface ProviderChildProgressSummaryCandidate {
+  summary: string;
+  recorded_at: string | null;
 }
 
 interface ProviderIssueClaimLike {
@@ -134,6 +140,7 @@ interface ProviderIssueChildStreamLike {
   run_id?: string | null;
   status?: string | null;
   launched_at?: string | null;
+  recorded_at?: string | null;
   summary?: string | null;
 }
 
@@ -435,14 +442,18 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const endReason = normalizeOptionalString(proof?.end_reason);
   const claimState = normalizeProviderLinearWorkflowState(claim?.state);
   const currentTurnStartedAt = normalizeOptionalString(proof?.current_turn_started_at);
-  const latestChildProgressSummaryAt = latestIsoTimestamp(
+  const latestChildProgressAt = latestIsoTimestamp(
     selectLatestChildLaneProgressAt(proof?.child_lanes ?? null, currentTurnStartedAt),
     selectLatestChildStreamProgressAt(proof?.child_streams ?? null, currentTurnStartedAt)
+  );
+  const latestChildSummaryCandidate = selectLatestChildProgressSummaryCandidate(
+    proof,
+    currentTurnStartedAt
   );
   const lastSemanticProgressAt = latestIsoTimestamp(
     normalizeOptionalString(proof?.last_event_at),
     latestAudit?.recorded_at ?? null,
-    latestChildProgressSummaryAt,
+    latestChildProgressAt,
     normalizeOptionalString(proof?.attempt_started_at)
   );
 
@@ -577,16 +588,20 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
 
   if (ownerPhase || proof) {
     const phase = normalizeProofProgressPhase(ownerPhase);
-    const summary = resolveAuthoritativeWorkerProgressSummary({
+    const authoritativeWorkerProgress = resolveAuthoritativeWorkerProgress({
       proof,
-      currentTurnStartedAt
-    }) ?? defaultProgressSummaryForPhase(phase);
+      currentTurnStartedAt,
+      latestChildSummaryCandidate
+    });
+    const summary =
+      authoritativeWorkerProgress.summary ?? defaultProgressSummaryForPhase(phase);
     if (isSemanticallyStalled(lastSemanticProgressAt, now())) {
       return {
         phase,
         kind: 'worker',
         status: 'stalled',
         summary,
+        summary_recorded_at: authoritativeWorkerProgress.summary_recorded_at,
         last_semantic_progress_at: lastSemanticProgressAt,
         stall_classification: 'stalled',
         stall_reason:
@@ -601,6 +616,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
       kind: 'worker',
       status: 'progressing',
       summary,
+      summary_recorded_at: authoritativeWorkerProgress.summary_recorded_at,
       last_semantic_progress_at: lastSemanticProgressAt,
       stall_classification: 'progressing',
       stall_reason: null,
@@ -624,22 +640,35 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   return null;
 }
 
-function resolveAuthoritativeWorkerProgressSummary(input: {
+function resolveAuthoritativeWorkerProgress(input: {
   proof: ProviderIssueProofLike | null;
   currentTurnStartedAt?: string | null;
-}): string | null {
+  latestChildSummaryCandidate?: ProviderChildProgressSummaryCandidate | null;
+}): { summary: string | null; summary_recorded_at: string | null } {
   const proofMessage = normalizeOptionalString(input.proof?.last_message);
+  const proofMessageAt = normalizeOptionalString(input.proof?.last_event_at);
   if (isHighSignalProviderProgressSummary(proofMessage)) {
-    return proofMessage;
+    return {
+      summary: proofMessage,
+      summary_recorded_at: proofMessageAt
+    };
   }
-  const latestChildSummary = selectLatestChildProgressSummary(
-    input.proof,
-    normalizeOptionalString(input.currentTurnStartedAt)
-  );
-  if (latestChildSummary) {
-    return latestChildSummary;
+  const latestChildSummaryCandidate =
+    input.latestChildSummaryCandidate ??
+    selectLatestChildProgressSummaryCandidate(
+      input.proof,
+      normalizeOptionalString(input.currentTurnStartedAt)
+    );
+  if (latestChildSummaryCandidate) {
+    return {
+      summary: latestChildSummaryCandidate.summary,
+      summary_recorded_at: latestChildSummaryCandidate.recorded_at
+    };
   }
-  return proofMessage;
+  return {
+    summary: proofMessage,
+    summary_recorded_at: proofMessageAt
+  };
 }
 
 export function selectLatestProviderLinearAuditEntry(
@@ -963,44 +992,47 @@ function defaultProgressSummaryForPhase(phase: ProviderLinearWorkerProgressPhase
   }
 }
 
-function selectLatestChildProgressSummary(
+function selectLatestChildProgressSummaryCandidate(
   proof: ProviderIssueProofLike | null,
   currentTurnStartedAt: string | null = null
-): string | null {
-  const latestLane = selectLatestChildLaneRecord(
-    selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt)
-  );
-  const latestStream = selectLatestChildStreamRecord(
-    selectCurrentTurnChildStreams(proof?.child_streams ?? null, currentTurnStartedAt)
-  );
-  if (!latestLane && !latestStream) {
+): ProviderChildProgressSummaryCandidate | null {
+  const childSummaries = [
+    ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt).map((childLane) => ({
+      summary: normalizeOptionalString(childLane.summary),
+      recorded_at: latestIsoTimestamp(
+        normalizeOptionalString(childLane.decision_at),
+        normalizeOptionalString(childLane.launched_at)
+      )
+    })),
+    ...selectCurrentTurnChildStreams(proof?.child_streams ?? null, currentTurnStartedAt).map((childStream) => ({
+      summary: normalizeOptionalString(childStream.summary),
+      recorded_at: latestIsoTimestamp(
+        normalizeOptionalString(childStream.recorded_at),
+        normalizeOptionalString(childStream.launched_at)
+      )
+    }))
+  ].filter((candidate): candidate is ProviderChildProgressSummaryCandidate => Boolean(candidate.summary));
+  if (childSummaries.length === 0) {
     return null;
   }
-  if (!latestStream) {
-    return normalizeOptionalString(latestLane?.summary);
-  }
-  if (!latestLane) {
-    return normalizeOptionalString(latestStream.summary);
-  }
-  const latestLaneAt = latestIsoTimestamp(
-    normalizeOptionalString(latestLane.decision_at),
-    normalizeOptionalString(latestLane.launched_at)
-  );
-  const latestStreamAt = normalizeOptionalString(latestStream.launched_at);
-  return compareIsoTimestamp(latestLaneAt, latestStreamAt) >= 0
-    ? normalizeOptionalString(latestLane.summary)
-    : normalizeOptionalString(latestStream.summary);
+  return childSummaries.sort((left, right) => compareIsoTimestamp(right.recorded_at, left.recorded_at))[0]
+    ?? null;
 }
 
 function selectLatestChildStreamProgressAt(
   childStreams: ProviderIssueChildStreamLike[] | null | undefined,
   currentTurnStartedAt: string | null = null
 ): string | null {
-  return normalizeOptionalString(
-    selectLatestChildStreamRecord(
-      selectCurrentTurnChildStreams(childStreams, currentTurnStartedAt)
-    )?.launched_at
-  );
+  const currentTurnChildStreams = selectCurrentTurnChildStreams(childStreams, currentTurnStartedAt);
+  if (currentTurnChildStreams.length === 0) {
+    return null;
+  }
+  return currentTurnChildStreams
+    .map((childStream) => latestIsoTimestamp(
+      normalizeOptionalString(childStream.recorded_at),
+      normalizeOptionalString(childStream.launched_at)
+    ))
+    .sort((left, right) => compareIsoTimestamp(right, left))[0] ?? null;
 }
 
 function selectCurrentTurnChildStreams(
@@ -1026,18 +1058,6 @@ function selectActiveChildStream(
     return null;
   }
   return [...active].sort(
-    (left, right) => compareIsoTimestamp(right.launched_at ?? null, left.launched_at ?? null)
-  )[0] ?? null;
-}
-
-function selectLatestChildStreamRecord(
-  childStreams: ProviderIssueChildStreamLike[] | null | undefined
-): ProviderIssueChildStreamLike | null {
-  const streams = childStreams ?? [];
-  if (streams.length === 0) {
-    return null;
-  }
-  return [...streams].sort(
     (left, right) => compareIsoTimestamp(right.launched_at ?? null, left.launched_at ?? null)
   )[0] ?? null;
 }

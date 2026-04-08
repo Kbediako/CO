@@ -169,6 +169,7 @@ export interface ProviderLinearWorkerChildStreamRecord {
   workspace_path: string | null;
   source_setup: DispatchPilotSourceSetup | null;
   launched_at: string;
+  recorded_at?: string | null;
 }
 
 export interface ProviderLinearWorkerChildLaneScope {
@@ -2739,7 +2740,8 @@ function normalizeProviderLinearWorkerChildStreamRecord(
           project_id: normalizeOptionalString(value.source_setup.project_id)
         }
       : null,
-    launched_at: launchedAt
+    launched_at: launchedAt,
+    recorded_at: normalizeOptionalString(value.recorded_at)
   };
 }
 

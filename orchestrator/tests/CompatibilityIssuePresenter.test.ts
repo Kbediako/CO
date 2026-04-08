@@ -167,6 +167,129 @@ describe('CompatibilityIssuePresenter', () => {
     expect(runningEntry.display_event).toBe('updated TECH_SPEC + validating status parity');
   });
 
+  it('keeps the projected child-summary message and timestamp when newer proof telemetry is generic', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        latestEvent: {
+          event: 'turn_running',
+          message: 'docs-review failed at docs:freshness after spec-guard passed',
+          at: '2026-04-06T02:34:00.000Z',
+          requestedBy: null,
+          reason: null
+        },
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'session-3',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'turn_started',
+          last_message: 'Provider worker turn is active.',
+          last_event_at: '2026-04-06T02:35:00.000Z',
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:00.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>,
+        providerDebugSnapshot: {
+          progress: {
+            kind: 'worker',
+            phase: 'turn_running',
+            summary: 'docs-review failed at docs:freshness after spec-guard passed',
+            summary_recorded_at: '2026-04-06T02:34:00.000Z',
+            status: 'progressing',
+            last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+            stall_reason: null,
+            recovery_recommendation: 'continue_waiting',
+            stall_classification: 'progressing'
+          }
+        } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+      })
+    );
+
+    expect(runningEntry.last_event).toBe('turn_running');
+    expect(runningEntry.last_message).toBe(
+      'docs-review failed at docs:freshness after spec-guard passed'
+    );
+    expect(runningEntry.last_event_at).toBe('2026-04-06T02:34:00.000Z');
+    expect(runningEntry.display_event).toBe(
+      'docs-review failed at docs:freshness after spec-guard passed'
+    );
+  });
+
+  it('prefers the source with newer semantic progress even when its displayed summary is older', () => {
+    const fresherSemanticSource = buildCompatibilitySource({
+      issueId: 'issue-100',
+      runId: 'run-with-summary-age',
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      summary: 'Provider worker turn is active.',
+      latestEvent: {
+        event: 'turn_running',
+        message: 'docs-review failed at docs:freshness after spec-guard passed',
+        at: '2026-04-06T02:34:00.000Z',
+        requestedBy: null,
+        reason: null
+      },
+      providerDebugSnapshot: {
+        progress: {
+          kind: 'worker',
+          phase: 'turn_running',
+          summary: 'docs-review failed at docs:freshness after spec-guard passed',
+          summary_recorded_at: '2026-04-06T02:34:00.000Z',
+          status: 'progressing',
+          last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+          stall_reason: null,
+          recovery_recommendation: 'continue_waiting',
+          stall_classification: 'progressing'
+        },
+        last_semantic_progress_at: '2026-04-06T02:35:00.000Z'
+      } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+    });
+    const newerSummaryTimestampSource = buildCompatibilitySource({
+      issueId: 'issue-100',
+      runId: 'run-with-newer-summary-age',
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      summary: 'A sibling source emitted a newer generic row.',
+      latestEvent: {
+        event: 'turn_running',
+        message: 'A sibling source emitted a newer generic row.',
+        at: '2026-04-06T02:34:30.000Z',
+        requestedBy: null,
+        reason: null
+      },
+      updatedAt: '2026-04-06T02:34:30.000Z'
+    });
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(fresherSemanticSource),
+      running: [newerSummaryTimestampSource, fresherSemanticSource]
+    });
+
+    expect(projection.running[0]).toMatchObject({
+      issue_id: 'issue-100',
+      last_message: 'docs-review failed at docs:freshness after spec-guard passed',
+      display_event: 'docs-review failed at docs:freshness after spec-guard passed',
+      last_event_at: '2026-04-06T02:34:00.000Z'
+    });
+  });
+
   it('does not assign shared Linear polling ownership when no tracked Linear issue exists', () => {
     const source = buildCompatibilitySource({
       issueProvider: 'local',
