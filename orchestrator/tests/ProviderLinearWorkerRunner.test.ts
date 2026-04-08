@@ -261,9 +261,12 @@ function expectRefreshAuthHeaders(
   expect(normalized.get('x-csrf-token')).toBe(token);
 }
 
-function createRuntimeContext(): RuntimeCodexCommandContext {
+function createRuntimeContext(
+  runtimeOverrides: Partial<RuntimeCodexCommandContext['runtime']> = {},
+  envOverrides: NodeJS.ProcessEnv = {}
+): RuntimeCodexCommandContext {
   return {
-    env: {},
+    env: envOverrides,
     runtime: {
       requested_mode: 'appserver',
       selected_mode: 'appserver',
@@ -278,7 +281,8 @@ function createRuntimeContext(): RuntimeCodexCommandContext {
         to_mode: null,
         checked_at: '2026-03-21T09:00:00.000Z'
       },
-      env_overrides: {}
+      env_overrides: {},
+      ...runtimeOverrides
     } as never
   };
 }
@@ -5209,6 +5213,101 @@ describe('provider linear worker runner', () => {
       thread_id: null,
       latest_turn_id: null,
       latest_session_id: null,
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'exec_runner_failed'
+    });
+  });
+
+  it('classifies ENOENT launches with a valid runtime workspace as explicit runtime parity failures', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const execRunner = vi.fn(async () => {
+      const error = new Error('spawn failed') as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      throw error;
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () =>
+            createRuntimeContext({
+              selected_mode: 'cli',
+              provider: 'CliRuntimeProvider'
+            })
+          ),
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('spawn failed');
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'runtime_parity_command_unavailable'
+    });
+  });
+
+  it('does not relabel unrelated ENOENT exec failures as runtime parity failures', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const missingRepoRoot = join(tempRoot ?? '', 'missing-repo-root');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: missingRepoRoot
+      }),
+      'utf8'
+    );
+    const execRunner = vi.fn(async () => {
+      const error = new Error('spawn failed') as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      throw error;
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: missingRepoRoot,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('spawn failed');
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
       owner_phase: 'ended',
       owner_status: 'failed',
       end_reason: 'exec_runner_failed'

@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260409-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d",
+      "title": "CO: Fix launchd-supervised control-host child runtime PATH so provider-worker launches resolve node and appserver/login probes truthfully",
+      "relates_to": "tasks/tasks-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d-co-115-docs-review/cli/2026-04-08T17-32-15-382Z-fc180ff1/manifest.json",
+          "override_reason": "The audited docs-review child stream passed spec-guard and docs:check after the repo-supported `npm run docs:archive-tasks` trim returned docs/TASKS.md from 451 to 450 lines, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The CO-115 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker. See out/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d/manual/20260408T173215Z-docs-review-fallback.md."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md",
+        "task": "tasks/tasks-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md",
+        "agent_task": ".agent/task/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md",
+        "docs": "docs/TECH_SPEC-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md"
+      }
+    },
+    {
       "id": "20260409-linear-5f850884-855f-41ed-b593-6c2dee5815d2",
       "title": "CO: Add source 0 to the run contract and shared memory-consumer read path",
       "relates_to": "tasks/tasks-linear-5f850884-855f-41ed-b593-6c2dee5815d2.md",

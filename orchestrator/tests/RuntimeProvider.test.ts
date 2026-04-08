@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 import { resolveRuntimeMode } from '../src/cli/runtime/mode.js';
 import { resolveRuntimeSelection } from '../src/cli/runtime/provider.js';
@@ -114,6 +117,59 @@ describe('runtime provider selection', () => {
     expect(selection.provider).toBe('CliRuntimeProvider');
     expect(selection.fallback.occurred).toBe(true);
     expect(selection.fallback.code).toBe('forced-preflight-failure');
+  });
+
+  it('reports codex command unavailability truthfully when the configured binary is missing', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'runtime-provider-missing-bin-'));
+    try {
+      const selection = await resolveRuntimeSelection({
+        requestedMode: 'appserver',
+        source: 'env',
+        executionMode: 'mcp',
+        repoRoot: process.cwd(),
+        env: {
+          CODEX_CLI_BIN: join(tempRoot, 'codex-missing-for-runtime-provider-test')
+        },
+        runId: 'runtime-missing-codex-bin'
+      });
+
+      expect(selection.requested_mode).toBe('appserver');
+      expect(selection.selected_mode).toBe('cli');
+      expect(selection.provider).toBe('CliRuntimeProvider');
+      expect(selection.fallback.occurred).toBe(true);
+      expect(selection.fallback.code).toBe('codex-command-unavailable');
+      expect(selection.fallback.reason).toContain('Codex CLI executable');
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('reports missing repo roots truthfully when appserver probes cannot enter the workspace', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'runtime-provider-missing-root-'));
+    const missingRepoRoot = join(tempRoot, 'deleted-worktree');
+    try {
+      await rm(tempRoot, { recursive: true, force: true });
+
+      const selection = await resolveRuntimeSelection({
+        requestedMode: 'appserver',
+        source: 'env',
+        executionMode: 'mcp',
+        repoRoot: missingRepoRoot,
+        env: {
+          CODEX_CLI_BIN: process.execPath
+        },
+        runId: 'runtime-missing-repo-root'
+      });
+
+      expect(selection.requested_mode).toBe('appserver');
+      expect(selection.selected_mode).toBe('cli');
+      expect(selection.provider).toBe('CliRuntimeProvider');
+      expect(selection.fallback.occurred).toBe(true);
+      expect(selection.fallback.code).toBe('runtime-workspace-unavailable');
+      expect(selection.fallback.reason).toContain('repo root is unavailable');
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it('fails fast for unsupported cloud+appserver mode', async () => {

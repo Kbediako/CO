@@ -274,6 +274,8 @@ function formatProviderLinearWorkerTerminalBaseSummary(
           return 'Provider linear worker failed because tracked issue rereads did not succeed.';
         case 'exec_runner_failed':
           return 'Provider linear worker failed because the Codex exec runner could not start or complete.';
+        case 'runtime_parity_command_unavailable':
+          return 'Provider linear worker failed because the requested runtime executable was unavailable under the current environment.';
         case 'thread_id_missing':
           return 'Provider linear worker failed because Codex did not emit a thread identifier.';
         case 'provider_linear_worker_proof_missing_or_unreadable':
