@@ -19,6 +19,7 @@ import { loadInstructionSet } from '../../../../packages/orchestrator/src/instru
 import type { EnvironmentPaths } from './environment.js';
 import type { RunPaths } from './runPaths.js';
 import { resolveRunPaths, relativeToRepo } from './runPaths.js';
+import { materializeRunSource0 } from './source0.js';
 import { normalizeWorkspacePath } from './workspacePath.js';
 import { ExperienceStore } from '../../persistence/ExperienceStore.js';
 import { formatExperienceInjections } from '../exec/experience.js';
@@ -211,6 +212,20 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
       sources: pack.sources.map((source) => source.path),
       ...(experiences.length > 0 ? { experiences } : {})
     };
+  });
+  let inheritedSource0: Awaited<ReturnType<typeof loadManifest>> | null = null;
+  if (parentRunId) {
+    try {
+      inheritedSource0 = await loadManifest(env, parentRunId);
+    } catch {
+      inheritedSource0 = null;
+    }
+  }
+  manifest.memory = await materializeRunSource0({
+    env,
+    paths,
+    manifest,
+    inheritedFrom: inheritedSource0
   });
 
   await writeJsonAtomic(paths.manifestPath, manifest);

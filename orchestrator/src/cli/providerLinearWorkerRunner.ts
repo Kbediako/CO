@@ -50,6 +50,7 @@ import {
   PROVIDER_WORKSPACE_ROOT_DIRNAME,
   resolveProviderWorkspacePath
 } from './run/workspacePath.js';
+import { buildRunSource0PromptLines, readRunSource0Descriptor } from './run/source0.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import {
   createRuntimeCodexCommandContext,
@@ -786,12 +787,14 @@ export function buildProviderWorkerPrompt(
   attemptContext: {
     linearAudit?: ProviderLinearAuditSummary | null;
     attemptStartedAt?: string | null;
+    manifest?: Record<string, unknown> | null;
   } = {}
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
     attemptContext.linearAudit ?? null,
     attemptContext.attemptStartedAt ?? null
   );
+  const source0PromptLines = buildRunSource0PromptLines(readRunSource0Descriptor(attemptContext.manifest ?? null));
   if (turnNumber > 1) {
     return [
       'Continuation guidance:',
@@ -823,6 +826,7 @@ export function buildProviderWorkerPrompt(
       '- `Merging` and `Rework` are optional active workflow states only when the team exposes them.',
       ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
       '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
+      ...(source0PromptLines.length > 0 ? ['', ...source0PromptLines] : []),
       '- Keep final closeout in that same workpad comment instead of creating a separate terminal summary comment.',
       '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.',
       '- Focus on the remaining ticket work and do not end the turn while the issue stays active unless you are truly blocked.'
@@ -863,6 +867,7 @@ export function buildProviderWorkerPrompt(
     '- Treat `Merging` and `Rework` as active workflow states only when the team exposes them.',
     ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
     '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
+    ...(source0PromptLines.length > 0 ? ['', ...source0PromptLines] : []),
     issue.url ? `- Linear URL: ${issue.url}` : null,
     issue.state ? `- Current state: ${issue.state}` : null,
     `- This is turn #1 of ${maxTurns} for the current worker run.`,
@@ -3781,7 +3786,8 @@ export async function runProviderLinearWorker(
         sharedRepoCheckoutPath,
         {
           linearAudit: finalProof.linear_audit,
-          attemptStartedAt: finalProof.attempt_started_at ?? null
+          attemptStartedAt: finalProof.attempt_started_at ?? null,
+          manifest: context.manifest
         }
       );
       const args =
