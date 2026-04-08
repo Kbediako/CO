@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import {
   buildActiveCloseoutProvenanceLines,
@@ -55,6 +55,27 @@ async function makeCloseoutBundle(
   await mkdir(bundleDir, { recursive: true });
   await writeFile(join(bundleDir, '09-review.log'), 'placeholder\n', 'utf8');
   return bundleDir;
+}
+
+function buildSource0Descriptor() {
+  return {
+    schema_version: 1,
+    kind: 'context_object',
+    object_id: 'sha256:source0',
+    pointer: 'ctx:sha256:source0#chunk:c000001',
+    dir_path: '.runs/sample-task/cli/sample-run/memory/source-0',
+    index_path: '.runs/sample-task/cli/sample-run/memory/source-0/index.json',
+    source_path: '.runs/sample-task/cli/sample-run/memory/source-0/source.txt',
+    byte_length: 128,
+    chunk_count: 1,
+    created_at: '2026-04-09T00:00:00.000Z',
+    origin: {
+      run_id: 'sample-run',
+      task_id: 'sample-task',
+      manifest_path: '.runs/sample-task/cli/sample-run/manifest.json'
+    },
+    inherited_from: null
+  };
 }
 
 afterEach(async () => {
@@ -142,5 +163,38 @@ describe('review-prompt-context', () => {
       '- These roots are already-resolved self-referential review surfaces for this task; do not re-derive or re-enumerate them unless directly necessary to assess code correctness.'
     ]);
     expect(olderCloseout).not.toBe(result.activeCloseoutBundleRoots[1]);
+  });
+
+  it('adds shared source 0 prompt lines when the manifest exposes the anchor', async () => {
+    const sandbox = await makeSandbox();
+    const manifestDir = join(sandbox, '.runs', 'sample-task', 'cli', 'sample-run');
+    await mkdir(manifestDir, { recursive: true });
+    await writeFile(
+      join(manifestDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'sample-run',
+        task_id: 'sample-task',
+        memory: {
+          source_0: buildSource0Descriptor()
+        }
+      }),
+      'utf8'
+    );
+
+    const result = await buildReviewPromptContext({
+      repoRoot: sandbox,
+      taskKey: 'sample-task',
+      taskLabel: 'sample-task',
+      reviewSurface: 'diff',
+      relativeManifest: '.runs/sample-task/cli/sample-run/manifest.json',
+      runnerLogExists: false,
+      relativeRunnerLog: '.runs/sample-task/cli/sample-run/runner.ndjson',
+      notes: 'Goal: helper test | Summary: source 0 | Risks: none',
+      scopeMode: 'uncommitted'
+    });
+
+    expect(result.promptLines).toContain('Shared source 0 anchor:');
+    expect(result.promptLines).toContain('- Pointer: `ctx:sha256:source0#chunk:c000001`');
+    expect(result.promptLines).toContain('- Source payload: `.runs/sample-task/cli/sample-run/memory/source-0/source.txt`');
   });
 });

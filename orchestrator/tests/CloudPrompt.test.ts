@@ -7,7 +7,7 @@ function invokeBuildCloudPrompt(params: {
   task: TaskContext;
   target: PlanItem;
   pipeline: PipelineDefinition;
-  manifest: Pick<CliManifest, 'prompt_packs'>;
+  manifest: Pick<CliManifest, 'prompt_packs' | 'memory'>;
 }): string {
   return buildCloudPrompt({
     task: params.task,
@@ -16,6 +16,27 @@ function invokeBuildCloudPrompt(params: {
     stage: params.pipeline.stages[0],
     manifest: params.manifest
   });
+}
+
+function buildSource0Descriptor() {
+  return {
+    schema_version: 1,
+    kind: 'context_object' as const,
+    object_id: 'sha256:source0',
+    pointer: 'ctx:sha256:source0#chunk:c000001',
+    dir_path: '.runs/task-1/cli/run-1/memory/source-0',
+    index_path: '.runs/task-1/cli/run-1/memory/source-0/index.json',
+    source_path: '.runs/task-1/cli/run-1/memory/source-0/source.txt',
+    byte_length: 256,
+    chunk_count: 1,
+    created_at: '2026-04-09T00:00:00.000Z',
+    origin: {
+      run_id: 'run-1',
+      task_id: 'task-1',
+      manifest_path: '.runs/task-1/cli/run-1/manifest.json'
+    },
+    inherited_from: null
+  };
 }
 describe('buildCloudPrompt experience injection', () => {
   const task: TaskContext = {
@@ -190,5 +211,23 @@ describe('buildCloudPrompt experience injection', () => {
     expect(prompt).toContain('[exp diag-2]');
     expect(prompt).toContain('[exp diag-3]');
     expect(prompt).not.toContain('[exp diag-4]');
+  });
+
+  it('adds shared source 0 anchor lines when the manifest exposes memory.source_0', () => {
+    const prompt = invokeBuildCloudPrompt({
+      task,
+      target,
+      pipeline,
+      manifest: {
+        prompt_packs: [],
+        memory: {
+          source_0: buildSource0Descriptor()
+        }
+      }
+    });
+
+    expect(prompt).toContain('Shared source 0 anchor:');
+    expect(prompt).toContain('- Pointer: `ctx:sha256:source0#chunk:c000001`');
+    expect(prompt).toContain('- Origin: run=`run-1`, task=`task-1`, manifest=`.runs/task-1/cli/run-1/manifest.json`');
   });
 });

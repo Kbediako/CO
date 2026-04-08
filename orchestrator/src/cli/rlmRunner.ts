@@ -11,6 +11,7 @@ import { detectValidator } from './rlm/validator.js';
 import { buildRlmPrompt } from './rlm/prompt.js';
 import { runRlmLoop } from './rlm/runner.js';
 import { buildContextObject, ContextStore, type ContextSource } from './rlm/context.js';
+import { readRunSource0Descriptor, resolveRunSource0Paths } from './run/source0.js';
 import { runSymbolicLoop, type SymbolicBudgets } from './rlm/symbolic.js';
 import {
   COLLAB_ALLOW_DEFAULT_ROLE_ENV_CANONICAL,
@@ -319,8 +320,9 @@ function resolveRlmMode(
 
 async function resolveContextSource(
   env: NodeJS.ProcessEnv,
+  repoRoot: string,
   fallbackText: string
-): Promise<{ source: ContextSource; bytes: number }> {
+): Promise<{ source: ContextSource; bytes: number; explicit: boolean }> {
   const rawPath = env.RLM_CONTEXT_PATH?.trim();
   if (rawPath) {
     const resolvedPath = resolve(rawPath);
@@ -336,19 +338,34 @@ async function resolveContextSource(
           : (await stat(sourcePath)).size;
       return {
         source: { type: 'dir', value: resolvedPath },
-        bytes: byteLength
+        bytes: byteLength,
+        explicit: true
       };
     }
     if (info.isFile()) {
-      return { source: { type: 'file', value: resolvedPath }, bytes: info.size };
+      return { source: { type: 'file', value: resolvedPath }, bytes: info.size, explicit: true };
     }
     throw new Error('context_source invalid');
+  }
+
+  const manifestPath = env.CODEX_ORCHESTRATOR_MANIFEST_PATH?.trim();
+  if (manifestPath) {
+    const rawManifest = JSON.parse(await readFile(resolve(manifestPath), 'utf8')) as Record<string, unknown>;
+    const descriptor = readRunSource0Descriptor(rawManifest);
+    if (descriptor) {
+      return {
+        source: { type: 'dir', value: resolveRunSource0Paths(repoRoot, descriptor).dirPath },
+        bytes: descriptor.byte_length,
+        explicit: true
+      };
+    }
   }
 
   const text = fallbackText ?? '';
   return {
     source: { type: 'text', value: text },
-    bytes: Buffer.byteLength(text, 'utf8')
+    bytes: Buffer.byteLength(text, 'utf8'),
+    explicit: false
   };
 }
 
@@ -549,15 +566,17 @@ async function main(): Promise<void> {
 
   let contextSource: ContextSource;
   let contextBytes: number;
+  let hasExplicitContextSource = false;
   try {
-    const resolved = await resolveContextSource(env, goal);
+    const resolved = await resolveContextSource(env, repoRoot, goal);
     contextSource = resolved.source;
     contextBytes = resolved.bytes;
+    hasExplicitContextSource = resolved.explicit;
   } catch (error) {
     await writeStateAndExit(
       'invalid_config',
       5,
-      `Invalid RLM_CONTEXT_PATH (${error instanceof Error ? error.message : String(error)}).`,
+      `Invalid RLM context source (${error instanceof Error ? error.message : String(error)}).`,
       {
         goal,
         roles,
@@ -569,7 +588,7 @@ async function main(): Promise<void> {
   }
 
   const delegated = Boolean(env.CODEX_DELEGATION_PARENT_MANIFEST_PATH?.trim());
-  const hasContextPath = Boolean(env.RLM_CONTEXT_PATH?.trim());
+  const hasContextPath = hasExplicitContextSource;
   const mode = resolveRlmMode(env.RLM_MODE, {
     delegated,
     contextBytes,
@@ -1094,6 +1113,7 @@ export const __test__ = {
   resolveAlignmentCheckerEnabled,
   resolveAlignmentCheckerEnforce,
   resolveSymbolicMultiAgentConfig,
+  resolveContextSource,
   resolveRlmMode,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,

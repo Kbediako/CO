@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { __test__ } from '../src/cli/rlmRunner.js';
 
@@ -8,11 +12,20 @@ const {
   parseProbability,
   resolveAlignmentCheckerEnabled,
   resolveAlignmentCheckerEnforce,
+  resolveContextSource,
   DEFAULT_MAX_ITERATIONS,
   DEFAULT_MAX_MINUTES,
   DEFAULT_ALIGNMENT_CHECKER_ENABLED,
   DEFAULT_ALIGNMENT_CHECKER_ENFORCE
 } = __test__;
+
+const sandboxes: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    sandboxes.splice(0).map((sandbox) => rm(sandbox, { recursive: true, force: true }))
+  );
+});
 
 describe('rlmRunner config parsing', () => {
   it('defaults max iterations when undefined', () => {
@@ -75,5 +88,55 @@ describe('rlmRunner config parsing', () => {
     expect(
       resolveAlignmentCheckerEnforce({ RLM_ALIGNMENT_CHECKER_ENFORCE: '0' } as NodeJS.ProcessEnv)
     ).toBe(false);
+  });
+
+  it('uses memory.source_0 from the manifest as an explicit context source when no RLM_CONTEXT_PATH is set', async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), 'rlm-runner-source0-'));
+    sandboxes.push(sandbox);
+    const contextDir = join(sandbox, '.runs', 'task-1', 'cli', 'run-1', 'memory', 'source-0');
+    await mkdir(contextDir, { recursive: true });
+    const manifestPath = join(sandbox, '.runs', 'task-1', 'cli', 'run-1', 'manifest.json');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-1',
+        task_id: 'task-1',
+        memory: {
+          source_0: {
+            schema_version: 1,
+            kind: 'context_object',
+            object_id: 'sha256:source0',
+            pointer: 'ctx:sha256:source0#chunk:c000001',
+            dir_path: '.runs/task-1/cli/run-1/memory/source-0',
+            index_path: '.runs/task-1/cli/run-1/memory/source-0/index.json',
+            source_path: '.runs/task-1/cli/run-1/memory/source-0/source.txt',
+            byte_length: 4096,
+            chunk_count: 1,
+            created_at: '2026-04-09T00:00:00.000Z',
+            origin: {
+              run_id: 'run-1',
+              task_id: 'task-1',
+              manifest_path: '.runs/task-1/cli/run-1/manifest.json'
+            },
+            inherited_from: null
+          }
+        }
+      }),
+      'utf8'
+    );
+
+    const resolved = await resolveContextSource(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath
+      } as NodeJS.ProcessEnv,
+      sandbox,
+      'fallback goal text'
+    );
+
+    expect(resolved).toEqual({
+      source: { type: 'dir', value: contextDir },
+      bytes: 4096,
+      explicit: true
+    });
   });
 });

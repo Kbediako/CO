@@ -174,6 +174,27 @@ function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): Li
   };
 }
 
+function buildSource0Descriptor() {
+  return {
+    schema_version: 1,
+    kind: 'context_object' as const,
+    object_id: 'sha256:source0',
+    pointer: 'ctx:sha256:source0#chunk:c000001',
+    dir_path: '.runs/linear-lin-issue-1/cli/run-child/memory/source-0',
+    index_path: '.runs/linear-lin-issue-1/cli/run-child/memory/source-0/index.json',
+    source_path: '.runs/linear-lin-issue-1/cli/run-child/memory/source-0/source.txt',
+    byte_length: 512,
+    chunk_count: 1,
+    created_at: '2026-03-21T09:00:00.000Z',
+    origin: {
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      manifest_path: '.runs/linear-lin-issue-1/cli/run-child/manifest.json'
+    },
+    inherited_from: null
+  };
+}
+
 function buildInProgressProof(
   overrides: Partial<ProviderLinearWorkerProof> = {}
 ): ProviderLinearWorkerProof {
@@ -572,8 +593,17 @@ describe('provider linear worker runner', () => {
 
     const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
     const sharedRepoCheckoutPath = '/tmp/co';
-    const firstPrompt = buildProviderWorkerPrompt(issue, 1, 5, helperCommand, sharedRepoCheckoutPath);
-    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, sharedRepoCheckoutPath);
+    const manifest = {
+      memory: {
+        source_0: buildSource0Descriptor()
+      }
+    };
+    const firstPrompt = buildProviderWorkerPrompt(issue, 1, 5, helperCommand, sharedRepoCheckoutPath, {
+      manifest
+    });
+    const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, sharedRepoCheckoutPath, {
+      manifest
+    });
 
     expect(firstPrompt).toContain('You are the provider worker for Linear issue CO-2');
     expect(firstPrompt).toContain('Issue description:');
@@ -640,6 +670,8 @@ describe('provider linear worker runner', () => {
     expect(firstPrompt).toContain('leave it untouched and record the explicit skip reason before `Done`');
     expect(firstPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
     expect(firstPrompt).toContain('close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`');
+    expect(firstPrompt).toContain('Shared source 0 anchor:');
+    expect(firstPrompt).toContain('- Pointer: `ctx:sha256:source0#chunk:c000001`');
     expect(continuationPrompt).toContain('Continuation guidance:');
     expect(continuationPrompt).toContain('do not restate them before acting');
     expect(continuationPrompt).not.toContain('Resume from the current workspace and workpad state instead of restarting from scratch.');
@@ -704,6 +736,8 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('leave it untouched and record the explicit skip reason before `Done`');
     expect(continuationPrompt).toContain('If the issue is in `Rework`, treat it as a full approach reset');
     expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.');
+    expect(continuationPrompt).toContain('Shared source 0 anchor:');
+    expect(continuationPrompt).toContain('- Source payload: `.runs/linear-lin-issue-1/cli/run-child/memory/source-0/source.txt`');
   });
 
   it('includes deterministic mutation suppressions in continuation prompts when the same attempt already failed validation', () => {

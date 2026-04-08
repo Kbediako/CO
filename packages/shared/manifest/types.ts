@@ -221,6 +221,30 @@ export interface CodexOrchestratorCLIManifest {
         experiences?: string[] | null;
       }[]
     | null;
+  memory?: {
+    source_0?: {
+      schema_version: number;
+      kind: "context_object";
+      object_id: string;
+      pointer: string;
+      dir_path: string;
+      index_path: string;
+      source_path: string;
+      byte_length: number;
+      chunk_count: number;
+      created_at: string;
+      origin: {
+        run_id: string;
+        task_id: string;
+        manifest_path: string;
+      };
+      inherited_from: {
+        run_id: string;
+        task_id: string;
+        manifest_path: string;
+      } | null;
+    } | null;
+  } | null;
   tfgrpo?: {
     epoch?: number | null;
     group_id?: string | null;

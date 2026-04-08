@@ -21,6 +21,7 @@ import {
   resolveRuntimeCodexCommand,
   type RuntimeCodexCommandContext
 } from './runtime/index.js';
+import { buildRunSource0PromptLines, readRunSource0Descriptor } from './run/source0.js';
 import { resolveProviderLinearChildLaneScopeContract } from './providerLinearChildLanePhaseContract.js';
 
 const execFileAsync = promisify(execFile);
@@ -78,6 +79,7 @@ interface ProviderLinearChildLaneContext {
   purpose: string;
   instructions: string | null;
   scope: ProviderLinearWorkerChildLaneScope;
+  source0PromptLines: string[];
   parentWorkspacePath: string;
   parentSnapshot: ProviderLinearWorkerChildLaneParentSnapshot;
 }
@@ -154,6 +156,7 @@ function buildChildLanePrompt(context: ProviderLinearChildLaneContext): string {
     '',
     `Purpose: ${context.purpose}`,
     ...scopeLines,
+    ...(context.source0PromptLines.length > 0 ? ['', ...context.source0PromptLines] : []),
     '',
     context.instructions ? `Additional instructions:\n${context.instructions}` : 'Additional instructions: none.',
     '',
@@ -235,6 +238,7 @@ async function loadProviderLinearChildLaneContext(
     purpose,
     instructions: normalizeOptionalString(env[PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV]),
     scope,
+    source0PromptLines: buildRunSource0PromptLines(readRunSource0Descriptor(rawManifest)),
     parentWorkspacePath: resolve(parentWorkspacePath),
     parentSnapshot: {
       base_sha: normalizeOptionalString(env[PROVIDER_LINEAR_CHILD_LANE_PARENT_SNAPSHOT_BASE_SHA_ENV]),
@@ -406,3 +410,7 @@ if (entry && entry === self) {
     process.exitCode = 1;
   });
 }
+
+export const __test__ = {
+  buildChildLanePrompt
+};

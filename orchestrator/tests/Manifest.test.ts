@@ -9,6 +9,7 @@ import {
   ensureGuardrailStatus,
   loadManifest
 } from '../src/cli/run/manifest.js';
+import { readRunSource0Payload } from '../src/cli/run/source0.js';
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import type { CliManifestCommand, PipelineDefinition } from '../src/cli/types.js';
 
@@ -128,6 +129,74 @@ describe('bootstrapManifest', () => {
         process.env.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID =
           previousProviderEnv.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID;
       }
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('creates a source_0 contract and preserves the anchor across child manifests', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'manifest-source0-'));
+    const parentEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-parent'
+    };
+    const childEnv: EnvironmentPaths = {
+      repoRoot,
+      runsRoot: join(repoRoot, '.runs'),
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'task-child'
+    };
+    const pipeline: PipelineDefinition = { id: 'test', title: 'Test Pipeline', stages: [] };
+
+    try {
+      const parent = await bootstrapManifest('run-parent', {
+        env: parentEnv,
+        pipeline,
+        parentRunId: null,
+        taskSlug: null,
+        approvalPolicy: null
+      });
+      const parentSource0 = parent.manifest.memory?.source_0;
+      expect(parentSource0).toBeTruthy();
+      expect(parentSource0?.kind).toBe('context_object');
+      expect(parentSource0?.origin).toEqual({
+        run_id: 'run-parent',
+        task_id: 'task-parent',
+        manifest_path: join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
+      });
+      expect(parentSource0?.inherited_from).toBeNull();
+
+      const payload = parentSource0
+        ? await readRunSource0Payload(repoRoot, parentSource0)
+        : null;
+      expect(payload?.kind).toBe('run_source_0');
+      expect(payload?.run_contract.run_id).toBe('run-parent');
+      expect(payload?.artifacts.manifest_path).toBe(
+        join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
+      );
+
+      const child = await bootstrapManifest('run-child', {
+        env: childEnv,
+        pipeline,
+        parentRunId: 'run-parent',
+        taskSlug: null,
+        approvalPolicy: null
+      });
+      const childSource0 = child.manifest.memory?.source_0;
+      expect(childSource0).toBeTruthy();
+      expect(childSource0?.object_id).toBe(parentSource0?.object_id);
+      expect(childSource0?.pointer).toBe(parentSource0?.pointer);
+      expect(childSource0?.origin).toEqual(parentSource0?.origin);
+      expect(childSource0?.dir_path).toBe(
+        join('.runs', 'task-child', 'cli', 'run-child', 'memory', 'source-0')
+      );
+      expect(childSource0?.inherited_from).toEqual({
+        run_id: 'run-parent',
+        task_id: 'task-parent',
+        manifest_path: join('.runs', 'task-parent', 'cli', 'run-parent', 'manifest.json')
+      });
+    } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }
   });
