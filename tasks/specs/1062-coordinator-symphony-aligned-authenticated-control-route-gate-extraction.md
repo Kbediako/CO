@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-authenticated-control-route-ga
 risk: high
 owners:
   - Codex
-last_review: 2026-03-08
+last_review: 2026-04-08
 ---
 
 # Spec Mirror - 1062 Coordinator Symphony-Aligned Authenticated Control Route Gate Extraction

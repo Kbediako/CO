@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-standalone-review-command-inte
 risk: high
 owners:
   - Codex
-last_review: 2026-03-08
+last_review: 2026-04-08
 ---
 
 # Spec Mirror - 1061 Coordinator Symphony-Aligned Standalone Review Command-Intent Boundary Guard
