@@ -137,6 +137,84 @@ describe('implementation-docs-archive script', () => {
     expect(payloadContent).toContain('# PRD Archive Test');
   });
 
+  it('archives docs when tasks/index marks the task as completed', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        status: 'completed',
+        completed_at: '2025-01-01'
+      }
+    });
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const stubContent = await readFile(join(repo, 'docs', 'PRD-archive-test.md'), 'utf8');
+    const payloadContent = await readFile(
+      join(
+        repo,
+        'out',
+        'implementation-docs-archive-automation',
+        'docs-archive',
+        'docs',
+        'PRD-archive-test.md'
+      ),
+      'utf8'
+    );
+
+    expect(stubContent).toContain('<!-- docs-archive:stub -->');
+    expect(payloadContent).toContain('# PRD Archive Test');
+  });
+
+  it('archives stale report-only findings when the linked task is terminal', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/findings/9999-archive-test-deliberation.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      }
+    });
+
+    await mkdir(join(repo, 'docs', 'findings'), { recursive: true });
+    const findingsPath = join(repo, 'docs', 'findings', '9999-archive-test-deliberation.md');
+    const findingsBefore = '# Findings\n\nHistorical deliberation.\n';
+    await writeFile(findingsPath, findingsBefore);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const registry = JSON.parse(await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8'));
+    const findingsEntry = registry.entries.find(
+      (entry: { path?: string }) => entry.path === 'docs/findings/9999-archive-test-deliberation.md'
+    );
+
+    expect(findingsEntry).toMatchObject({
+      path: 'docs/findings/9999-archive-test-deliberation.md',
+      status: 'archived'
+    });
+    expect(await readFile(findingsPath, 'utf8')).toBe(findingsBefore);
+  });
+
   it('keeps docs freshness registry unchanged when no archives are produced', async () => {
     const repo = await initRepository({
       policyOverrides: { retain_days: 99999, max_lines: 99999 }

@@ -257,18 +257,18 @@
     },
     {
       "id": "20260406-linear-f0d312eb-055f-4926-80df-8fcaaf56839c",
-      "title": "CO workflow: unblock repo-wide spec/docs freshness review blockers",
+      "title": "CO workflow: stop repo-wide docs baseline regressions from forcing manual fallback in unrelated lanes",
       "relates_to": "tasks/tasks-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-06",
+      "last_review": "2026-04-09",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
-          "date": "2026-04-06",
-          "manifest": ".runs/linear-f0d312eb-055f-4926-80df-8fcaaf56839c-co-102-docs-review/cli/2026-04-06T03-20-19-962Z-29dd089f/manifest.json"
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-f0d312eb-055f-4926-80df-8fcaaf56839c-co-102-docs-review-r2/cli/2026-04-08T22-48-54-430Z-492ca414/manifest.json"
         }
       },
       "paths": {
@@ -5735,7 +5735,9 @@
         "task": "tasks/tasks-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md",
         "agent_task": ".agent/task/1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-question-child-resolution-adapter-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-09"
     },
     {
       "id": "20260308-1072-coordinator-symphony-aligned-control-request-context-assembly-extraction",
@@ -5751,7 +5753,9 @@
         "task": "tasks/tasks-1072-coordinator-symphony-aligned-control-request-context-assembly-extraction.md",
         "agent_task": ".agent/task/1072-coordinator-symphony-aligned-control-request-context-assembly-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-request-context-assembly-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1071-coordinator-symphony-aligned-control-event-transport-extraction",
@@ -5767,7 +5771,9 @@
         "task": "tasks/tasks-1071-coordinator-symphony-aligned-control-event-transport-extraction.md",
         "agent_task": ".agent/task/1071-coordinator-symphony-aligned-control-event-transport-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-event-transport-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1070-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction",
@@ -5783,7 +5789,9 @@
         "task": "tasks/tasks-1070-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
         "agent_task": ".agent/task/1070-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-bootstrap-and-telegram-bridge-lifecycle-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction",
@@ -5799,7 +5807,9 @@
         "task": "tasks/tasks-1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md",
         "agent_task": ".agent/task/1069-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-expiry-cycle-and-timer-ownership-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction",
@@ -5815,7 +5825,9 @@
         "task": "tasks/tasks-1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction.md",
         "agent_task": ".agent/task/1068-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-question-queue-child-resolution-adapter-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1067-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure",
@@ -5831,7 +5843,9 @@
         "task": "tasks/tasks-1067-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure.md",
         "agent_task": ".agent/task/1067-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-manifest-affinity-and-termination-closure.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard",
@@ -5847,7 +5861,9 @@
         "task": "tasks/tasks-1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md",
         "agent_task": ".agent/task/1066-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-validation-suite-boundary-guard.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1065-coordinator-symphony-aligned-authenticated-route-controller-extraction",
@@ -5863,7 +5879,9 @@
         "task": "tasks/tasks-1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md",
         "agent_task": ".agent/task/1065-coordinator-symphony-aligned-authenticated-route-controller-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-route-controller-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1064-coordinator-symphony-aligned-authenticated-route-controller-context-extraction",
@@ -5879,7 +5897,9 @@
         "task": "tasks/tasks-1064-coordinator-symphony-aligned-authenticated-route-controller-context-extraction.md",
         "agent_task": ".agent/task/1064-coordinator-symphony-aligned-authenticated-route-controller-context-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-route-controller-context-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1063-coordinator-symphony-aligned-authenticated-route-dispatcher-extraction",
@@ -5895,7 +5915,9 @@
         "task": "tasks/tasks-1063-coordinator-symphony-aligned-authenticated-route-dispatcher-extraction.md",
         "agent_task": ".agent/task/1063-coordinator-symphony-aligned-authenticated-route-dispatcher-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-route-dispatcher-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1062-coordinator-symphony-aligned-authenticated-control-route-gate-extraction",
@@ -5911,7 +5933,9 @@
         "task": "tasks/tasks-1062-coordinator-symphony-aligned-authenticated-control-route-gate-extraction.md",
         "agent_task": ".agent/task/1062-coordinator-symphony-aligned-authenticated-control-route-gate-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-authenticated-control-route-gate-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard",
@@ -5927,7 +5951,9 @@
         "task": "tasks/tasks-1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
         "agent_task": ".agent/task/1061-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-command-intent-boundary-guard.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1060-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard",
@@ -5943,7 +5969,9 @@
         "task": "tasks/tasks-1060-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard.md",
         "agent_task": ".agent/task/1060-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-meta-surface-expansion-guard.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard",
@@ -5959,7 +5987,9 @@
         "task": "tasks/tasks-1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md",
         "agent_task": ".agent/task/1059-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-low-signal-drift-guard.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction",
@@ -5975,7 +6005,9 @@
         "task": "tasks/tasks-1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md",
         "agent_task": ".agent/task/1058-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-execution-state-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1057-coordinator-symphony-aligned-control-action-controller-extraction",
@@ -5991,7 +6023,9 @@
         "task": "tasks/tasks-1057-coordinator-symphony-aligned-control-action-controller-extraction.md",
         "agent_task": ".agent/task/1057-coordinator-symphony-aligned-control-action-controller-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-controller-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction",
@@ -6007,7 +6041,9 @@
         "task": "tasks/tasks-1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
         "agent_task": ".agent/task/1056-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-controller-sequencing-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1055-coordinator-symphony-aligned-control-action-finalization-extraction",
@@ -6023,7 +6059,9 @@
         "task": "tasks/tasks-1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
         "agent_task": ".agent/task/1055-coordinator-symphony-aligned-control-action-finalization-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-finalization-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1054-coordinator-symphony-aligned-control-action-execution-extraction",
@@ -6039,7 +6077,9 @@
         "task": "tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
         "agent_task": ".agent/task/1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-action-execution-extraction.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-03-08"
     },
     {
       "id": "20260308-1053-coordinator-symphony-aligned-control-action-cancel-confirmation-resolution-extraction",
@@ -6431,7 +6471,7 @@
       "title": "Coordinator Symphony-Aligned Control Action Execution Extraction",
       "path": "tasks/tasks-1054-coordinator-symphony-aligned-control-action-execution-extraction.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "coordinator-symphony-aligned-control-action-execution-extraction-docs-first",
         "status": "succeeded",
@@ -6439,7 +6479,7 @@
         "run_id": "20260307T160831Z-docs-first"
       },
       "created_at": "2026-03-08",
-      "completed_at": null
+      "completed_at": "2026-03-08"
     },
     {
       "id": "1053",
@@ -7270,7 +7310,7 @@
       "title": "Manifest Persister Throughput",
       "path": "tasks/tasks-0935-manifest-persister-throughput.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "manifest-persister-throughput-planning",
         "status": "approved",
@@ -7278,7 +7318,7 @@
         "run_id": "2026-01-06T00-38-50-402Z-120c37a4"
       },
       "created_at": "2026-01-05",
-      "completed_at": null
+      "completed_at": "2026-01-06"
     },
     {
       "id": "0936",
@@ -7286,7 +7326,7 @@
       "title": "Metrics Pending IO Batching",
       "path": "tasks/tasks-0936-metrics-pending-io-batching.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "metrics-pending-io-batching-planning",
         "status": "approved",
@@ -7294,7 +7334,7 @@
         "run_id": "2026-01-06T01-06-48-284Z-792d4ebb"
       },
       "created_at": "2026-01-06",
-      "completed_at": null
+      "completed_at": "2026-01-06"
     },
     {
       "id": "0937",
@@ -7302,7 +7342,7 @@
       "title": "Metrics Pending Batch Cap",
       "path": "tasks/tasks-0937-metrics-pending-batch-cap.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "metrics-pending-batch-cap-planning",
         "status": "approved",
@@ -7310,7 +7350,7 @@
         "run_id": "2026-01-06T02-47-08-254Z-23dd2c54"
       },
       "created_at": "2026-01-06",
-      "completed_at": null
+      "completed_at": "2026-01-06"
     },
     {
       "id": "0938",
@@ -7318,7 +7358,7 @@
       "title": "Metrics Pending Streaming Merge",
       "path": "tasks/tasks-0938-metrics-pending-streaming-merge.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "metrics-pending-streaming-merge-planning",
         "status": "approved",
@@ -7326,7 +7366,7 @@
         "run_id": "2026-01-06T04-14-49-312Z-de71c874"
       },
       "created_at": "2026-01-06",
-      "completed_at": null
+      "completed_at": "2026-01-06"
     },
     {
       "id": "0939",
@@ -7334,7 +7374,7 @@
       "title": "Orchestrator Performance & Reliability Loop 2",
       "path": "tasks/tasks-0939-orchestrator-performance-reliability-loop-2.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "orchestrator-performance-reliability-loop-2-planning",
         "status": "approved",
@@ -7342,7 +7382,7 @@
         "run_id": "2026-01-06T07-49-03-214Z-a31732c2"
       },
       "created_at": "2026-01-06",
-      "completed_at": null
+      "completed_at": "2026-01-06"
     },
     {
       "id": "0940",

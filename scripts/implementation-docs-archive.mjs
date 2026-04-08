@@ -19,6 +19,8 @@ const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
 const ARCHIVE_MARKER = '<!-- docs-archive:stub -->';
 const DEFAULT_OWNER = 'Codex (top-level agent), Review agent';
+const TERMINAL_TASK_STATUSES = new Set(['succeeded', 'completed']);
+const REPORT_ONLY_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*-deliberation\.md$/;
 
 function showUsage() {
   console.log(`Usage: node scripts/implementation-docs-archive.mjs [options]
@@ -241,6 +243,23 @@ function parsePolicy(raw, policyPath) {
   };
 }
 
+function isCompletedTaskItem(item) {
+  if (!item || typeof item !== 'object') {
+    return false;
+  }
+
+  const status = typeof item.status === 'string' ? item.status : '';
+  const gateStatus = typeof item.gate?.status === 'string' ? item.gate.status : '';
+  return TERMINAL_TASK_STATUSES.has(status) || gateStatus === 'succeeded';
+}
+
+function extractNumericTaskId(taskKey) {
+  if (typeof taskKey !== 'string') {
+    return null;
+  }
+  const match = taskKey.match(/^(\d+)-/);
+  return match?.[1] ?? null;
+}
 
 async function collectDocFiles(repoRoot) {
   const roots = ['docs', 'tasks', '.agent/task'];
@@ -356,6 +375,7 @@ async function main() {
 
   const taskLinkedDocs = new Set();
   const taskCandidates = [];
+  const reportOnlyRetentionCandidates = new Map();
 
   for (const item of items) {
     const taskKey = normalizeTaskKey(item);
@@ -402,13 +422,25 @@ async function main() {
       taskLinkedDocs.add(pathValue);
     }
 
-    const status = typeof item.status === 'string' ? item.status : '';
     const completedDate = parseIsoDate(item.completed_at);
-    if (status !== 'succeeded' || !completedDate) {
+    if (!completedDate || !isCompletedTaskItem(item)) {
       continue;
     }
 
     const ageDays = computeAgeInDays(completedDate, today);
+    const numericTaskId = extractNumericTaskId(taskKey);
+    if (numericTaskId && ageDays >= policy.retainDays) {
+      const existingCandidate = reportOnlyRetentionCandidates.get(numericTaskId);
+      const nextCandidate = {
+        taskId: numericTaskId,
+        taskKey,
+        completedAt: formatDate(completedDate),
+        ageDays
+      };
+      if (!existingCandidate || existingCandidate.completedAt < nextCandidate.completedAt) {
+        reportOnlyRetentionCandidates.set(numericTaskId, nextCandidate);
+      }
+    }
     for (const pathValue of docPaths) {
       if (excludeSet.has(pathValue)) {
         continue;
@@ -433,6 +465,17 @@ async function main() {
   }
 
   const allDocs = await collectDocFiles(repoRoot);
+  const reportOnlyFindingsByTaskId = new Map();
+  for (const docPath of allDocs) {
+    const match = docPath.match(REPORT_ONLY_FINDINGS_PATTERN);
+    if (!match) {
+      continue;
+    }
+    const taskId = match[1];
+    const existing = reportOnlyFindingsByTaskId.get(taskId) ?? [];
+    existing.push(docPath);
+    reportOnlyFindingsByTaskId.set(taskId, existing);
+  }
   const strayCandidates = allDocs.filter((docPath) => {
     if (excludeSet.has(docPath)) {
       return false;
@@ -648,6 +691,47 @@ async function main() {
       context: strayContext,
       loadedDoc
     });
+  }
+
+  for (const [taskId, taskContext] of reportOnlyRetentionCandidates.entries()) {
+    const findingPaths = reportOnlyFindingsByTaskId.get(taskId) ?? [];
+    for (const relativePath of findingPaths) {
+      const registryEntry = registryMap.get(relativePath);
+      if (!registryEntry || registryEntry.status === 'archived') {
+        continue;
+      }
+
+      const cadenceDays = Number.isFinite(registryEntry?.cadence_days)
+        ? Number(registryEntry.cadence_days)
+        : NaN;
+      const reviewDate = parseIsoDate(registryEntry?.last_review ?? null);
+      if (!reviewDate || !Number.isInteger(cadenceDays) || cadenceDays <= 0) {
+        continue;
+      }
+
+      const ageDays = computeAgeInDays(reviewDate, today);
+      if (ageDays <= cadenceDays) {
+        continue;
+      }
+
+      const previousLastReview = registryEntry.last_review;
+      registryEntry.status = 'archived';
+      registryEntry.last_review = todayString;
+      if (!registryEntry.owner || typeof registryEntry.owner !== 'string') {
+        registryEntry.owner = DEFAULT_OWNER;
+      }
+
+      report.archived.push({
+        path: relativePath,
+        reason: 'report_only_retention',
+        context: {
+          ...taskContext,
+          report_last_review: previousLastReview,
+          report_age_days: ageDays
+        }
+      });
+      report.totals.archived += 1;
+    }
   }
 
   report.totals.stray_candidates = report.stray_candidates.length;
