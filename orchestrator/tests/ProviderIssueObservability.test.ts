@@ -170,6 +170,38 @@ describe('provider issue observability', () => {
     expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:00.000Z');
   });
 
+  it('treats no-period generic worker filler as replaceable by richer child progress', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_started',
+        last_message: 'Provider worker turn is active',
+        last_event_at: '2026-04-05T05:40:00.000Z',
+        updated_at: '2026-04-05T05:45:00.000Z',
+        child_streams: [
+          {
+            stream: 'co-109-docs-review',
+            task_id: 'linear-co-109-docs-review',
+            run_id: 'run-child-109',
+            status: 'failed',
+            launched_at: '2026-04-05T05:44:00.000Z',
+            summary: 'docs-review failed at docs:freshness after spec-guard passed'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'docs-review failed at docs:freshness after spec-guard passed'
+    });
+    expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:00.000Z');
+  });
+
   it('ignores previous-turn child-stream summaries when the current turn has not emitted richer child progress', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

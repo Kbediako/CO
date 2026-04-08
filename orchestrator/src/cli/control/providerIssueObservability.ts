@@ -1136,12 +1136,19 @@ function isHighSignalProviderProgressSummary(value: string | null): value is str
 
 const GENERIC_PROVIDER_PROGRESS_SUMMARIES = new Set([
   'provider worker is bootstrapping.',
+  'provider worker is bootstrapping',
   'provider worker turn is active.',
+  'provider worker turn is active',
   'provider worker completed a turn and is evaluating next steps.',
+  'provider worker completed a turn and is evaluating next steps',
   'provider worker turn failed.',
+  'provider worker turn failed',
   'provider worker progress updated.',
+  'provider worker progress updated',
   'turn active.',
-  'turn is still running.'
+  'turn active',
+  'turn is still running.',
+  'turn is still running'
 ]);
 
 function latestIsoTimestamp(...values: Array<string | null | undefined>): string | null {
