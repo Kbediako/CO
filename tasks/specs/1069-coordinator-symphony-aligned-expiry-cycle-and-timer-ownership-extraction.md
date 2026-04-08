@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-expiry-cycle-and-timer-ownersh
 risk: high
 owners:
   - Codex
-last_review: 2026-03-08
+last_review: 2026-04-08
 ---
 
 # Spec Mirror - 1069 Coordinator Symphony-Aligned Expiry Cycle and Timer Ownership Extraction

@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-question-queue-child-resolutio
 risk: high
 owners:
   - Codex
-last_review: 2026-03-08
+last_review: 2026-04-08
 ---
 
 # Spec Mirror - 1068 Coordinator Symphony-Aligned Question Queue Child-Resolution Adapter Extraction

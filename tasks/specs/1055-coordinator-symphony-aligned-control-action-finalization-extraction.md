@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-control-action-finalization-ex
 risk: high
 owners:
   - Codex
-last_review: 2026-03-08
+last_review: 2026-04-08
 ---
 
 # TECH_SPEC - Coordinator Symphony-Aligned Control Action Finalization Extraction

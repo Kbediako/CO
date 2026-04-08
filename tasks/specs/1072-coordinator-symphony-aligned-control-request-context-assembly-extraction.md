@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-control-request-context-assemb
 risk: high
 owners:
   - Codex
-last_review: 2026-03-08
+last_review: 2026-04-08
 ---
 
 # Spec Mirror - 1072 Coordinator Symphony-Aligned Control Request Context Assembly Extraction

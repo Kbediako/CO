@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-control-server-bootstrap-and-t
 risk: high
 owners:
   - Codex
-last_review: 2026-03-08
+last_review: 2026-04-08
 ---
 
 # Spec Mirror - 1070 Coordinator Symphony-Aligned Control Server Bootstrap and Telegram Bridge Lifecycle Extraction

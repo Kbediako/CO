@@ -5,7 +5,7 @@ relates_to: docs/PRD-coordinator-symphony-aligned-control-event-transport-extrac
 risk: high
 owners:
   - Codex
-last_review: 2026-03-08
+last_review: 2026-04-08
 ---
 
 # Spec Mirror - 1071 Coordinator Symphony-Aligned Control Event Transport Extraction

@@ -1612,6 +1612,17 @@ Subcommands:
     --project-id <id>     Optional project scope check.
     --format json         Emit machine-readable output.
 
+  screenshot-proof
+    --issue-id <id>       Linear issue id/key for audit continuity.
+    --output <path>       Optional local screenshot path (.png/.jpg/.jpeg). Defaults under .tmp/.
+    --display-id <id>     Optional macOS display id for bounded display capture.
+    --window-id <id>      Optional macOS window id for bounded window capture.
+    --open-preview        Open the captured file in Preview and attempt bounded AppleScript cleanup.
+    --workspace-id <id>   Optional workspace scope check.
+    --team-id <id>        Optional team scope check.
+    --project-id <id>     Optional project scope check.
+    --format json         Emit machine-readable output.
+
   child-stream
     --pipeline <id>       Allowlisted child pipeline: docs-review, implementation-gate, or docs-relevance-advisory.
     --stream <name>       Optional task-id suffix for the child stream (defaults to the pipeline id).

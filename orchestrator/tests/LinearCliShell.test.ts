@@ -414,6 +414,101 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('routes screenshot-proof into the local macOS capture resolver and records audit metadata', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const resolveProviderLinearScreenshotProofMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearScreenshotProof.js').resolveProviderLinearScreenshotProof>()
+        .mockResolvedValue({
+          ok: true,
+          capture: {
+            platform: 'darwin',
+            mode: 'display',
+            display_id: null,
+            window_id: null,
+            open_preview: false,
+            command: {
+              executable: 'screencapture',
+              args: ['-x', '/repo/.tmp/proof.png']
+            },
+            output_path: '/repo/.tmp/proof.png',
+            file_url: 'file:///repo/.tmp/proof.png',
+            embed_markdown: '![Proof screenshot](file:///repo/.tmp/proof.png)',
+            bytes: 42,
+            media_type: 'image/png',
+            cleanup: {
+              attempted: false,
+              status: 'skipped',
+              summary: 'Cleanup skipped because the helper did not open a temporary Preview surface.',
+              command: null,
+              exit_code: null,
+              stdout: null,
+              stderr: null
+            }
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['screenshot-proof'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          output: '/repo/.tmp/proof.png'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        resolveProviderLinearScreenshotProof: resolveProviderLinearScreenshotProofMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
+        }),
+        getCwd: () => '/repo',
+        now: () => '2026-04-08T06:00:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(resolveProviderLinearScreenshotProofMock).toHaveBeenCalledWith({
+      cwd: '/repo',
+      outputPath: '/repo/.tmp/proof.png',
+      displayId: null,
+      windowId: null,
+      openPreview: false
+    });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'screenshot-proof',
+      issue_id: 'lin-issue-1',
+      capture: {
+        output_path: '/repo/.tmp/proof.png',
+        cleanup: {
+          status: 'skipped'
+        }
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
+      recorded_at: '2026-04-08T06:00:00.000Z',
+      operation: 'screenshot-proof',
+      ok: true,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: 'display',
+      via: 'cleanup:skipped',
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: null,
+      error_message: null
+    });
+  });
+
   it('resolves runtime-proof permits from the repo root when invoked in a nested package directory', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-runtime-proof-root-'));
     tempDirs.push(repoRoot);

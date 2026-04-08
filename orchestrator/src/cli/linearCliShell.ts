@@ -34,6 +34,11 @@ import {
   type ProviderLinearRuntimeProofReachability
 } from './control/providerLinearRuntimeProof.js';
 import {
+  resolveProviderLinearScreenshotProof,
+  type ProviderLinearScreenshotProofCapture,
+  type ProviderLinearScreenshotProofError
+} from './control/providerLinearScreenshotProof.js';
+import {
   runProviderLinearChildStreamShell,
   type ProviderLinearChildStreamResult
 } from './providerLinearChildStreamShell.js';
@@ -61,6 +66,7 @@ interface LinearCliShellDependencies {
   runProviderLinearChildLaneShell: typeof runProviderLinearChildLaneShell;
   createProviderLinearFollowUpIssue: typeof createProviderLinearFollowUpIssue;
   resolveProviderLinearRuntimeProof: typeof resolveProviderLinearRuntimeProof;
+  resolveProviderLinearScreenshotProof: typeof resolveProviderLinearScreenshotProof;
   appendAuditEntry: typeof appendProviderLinearAuditEntry;
   readTextFile: (path: string) => Promise<string>;
   getEnv: () => NodeJS.ProcessEnv;
@@ -122,6 +128,23 @@ type ProviderLinearRuntimeProofResult =
       };
     };
 
+type ProviderLinearScreenshotProofResult =
+  | {
+      ok: true;
+      operation: 'screenshot-proof';
+      issue_id: string;
+      source_setup: DispatchPilotSourceSetup | null;
+      capture: ProviderLinearScreenshotProofCapture;
+    }
+  | {
+      ok: false;
+      operation: 'screenshot-proof';
+      issue_id: string | null;
+      source_setup: DispatchPilotSourceSetup | null;
+      capture: ProviderLinearScreenshotProofCapture | null;
+      error: ProviderLinearScreenshotProofError;
+    };
+
 const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   getProviderLinearIssueContext,
   upsertProviderLinearWorkpadComment,
@@ -132,6 +155,7 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   runProviderLinearChildLaneShell,
   createProviderLinearFollowUpIssue,
   resolveProviderLinearRuntimeProof,
+  resolveProviderLinearScreenshotProof,
   appendAuditEntry: appendProviderLinearAuditEntry,
   readTextFile: async (path: string) => await readFile(path, 'utf8'),
   getEnv: () => process.env,
@@ -383,6 +407,47 @@ export async function runLinearCliShell(
               issue_id: issueId,
               source_setup: sourceSetup,
               policy: resolved.policy,
+              error: resolved.error
+            };
+        await recordAuditResult(result, params.flags, env, dependencies);
+        emitJsonResult(result, dependencies);
+        return;
+      }
+      case 'screenshot-proof': {
+        assertAllowedFlags(params.flags, [
+          'format',
+          'issue-id',
+          'workspace-id',
+          'team-id',
+          'project-id',
+          'output',
+          'display-id',
+          'window-id',
+          'open-preview'
+        ]);
+        const issueId = requireFlag(params.flags, 'issue-id');
+        const sourceSetup = resolveAuditSourceSetup(params.flags, env);
+        const resolved = await dependencies.resolveProviderLinearScreenshotProof({
+          cwd: dependencies.getCwd(),
+          outputPath: readRawStringFlag(params.flags, 'output') ?? null,
+          displayId: readStringFlag(params.flags, 'display-id') ?? null,
+          windowId: readStringFlag(params.flags, 'window-id') ?? null,
+          openPreview: readBooleanFlag(params.flags, 'open-preview')
+        });
+        const result: ProviderLinearScreenshotProofResult = resolved.ok
+          ? {
+              ok: true,
+              operation: 'screenshot-proof',
+              issue_id: issueId,
+              source_setup: sourceSetup,
+              capture: resolved.capture
+            }
+          : {
+              ok: false,
+              operation: 'screenshot-proof',
+              issue_id: issueId,
+              source_setup: sourceSetup,
+              capture: resolved.capture,
               error: resolved.error
             };
         await recordAuditResult(result, params.flags, env, dependencies);
@@ -734,6 +799,7 @@ type LinearCliResult =
   | ProviderLinearAttachPrResult
   | ProviderLinearCreateFollowUpResult
   | ProviderLinearRuntimeProofResult
+  | ProviderLinearScreenshotProofResult
   | ProviderLinearChildStreamResult
   | ProviderLinearChildLaneResult;
 
@@ -796,6 +862,26 @@ function buildAuditEntry(
         action: result.stream ? `${result.action}:${result.stream}` : result.action,
         via: result.child_lane ? `pipeline:${result.child_lane.pipeline_id}` : null,
         state: result.child_lane?.decision ?? result.child_run?.status ?? null,
+        follow_up_issue_id: null,
+        follow_up_issue_identifier: null,
+        failed_relation_type: null,
+        comment_id: null,
+        attachment_id: null,
+        error_code: result.error.code,
+        error_message: result.error.message
+      };
+    }
+    if (result.operation === 'screenshot-proof') {
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: false,
+        issue_id: result.issue_id ?? requestedIssueId,
+        issue_identifier: null,
+        source_setup: result.source_setup ?? sourceSetup,
+        action: result.capture?.mode ?? null,
+        via: result.capture ? `cleanup:${result.capture.cleanup.status}` : null,
+        state: null,
         follow_up_issue_id: null,
         follow_up_issue_identifier: null,
         failed_relation_type: null,
@@ -941,6 +1027,23 @@ function buildAuditEntry(
         source_setup: result.source_setup,
         action: result.proof?.kind ?? 'policy',
         via: `permit:${result.policy.permit_status}`,
+        state: null,
+        ...followUpAuditFields,
+        comment_id: null,
+        attachment_id: null,
+        error_code: null,
+        error_message: null
+      };
+    case 'screenshot-proof':
+      return {
+        recorded_at: recordedAt,
+        operation: result.operation,
+        ok: true,
+        issue_id: result.issue_id,
+        issue_identifier: null,
+        source_setup: result.source_setup,
+        action: result.capture.mode,
+        via: `cleanup:${result.capture.cleanup.status}`,
         state: null,
         ...followUpAuditFields,
         comment_id: null,
