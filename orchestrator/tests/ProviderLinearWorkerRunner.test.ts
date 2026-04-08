@@ -270,14 +270,20 @@ async function appendParallelizationDecisionAudit(
     reason: ProviderLinearParallelizationReason;
     summary?: string | null;
     recordedAt?: string;
+    recordedAtBase?: string;
     issueId?: string;
     issueIdentifier?: string | null;
   }
 ): Promise<void> {
   const turnIndex = input.turnIndex ?? 1;
-  const second = String(Math.max(turnIndex, 1)).padStart(2, '0');
   await appendProviderLinearAuditEntry(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME), {
-    recorded_at: input.recordedAt ?? `2026-03-21T09:00:${second}.200Z`,
+    recorded_at:
+      input.recordedAt ??
+      new Date(
+        Date.parse(input.recordedAtBase ?? '2026-03-21T09:00:00.000Z') +
+          Math.max(turnIndex, 1) * 1_000 +
+          200
+      ).toISOString(),
     operation: 'parallelization',
     ok: true,
     issue_id: input.issueId ?? 'lin-issue-1',
@@ -304,6 +310,7 @@ async function appendParallelizationDecisionAuditForRequest(
     reason: ProviderLinearParallelizationReason;
     summary?: string | null;
     recordedAt?: string;
+    recordedAtBase?: string;
     issueId?: string;
     issueIdentifier?: string | null;
   }
@@ -313,9 +320,14 @@ async function appendParallelizationDecisionAuditForRequest(
     throw new Error('expected provider linear audit path in exec request env');
   }
   const turnIndex = input.turnIndex ?? 1;
-  const second = String(Math.max(turnIndex, 1)).padStart(2, '0');
   await appendProviderLinearAuditEntry(auditPath, {
-    recorded_at: input.recordedAt ?? `2026-03-21T09:00:${second}.200Z`,
+    recorded_at:
+      input.recordedAt ??
+      new Date(
+        Date.parse(input.recordedAtBase ?? '2026-03-21T09:00:00.000Z') +
+          Math.max(turnIndex, 1) * 1_000 +
+          200
+      ).toISOString(),
     operation: 'parallelization',
     ok: true,
     issue_id: input.issueId ?? 'lin-issue-1',
@@ -6247,6 +6259,71 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('accepts forbid_parallel when the current turn launches no child lanes', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner: vi.fn(async (request) => {
+          await appendParallelizationDecisionAuditForRequest(request, {
+            decision: 'forbid_parallel',
+            reason: 'blocked_by_dependency',
+            summary: 'Dependent work blocks safe parallel execution.',
+            recordedAt: '2026-03-21T09:00:03.050Z'
+          });
+          return {
+            exitCode: 0,
+            stdout: [
+              '{"type":"thread.started","thread_id":"thread-1"}',
+              '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+              '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:04.000Z"}}'
+            ].join('\n'),
+            stderr: ''
+          };
+        }),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:03.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active',
+      parallelization: {
+        decision: 'forbid_parallel',
+        reason: 'blocked_by_dependency',
+        child_lane_count: 0
+      },
+      child_lanes: []
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active',
+      parallelization: {
+        decision: 'forbid_parallel',
+        reason: 'blocked_by_dependency',
+        child_lane_count: 0
+      },
+      child_lanes: []
+    });
+  });
+
   it('fails closed when the initial tracked issue lookup fails before turn 1', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const execRunner = vi.fn();
@@ -7649,7 +7726,8 @@ describe('provider linear worker runner', () => {
     const execRunner = vi.fn(async (request) => {
       execCallCount += 1;
       await appendStaySerialParallelizationDecisionAuditForRequest(request, {
-        turnIndex: execCallCount
+        turnIndex: execCallCount,
+        recordedAtBase: execCallCount === 1 ? '2026-03-21T09:00:00.000Z' : '2026-03-21T09:01:00.000Z'
       });
       if (execCallCount === 1) {
         return {
@@ -7761,7 +7839,8 @@ describe('provider linear worker runner', () => {
     const execRunner = vi.fn(async (request) => {
       execCallCount += 1;
       await appendStaySerialParallelizationDecisionAuditForRequest(request, {
-        turnIndex: execCallCount
+        turnIndex: execCallCount,
+        recordedAtBase: execCallCount === 1 ? '2026-03-21T09:00:00.000Z' : '2026-03-21T09:01:00.000Z'
       });
       if (execCallCount === 1) {
         return {
@@ -9165,6 +9244,48 @@ describe('provider linear worker runner', () => {
         recorded_at: '2026-03-21T09:00:30.000Z'
       }
     });
+  });
+
+  it('does not hydrate a previous-attempt parallelization decision before turn 1 starts', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const auditPath = join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME);
+
+    await appendParallelizationDecisionAudit(runDir, {
+      recordedAt: '2026-03-21T08:59:30.000Z',
+      decision: 'stay_serial',
+      reason: 'single_bounded_change',
+      summary: 'Previous attempt stayed serial.'
+    });
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          attempt_started_at: '2026-03-21T09:00:00.000Z',
+          current_turn_started_at: null,
+          owner_phase: 'bootstrapping',
+          linear_audit: null,
+          child_streams: [],
+          child_lanes: [],
+          parallelization: null,
+          updated_at: '2026-03-21T09:00:05.000Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const refresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      auditPath,
+      () => '2026-03-21T09:00:05.000Z'
+    );
+
+    expect(refresh?.parallelization).toBeNull();
+    expect(
+      (JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof).parallelization
+    ).toBeNull();
   });
 
   it('treats Ready as the live Todo-equivalent queue state even though Linear marks it unstarted', async () => {

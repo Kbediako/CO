@@ -1928,19 +1928,23 @@ function selectProviderLinearWorkerProofTelemetryFields(
 function deriveProviderLinearWorkerParallelizationRecord(input: {
   linearAudit: ProviderLinearAuditSummary | null | undefined;
   issueId: string | null | undefined;
+  attemptStartedAt?: string | null | undefined;
   currentTurnStartedAt?: string | null | undefined;
   childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
 }): ProviderLinearWorkerParallelizationRecord | null {
+  const boundary =
+    normalizeOptionalString(input.currentTurnStartedAt) ??
+    normalizeOptionalString(input.attemptStartedAt);
   const snapshot = readProviderLinearParallelizationSnapshot(input.linearAudit, {
     issueId: input.issueId,
-    recordedAtNotBefore: input.currentTurnStartedAt
+    recordedAtNotBefore: boundary
   });
   if (!snapshot) {
     return null;
   }
   return {
     ...snapshot,
-    child_lane_count: selectCurrentTurnChildLanes(input.childLanes, input.currentTurnStartedAt).length
+    child_lane_count: selectCurrentTurnChildLanes(input.childLanes, boundary).length
   };
 }
 
@@ -3269,6 +3273,7 @@ async function writeProofSnapshot(
       parallelization: deriveProviderLinearWorkerParallelizationRecord({
         linearAudit,
         issueId: proof.issue_id,
+        attemptStartedAt: proof.attempt_started_at,
         currentTurnStartedAt: proof.current_turn_started_at,
         childLanes
       }),
@@ -3322,6 +3327,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
       parallelization: deriveProviderLinearWorkerParallelizationRecord({
         linearAudit,
         issueId: parsed.issue_id,
+        attemptStartedAt: parsed.attempt_started_at,
         currentTurnStartedAt: parsed.current_turn_started_at,
         childLanes
       }),
