@@ -108,6 +108,7 @@ describe('runCommandStage environment propagation', () => {
   it('sets MCP_RUNNER_TASK_ID to the manifest task id', async () => {
     const baseEnv = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const env = { ...baseEnv, taskId: 'delegation-stream-task' };
+    const stagePath = '/tmp/provider-worker-path';
     const pipeline: PipelineDefinition = {
       id: 'pipeline-env',
       title: 'Env Propagation',
@@ -116,7 +117,8 @@ describe('runCommandStage environment propagation', () => {
           kind: 'command',
           id: 'stage-env',
           title: 'Echo',
-          command: 'echo ok'
+          command: 'echo ok',
+          env: { PATH: stagePath }
         }
       ]
     };
@@ -135,5 +137,7 @@ describe('runCommandStage environment propagation', () => {
     expect(manifest.task_id).toBe('delegation-stream-task');
     expect(mockState.lastRunInput?.env?.MCP_RUNNER_TASK_ID).toBe('delegation-stream-task');
     expect(mockState.lastRunInput?.env?.CODEX_ORCHESTRATOR_TASK_ID).toBe('delegation-stream-task');
+    expect(mockState.lastRunInput?.env?.CODEX_ORCHESTRATOR_NODE_BIN).toBe(process.execPath);
+    expect(mockState.lastRunInput?.env?.PATH).toBe(stagePath);
   });
 });

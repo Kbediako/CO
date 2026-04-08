@@ -430,6 +430,19 @@ function shouldForceNonInteractive(env: NodeJS.ProcessEnv): boolean {
   );
 }
 
+function classifyExecRunnerFailure(
+  error: unknown,
+  runtimeContext: RuntimeCodexCommandContext
+): ProviderLinearWorkerProof['end_reason'] {
+  if (
+    runtimeContext.runtime.fallback.code === 'codex-command-unavailable' &&
+    (error as NodeJS.ErrnoException)?.code === 'ENOENT'
+  ) {
+    return 'runtime_parity_command_unavailable';
+  }
+  return 'exec_runner_failed';
+}
+
 function normalizeOptionalString(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
@@ -3915,7 +3928,7 @@ export async function runProviderLinearWorker(
           ...failedProofBase,
           owner_phase: 'ended',
           owner_status: 'failed',
-          end_reason: 'exec_runner_failed',
+          end_reason: classifyExecRunnerFailure(error, runtimeContext),
           updated_at: deps.now()
         };
         finalProof = await persistProof(finalProof);
@@ -4047,10 +4060,11 @@ export async function runProviderLinearWorker(
 
 function resolveProviderLinearHelperCommand(env: NodeJS.ProcessEnv): string {
   const packageRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PACKAGE_ROOT);
+  const nodeBin = normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? 'node';
   if (!packageRoot) {
     return 'codex-orchestrator linear';
   }
-  return `node "${join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js')}" linear`;
+  return `"${nodeBin}" "${join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js')}" linear`;
 }
 
 async function main(): Promise<void> {
