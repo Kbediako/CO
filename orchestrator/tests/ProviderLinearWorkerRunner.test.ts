@@ -5219,7 +5219,7 @@ describe('provider linear worker runner', () => {
     });
   });
 
-  it('classifies codex-command-unavailable runtime fallbacks as explicit runtime parity failures', async () => {
+  it('classifies ENOENT launches with a valid runtime workspace as explicit runtime parity failures', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const execRunner = vi.fn(async () => {
       const error = new Error('spawn failed') as NodeJS.ErrnoException;
@@ -5240,15 +5240,7 @@ describe('provider linear worker runner', () => {
           resolveRuntimeContext: vi.fn(async () =>
             createRuntimeContext({
               selected_mode: 'cli',
-              provider: 'CliRuntimeProvider',
-              fallback: {
-                occurred: true,
-                code: 'codex-command-unavailable',
-                reason: 'Could not resolve the Codex CLI executable under the current runtime.',
-                from_mode: 'appserver',
-                to_mode: 'cli',
-                checked_at: '2026-03-21T09:00:00.000Z'
-              }
+              provider: 'CliRuntimeProvider'
             })
           ),
           execRunner,
@@ -5273,6 +5265,18 @@ describe('provider linear worker runner', () => {
 
   it('does not relabel unrelated ENOENT exec failures as runtime parity failures', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
+    const missingRepoRoot = join(tempRoot ?? '', 'missing-repo-root');
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        workspace_path: missingRepoRoot
+      }),
+      'utf8'
+    );
     const execRunner = vi.fn(async () => {
       const error = new Error('spawn failed') as NodeJS.ErrnoException;
       error.code = 'ENOENT';
@@ -5283,7 +5287,7 @@ describe('provider linear worker runner', () => {
       runProviderLinearWorker(
         {
           CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
-          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_ROOT: missingRepoRoot,
           CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
           CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3'
         },

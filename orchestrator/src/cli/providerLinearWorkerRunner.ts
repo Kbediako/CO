@@ -4,6 +4,7 @@ import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
 import { mkdir, open, readFile, readdir, realpath, stat } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
@@ -433,12 +434,11 @@ function shouldForceNonInteractive(env: NodeJS.ProcessEnv): boolean {
 
 function classifyExecRunnerFailure(
   error: unknown,
-  runtimeContext: RuntimeCodexCommandContext
+  spawnContext: {
+    cwd: string;
+  }
 ): ProviderLinearWorkerProof['end_reason'] {
-  if (
-    runtimeContext.runtime.fallback.code === 'codex-command-unavailable' &&
-    (error as NodeJS.ErrnoException)?.code === 'ENOENT'
-  ) {
+  if ((error as NodeJS.ErrnoException)?.code === 'ENOENT' && existsSync(spawnContext.cwd)) {
     return 'runtime_parity_command_unavailable';
   }
   return 'exec_runner_failed';
@@ -3934,7 +3934,9 @@ export async function runProviderLinearWorker(
           ...failedProofBase,
           owner_phase: 'ended',
           owner_status: 'failed',
-          end_reason: classifyExecRunnerFailure(error, runtimeContext),
+          end_reason: classifyExecRunnerFailure(error, {
+            cwd: context.repoRoot
+          }),
           updated_at: deps.now()
         };
         finalProof = await persistProof(finalProof);

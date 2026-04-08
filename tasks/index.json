@@ -15,8 +15,6 @@
           "date": "2026-04-09",
           "manifest": ".runs/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d-co-115-docs-review/cli/2026-04-08T17-32-15-382Z-fc180ff1/manifest.json",
           "override_reason": "The audited docs-review child stream passed spec-guard and docs:check after the repo-supported `npm run docs:archive-tasks` trim returned docs/TASKS.md from 451 to 450 lines, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The CO-115 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker. See out/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d/manual/20260408T173215Z-docs-review-fallback.md."
-          "manifest": ".runs/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d-co-115-docs-review/cli/2026-04-08T17-32-15-382Z-fc180ff1/manifest.json",
-          "override_reason": "The audited docs-review child stream passed spec-guard and docs:check after the repo-supported `npm run docs:archive-tasks` trim returned docs/TASKS.md from 451 to 450 lines, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The CO-115 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker. See out/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d/manual/20260408T173215Z-docs-review-fallback.md."
         }
       },
       "paths": {
