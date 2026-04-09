@@ -162,6 +162,15 @@ describe('controlHostSupervision helpers', () => {
     );
   });
 
+  it('rejects supervision labels whose derived slug would be dot-only', () => {
+    expect(() =>
+      resolveControlHostSupervisionPaths({
+        homeDir: '/Users/tester',
+        label: '..'
+      })
+    ).toThrow('control-host supervision label may not resolve to "." or "..".');
+  });
+
   it('rejects blank env file entries before resolving paths', () => {
     expect(() =>
       buildControlHostSupervisionConfig({

@@ -359,6 +359,9 @@ export function parseControlHostSupervisionCsv(raw: string | null | undefined): 
 export function sanitizeControlHostSupervisionPathSegment(value: string): string {
   const trimmed = value.trim();
   const sanitized = trimmed.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  if (sanitized === '.' || sanitized === '..') {
+    throw new Error('control-host supervision label may not resolve to "." or "..".');
+  }
   return sanitized.length > 0 ? sanitized : 'control-host';
 }
 
