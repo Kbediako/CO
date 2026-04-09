@@ -382,6 +382,133 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('prefers merge-closeout semantic progress time for latestEvent sourceUpdatedAt', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child-merge-closeout-freshness');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child-merge-closeout-freshness',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Merge closeout lane active.'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'turn_completed',
+          owner_status: 'in_progress',
+          last_event: 'task_complete',
+          last_message: 'Merge closeout lane active.',
+          last_event_at: '2026-03-20T01:15:28.970Z',
+          linear_audit: {
+            path: join(childPaths.runDir, 'provider-linear-worker-linear-audit.jsonl'),
+            attempted_count: 1,
+            success_count: 1,
+            failure_count: 0,
+            latest_recorded_at: '2026-03-20T01:16:40.000Z',
+            parallelization_entries: [],
+            latest_by_operation: {
+              transition: {
+                recorded_at: '2026-03-20T01:16:40.000Z',
+                operation: 'transition',
+                ok: true,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: 'updated',
+                via: null,
+                state: 'Merging',
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                error_code: null,
+                error_message: null
+              }
+            }
+          }
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_state: 'Merging',
+      reason: 'provider_issue_rehydrated_active_run',
+      state: 'running',
+      merge_closeout: {
+        recorded_at: '2026-03-20T01:16:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-20T01:16:20.000Z',
+        status: 'watching',
+        reason: 'checks_pending',
+        summary: 'Waiting for required checks before merge.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'BLOCKED',
+          ready_to_merge: false,
+          gate_reasons: ['required_checks_pending'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 2,
+          checks_failed: 0,
+          required_checks_pending: 2,
+          required_checks_failed: 0,
+          updated_at: '2026-03-20T01:16:20.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot?.last_semantic_progress_at).toBe('2026-03-20T01:16:40.000Z');
+    expect(selected?.providerDebugSnapshot?.progress?.last_semantic_progress_at).toBe(
+      '2026-03-20T01:16:20.000Z'
+    );
+    expect(selected?.latestEvent).toMatchObject({
+      sourceUpdatedAt: '2026-03-20T01:16:20.000Z'
+    });
+  });
+
   it('uses the displayed child summary timestamp for latestEvent when newer child activity has no summary', async () => {
     const { root, paths } = await createHostPaths();
     const baseTimestampMs = Date.parse('2026-03-30T01:15:00.000Z');
@@ -535,8 +662,24 @@ describe('SelectedRunProjection', () => {
     expect(selected?.latestEvent).toMatchObject({
       event: 'turn_running',
       message: 'docs-review failed at docs:freshness after spec-guard passed',
-      at: childStreamRecordedAt
+      at: childStreamRecordedAt,
+      source: 'child_stream_summary',
+      messageRecordedAt: childStreamRecordedAt,
+      sourceUpdatedAt: childStreamRecordedAt
     });
+    expect(selected?.latestEvent?.candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'child_stream_summary',
+          accepted: true,
+          rejection_reason: null
+        }),
+        expect.objectContaining({
+          source: 'generic_phase_fallback',
+          accepted: false
+        })
+      ])
+    );
   });
 
   it('surfaces pending shared-root reconciliation instead of terminal success after merge closeout', async () => {

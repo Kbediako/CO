@@ -2105,17 +2105,19 @@ describe('ControlRuntime', () => {
       expect.objectContaining({
         issue_identifier: 'ISSUE-1037-EVENT',
         pid: '4242',
-        last_event: 'turn_completed',
+        last_event: 'turn.completed',
         last_message: 'Codex turn completed',
-        last_event_at: '2026-03-07T00:29:30.000Z'
+        last_event_at: '2026-03-07T00:29:30.000Z',
+        event_source: 'legacy_proof_last_message'
       })
     ]);
     expect(sameIssueRecord?.payload.running).toMatchObject({
       issue_identifier: 'ISSUE-1037-EVENT',
       pid: '4242',
-      last_event: 'turn_completed',
+      last_event: 'turn.completed',
       last_message: 'Codex turn completed',
-      last_event_at: '2026-03-07T00:29:30.000Z'
+      last_event_at: '2026-03-07T00:29:30.000Z',
+      event_source: 'legacy_proof_last_message'
     });
   });
 
