@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -6,14 +7,23 @@ import { describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
-const cliEntrypoint = fileURLToPath(new URL('../../bin/codex-orchestrator.ts', import.meta.url));
-const cliHelpTimeoutMs = 30_000;
+const sourceCliEntrypoint = fileURLToPath(new URL('../../bin/codex-orchestrator.ts', import.meta.url));
+const builtCliEntrypoint = fileURLToPath(new URL('../../dist/bin/codex-orchestrator.js', import.meta.url));
+const cliEntrypoint = existsSync(builtCliEntrypoint) ? builtCliEntrypoint : sourceCliEntrypoint;
+const cliHelpTimeoutMs = 90_000;
+
+function buildCliArgs(args: string[]): string[] {
+  if (cliEntrypoint === builtCliEntrypoint) {
+    return [cliEntrypoint, ...args];
+  }
+  return ['--loader', 'ts-node/esm', cliEntrypoint, ...args];
+}
 
 describe('codex-orchestrator CLI monitor alias', () => {
   it('lists co-status in the top-level help output', async () => {
     const { stdout } = await execFileAsync(
       process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, '--help'],
+      buildCliArgs(['--help']),
       { cwd: repoRoot }
     );
 
@@ -26,7 +36,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
   it('prints dedicated co-status help', async () => {
     const { stdout } = await execFileAsync(
       process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', '--help'],
+      buildCliArgs(['co-status', '--help']),
       { cwd: repoRoot }
     );
 
@@ -45,7 +55,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
   it('prints dedicated co-status attach help', async () => {
     const { stdout } = await execFileAsync(
       process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', 'attach', '--help'],
+      buildCliArgs(['co-status', 'attach', '--help']),
       { cwd: repoRoot }
     );
 
@@ -62,19 +72,46 @@ describe('codex-orchestrator CLI monitor alias', () => {
   it('prints control-host help with the provider worker default pipeline', async () => {
     const { stdout } = await execFileAsync(
       process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, 'control-host', '--help'],
+      buildCliArgs(['control-host', '--help']),
       { cwd: repoRoot }
     );
 
-    expect(stdout).toContain('Usage: codex-orchestrator control-host [options]');
+    expect(stdout).toContain('codex-orchestrator control-host [options]');
     expect(stdout).toContain('Pipeline used for provider-driven starts (default: provider-linear-worker).');
+    expect(stdout).toContain(
+      'codex-orchestrator control-host supervise <install|status|restart|uninstall|run> [options]'
+    );
+    expect(stdout).toContain(
+      'supervise install     Install a launchd LaunchAgent-backed local control-host supervisor.'
+    );
+  }, cliHelpTimeoutMs);
+
+  it('prints dedicated control-host supervision help', async () => {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      buildCliArgs(['control-host', 'supervise', '--help']),
+      { cwd: repoRoot }
+    );
+
+    expect(stdout).toContain(
+      'Usage: codex-orchestrator control-host supervise <install|status|restart|uninstall|run> [options]'
+    );
+    expect(stdout).toContain(
+      'Install the macOS launchd LaunchAgent plus generated config/state files.'
+    );
+    expect(stdout).toContain(
+      '--env-files <csv|none>      Comma-separated env/bootstrap files to source before launch.'
+    );
+    expect(stdout).toContain(
+      '--unhealthy-threshold <n>   Consecutive unhealthy samples before launchd restart (default: 3).'
+    );
   }, cliHelpTimeoutMs);
 
   for (const helpArg of ['help', '-h']) {
     it(`treats co-status ${helpArg} as a help request`, async () => {
       const { stdout } = await execFileAsync(
         process.execPath,
-        ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', helpArg],
+        buildCliArgs(['co-status', helpArg]),
         { cwd: repoRoot }
       );
 
@@ -87,7 +124,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
     await expect(
       execFileAsync(
         process.execPath,
-        ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', 'attach', 'unexpected-arg'],
+        buildCliArgs(['co-status', 'attach', 'unexpected-arg']),
         { cwd: repoRoot }
       )
     ).rejects.toMatchObject({
@@ -99,7 +136,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
     await expect(
       execFileAsync(
         process.execPath,
-        ['--loader', 'ts-node/esm', cliEntrypoint, 'doctor', 'unexpected-arg'],
+        buildCliArgs(['doctor', 'unexpected-arg']),
         { cwd: repoRoot }
       )
     ).rejects.toMatchObject({
@@ -110,7 +147,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
   it('prints dedicated doctor help with the apply/json limitation', async () => {
     const { stdout } = await execFileAsync(
       process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, 'doctor', '--help'],
+      buildCliArgs(['doctor', '--help']),
       { cwd: repoRoot }
     );
 

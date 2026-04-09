@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260409-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee",
+      "title": "CO: ship installable local control-host supervision instead of host-local co-control-host-supervisor.sh",
+      "relates_to": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
+        "task": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
+        "agent_task": ".agent/task/linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
+        "docs": "docs/TECH_SPEC-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md"
+      }
+    },
+    {
       "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
       "title": "CO: automate truthful In Review -> Merging promotion after clean review handoff",
       "relates_to": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",

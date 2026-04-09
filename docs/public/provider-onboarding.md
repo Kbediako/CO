@@ -130,3 +130,26 @@ codex-orchestrator co-status --help
 ```
 
 `control-host --format json` is a persistent host startup handshake, not a one-shot status dump.
+
+## macOS launchd supervision
+
+On macOS, use the shipped supervision surface instead of a copied local shell wrapper:
+
+1. Install the LaunchAgent-backed supervisor from the repo root:
+   ```bash
+   codex-orchestrator control-host supervise install --format json
+   ```
+2. Inspect the current launchd, config, and restart-reason state:
+   ```bash
+   codex-orchestrator control-host supervise status --format json
+   ```
+3. Restart the supervised host after config or env changes:
+   ```bash
+   codex-orchestrator control-host supervise restart --format json
+   ```
+4. Remove the generated LaunchAgent, config, state, and logs:
+   ```bash
+   codex-orchestrator control-host supervise uninstall --format json
+   ```
+
+`control-host supervise status --format json` is the machine-checkable operator surface for whether the LaunchAgent is loaded and what last restart reason or health state the supervisor recorded.

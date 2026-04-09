@@ -51,6 +51,7 @@ import {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   runControlHostCliShell
 } from '../orchestrator/src/cli/controlHostCliShell.js';
+import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/controlHostSupervisionCliShell.js';
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
 import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
@@ -754,7 +755,23 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
 }
 
 async function handleControlHost(rawArgs: string[]): Promise<void> {
-  const { flags } = parseArgs(rawArgs);
+  if (rawArgs[0] === 'supervise') {
+    const { positionals, flags } = parseArgs(rawArgs.slice(1));
+    await runControlHostSupervisionCliShell({
+      positionals,
+      flags,
+      printHelp: printControlHostSupervisionHelp
+    });
+    return;
+  }
+  const { positionals, flags } = parseArgs(rawArgs);
+  if (isHelpRequest(positionals, flags)) {
+    printControlHostHelp();
+    return;
+  }
+  if (positionals.length > 0) {
+    throw new Error(`Unknown control-host argument(s): ${positionals.join(' ')}`);
+  }
   await runControlHostCliShell({
     flags,
     printHelp: printControlHostHelp
@@ -1674,7 +1691,9 @@ Options:
 }
 
 function printControlHostHelp(): void {
-  console.log(`Usage: codex-orchestrator control-host [options]
+  console.log(`Usage:
+  codex-orchestrator control-host [options]
+  codex-orchestrator control-host supervise <install|status|restart|uninstall|run> [options]
 
 Options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
@@ -1682,6 +1701,44 @@ Options:
   --pipeline <id>       Pipeline used for provider-driven starts (default: ${DEFAULT_PROVIDER_START_PIPELINE_ID}).
   --format json         Emit the startup readiness payload to stdout, then keep the host running.
   --help                Show this message.
+
+Supervision subcommands:
+  supervise install     Install a launchd LaunchAgent-backed local control-host supervisor.
+  supervise status      Show the installed launchd/config/state status.
+  supervise restart     Restart the installed control-host supervisor.
+  supervise uninstall   Remove the installed launchd supervisor and generated artifacts.
+  supervise run         Internal long-lived runner for launchd ProgramArguments.
+`);
+}
+
+function printControlHostSupervisionHelp(): void {
+  console.log(`Usage: codex-orchestrator control-host supervise <install|status|restart|uninstall|run> [options]
+
+Subcommands:
+  install               Install the macOS launchd LaunchAgent plus generated config/state files.
+  status                Show the current install, launchctl, and restart-reason state.
+  restart               Kickstart the installed launchd service.
+  uninstall             Boot out the launchd service and remove generated artifacts.
+  run                   Internal long-lived supervision runner for launchd use.
+
+Common options:
+  --label <value>             LaunchAgent label (default: com.kbediako.codex-orchestrator.control-host).
+  --config <path>             Explicit config path for status, restart, uninstall, or run.
+  --format json               Emit machine-readable output for install, status, restart, or uninstall.
+
+Install options:
+  --repo-root <path>          Repo root used as the supervised control-host working directory.
+  --node <path>               Explicit Node executable for launchd ProgramArguments.
+  --cli-entrypoint <path>     Explicit codex-orchestrator JS entrypoint for launchd ProgramArguments.
+  --task <id>                 Control-host task id (default: local-mcp).
+  --run <id>                  Control-host run id (default: control-host).
+  --pipeline <id>             Provider start pipeline (default: provider-linear-worker).
+  --health-interval <sec>     Health poll interval in seconds (default: 30).
+  --unhealthy-threshold <n>   Consecutive unhealthy samples before launchd restart (default: 3).
+  --launchd-throttle <sec>    LaunchAgent ThrottleInterval value (default: 15).
+  --kill-timeout <sec>        Grace period before force-killing the child host (default: 10).
+  --env-files <csv|none>      Comma-separated env/bootstrap files to source before launch.
+  --shell <path>              Shell used to source env/bootstrap files (default: $SHELL or /bin/zsh).
 `);
 }
 
