@@ -1,8 +1,7 @@
 # ACTION PLAN: 1028 Controller-Owned Compatibility + UI Presenters
 
-1. Register `1028` across `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, task/spec/checklist mirrors, and findings.
-2. Capture docs-review evidence for the extraction scope.
-3. Remove selected-run presentation wrappers from `ControlRuntime`.
-4. Retarget `controlServer.ts` and presenter helpers to own `/ui`, `/state`, and `/issue` payload shaping over `readSelectedRunSnapshot()`.
-5. Run validation, capture elegance/manual evidence, sync the task state, and close the slice.
+<!-- docs-archive:stub -->
+> Archived on 2026-04-08. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md
 
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md

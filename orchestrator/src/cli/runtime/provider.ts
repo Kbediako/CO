@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -66,6 +67,30 @@ function summarizePreflightFailures(issues: Array<{ code: string; message: strin
   const codes = issues.map((issue) => issue.code).join(', ');
   const messages = issues.map((issue) => issue.message).join(' ');
   return `Appserver preflight failed (${codes}). ${messages}`.trim();
+}
+
+function buildCodexCommandUnavailableIssue(codexBin: string): { code: string; message: string } {
+  return {
+    code: 'codex-command-unavailable',
+    message: `Could not resolve the Codex CLI executable (${codexBin}) under the current runtime.`
+  };
+}
+
+function buildRuntimeWorkspaceUnavailableIssue(repoRoot: string): { code: string; message: string } {
+  return {
+    code: 'runtime-workspace-unavailable',
+    message: `Could not probe the Codex runtime because the selected repo root is unavailable (${repoRoot}).`
+  };
+}
+
+function buildEnoentProbeIssue(params: {
+  codexBin: string;
+  repoRoot: string;
+}): { code: string; message: string } {
+  if (!existsSync(params.repoRoot)) {
+    return buildRuntimeWorkspaceUnavailableIssue(params.repoRoot);
+  }
+  return buildCodexCommandUnavailableIssue(params.codexBin);
 }
 
 function resolveRequestedMode(options: RuntimeSelectionOptions): RuntimeMode {
@@ -144,6 +169,18 @@ async function runAppserverPreflight(params: {
     APP_SERVER_HELP_TIMEOUT_MS
   );
   if (!appServerHelp.ok) {
+    if (appServerHelp.code === 'ENOENT') {
+      issues.push(
+        buildEnoentProbeIssue({
+          codexBin,
+          repoRoot: params.repoRoot
+        })
+      );
+      return {
+        ok: false,
+        issues
+      };
+    }
     issues.push({
       code: 'appserver-command-unavailable',
       message:
@@ -162,12 +199,21 @@ async function runAppserverPreflight(params: {
       LOGIN_STATUS_TIMEOUT_MS
     );
     if (!loginStatus.ok) {
+      const enoentIssue =
+        loginStatus.code === 'ENOENT'
+          ? buildEnoentProbeIssue({
+              codexBin,
+              repoRoot: params.repoRoot
+            })
+          : null;
       issues.push({
-        code: 'login-status-failed',
+        code: enoentIssue?.code ?? 'login-status-failed',
         message:
           loginStatus.code === 'timeout'
             ? 'Timed out probing `codex login status`.'
-            : 'Failed probing `codex login status`.'
+            : loginStatus.code === 'ENOENT'
+              ? (enoentIssue?.message ?? 'Failed probing `codex login status`.')
+              : 'Failed probing `codex login status`.'
       });
     } else {
       const text = `${loginStatus.stdout}\n${loginStatus.stderr}`.toLowerCase();

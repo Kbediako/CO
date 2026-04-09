@@ -286,6 +286,7 @@ describe('PipelineResolver env overrides', () => {
       docsRelevanceAdvisory,
       'docs-relevance-review'
     );
+    const providerWorkerStage = findCommandStage(providerWorker, 'provider-linear-worker');
     const providerWorkerEnv = findCommandStageEnv(providerWorker, 'provider-linear-worker');
 
     expect(implementationReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
@@ -300,6 +301,9 @@ describe('PipelineResolver env overrides', () => {
     );
     expect(docsRelevanceEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(docsRelevanceEnv.FORCE_CODEX_REVIEW).toBe('');
+    expect(providerWorkerStage?.command).toBe(
+      'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js"'
+    );
     expect(providerWorkerEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(providerWorkerEnv.FORCE_CODEX_REVIEW).toBe('1');
   });

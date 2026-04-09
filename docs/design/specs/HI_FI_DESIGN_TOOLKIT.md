@@ -1,5 +1,5 @@
 ---
-last_review: 2026-03-19
+last_review: 2026-04-09
 ---
 
 # Technical Spec — Hi-Fi Design Toolkit (Task 0410)

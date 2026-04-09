@@ -24,6 +24,7 @@ import {
 } from '../providerLinearWorkerRunner.js';
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
+import { buildCommandPreview } from '../utils/commandPreview.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
 import {
   deriveReviewOutcomeDisposition,
@@ -134,9 +135,8 @@ export async function runCommandStage(
     commandLog.write(payload);
   };
 
-  writeEvent({ type: 'command:start', command: stage.command });
-
   const runner = getCliExecRunner();
+  let invocationPreview = stage.command;
 
   let activeCorrelationId: string | null = null;
   let stdoutBytes = 0;
@@ -207,7 +207,7 @@ export async function runCommandStage(
           stageIndex: index,
           toolName: 'exec',
           status: 'started',
-          message: stage.command,
+          message: invocationPreview,
           attempt: event.attempt
         });
         break;
@@ -273,11 +273,16 @@ export async function runCommandStage(
       CODEX_ORCHESTRATOR_ROOT: env.repoRoot,
       CODEX_ORCHESTRATOR_PACKAGE_ROOT: PACKAGE_ROOT
     };
+    baseEnv.CODEX_ORCHESTRATOR_NODE_BIN = process.execPath;
     baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE =
       context.runtimeMode ?? (manifest.runtime_mode === 'appserver' ? 'appserver' : 'cli');
     // Keep both keys during migration because downstream tools still read either name.
     baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE = baseEnv.CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE;
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
+    execEnv.CODEX_ORCHESTRATOR_NODE_BIN = process.execPath;
+    const invocation = resolveStageInvocation(stage, execEnv);
+    invocationPreview = invocation.preview;
+    writeEvent({ type: 'command:start', command: invocationPreview });
     const timeoutMs = resolveStageTimeoutMs(stage, execEnv);
     const invocationId = `cli-command:${manifest.run_id}:${stage.id}:${Date.now()}`;
     if (timeoutMs !== null) {
@@ -289,7 +294,8 @@ export async function runCommandStage(
       MAX_CAPTURED_CHUNK_EVENTS > 0 ? { maxChunkEvents: MAX_CAPTURED_CHUNK_EVENTS } : undefined;
     try {
       result = await runner.run({
-        command: stage.command,
+        command: invocation.command,
+        args: invocation.args,
         cwd: stage.cwd ?? env.repoRoot,
         env: execEnv,
         sessionId: effectiveSessionId ?? undefined,
@@ -716,6 +722,29 @@ function isProviderLinearWorkerCommandStage(stage: CommandStage): boolean {
   }
   const haystack = `${stage.title} ${stage.command}`.toLowerCase();
   return haystack.includes('providerlinearworkerrunner');
+}
+
+function resolveStageInvocation(
+  stage: CommandStage,
+  env: NodeJS.ProcessEnv
+): {
+  command: string;
+  args?: string[];
+  preview: string;
+} {
+  if (isProviderLinearWorkerCommandStage(stage)) {
+    const command = normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath;
+    const args = [join(PACKAGE_ROOT, 'dist/orchestrator/src/cli/providerLinearWorkerRunner.js')];
+    return {
+      command,
+      args,
+      preview: buildCommandPreview(command, args)
+    };
+  }
+  return {
+    command: stage.command,
+    preview: stage.command
+  };
 }
 
 function resolveReviewEvidenceWaiverReason(

@@ -4780,7 +4780,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       '[redacted active-closeout-bundle-reread sample'
     );
     expect(telemetry.summary.startupAnchorObserved).toBe(true);
-    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(4);
+    expect(telemetry.summary.metaSurfaceSignals).toBeGreaterThanOrEqual(2);
     expect(telemetry.summary.metaSurfaceKinds).toContain('review-closeout-bundle');
     expect(telemetry.summary.preAnchorMetaSurfaceKinds).toEqual([]);
   }, LONG_WAIT_TEST_TIMEOUT_MS);

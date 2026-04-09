@@ -678,6 +678,110 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
+  it('falls back to cached issue context when shared cooldown is active and fallback is explicitly allowed', async () => {
+    const env = await createRunScopedEnv();
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        state: {
+          id: 'state-merging',
+          name: 'Merging',
+          type: 'started'
+        }
+      })
+    );
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          errors: [
+            {
+              message: 'Rate limit exceeded. Only 5000 requests are allowed per 1 hour.',
+              path: ['issue'],
+              extensions: {
+                code: 'RATELIMITED',
+                statusCode: 429
+              }
+            }
+          ]
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'retry-after': '3600',
+            'x-ratelimit-requests-limit': '5000',
+            'x-ratelimit-requests-remaining': '0',
+            'x-ratelimit-requests-reset': '1774701380970',
+            'x-request-id': 'req-fallback-1'
+          }
+        }
+      )
+    );
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl,
+      fallbackToCacheOnFailure: true
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      cache_fallback_used: true,
+      issue: {
+        id: 'lin-issue-1',
+        state: {
+          name: 'Merging',
+          type: 'started'
+        }
+      }
+    });
+  });
+
+  it('does not fall back to cached issue context when the live issue lookup fails for a non-cooldown reason', async () => {
+    const env = await createRunScopedEnv();
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        state: {
+          id: 'state-merging',
+          name: 'Merging',
+          type: 'started'
+        }
+      })
+    );
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse({
+        data: {
+          viewer: {
+            organization: {
+              id: 'lin-workspace-1'
+            }
+          },
+          issue: null
+        }
+      })
+    );
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl,
+      fallbackToCacheOnFailure: true
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'issue-context',
+      error: {
+        code: 'linear_issue_not_found'
+      }
+    });
+  });
+
   it('returns issue context with comments, team states, attachments, and resolved workpad comment', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { query?: string; variables?: { issueId?: string } };
