@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -7,28 +6,18 @@ import { describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
-const cliEntrypoint = fileURLToPath(new URL('../../bin/codex-orchestrator.ts', import.meta.url));
-const distCliEntrypoint = fileURLToPath(new URL('../../dist/bin/codex-orchestrator.js', import.meta.url));
+const cliBootstrapEntrypoint = fileURLToPath(
+  new URL('../../bin/codex-orchestrator.js', import.meta.url)
+);
 const cliHelpTimeoutMs = 30_000;
 
 async function runCli(args: string[]): Promise<{ stdout: string; stderr: string }> {
-  const cliArgs = await buildCliArgs(args);
+  const cliArgs = buildCliArgs(args);
   return await execFileAsync(process.execPath, cliArgs, { cwd: repoRoot });
 }
 
-async function buildCliArgs(args: string[]): Promise<string[]> {
-  return (await shouldUseFreshDist(cliEntrypoint, distCliEntrypoint))
-    ? [distCliEntrypoint, ...args]
-    : ['--loader', 'ts-node/esm', cliEntrypoint, ...args];
-}
-
-async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
-  const distCliStat = await stat(distEntry).catch(() => null);
-  if (!distCliStat?.isFile()) {
-    return false;
-  }
-  const sourceCliStat = await stat(sourceEntry).catch(() => null);
-  return !sourceCliStat || distCliStat.mtimeMs >= sourceCliStat.mtimeMs;
+function buildCliArgs(args: string[]): string[] {
+  return [cliBootstrapEntrypoint, ...args];
 }
 
 describe('codex-orchestrator CLI monitor alias', () => {
@@ -87,9 +76,9 @@ describe('codex-orchestrator CLI monitor alias', () => {
 
   it('rejects unexpected positional arguments for co-status attach', async () => {
     await expect(
-      buildCliArgs(['co-status', 'attach', 'unexpected-arg']).then((args) =>
-        execFileAsync(process.execPath, args, { cwd: repoRoot })
-      )
+      execFileAsync(process.execPath, buildCliArgs(['co-status', 'attach', 'unexpected-arg']), {
+        cwd: repoRoot
+      })
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown co-status attach argument(s): unexpected-arg')
     });
@@ -97,9 +86,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
 
   it('rejects unexpected positional arguments for doctor', async () => {
     await expect(
-      buildCliArgs(['doctor', 'unexpected-arg']).then((args) =>
-        execFileAsync(process.execPath, args, { cwd: repoRoot })
-      )
+      execFileAsync(process.execPath, buildCliArgs(['doctor', 'unexpected-arg']), { cwd: repoRoot })
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown doctor argument(s): unexpected-arg')
     });

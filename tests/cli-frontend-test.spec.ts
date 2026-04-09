@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmod, mkdtemp, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -12,8 +12,7 @@ const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
 
 const WORKSPACE_ROOT = process.cwd();
-const CLI_ENTRY = join(WORKSPACE_ROOT, 'bin', 'codex-orchestrator.ts');
-const DIST_CLI_ENTRY = join(WORKSPACE_ROOT, 'dist', 'bin', 'codex-orchestrator.js');
+const CLI_BOOTSTRAP_ENTRY = join(WORKSPACE_ROOT, 'bin', 'codex-orchestrator.js');
 const SHIPPED_ORCHESTRATOR_CONFIG_PATH = join(WORKSPACE_ROOT, 'codex.orchestrator.json');
 const TS_NODE_ESM_LOADER_PATH = require.resolve('ts-node/esm');
 const SHIPPED_FRONTEND_TESTING_RUNNER_RELATIVE_PATH = join(
@@ -125,9 +124,7 @@ async function runFrontendTestWithEnv(
   env: NodeJS.ProcessEnv,
   extraArgs: string[]
 ): Promise<{ manifestPath: string; runtimeMode: string | null; runtimeProvider: string | null }> {
-  const cliArgs = (await shouldUseFreshDist(CLI_ENTRY, DIST_CLI_ENTRY))
-    ? [DIST_CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs]
-    : ['--loader', 'ts-node/esm', CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs];
+  const cliArgs = [CLI_BOOTSTRAP_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs];
   const { stdout } = await execFileAsync(
     process.execPath,
     cliArgs,
@@ -152,15 +149,6 @@ async function runFrontendTestWithEnv(
     runtimeMode: payload.runtime_mode ?? null,
     runtimeProvider: payload.runtime_provider ?? null
   };
-}
-
-async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
-  const distCliStat = await stat(distEntry).catch(() => null);
-  if (!distCliStat?.isFile()) {
-    return false;
-  }
-  const sourceCliStat = await stat(sourceEntry).catch(() => null);
-  return !sourceCliStat || distCliStat.mtimeMs >= sourceCliStat.mtimeMs;
 }
 
 async function writeFrontendTestingFixtureConfig(

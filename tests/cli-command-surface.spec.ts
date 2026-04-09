@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -16,8 +15,7 @@ import {
 import { runEntrypointLikeExec } from './helpers/inProcessEntrypoint.js';
 
 const execFileAsync = promisify(execFile);
-const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
-const CLI_ENTRY_DIST = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
+const CLI_BOOTSTRAP_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.js');
 const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
@@ -56,9 +54,10 @@ afterEach(async () => {
 async function runCli(
   args: string[],
   env?: NodeJS.ProcessEnv,
-  _timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
+  timeoutMs: number = CLI_EXEC_TIMEOUT_MS,
   explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
+  void timeoutMs;
   return await runEntrypointLikeExec({
     args,
     env: buildCliEnv(env, explicitProviderOverrideKeys),
@@ -73,54 +72,16 @@ async function runCliSubprocess(
   explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
   const cliEnv = buildCliEnv(env, explicitProviderOverrideKeys);
-  const entryArgs = await buildCliArgs(args);
+  const entryArgs = buildCliArgs(args);
   return await execFileAsync(process.execPath, entryArgs, {
     env: cliEnv,
     timeout: timeoutMs
   });
 }
 
-async function buildCliArgs(args: string[]): Promise<string[]> {
-  return (await shouldUseFreshDist(CLI_ENTRY, CLI_ENTRY_DIST))
-    ? [CLI_ENTRY_DIST, ...args]
-    : ['--loader', 'ts-node/esm', CLI_ENTRY, ...args];
+function buildCliArgs(args: string[]): string[] {
+  return [CLI_BOOTSTRAP_ENTRY, ...args];
 }
-
-async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
-  if (!existsSync(distEntry)) {
-    return false;
-  }
-
-  try {
-    const distStats = await stat(distEntry);
-    try {
-      const sourceStats = await stat(sourceEntry);
-      return distStats.mtimeMs >= sourceStats.mtimeMs;
-    } catch (sourceError) {
-      if ((sourceError as NodeJS.ErrnoException).code === 'ENOENT') {
-        return true;
-      }
-      return false;
-    }
-  } catch {
-    return false;
-  }
-}
-
-describe('shouldUseFreshDist', () => {
-  it('uses dist when the source entry is missing but the built entry exists', async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
-    const distEntry = join(tempRoot, 'dist-entry.js');
-    try {
-      await writeFile(distEntry, 'console.log("dist");', 'utf8');
-      await expect(shouldUseFreshDist(join(tempRoot, 'missing-source.ts'), distEntry)).resolves.toBe(
-        true
-      );
-    } finally {
-      await rm(tempRoot, { recursive: true, force: true });
-    }
-  });
-});
 
 describe('isDirectExecution', () => {
   it('treats symlink-preserved entrypoints as direct execution', async () => {
@@ -2452,7 +2413,7 @@ describe('codex-orchestrator command surface', () => {
     };
 
     const { stdout } = await runCli(
-      ['exec', 'node -e "console.log(\\\"x y\\\")"', '--json', 'compact'],
+      ['exec', `node -e 'console.log("x y")'`, '--json', 'compact'],
       env
     );
     const lines = stdout
