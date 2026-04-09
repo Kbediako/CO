@@ -3,7 +3,7 @@
 ## Added by Bootstrap 2026-04-09
 
 ## Summary
-- Goal: land the smallest truthful source-of-truth fix so STATUS carries canonical current-turn activity and explicit provenance end to end.
+- Goal: land the smallest truthful source-of-truth fix, so STATUS carries canonical current-turn activity and explicit provenance end to end.
 - Scope:
   - bootstrap the issue packet, registry mirrors, and single workpad
   - run audited `docs-review` before implementation
@@ -44,7 +44,7 @@
 - [x] Follow-up review-response delta for stale-floor rewind and proof provenance. Evidence: `npm run build`, `npx vitest run orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, and the same review telemetry root with a truthful manual correctness plus elegance fallback after the uncommitted wrapper hit `startup-anchor`.
 - [ ] Final PR checks and `pr ready-review` drain on the latest head stay clean before the review-state transition. Evidence: pending current GitHub Actions / ready-review run for PR `#390`.
 - Rollback plan:
-  - keep the change bounded to canonical activity persistence and selection surfaces so the lane remains revertible without touching unrelated STATUS behavior
+  - keep the change bounded to canonical activity persistence and selection surfaces, so the lane remains revertible without touching unrelated STATUS behavior
 
 ## Risks & Mitigations
 - `docs/TASKS.md` is already at the line cap before this packet is added.
@@ -52,7 +52,7 @@
 - Canonical activity may require a proof-shape change that touches multiple overlapping read paths.
   - Mitigation: keep the new contract additive and update observability/projection tests together.
 - Session-log hydration can accidentally override fresher stdout truth.
-  - Mitigation: rank candidates by provenance and freshness with explicit timestamps and rejection reasons.
+  - Mitigation: rank candidates by provenance and freshness, with explicit timestamps and rejection reasons.
 
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review` child stream `co-112-docs-review` (`clean-success`)

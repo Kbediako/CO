@@ -456,6 +456,77 @@ describe('CompatibilityIssuePresenter', () => {
     ]);
   });
 
+  it('keeps proof-origin event candidates self-contained when proof wins on message alone', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'running',
+        displayStatus: 'Running',
+        summary: 'Provider worker turn is active.',
+        latestEvent: {
+          event: 'running',
+          message: null,
+          at: '2026-04-06T02:34:00.000Z',
+          source: 'child_stream_summary',
+          messageRecordedAt: '2026-04-06T02:34:00.000Z',
+          sourceUpdatedAt: '2026-04-06T02:34:00.000Z',
+          candidates: [],
+          requestedBy: null,
+          reason: null
+        },
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: null,
+          last_message: null,
+          last_event_at: null,
+          current_turn_activity: {
+            event: null,
+            message_or_payload: 'Investigating provider-worker EVENT provenance.',
+            recorded_at: '2026-04-06T02:35:30.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:30.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+      })
+    );
+
+    expect(runningEntry.last_event).toBe('running');
+    expect(runningEntry.last_message).toBe('Investigating provider-worker EVENT provenance.');
+    expect(runningEntry.event_candidates).toEqual([
+      {
+        source: 'canonical_stdout_jsonl',
+        event: null,
+        summary: 'Investigating provider-worker EVENT provenance.',
+        message_recorded_at: '2026-04-06T02:35:30.000Z',
+        source_updated_at: '2026-04-06T02:35:30.000Z',
+        derived: false,
+        accepted: true,
+        rejection_reason: null
+      }
+    ]);
+  });
+
   it('prefers the source with newer semantic progress even when its displayed summary is older', () => {
     const fresherSemanticSource = buildCompatibilitySource({
       issueId: 'issue-100',

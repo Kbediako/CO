@@ -597,6 +597,7 @@ function buildSelectedRunLatestEvent(input: {
         null,
       sourceUpdatedAt:
         input.terminalMergeCloseoutProgress.source_updated_at ??
+        input.terminalMergeCloseoutProgress.last_semantic_progress_at ??
         input.providerDebugSnapshot.last_semantic_progress_at ??
         input.updatedAt,
       candidates: input.terminalMergeCloseoutProgress.event_candidates ?? [],

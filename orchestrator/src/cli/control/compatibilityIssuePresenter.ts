@@ -375,9 +375,9 @@ export function buildCompatibilityRunningEntry(
         ? [
             {
               source: eventSource,
-              event: runningEvent.event,
-              summary: runningMessage,
-              message_recorded_at: messageRecordedAt,
+              event: proofEvent,
+              summary: proofMessage,
+              message_recorded_at: proofMessage ? messageRecordedAt : null,
               source_updated_at: sourceUpdatedAt,
               derived: false,
               accepted: true,
