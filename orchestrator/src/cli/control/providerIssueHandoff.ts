@@ -117,6 +117,7 @@ interface ProviderIssueRunRecord {
   issueUpdatedAt: string | null;
   startedAt: string | null;
   updatedAt: string | null;
+  hasFreshWorkerHostContext: boolean;
   workerHost: string | null;
   residentSessionSeed: ProviderLinearResidentSessionSeed | null;
 }
@@ -142,6 +143,9 @@ function resolveRehydratedActiveRunWorkerHost(
 ): string | null {
   if (run.workerHost) {
     return run.workerHost;
+  }
+  if (run.hasFreshWorkerHostContext) {
+    return null;
   }
   const claimWorkerHost = normalizeProviderWorkerHostName(claim?.worker_host);
   if (!claimWorkerHost) {
@@ -3611,6 +3615,13 @@ export async function discoverProviderIssueRuns(
         join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
       );
       const manifestStartedAt = readStringValue(manifest, 'started_at');
+      const hasFreshWorkerHostContext = Boolean(
+        proof
+        && isProviderLinearWorkerProofFreshForStage(
+          proof as ProviderLinearWorkerProofRecord & Record<string, unknown>,
+          manifestStartedAt
+        )
+      );
       discovered.push({
         provider: issueProvider,
         issueId,
@@ -3627,14 +3638,10 @@ export async function discoverProviderIssueRuns(
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
         startedAt: manifestStartedAt,
         updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof),
-        workerHost:
-          proof
-          && isProviderLinearWorkerProofFreshForStage(
-            proof as ProviderLinearWorkerProofRecord & Record<string, unknown>,
-            manifestStartedAt
-          )
-            ? normalizeProviderWorkerHostName(proof.worker_host)
-            : null,
+        hasFreshWorkerHostContext,
+        workerHost: hasFreshWorkerHostContext
+          ? normalizeProviderWorkerHostName(proof?.worker_host)
+          : null,
         residentSessionSeed: resolveProviderResidentSessionSeed(
           manifest,
           proof,
@@ -4520,6 +4527,7 @@ function resolveProviderReleaseRun(
       issueUpdatedAt: claim.issue_updated_at,
       startedAt: null,
       updatedAt: claim.updated_at,
+      hasFreshWorkerHostContext: false,
       workerHost: claim.worker_host ?? null,
       residentSessionSeed: null
     };

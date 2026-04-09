@@ -231,6 +231,8 @@ describe('controlHostCliShell manifest discovery', () => {
       buildRemoteProviderEnvValues(
         {
           CO_LINEAR_API_TOKEN: 'lin-token',
+          CODEX_CONFIG_OVERRIDES: 'model_reasoning_effort=\"xhigh\"',
+          CODEX_MCP_CONFIG_OVERRIDES: 'delegation.enabled=true',
           CODEX_ORCHESTRATOR_APPSERVER_SKIP_LOGIN_CHECK: '1',
           CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
           CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
@@ -248,6 +250,8 @@ describe('controlHostCliShell manifest discovery', () => {
       )
     ).toEqual({
       CO_LINEAR_API_TOKEN: 'lin-token',
+      CODEX_CONFIG_OVERRIDES: 'model_reasoning_effort="xhigh"',
+      CODEX_MCP_CONFIG_OVERRIDES: 'delegation.enabled=true',
       CODEX_ORCHESTRATOR_APPSERVER_SKIP_LOGIN_CHECK: '1',
       CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
       CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
