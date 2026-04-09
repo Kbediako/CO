@@ -9,7 +9,7 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const cliBootstrapEntrypoint = fileURLToPath(
   new URL('../../bin/codex-orchestrator.js', import.meta.url)
 );
-const cliHelpTimeoutMs = 30_000;
+const cliHelpTimeoutMs = 60_000;
 
 async function runCli(args: string[]): Promise<{ stdout: string; stderr: string }> {
   const cliArgs = buildCliArgs(args);

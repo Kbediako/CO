@@ -75,6 +75,8 @@ export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-pro
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
 export const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME = 'provider-linear-worker-child-streams.json';
 export const PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME = 'provider-linear-worker-child-lanes.json';
+export const PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV =
+  'CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED';
 const PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME =
   'provider-linear-worker-session-log-hydration.json';
 const PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_PROOF_FILENAME}.lock`;
@@ -120,9 +122,11 @@ const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
   // prefer a short wait over allowing stale snapshots to overwrite newer state.
   maxDelayMs: 250
 };
-const PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS = new Set<string>([
+export const PROVIDER_LINEAR_RESIDENT_SESSION_CONTINUITY_END_REASONS = new Set<string>([
   'max_turns_reached_issue_still_active'
 ]);
+const PROVIDER_CONTROL_HOST_REFRESH_SUCCESS_END_REASONS =
+  PROVIDER_LINEAR_RESIDENT_SESSION_CONTINUITY_END_REASONS;
 const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
 const PROVIDER_WORKER_SESSION_LOG_POLL_INTERVAL_MS = 250;
 const PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS = 15 * 60 * 1000;
@@ -150,12 +154,33 @@ export interface ProviderLinearWorkerContext {
   issueIdentifier: string;
   issueUpdatedAt: string | null;
   maxTurns: number;
+  residentSessionSeed: ProviderLinearResidentSessionSeed | null;
 }
 
 export interface ProviderLinearWorkerTokenUsage {
   input_tokens: number | null;
   output_tokens: number | null;
   total_tokens: number | null;
+}
+
+export interface ProviderLinearResidentSessionSeed {
+  source_run_id: string;
+  source_updated_at: string;
+  source_end_reason: string;
+  source_thread_id: string;
+  logical_turn_count: number;
+  restart_count: number;
+}
+
+export interface ProviderLinearResidentSessionState {
+  logical_session_id: string;
+  logical_turn_count: number;
+  restart_count: number;
+  continuity_state: 'fresh' | 'guarded_resume_pending' | 'guarded_resume_active';
+  source_run_id: string | null;
+  source_updated_at: string | null;
+  source_end_reason: string | null;
+  source_thread_id: string | null;
 }
 
 export interface ProviderLinearWorkerChildStreamRecord {
@@ -258,6 +283,7 @@ export interface ProviderLinearWorkerProof {
   progress?: ProviderLinearWorkerProgressSnapshot | null;
   linear_budget?: LinearBudgetStatus | null;
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
+  resident_session?: ProviderLinearResidentSessionState | null;
   end_reason: string | null;
   updated_at: string;
 }
@@ -479,6 +505,16 @@ function normalizeOptionalInteger(value: unknown): number | null {
   return null;
 }
 
+function normalizeNonNegativeInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
+}
+
+function normalizePositiveInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized > 0 ? normalized : null;
+}
+
 function normalizeStringArray(value: unknown): string[] | null {
   if (!Array.isArray(value)) {
     return null;
@@ -609,6 +645,9 @@ export async function loadProviderLinearWorkerContext(
   if (!issueId || !issueIdentifier) {
     throw new Error('Provider worker requires issue_id and issue_identifier in env or manifest.');
   }
+  const residentSessionSeed = parseProviderLinearResidentSessionSeed(
+    env[PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]
+  );
   const manifestWorkspacePath =
     normalizeOptionalString(manifest.workspace_path) ??
     normalizeOptionalString(manifest.workspacePath);
@@ -679,7 +718,8 @@ export async function loadProviderLinearWorkerContext(
       normalizeOptionalString(env.CODEX_ORCHESTRATOR_ISSUE_UPDATED_AT) ??
       normalizeOptionalString(manifest.issue_updated_at) ??
       normalizeOptionalString(manifest.issueUpdatedAt),
-    maxTurns: await resolveProviderWorkerMaxTurns(env)
+    maxTurns: await resolveProviderWorkerMaxTurns(env),
+    residentSessionSeed
   };
 }
 
@@ -698,6 +738,85 @@ function contextTaskIdFromManifestPath(manifestPath: string): string | null {
   }
   const taskId = sanitizeTaskId(basename(resolve(dirname(manifestPath), '..', '..')));
   return taskId.length > 0 ? taskId : null;
+}
+
+function parseProviderLinearResidentSessionSeed(
+  raw: string | null | undefined
+): ProviderLinearResidentSessionSeed | null {
+  const normalizedRaw = normalizeOptionalString(raw);
+  if (!normalizedRaw) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalizedRaw);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  const sourceRunId = normalizeOptionalString(parsed.source_run_id);
+  const sourceUpdatedAt = normalizeOptionalString(parsed.source_updated_at);
+  const sourceEndReason = normalizeOptionalString(parsed.source_end_reason);
+  const sourceThreadId = normalizeOptionalString(parsed.source_thread_id);
+  const logicalTurnCount = normalizeNonNegativeInteger(parsed.logical_turn_count);
+  const restartCount = normalizePositiveInteger(parsed.restart_count);
+  if (
+    !sourceRunId ||
+    !sourceUpdatedAt ||
+    !sourceEndReason ||
+    !sourceThreadId ||
+    logicalTurnCount === null ||
+    restartCount === null
+  ) {
+    return null;
+  }
+  return {
+    source_run_id: sourceRunId,
+    source_updated_at: sourceUpdatedAt,
+    source_end_reason: sourceEndReason,
+    source_thread_id: sourceThreadId,
+    logical_turn_count: logicalTurnCount,
+    restart_count: restartCount
+  };
+}
+
+function buildProviderLinearResidentLogicalSessionId(issueId: string): string {
+  return `linear:${issueId}:resident-session`;
+}
+
+function buildInitialProviderLinearResidentSessionState(input: {
+  issueId: string;
+  seed: ProviderLinearResidentSessionSeed | null;
+}): ProviderLinearResidentSessionState {
+  return {
+    logical_session_id: buildProviderLinearResidentLogicalSessionId(input.issueId),
+    logical_turn_count: input.seed?.logical_turn_count ?? 0,
+    restart_count: input.seed?.restart_count ?? 0,
+    continuity_state: input.seed ? 'guarded_resume_pending' : 'fresh',
+    source_run_id: input.seed?.source_run_id ?? null,
+    source_updated_at: input.seed?.source_updated_at ?? null,
+    source_end_reason: input.seed?.source_end_reason ?? null,
+    source_thread_id: input.seed?.source_thread_id ?? null
+  };
+}
+
+function buildActiveProviderLinearResidentSessionState(input: {
+  issueId: string;
+  logicalTurnCount: number;
+  seed: ProviderLinearResidentSessionSeed | null;
+}): ProviderLinearResidentSessionState {
+  return {
+    logical_session_id: buildProviderLinearResidentLogicalSessionId(input.issueId),
+    logical_turn_count: input.logicalTurnCount,
+    restart_count: input.seed?.restart_count ?? 0,
+    continuity_state: input.seed ? 'guarded_resume_active' : 'fresh',
+    source_run_id: input.seed?.source_run_id ?? null,
+    source_updated_at: input.seed?.source_updated_at ?? null,
+    source_end_reason: input.seed?.source_end_reason ?? null,
+    source_thread_id: input.seed?.source_thread_id ?? null
+  };
 }
 
 function buildIssueDescriptionSection(issue: LiveLinearTrackedIssue): string[] {
@@ -728,6 +847,16 @@ function buildBlockersSection(issue: LiveLinearTrackedIssue): string[] {
     'Known blockers:',
     ...issue.blocked_by.map((entry) => `- ${entry.identifier ?? entry.id ?? 'unknown'} (${entry.state ?? 'unknown'})`)
   ];
+}
+
+function buildCurrentIssueContextSection(issue: LiveLinearTrackedIssue): string[] {
+  return [
+    issue.url ? `- Linear URL: ${issue.url}` : null,
+    issue.state ? `- Current state: ${issue.state}` : null,
+    ...buildIssueDescriptionSection(issue),
+    ...buildRecentActivitySection(issue),
+    ...buildBlockersSection(issue)
+  ].filter((line): line is string => Boolean(line));
 }
 
 function buildPreReviewHandoffGateSection(): string[] {
@@ -818,6 +947,8 @@ export function buildProviderWorkerPrompt(
     linearAudit?: ProviderLinearAuditSummary | null;
     attemptStartedAt?: string | null;
     manifest?: Record<string, unknown> | null;
+    residentSession?: ProviderLinearResidentSessionState | null;
+    continueResidentSessionOnBoot?: boolean;
   } = {}
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
@@ -825,12 +956,18 @@ export function buildProviderWorkerPrompt(
     attemptContext.attemptStartedAt ?? null
   );
   const source0PromptLines = buildRunSource0PromptLines(readRunSource0Descriptor(attemptContext.manifest ?? null));
-  if (turnNumber > 1) {
+  const continueResidentSessionOnBoot = attemptContext.continueResidentSessionOnBoot === true;
+  const logicalTurnCount = attemptContext.residentSession?.logical_turn_count ?? 0;
+  if (turnNumber > 1 || continueResidentSessionOnBoot) {
     return [
       'Continuation guidance:',
       '',
-      '- The previous Codex turn completed normally, but the Linear issue is still in an active state.',
-      `- This is continuation turn #${turnNumber} of ${maxTurns} for the current provider worker run.`,
+      continueResidentSessionOnBoot
+        ? '- The previous provider worker drained at a guarded restart boundary; resume the same resident session instead of starting a fresh thread.'
+        : '- The previous Codex turn completed normally, but the Linear issue is still in an active state.',
+      continueResidentSessionOnBoot
+        ? `- This is worker turn #1 of ${maxTurns} for the restarted provider worker process, continuing logical resident turn #${logicalTurnCount + 1}.`
+        : `- This is continuation turn #${turnNumber} of ${maxTurns} for the current provider worker run.`,
       '- The original task instructions and prior turn context are already present in this thread, so do not restate them before acting.',
       `- Keep the same workflow contract and continue using \`${helperCommand}\` for ticket updates with Linear issue id \`${issue.id}\` (not the human identifier \`${issue.identifier}\`).`,
       '- Follow the repo-local workflow skills: `skills/linear/SKILL.md` for workpad, review, and rework behavior, and `skills/land/SKILL.md` for the merge shepherding loop once the issue reaches `Merging`.',
@@ -857,6 +994,9 @@ export function buildProviderWorkerPrompt(
       ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
       '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
       ...(source0PromptLines.length > 0 ? ['', ...source0PromptLines] : []),
+      ...(continueResidentSessionOnBoot
+        ? ['', 'Fresh Linear context for this guarded restart:', ...buildCurrentIssueContextSection(issue)]
+        : []),
       '- Keep final closeout in that same workpad comment instead of creating a separate terminal summary comment.',
       '- Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.',
       '- Focus on the remaining ticket work and do not end the turn while the issue stays active unless you are truly blocked.'
@@ -898,12 +1038,8 @@ export function buildProviderWorkerPrompt(
     ...buildMergedCloseoutGuidance(sharedRepoCheckoutPath),
     '- If the issue is in `Rework`, treat it as a full approach reset: close the previous PR, remove the previous workpad, create a fresh branch from `origin/main`, then restart execution under a new workpad before handing back to review.',
     ...(source0PromptLines.length > 0 ? ['', ...source0PromptLines] : []),
-    issue.url ? `- Linear URL: ${issue.url}` : null,
-    issue.state ? `- Current state: ${issue.state}` : null,
     `- This is turn #1 of ${maxTurns} for the current worker run.`,
-    ...buildIssueDescriptionSection(issue),
-    ...buildRecentActivitySection(issue),
-    ...buildBlockersSection(issue)
+    ...buildCurrentIssueContextSection(issue)
   ]
     .filter((line): line is string => Boolean(line))
     .join('\n');
@@ -2121,6 +2257,7 @@ function selectProviderLinearWorkerProofTelemetryFields(
     owner_phase: proof.owner_phase,
     owner_status: proof.owner_status,
     tracked_issue_error: proof.tracked_issue_error ?? null,
+    resident_session: proof.resident_session ?? null,
     end_reason: proof.end_reason ?? null
   };
 }
@@ -3617,6 +3754,8 @@ export async function runProviderLinearWorker(
   const workerPid = String(process.pid);
   childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
   const helperCommand = resolveProviderLinearHelperCommand(childEnv);
+  const residentSessionSeed = context.residentSessionSeed;
+  const residentLogicalTurnBase = residentSessionSeed?.logical_turn_count ?? 0;
   if (shouldForceNonInteractive(childEnv)) {
     childEnv.CODEX_REVIEW_NON_INTERACTIVE = '1';
     childEnv.FORCE_CODEX_REVIEW = '1';
@@ -3632,7 +3771,7 @@ export async function runProviderLinearWorker(
     attempt_started_at: attemptStartedAt,
     current_turn_started_at: null,
     pid: workerPid,
-    thread_id: null,
+    thread_id: residentSessionSeed?.source_thread_id ?? null,
     latest_turn_id: null,
     latest_session_id: null,
     latest_session_id_source: null,
@@ -3654,6 +3793,10 @@ export async function runProviderLinearWorker(
     progress: null,
     tracked_issue_error: null,
     linear_budget: null,
+    resident_session: buildInitialProviderLinearResidentSessionState({
+      issueId: context.issueId,
+      seed: residentSessionSeed
+    }),
     end_reason: null,
     updated_at: attemptStartedAt
   };
@@ -3738,7 +3881,7 @@ export async function runProviderLinearWorker(
   };
 
   let issue = await readTrackedIssueWithFailClosedProof();
-  let threadId: string | null = null;
+  let threadId: string | null = residentSessionSeed?.source_thread_id ?? null;
   let turnId: string | null = null;
   let lifecycle = classifyProviderLinearWorkerLifecycle(issue);
   let liveRefreshRequestedAtMs = 0;
@@ -4008,6 +4151,7 @@ export async function runProviderLinearWorker(
           taskId: context.taskId
         })) ??
         deriveSharedRepoCheckoutPathFallback(context.repoRoot, context.taskId);
+      const continueResidentSessionOnBoot = turnNumber === 1 && residentSessionSeed !== null;
       const prompt = buildProviderWorkerPrompt(
         issue,
         turnNumber,
@@ -4017,11 +4161,15 @@ export async function runProviderLinearWorker(
         {
           linearAudit: finalProof.linear_audit,
           attemptStartedAt: finalProof.attempt_started_at ?? null,
-          manifest: context.manifest
+          manifest: context.manifest,
+          residentSession: finalProof.resident_session ?? null,
+          continueResidentSessionOnBoot
         }
       );
       const args =
-        turnNumber === 1
+        continueResidentSessionOnBoot
+          ? ['exec', 'resume', '--json', residentSessionSeed?.source_thread_id ?? '', prompt]
+          : turnNumber === 1
           ? ['exec', '--json', prompt]
           : ['exec', 'resume', '--json', threadId ?? '', prompt];
       const resolved = resolveRuntimeCodexCommand(args, runtimeContext);
@@ -4178,6 +4326,25 @@ export async function runProviderLinearWorker(
       const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
       threadId = parsed.threadId ?? finalProof.thread_id ?? threadId;
       const parsedThreadChanged = Boolean(threadId && threadId !== finalProof.thread_id);
+      if (
+        continueResidentSessionOnBoot &&
+        residentSessionSeed &&
+        threadId &&
+        threadId !== residentSessionSeed.source_thread_id
+      ) {
+        finalProof = {
+          ...finalProof,
+          thread_id: threadId,
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'guarded_resume_thread_mismatch',
+          updated_at: deps.now()
+        };
+        finalProof = await persistProof(finalProof);
+        throw new Error(
+          `provider-linear-worker guarded resident resume changed thread identity from ${residentSessionSeed.source_thread_id} to ${threadId}`
+        );
+      }
       turnId = parsed.turnId ?? (parsedThreadChanged ? null : finalProof.latest_turn_id ?? turnId);
       const parsedTurnChanged = Boolean(turnId && turnId !== finalProof.latest_turn_id);
       const parsedScopeChanged = parsedThreadChanged || parsedTurnChanged;
@@ -4216,6 +4383,11 @@ export async function runProviderLinearWorker(
         parallelization: finalProof.parallelization ?? null,
         progress: finalProof.progress ?? null,
         tracked_issue_error: null,
+        resident_session: buildActiveProviderLinearResidentSessionState({
+          issueId: context.issueId,
+          logicalTurnCount: residentLogicalTurnBase + turnNumber,
+          seed: residentSessionSeed
+        }),
         end_reason: null,
         updated_at: deps.now()
       };

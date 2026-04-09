@@ -5,8 +5,10 @@ import process from 'node:process';
 
 import { logger } from '../../logger.js';
 import {
+  PROVIDER_LINEAR_RESIDENT_SESSION_CONTINUITY_END_REASONS,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
-  PROVIDER_LINEAR_WORKER_PROOF_FILENAME
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  type ProviderLinearResidentSessionSeed
 } from '../providerLinearWorkerRunner.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { RunPaths } from '../run/runPaths.js';
@@ -68,6 +70,7 @@ export interface ProviderIssueLauncher {
     workspaceId?: string | null;
     teamId?: string | null;
     projectId?: string | null;
+    residentSessionSeed?: ProviderLinearResidentSessionSeed | null;
     launchToken: string;
   }): Promise<{ runId: string; manifestPath: string } | null>;
   resume(input: {
@@ -108,14 +111,18 @@ interface ProviderIssueRunRecord {
   issueUpdatedAt: string | null;
   startedAt: string | null;
   updatedAt: string | null;
+  residentSessionSeed: ProviderLinearResidentSessionSeed | null;
 }
 
 interface ProviderLinearWorkerProofRecord {
   attempt_started_at?: unknown;
+  thread_id?: unknown;
+  turn_count?: unknown;
   owner_phase?: unknown;
   owner_status?: unknown;
   end_reason?: unknown;
   updated_at?: unknown;
+  resident_session?: unknown;
 }
 
 export interface ProviderIssueHandoffService {
@@ -954,6 +961,7 @@ export function createProviderIssueHandoffService(
         workspaceId: input.trackedIssue.workspace_id,
         teamId: input.trackedIssue.team_id,
         projectId: input.trackedIssue.project_id,
+        residentSessionSeed: input.previousRun?.residentSessionSeed ?? null,
         launchToken
       });
     } catch (error) {
@@ -2400,6 +2408,7 @@ export function createProviderIssueHandoffService(
           workspaceId: input.trackedIssue.workspace_id,
           teamId: input.trackedIssue.team_id,
           projectId: input.trackedIssue.project_id,
+          residentSessionSeed: latestRun?.residentSessionSeed ?? null,
           launchToken
         });
       } catch (error) {
@@ -3457,7 +3466,12 @@ export async function discoverProviderIssueRuns(
         summary: resolveProviderIssueRunSummary(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
         startedAt: readStringValue(manifest, 'started_at'),
-        updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof)
+        updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof),
+        residentSessionSeed: resolveProviderResidentSessionSeed(
+          manifest,
+          proof,
+          readStringValue(manifest, 'run_id') ?? runEntry
+        )
       });
     }
   }
@@ -3610,6 +3624,27 @@ function shouldUseProviderLinearWorkerTerminalProof(
   return proofTimestamp >= manifestTimestamp;
 }
 
+function shouldUseProviderLinearWorkerTerminalProofForResidentSeed(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null
+): boolean {
+  const proofTerminalStatus = resolveProviderLinearWorkerTerminalStatus(proof);
+  if (proofTerminalStatus !== 'succeeded') {
+    return false;
+  }
+  const proofRecord = (proof ?? {}) as Record<string, unknown>;
+  const runStartedAt = readStringValue(manifest, 'started_at');
+  if (runStartedAt && !isProviderLinearWorkerProofFreshForStage(proofRecord, runStartedAt)) {
+    return false;
+  }
+  const proofUpdatedAt = readStringValue(proofRecord, 'updated_at');
+  if (!proofUpdatedAt || Number.isNaN(Date.parse(proofUpdatedAt))) {
+    return false;
+  }
+  const manifestStatus = readStringValue(manifest, 'status');
+  return !manifestStatus || manifestStatus === 'in_progress' || manifestStatus === 'succeeded';
+}
+
 function shouldUseProviderLinearWorkerTerminalProofForStatusOverride(
   manifest: Record<string, unknown>,
   proof: ProviderLinearWorkerProofRecord | null
@@ -3651,6 +3686,44 @@ function resolveProviderLinearWorkerTerminalReason(
     return null;
   }
   return readStringValue(proof as Record<string, unknown>, 'end_reason');
+}
+
+function resolveProviderResidentSessionSeed(
+  manifest: Record<string, unknown>,
+  proof: ProviderLinearWorkerProofRecord | null,
+  runId: string
+): ProviderLinearResidentSessionSeed | null {
+  const proofRecord = (proof ?? {}) as Record<string, unknown>;
+  if (!shouldUseProviderLinearWorkerTerminalProofForResidentSeed(manifest, proof)) {
+    return null;
+  }
+  const endReason = readStringValue(proofRecord, 'end_reason');
+  const threadId = readStringValue(proofRecord, 'thread_id');
+  const updatedAt = readStringValue(proofRecord, 'updated_at');
+  if (
+    !endReason ||
+    !PROVIDER_LINEAR_RESIDENT_SESSION_CONTINUITY_END_REASONS.has(endReason) ||
+    !threadId ||
+    !updatedAt
+  ) {
+    return null;
+  }
+  const residentSessionRecord = readRecordValue(proofRecord, 'resident_session');
+  const logicalTurnCount =
+    readIntegerValue(residentSessionRecord, 'logical_turn_count') ??
+    readIntegerValue(proofRecord, 'turn_count');
+  if (logicalTurnCount === null) {
+    return null;
+  }
+  const priorRestartCount = readIntegerValue(residentSessionRecord, 'restart_count') ?? 0;
+  return {
+    source_run_id: runId,
+    source_updated_at: updatedAt,
+    source_end_reason: endReason,
+    source_thread_id: threadId,
+    logical_turn_count: logicalTurnCount,
+    restart_count: priorRestartCount + 1
+  };
 }
 
 function filterProviderIssueRunsForStartPipeline(
@@ -4259,7 +4332,8 @@ function resolveProviderReleaseRun(
       summary: null,
       issueUpdatedAt: claim.issue_updated_at,
       startedAt: null,
-      updatedAt: claim.updated_at
+      updatedAt: claim.updated_at,
+      residentSessionSeed: null
     };
   }
   return claimRuns[0] ?? null;
@@ -4497,11 +4571,41 @@ async function readBestEffortJsonFile<T>(path: string): Promise<T | null> {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readRecordValue(record: Record<string, unknown>, ...keys: string[]): Record<string, unknown> | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (isRecord(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function readStringValue(record: Record<string, unknown>, ...keys: string[]): string | null {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === 'string' && value.trim().length > 0) {
       return value.trim();
+    }
+  }
+  return null;
+}
+
+function readIntegerValue(record: Record<string, unknown> | null, ...keys: string[]): number | null {
+  if (!record) {
+    return null;
+  }
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 0) {
+      return value;
+    }
+    if (typeof value === 'string' && /^\d+$/u.test(value.trim())) {
+      return Number.parseInt(value.trim(), 10);
     }
   }
   return null;
