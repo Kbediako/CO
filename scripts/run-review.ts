@@ -679,11 +679,17 @@ async function runDiffBudget(options: CliOptions, repoRoot: string): Promise<voi
       process.stderr.write(chunk);
     });
     child.once('error', (error) => reject(error instanceof Error ? error : new Error(String(error))));
-    child.once('exit', (code) => {
+    child.once('close', (code, signal) => {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`diff budget exited with code ${code}`));
+        reject(
+          new Error(
+            code === null
+              ? `diff budget terminated by signal ${signal ?? 'unknown'}`
+              : `diff budget exited with code ${code}`
+          )
+        );
       }
     });
   });

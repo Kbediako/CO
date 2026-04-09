@@ -114,9 +114,8 @@ export async function runCodexOrchestratorCli(rawArgs: string[] = process.argv.s
     return 0;
   }
 
-  const orchestrator = new CodexOrchestrator();
-
   try {
+    const orchestrator = new CodexOrchestrator();
     switch (command) {
       case 'start':
         await handleStart(orchestrator, args);

@@ -87,12 +87,35 @@ async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promi
   }
 
   try {
-    const [sourceStats, distStats] = await Promise.all([stat(sourceEntry), stat(distEntry)]);
-    return distStats.mtimeMs >= sourceStats.mtimeMs;
+    const distStats = await stat(distEntry);
+    try {
+      const sourceStats = await stat(sourceEntry);
+      return distStats.mtimeMs >= sourceStats.mtimeMs;
+    } catch (sourceError) {
+      if ((sourceError as NodeJS.ErrnoException).code === 'ENOENT') {
+        return true;
+      }
+      return false;
+    }
   } catch {
     return false;
   }
 }
+
+describe('shouldUseFreshDist', () => {
+  it('uses dist when the source entry is missing but the built entry exists', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const distEntry = join(tempRoot, 'dist-entry.js');
+    try {
+      await writeFile(distEntry, 'console.log("dist");', 'utf8');
+      await expect(shouldUseFreshDist(join(tempRoot, 'missing-source.ts'), distEntry)).resolves.toBe(
+        true
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
 
 function buildCliEnv(
   env?: NodeJS.ProcessEnv,

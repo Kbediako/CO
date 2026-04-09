@@ -15,7 +15,7 @@
 ## Milestones & Sequencing
 1. Create the CO-114 docs packet, checklist mirrors, `docs/TASKS.md` snapshot, freshness-registry entries, and the single local workpad source; upsert the workpad and run the audited `linear child-stream --pipeline docs-review`.
 2. Capture current focused timing baselines for `tests/run-review.spec.ts` and `tests/cli-command-surface.spec.ts`, plus the current full-test proxy or recorded Core Lane baseline.
-3. Refactor the CLI and review-wrapper harnesses so pure contract assertions move in-process while a bounded subprocess smoke layer remains.
+3. Refactor the CLI and review-wrapper harnesses, so pure contract assertions move in-process while a bounded subprocess smoke layer remains.
 4. Re-run focused timings, validate the retained subprocess smoke layer, and complete the required repo validation floor.
 5. Run standalone review, an explicit elegance pass, refresh the workpad, and prepare PR or review handoff if the lane is ready.
 

@@ -64,6 +64,7 @@ last_review: 2026-04-09
   - `npm run build`
   - `npm run lint`
   - `npm run test`
+  - `npm run eval:test` when `evaluation/fixtures/**` is in scope for the touched lane
   - `npm run docs:check`
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`

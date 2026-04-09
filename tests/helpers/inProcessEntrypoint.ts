@@ -6,6 +6,8 @@ type InProcessEntrypointResult = {
   stderr: string;
 };
 
+let inProcessEntrypointActive = false;
+
 function renderChunk(chunk: unknown, encoding?: BufferEncoding): string {
   if (typeof chunk === 'string') {
     return chunk;
@@ -102,6 +104,11 @@ export async function runEntrypointInProcess(options: {
   env: NodeJS.ProcessEnv;
   runner: (args?: string[]) => Promise<number>;
 }): Promise<InProcessEntrypointResult> {
+  if (inProcessEntrypointActive) {
+    throw new Error('runEntrypointInProcess cannot run concurrently in the same worker.');
+  }
+  inProcessEntrypointActive = true;
+
   const stdoutBuffer = { value: '' };
   const stderrBuffer = { value: '' };
   const restoreStdout = installOutputCapture(process.stdout, stdoutBuffer);
@@ -125,6 +132,7 @@ export async function runEntrypointInProcess(options: {
     restoreConsole();
     restoreStderr();
     restoreStdout();
+    inProcessEntrypointActive = false;
   }
 }
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -1353,12 +1353,54 @@ async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promi
   }
 
   try {
-    const [sourceStats, distStats] = await Promise.all([stat(sourceEntry), stat(distEntry)]);
-    return distStats.mtimeMs >= sourceStats.mtimeMs;
+    const [distStats, newestSourceMtime] = await Promise.all([
+      stat(distEntry),
+      getNewestSourceMtime(dirname(sourceEntry))
+    ]);
+    return distStats.mtimeMs >= newestSourceMtime;
   } catch {
     return false;
   }
 }
+
+async function getNewestSourceMtime(root: string): Promise<number> {
+  let newestMtime = 0;
+  const entries = await readdir(root, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = join(root, entry.name);
+    if (entry.isDirectory()) {
+      newestMtime = Math.max(newestMtime, await getNewestSourceMtime(entryPath));
+      continue;
+    }
+    const entryStats = await stat(entryPath);
+    newestMtime = Math.max(newestMtime, entryStats.mtimeMs);
+  }
+  return newestMtime;
+}
+
+describe('shouldUseFreshDist', () => {
+  it('treats dist as stale when a newer source dependency exists under scripts/', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const scriptsRoot = join(tempRoot, 'scripts');
+    const helperPath = join(scriptsRoot, 'lib', 'helper.ts');
+    const sourceEntry = join(scriptsRoot, 'run-review.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(helperPath), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(sourceEntry, 'export {};\n', 'utf8');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await writeFile(helperPath, 'export {};\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
 
 afterEach(async () => {
   while (createdSandboxes.length > 0) {
