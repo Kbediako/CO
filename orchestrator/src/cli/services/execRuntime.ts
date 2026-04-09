@@ -29,6 +29,17 @@ const privacyGuard = new PrivacyGuard({ mode: resolvePrivacyGuardMode() });
 const handleService = new RemoteExecHandleService({ guard: privacyGuard, now: () => new Date() });
 const POST_EXIT_STDIO_DRAIN_GRACE_MS = 20;
 
+function flushBufferedStream(
+  stream: NodeJS.ReadableStream,
+  forward: (chunk: Buffer | string) => void
+): void {
+  let chunk = stream.read();
+  while (chunk !== null) {
+    forward(chunk as Buffer | string);
+    chunk = stream.read();
+  }
+}
+
 const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) => {
   const hasExplicitArgs = Array.isArray(request.args);
   const child = spawn(request.command, request.args ?? [], {
@@ -96,17 +107,17 @@ const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) =
     };
 
     const handleStdoutData = (chunk: Buffer | string) => {
-      request.onStdout(chunk);
       if (exitResult) {
-        scheduleFinalize();
+        return;
       }
+      request.onStdout(chunk);
     };
 
     const handleStderrData = (chunk: Buffer | string) => {
-      request.onStderr(chunk);
       if (exitResult) {
-        scheduleFinalize();
+        return;
       }
+      request.onStderr(chunk);
     };
 
     const handleStdoutClose = () => {
@@ -121,6 +132,10 @@ const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) =
 
     const handleExit = (exitCode: number | null, signal: NodeJS.Signals | null) => {
       exitResult = { exitCode, signal };
+      child.stdout.off('data', handleStdoutData);
+      child.stderr.off('data', handleStderrData);
+      flushBufferedStream(child.stdout, request.onStdout);
+      flushBufferedStream(child.stderr, request.onStderr);
       scheduleFinalize();
     };
 
@@ -132,6 +147,8 @@ const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) =
       child.stderr.off('close', handleStderrClose);
       child.off('exit', handleExit);
       child.off('error', handleError);
+      child.stdout.destroy();
+      child.stderr.destroy();
     };
 
     child.stdout.on('data', handleStdoutData);

@@ -40,4 +40,21 @@ describe('CLI exec runtime', () => {
     expect(result.stdout.trim()).toBe('foreground-done');
     expect(result.durationMs).toBeLessThan(1_000);
   });
+
+  it('ignores descendant stdout written after the parent process exits', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+
+    const { getCliExecRunner } = await import('../src/cli/services/execRuntime.js');
+    const runner = getCliExecRunner();
+    const result = await runner.run({
+      command: '/bin/sh',
+      args: ['-c', '(sleep 0.005; for i in 1 2 3; do echo bg; sleep 0.005; done) & echo foreground-done']
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.stdout.trim()).toBe('foreground-done');
+    expect(result.durationMs).toBeLessThan(1_000);
+  });
 });
