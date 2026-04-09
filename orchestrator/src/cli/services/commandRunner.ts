@@ -294,7 +294,7 @@ export async function runCommandStage(
     const invocation = resolveStageInvocation(stage, execEnv);
     if (invocation.warning) {
       logger.warn(invocation.warning);
-      writeEvent({ type: 'command:warning', message: invocation.warning });
+      writeEvent({ type: 'command:warning', warning: invocation.warning });
     }
     invocationPreview = invocation.preview;
     writeEvent({ type: 'command:start', command: invocationPreview });
