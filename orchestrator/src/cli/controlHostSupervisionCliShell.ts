@@ -40,6 +40,7 @@ interface CommandBufferResult {
   exitCode: number;
   stdout: Buffer;
   stderr: Buffer;
+  timedOut?: boolean;
 }
 
 interface ResolvedSupervisionInstall {
@@ -569,7 +570,8 @@ async function resolveStoredControlHostSupervision(
 }
 
 async function loadBootstrapEnvironment(
-  config: ControlHostSupervisionConfig
+  config: ControlHostSupervisionConfig,
+  commandRunner: typeof runCommandBuffer = runCommandBuffer
 ): Promise<NodeJS.ProcessEnv> {
   const baseEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -597,10 +599,19 @@ async function loadBootstrapEnvironment(
     ),
     'env -0'
   ].join('; ');
-  const result = await runCommandBuffer(config.shellPath, ['-lc', shellScript], {
+  const bootstrapTimeoutMs = resolveControlHostSupervisionProbeTimeoutMs(
+    config.healthIntervalSeconds
+  );
+  const result = await commandRunner(config.shellPath, ['-lc', shellScript], {
     cwd: config.repoRoot,
-    env: baseEnv
+    env: baseEnv,
+    timeoutMs: bootstrapTimeoutMs
   });
+  if (result.timedOut === true) {
+    throw new Error(
+      `Timed out while sourcing control-host supervision env/bootstrap files after ${Math.round(bootstrapTimeoutMs / 1_000)}s.`
+    );
+  }
   if (result.exitCode !== 0) {
     const stderr = result.stderr.toString('utf8').trim();
     throw new Error(
@@ -1080,6 +1091,7 @@ async function runCommandBuffer(
   options?: {
     cwd?: string;
     env?: NodeJS.ProcessEnv;
+    timeoutMs?: number;
   }
 ): Promise<CommandBufferResult> {
   try {
@@ -1087,6 +1099,7 @@ async function runCommandBuffer(
       cwd: options?.cwd,
       env: options?.env,
       encoding: 'buffer',
+      ...(typeof options?.timeoutMs === 'number' ? { timeout: options.timeoutMs } : {}),
       maxBuffer: COMMAND_BUFFER_MAX_BYTES
     });
     return {
@@ -1099,13 +1112,22 @@ async function runCommandBuffer(
       code?: string | number;
       stdout?: string | Buffer;
       stderr?: string | Buffer;
+      killed?: boolean;
+      signal?: string | null;
     };
     const exitCode =
       typeof execError.code === 'number' ? execError.code : execError.code === 'ENOENT' ? 127 : 1;
+    const timedOut =
+      typeof options?.timeoutMs === 'number' &&
+      execError.killed === true &&
+      execError.signal === 'SIGTERM';
     return {
       exitCode,
       stdout: bufferLikeToBuffer(execError.stdout),
-      stderr: bufferLikeToBuffer(execError.stderr ?? execError.message)
+      stderr: bufferLikeToBuffer(
+        execError.stderr ?? (timedOut ? `command timed out after ${options.timeoutMs}ms` : execError.message)
+      ),
+      timedOut
     };
   }
 }
@@ -1211,6 +1233,7 @@ function assertStoredControlHostSupervisionConfig(
   }
   assertStoredTimerField(configPath, record.healthIntervalSeconds, 'healthIntervalSeconds');
   assertStoredTimerField(configPath, record.killTimeoutSeconds, 'killTimeoutSeconds');
+  assertStoredPositiveIntegerField(configPath, record.unhealthyThreshold, 'unhealthyThreshold');
   if (!Array.isArray(record.envFiles) || record.envFiles.some((entry) => !isNonEmptyString(entry))) {
     throw new Error(`Invalid control-host supervision config at ${configPath}: invalid envFiles.`);
   }
@@ -1240,6 +1263,17 @@ function assertStoredTimerField(
     throw new Error(
       `Invalid control-host supervision config at ${configPath}: ${key} must be <= ${CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS}.`
     );
+  }
+}
+
+function assertStoredPositiveIntegerField(
+  configPath: string,
+  value: unknown,
+  key: 'unhealthyThreshold'
+): void {
+  const integerValue = typeof value === 'number' ? value : Number.NaN;
+  if (!Number.isInteger(integerValue) || integerValue <= 0) {
+    throw new Error(`Invalid control-host supervision config at ${configPath}: invalid ${key}.`);
   }
 }
 
@@ -1380,6 +1414,7 @@ export const __test__ = {
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
+  loadBootstrapEnvironment,
   parseNulDelimitedEnv,
   probeControlHostHealth,
   readFormatFlag,

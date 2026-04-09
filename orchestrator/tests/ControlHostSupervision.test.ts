@@ -26,6 +26,7 @@ const {
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
+  loadBootstrapEnvironment,
   parseNulDelimitedEnv,
   probeControlHostHealth,
   readFormatFlag,
@@ -357,7 +358,7 @@ describe('controlHostSupervision shell helpers', () => {
     );
   });
 
-  it('rejects stored config timer values that exceed the runtime timer contract', () => {
+  it('rejects stored config timer and threshold values that exceed the runtime contract', () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',
       cwd: '/repo/workspace',
@@ -374,6 +375,15 @@ describe('controlHostSupervision shell helpers', () => {
       })
     ).toThrow(
       'Invalid control-host supervision config at /tmp/invalid-config.json: invalid healthIntervalSeconds.'
+    );
+
+    expect(() =>
+      assertStoredControlHostSupervisionConfig('/tmp/invalid-config.json', {
+        ...config,
+        unhealthyThreshold: 0
+      })
+    ).toThrow(
+      'Invalid control-host supervision config at /tmp/invalid-config.json: invalid unhealthyThreshold.'
     );
 
     expect(() =>
@@ -627,6 +637,49 @@ describe('controlHostSupervision shell helpers', () => {
       reason: 'probe_timeout',
       message: 'co-status probe timed out after 5s.'
     });
+  });
+
+  it('bounds bootstrap env sourcing timeouts and surfaces timeout errors', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-bootstrap-timeout-'));
+    const envFile = join(tempRoot, 'provider.env');
+    await writeFile(envFile, 'CONTROL_HOST_MODE=managed\n', 'utf8');
+
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      envFiles: [envFile],
+      healthIntervalSeconds: 5
+    });
+    let observedTimeoutMs: number | undefined;
+
+    try {
+      await expect(
+        loadBootstrapEnvironment(
+          config,
+          async (
+            _command: string,
+            _args: string[],
+            options?: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number }
+          ) => {
+            observedTimeoutMs = options?.timeoutMs;
+            return {
+              exitCode: 1,
+              stdout: Buffer.alloc(0),
+              stderr: Buffer.from('command timed out after 5000ms', 'utf8'),
+              timedOut: true
+            };
+          }
+        )
+      ).rejects.toThrow(
+        'Timed out while sourcing control-host supervision env/bootstrap files after 5s.'
+      );
+      expect(observedTimeoutMs).toBe(resolveControlHostSupervisionProbeTimeoutMs(5));
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it('ignores only missing-service launchctl bootout failures', () => {
