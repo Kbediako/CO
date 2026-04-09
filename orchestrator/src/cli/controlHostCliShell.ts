@@ -58,7 +58,10 @@ import {
   createProviderIssueHandoffService,
   type ProviderIssueHandoffService
 } from './control/providerIssueHandoff.js';
-import { runProviderDeterministicMergeCloseout } from './control/providerMergeCloseout.js';
+import {
+  runProviderDeterministicMergeCloseout,
+  runProviderReviewHandoffPromotion
+} from './control/providerMergeCloseout.js';
 import {
   createProviderWorkflowConfigStore,
   type ProviderWorkflowConfigStore
@@ -167,6 +170,7 @@ export async function runControlHostCliShell(
         publishRuntime,
         readFeatureToggles,
         providerWorkflowConfigStore,
+        runReviewHandoffPromotion: runProviderReviewHandoffPromotion,
         runMergeCloseout: runProviderDeterministicMergeCloseout,
         resolveTrackedIssue: async ({ issueId }) => {
           const runtimeEnv = process.env;

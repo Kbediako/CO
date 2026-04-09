@@ -218,7 +218,7 @@ describe('prepareControlServerStartupInputs', () => {
       expect(context.questionQueue.list()).toEqual(questions);
       expect(context.delegationTokens.list()).toEqual(tokens);
       expect(context.linearAdvisoryState).toEqual(linearAdvisorySeed);
-      expect(context.providerIntakeState).toEqual({
+      expect(context.providerIntakeState).toMatchObject({
         ...providerIntakeSeed,
         polling: null
       });

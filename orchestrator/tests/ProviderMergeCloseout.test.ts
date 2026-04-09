@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { runProviderDeterministicMergeCloseout } from '../src/cli/control/providerMergeCloseout.js';
+import {
+  runProviderDeterministicMergeCloseout,
+  runProviderReviewHandoffPromotion
+} from '../src/cli/control/providerMergeCloseout.js';
 
 describe('runProviderDeterministicMergeCloseout', () => {
   it('records merge attempt, shared-root reconciliation, and Done transition for a merge-ready attached PR', async () => {
@@ -1456,7 +1459,10 @@ describe('runProviderDeterministicMergeCloseout', () => {
         'https://github.com/asabeko/CO/pull/360',
         'https://github.com/asabeko/CO/pull/372'
       ],
-      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/355'],
+      ignored_historical_pr_urls: [
+        'https://github.com/asabeko/CO/pull/355',
+        'https://github.com/asabeko/CO/pull/360'
+      ],
       conflicting_attached_pr_urls: [],
       pr: {
         owner: 'asabeko',
@@ -1806,6 +1812,355 @@ describe('runProviderDeterministicMergeCloseout', () => {
       }
     });
     expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+    expect(transitionIssueState).not.toHaveBeenCalled();
+  });
+});
+
+describe('runProviderReviewHandoffPromotion', () => {
+  it('promotes a merge-ready review handoff into Merging', async () => {
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn().mockResolvedValue({
+      state: 'OPEN',
+      reviewDecision: 'APPROVED',
+      mergeStateStatus: 'CLEAN',
+      readyToMerge: true,
+      gateReasons: [],
+      unresolvedThreadCount: 0,
+      updatedAt: '2026-04-09T03:00:00.000Z',
+      mergedAt: null,
+      headOid: 'abc123',
+      checks: { pending: [], failed: [] },
+      requiredChecks: { pending: [], failed: [] }
+    });
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'transitioned' as const,
+      previous_state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+      target_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-116',
+        title: 'Review handoff promotion',
+        description: null,
+        url: null,
+        updated_at: '2026-04-09T03:05:00.000Z',
+        workspace_id: null,
+        state: { id: 'state-merging', name: 'Merging', type: 'started' },
+        team: null,
+        project: null,
+        comments: [],
+        attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/416' }],
+        workpad_comment: null
+      },
+      source_setup: null
+    }));
+
+    const result = await runProviderReviewHandoffPromotion(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-116',
+        issueState: 'In Review',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-09T03:04:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-09T03:05:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-116',
+            title: 'Review handoff promotion',
+            description: null,
+            url: null,
+            updated_at: '2026-04-09T03:04:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/416' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'promoted',
+      reason: 'promoted_to_merging',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      pr: {
+        number: 416
+      },
+      snapshot: {
+        review_decision: 'APPROVED',
+        merge_state_status: 'CLEAN',
+        ready_to_merge: true
+      },
+      linear_transition: {
+        status: 'transitioned',
+        target_state: 'Merging',
+        issue_state: 'Merging'
+      }
+    });
+    expect(fetchSnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      owner: 'asabeko',
+      repo: 'CO',
+      prNumber: 416,
+      readinessMode: 'merge'
+    }));
+    expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging'
+    }));
+  });
+
+  it('promotes an already-merged review handoff into Merging and preserves older attached PR URLs in structured truth', async () => {
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 355) {
+        return {
+          state: 'MERGED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=MERGED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-09T03:02:00.000Z',
+          mergedAt: '2026-04-09T03:02:00.000Z',
+          headOid: 'old355',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 360) {
+        return {
+          state: 'OPEN',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'BEHIND',
+          readyToMerge: false,
+          gateReasons: ['mergeStateStatus=BEHIND'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-09T03:03:00.000Z',
+          mergedAt: null,
+          headOid: 'old360',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 416) {
+        return {
+          state: 'MERGED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=MERGED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-09T03:06:00.000Z',
+          mergedAt: '2026-04-09T03:06:00.000Z',
+          headOid: 'abc123',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      throw new Error(`Unexpected PR ${String(prNumber)}`);
+    });
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'transitioned' as const,
+      previous_state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+      target_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-116',
+        title: 'Review handoff promotion',
+        description: null,
+        url: null,
+        updated_at: '2026-04-09T03:07:00.000Z',
+        workspace_id: null,
+        state: { id: 'state-merging', name: 'Merging', type: 'started' },
+        team: null,
+        project: null,
+        comments: [],
+        attachments: [
+          { id: 'att-355', title: 'Historical merged PR', url: 'https://github.com/asabeko/CO/pull/355' },
+          { id: 'att-360', title: 'Stale PR', url: 'https://github.com/asabeko/CO/pull/360' },
+          { id: 'att-416', title: 'Merged replacement PR', url: 'https://github.com/asabeko/CO/pull/416' }
+        ],
+        workpad_comment: null
+      },
+      source_setup: null
+    }));
+
+    const result = await runProviderReviewHandoffPromotion(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-116',
+        issueState: 'In Review',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-09T03:06:30.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-09T03:07:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-116',
+            title: 'Review handoff promotion',
+            description: null,
+            url: null,
+            updated_at: '2026-04-09T03:06:30.000Z',
+            workspace_id: null,
+            state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [
+              { id: 'att-355', title: 'Historical merged PR', url: 'https://github.com/asabeko/CO/pull/355' },
+              { id: 'att-360', title: 'Stale PR', url: 'https://github.com/asabeko/CO/pull/360' },
+              { id: 'att-416', title: 'Merged replacement PR', url: 'https://github.com/asabeko/CO/pull/416' }
+            ],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'promoted',
+      reason: 'promoted_to_merging',
+      issue_state: 'Merging',
+      attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/355',
+        'https://github.com/asabeko/CO/pull/360',
+        'https://github.com/asabeko/CO/pull/416'
+      ],
+      ignored_historical_pr_urls: [
+        'https://github.com/asabeko/CO/pull/355',
+        'https://github.com/asabeko/CO/pull/360'
+      ],
+      pr: {
+        number: 416
+      },
+      snapshot: {
+        state: 'MERGED',
+        ready_to_merge: false,
+        merged_at: '2026-04-09T03:06:00.000Z'
+      },
+      linear_transition: {
+        status: 'transitioned',
+        target_state: 'Merging',
+        issue_state: 'Merging'
+      }
+    });
+    expect(result.summary).toContain('already merged');
+    expect(result.summary).toContain('Older unmerged PR URLs');
+    expect(result.summary).toContain('https://github.com/asabeko/CO/pull/360');
+    expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-1',
+      stateName: 'Merging'
+    }));
+  });
+
+  it('refuses review handoff promotion when review is still required', async () => {
+    const runCommand = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      exitCode: 0,
+      stdout: 'git@github.com:asabeko/CO.git\n',
+      stderr: ''
+    });
+    const fetchSnapshot = vi.fn().mockResolvedValue({
+      state: 'OPEN',
+      reviewDecision: 'REVIEW_REQUIRED',
+      mergeStateStatus: 'CLEAN',
+      readyToMerge: false,
+      gateReasons: ['review=REVIEW_REQUIRED'],
+      unresolvedThreadCount: 0,
+      updatedAt: '2026-04-09T03:10:00.000Z',
+      mergedAt: null,
+      headOid: 'def456',
+      checks: { pending: [], failed: [] },
+      requiredChecks: { pending: [], failed: [] }
+    });
+    const transitionIssueState = vi.fn();
+
+    const result = await runProviderReviewHandoffPromotion(
+      {
+        issueId: 'lin-issue-1',
+        issueIdentifier: 'CO-116',
+        issueState: 'In Review',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-09T03:10:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-09T03:10:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-116',
+            title: 'Review handoff promotion',
+            description: null,
+            url: null,
+            updated_at: '2026-04-09T03:10:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-in-review', name: 'In Review', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/416' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => ['review=REVIEW_REQUIRED']),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'review=REVIEW_REQUIRED',
+      snapshot: {
+        review_decision: 'REVIEW_REQUIRED',
+        ready_to_merge: false,
+        action_required_reasons: ['review=REVIEW_REQUIRED']
+      }
+    });
+    expect(result.summary).toContain('Review-handoff promotion is blocked by');
     expect(transitionIssueState).not.toHaveBeenCalled();
   });
 });

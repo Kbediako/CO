@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
+      "title": "CO: automate truthful In Review -> Merging promotion after clean review handoff",
+      "relates_to": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad-co-116-docs-review/cli/2026-04-09T02-47-50-041Z-2edb5399/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
+        "task": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
+        "agent_task": ".agent/task/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
+        "docs": "docs/TECH_SPEC-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md"
+      }
+    },
+    {
       "id": "20260409-linear-057747d0-a472-4cba-ac18-2d7342f2a168",
       "title": "CO: Make source checkouts prefer fresh CLI source after merge without manual npm run build",
       "relates_to": "tasks/tasks-linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
@@ -9,7 +32,13 @@
         "Codex"
       ],
       "last_review": "2026-04-09",
-      "approvals": {},
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-057747d0-a472-4cba-ac18-2d7342f2a168-co-113-docs-review-rerun/cli/2026-04-09T05-52-18-812Z-e46daad0/manifest.json"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
         "task": "tasks/tasks-linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
