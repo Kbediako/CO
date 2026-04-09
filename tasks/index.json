@@ -71,6 +71,23 @@
       }
     },
     {
+      "id": "20260409-linear-057747d0-a472-4cba-ac18-2d7342f2a168",
+      "title": "CO: Make source checkouts prefer fresh CLI source after merge without manual npm run build",
+      "relates_to": "tasks/tasks-linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
+        "task": "tasks/tasks-linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
+        "agent_task": ".agent/task/linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
+        "docs": "docs/TECH_SPEC-linear-057747d0-a472-4cba-ac18-2d7342f2a168.md"
+      }
+    },
+    {
       "id": "20260409-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827",
       "title": "Reduce practical Linear request-bucket exhaustion under low-headroom single-issue operation",
       "relates_to": "tasks/tasks-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md",

@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { isDirectExecution, runCodexOrchestratorCli } from '../bin/codex-orchestrator.js';
+import { isDirectExecution, runCodexOrchestratorCli } from '../bin/codex-orchestrator.ts';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
 import {
   PROVIDER_OVERRIDE_ENV_KEYS,
