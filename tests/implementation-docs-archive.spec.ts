@@ -207,12 +207,25 @@ describe('implementation-docs-archive script', () => {
     const findingsEntry = registry.entries.find(
       (entry: { path?: string }) => entry.path === 'docs/findings/9999-archive-test-deliberation.md'
     );
+    const payloadContent = await readFile(
+      join(
+        repo,
+        'out',
+        'implementation-docs-archive-automation',
+        'docs-archive',
+        'docs',
+        'findings',
+        '9999-archive-test-deliberation.md'
+      ),
+      'utf8'
+    );
 
     expect(findingsEntry).toMatchObject({
       path: 'docs/findings/9999-archive-test-deliberation.md',
       status: 'archived'
     });
     expect(await readFile(findingsPath, 'utf8')).toBe(findingsBefore);
+    expect(payloadContent).toBe(findingsBefore);
   });
 
   it('keeps excluded stale report-only findings active when the linked task is terminal', async () => {

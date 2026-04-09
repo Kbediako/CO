@@ -530,7 +530,7 @@ async function main() {
     };
   }
 
-  async function archiveDoc({ relativePath, reason, context, loadedDoc = null }) {
+  async function archiveDoc({ relativePath, reason, context, loadedDoc = null, preserveSourceDoc = false }) {
     const loaded = loadedDoc ?? (await loadContainedDoc(relativePath, context));
     if (!loaded) {
       return;
@@ -562,7 +562,9 @@ async function main() {
       if (!(await pathExists(payloadPath))) {
         throw new Error(`Archive payload missing after write: ${payloadPath}`);
       }
-      await writeFile(containedPath.absolutePath, stub);
+      if (!preserveSourceDoc) {
+        await writeFile(containedPath.absolutePath, stub);
+      }
     }
 
     const entry = ensureRegistryEntry(registryMap, relativePath, {
@@ -718,23 +720,16 @@ async function main() {
         continue;
       }
 
-      const previousLastReview = registryEntry.last_review;
-      registryEntry.status = 'archived';
-      registryEntry.last_review = todayString;
-      if (!registryEntry.owner || typeof registryEntry.owner !== 'string') {
-        registryEntry.owner = DEFAULT_OWNER;
-      }
-
-      report.archived.push({
-        path: relativePath,
+      await archiveDoc({
+        relativePath,
         reason: 'report_only_retention',
         context: {
           ...taskContext,
-          report_last_review: previousLastReview,
+          report_last_review: registryEntry.last_review,
           report_age_days: ageDays
-        }
+        },
+        preserveSourceDoc: true
       });
-      report.totals.archived += 1;
     }
   }
 
