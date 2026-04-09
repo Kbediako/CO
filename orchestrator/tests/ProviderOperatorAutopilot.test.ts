@@ -486,6 +486,73 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('moves closed unmerged review handoffs to Rework even when the snapshot reason list is empty', async () => {
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'rework', name: 'Rework', type: 'started' },
+        updated_at: '2026-04-09T10:07:00.000Z'
+      },
+      previous_state: { id: 'review', name: 'In Review', type: 'started' },
+      target_state: { id: 'rework', name: 'Rework', type: 'started' },
+      source_setup: null
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'In Review',
+            state_type: 'started'
+          })
+        ],
+        claims: [
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            issue_state: 'In Review',
+            review_promotion: createReviewPromotion({
+              status: 'action_required',
+              reason: 'pr_closed_unmerged',
+              action_required_reasons: [],
+              snapshot_state: 'CLOSED'
+            })
+          })
+        ],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:07:00.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).toHaveBeenCalledWith({
+      issueId: 'lin-issue-1',
+      stateName: 'Rework',
+      sourceSetup: null,
+      env: expect.any(Object)
+    });
+    expect(result).toMatchObject({
+      status: 'acted',
+      actions: [
+        {
+          kind: 'review_handoff_rework',
+          issue_identifier: 'CO-118',
+          reason: 'author_action_required_rework',
+          action_required_reasons: ['pr_closed_unmerged']
+        }
+      ]
+    });
+  });
+
   it('surfaces pending local rollout follow-up after merged closeout truth lands', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [],
@@ -655,6 +722,8 @@ function createClaim(
 function createReviewPromotion(input: {
   status: 'watching' | 'action_required' | 'promoted' | 'promotion_failed' | 'transition_failed';
   action_required_reasons: string[];
+  reason?: string;
+  snapshot_state?: 'OPEN' | 'CLOSED';
 }) {
   return {
     recorded_at: '2026-04-09T09:05:00.000Z',
@@ -664,7 +733,11 @@ function createReviewPromotion(input: {
     issue_state_type: 'started',
     issue_updated_at: '2026-04-09T09:05:00.000Z',
     status: input.status,
-    reason: input.status === 'action_required' ? 'review_handoff_promotion_blocked' : 'review_handoff_watching',
+    reason:
+      input.reason ??
+      (input.status === 'action_required'
+        ? 'review_handoff_promotion_blocked'
+        : 'review_handoff_watching'),
     summary: 'review-handoff promotion test fixture',
     attached_pr_urls: ['https://github.com/asabeko/CO/pull/118'],
     ignored_historical_pr_urls: [],
@@ -676,7 +749,7 @@ function createReviewPromotion(input: {
       number: 118
     },
     snapshot: {
-      state: 'OPEN',
+      state: input.snapshot_state ?? 'OPEN',
       review_decision: input.action_required_reasons.find((reason) => reason.startsWith('review='))?.split('=')[1] ?? 'CHANGES_REQUESTED',
       merge_state_status: 'CLEAN',
       ready_to_merge: false,

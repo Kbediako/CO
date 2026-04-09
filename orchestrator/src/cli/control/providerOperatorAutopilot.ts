@@ -498,9 +498,10 @@ async function maybeRunReviewHandoffRework(input: {
   if (!candidate) {
     return { action: null, hold: null, failed: false, summary: '', error: null };
   }
-  const snapshotReasons =
-    candidate.claim.review_promotion?.snapshot?.action_required_reasons ?? [];
-  const authorActionReasons = snapshotReasons.filter((reason) =>
+  const actionRequiredReasons = resolveReviewHandoffActionRequiredReasons(
+    candidate.claim.review_promotion ?? null
+  );
+  const authorActionReasons = actionRequiredReasons.filter((reason) =>
     isAuthorActionRequiredReason(reason, input.config.review_handoff_rework.excluded_action_required_reasons)
   );
   if (authorActionReasons.length === 0) {
@@ -511,8 +512,8 @@ async function maybeRunReviewHandoffRework(input: {
         issue_id: candidate.trackedIssue.id,
         issue_identifier: candidate.trackedIssue.identifier,
         reason: 'review_handoff_non_author_action_required',
-        summary: `Review handoff ${candidate.trackedIssue.identifier} remains parked because the current blockers are not author-action-required: ${formatReasonList(snapshotReasons)}.`,
-        action_required_reasons: [...snapshotReasons]
+        summary: `Review handoff ${candidate.trackedIssue.identifier} remains parked because the current blockers are not author-action-required: ${formatReasonList(actionRequiredReasons)}.`,
+        action_required_reasons: [...actionRequiredReasons]
       },
       failed: false,
       summary: '',
@@ -680,6 +681,7 @@ function isAuthorActionRequiredReason(reason: string, excludedReasons: string[])
     return false;
   }
   return (
+    reason === 'pr_closed_unmerged' ||
     reason.startsWith('review=') ||
     reason.startsWith('merge_state=') ||
     reason.startsWith('unresolved_threads=') ||
@@ -687,6 +689,17 @@ function isAuthorActionRequiredReason(reason: string, excludedReasons: string[])
     reason.startsWith('required_checks_failed=') ||
     reason.startsWith('checks_failed=')
   );
+}
+
+function resolveReviewHandoffActionRequiredReasons(
+  reviewPromotion: ProviderIntakeClaimRecord['review_promotion']
+): string[] {
+  const snapshotReasons = reviewPromotion?.snapshot?.action_required_reasons ?? [];
+  if (snapshotReasons.length > 0) {
+    return [...snapshotReasons];
+  }
+  const fallbackReason = normalizeOptionalString(reviewPromotion?.reason);
+  return fallbackReason ? [fallbackReason] : [];
 }
 
 function normalizeComparableResult(
