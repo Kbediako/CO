@@ -179,6 +179,11 @@ export function createProviderWorkflowConfigStore(
 
       const raw = await readFile(sourcePath, 'utf8');
       const pipeline = parseRequiredPipelineFromRaw(raw, sourcePath, createOptions.pipelineId);
+      const nextTerminalCleanup = buildTerminalCleanupPayload(
+        pipeline.metadata,
+        state.terminal_cleanup?.last_result ?? null
+      );
+      const nextWorkerHosts = buildWorkerHostsPayload(pipeline.metadata);
 
       await mkdir(dirname(snapshotPath), { recursive: true });
       await replaceSnapshotAtomically(raw);
@@ -193,11 +198,8 @@ export function createProviderWorkflowConfigStore(
         last_success_at: attemptedAt,
         last_error_at: null,
         last_error: null,
-        terminal_cleanup: buildTerminalCleanupPayload(
-          pipeline.metadata,
-          state.terminal_cleanup?.last_result ?? null
-        ),
-        worker_hosts: buildWorkerHostsPayload(pipeline.metadata)
+        terminal_cleanup: nextTerminalCleanup,
+        worker_hosts: nextWorkerHosts
       };
       if (!reloadOptions.startup && previousStatus === 'reload_failed') {
         logger.info(

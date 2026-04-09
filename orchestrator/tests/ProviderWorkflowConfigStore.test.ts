@@ -124,6 +124,42 @@ describe('providerWorkflowConfigStore', () => {
     );
   });
 
+  it('preserves the last known good snapshot when a later reload has invalid worker_hosts metadata', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    const snapshotPath = await store.getLaunchConfigPath();
+    const initialSnapshot = await readFile(snapshotPath, 'utf8');
+
+    await writeRepoConfig(
+      buildValidProviderConfig('broken', {
+        worker_hosts: {
+          hosts: [
+            {
+              name: 'worker-host-01'
+            }
+          ]
+        }
+      })
+    );
+    const degraded = await store.refresh();
+
+    expect(degraded.status).toBe('reload_failed');
+    expect(degraded.snapshot_path).toBe(snapshotPath);
+    expect(degraded.last_error).toContain('ssh_destination');
+    expect(await readFile(snapshotPath, 'utf8')).toBe(initialSnapshot);
+    expect(await store.getLaunchConfigPath()).toBe(snapshotPath);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('keeping last known good configuration')
+    );
+  });
+
   it('replaces the snapshot and clears the error when a later valid reload succeeds', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const store = createProviderWorkflowConfigStore({
