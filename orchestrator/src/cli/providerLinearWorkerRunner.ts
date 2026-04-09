@@ -3873,7 +3873,7 @@ export async function runProviderLinearWorker(
     throw new Error('provider-linear-worker tracked issue read loop exited unexpectedly.');
   };
 
-    let issue = await readTrackedIssueWithFailClosedProof();
+  let issue = await readTrackedIssueWithFailClosedProof();
   let threadId: string | null = residentSessionSeed?.source_thread_id ?? null;
   let turnId: string | null = null;
   let lifecycle = classifyProviderLinearWorkerLifecycle(issue);

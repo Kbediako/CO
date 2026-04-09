@@ -1133,7 +1133,7 @@ describe('codex-orchestrator command surface', () => {
   }, TEST_TIMEOUT);
 
   it('prints self-check text output through the binary shell', async () => {
-    const { stdout } = await runCli(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
+    const { stdout } = await runCliSubprocess(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Status: ok');
     expect(stdout).toContain('Name: @kbediako/codex-orchestrator');
     expect(stdout).toContain('Version: 0.1.38');
@@ -1168,7 +1168,7 @@ describe('codex-orchestrator command surface', () => {
       ...process.env,
       CODEX_HOME: tempDir
     };
-    const { stdout } = await runCli(['doctor', '--apply'], env, CLI_BINARY_SHELL_TIMEOUT);
+    const { stdout } = await runCliSubprocess(['doctor', '--apply'], env, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Doctor apply plan:');
     expect(stdout).toContain('chrome-devtools');
     expect(stdout).toContain('delegation');
