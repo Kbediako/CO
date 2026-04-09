@@ -51,7 +51,10 @@ import {
   providerLinearChildLanePathSelectorsOverlap,
   resolveProviderLinearChildLaneScopeContract
 } from './providerLinearChildLanePhaseContract.js';
-import { resolveCodexOrchestratorBootstrapInvocation } from './utils/packageProgramResolver.js';
+import {
+  applyResolvedProgramInvocationEnvOverrides,
+  resolveCodexOrchestratorBootstrapInvocation
+} from './utils/packageProgramResolver.js';
 import { slugify } from './utils/strings.js';
 import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
 
@@ -517,9 +520,7 @@ async function launchChildLane(
     },
     sourceSetup
   });
-  if (invocation.envOverrides) {
-    Object.assign(childStartEnv, invocation.envOverrides);
-  }
+  applyResolvedProgramInvocationEnvOverrides(childStartEnv, invocation.envOverrides);
 
   let execResult: ProviderLinearWorkerExecResult;
   try {

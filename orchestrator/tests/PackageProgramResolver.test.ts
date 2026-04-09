@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  filterResolvedProgramInvocationEnvOverrides,
   resolveCodexOrchestratorBootstrapInvocation,
   resolvePackageProgramInvocation
 } from '../src/cli/utils/packageProgramResolver.js';
@@ -93,6 +94,17 @@ describe('packageProgramResolver', () => {
     expect(invocation.mode).toBe('source');
     expect(invocation.envOverrides).toEqual({
       TS_NODE_PROJECT: `${localRoot}/tsconfig.json`
+    });
+  });
+
+  it('drops resolved invocation env overrides outside the allowlist', () => {
+    expect(
+      filterResolvedProgramInvocationEnvOverrides({
+        TS_NODE_PROJECT: '/tmp/local-checkout/tsconfig.json',
+        MALICIOUS_FLAG: '1'
+      })
+    ).toEqual({
+      TS_NODE_PROJECT: '/tmp/local-checkout/tsconfig.json'
     });
   });
 });

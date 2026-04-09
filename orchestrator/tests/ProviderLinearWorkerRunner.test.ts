@@ -39,6 +39,7 @@ import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/provider
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
+const SOURCE_HELPER_COMMAND = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
 
 afterEach(async () => {
   vi.unstubAllGlobals();
@@ -596,7 +597,7 @@ describe('provider linear worker runner', () => {
   it('builds a full first-turn prompt and a continuation prompt', () => {
     const issue = createTrackedIssue();
 
-    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
+    const helperCommand = SOURCE_HELPER_COMMAND;
     const sharedRepoCheckoutPath = '/tmp/co';
     const manifest = {
       memory: {
@@ -758,7 +759,7 @@ describe('provider linear worker runner', () => {
 
   it('includes deterministic mutation suppressions in continuation prompts when the same attempt already failed validation', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
+    const helperCommand = SOURCE_HELPER_COMMAND;
     const audit: ProviderLinearAuditSummary = {
       path: '/tmp/provider-linear-worker-linear-audit.jsonl',
       attempted_count: 1,
@@ -803,7 +804,7 @@ describe('provider linear worker runner', () => {
 
   it('ignores deterministic mutation suppressions that predate the current attempt', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
+    const helperCommand = SOURCE_HELPER_COMMAND;
     const audit: ProviderLinearAuditSummary = {
       path: '/tmp/provider-linear-worker-linear-audit.jsonl',
       attempted_count: 1,
@@ -848,7 +849,7 @@ describe('provider linear worker runner', () => {
 
   it('ignores deterministic mutation suppressions when the current attempt start is missing', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
+    const helperCommand = SOURCE_HELPER_COMMAND;
     const audit: ProviderLinearAuditSummary = {
       path: '/tmp/provider-linear-worker-linear-audit.jsonl',
       attempted_count: 1,
@@ -892,7 +893,7 @@ describe('provider linear worker runner', () => {
 
   it('suppresses deterministic workpad validation retries within the same attempt', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
+    const helperCommand = SOURCE_HELPER_COMMAND;
     const audit: ProviderLinearAuditSummary = {
       path: '/tmp/provider-linear-worker-linear-audit.jsonl',
       attempted_count: 1,
@@ -937,7 +938,7 @@ describe('provider linear worker runner', () => {
 
   it('ignores malformed audit summaries when deriving continuation suppressions', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
+    const helperCommand = SOURCE_HELPER_COMMAND;
 
     const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
       linearAudit: {

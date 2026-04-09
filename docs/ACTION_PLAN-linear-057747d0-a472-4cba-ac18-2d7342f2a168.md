@@ -73,5 +73,5 @@
   - Mitigation: emit warnings only when the checkout looks like a source checkout but the source runtime is unavailable and the launcher must fall back to `dist`.
 
 ## Approvals
-- Reviewer: Pending docs-review and implementation validation
+- Reviewer: Docs-review approval is recorded via rerun child-stream manifest `.runs/linear-057747d0-a472-4cba-ac18-2d7342f2a168-co-113-docs-review-rerun/cli/2026-04-09T09-58-01-151Z-f0aa9682/manifest.json`; forced review telemetry `.runs/linear-057747d0-a472-4cba-ac18-2d7342f2a168-co-113-docs-review-rerun/cli/2026-04-09T09-58-01-151Z-f0aa9682/review/telemetry.json` ended `failed-other` after docs gates cleared, so the accepted fallback note is `out/linear-057747d0-a472-4cba-ac18-2d7342f2a168/manual/20260409T095801Z-docs-review-fallback.md`. Review-thread follow-up validation is in progress on PR `#393`.
 - Date: 2026-04-09

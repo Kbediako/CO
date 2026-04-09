@@ -29,6 +29,7 @@ export interface ResolvedPackageProgramInvocation {
 
 const DEFAULT_SOURCE_EXTENSIONS = ['.ts', '.mts', '.js', '.mjs', '.tsx'] as const;
 const BOOTSTRAP_SOURCE_EXTENSIONS = ['.js', '.ts', '.mjs', '.mts', '.tsx'] as const;
+const ALLOWED_RESOLVED_ENV_OVERRIDE_KEYS = ['TS_NODE_PROJECT'] as const;
 
 export function resolvePackageProgramInvocation(
   options: ResolvePackageProgramInvocationOptions
@@ -69,9 +70,9 @@ export function resolvePackageProgramInvocation(
         sourcePath,
         mode: 'source',
         warning: null,
-        envOverrides: {
+        envOverrides: filterResolvedProgramInvocationEnvOverrides({
           TS_NODE_PROJECT: join(packageRoot, 'tsconfig.json')
-        }
+        })
       };
     }
   }
@@ -114,6 +115,32 @@ export function resolveProviderLinearWorkerProgramInvocation(
     ...options,
     distRelativePath: 'orchestrator/src/cli/providerLinearWorkerRunner.js'
   });
+}
+
+export function filterResolvedProgramInvocationEnvOverrides(
+  envOverrides?: NodeJS.ProcessEnv
+): NodeJS.ProcessEnv | undefined {
+  if (!envOverrides) {
+    return undefined;
+  }
+  const filtered: NodeJS.ProcessEnv = {};
+  for (const key of ALLOWED_RESOLVED_ENV_OVERRIDE_KEYS) {
+    const value = envOverrides[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      filtered[key] = value;
+    }
+  }
+  return Object.keys(filtered).length > 0 ? filtered : undefined;
+}
+
+export function applyResolvedProgramInvocationEnvOverrides(
+  targetEnv: NodeJS.ProcessEnv,
+  envOverrides?: NodeJS.ProcessEnv
+): void {
+  const filtered = filterResolvedProgramInvocationEnvOverrides(envOverrides);
+  if (filtered) {
+    Object.assign(targetEnv, filtered);
+  }
 }
 
 function resolvePackageRoot(

@@ -48,8 +48,16 @@ async function assertPathExists(filePath, label) {
 async function assertPathMissing(filePath, label) {
   try {
     await access(filePath);
-  } catch {
-    return;
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      return;
+    }
+    throw error;
   }
   throw new Error(`${label} should be absent: ${filePath}`);
 }

@@ -20,7 +20,10 @@ import {
 } from './providerLinearWorkerRunner.js';
 import { logger } from '../logger.js';
 import { slugify } from './utils/strings.js';
-import { resolveCodexOrchestratorBootstrapInvocation } from './utils/packageProgramResolver.js';
+import {
+  applyResolvedProgramInvocationEnvOverrides,
+  resolveCodexOrchestratorBootstrapInvocation
+} from './utils/packageProgramResolver.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
 const ALLOWED_PROVIDER_CHILD_PIPELINES = ['docs-review', 'implementation-gate', 'docs-relevance-advisory'] as const;
@@ -231,9 +234,7 @@ export async function runProviderLinearChildStreamShell(
     childTaskId,
     sourceSetup
   );
-  if (invocation.envOverrides) {
-    Object.assign(childStartEnv, invocation.envOverrides);
-  }
+  applyResolvedProgramInvocationEnvOverrides(childStartEnv, invocation.envOverrides);
   const childLaunchTimestamp = deps.now();
   let execResult: ProviderLinearWorkerExecResult;
   try {

@@ -32,6 +32,7 @@ import {
 } from '../../../../scripts/lib/review-execution-telemetry.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
 import {
+  applyResolvedProgramInvocationEnvOverrides,
   resolvePackageProgramInvocation,
   resolveProviderLinearWorkerProgramInvocation
 } from '../utils/packageProgramResolver.js';
@@ -293,9 +294,7 @@ export async function runCommandStage(
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
     execEnv.CODEX_ORCHESTRATOR_NODE_BIN = process.execPath;
     const invocation = resolveStageInvocation(stage, execEnv);
-    if (invocation.envOverrides) {
-      Object.assign(execEnv, invocation.envOverrides);
-    }
+    applyResolvedProgramInvocationEnvOverrides(execEnv, invocation.envOverrides);
     if (invocation.warning) {
       logger.warn(invocation.warning);
       writeEvent({ type: 'command:warning', warning: invocation.warning });
