@@ -175,6 +175,59 @@ describe('shouldUseFreshDist', () => {
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
+
+  it('refreshes a cached dependency closure when a tracked file adds a new runtime import', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependency = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const newlyTrackedDependency = join(tempRoot, 'scripts', 'lib', 'provider-run-contract.ts');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'scripts', 'lib'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependency, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependency, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const trackedUpdateAt = new Date('2026-01-01T00:00:02.000Z');
+      await writeFile(
+        transitiveDependency,
+        "export { runProviderContract } from '../../../scripts/lib/provider-run-contract.js';\n",
+        'utf8'
+      );
+      await writeFile(newlyTrackedDependency, 'export function runProviderContract() {}\n', 'utf8');
+      await utimes(transitiveDependency, trackedUpdateAt, trackedUpdateAt);
+      await utimes(newlyTrackedDependency, trackedUpdateAt, trackedUpdateAt);
+
+      const rebuiltDistAt = new Date('2026-01-01T00:00:03.000Z');
+      await utimes(distEntry, rebuiltDistAt, rebuiltDistAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const newerDependencyAt = new Date('2026-01-01T00:00:04.000Z');
+      await writeFile(newlyTrackedDependency, 'export function runProviderContract() { return true; }\n', 'utf8');
+      await utimes(newlyTrackedDependency, newerDependencyAt, newerDependencyAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('isDirectExecution', () => {

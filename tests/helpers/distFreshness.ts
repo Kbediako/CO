@@ -8,6 +8,11 @@ type DependencyClosure = {
   hasUnresolvedTrackedDependency: boolean;
 };
 
+type CachedDependencyClosure = {
+  closure: DependencyClosure;
+  trackedMtimes: ReadonlyMap<string, number>;
+};
+
 const SOURCE_EXTENSION_PRIORITY = [
   '.ts',
   '.tsx',
@@ -19,7 +24,7 @@ const SOURCE_EXTENSION_PRIORITY = [
   '.cjs'
 ] as const;
 
-const dependencyClosureCache = new Map<string, Promise<DependencyClosure>>();
+const dependencyClosureCache = new Map<string, Promise<CachedDependencyClosure>>();
 
 export async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
   let distStats;
@@ -52,18 +57,32 @@ export async function shouldUseFreshDist(sourceEntry: string, distEntry: string)
 
 function getDependencyClosure(sourceEntry: string): Promise<DependencyClosure> {
   const cacheKey = resolve(sourceEntry);
-  let cached = dependencyClosureCache.get(cacheKey);
-  if (!cached) {
-    cached = discoverDependencyClosure(cacheKey).catch((error) => {
-      dependencyClosureCache.delete(cacheKey);
-      throw error;
-    });
-    dependencyClosureCache.set(cacheKey, cached);
-  }
-  return cached;
+  return getDependencyClosureCached(cacheKey).then(({ closure }) => closure);
 }
 
-async function discoverDependencyClosure(sourceEntry: string): Promise<DependencyClosure> {
+async function getDependencyClosureCached(sourceEntry: string): Promise<CachedDependencyClosure> {
+  const cacheKey = resolve(sourceEntry);
+  const cached = dependencyClosureCache.get(cacheKey);
+  if (!cached) {
+    return await refreshDependencyClosure(cacheKey);
+  }
+  const cachedClosure = await cached;
+  if (await trackedFilesChanged(cachedClosure.trackedMtimes)) {
+    return await refreshDependencyClosure(cacheKey);
+  }
+  return cachedClosure;
+}
+
+function refreshDependencyClosure(sourceEntry: string): Promise<CachedDependencyClosure> {
+  const refreshed = discoverDependencyClosure(sourceEntry).catch((error) => {
+    dependencyClosureCache.delete(sourceEntry);
+    throw error;
+  });
+  dependencyClosureCache.set(sourceEntry, refreshed);
+  return refreshed;
+}
+
+async function discoverDependencyClosure(sourceEntry: string): Promise<CachedDependencyClosure> {
   const files = new Set<string>();
   let hasUnresolvedTrackedDependency = false;
   const pending = [sourceEntry];
@@ -88,7 +107,10 @@ async function discoverDependencyClosure(sourceEntry: string): Promise<Dependenc
     }
   }
 
-  return { files, hasUnresolvedTrackedDependency };
+  return {
+    closure: { files, hasUnresolvedTrackedDependency },
+    trackedMtimes: await readTrackedMtimes(files)
+  };
 }
 
 function collectRelativeRuntimeSpecifiers(filePath: string, sourceText: string): string[] {
@@ -219,4 +241,28 @@ async function getNewestTrackedMtime(files: Iterable<string>): Promise<number> {
   const trackedFiles = [...files];
   const stats = await Promise.all(trackedFiles.map((file) => stat(file)));
   return stats.reduce((newest, entry) => Math.max(newest, entry.mtimeMs), 0);
+}
+
+async function readTrackedMtimes(files: Iterable<string>): Promise<ReadonlyMap<string, number>> {
+  const trackedFiles = [...files];
+  const stats = await Promise.all(trackedFiles.map((file) => stat(file)));
+  return new Map(trackedFiles.map((file, index) => [file, stats[index].mtimeMs]));
+}
+
+async function trackedFilesChanged(trackedMtimes: ReadonlyMap<string, number>): Promise<boolean> {
+  const trackedFiles = [...trackedMtimes.keys()];
+  const currentStats = await Promise.all(
+    trackedFiles.map(async (file) => {
+      try {
+        return await stat(file);
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return trackedFiles.some((file, index) => {
+    const currentStatsEntry = currentStats[index];
+    return !currentStatsEntry || currentStatsEntry.mtimeMs !== trackedMtimes.get(file);
+  });
 }
