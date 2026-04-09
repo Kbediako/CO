@@ -4,7 +4,7 @@ title: CO: Harden hot-suite dist freshness heuristics for transitive CLI/runtime
 status: in_progress
 owner: Codex
 created: 2026-04-10
-last_review: 2026-04-10
+last_review: 2026-04-09
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md

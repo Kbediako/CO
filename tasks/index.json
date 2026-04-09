@@ -8,11 +8,11 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-04-09",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (stalled low-signal drift, manual fallback accepted)",
-          "date": "2026-04-10",
+          "date": "2026-04-09",
           "manifest": ".runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2-co-123-docs-review/cli/2026-04-09T15-19-12-917Z-b0df389b/manifest.json",
           "override_reason": "The audited docs-review child stream passed delegation guard, spec-guard, docs:check, and docs:freshness, then stalled inside the forced `npm run review` step without emitting telemetry because the review drifted into repo-wide `generated_at`, `require()`, and registry/meta-surface probing instead of producing a concrete CO-123 packet finding. The packet, registry mirrors, and workpad now align on the shared-helper plus entrypoint-specific transitive relative-import-closure contract, so the manifest-backed child run is recorded as a truthful manual fallback rather than a packet-shape blocker. See out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T152544Z-docs-first/05-docs-review-override.md."
         }

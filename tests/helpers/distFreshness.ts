@@ -54,7 +54,10 @@ function getDependencyClosure(sourceEntry: string): Promise<DependencyClosure> {
   const cacheKey = resolve(sourceEntry);
   let cached = dependencyClosureCache.get(cacheKey);
   if (!cached) {
-    cached = discoverDependencyClosure(cacheKey);
+    cached = discoverDependencyClosure(cacheKey).catch((error) => {
+      dependencyClosureCache.delete(cacheKey);
+      throw error;
+    });
     dependencyClosureCache.set(cacheKey, cached);
   }
   return cached;

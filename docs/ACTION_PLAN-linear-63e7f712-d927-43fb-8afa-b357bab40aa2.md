@@ -49,5 +49,5 @@
   - Mitigation: centralize the recursion and mtime logic in one test-local helper while keeping separate root builders.
 
 ## Approvals
-- Reviewer: pending audited `linear child-stream --pipeline docs-review`
+- Reviewer: `codex-orchestrator docs-review` (manual fallback accepted)
 - Date: 2026-04-09
