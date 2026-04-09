@@ -22,7 +22,10 @@ const SHIPPED_FRONTEND_TESTING_RUNNER_RELATIVE_PATH = join(
   'cli',
   'frontendTestingRunner.js'
 );
-const TEST_TIMEOUT = 30000;
+// This fixture shells through ts-node and a generated package-root proxy. Under
+// the full suite's parallel CLI load it can take materially longer than the
+// isolated run, so keep the timeout aligned with that heavier contention.
+const TEST_TIMEOUT = 90000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',

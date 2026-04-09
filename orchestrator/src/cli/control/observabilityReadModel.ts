@@ -82,6 +82,76 @@ export interface ControlProviderTerminalCleanupPayload {
   last_result: ControlProviderTerminalCleanupLastResultPayload | null;
 }
 
+export interface ControlProviderOperatorAutopilotLinearTransitionPayload {
+  status: 'transitioned' | 'noop' | 'failed';
+  attempted_at: string;
+  previous_state: string | null;
+  target_state: string;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  issue_updated_at: string | null;
+  error: string | null;
+}
+
+export interface ControlProviderOperatorAutopilotActionPayload {
+  kind: 'backlog_promotion' | 'review_handoff_rework';
+  issue_id: string;
+  issue_identifier: string | null;
+  reason: string;
+  summary: string;
+  transition: ControlProviderOperatorAutopilotLinearTransitionPayload;
+  action_required_reasons: string[];
+}
+
+export interface ControlProviderOperatorAutopilotHoldPayload {
+  kind: 'backlog_promotion' | 'review_handoff_rework';
+  issue_id: string | null;
+  issue_identifier: string | null;
+  reason: string;
+  summary: string;
+  action_required_reasons: string[];
+}
+
+export interface ControlProviderOperatorAutopilotPendingActionPayload {
+  kind: 'local_rollout';
+  issue_id: string;
+  issue_identifier: string | null;
+  summary: string;
+  merge_closeout_reason: string;
+  shared_root_status: string | null;
+  linear_transition_status: string | null;
+}
+
+export interface ControlProviderOperatorAutopilotLastResultPayload {
+  recorded_at: string;
+  status: 'disabled' | 'noop' | 'acted' | 'failed';
+  summary: string;
+  error: string | null;
+  actions: ControlProviderOperatorAutopilotActionPayload[];
+  holds: ControlProviderOperatorAutopilotHoldPayload[];
+  pending_actions: ControlProviderOperatorAutopilotPendingActionPayload[];
+}
+
+export interface ControlProviderOperatorAutopilotPayload {
+  enabled: boolean;
+  backlog_promotion: {
+    enabled: boolean;
+    state_name: string;
+    target_state_name: string;
+  };
+  review_handoff_rework: {
+    enabled: boolean;
+    target_state_name: string;
+    excluded_action_required_reasons: string[];
+  };
+  post_merge_rollout: {
+    enabled: boolean;
+    summary: string;
+  };
+  audit_path: string;
+  last_result: ControlProviderOperatorAutopilotLastResultPayload | null;
+}
+
 export interface ControlProviderWorkflowPayload {
   status: 'ready' | 'reload_failed';
   pipeline_id: string;
@@ -92,6 +162,7 @@ export interface ControlProviderWorkflowPayload {
   last_error_at: string | null;
   last_error: string | null;
   terminal_cleanup?: ControlProviderTerminalCleanupPayload | null;
+  operator_autopilot?: ControlProviderOperatorAutopilotPayload | null;
 }
 
 interface SharedSelectedProjectionFields {
@@ -533,6 +604,76 @@ export function buildSelectedRunRuntimeFingerprintInput(
                       closed_pr_urls: [
                         ...providerWorkflow.terminal_cleanup.last_result.closed_pr_urls
                       ]
+                    }
+                  : null
+              }
+            : null,
+          operator_autopilot: providerWorkflow.operator_autopilot
+            ? {
+                enabled: providerWorkflow.operator_autopilot.enabled,
+                backlog_promotion: {
+                  enabled: providerWorkflow.operator_autopilot.backlog_promotion.enabled,
+                  state_name: providerWorkflow.operator_autopilot.backlog_promotion.state_name,
+                  target_state_name:
+                    providerWorkflow.operator_autopilot.backlog_promotion.target_state_name
+                },
+                review_handoff_rework: {
+                  enabled: providerWorkflow.operator_autopilot.review_handoff_rework.enabled,
+                  target_state_name:
+                    providerWorkflow.operator_autopilot.review_handoff_rework.target_state_name,
+                  excluded_action_required_reasons: [
+                    ...providerWorkflow.operator_autopilot.review_handoff_rework.excluded_action_required_reasons
+                  ]
+                },
+                post_merge_rollout: {
+                  enabled: providerWorkflow.operator_autopilot.post_merge_rollout.enabled,
+                  summary: providerWorkflow.operator_autopilot.post_merge_rollout.summary
+                },
+                audit_path: providerWorkflow.operator_autopilot.audit_path,
+                last_result: providerWorkflow.operator_autopilot.last_result
+                  ? {
+                      recorded_at: providerWorkflow.operator_autopilot.last_result.recorded_at,
+                      status: providerWorkflow.operator_autopilot.last_result.status,
+                      summary: providerWorkflow.operator_autopilot.last_result.summary,
+                      error: providerWorkflow.operator_autopilot.last_result.error,
+                      actions: providerWorkflow.operator_autopilot.last_result.actions.map((action) => ({
+                        kind: action.kind,
+                        issue_id: action.issue_id,
+                        issue_identifier: action.issue_identifier,
+                        reason: action.reason,
+                        summary: action.summary,
+                        transition: {
+                          status: action.transition.status,
+                          attempted_at: action.transition.attempted_at,
+                          previous_state: action.transition.previous_state,
+                          target_state: action.transition.target_state,
+                          issue_state: action.transition.issue_state,
+                          issue_state_type: action.transition.issue_state_type,
+                          issue_updated_at: action.transition.issue_updated_at,
+                          error: action.transition.error
+                        },
+                        action_required_reasons: [...action.action_required_reasons]
+                      })),
+                      holds: providerWorkflow.operator_autopilot.last_result.holds.map((hold) => ({
+                        kind: hold.kind,
+                        issue_id: hold.issue_id,
+                        issue_identifier: hold.issue_identifier,
+                        reason: hold.reason,
+                        summary: hold.summary,
+                        action_required_reasons: [...hold.action_required_reasons]
+                      })),
+                      pending_actions:
+                        providerWorkflow.operator_autopilot.last_result.pending_actions.map(
+                          (pendingAction) => ({
+                            kind: pendingAction.kind,
+                            issue_id: pendingAction.issue_id,
+                            issue_identifier: pendingAction.issue_identifier,
+                            summary: pendingAction.summary,
+                            merge_closeout_reason: pendingAction.merge_closeout_reason,
+                            shared_root_status: pendingAction.shared_root_status,
+                            linear_transition_status: pendingAction.linear_transition_status
+                          })
+                        )
                     }
                   : null
               }

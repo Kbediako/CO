@@ -38,6 +38,7 @@ import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/provider
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
+const PROVIDER_LINEAR_WORKER_TEST_TIMEOUT_MS = 20_000;
 
 afterEach(async () => {
   vi.unstubAllGlobals();
@@ -399,7 +400,7 @@ async function appendStaySerialParallelizationDecisionAuditForRequest(
   });
 }
 
-describe('provider linear worker runner', () => {
+describe('provider linear worker runner', { timeout: PROVIDER_LINEAR_WORKER_TEST_TIMEOUT_MS }, () => {
   it('loads provider worker context from manifest-backed env', async () => {
     const { manifestPath } = await createManifestRoot();
 

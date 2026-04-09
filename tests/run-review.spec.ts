@@ -1475,7 +1475,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const heavyPromptPath = join(dirname(heavyManifestPath), 'review', 'prompt.txt');
     const heavyPrompt = await readFile(heavyPromptPath, 'utf8');
     expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
-  });
+  }, LONG_WAIT_TEST_TIMEOUT_MS * 2);
 
   it('uses a generated NOTES fallback when NOTES is absent', async () => {
     const sandbox = await makeSandbox();

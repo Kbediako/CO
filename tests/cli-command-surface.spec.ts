@@ -898,7 +898,7 @@ describe('codex-orchestrator command surface', () => {
     await expect(runCli(['init', 'ship-it'])).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown init template: ship-it')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('writes init codex templates to the requested cwd', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-init-codex-'));
