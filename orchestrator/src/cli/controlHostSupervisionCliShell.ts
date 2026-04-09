@@ -550,7 +550,7 @@ async function loadBootstrapEnvironment(
       `Failed to source control-host supervision env/bootstrap files: ${stderr || 'shell returned a non-zero exit code.'}`
     );
   }
-  return parseNulDelimitedEnv(result.stdout, baseEnv);
+  return parseNulDelimitedEnv(result.stdout);
 }
 
 async function probeControlHostHealth(
@@ -933,11 +933,8 @@ async function runCommandBuffer(
   }
 }
 
-function parseNulDelimitedEnv(
-  raw: Buffer,
-  baseEnv: NodeJS.ProcessEnv
-): NodeJS.ProcessEnv {
-  const nextEnv: NodeJS.ProcessEnv = { ...baseEnv };
+function parseNulDelimitedEnv(raw: Buffer): NodeJS.ProcessEnv {
+  const nextEnv: NodeJS.ProcessEnv = {};
   for (const entry of raw.toString('utf8').split('\u0000')) {
     if (!entry) {
       continue;
@@ -1048,6 +1045,7 @@ export const __test__ = {
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
+  parseNulDelimitedEnv,
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,

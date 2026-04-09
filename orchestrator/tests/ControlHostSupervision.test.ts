@@ -16,6 +16,7 @@ const {
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
+  parseNulDelimitedEnv,
   probeControlHostHealth,
   readFormatFlag,
   readStringFlag,
@@ -198,6 +199,9 @@ describe('controlHostSupervision shell helpers', () => {
     expect(() => readIntegerFlag({ 'kill-timeout': '1.5' }, 'kill-timeout')).toThrow(
       '--kill-timeout must be an integer.'
     );
+    expect(() => readIntegerFlag({ 'health-interval': true }, 'health-interval')).toThrow(
+      '--health-interval requires a value.'
+    );
     expect(readIntegerFlag({ 'unhealthy-threshold': '30' }, 'unhealthy-threshold')).toBe(30);
   });
 
@@ -348,5 +352,18 @@ describe('controlHostSupervision shell helpers', () => {
     expect(nextState.last_health_status).toBeNull();
     expect(nextState.consecutive_unhealthy_samples).toBe(0);
     expect(nextState.last_restart_reason).toBe('restart_required');
+  });
+
+  it('parses shell env output without restoring variables that were unset during bootstrap', () => {
+    const parsed = parseNulDelimitedEnv(
+      Buffer.from('HOME=/Users/tester\u0000PATH=/usr/bin\u0000CONTROL_HOST_MODE=managed\u0000', 'utf8')
+    );
+
+    expect(parsed).toEqual({
+      HOME: '/Users/tester',
+      PATH: '/usr/bin',
+      CONTROL_HOST_MODE: 'managed'
+    });
+    expect(parsed.OPENAI_API_KEY).toBeUndefined();
   });
 });
