@@ -91,7 +91,7 @@
      - [x] Status: _completed 2025-11-06_
    - Subtask: Sliding stdio buffer
      - Files: the former shared stdio shim (now replaced by the package-local exec stdio implementation)
-     - Acceptance: O(chunk) sliding window with unit coverage; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/shared/tests/StdioTracker.test.ts`.
+     - Acceptance: O(chunk) sliding window with unit coverage; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/orchestrator/tests/StdioTracker.test.ts`.
      - [x] Status: _completed 2025-11-06_
    - Subtask: O(1) TaskStateStore append
      - Files: `orchestrator/src/persistence/TaskStateStore.ts`

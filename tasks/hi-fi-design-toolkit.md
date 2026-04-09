@@ -1,7 +1,6 @@
 # Task Checklist — Hi-Fi Design Toolkit (0410-hi-fi-design-toolkit)
 
 > Historical note (CO-88, 2026-04-09): the current repo no longer ships the token/component publication surface described below. `packages/design-system` is now only a placeholder scaffold with helper scripts, so treat this checklist as historical implementation evidence rather than the current public package contract.
-
 > Export `MCP_RUNNER_TASK_ID=0410-hi-fi-design-toolkit` before running diagnostics or guardrail commands. Mirror every checklist change with `docs/TASKS.md` and `.agent/task/hi-fi-design-toolkit.md`. Keep `[ ]` until the proving manifest (e.g., `.runs/0410-hi-fi-design-toolkit/cli/<run-id>/manifest.json`) is attached inline.
 
 ## Foundation

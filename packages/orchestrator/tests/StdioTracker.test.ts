@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createStdioTracker } from '../../orchestrator/src/exec/stdio.js';
+import { createStdioTracker } from '../src/exec/stdio.js';
 
 describe('createStdioTracker', () => {
   it('increments sequence numbers across streams with timestamps', () => {
