@@ -8,6 +8,7 @@ import process from 'node:process';
 import { promisify } from 'node:util';
 
 import {
+  CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS,
   DEFAULT_CONTROL_HOST_SUPERVISION_LABEL,
   DEFAULT_CONTROL_HOST_SUPERVISION_KILL_TIMEOUT_SECONDS,
   DEFAULT_CONTROL_HOST_SUPERVISION_RESTART_EXIT_CODE,
@@ -67,6 +68,13 @@ interface ControlHostSupervisionStatusPayload {
     summary: string | null;
     stderr: string | null;
   };
+}
+
+interface ExistingControlHostSupervisionInstallSnapshot {
+  paths: ControlHostSupervisionPaths;
+  configContents: string | null;
+  stateContents: string | null;
+  plistContents: string | null;
 }
 
 interface ControlHostSupervisionChildExitEvent {
@@ -158,6 +166,7 @@ async function installControlHostSupervision(flags: ArgMap): Promise<void> {
   const format = readFormatFlag(flags);
   const install = resolveInstallConfig(flags);
   const serviceTarget = resolveControlHostSupervisionServiceTarget(install.config.label);
+  const priorInstall = await captureExistingControlHostSupervisionInstall(install.config.paths);
 
   await assertControlHostSupervisionInstallPaths(install.config);
   await mkdir(dirname(install.config.paths.plistPath), { recursive: true });
@@ -187,7 +196,11 @@ async function installControlHostSupervision(flags: ArgMap): Promise<void> {
   } catch (error) {
     const detail = (error as Error).message;
     try {
-      await rollbackFailedControlHostSupervisionInstall(install.config.paths, serviceTarget);
+      if (priorInstall) {
+        await restoreExistingControlHostSupervisionInstall(priorInstall, serviceTarget);
+      } else {
+        await rollbackFailedControlHostSupervisionInstall(install.config.paths, serviceTarget);
+      }
     } catch (rollbackError) {
       throw new Error(`${detail} (rollback failed: ${(rollbackError as Error).message})`);
     }
@@ -839,6 +852,68 @@ async function rollbackFailedControlHostSupervisionInstall(
   await remove(paths.logsDir, { recursive: true, force: true });
 }
 
+async function captureExistingControlHostSupervisionInstall(
+  paths: ControlHostSupervisionPaths
+): Promise<ExistingControlHostSupervisionInstallSnapshot | null> {
+  const [configContents, stateContents, plistContents] = await Promise.all([
+    readTextFileIfExists(paths.configPath),
+    readTextFileIfExists(paths.statePath),
+    readTextFileIfExists(paths.plistPath)
+  ]);
+  if (configContents === null && stateContents === null && plistContents === null) {
+    return null;
+  }
+  return {
+    paths,
+    configContents,
+    stateContents,
+    plistContents
+  };
+}
+
+async function restoreExistingControlHostSupervisionInstall(
+  snapshot: ExistingControlHostSupervisionInstallSnapshot,
+  serviceTarget: string,
+  options?: {
+    bootout?: (serviceTarget: string) => Promise<void>;
+    bootstrap?: (args: string[]) => Promise<void>;
+    remove?: typeof rm;
+    write?: typeof writeFile;
+  }
+): Promise<void> {
+  const bootout = options?.bootout ?? bootoutLaunchctlServiceTarget;
+  const bootstrap =
+    options?.bootstrap ??
+    (async (args: string[]) => {
+      await runLaunchctl(args);
+    });
+  const remove = options?.remove ?? rm;
+  const write = options?.write ?? writeFile;
+
+  await bootout(serviceTarget);
+  await mkdir(snapshot.paths.supportDir, { recursive: true });
+  await mkdir(dirname(snapshot.paths.plistPath), { recursive: true });
+  await restoreTextFile(snapshot.paths.configPath, snapshot.configContents, {
+    write,
+    remove
+  });
+  await restoreTextFile(snapshot.paths.statePath, snapshot.stateContents, {
+    write,
+    remove
+  });
+  await restoreTextFile(snapshot.paths.plistPath, snapshot.plistContents, {
+    write,
+    remove
+  });
+  if (snapshot.plistContents !== null) {
+    await bootstrap([
+      'bootstrap',
+      resolveLaunchdDomain(),
+      snapshot.paths.plistPath
+    ]);
+  }
+}
+
 async function removeInstalledControlHostSupervisionArtifacts(
   label: string,
   options?: {
@@ -1121,6 +1196,8 @@ function assertStoredControlHostSupervisionConfig(
       );
     }
   }
+  assertStoredTimerField(configPath, record.healthIntervalSeconds, 'healthIntervalSeconds');
+  assertStoredTimerField(configPath, record.killTimeoutSeconds, 'killTimeoutSeconds');
   if (!Array.isArray(record.envFiles) || record.envFiles.some((entry) => !isNonEmptyString(entry))) {
     throw new Error(`Invalid control-host supervision config at ${configPath}: invalid envFiles.`);
   }
@@ -1134,6 +1211,22 @@ function assertStoredControlHostSupervisionConfig(
         `Invalid control-host supervision config at ${configPath}: missing paths.${key}.`
       );
     }
+  }
+}
+
+function assertStoredTimerField(
+  configPath: string,
+  value: unknown,
+  key: 'healthIntervalSeconds' | 'killTimeoutSeconds'
+): void {
+  const timerSeconds = typeof value === 'number' ? value : Number.NaN;
+  if (!Number.isInteger(timerSeconds) || timerSeconds <= 0) {
+    throw new Error(`Invalid control-host supervision config at ${configPath}: invalid ${key}.`);
+  }
+  if (timerSeconds > CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS) {
+    throw new Error(
+      `Invalid control-host supervision config at ${configPath}: ${key} must be <= ${CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS}.`
+    );
   }
 }
 
@@ -1165,6 +1258,34 @@ async function readJsonFileIfExists<T>(path: string): Promise<T | null> {
     }
     throw error;
   }
+}
+
+async function readTextFileIfExists(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function restoreTextFile(
+  path: string,
+  contents: string | null,
+  options?: {
+    write?: typeof writeFile;
+    remove?: typeof rm;
+  }
+): Promise<void> {
+  const write = options?.write ?? writeFile;
+  const remove = options?.remove ?? rm;
+  if (contents === null) {
+    await remove(path, { force: true });
+    return;
+  }
+  await write(path, contents, 'utf8');
 }
 
 async function writeJsonFile(path: string, value: unknown): Promise<void> {
@@ -1211,6 +1332,7 @@ export const __test__ = {
   assertStoredControlHostSupervisionConfig,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
+  captureExistingControlHostSupervisionInstall,
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
@@ -1220,6 +1342,7 @@ export const __test__ = {
   readStringFlag,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
+  restoreExistingControlHostSupervisionInstall,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget

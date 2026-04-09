@@ -1,11 +1,12 @@
 import { EventEmitter } from 'node:events';
-import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import {
+  CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS,
   buildControlHostSupervisionConfig,
   buildControlHostSupervisionPlist,
   evaluateControlHostSupervisionHealthPayload,
@@ -20,6 +21,7 @@ const {
   assertStoredControlHostSupervisionConfig,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
+  captureExistingControlHostSupervisionInstall,
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
@@ -29,6 +31,7 @@ const {
   readStringFlag,
   readIntegerFlag,
   removeInstalledControlHostSupervisionArtifacts,
+  restoreExistingControlHostSupervisionInstall,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
@@ -307,6 +310,35 @@ describe('controlHostSupervision shell helpers', () => {
     );
   });
 
+  it('rejects stored config timer values that exceed the runtime timer contract', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      shellPath: '/bin/zsh'
+    });
+
+    expect(() =>
+      assertStoredControlHostSupervisionConfig('/tmp/invalid-config.json', {
+        ...config,
+        healthIntervalSeconds: 0
+      })
+    ).toThrow(
+      'Invalid control-host supervision config at /tmp/invalid-config.json: invalid healthIntervalSeconds.'
+    );
+
+    expect(() =>
+      assertStoredControlHostSupervisionConfig('/tmp/invalid-config.json', {
+        ...config,
+        killTimeoutSeconds: CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS + 1
+      })
+    ).toThrow(
+      `Invalid control-host supervision config at /tmp/invalid-config.json: killTimeoutSeconds must be <= ${CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS}.`
+    );
+  });
+
   it('rolls back generated install artifacts when launchd registration fails', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-rollback-'));
     const paths = {
@@ -343,6 +375,62 @@ describe('controlHostSupervision shell helpers', () => {
       await expect(stat(paths.plistPath)).rejects.toMatchObject({ code: 'ENOENT' });
       await expect(stat(paths.supportDir)).rejects.toMatchObject({ code: 'ENOENT' });
       await expect(stat(paths.logsDir)).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('restores an existing install instead of deleting it after a failed reinstall', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-restore-'));
+    const paths = {
+      supportDir: join(tempRoot, 'support'),
+      configPath: join(tempRoot, 'support', 'config.json'),
+      statePath: join(tempRoot, 'support', 'state.json'),
+      plistPath: join(tempRoot, 'LaunchAgents', 'com.example.control-host.plist'),
+      logsDir: join(tempRoot, 'logs'),
+      stdoutLogPath: join(tempRoot, 'logs', 'stdout.log'),
+      stderrLogPath: join(tempRoot, 'logs', 'stderr.log')
+    };
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(
+      'com.example.control-host'
+    );
+    const bootouts: string[] = [];
+    const bootstraps: string[][] = [];
+
+    try {
+      await mkdir(join(tempRoot, 'LaunchAgents'), { recursive: true });
+      await mkdir(paths.supportDir, { recursive: true });
+      await writeFile(paths.plistPath, '<plist>old</plist>', 'utf8');
+      await writeFile(paths.configPath, '{"version":1,"label":"old"}\n', 'utf8');
+      await writeFile(paths.statePath, '{"status":"running"}\n', 'utf8');
+
+      const snapshot = await captureExistingControlHostSupervisionInstall(paths);
+      expect(snapshot).not.toBeNull();
+
+      await writeFile(paths.plistPath, '<plist>new</plist>', 'utf8');
+      await writeFile(paths.configPath, '{"version":1,"label":"new"}\n', 'utf8');
+      await writeFile(paths.statePath, '{"status":"failed"}\n', 'utf8');
+
+      await restoreExistingControlHostSupervisionInstall(snapshot!, serviceTarget, {
+        bootout: async (target) => {
+          bootouts.push(target);
+        },
+        bootstrap: async (args) => {
+          bootstraps.push(args);
+        }
+      });
+
+      expect(bootouts).toEqual([serviceTarget]);
+      expect(bootstraps).toEqual([
+        ['bootstrap', `gui/${process.getuid?.()}`, paths.plistPath]
+      ]);
+      await expect(readFile(paths.plistPath, 'utf8')).resolves.toBe('<plist>old</plist>');
+      await expect(readFile(paths.configPath, 'utf8')).resolves.toBe(
+        '{"version":1,"label":"old"}\n'
+      );
+      await expect(readFile(paths.statePath, 'utf8')).resolves.toBe(
+        '{"status":"running"}\n'
+      );
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
