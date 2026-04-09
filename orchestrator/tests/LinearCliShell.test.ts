@@ -88,6 +88,7 @@ describe('runLinearCliShell', () => {
         team_id: 'lin-team-1',
         project_id: null
       },
+      allowReadOnlyCacheReuse: true,
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token',
         CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
