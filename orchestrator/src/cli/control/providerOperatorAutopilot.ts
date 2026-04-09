@@ -39,6 +39,7 @@ const BACKLOG_PROMOTION_BLOCKING_CLAIM_STATES = new Set([
   'resuming',
   'resumable'
 ]);
+const REVIEW_HANDOFF_REWORK_ELIGIBLE_CLAIM_STATES = new Set(['handoff_failed']);
 
 export interface ProviderOperatorAutopilotConfig {
   enabled: boolean;
@@ -441,6 +442,9 @@ async function maybeRunReviewHandoffRework(input: {
       if (!trackedIssue || !classifyProviderLinearWorkflowState(trackedIssue).isHandoff) {
         return [];
       }
+      if (!isReviewHandoffReworkClaimEligible({ claim, trackedIssue })) {
+        return [];
+      }
       const reviewPromotion = claim.review_promotion ?? null;
       if (reviewPromotion?.status !== 'action_required') {
         return [];
@@ -524,6 +528,16 @@ async function maybeRunReviewHandoffRework(input: {
     summary: '',
     error: null
   };
+}
+
+function isReviewHandoffReworkClaimEligible(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'state'>;
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'viewer_id' | 'assignee_id'>;
+}): boolean {
+  return (
+    REVIEW_HANDOFF_REWORK_ELIGIBLE_CLAIM_STATES.has(input.claim.state) &&
+    isLiveLinearTrackedIssueOwnedByCurrentViewerOrUnassigned(input.trackedIssue)
+  );
 }
 
 function collectPendingActions(input: {

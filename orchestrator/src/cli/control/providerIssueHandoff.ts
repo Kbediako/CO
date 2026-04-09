@@ -189,6 +189,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     env?: NodeJS.ProcessEnv;
     previous_result?: ProviderOperatorAutopilotResult | null;
   }) => Promise<ProviderOperatorAutopilotResult>) | null;
+  appendOperatorAutopilotAuditResult?: typeof appendProviderOperatorAutopilotAuditResult;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
@@ -261,6 +262,8 @@ export function createProviderIssueHandoffService(
   const runReviewHandoffPromotion = options.runReviewHandoffPromotion ?? null;
   const runMergeCloseout = options.runMergeCloseout ?? null;
   const runOperatorAutopilot = options.runOperatorAutopilot ?? runProviderOperatorAutopilot;
+  const appendOperatorAutopilotAuditResult =
+    options.appendOperatorAutopilotAuditResult ?? appendProviderOperatorAutopilotAuditResult;
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -2971,10 +2974,18 @@ export function createProviderIssueHandoffService(
       providerWorkflow.operator_autopilot?.audit_path &&
       !areProviderOperatorAutopilotResultsMeaningfullyEqual(previousResult, nextResult)
     ) {
-      await appendProviderOperatorAutopilotAuditResult(
-        providerWorkflow.operator_autopilot.audit_path,
-        nextResult
-      );
+      try {
+        await appendOperatorAutopilotAuditResult(
+          providerWorkflow.operator_autopilot.audit_path,
+          nextResult
+        );
+      } catch (error) {
+        logger.warn(
+          `[provider-operator-autopilot] Failed to append audit result path=${
+            providerWorkflow.operator_autopilot.audit_path
+          }: ${(error as Error)?.message ?? String(error)}`
+        );
+      }
     }
     options.providerWorkflowConfigStore.recordOperatorAutopilotResult(nextResult);
     if (nextResult.status === 'failed') {

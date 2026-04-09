@@ -287,6 +287,96 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('ignores released review handoff claims even when review action is required', async () => {
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('transition should not run for released handoff claims');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'In Review',
+            state_type: 'started'
+          })
+        ],
+        claims: [
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            state: 'released',
+            reason: 'provider_issue_released:assignee_changed',
+            issue_state: 'In Review',
+            review_promotion: createReviewPromotion({
+              status: 'action_required',
+              action_required_reasons: ['review=CHANGES_REQUESTED']
+            })
+          })
+        ],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: []
+    });
+  });
+
+  it('ignores foreign-owned review handoff claims even when review action is required', async () => {
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('transition should not run for foreign-owned handoff claims');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'In Review',
+            state_type: 'started',
+            assignee_id: 'viewer-2',
+            assignee_name: 'Other Operator'
+          })
+        ],
+        claims: [
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            issue_state: 'In Review',
+            issue_assignee_id: 'viewer-2',
+            issue_assignee_name: 'Other Operator',
+            review_promotion: createReviewPromotion({
+              status: 'action_required',
+              action_required_reasons: ['review=CHANGES_REQUESTED']
+            })
+          })
+        ],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: []
+    });
+  });
+
   it('keeps non-author-action review blockers parked in review', async () => {
     const transitionIssueState = vi.fn(async () => {
       throw new Error('transition should not run for excluded review blockers');

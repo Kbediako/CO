@@ -10215,6 +10215,167 @@ describe('createProviderIssueHandoffService', () => {
     await expect(readFile(auditPath, 'utf8')).resolves.toContain('Promoted backlog head CO-118 to Ready.');
   });
 
+  it('keeps refresh alive when operator autopilot audit writes fail', async () => {
+    const { paths } = await createHostPaths();
+    const trackedIssue = createTrackedIssue({
+      id: 'lin-issue-1',
+      identifier: 'CO-118',
+      state: 'Backlog',
+      state_type: 'backlog'
+    });
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const recordOperatorAutopilotResult = vi.fn();
+    const appendOperatorAutopilotAuditResult = vi.fn(async () => {
+      throw new Error('audit append failed');
+    });
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+        last_success_at: '2026-04-09T10:00:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        operator_autopilot: {
+          enabled: true,
+          backlog_promotion: {
+            enabled: true,
+            state_name: 'Backlog',
+            target_state_name: 'Ready'
+          },
+          review_handoff_rework: {
+            enabled: true,
+            target_state_name: 'Rework',
+            excluded_action_required_reasons: [
+              'draft',
+              'label:do-not-merge',
+              'review=REVIEW_REQUIRED',
+              'required_checks_query_failed'
+            ]
+          },
+          post_merge_rollout: {
+            enabled: true,
+            summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+          },
+          audit_path: join(paths.runDir, 'provider-operator-autopilot.jsonl'),
+          last_result: null
+        }
+      })),
+      refresh: vi.fn(async () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+        last_success_at: '2026-04-09T10:00:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        operator_autopilot: {
+          enabled: true,
+          backlog_promotion: {
+            enabled: true,
+            state_name: 'Backlog',
+            target_state_name: 'Ready'
+          },
+          review_handoff_rework: {
+            enabled: true,
+            target_state_name: 'Rework',
+            excluded_action_required_reasons: [
+              'draft',
+              'label:do-not-merge',
+              'review=REVIEW_REQUIRED',
+              'required_checks_query_failed'
+            ]
+          },
+          post_merge_rollout: {
+            enabled: true,
+            summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+          },
+          audit_path: join(paths.runDir, 'provider-operator-autopilot.jsonl'),
+          last_result: null
+        }
+      })),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+        last_success_at: '2026-04-09T10:00:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        operator_autopilot: {
+          enabled: true,
+          backlog_promotion: {
+            enabled: true,
+            state_name: 'Backlog',
+            target_state_name: 'Ready'
+          },
+          review_handoff_rework: {
+            enabled: true,
+            target_state_name: 'Rework',
+            excluded_action_required_reasons: [
+              'draft',
+              'label:do-not-merge',
+              'review=REVIEW_REQUIRED',
+              'required_checks_query_failed'
+            ]
+          },
+          post_merge_rollout: {
+            enabled: true,
+            summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+          },
+          audit_path: join(paths.runDir, 'provider-operator-autopilot.jsonl'),
+          last_result: null
+        }
+      }),
+      getLaunchConfigPath: vi.fn(async () => '/repo/.runs/local-mcp/cli/control-host/provider-workflow.json'),
+      recordTerminalCleanupResult: vi.fn(),
+      recordOperatorAutopilotResult
+    };
+    const autopilotResult = {
+      recorded_at: '2026-04-09T10:00:00.000Z',
+      status: 'acted' as const,
+      summary: 'Promoted backlog head CO-118 to Ready.',
+      error: null,
+      actions: [],
+      holds: [],
+      pending_actions: []
+    };
+    const runOperatorAutopilot = vi.fn(async () => autopilotResult);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      providerWorkflowConfigStore,
+      runOperatorAutopilot,
+      appendOperatorAutopilotAuditResult,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssues: async () => ({
+        kind: 'ready',
+        trackedIssues: [trackedIssue]
+      })
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(runOperatorAutopilot).toHaveBeenCalled();
+    expect(appendOperatorAutopilotAuditResult).toHaveBeenCalledWith(
+      join(paths.runDir, 'provider-operator-autopilot.jsonl'),
+      autopilotResult
+    );
+    expect(recordOperatorAutopilotResult).toHaveBeenCalledWith(autopilotResult);
+  });
+
   it('cleans terminal released provider workspaces during refresh startup replay even when the assignee changed', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
