@@ -215,6 +215,9 @@ describe('runCommandStage environment propagation', () => {
     expect(mockState.lastRunInput?.command?.replaceAll('\\', '/')).toContain(
       'orchestrator/src/cli/utils/specGuardRunner.ts'
     );
+    expect(mockState.lastRunInput?.env?.TS_NODE_PROJECT?.replaceAll('\\', '/')).toBe(
+      join(process.cwd(), 'tsconfig.json').replaceAll('\\', '/')
+    );
     expect(mockState.lastRunInput?.command).toContain(
       '&& printf "%s" "$EXTRA_STAGE_ARG" > result.txt'
     );

@@ -63,6 +63,27 @@ describe('checked-in CLI bootstrap', () => {
     expect(result.stderr).toBe('');
   });
 
+  it('pins TS_NODE_PROJECT to the package root when source mode runs from another cwd', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'cli-bootstrap-project-'));
+    await writeFakePackageRoot(tempRoot, {
+      sourceBody: 'console.log(`ts-node-project=${process.env.TS_NODE_PROJECT ?? ""}`);\n',
+      distBody: 'console.log("dist-runner");\n',
+      withTsNodeLoader: true
+    });
+
+    const callerCwd = await mkdtemp(join(tmpdir(), 'cli-bootstrap-caller-'));
+    try {
+      const result = await runBootstrap(tempRoot, {}, { cwd: callerCwd });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim().startsWith('ts-node-project=')).toBe(true);
+      expect(result.stdout.trim().endsWith(join(tempRoot, 'tsconfig.json'))).toBe(true);
+      expect(result.stderr).toBe('');
+    } finally {
+      await rm(callerCwd, { recursive: true, force: true });
+    }
+  });
+
   it('falls back to dist with an explicit warning when the source runtime is unavailable', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'cli-bootstrap-dist-'));
     await writeFakePackageRoot(tempRoot, {
@@ -148,6 +169,7 @@ async function writeFakePackageRoot(
     JSON.stringify({ name: 'cli-bootstrap-fixture', type: 'module' }),
     'utf8'
   );
+  await writeFile(join(packageRoot, 'tsconfig.json'), '{ "compilerOptions": { "module": "nodenext" } }\n', 'utf8');
   await mkdir(join(packageRoot, 'bin'), { recursive: true });
   await mkdir(join(packageRoot, 'dist', 'bin'), { recursive: true });
   await writeFile(join(packageRoot, 'bin', 'codex-orchestrator.js'), await readFile(BOOTSTRAP_PATH, 'utf8'), 'utf8');
@@ -197,7 +219,7 @@ async function writeFakePackageRoot(
 async function runBootstrap(
   packageRoot: string,
   envOverrides: Record<string, string> = {},
-  options: { nodeArgs?: string[]; entryArgs?: string[] } = {}
+  options: { nodeArgs?: string[]; entryArgs?: string[]; cwd?: string } = {}
 ): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
   return await new Promise((resolve, reject) => {
     const child = spawn(
@@ -208,7 +230,7 @@ async function runBootstrap(
         ...(options.entryArgs ?? [])
       ],
       {
-        cwd: packageRoot,
+        cwd: options.cwd ?? packageRoot,
         env: {
           ...process.env,
           ...envOverrides

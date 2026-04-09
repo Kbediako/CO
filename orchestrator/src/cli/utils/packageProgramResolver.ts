@@ -24,6 +24,7 @@ export interface ResolvedPackageProgramInvocation {
   sourcePath: string | null;
   mode: 'source' | 'dist';
   warning: string | null;
+  envOverrides?: NodeJS.ProcessEnv;
 }
 
 const DEFAULT_SOURCE_EXTENSIONS = ['.ts', '.mts', '.js', '.mjs', '.tsx'] as const;
@@ -67,7 +68,10 @@ export function resolvePackageProgramInvocation(
         distPath,
         sourcePath,
         mode: 'source',
-        warning: null
+        warning: null,
+        envOverrides: {
+          TS_NODE_PROJECT: join(packageRoot, 'tsconfig.json')
+        }
       };
     }
   }

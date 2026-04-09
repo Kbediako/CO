@@ -77,4 +77,22 @@ describe('packageProgramResolver', () => {
 
     expect(invocation.packageRoot).toBe(foreignRoot);
   });
+
+  it('pins TS_NODE_PROJECT when source mode resolves a TypeScript entrypoint', () => {
+    const localRoot = '/tmp/local-checkout';
+    const files = new Set([`${localRoot}/orchestrator/src/cli/providerLinearWorkerRunner.ts`]);
+
+    const invocation = resolvePackageProgramInvocation({
+      distRelativePath: 'orchestrator/src/cli/providerLinearWorkerRunner.js',
+      packageRoot: localRoot,
+      execPath: '/usr/bin/node',
+      fileExists: (candidate) => files.has(candidate),
+      resolveModulePath: () => `${localRoot}/node_modules/ts-node/esm.mjs`
+    });
+
+    expect(invocation.mode).toBe('source');
+    expect(invocation.envOverrides).toEqual({
+      TS_NODE_PROJECT: `${localRoot}/tsconfig.json`
+    });
+  });
 });

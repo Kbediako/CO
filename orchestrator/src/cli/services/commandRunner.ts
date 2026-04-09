@@ -90,6 +90,7 @@ interface ResolvedStageInvocation {
   args?: string[];
   preview: string;
   warning?: string | null;
+  envOverrides?: NodeJS.ProcessEnv;
 }
 
 type CollabToolCallRecord = NonNullable<CliManifest['collab_tool_calls']>[number];
@@ -292,6 +293,9 @@ export async function runCommandStage(
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
     execEnv.CODEX_ORCHESTRATOR_NODE_BIN = process.execPath;
     const invocation = resolveStageInvocation(stage, execEnv);
+    if (invocation.envOverrides) {
+      Object.assign(execEnv, invocation.envOverrides);
+    }
     if (invocation.warning) {
       logger.warn(invocation.warning);
       writeEvent({ type: 'command:warning', warning: invocation.warning });
@@ -753,7 +757,8 @@ function resolveStageInvocation(
       command: invocation.command,
       args: invocation.args,
       preview: buildCommandPreview(invocation.command, invocation.args),
-      warning: invocation.warning
+      warning: invocation.warning,
+      envOverrides: invocation.envOverrides
     };
   }
   const packageRootInvocation = resolvePackageRootDistStageInvocation(stage.command, env);
@@ -788,7 +793,8 @@ function resolvePackageRootDistStageInvocation(
   return {
     command,
     preview: command,
-    warning: invocation.warning
+    warning: invocation.warning,
+    envOverrides: invocation.envOverrides
   };
 }
 
