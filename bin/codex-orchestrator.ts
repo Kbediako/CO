@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, writeSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { opendir } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
 import { type ExecOutputMode } from '../orchestrator/src/cli/exec/command.js';
@@ -86,34 +87,43 @@ interface RunOutputPayload {
 }
 
 function writeStderrLine(message: string): void {
-  const line = `${message}\n`;
-  const stderrFd = process.stderr.fd;
-  if (typeof stderrFd === 'number') {
-    try {
-      writeSync(stderrFd, line);
-      return;
-    } catch {
-      // Fall through to the standard stream write when direct fd access is unavailable.
-    }
-  }
-  process.stderr.write(line);
+  process.stderr.write(`${message}\n`);
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+export function isDirectExecution(entryArg = process.argv[1], metaUrl = import.meta.url): boolean {
+  if (typeof entryArg !== 'string' || entryArg.length === 0) {
+    return false;
+  }
+
+  const candidateUrls = new Set<string>();
+  try {
+    candidateUrls.add(pathToFileURL(resolve(entryArg)).href);
+  } catch {
+    // Fall through to the realpath check so missing/cwd issues still fail closed.
+  }
+  try {
+    candidateUrls.add(pathToFileURL(realpathSync(entryArg)).href);
+  } catch {
+    // Missing or unreadable entry points should not be treated as direct execution.
+  }
+  return candidateUrls.has(metaUrl);
+}
+
+export async function runCodexOrchestratorCli(rawArgs: string[] = process.argv.slice(2)): Promise<number> {
+  process.exitCode = 0;
+  const args = [...rawArgs];
   const command = args.shift();
   if (!command || command === 'help' || command === '--help' || command === '-h') {
     printHelp();
-    return;
+    return 0;
   }
   if (command === '--version' || command === '-v') {
     printVersion();
-    return;
+    return 0;
   }
 
-  const orchestrator = new CodexOrchestrator();
-
   try {
+    const orchestrator = new CodexOrchestrator();
     switch (command) {
       case 'start':
         await handleStart(orchestrator, args);
@@ -197,6 +207,8 @@ async function main(): Promise<void> {
     writeStderrLine((error as Error)?.message ?? String(error));
     process.exitCode = 1;
   }
+
+  return typeof process.exitCode === 'number' ? process.exitCode : 0;
 }
 
 function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
@@ -1528,7 +1540,9 @@ Notes:
 `);
 }
 
-void main();
+if (isDirectExecution()) {
+  void runCodexOrchestratorCli();
+}
 
 function printVersion(): void {
   const pkg = loadPackageInfo();
