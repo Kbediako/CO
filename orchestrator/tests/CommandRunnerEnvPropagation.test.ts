@@ -171,10 +171,49 @@ describe('runCommandStage environment propagation', () => {
     await runCommandStage({ env, paths, manifest, stage, index: 1 });
 
     expect(mockState.lastRunInput?.command).toBe(process.execPath);
-    expect(mockState.lastRunInput?.args).toHaveLength(1);
-    expect(mockState.lastRunInput?.args?.[0]?.replaceAll('\\', '/')).toContain(
-      'dist/orchestrator/src/cli/providerLinearWorkerRunner.js'
+    expect(mockState.lastRunInput?.args?.[0]).toBe('--no-warnings');
+    expect(mockState.lastRunInput?.args?.[1]).toBe('--loader');
+    expect(mockState.lastRunInput?.args?.[2]?.replaceAll('\\', '/')).toContain('/node_modules/ts-node/');
+    expect(mockState.lastRunInput?.args?.[3]?.replaceAll('\\', '/')).toContain(
+      'orchestrator/src/cli/providerLinearWorkerRunner.ts'
     );
     expect(mockState.lastRunInput?.env?.CODEX_ORCHESTRATOR_NODE_BIN).toBe(process.execPath);
+  });
+
+  it('rewrites package-root dist stage commands onto live source files when a source checkout is available', async () => {
+    const baseEnv = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const env = { ...baseEnv, taskId: 'source-stage-task' };
+    const pipeline: PipelineDefinition = {
+      id: 'pipeline-source-stage',
+      title: 'Source Stage',
+      stages: [
+        {
+          kind: 'command',
+          id: 'spec-guard',
+          title: 'Run spec guard',
+          command: 'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/utils/specGuardRunner.js" --dry-run'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-source-stage', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    const stage = pipeline.stages[0] as CommandStage;
+    await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(mockState.lastRunInput?.command).toBe(process.execPath);
+    expect(mockState.lastRunInput?.args?.[0]).toBe('--no-warnings');
+    expect(mockState.lastRunInput?.args?.[1]).toBe('--loader');
+    expect(mockState.lastRunInput?.args?.[2]?.replaceAll('\\', '/')).toContain('/node_modules/ts-node/');
+    expect(mockState.lastRunInput?.args?.[3]?.replaceAll('\\', '/')).toContain(
+      'orchestrator/src/cli/utils/specGuardRunner.ts'
+    );
+    expect(mockState.lastRunInput?.args?.[4]).toBe('--dry-run');
   });
 });

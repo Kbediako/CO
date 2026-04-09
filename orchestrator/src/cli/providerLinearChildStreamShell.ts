@@ -20,6 +20,7 @@ import {
 } from './providerLinearWorkerRunner.js';
 import { logger } from '../logger.js';
 import { slugify } from './utils/strings.js';
+import { resolveCodexOrchestratorBootstrapInvocation } from './utils/packageProgramResolver.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
 import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
 const ALLOWED_PROVIDER_CHILD_PIPELINES = ['docs-review', 'implementation-gate', 'docs-relevance-advisory'] as const;
@@ -373,19 +374,8 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   command: string;
   argsPrefix: string[];
 } {
-  const packageRoot = typeof env.CODEX_ORCHESTRATOR_PACKAGE_ROOT === 'string'
-    ? env.CODEX_ORCHESTRATOR_PACKAGE_ROOT.trim()
-    : '';
-  if (packageRoot.length > 0) {
-    return {
-      command: process.execPath,
-      argsPrefix: [join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js')]
-    };
-  }
-  return {
-    command: 'codex-orchestrator',
-    argsPrefix: []
-  };
+  const invocation = resolveCodexOrchestratorBootstrapInvocation({ env, execPath: process.execPath });
+  return { command: invocation.command, argsPrefix: invocation.args };
 }
 function parseProviderChildRunResult(raw: string, repoRoot: string, runsRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
   const parsed = parseTrailingJsonObject(raw);
