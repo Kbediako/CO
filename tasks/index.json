@@ -41,6 +41,30 @@
       }
     },
     {
+      "id": "20260409-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5",
+      "title": "CO STATUS: preserve canonical provider-worker activity truth and EVENT provenance end to end",
+      "relates_to": "tasks/tasks-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5-co-112-docs-review/cli/2026-04-09T05-39-47-373Z-741ea904/manifest.json",
+          "telemetry": ".runs/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5-co-112-docs-review/cli/2026-04-09T05-39-47-373Z-741ea904/review/telemetry.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
+        "task": "tasks/tasks-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
+        "agent_task": ".agent/task/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
+        "docs": "docs/TECH_SPEC-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md"
+      }
+    },
+    {
       "id": "20260409-linear-54387f04-30aa-436a-9901-690c0e9cfcee",
       "title": "CO: Reduce Core Lane wall time by shrinking subprocess-heavy CLI and review suites without lowering validation coverage",
       "relates_to": "tasks/tasks-linear-54387f04-30aa-436a-9901-690c0e9cfcee.md",
