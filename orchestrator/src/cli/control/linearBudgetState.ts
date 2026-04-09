@@ -618,8 +618,14 @@ export function resolveLinearPollingInterval(input: {
   let suppression = pressure.suppression;
   if (requestHeadroomGuard && requestHeadroomGuard.interval_ms > baseIntervalMs) {
     baseIntervalMs = requestHeadroomGuard.interval_ms;
-    reason = requestHeadroomGuard.reason;
-    suppression = requestHeadroomGuard.suppression;
+    if (
+      reason === null ||
+      reason.startsWith('linear_budget_requests_') ||
+      reason.startsWith('linear_budget_endpoint_requests_')
+    ) {
+      reason = requestHeadroomGuard.reason;
+      suppression = requestHeadroomGuard.suppression;
+    }
   }
 
   const intervalMs = applyDeterministicPositiveJitter(

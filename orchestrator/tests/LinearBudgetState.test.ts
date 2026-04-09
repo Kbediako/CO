@@ -1170,6 +1170,55 @@ describe('linearBudgetState', () => {
     expect(schedule.interval_ms).toBeLessThanOrEqual(80_000);
   });
 
+  it('preserves a non-request suppression reason when request headroom only lengthens the interval', () => {
+    const schedule = resolveLinearPollingInterval({
+      budget: {
+        observed_at: '2026-04-08T00:00:00.000Z',
+        source: 'dispatch_source_tracked_issues',
+        request_id: 'req-complexity-dominant-headroom',
+        retry_after_seconds: null,
+        cooldown_until: null,
+        cooldown_active: false,
+        suppression: 'low',
+        suppression_reason: 'linear_budget_complexity_low',
+        scope_kind: 'user',
+        scope_key: 'viewer-scope',
+        viewer_id: 'viewer-1',
+        workspace_id: 'workspace-1',
+        token_fingerprints: [],
+        requests: {
+          limit: 5000,
+          remaining: 100,
+          reset_at: '2026-04-08T01:00:00.000Z'
+        },
+        endpoint_requests: null,
+        complexity: {
+          limit: 100,
+          remaining: 5,
+          reset_at: '2026-04-08T01:00:00.000Z'
+        },
+        endpoint_complexity: null,
+        endpoint_name: null,
+        selected_endpoint_key: 'source:dispatch-source-tracked-issues',
+        request_complexity: 207,
+        endpoints: {},
+        reservations: [],
+        reservations_active: 0
+      },
+      default_interval_ms: 15_000,
+      nowMs: Date.parse('2026-04-08T00:00:00.000Z'),
+      operation: 'dispatch_source_tracked_issues'
+    });
+
+    expect(schedule.reason).toBe('linear_budget_complexity_constrained');
+    expect(schedule.linear_budget).toMatchObject({
+      suppression: 'constrained',
+      suppression_reason: 'linear_budget_complexity_constrained'
+    });
+    expect(schedule.interval_ms).toBeGreaterThanOrEqual(72_000);
+    expect(schedule.interval_ms).toBeLessThanOrEqual(80_000);
+  });
+
   it('keeps reset-aware slowdown active after remaining requests fall inside the reserve window', () => {
     const schedule = resolveLinearPollingInterval({
       budget: {

@@ -483,6 +483,7 @@ describe('providerLinearWorkflowFacade', () => {
     const result = await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
       env,
+      allowReadOnlyCacheReuse: true,
       fetchImpl
     });
 
@@ -662,6 +663,7 @@ describe('providerLinearWorkflowFacade', () => {
     const result = await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
       env,
+      allowReadOnlyCacheReuse: true,
       fetchImpl
     });
 
@@ -727,6 +729,7 @@ describe('providerLinearWorkflowFacade', () => {
     const result = await getProviderLinearIssueContext({
       issueId: 'lin-issue-1',
       env,
+      allowReadOnlyCacheReuse: true,
       fetchImpl
     });
 
