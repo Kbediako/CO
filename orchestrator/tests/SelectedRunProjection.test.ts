@@ -1026,6 +1026,132 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('keeps post-promotion merge closeout pending visible in the selected-run debug snapshot', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-review-promotion');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-review-promotion',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updatedAt: '2026-03-20T01:16:00.000Z',
+        summary: 'Promoted the issue from In Review to Merging.',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'succeeded',
+            summary: 'Promoted the issue from In Review to Merging.'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          last_message: 'Promoted the issue from In Review to Merging.',
+          last_event_at: '2026-03-20T01:15:58.000Z',
+          updated_at: '2026-03-20T01:16:00.000Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.updated_at = '2026-03-20T01:16:00.000Z';
+    providerIntakeState.latest_reason = 'provider_issue_review_promotion_promoted';
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_promoted',
+      updated_at: '2026-03-20T01:16:00.000Z',
+      run_id: 'run-review-promotion',
+      run_manifest_path: childPaths.manifestPath,
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-20T01:16:00.000Z',
+      review_promotion: {
+        recorded_at: '2026-03-20T01:16:00.000Z',
+        status: 'promoted',
+        reason: 'promoted_to_merging',
+        summary: 'Promoted the issue from In Review to Merging after confirming the attached PR is merge-ready.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/82'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/82',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 82
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'CLEAN',
+          ready_to_merge: true,
+          gate_reasons: [],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-20T01:15:59.000Z',
+          merged_at: null,
+          head_oid: 'head-oid-82'
+        },
+        linear_transition: {
+          status: 'transitioned',
+          attempted_at: '2026-03-20T01:16:00.000Z',
+          previous_state: 'In Review',
+          target_state: 'Merging',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-20T01:16:00.000Z',
+          error: null
+        }
+      },
+      merge_closeout: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.providerDebugSnapshot).toMatchObject({
+      pull_request: {
+        review_promotion_status: 'promoted',
+        merge_closeout_status: null,
+        number: 82,
+        ready_to_merge: true
+      },
+      progress: {
+        phase: 'watching_merge',
+        kind: 'workflow',
+        status: 'progressing',
+        recovery_recommendation: 'continue_waiting'
+      },
+      stall_classification: 'progressing'
+    });
+    expect(selected?.providerDebugSnapshot?.progress?.summary).toBe(
+      'Promoted the issue from In Review to Merging after confirming the attached PR is merge-ready. Waiting for merge closeout to start.'
+    );
+  });
+
   it('keeps stale pending shared-root reconciliation visible until the live issue reaches a terminal state', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {

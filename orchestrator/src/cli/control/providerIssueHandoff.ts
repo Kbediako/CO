@@ -52,7 +52,10 @@ import {
 } from './providerTerminalCleanup.js';
 import { PROVIDER_LINEAR_AUDIT_ENV_VAR } from './providerLinearWorkflowAudit.js';
 import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
-import type { ProviderMergeCloseoutRecord } from './providerMergeCloseout.js';
+import type {
+  ProviderMergeCloseoutRecord,
+  ProviderReviewHandoffPromotionRecord
+} from './providerMergeCloseout.js';
 
 export interface ProviderIssueLauncher {
   start(input: {
@@ -150,6 +153,16 @@ export interface CreateProviderIssueHandoffServiceOptions {
   resolveTrackedIssues?: (() => Promise<ProviderTrackedIssuePollResolution>) | null;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore | null;
   runTerminalCleanup?: typeof runProviderTerminalCleanup;
+  runReviewHandoffPromotion?: ((input: {
+    issueId: string;
+    issueIdentifier?: string | null;
+    issueState?: string | null;
+    issueStateType?: string | null;
+    issueUpdatedAt?: string | null;
+    sourceSetup?: DispatchPilotSourceSetup | null;
+    repoRoot: string;
+    env?: NodeJS.ProcessEnv;
+  }) => Promise<ProviderReviewHandoffPromotionRecord>) | null;
   runMergeCloseout?: ((input: {
     issueId: string;
     issueIdentifier?: string | null;
@@ -230,6 +243,7 @@ export function createProviderIssueHandoffService(
   const allowedRunRoots = [resolve(options.paths.runDir, '..', '..', '..')];
   const repoRoot = resolve(options.paths.repoRoot);
   const runTerminalCleanup = options.runTerminalCleanup ?? runProviderTerminalCleanup;
+  const runReviewHandoffPromotion = options.runReviewHandoffPromotion ?? null;
   const runMergeCloseout = options.runMergeCloseout ?? null;
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
@@ -404,6 +418,91 @@ export function createProviderIssueHandoffService(
     });
   };
 
+  const maybeHandleReviewHandoffPromotion = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: LiveLinearTrackedIssue;
+    latestRun: ProviderIssueRunRecord | null;
+  }): Promise<ProviderIntakeClaimRecord | null> => {
+    if (
+      !runReviewHandoffPromotion ||
+      !classifyProviderLinearWorkflowState(input.trackedIssue).isHandoff
+    ) {
+      return null;
+    }
+    const reviewPromotion = await runReviewHandoffPromotion({
+      issueId: input.trackedIssue.id,
+      issueIdentifier: input.trackedIssue.identifier,
+      issueState: input.trackedIssue.state,
+      issueStateType: input.trackedIssue.state_type,
+      issueUpdatedAt: input.trackedIssue.updated_at,
+      sourceSetup: resolveMergeCloseoutSourceSetup(),
+      env: buildMergeCloseoutEnv(input.latestRun?.manifestPath ?? input.claim.run_manifest_path),
+      repoRoot
+    });
+    if (reviewPromotion.reason === 'issue_no_longer_review_handoff') {
+      const refreshedClaimIssueFields = {
+        issue_identifier: reviewPromotion.issue_identifier ?? input.claim.issue_identifier,
+        issue_state: reviewPromotion.issue_state ?? input.claim.issue_state,
+        issue_state_type: reviewPromotion.issue_state_type ?? input.claim.issue_state_type,
+        issue_updated_at: reviewPromotion.issue_updated_at ?? input.claim.issue_updated_at
+      };
+      const refreshedClaim = {
+        ...input.claim,
+        ...refreshedClaimIssueFields,
+        review_promotion: null
+      };
+      const refreshedTrackedIssue = buildTrackedIssueSnapshotFromClaim(
+        refreshedClaim,
+        resolveProviderViewerAuthFingerprint()
+      );
+      const mergeCloseoutClaim =
+        normalizeProviderLinearWorkflowState(refreshedTrackedIssue.state) === 'merging'
+          ? await maybeHandleDeterministicMergingCloseout({
+              claim: refreshedClaim,
+              trackedIssue: refreshedTrackedIssue,
+              latestRun: input.latestRun
+            })
+          : null;
+      if (mergeCloseoutClaim) {
+        return mergeCloseoutClaim;
+      }
+      const refreshedWorkflowState = classifyProviderLinearWorkflowState(refreshedTrackedIssue);
+      const refreshedLifecycle = refreshedWorkflowState.isTerminal
+        ? {
+            state: 'ignored' as const,
+            reason: 'provider_issue_state_not_active' as const,
+            ...clearProviderRetryFields()
+          }
+        : {
+            state: 'accepted' as const,
+            reason: 'provider_issue_rehydration_pending_revalidation' as const,
+            ...clearProviderRetryFields()
+          };
+      return await upsertProviderClaimAndPersist({
+        ...refreshedClaim,
+        task_id: input.latestRun?.taskId ?? input.claim.task_id,
+        run_id: input.latestRun?.runId ?? input.claim.run_id,
+        run_manifest_path: input.latestRun?.manifestPath ?? input.claim.run_manifest_path,
+        merge_closeout: null,
+        ...refreshedLifecycle
+      });
+    }
+    return await upsertProviderClaimAndPersist({
+      ...input.claim,
+      issue_state: reviewPromotion.issue_state,
+      issue_state_type: reviewPromotion.issue_state_type,
+      issue_updated_at: reviewPromotion.issue_updated_at,
+      state: resolveProviderReviewPromotionClaimState(reviewPromotion),
+      reason: resolveProviderReviewPromotionClaimReason(reviewPromotion),
+      task_id: input.latestRun?.taskId ?? input.claim.task_id,
+      run_id: input.latestRun?.runId ?? input.claim.run_id,
+      run_manifest_path: input.latestRun?.manifestPath ?? input.claim.run_manifest_path,
+      ...clearProviderRetryFields(),
+      review_promotion: reviewPromotion,
+      merge_closeout: null
+    });
+  };
+
   const buildMergeCloseoutEnv = (
     runManifestPath: string | null | undefined
   ): NodeJS.ProcessEnv => {
@@ -540,6 +639,7 @@ export function createProviderIssueHandoffService(
         input.claim.state === 'starting' ||
         input.claim.state === 'resuming' ||
         input.claim.reason === 'provider_issue_rehydrated_active_run' ||
+        input.claim.reason === 'provider_issue_review_promotion_promoted' ||
         isProviderMergeCloseoutWatchingClaim(input.claim)
       ) &&
       normalizeProviderLinearWorkflowState(input.trackedIssue.state) === 'merging'
@@ -768,6 +868,7 @@ export function createProviderIssueHandoffService(
       run_manifest_path: input.run.manifestPath,
       launch_source: PROVIDER_LAUNCH_SOURCE,
       launch_token: launchToken,
+      review_promotion: null,
       merge_closeout: null,
       ...buildProviderRetryLaunchFields({
         claim: input.claim,
@@ -795,6 +896,7 @@ export function createProviderIssueHandoffService(
         run_manifest_path: input.run.manifestPath,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
+        review_promotion: null,
         merge_closeout: null,
         ...buildQueuedProviderRetryFields({
           claim: input.claim,
@@ -831,6 +933,7 @@ export function createProviderIssueHandoffService(
       run_manifest_path: null,
       launch_source: PROVIDER_LAUNCH_SOURCE,
       launch_token: launchToken,
+      review_promotion: null,
       merge_closeout: null,
       ...buildProviderRetryLaunchFields({
         claim: input.claim,
@@ -866,6 +969,7 @@ export function createProviderIssueHandoffService(
         run_manifest_path: null,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
+        review_promotion: null,
         merge_closeout: null,
         ...buildQueuedProviderRetryFields({
           claim: input.claim,
@@ -889,6 +993,7 @@ export function createProviderIssueHandoffService(
           run_manifest_path: startedRun.manifestPath,
           launch_source: PROVIDER_LAUNCH_SOURCE,
           launch_token: launchToken,
+          review_promotion: null,
           merge_closeout: null,
           ...buildProviderRetryLaunchFields({
             claim: input.claim,
@@ -1140,7 +1245,9 @@ export function createProviderIssueHandoffService(
         }
         const trackedIssueFields = freshTrackedIssue.claimFields;
         const reactivatedMergeCloseoutReset =
-          claim.reason === 'provider_issue_rehydrated_active_run' ? {} : { merge_closeout: null };
+          claim.reason === 'provider_issue_rehydrated_active_run'
+            ? {}
+            : { review_promotion: null, merge_closeout: null };
         publishRuntime ||= hasProviderClaimTransitioned(claim, {
           ...trackedIssueFields,
           state: 'running',
@@ -1218,25 +1325,36 @@ export function createProviderIssueHandoffService(
       ) {
         if (input?.refreshTrackedIssueMetadata) {
           const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
-          if (
-            freshTrackedIssue.trackedIssue &&
-            shouldAttemptDeterministicMergeCloseoutForRecoveredRun({
-              claim,
-              trackedIssue: freshTrackedIssue.trackedIssue,
-              run: completedRun
-            })
-          ) {
-            const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
-              claim: {
-                ...claim,
-                ...freshTrackedIssue.claimFields
-              },
+          if (freshTrackedIssue.trackedIssue) {
+            const refreshedClaim = {
+              ...claim,
+              ...freshTrackedIssue.claimFields
+            };
+            const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
+              claim: refreshedClaim,
               trackedIssue: freshTrackedIssue.trackedIssue,
               latestRun: completedRun
             });
-            if (mergeCloseoutClaim) {
+            if (reviewPromotionClaim) {
               hasPendingClaims = true;
               continue;
+            }
+            if (
+              shouldAttemptDeterministicMergeCloseoutForRecoveredRun({
+                claim: refreshedClaim,
+                trackedIssue: freshTrackedIssue.trackedIssue,
+                run: completedRun
+              })
+            ) {
+              const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
+                claim: refreshedClaim,
+                trackedIssue: freshTrackedIssue.trackedIssue,
+                latestRun: completedRun
+              });
+              if (mergeCloseoutClaim) {
+                hasPendingClaims = true;
+                continue;
+              }
             }
           }
         }
@@ -1695,6 +1813,15 @@ export function createProviderIssueHandoffService(
       }
 
       if (resolution.kind === 'owned') {
+        const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
+          claim,
+          trackedIssue: resolution.trackedIssue,
+          latestRun
+        });
+        if (reviewPromotionClaim) {
+          options.publishRuntime?.('provider-intake.refresh');
+          return;
+        }
         const queuedRetryFields = buildQueuedProviderRetryFields({
           claim,
           previousRun: latestRun,
@@ -1992,9 +2119,68 @@ export function createProviderIssueHandoffService(
       }
 
       if (existing && eligibility.claimReason === 'provider_issue_handoff_owned') {
+        const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir, {
+          provider: 'linear',
+          issueId: input.trackedIssue.id
+        });
+        const attachableDiscoveredRuns = filterProviderIssueRunsForStartPipeline(
+          discoveredRuns,
+          startPipelineId
+        );
+        const activeRun =
+          attachableDiscoveredRuns.find((run) => run.status === 'in_progress') ?? null;
+        const latestRun = resolveProviderClaimRunIdentity(existing, attachableDiscoveredRuns)
+          ?? resolveLatestKnownProviderRun(attachableDiscoveredRuns);
+        if (
+          existing.state !== 'starting' &&
+          existing.state !== 'resuming' &&
+          existing.state !== 'running' &&
+          !activeRun &&
+          latestRun?.status !== 'queued'
+        ) {
+          const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
+            claim: existing,
+            trackedIssue: input.trackedIssue,
+            latestRun
+          });
+          if (reviewPromotionClaim) {
+            return {
+              kind: 'ignored',
+              reason: reviewPromotionClaim.reason ?? 'provider_issue_review_promotion_completed',
+              claim: reviewPromotionClaim
+            };
+          }
+        }
+        if (activeRun) {
+          const trackedIssueFields = buildFreshTrackedIssueClaimFields(existing, input.trackedIssue);
+          const reactivatedMergeCloseoutReset =
+            existing.reason === 'provider_issue_rehydrated_active_run'
+              ? {}
+              : { review_promotion: null, merge_closeout: null };
+          const claim = await upsertProviderClaimAndPersist({
+            ...existing,
+            ...trackedIssueFields,
+            launch_source: undefined,
+            launch_token: undefined,
+            task_id: activeRun.taskId,
+            state: 'running',
+            reason: 'provider_issue_rehydrated_active_run',
+            run_id: activeRun.runId,
+            run_manifest_path: activeRun.manifestPath,
+            accepted_at: existing.accepted_at,
+            last_delivery_id: input.deliveryId,
+            last_event: input.event,
+            last_action: input.action,
+            last_webhook_timestamp: input.webhookTimestamp,
+            ...reactivatedMergeCloseoutReset
+          });
+          return { kind: 'ignored', reason: 'provider_issue_rehydrated_active_run', claim };
+        }
         const claim = await retainOwnedHandoffClaim({
           claim: existing,
           trackedIssue: input.trackedIssue,
+          run: latestRun,
+          state: existing.state,
           claimMetadata: {
             accepted_at: existing.accepted_at,
             last_delivery_id: input.deliveryId,
@@ -2111,6 +2297,20 @@ export function createProviderIssueHandoffService(
           nextIssueUpdatedAt: input.trackedIssue.updated_at
         });
       if (latestRun?.status === 'succeeded' && latestExisting?.state !== 'released') {
+        const reviewPromotionClaim = latestExisting
+          ? await maybeHandleReviewHandoffPromotion({
+              claim: latestExisting,
+              trackedIssue: input.trackedIssue,
+              latestRun
+            })
+          : null;
+        if (reviewPromotionClaim) {
+          return {
+            kind: 'ignored',
+            reason: reviewPromotionClaim.reason ?? 'provider_issue_review_promotion_completed',
+            claim: reviewPromotionClaim
+          };
+        }
         const mergeCloseoutClaim = latestExisting
           ? await maybeHandleDeterministicMergingCloseout({
               claim: latestExisting,
@@ -2178,6 +2378,7 @@ export function createProviderIssueHandoffService(
         run_manifest_path: null,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
+        review_promotion: null,
         merge_closeout: null,
         ...buildProviderRetryLaunchFields({
           claim: latestRetryStateBase,
@@ -2212,6 +2413,7 @@ export function createProviderIssueHandoffService(
           run_manifest_path: null,
           launch_source: PROVIDER_LAUNCH_SOURCE,
           launch_token: launchToken,
+          review_promotion: null,
           merge_closeout: null,
           ...buildQueuedProviderRetryFields({
             claim: latestRetryStateBase,
@@ -2234,6 +2436,7 @@ export function createProviderIssueHandoffService(
             run_manifest_path: startedRun.manifestPath,
             launch_source: PROVIDER_LAUNCH_SOURCE,
             launch_token: launchToken,
+            review_promotion: null,
             merge_closeout: null,
             ...buildProviderRetryLaunchFields({
               claim: latestRetryStateBase,
@@ -2359,6 +2562,15 @@ export function createProviderIssueHandoffService(
                       trackedIssueRefetch
                     })
                   : claim;
+              const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
+                claim: currentClaim,
+                trackedIssue: resolution.trackedIssue,
+                latestRun: resolveProviderClaimRunIdentity(currentClaim, attachableClaimRuns) ?? latestRun
+              });
+              if (reviewPromotionClaim) {
+                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                continue;
+              }
               await retainOwnedHandoffClaim({
                 claim: currentClaim,
                 trackedIssue: resolution.trackedIssue,
@@ -2420,7 +2632,9 @@ export function createProviderIssueHandoffService(
                 resolution.trackedIssue
               );
               const reactivatedMergeCloseoutReset =
-                claim.reason === 'provider_issue_rehydrated_active_run' ? {} : { merge_closeout: null };
+                claim.reason === 'provider_issue_rehydrated_active_run'
+                  ? {}
+                  : { review_promotion: null, merge_closeout: null };
               const transitioned = hasProviderClaimTransitioned(claim, {
                 ...trackedIssueFields,
                 state: 'running',
@@ -2465,6 +2679,15 @@ export function createProviderIssueHandoffService(
               currentClaim.state !== 'resuming' &&
               latestRun?.status !== 'queued'
             ) {
+              const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
+                claim: currentClaim,
+                trackedIssue: resolution.trackedIssue,
+                latestRun
+              });
+              if (reviewPromotionClaim) {
+                noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+                continue;
+              }
               const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
                 claim: currentClaim,
                 trackedIssue: resolution.trackedIssue,
@@ -2522,7 +2745,9 @@ export function createProviderIssueHandoffService(
               resolution.trackedIssue
             );
             const reactivatedMergeCloseoutReset =
-              claim.reason === 'provider_issue_rehydrated_active_run' ? {} : { merge_closeout: null };
+              claim.reason === 'provider_issue_rehydrated_active_run'
+                ? {}
+                : { review_promotion: null, merge_closeout: null };
             const transitioned = hasProviderClaimTransitioned(claim, {
               ...trackedIssueFields,
               state: 'running',
@@ -3595,6 +3820,39 @@ function resolveProviderRetryErrorFromRun(run: ProviderIssueRunRecord | null): s
   return run.summary ?? null;
 }
 
+function resolveProviderReviewPromotionClaimReason(
+  reviewPromotion: ProviderReviewHandoffPromotionRecord
+): string {
+  switch (reviewPromotion.status) {
+    case 'promoted':
+      return 'provider_issue_review_promotion_promoted';
+    case 'action_required':
+      return 'provider_issue_review_promotion_action_required';
+    case 'transition_failed':
+      return 'provider_issue_review_promotion_transition_failed';
+    case 'promotion_failed':
+      return 'provider_issue_review_promotion_failed';
+    case 'watching':
+    default:
+      return 'provider_issue_review_promotion_watching';
+  }
+}
+
+function resolveProviderReviewPromotionClaimState(
+  reviewPromotion: ProviderReviewHandoffPromotionRecord
+): ProviderIntakeClaimState {
+  switch (reviewPromotion.status) {
+    case 'action_required':
+    case 'transition_failed':
+    case 'promotion_failed':
+      return 'handoff_failed';
+    case 'watching':
+    case 'promoted':
+    default:
+      return 'completed';
+  }
+}
+
 function resolveProviderMergeCloseoutClaimReason(
   mergeCloseout: ProviderMergeCloseoutRecord
 ): string {
@@ -3665,6 +3923,37 @@ function buildProviderCompletedRunRehydrateState(input: {
   | 'retry_due_at'
   | 'retry_error'
 > {
+  if (
+    !input.claim.merge_closeout &&
+    input.claim.review_promotion &&
+    resolveProviderReviewPromotionClaimState(input.claim.review_promotion) === 'handoff_failed'
+  ) {
+    return {
+      task_id: input.run.taskId,
+      state: 'handoff_failed',
+      reason: resolveProviderReviewPromotionClaimReason(input.claim.review_promotion),
+      run_id: input.run.runId,
+      run_manifest_path: input.run.manifestPath,
+      ...clearProviderRetryFields()
+    };
+  }
+  if (
+    !input.claim.merge_closeout &&
+    input.claim.review_promotion &&
+    resolveProviderReviewPromotionClaimState(input.claim.review_promotion) === 'completed' &&
+    normalizeProviderLinearWorkflowState(
+      input.claim.review_promotion.issue_state ?? input.claim.issue_state
+    ) === 'merging'
+  ) {
+    return {
+      task_id: input.run.taskId,
+      state: 'completed',
+      reason: resolveProviderReviewPromotionClaimReason(input.claim.review_promotion),
+      run_id: input.run.runId,
+      run_manifest_path: input.run.manifestPath,
+      ...clearProviderRetryFields()
+    };
+  }
   if (
     input.claim.merge_closeout &&
     resolveProviderMergeCloseoutClaimState(input.claim.merge_closeout) === 'handoff_failed'
@@ -3778,7 +4067,7 @@ function hasProviderClaimTransitioned(
           >
         >
     )
-  ) & Partial<Pick<ProviderIntakeClaimRecord, 'merge_closeout'>>
+  ) & Partial<Pick<ProviderIntakeClaimRecord, 'review_promotion' | 'merge_closeout'>>
 ): boolean {
   return (
     (
@@ -3831,6 +4120,10 @@ function hasProviderClaimTransitioned(
     (claim.retry_due_at ?? null) !== (next.retry_due_at ?? null) ||
     (claim.retry_error ?? null) !== (next.retry_error ?? null) ||
     (
+      next.review_promotion !== undefined &&
+      !areProviderReviewPromotionRecordsEqual(claim.review_promotion, next.review_promotion)
+    ) ||
+    (
       next.merge_closeout !== undefined &&
       !areProviderMergeCloseoutRecordsEqual(claim.merge_closeout, next.merge_closeout)
     )
@@ -3858,6 +4151,13 @@ function areProviderIssueBlockersEqual(
       blocker?.state_type === other?.state_type
     );
   });
+}
+
+function areProviderReviewPromotionRecordsEqual(
+  left: ProviderIntakeClaimRecord['review_promotion'],
+  right: ProviderIntakeClaimRecord['review_promotion']
+): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 }
 
 function areProviderMergeCloseoutRecordsEqual(
