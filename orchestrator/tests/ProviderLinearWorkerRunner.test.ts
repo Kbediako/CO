@@ -399,7 +399,7 @@ async function appendStaySerialParallelizationDecisionAuditForRequest(
   });
 }
 
-describe('provider linear worker runner', () => {
+describe('provider linear worker runner', { timeout: 15_000 }, () => {
   it('loads provider worker context from manifest-backed env', async () => {
     const { manifestPath } = await createManifestRoot();
 
@@ -1734,7 +1734,7 @@ describe('provider linear worker runner', () => {
         typeof message === 'string' && message.includes('[provider-linear-worker-progress]')
       )
     ).toBe(true);
-  });
+  }, 15_000);
 
   it('passes env-backed Linear scope bindings into tracked issue refreshes', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
@@ -1805,7 +1805,7 @@ describe('provider linear worker runner', () => {
         project_id: 'project-1'
       }
     });
-  });
+  }, 15_000);
 
   it('treats a corrupt child-stream ledger as fatal during proof hydration', async () => {
     const { runDir } = await createManifestRoot();

@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260409-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702",
+      "title": "CO workflow: stop linked-worktree Linear helpers from leaking repo git identity",
+      "relates_to": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (manual fallback accepted after stalled approval rerun)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-approval-rerun/cli/2026-04-09T08-59-49-479Z-b1d984dc/manifest.json",
+          "override_reason": "The approval rerun completed delegation-guard, spec-guard, docs:check, and docs:freshness on the corrected packet. Its bounded standalone review surfaced one real packet wording issue (the packet still claimed the shared repo git config remained untouched even though a one-time extensions.worktreeConfig precondition is allowed), that wording was fixed in docs/PRD, tasks/specs, and the workpad, and the rerun then remained in_progress without terminal telemetry. A manual packet review found no remaining docs blockers, so the issue proceeds under a truthful docs-review fallback instead of stalling."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "task": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "agent_task": ".agent/task/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
+        "docs": "docs/TECH_SPEC-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md"
+      }
+    },
+    {
       "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
       "title": "CO: automate truthful In Review -> Merging promotion after clean review handoff",
       "relates_to": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",

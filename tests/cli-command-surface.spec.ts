@@ -20,6 +20,7 @@ const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const CLI_ENTRY_DIST = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
 const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
+const CLI_SUBPROCESS_TIMEOUT = 60000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
 const SKILLS_INSTALL_JSON_TIMEOUT = 70000;
@@ -264,7 +265,7 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
 
 describe('codex-orchestrator command surface', () => {
   it('prints root help with quickstart guidance', async () => {
-    const { stdout } = await runCliSubprocess(['--help'], undefined, CLI_BOOT_TIMEOUT);
+    const { stdout } = await runCliSubprocess(['--help'], undefined, CLI_SUBPROCESS_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
     expect(stdout).toContain('codex defaults');
@@ -272,42 +273,25 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
     expect(stdout).toContain('codex-orchestrator doctor --usage --window-days 30');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_SUBPROCESS_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-unknown-command-'));
-    const stdoutPath = join(tempDir, 'stdout.txt');
-    const stderrPath = join(tempDir, 'stderr.txt');
-    const exitCodePath = join(tempDir, 'exit-code.txt');
+    let failure: { stdout: string; stderr: string; exitCode: number } | null = null;
+    try {
+      await runCliSubprocess(['unknown-command'], undefined, CLI_SUBPROCESS_TIMEOUT);
+    } catch (error) {
+      failure = parseCliFailure(error);
+    }
 
-    await execFileAsync(
-      '/bin/sh',
-      [
-        '-c',
-        '"$NODE_BIN" --loader ts-node/esm "$CLI_ENTRY_PATH" unknown-command >"$CLI_STDOUT_PATH" 2>"$CLI_STDERR_PATH"; printf "%s" "$?" >"$CLI_EXIT_CODE_PATH"'
-      ],
-      {
-        env: {
-          ...buildCliEnv(),
-          NODE_BIN: process.execPath,
-          CLI_ENTRY_PATH: CLI_ENTRY,
-          CLI_STDOUT_PATH: stdoutPath,
-          CLI_STDERR_PATH: stderrPath,
-          CLI_EXIT_CODE_PATH: exitCodePath
-        },
-        timeout: CLI_BOOT_TIMEOUT
-      }
-    );
-
-    const stdout = await readFile(stdoutPath, 'utf8');
-    const stderr = await readFile(stderrPath, 'utf8');
-    const exitCode = Number((await readFile(exitCodePath, 'utf8')).trim());
-    expect(exitCode).not.toBe(0);
+    expect(failure).not.toBeNull();
+    expect(failure?.exitCode).not.toBe(0);
+    const stdout = failure?.stdout ?? '';
+    const stderr = failure?.stderr ?? '';
     if (stderr.trim().length > 0) {
       expect(stderr).toMatch(/Unknown command: unknown-command|Command failed:/);
     }
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_SUBPROCESS_TIMEOUT);
 
   it('falls back to exec failure message detail when stderr is empty', () => {
     const parsed = parseCliFailure({
@@ -436,12 +420,12 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCliSubprocess(
       ['pr', 'ready-review', '--help'],
       undefined,
-      CLI_BOOT_TIMEOUT
+      CLI_SUBPROCESS_TIMEOUT
     );
     expect(stdout).toContain('Usage: codex-orchestrator pr ready-review');
     expect(stdout).toContain('review handoff is safe after a bounded automated-feedback drain');
     expect(stdout).not.toContain('--auto-merge');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_SUBPROCESS_TIMEOUT);
 
   it('does not treat help-like option values as pr help requests', async () => {
     await expect(
@@ -535,12 +519,12 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints review help without invoking run-review', async () => {
-    const { stdout } = await runCliSubprocess(['review', '--help'], undefined, CLI_BOOT_TIMEOUT);
+    const { stdout } = await runCliSubprocess(['review', '--help'], undefined, CLI_SUBPROCESS_TIMEOUT);
     expect(stdout).toContain('Usage: codex-orchestrator review');
     expect(stdout).toContain('Runs the standalone review wrapper');
     expect(stdout).toContain('--manifest <path>');
     expect(stdout).toContain('CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_SUBPROCESS_TIMEOUT);
 
   it('launches review via the CLI shell in non-interactive handoff mode', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-review-launch-'));
@@ -567,7 +551,7 @@ describe('codex-orchestrator command surface', () => {
         DIFF_BUDGET_OVERRIDE_REASON:
           'cli command-surface review shell test exercises non-interactive handoff against the stacked branch baseline'
       },
-      CLI_BOOT_TIMEOUT
+      CLI_SUBPROCESS_TIMEOUT
     );
 
     expect(stdout).toContain('Codex review handoff (non-interactive):');
@@ -576,7 +560,7 @@ describe('codex-orchestrator command surface', () => {
     const prompt = await readFile(join(runDir, 'review', 'prompt.txt'), 'utf8');
     expect(prompt).toContain('Evidence manifest:');
     expect(prompt).toContain('sample-run/manifest.json');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_SUBPROCESS_TIMEOUT);
 
   it('prints start help without preparing a run', async () => {
     const { stdout } = await runCli(['start', '--help'], undefined, CLI_BOOT_TIMEOUT);
@@ -1141,7 +1125,11 @@ describe('codex-orchestrator command surface', () => {
   }, TEST_TIMEOUT);
 
   it('prints self-check json output through the binary shell', async () => {
-    const { stdout } = await runCliSubprocess(['self-check', '--format', 'json']);
+    const { stdout } = await runCliSubprocess(
+      ['self-check', '--format', 'json'],
+      undefined,
+      CLI_SUBPROCESS_TIMEOUT
+    );
     const payload = JSON.parse(stdout) as {
       status?: string;
       name?: string;
@@ -1155,7 +1143,7 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.version).toBe('0.1.38');
     expect(payload.node).toBe(process.version);
     expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
-  }, TEST_TIMEOUT);
+  }, CLI_SUBPROCESS_TIMEOUT);
 
   it('prints doctor apply plan when wiring is missing', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));

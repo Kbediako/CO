@@ -141,8 +141,13 @@ jobs:
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cd "$ROOT_DIR"
+          node "$ROOT_DIR/scripts/worktree-git-identity.mjs" \
+            --worktree "$WORKTREE_DIR" \
+            --name "github-actions[bot]" \
+            --email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          cd "$WORKTREE_DIR"
           git add .
           git commit -m "Update archive payload"
           git push origin "$ARCHIVE_BRANCH"

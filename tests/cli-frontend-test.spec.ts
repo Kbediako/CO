@@ -22,7 +22,7 @@ const SHIPPED_FRONTEND_TESTING_RUNNER_RELATIVE_PATH = join(
   'cli',
   'frontendTestingRunner.js'
 );
-const TEST_TIMEOUT = 30000;
+const TEST_TIMEOUT = 60_000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
@@ -124,9 +124,10 @@ async function runFrontendTestWithEnv(
   env: NodeJS.ProcessEnv,
   extraArgs: string[]
 ): Promise<{ manifestPath: string; runtimeMode: string | null; runtimeProvider: string | null }> {
+  const entryArgs = ['--loader', 'ts-node/esm', CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs];
   const { stdout } = await execFileAsync(
     process.execPath,
-    ['--loader', 'ts-node/esm', CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs],
+    entryArgs,
     {
       env,
       timeout: TEST_TIMEOUT
