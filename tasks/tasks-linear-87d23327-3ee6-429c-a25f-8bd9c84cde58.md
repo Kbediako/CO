@@ -1,0 +1,47 @@
+# Task Checklist - linear-87d23327-3ee6-429c-a25f-8bd9c84cde58
+
+- Linear Issue: `CO-132` / `87d23327-3ee6-429c-a25f-8bd9c84cde58`
+- MCP Task ID: `linear-87d23327-3ee6-429c-a25f-8bd9c84cde58`
+- Primary PRD: `docs/PRD-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`
+- TECH_SPEC: `tasks/specs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`
+
+## Docs-First
+- [x] PRD drafted for the broad repo test-lane stabilization/classification lane. Evidence: `docs/PRD-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`.
+- [x] TECH_SPEC drafted with the bounded reproduction/classification/fix contract. Evidence: `tasks/specs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`, `docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`.
+- [x] ACTION_PLAN drafted for docs-review, fresh reproduction, implementation, validation, and handoff. Evidence: `docs/ACTION_PLAN-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`.
+- [x] `tasks/index.json` updated with the new TECH_SPEC entry and review date. Evidence: `tasks/index.json`.
+- [x] `docs/TASKS.md` updated with the new lane snapshot. Evidence: `docs/TASKS.md`.
+- [x] `docs/docs-freshness-registry.json` updated with the new packet entries. Evidence: `docs/docs-freshness-registry.json`.
+- [x] Checklist mirrored to `.agent/task/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`. Evidence: `.agent/task/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`.
+- [x] Pre-implementation issue-quality review is captured in the spec packet. Evidence: `tasks/specs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`.
+- [x] docs-review approval captured for `linear-87d23327-3ee6-429c-a25f-8bd9c84cde58`. Evidence: child-stream manifest `.runs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58-co-132-docs-review/cli/2026-04-09T15-08-35-661Z-8046695d/manifest.json` and review telemetry `.runs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58-co-132-docs-review/cli/2026-04-09T15-08-35-661Z-8046695d/review/telemetry.json` (`status: succeeded`, `review_outcome: clean-success`).
+
+## Workflow
+- [x] Issue moved from `Ready` to the live started state (`In Progress`) before active coding. Evidence: provider-worker Linear transition recorded on 2026-04-09.
+- [x] The required turn-level parallelization decision was recorded for this turn. Evidence: provider-worker `parallelization` = `stay_serial` / `single_bounded_change` on 2026-04-09.
+- [x] Detached workspace was switched onto a dedicated issue branch before implementation. Evidence: `linear/co-132-timeout-test-lane-truth`.
+- [x] Exactly one persistent `## Codex Workpad` comment is kept current on the issue. Evidence: Linear workpad comment `8eb0487f-0ff0-4e98-9d25-723f74e90844`, local source `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/workpad.md`.
+
+## Investigation
+- [x] Source blocker evidence from `CO-94` is captured in this packet. Evidence: `/Users/kbediako/Code/CO/.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d/cli/2026-04-09T08-36-05-967Z-014680f3/provider-linear-worker-proof.json`, `/Users/kbediako/Code/CO/.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d/cli/2026-04-09T08-36-05-967Z-014680f3/provider-linear-issue-context-cache.json`.
+- [x] Adjacent prior lanes were reviewed so this issue stays narrower than a generic historical hang rehash. Evidence: `docs/PRD-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md`, `docs/PRD-linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60.md`, `docs/PRD-linear-fdefaeca-8c14-4dc3-980e-cdc6cfa6d955.md`.
+- [x] Fresh current-tree full-lane evidence is captured with exact classification. Evidence: `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T150909Z-baseline-repro/01-npm-test-rerun.log` (`323` files / `3274` tests passed) plus the earlier same-command live run summary (`323` / `3274` in `126.57s`).
+- [x] The smallest owner seam is identified truthfully: the `CO-94` blocker does not reproduce on current head and is best explained by later repo changes across previously implicated surfaces, so this lane closes as an evidence-backed non-repro/classification outcome instead of forcing a speculative shared code fix. Evidence: `docs/PRD-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`, `docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`, `git diff --stat d47f219ef..HEAD -- orchestrator/tests/ControlRuntime.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts orchestrator/tests/ControlServer.test.ts orchestrator/tests/ControlHostCliShell.test.ts orchestrator/tests/WorkspacePath.test.ts tests/subagent-edit-guard.spec.ts tests/diff-budget.spec.ts tests/cli-frontend-test.spec.ts tests/spec-guard.spec.ts tests/vitest-progress-config.spec.ts tests/cli-orchestrator.spec.ts tests/cli-command-surface.spec.ts tests/run-review.spec.ts`.
+
+## Implementation
+- [x] Smallest truthful outcome is landed as an evidence-backed classification packet/workpad refresh only; no additional product-code fix is required on current head because the broad lane no longer reproduces. Evidence: `docs/PRD-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`, `docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/workpad.md`.
+- [x] Focused regressions or deterministic evidence cover the chosen owner seam. Evidence: repeated green full-suite runs at `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T150909Z-baseline-repro/01-npm-test-rerun.log` and `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/05-test.log`, plus post-fix packet review notes in `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/11-manual-review-fallback.md`.
+
+## Validation
+- [x] `MCP_RUNNER_TASK_ID=linear-87d23327-3ee6-429c-a25f-8bd9c84cde58 "/opt/homebrew/Cellar/node/25.2.1/bin/node" "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --stream co-132-docs-review --format json`. Evidence: `.runs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58-co-132-docs-review/cli/2026-04-09T15-08-35-661Z-8046695d/manifest.json`, `.runs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58-co-132-docs-review/cli/2026-04-09T15-08-35-661Z-8046695d/review/telemetry.json`.
+- [x] Fresh broad-lane repro or exact environment-sensitive blocker record is captured under `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/`. Evidence: `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T150909Z-baseline-repro/01-npm-test-rerun.log`.
+- [x] Required validation commands pass or exact remaining blockers are recorded truthfully for the final diff. Evidence: full validation bundle at `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/01-delegation-guard.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/02-spec-guard.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/03-build.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/04-lint.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/05-test.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/06-docs-check.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/07-docs-freshness.log`, and `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/08-diff-budget.log`; post-sync docs guards rerun clean at `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/13-spec-guard-postsync.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/14-docs-check-postsync.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/15-docs-freshness-postsync.log`, and `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/16-diff-budget-postsync.log`.
+- [x] Standalone review plus explicit elegance review are captured before any review handoff if the final diff is non-trivial. Evidence: `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/09-review.log` (initial review found stale canonical spec), `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/10-review-rerun.log` (post-fix rerun stalled without new concrete findings and was replaced by manual fallback), `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/11-manual-review-fallback.md`, and `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260409T152029Z-final-validation/12-elegance-review.md`.
+
+## Handoff
+- [ ] Workpad refreshed after docs, after reproduction/classification, after implementation, and immediately before any review or merge handoff. Evidence: pending.
+- [ ] PR attached to the Linear issue before any review-state transition. Evidence: pending.
+- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
+- [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
+- [x] Issue remains active until review handoff prerequisites are complete. Evidence: issue state is currently `In Progress`.

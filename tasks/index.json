@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260410-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58",
+      "title": "CO: Stabilize broad timeout-heavy repo test lane so unrelated failures stop blocking narrow issue handoffs",
+      "relates_to": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58-co-132-docs-review/cli/2026-04-09T15-08-35-661Z-8046695d/manifest.json",
+          "telemetry": ".runs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58-co-132-docs-review/cli/2026-04-09T15-08-35-661Z-8046695d/review/telemetry.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "task": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "agent_task": ".agent/task/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "docs": "docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md"
+      }
+    },
+    {
       "id": "20260409-linear-70e83230-4f52-4850-b494-41fd0ec32f13",
       "title": "CO: Add a guarded resident app-server control seam with drain/restart/resume continuity",
       "relates_to": "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
