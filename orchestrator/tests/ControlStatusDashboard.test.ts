@@ -645,6 +645,37 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('│ Inspect: live | alternate screen | full frame');
   });
 
+  it('renders remote worker_host ownership in the live running and retry frame text', () => {
+    const baseDataset = buildDataset();
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        running: [
+          {
+            ...baseDataset.running[0],
+            worker_host: 'worker-host-01'
+          }
+        ],
+        retrying: [
+          {
+            ...baseDataset.retrying[0],
+            worker_host: 'worker-host-02'
+          }
+        ]
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 1842.7
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain('worker-host-01 |');
+    expect(plainFrame).toContain('worker-host-02 | rate limit exceeded');
+  });
+
   it('labels live primary-screen renders as primary scrollback', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset(),
