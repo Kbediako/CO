@@ -819,7 +819,6 @@ function buildLegacyProofMessageProgressCandidate(
 ): RankedProviderLinearWorkerProgressCandidate | null {
   const summary = normalizeOptionalString(proof?.last_message);
   const event = normalizeOptionalString(proof?.last_event);
-  const messageRecordedAt = normalizeOptionalString(proof?.last_event_at);
   if (!summary && !event) {
     return null;
   }
@@ -827,8 +826,14 @@ function buildLegacyProofMessageProgressCandidate(
     source: 'legacy_proof_last_message',
     event,
     summary,
-    message_recorded_at: messageRecordedAt,
-    source_updated_at: latestIsoTimestamp(messageRecordedAt, normalizeOptionalString(proof?.updated_at)),
+    // Legacy proof does not preserve an authoritative last-message timestamp.
+    // `last_event_at` can advance on non-message events (for example token_count),
+    // so treating it as message freshness can incorrectly outrank canonical activity.
+    message_recorded_at: null,
+    source_updated_at: latestIsoTimestamp(
+      normalizeOptionalString(proof?.last_event_at),
+      normalizeOptionalString(proof?.updated_at)
+    ),
     derived: false
   };
 }
@@ -920,11 +925,14 @@ function compareProviderLinearWorkerProgressCandidatePriority(
   if (signalComparison !== 0) {
     return signalComparison;
   }
-  const freshnessComparison =
-    compareIsoTimestamp(left.message_recorded_at, right.message_recorded_at) ||
-    compareIsoTimestamp(left.source_updated_at, right.source_updated_at);
-  if (freshnessComparison !== 0) {
-    return freshnessComparison;
+  if (left.message_recorded_at && right.message_recorded_at) {
+    const messageFreshnessComparison = compareIsoTimestamp(
+      left.message_recorded_at,
+      right.message_recorded_at
+    );
+    if (messageFreshnessComparison !== 0) {
+      return messageFreshnessComparison;
+    }
   }
   const sourceComparison =
     providerLinearWorkerProgressCandidateSourcePriority(left.source) -
@@ -932,7 +940,7 @@ function compareProviderLinearWorkerProgressCandidatePriority(
   if (sourceComparison !== 0) {
     return sourceComparison;
   }
-  return 0;
+  return compareIsoTimestamp(left.source_updated_at, right.source_updated_at);
 }
 
 function scoreProviderLinearWorkerProgressCandidate(

@@ -312,6 +312,109 @@ describe('provider issue observability', () => {
     );
   });
 
+  it('does not let non-message legacy proof events overstate last-message freshness', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-05T05:40:00.000Z',
+        current_turn_activity: {
+          event: 'agent_message',
+          message_or_payload: 'Investigating provider-worker EVENT provenance.',
+          recorded_at: '2026-04-05T05:44:10.000Z',
+          source: 'stdout_jsonl',
+          turn_id: 'turn-2',
+          session_id: 'thread-1-turn-2'
+        },
+        last_event: 'token_count',
+        last_message: 'Investigating provider-worker EVENT provenance.',
+        last_event_at: '2026-04-05T05:44:30.000Z',
+        updated_at: '2026-04-05T05:44:30.000Z',
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'Investigating provider-worker EVENT provenance.',
+      summary_recorded_at: '2026-04-05T05:44:10.000Z',
+      message_recorded_at: '2026-04-05T05:44:10.000Z',
+      source_updated_at: '2026-04-05T05:44:10.000Z',
+      event_source: 'canonical_stdout_jsonl'
+    });
+    expect(progress?.event_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'canonical_stdout_jsonl',
+          accepted: true,
+          rejection_reason: null
+        }),
+        expect.objectContaining({
+          source: 'legacy_proof_last_message',
+          summary: 'Investigating provider-worker EVENT provenance.',
+          message_recorded_at: null,
+          source_updated_at: '2026-04-05T05:44:30.000Z',
+          accepted: false,
+          rejection_reason: 'less_authoritative_than_winner'
+        })
+      ])
+    );
+  });
+
+  it('keeps an authoritative legacy proof message ahead of older derived child summaries when message freshness is unknown', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'token_count',
+        last_message: 'Investigating provider-worker EVENT provenance.',
+        last_event_at: '2026-04-05T05:44:30.000Z',
+        updated_at: '2026-04-05T05:44:30.000Z',
+        child_streams: [
+          {
+            stream: 'co-112-docs-review',
+            task_id: 'linear-co-112-docs-review',
+            run_id: 'run-child-112',
+            status: 'failed',
+            launched_at: '2026-04-05T05:41:30.000Z',
+            recorded_at: '2026-04-05T05:42:10.000Z',
+            summary: 'docs-review failed at docs:freshness after spec-guard passed'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'Investigating provider-worker EVENT provenance.',
+      summary_recorded_at: null,
+      message_recorded_at: null,
+      source_updated_at: '2026-04-05T05:44:30.000Z',
+      event_source: 'legacy_proof_last_message'
+    });
+    expect(progress?.event_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'legacy_proof_last_message',
+          message_recorded_at: null,
+          accepted: true,
+          rejection_reason: null
+        }),
+        expect.objectContaining({
+          source: 'child_stream_summary',
+          message_recorded_at: '2026-04-05T05:42:10.000Z',
+          accepted: false,
+          rejection_reason: 'less_authoritative_than_winner'
+        })
+      ])
+    );
+  });
+
   it('prefers the latest child-lane summary over generic turn-running filler', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {
