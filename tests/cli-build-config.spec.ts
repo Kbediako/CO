@@ -8,12 +8,14 @@ function readFirstLine(filePath: string): string {
 }
 
 describe('CLI build configuration', () => {
-  it('preserves the CLI shebang in source or dist output', () => {
-    const distPath = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
-    const sourcePath = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
-    const targetPath = existsSync(distPath) ? distPath : sourcePath;
+  it('preserves the CLI shebang in the checked-in bootstrap and dist output', () => {
+    const bootstrapPath = join(process.cwd(), 'bin', 'codex-orchestrator.js');
+    expect(readFirstLine(bootstrapPath)).toBe('#!/usr/bin/env node');
 
-    expect(readFirstLine(targetPath)).toBe('#!/usr/bin/env node');
+    const distPath = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
+    if (existsSync(distPath)) {
+      expect(readFirstLine(distPath)).toBe('#!/usr/bin/env node');
+    }
   });
 
   it('uses NodeNext ESM settings', () => {
@@ -29,7 +31,9 @@ describe('CLI build configuration', () => {
   it('declares ESM mode in package.json', () => {
     const pkgPath = join(process.cwd(), 'package.json');
     const raw = readFileSync(pkgPath, 'utf8');
-    const pkg = JSON.parse(raw) as { type?: string };
+    const pkg = JSON.parse(raw) as { type?: string; bin?: Record<string, string> };
     expect(pkg.type).toBe('module');
+    expect(pkg.bin?.['codex-orchestrator']).toBe('bin/codex-orchestrator.js');
+    expect(pkg.bin?.['codex-orch']).toBe('bin/codex-orchestrator.js');
   });
 });
