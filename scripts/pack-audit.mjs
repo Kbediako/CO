@@ -6,6 +6,7 @@ import process from 'node:process';
 import { runPack } from './lib/npm-pack.js';
 
 const REQUIRED_FILES = [
+  'bin/codex-orchestrator.js',
   'dist/bin/codex-orchestrator.js',
   'dist/scripts/run-review.js',
   'schemas/manifest.json',
@@ -22,6 +23,7 @@ const REQUIRED_FILES = [
 const ALLOWED_PREFIXES = ['dist/', 'schemas/', 'templates/', 'skills/'];
 const EXPLICIT_ALLOWED_PREFIXES = ['docs/public/'];
 const ALLOWED_ROOT_FILES = new Set([
+  'bin/codex-orchestrator.js',
   'README.md',
   'LICENSE',
   'package.json',
