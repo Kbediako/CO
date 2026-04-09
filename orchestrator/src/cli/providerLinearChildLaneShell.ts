@@ -517,6 +517,9 @@ async function launchChildLane(
     },
     sourceSetup
   });
+  if (invocation.envOverrides) {
+    Object.assign(childStartEnv, invocation.envOverrides);
+  }
 
   let execResult: ProviderLinearWorkerExecResult;
   try {
@@ -2034,9 +2037,10 @@ function buildProviderLinearChildLaneStartEnv(
 function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   command: string;
   argsPrefix: string[];
+  envOverrides?: NodeJS.ProcessEnv;
 } {
   const invocation = resolveCodexOrchestratorBootstrapInvocation({ env, execPath: process.execPath });
-  return { command: invocation.command, argsPrefix: invocation.args };
+  return { command: invocation.command, argsPrefix: invocation.args, envOverrides: invocation.envOverrides };
 }
 
 function parseProviderChildLaneRunResult(

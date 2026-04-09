@@ -231,6 +231,9 @@ export async function runProviderLinearChildStreamShell(
     childTaskId,
     sourceSetup
   );
+  if (invocation.envOverrides) {
+    Object.assign(childStartEnv, invocation.envOverrides);
+  }
   const childLaunchTimestamp = deps.now();
   let execResult: ProviderLinearWorkerExecResult;
   try {
@@ -373,9 +376,10 @@ function buildProviderLinearChildStartEnv(env: NodeJS.ProcessEnv, repoRoot: stri
 function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   command: string;
   argsPrefix: string[];
+  envOverrides?: NodeJS.ProcessEnv;
 } {
   const invocation = resolveCodexOrchestratorBootstrapInvocation({ env, execPath: process.execPath });
-  return { command: invocation.command, argsPrefix: invocation.args };
+  return { command: invocation.command, argsPrefix: invocation.args, envOverrides: invocation.envOverrides };
 }
 function parseProviderChildRunResult(raw: string, repoRoot: string, runsRoot: string, pipelineId: ProviderLinearChildStreamPipelineId, taskId: string): ProviderLinearChildRunResult | null {
   const parsed = parseTrailingJsonObject(raw);

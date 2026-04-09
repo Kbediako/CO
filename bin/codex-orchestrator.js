@@ -40,6 +40,9 @@ function main() {
     ...process.env,
     CODEX_ORCHESTRATOR_PACKAGE_ROOT: packageRoot
   }
+  if (sourceLoader) {
+    env.TS_NODE_PROJECT = join(packageRoot, 'tsconfig.json')
+  }
 
   const child = spawn(process.execPath, [...process.execArgv, ...args], {
     env,
