@@ -120,8 +120,7 @@ async function installControlHostSupervision(flags: ArgMap): Promise<void> {
   const install = resolveInstallConfig(flags);
   const serviceTarget = resolveControlHostSupervisionServiceTarget(install.config.label);
 
-  await assertPathExists(install.config.nodePath, 'Node executable');
-  await assertPathExists(install.config.cliEntrypoint, 'Control-host supervision entrypoint');
+  await assertControlHostSupervisionInstallPaths(install.config);
   await mkdir(dirname(install.config.paths.plistPath), { recursive: true });
   await mkdir(install.config.paths.supportDir, { recursive: true });
   await mkdir(install.config.paths.logsDir, { recursive: true });
@@ -704,11 +703,17 @@ function readFormatFlag(flags: ArgMap): OutputFormat {
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
   const value = flags[key];
+  if (value === true) {
+    throw new Error(`--${key} requires a value.`);
+  }
   if (typeof value !== 'string') {
     return undefined;
   }
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  if (trimmed.length === 0) {
+    throw new Error(`--${key} requires a value.`);
+  }
+  return trimmed;
 }
 
 function readIntegerFlag(flags: ArgMap, key: string): number | undefined {
@@ -958,10 +963,23 @@ function firstNonEmptyLine(value: string): string | null {
   return null;
 }
 
-async function assertPathExists(path: string, label: string): Promise<void> {
-  if (!(await pathExists(path))) {
+async function assertPathExists(
+  path: string,
+  label: string,
+  exists: (path: string) => Promise<boolean> = pathExists
+): Promise<void> {
+  if (!(await exists(path))) {
     throw new Error(`${label} not found: ${path}`);
   }
+}
+
+async function assertControlHostSupervisionInstallPaths(
+  config: ControlHostSupervisionConfig,
+  exists: (path: string) => Promise<boolean> = pathExists
+): Promise<void> {
+  await assertPathExists(config.nodePath, 'Node executable', exists);
+  await assertPathExists(config.cliEntrypoint, 'Control-host supervision entrypoint', exists);
+  await assertPathExists(config.shellPath, 'Shell executable', exists);
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -1025,12 +1043,14 @@ async function sleep(ms: number): Promise<void> {
 }
 
 export const __test__ = {
+  assertControlHostSupervisionInstallPaths,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
   probeControlHostHealth,
   readFormatFlag,
+  readStringFlag,
   readIntegerFlag,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget

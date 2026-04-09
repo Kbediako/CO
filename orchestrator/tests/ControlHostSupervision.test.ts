@@ -11,12 +11,14 @@ import {
 import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlHostSupervisionCliShell.js';
 
 const {
+  assertControlHostSupervisionInstallPaths,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
   probeControlHostHealth,
   readFormatFlag,
+  readStringFlag,
   readIntegerFlag,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
@@ -204,6 +206,30 @@ describe('controlHostSupervision shell helpers', () => {
     expect(readFormatFlag({ format: 'text' })).toBe('text');
     expect(() => readFormatFlag({ format: 'yaml' })).toThrow(
       '--format must be either "text" or "json".'
+    );
+  });
+
+  it('rejects valueless string flags instead of silently falling back to defaults', () => {
+    expect(() => readStringFlag({ label: true }, 'label')).toThrow('--label requires a value.');
+    expect(() => readStringFlag({ label: '   ' }, 'label')).toThrow(
+      '--label requires a value.'
+    );
+  });
+
+  it('validates the configured shell path during install-time path checks', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      shellPath: '/missing/shell'
+    });
+
+    await expect(
+      assertControlHostSupervisionInstallPaths(config, async (path) => path !== config.shellPath)
+    ).rejects.toThrow(
+      `Shell executable not found: ${config.shellPath}`
     );
   });
 
