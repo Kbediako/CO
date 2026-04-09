@@ -12,10 +12,11 @@
   },
   "type": "module",
   "bin": {
-    "codex-orchestrator": "dist/bin/codex-orchestrator.js",
-    "codex-orch": "dist/bin/codex-orchestrator.js"
+    "codex-orchestrator": "bin/codex-orchestrator.js",
+    "codex-orch": "bin/codex-orchestrator.js"
   },
   "files": [
+    "bin/codex-orchestrator.js",
     "dist/bin/**",
     "dist/orchestrator/**",
     "dist/packages/**",

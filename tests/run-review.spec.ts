@@ -1,14 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { chmod, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { chmod, mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { ReviewOutcomeDisposition } from '../scripts/lib/review-execution-telemetry.js';
+import { runReviewCli } from '../scripts/run-review.js';
+import { runEntrypointInProcess } from './helpers/inProcessEntrypoint.js';
 
 const execFileAsync = promisify(execFile);
 const runReviewScript = join(process.cwd(), 'scripts', 'run-review.ts');
+const runReviewScriptDist = join(process.cwd(), 'dist', 'scripts', 'run-review.js');
 const createdSandboxes: string[] = [];
 const shellBinary = 'bash';
 const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
@@ -1288,7 +1292,27 @@ async function runReviewCommand(
   env: Record<string, string | undefined>,
   extraArgs: string[] = []
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const args = ['--loader', 'ts-node/esm', runReviewScript, ...extraArgs];
+  const args = [...extraArgs];
+  if (manifestPath) {
+    args.push('--manifest', manifestPath);
+  }
+  args.push('--non-interactive');
+  return await runEntrypointInProcess({
+    args,
+    env,
+    runner: runReviewCli
+  });
+}
+
+async function runReviewCommandSubprocess(
+  manifestPath: string | null,
+  env: Record<string, string | undefined>,
+  extraArgs: string[] = []
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const entryArgs = (await shouldUseFreshDist(runReviewScript, runReviewScriptDist))
+    ? [runReviewScriptDist, ...extraArgs]
+    : ['--loader', 'ts-node/esm', runReviewScript, ...extraArgs];
+  const args = [...entryArgs];
   if (manifestPath) {
     args.push('--manifest', manifestPath);
   }
@@ -1323,6 +1347,112 @@ async function runReviewCommand(
   }
 }
 
+async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
+  if (!existsSync(distEntry)) {
+    return false;
+  }
+
+  try {
+    const [distStats, newestSourceMtime] = await Promise.all([
+      stat(distEntry),
+      getNewestSourceMtimeForRoots([sourceEntry, join(dirname(sourceEntry), 'lib')])
+    ]);
+    return distStats.mtimeMs >= newestSourceMtime;
+  } catch {
+    return false;
+  }
+}
+
+async function getNewestSourceMtime(root: string): Promise<number> {
+  const rootStats = await stat(root);
+  if (!rootStats.isDirectory()) {
+    return rootStats.mtimeMs;
+  }
+
+  let newestMtime = rootStats.mtimeMs;
+  const entries = await readdir(root, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = join(root, entry.name);
+    if (entry.isDirectory()) {
+      newestMtime = Math.max(newestMtime, await getNewestSourceMtime(entryPath));
+      continue;
+    }
+    const entryStats = await stat(entryPath);
+    newestMtime = Math.max(newestMtime, entryStats.mtimeMs);
+  }
+  return newestMtime;
+}
+
+async function getNewestSourceMtimeForRoots(roots: string[]): Promise<number> {
+  const mtimes = await Promise.all(
+    roots.map(async (root) => {
+      try {
+        return await getNewestSourceMtime(root);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return 0;
+        }
+        throw error;
+      }
+    })
+  );
+  return Math.max(0, ...mtimes);
+}
+
+describe('shouldUseFreshDist', () => {
+  it('treats dist as stale when a newer source dependency exists under scripts/', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const scriptsRoot = join(tempRoot, 'scripts');
+    const helperPath = join(scriptsRoot, 'lib', 'helper.ts');
+    const sourceEntry = join(scriptsRoot, 'run-review.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(helperPath), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(sourceEntry, 'export {};\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+      await writeFile(helperPath, 'export {};\n', 'utf8');
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const helperAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(helperPath, helperAt, helperAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores newer sibling scripts outside the run-review surface', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const scriptsRoot = join(tempRoot, 'scripts');
+    const sourceEntry = join(scriptsRoot, 'run-review.ts');
+    const unrelatedSibling = join(scriptsRoot, 'other-script.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(scriptsRoot, { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(sourceEntry, 'export {};\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+      await writeFile(unrelatedSibling, 'export {};\n', 'utf8');
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const siblingAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(unrelatedSibling, siblingAt, siblingAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 afterEach(async () => {
   while (createdSandboxes.length > 0) {
     const dir = createdSandboxes.pop();
@@ -1337,7 +1467,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
-    const result = await runReviewCommand(manifestPath, baseEnv(sandbox, codexBin));
+    const result = await runReviewCommandSubprocess(manifestPath, baseEnv(sandbox, codexBin));
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('skipping diff budget (missing scripts/diff-budget.mjs');
@@ -1846,7 +1976,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
-    const result = await runReviewCommand(manifestPath, {
+    const result = await runReviewCommandSubprocess(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       RUN_REVIEW_MODE: 'heavy-hang',
       CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1',
