@@ -85,6 +85,21 @@ const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OV
 const SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 5_000;
 const SPAWN_MANIFEST_WAIT_INTERVAL_MS = 100;
 export const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
+const ALLOWED_REMOTE_PROVIDER_ENV_KEYS = [
+  'ALL_PROXY',
+  'HTTPS_PROXY',
+  'HTTP_PROXY',
+  'NODE_EXTRA_CA_CERTS',
+  'NO_PROXY',
+  'OPENAI_API_KEY',
+  'OPENAI_BASE_URL',
+  'OPENAI_ORGANIZATION',
+  'OPENAI_ORG_ID',
+  'OPENAI_PROJECT',
+  'OPENAI_PROJECT_ID',
+  'SSL_CERT_DIR',
+  'SSL_CERT_FILE'
+] as const;
 
 interface SpawnedRunManifestInfo {
   runId: string;
@@ -410,11 +425,7 @@ async function spawnBackgroundCliOverSsh(
   args: string[],
   envOverrides: Record<string, string> = {}
 ): Promise<void> {
-  const envValues = Object.fromEntries(
-    Object.entries({ ...process.env, ...envOverrides }).filter(
-      (entry): entry is [string, string] => typeof entry[1] === 'string'
-    )
-  );
+  const envValues = buildRemoteProviderEnvValues(process.env, envOverrides);
   const remoteCommand = buildRemoteProviderLaunchCommand({
     cwd: launchSpec.cwd,
     nodePath: resolveRemoteProviderNodePath(launchSpec.transport.host),
@@ -466,6 +477,24 @@ function buildRemoteProviderLaunchCommand(input: {
     ...input.args.map((value) => quoteShellArg(value))
   ].join(' ');
   return `cd ${quoteShellArg(input.cwd)} && exec env ${envAssignments.join(' ')} ${command}`;
+}
+
+function buildRemoteProviderEnvValues(
+  inheritedEnv: NodeJS.ProcessEnv,
+  envOverrides: Record<string, string> = {}
+): Record<string, string> {
+  const inheritedValues = Object.fromEntries(
+    ALLOWED_REMOTE_PROVIDER_ENV_KEYS.flatMap((key) => {
+      const value = inheritedEnv[key];
+      return typeof value === 'string' ? [[key, value] as const] : [];
+    })
+  );
+  return Object.fromEntries(
+    Object.entries({
+      ...inheritedValues,
+      ...envOverrides
+    }).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+  );
 }
 
 function quoteShellArg(value: string): string {
@@ -793,6 +822,7 @@ function resolveRemoteProviderNodePath(workerHost: ProviderWorkerHostConfig): st
 export const __test__ = {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
+  buildRemoteProviderEnvValues,
   buildRemoteProviderLaunchCommand,
   buildProviderLinearSourceEnvOverrides,
   buildProviderOverrideOwnershipEnv,

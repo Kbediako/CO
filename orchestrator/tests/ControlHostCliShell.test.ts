@@ -18,6 +18,7 @@ import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 const {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
+  buildRemoteProviderEnvValues,
   buildRemoteProviderLaunchCommand,
   buildProviderLinearSourceEnvOverrides,
   buildProviderOverrideOwnershipEnv,
@@ -198,6 +199,26 @@ describe('controlHostCliShell manifest discovery', () => {
         }
       })
     ).toContain("'node' '/repo/dist/bin/codex-orchestrator.js' 'start' 'provider-linear-worker'");
+  });
+
+  it('only forwards the bounded inherited env allowlist to remote worker launches', () => {
+    expect(
+      buildRemoteProviderEnvValues(
+        {
+          OPENAI_API_KEY: 'sk-test',
+          HTTPS_PROXY: 'https://proxy.internal:8443',
+          SSH_AUTH_SOCK: '/tmp/launchd.sock',
+          HOME: '/Users/kbediako'
+        },
+        {
+          CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task'
+        }
+      )
+    ).toEqual({
+      OPENAI_API_KEY: 'sk-test',
+      HTTPS_PROXY: 'https://proxy.internal:8443',
+      CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task'
+    });
   });
 
   it('prefers launch-time package-root overrides when stamping provider ownership markers', () => {
