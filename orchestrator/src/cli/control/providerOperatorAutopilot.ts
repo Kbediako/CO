@@ -485,10 +485,19 @@ async function maybeRunReviewHandoffRework(input: {
       if (reviewPromotion?.status !== 'action_required') {
         return [];
       }
+      const actionRequiredReasons = resolveReviewHandoffActionRequiredReasons(reviewPromotion);
+      const authorActionReasons = actionRequiredReasons.filter((reason) =>
+        isAuthorActionRequiredReason(
+          reason,
+          input.config.review_handoff_rework.excluded_action_required_reasons
+        )
+      );
       return [{
         claim,
         trackedIssue,
-        sortOrder: input.orderByIssueId.get(claim.issue_id) ?? Number.MAX_SAFE_INTEGER
+        sortOrder: input.orderByIssueId.get(claim.issue_id) ?? Number.MAX_SAFE_INTEGER,
+        actionRequiredReasons,
+        authorActionReasons
       }];
     })
     .sort((left, right) => {
@@ -497,16 +506,15 @@ async function maybeRunReviewHandoffRework(input: {
       }
       return left.claim.issue_identifier.localeCompare(right.claim.issue_identifier);
     });
-  const candidate = candidates[0] ?? null;
-  if (!candidate) {
+  const parkedCandidate = candidates[0] ?? null;
+  if (!parkedCandidate) {
     return { action: null, hold: null, failed: false, summary: '', error: null };
   }
-  const actionRequiredReasons = resolveReviewHandoffActionRequiredReasons(
-    candidate.claim.review_promotion ?? null
-  );
-  const authorActionReasons = actionRequiredReasons.filter((reason) =>
-    isAuthorActionRequiredReason(reason, input.config.review_handoff_rework.excluded_action_required_reasons)
-  );
+  const candidate =
+    candidates.find((candidateEntry) => candidateEntry.authorActionReasons.length > 0) ??
+    parkedCandidate;
+  const actionRequiredReasons = [...candidate.actionRequiredReasons];
+  const authorActionReasons = [...candidate.authorActionReasons];
   if (authorActionReasons.length === 0) {
     return {
       action: null,

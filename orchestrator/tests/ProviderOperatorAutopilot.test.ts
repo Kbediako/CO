@@ -531,6 +531,88 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('picks the first author-action-required handoff even when an earlier handoff is parked for review-only blockers', async () => {
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-119',
+        state: { id: 'rework', name: 'Rework', type: 'started' },
+        updated_at: '2026-04-09T10:06:00.000Z'
+      },
+      previous_state: { id: 'review', name: 'In Review', type: 'started' },
+      target_state: { id: 'rework', name: 'Rework', type: 'started' },
+      source_setup: null
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'In Review',
+            state_type: 'started'
+          }),
+          createTrackedIssue({
+            id: 'lin-issue-2',
+            identifier: 'CO-119',
+            state: 'In Review',
+            state_type: 'started',
+            created_at: '2026-04-09T09:05:00.000Z'
+          })
+        ],
+        claims: [
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            issue_state: 'In Review',
+            review_promotion: createReviewPromotion({
+              status: 'action_required',
+              action_required_reasons: ['review=REVIEW_REQUIRED']
+            })
+          }),
+          createClaim({
+            issue_id: 'lin-issue-2',
+            issue_identifier: 'CO-119',
+            issue_state: 'In Review',
+            issue_updated_at: '2026-04-09T09:05:00.000Z',
+            review_promotion: createReviewPromotion({
+              status: 'action_required',
+              action_required_reasons: ['review=CHANGES_REQUESTED', 'unresolved_threads=1']
+            })
+          })
+        ],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:06:00.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).toHaveBeenCalledWith({
+      issueId: 'lin-issue-2',
+      stateName: 'Rework',
+      sourceSetup: null,
+      env: expect.any(Object)
+    });
+    expect(result).toMatchObject({
+      status: 'acted',
+      actions: [
+        {
+          kind: 'review_handoff_rework',
+          issue_identifier: 'CO-119',
+          action_required_reasons: ['review=CHANGES_REQUESTED', 'unresolved_threads=1']
+        }
+      ],
+      holds: []
+    });
+  });
+
   it('moves closed unmerged review handoffs to Rework even when the snapshot reason list is empty', async () => {
     const transitionIssueState = vi.fn(async () => ({
       ok: true as const,
