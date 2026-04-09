@@ -11,7 +11,7 @@ const sdkModuleUrl = pathToFileURL(fileURLToPath(new URL('../src/orchestrator.ts
 
 describe('ExecClient artifact retention', () => {
   it('keeps compatibility artifact files available after awaiting result inline', async () => {
-    const script = `
+    await runGcProbe(`
       import { access } from 'node:fs/promises';
       import { setTimeout as delay } from 'node:timers/promises';
       import { ExecClient } from ${JSON.stringify(sdkModuleUrl)};
@@ -37,16 +37,55 @@ describe('ExecClient artifact retention', () => {
           \`compatibility artifact paths disappeared early: events=\${eventsPathExists} stderr=\${stderrPathExists}\`
         );
       }
-    `;
+    `);
+  }, 30_000);
 
-    await expect(
-      execFileAsync(
-        process.execPath,
-        ['--expose-gc', '--loader', 'ts-node/esm', '--input-type=module', '--eval', script],
-        { cwd: workspaceRoot }
-      )
-    ).resolves.toMatchObject({
-      stderr: expect.stringContaining('')
-    });
+  it('reclaims compatibility artifact files after the handle/result become unreachable', async () => {
+    await runGcProbe(`
+      import { access } from 'node:fs/promises';
+      import { setTimeout as delay } from 'node:timers/promises';
+      import { ExecClient } from ${JSON.stringify(sdkModuleUrl)};
+
+      const retainedArtifactPath = await (async () => {
+        const client = new ExecClient({
+          cliPath: ${JSON.stringify(cliBootstrapPath)},
+          cwd: ${JSON.stringify(workspaceRoot)}
+        });
+
+        const result = await client.run({
+          command: process.execPath,
+          args: ['-e', 'console.log("ok")']
+        }).result;
+
+        return result.eventsPath;
+      })();
+
+      let cleaned = false;
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        global.gc();
+        await delay(20);
+        const artifactStillExists = await access(retainedArtifactPath).then(() => true, () => false);
+        if (!artifactStillExists) {
+          cleaned = true;
+          break;
+        }
+      }
+
+      if (!cleaned) {
+        throw new Error('compatibility artifact path was not reclaimed after references were released');
+      }
+    `);
   }, 30_000);
 });
+
+async function runGcProbe(script: string): Promise<void> {
+  await expect(
+    execFileAsync(
+      process.execPath,
+      ['--expose-gc', '--loader', 'ts-node/esm', '--input-type=module', '--eval', script],
+      { cwd: workspaceRoot }
+    )
+  ).resolves.toMatchObject({
+    stderr: expect.stringContaining('')
+  });
+}

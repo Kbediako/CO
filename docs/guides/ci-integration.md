@@ -112,6 +112,6 @@ Notable behaviors:
 
 - `run.result` resolves to the parsed summary payload plus all intermediate events.
 - `run.retry(overrides)` reruns the same command (optionally overriding flags like `taskId` or `notify`).
-- Deprecated compatibility files at `result.eventsPath` and `result.stderrPath` remain available until `run.cleanupArtifacts()` (or process exit if you never call it).
+- Deprecated compatibility files at `result.eventsPath` and `result.stderrPath` remain available while the associated handle/result is still retained; call `run.cleanupArtifacts()` for deterministic cleanup.
 
 This combination allows CI jobs to trigger a command, stream logs for real-time visibility, and deterministically resume or retry using the manifest evidence captured by the CLI.
