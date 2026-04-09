@@ -684,6 +684,28 @@ function buildValidProviderConfig(
         title: `Provider worker ${version}`,
         guardrailsRequired: false,
         metadata: {
+          operator_autopilot: {
+            enabled: true,
+            backlog_promotion: {
+              enabled: true,
+              state_name: 'Backlog',
+              target_state_name: 'Ready'
+            },
+            review_handoff_rework: {
+              enabled: true,
+              target_state_name: 'Rework',
+              excluded_action_required_reasons: [
+                'draft',
+                'label:do-not-merge',
+                'review=REVIEW_REQUIRED',
+                'required_checks_query_failed'
+              ]
+            },
+            post_merge_rollout: {
+              enabled: true,
+              summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+            }
+          },
           terminal_cleanup: {
             enabled: true,
             close_attached_pr: {

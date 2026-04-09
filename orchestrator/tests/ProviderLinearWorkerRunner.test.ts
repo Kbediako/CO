@@ -433,6 +433,7 @@ async function appendStaySerialParallelizationDecisionAuditForRequest(
 }
 
 describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerTestTimeoutMs }, () => {
+describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerTestTimeoutMs }, () => {
   it('loads provider worker context from manifest-backed env', async () => {
     const { manifestPath } = await createManifestRoot();
 

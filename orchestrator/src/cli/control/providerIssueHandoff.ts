@@ -59,6 +59,13 @@ import {
   selectProviderWorkerHost
 } from './providerWorkerHosts.js';
 import {
+  appendProviderOperatorAutopilotAuditResult,
+  areProviderOperatorAutopilotResultsMeaningfullyEqual,
+  runProviderOperatorAutopilot,
+  type ProviderOperatorAutopilotConfig,
+  type ProviderOperatorAutopilotResult
+} from './providerOperatorAutopilot.js';
+import {
   runProviderTerminalCleanup,
   type ProviderTerminalCleanupConfig
 } from './providerTerminalCleanup.js';
@@ -267,6 +274,15 @@ export interface CreateProviderIssueHandoffServiceOptions {
     env?: NodeJS.ProcessEnv;
   }) => Promise<ProviderMergeCloseoutRecord>) | null;
   isProcessAlive?: ((pid: number) => boolean) | null;
+  runOperatorAutopilot?: ((input: {
+    tracked_issues: LiveLinearTrackedIssue[];
+    claims: ProviderIntakeClaimRecord[];
+    config: ProviderOperatorAutopilotConfig;
+    source_setup?: DispatchPilotSourceSetup | null;
+    env?: NodeJS.ProcessEnv;
+    previous_result?: ProviderOperatorAutopilotResult | null;
+  }) => Promise<ProviderOperatorAutopilotResult>) | null;
+  appendOperatorAutopilotAuditResult?: typeof appendProviderOperatorAutopilotAuditResult;
 }
 
 const RESUME_ELIGIBLE_STATUSES = new Set(['failed', 'cancelled']);
@@ -343,6 +359,9 @@ export function createProviderIssueHandoffService(
   const runReviewHandoffPromotion = options.runReviewHandoffPromotion ?? null;
   const runMergeCloseout = options.runMergeCloseout ?? null;
   const isProcessAlive = options.isProcessAlive ?? isLocalProcessAlive;
+  const runOperatorAutopilot = options.runOperatorAutopilot ?? runProviderOperatorAutopilot;
+  const appendOperatorAutopilotAuditResult =
+    options.appendOperatorAutopilotAuditResult ?? appendProviderOperatorAutopilotAuditResult;
   const retryQueue = createProviderIssueRetryQueue();
   const releaseCancelInFlight = new Map<
     string,
@@ -3995,8 +4014,13 @@ export function createProviderIssueHandoffService(
           return;
         }
 
+        const dispatchTrackedIssues = await maybeRunProviderOperatorAutopilotCycle({
+          pollInput,
+          sourceSetup: resolveMergeCloseoutSourceSetup()
+        });
+
         assertRefreshCycleNotStuck();
-        let freshDiscoveryTrackedIssues = pollInput.trackedIssues;
+        let freshDiscoveryTrackedIssues = dispatchTrackedIssues;
         if (
           pollInput.deferFreshDiscovery === true &&
           freshDiscoveryTrackedIssues.length === 0 &&
@@ -4052,6 +4076,111 @@ export function createProviderIssueHandoffService(
         }
       });
     });
+  };
+
+  const maybeRunProviderOperatorAutopilotCycle = async (input: {
+    pollInput: ProviderIssueHandoffPollInput;
+    sourceSetup: DispatchPilotSourceSetup | null;
+  }): Promise<LiveLinearTrackedIssue[]> => {
+    const fallbackTrackedIssues = input.pollInput.trackedIssues;
+    if (!options.providerWorkflowConfigStore || !runOperatorAutopilot) {
+      return fallbackTrackedIssues;
+    }
+    let providerWorkflow: Awaited<ReturnType<ProviderWorkflowConfigStore['refresh']>>;
+    try {
+      providerWorkflow = await options.providerWorkflowConfigStore.refresh();
+    } catch (error) {
+      logger.warn(
+        `[provider-operator-autopilot] Failed to refresh provider workflow config: ${
+          (error as Error)?.message ?? String(error)
+        }`
+      );
+      return fallbackTrackedIssues;
+    }
+    const autopilotConfig = resolveProviderOperatorAutopilotConfigFromPayload(providerWorkflow);
+    if (!autopilotConfig) {
+      return fallbackTrackedIssues;
+    }
+    const previousResult = providerWorkflow.operator_autopilot?.last_result ?? null;
+    let nextResult: ProviderOperatorAutopilotResult;
+    let loggedAutopilotFailure = false;
+    try {
+      nextResult = await runOperatorAutopilot({
+        tracked_issues: input.pollInput.trackedIssues,
+        claims: options.state.claims,
+        config: autopilotConfig,
+        source_setup: input.sourceSetup,
+        env: process.env,
+        previous_result: previousResult
+      });
+    } catch (error) {
+      const message = (error as Error)?.message ?? String(error);
+      nextResult = {
+        recorded_at: isoTimestamp(),
+        status: 'failed',
+        summary: 'Operator autopilot evaluation failed.',
+        error: message,
+        actions: [],
+        holds: [],
+        pending_actions:
+          providerWorkflow.operator_autopilot?.post_merge_rollout.enabled
+            ? (previousResult?.pending_actions.map((pendingAction) => ({ ...pendingAction })) ?? [])
+            : []
+      };
+      loggedAutopilotFailure = true;
+      logger.warn(`[provider-operator-autopilot] ${nextResult.summary} error=${message}`);
+    }
+    const resultChanged = !areProviderOperatorAutopilotResultsMeaningfullyEqual(
+      previousResult,
+      nextResult
+    );
+    if (providerWorkflow.operator_autopilot?.audit_path && resultChanged) {
+      try {
+        await appendOperatorAutopilotAuditResult(
+          providerWorkflow.operator_autopilot.audit_path,
+          nextResult
+        );
+      } catch (error) {
+        logger.warn(
+          `[provider-operator-autopilot] Failed to append audit result path=${
+            providerWorkflow.operator_autopilot.audit_path
+          }: ${(error as Error)?.message ?? String(error)}`
+        );
+      }
+    }
+    if (resultChanged) {
+      options.providerWorkflowConfigStore.recordOperatorAutopilotResult(nextResult);
+    }
+    if (resultChanged && nextResult.status === 'failed' && !loggedAutopilotFailure) {
+      logger.warn(
+        `[provider-operator-autopilot] ${nextResult.summary} error=${nextResult.error ?? 'unknown'}`
+      );
+    }
+    if (
+      !nextResult.actions.some(
+        (action) =>
+          action.transition.status === 'transitioned' || action.transition.status === 'noop'
+      ) ||
+      !input.pollInput.refetchTrackedIssues
+    ) {
+      return fallbackTrackedIssues;
+    }
+    try {
+      const resolution = await input.pollInput.refetchTrackedIssues();
+      if (resolution.kind === 'ready') {
+        return resolution.trackedIssues;
+      }
+      logger.warn(
+        '[provider-operator-autopilot] Tracked-issue refetch skipped after autopilot action; dispatch continues with the pre-transition poll snapshot.'
+      );
+    } catch (error) {
+      logger.warn(
+        `[provider-operator-autopilot] Failed to refetch tracked issues after autopilot action: ${
+          (error as Error)?.message ?? String(error)
+        }`
+      );
+    }
+    return fallbackTrackedIssues;
   };
 
   providerIssueHandoffService = {
@@ -4629,6 +4758,52 @@ function resolveProviderTerminalCleanupConfigFromPayload(
     closeAttachedPr: {
       enabled: terminalCleanup.close_attached_pr.enabled,
       commentTemplate: terminalCleanup.close_attached_pr.comment_template
+    }
+  };
+}
+
+function resolveProviderOperatorAutopilotConfigFromPayload(
+  providerWorkflow: {
+    operator_autopilot?: {
+      enabled: boolean;
+      backlog_promotion: {
+        enabled: boolean;
+        state_name: string;
+        target_state_name: string;
+      };
+      review_handoff_rework: {
+        enabled: boolean;
+        target_state_name: string;
+        excluded_action_required_reasons: string[];
+      };
+      post_merge_rollout: {
+        enabled: boolean;
+        summary: string;
+      };
+    } | null;
+  } | null
+): ProviderOperatorAutopilotConfig | null {
+  const operatorAutopilot = providerWorkflow?.operator_autopilot ?? null;
+  if (!operatorAutopilot) {
+    return null;
+  }
+  return {
+    enabled: operatorAutopilot.enabled,
+    backlog_promotion: {
+      enabled: operatorAutopilot.backlog_promotion.enabled,
+      state_name: operatorAutopilot.backlog_promotion.state_name,
+      target_state_name: operatorAutopilot.backlog_promotion.target_state_name
+    },
+    review_handoff_rework: {
+      enabled: operatorAutopilot.review_handoff_rework.enabled,
+      target_state_name: operatorAutopilot.review_handoff_rework.target_state_name,
+      excluded_action_required_reasons: [
+        ...operatorAutopilot.review_handoff_rework.excluded_action_required_reasons
+      ]
+    },
+    post_merge_rollout: {
+      enabled: operatorAutopilot.post_merge_rollout.enabled,
+      summary: operatorAutopilot.post_merge_rollout.summary
     }
   };
 }
