@@ -375,7 +375,7 @@ async function main() {
 
   const taskLinkedDocs = new Set();
   const taskCandidates = [];
-  const reportOnlyRetentionCandidates = new Map();
+  const reportOnlyRetentionEligibility = new Map();
 
   for (const item of items) {
     const taskKey = normalizeTaskKey(item);
@@ -423,24 +423,40 @@ async function main() {
     }
 
     const completedDate = parseIsoDate(item.completed_at);
-    if (!completedDate || !isCompletedTaskItem(item)) {
+    const isTerminalTask = isCompletedTaskItem(item);
+    const numericTaskId = extractNumericTaskId(taskKey);
+    if (numericTaskId) {
+      const existingEligibility = reportOnlyRetentionEligibility.get(numericTaskId) ?? {
+        candidate: null,
+        hasNonTerminalItem: false
+      };
+      if (!isTerminalTask) {
+        existingEligibility.hasNonTerminalItem = true;
+      } else if (completedDate) {
+        const ageDays = computeAgeInDays(completedDate, today);
+        if (ageDays >= policy.retainDays) {
+          const nextCandidate = {
+            taskId: numericTaskId,
+            taskKey,
+            completedAt: formatDate(completedDate),
+            ageDays
+          };
+          if (
+            !existingEligibility.candidate ||
+            existingEligibility.candidate.completedAt < nextCandidate.completedAt
+          ) {
+            existingEligibility.candidate = nextCandidate;
+          }
+        }
+      }
+      reportOnlyRetentionEligibility.set(numericTaskId, existingEligibility);
+    }
+
+    if (!completedDate || !isTerminalTask) {
       continue;
     }
 
     const ageDays = computeAgeInDays(completedDate, today);
-    const numericTaskId = extractNumericTaskId(taskKey);
-    if (numericTaskId && ageDays >= policy.retainDays) {
-      const existingCandidate = reportOnlyRetentionCandidates.get(numericTaskId);
-      const nextCandidate = {
-        taskId: numericTaskId,
-        taskKey,
-        completedAt: formatDate(completedDate),
-        ageDays
-      };
-      if (!existingCandidate || existingCandidate.completedAt < nextCandidate.completedAt) {
-        reportOnlyRetentionCandidates.set(numericTaskId, nextCandidate);
-      }
-    }
     for (const pathValue of docPaths) {
       if (excludeSet.has(pathValue)) {
         continue;
@@ -465,6 +481,11 @@ async function main() {
   }
 
   const allDocs = await collectDocFiles(repoRoot);
+  const reportOnlyRetentionCandidates = new Map(
+    Array.from(reportOnlyRetentionEligibility.entries())
+      .filter(([, eligibility]) => !eligibility.hasNonTerminalItem && eligibility.candidate)
+      .map(([taskId, eligibility]) => [taskId, eligibility.candidate])
+  );
   const reportOnlyFindingsByTaskId = new Map();
   for (const docPath of allDocs) {
     const match = docPath.match(REPORT_ONLY_FINDINGS_PATTERN);
