@@ -69,6 +69,7 @@ import {
   normalizeProviderLinearChildLanePathSelectors,
   type ProviderLinearChildLanePathSelector
 } from './providerLinearChildLanePhaseContract.js';
+import { resolveCodexOrchestratorBootstrapInvocation } from './utils/packageProgramResolver.js';
 
 export const PROVIDER_LINEAR_WORKER_PROOF_FILENAME = 'provider-linear-worker-proof.json';
 export const PROVIDER_LINEAR_WORKER_AUDIT_FILENAME = 'provider-linear-worker-linear-audit.jsonl';
@@ -4295,13 +4296,14 @@ export async function runProviderLinearWorker(
   }
 }
 
-function resolveProviderLinearHelperCommand(env: NodeJS.ProcessEnv): string {
-  const packageRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_PACKAGE_ROOT);
+export function resolveProviderLinearHelperCommand(env: NodeJS.ProcessEnv): string {
   const nodeBin = normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? 'node';
-  if (!packageRoot) {
-    return 'codex-orchestrator linear';
-  }
-  return `"${nodeBin}" "${join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js')}" linear`;
+  const invocation = resolveCodexOrchestratorBootstrapInvocation({ env, execPath: nodeBin });
+  return [...[invocation.command, ...invocation.args].map(quoteShellArg), 'linear'].join(' ');
+}
+
+function quoteShellArg(value: string): string {
+  return `"${value.replace(/(["\\$`])/gu, '\\$1')}"`;
 }
 
 async function main(): Promise<void> {
