@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260409-linear-54387f04-30aa-436a-9901-690c0e9cfcee",
+      "title": "CO: Reduce Core Lane wall time by shrinking subprocess-heavy CLI and review suites without lowering validation coverage",
+      "relates_to": "tasks/tasks-linear-54387f04-30aa-436a-9901-690c0e9cfcee.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-54387f04-30aa-436a-9901-690c0e9cfcee-co-114-docs-review/cli/2026-04-09T04-29-36-631Z-60ef7624/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-54387f04-30aa-436a-9901-690c0e9cfcee.md",
+        "task": "tasks/tasks-linear-54387f04-30aa-436a-9901-690c0e9cfcee.md",
+        "agent_task": ".agent/task/linear-54387f04-30aa-436a-9901-690c0e9cfcee.md",
+        "docs": "docs/TECH_SPEC-linear-54387f04-30aa-436a-9901-690c0e9cfcee.md"
+      }
+    },
+    {
       "id": "20260409-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d",
       "title": "CO: Fix launchd-supervised control-host child runtime PATH so provider-worker launches resolve node and appserver/login probes truthfully",
       "relates_to": "tasks/tasks-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md",
