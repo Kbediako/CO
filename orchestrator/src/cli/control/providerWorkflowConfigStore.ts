@@ -14,6 +14,10 @@ import {
   resolveProviderTerminalCleanupConfig,
   type ProviderTerminalCleanupResult
 } from './providerTerminalCleanup.js';
+import {
+  cloneProviderWorkerHostConfigs,
+  resolveProviderWorkerHostConfig
+} from './providerWorkerHosts.js';
 import type {
   ControlProviderTerminalCleanupLastResultPayload,
   ControlProviderWorkflowPayload
@@ -60,7 +64,8 @@ export function createProviderWorkflowConfigStore(
     last_success_at: null,
     last_error_at: null,
     last_error: null,
-    terminal_cleanup: buildDefaultTerminalCleanupPayload()
+    terminal_cleanup: buildDefaultTerminalCleanupPayload(),
+    worker_hosts: []
   };
 
   async function snapshotIsUsable(path: string | null): Promise<boolean> {
@@ -186,7 +191,8 @@ export function createProviderWorkflowConfigStore(
         terminal_cleanup: buildTerminalCleanupPayload(
           pipeline.metadata,
           state.terminal_cleanup?.last_result ?? null
-        )
+        ),
+        worker_hosts: buildWorkerHostsPayload(pipeline.metadata)
       };
       if (!reloadOptions.startup && previousStatus === 'reload_failed') {
         logger.info(
@@ -221,7 +227,8 @@ export function createProviderWorkflowConfigStore(
           terminal_cleanup: buildTerminalCleanupPayload(
             pipeline.metadata,
             state.terminal_cleanup?.last_result ?? null
-          )
+          ),
+          worker_hosts: buildWorkerHostsPayload(pipeline.metadata)
         };
         return state;
       }
@@ -347,4 +354,8 @@ function cloneTerminalCleanupLastResult(
     matching_open_pr_urls: [...result.matching_open_pr_urls],
     closed_pr_urls: [...result.closed_pr_urls]
   };
+}
+
+function buildWorkerHostsPayload(metadata: unknown): ControlProviderWorkflowPayload['worker_hosts'] {
+  return cloneProviderWorkerHostConfigs(resolveProviderWorkerHostConfig(metadata));
 }

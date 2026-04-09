@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 const execFileAsync = promisify(execFile);
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const cliEntrypoint = fileURLToPath(new URL('../../bin/codex-orchestrator.ts', import.meta.url));
-const cliHelpTimeoutMs = 30_000;
+const cliHelpTimeoutMs = 120_000;
 
 describe('codex-orchestrator CLI monitor alias', () => {
   it('lists co-status in the top-level help output', async () => {

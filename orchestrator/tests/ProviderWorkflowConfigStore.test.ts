@@ -239,6 +239,56 @@ describe('providerWorkflowConfigStore', () => {
     expect(store.snapshot().terminal_cleanup?.last_result?.status).toBe('failed');
   });
 
+  it('loads optional worker-host inventory metadata into the provider workflow snapshot', async () => {
+    await writeRepoConfig(
+      buildValidProviderConfig('v1', {
+        worker_hosts: {
+          hosts: [
+            {
+              name: 'worker-host-01',
+              transport: 'ssh',
+              ssh_destination: 'codex@worker-host-01',
+              ssh_options: ['-p', '2222'],
+              max_concurrent_agents: 2,
+              node_path: '/opt/homebrew/bin/node'
+            },
+            {
+              name: 'worker-host-02',
+              ssh_destination: 'codex@worker-host-02',
+              max_concurrent_agents: 1
+            }
+          ]
+        }
+      })
+    );
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    const bootstrapped = await store.bootstrap();
+
+    expect(bootstrapped.worker_hosts).toEqual([
+      {
+        name: 'worker-host-01',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-01',
+        ssh_options: ['-p', '2222'],
+        max_concurrent_agents: 2,
+        node_path: '/opt/homebrew/bin/node'
+      },
+      {
+        name: 'worker-host-02',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-02',
+        ssh_options: [],
+        max_concurrent_agents: 1,
+        node_path: null
+      }
+    ]);
+  });
+
   it('retries a failed revision when the config is repaired without metadata change', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const store = createProviderWorkflowConfigStore({
@@ -522,7 +572,10 @@ function getRepoConfigPath(): string {
   return join(workspaceRoot, 'codex.orchestrator.json');
 }
 
-function buildValidProviderConfig(version: string): Record<string, unknown> {
+function buildValidProviderConfig(
+  version: string,
+  metadataOverrides: Record<string, unknown> = {}
+): Record<string, unknown> {
   return {
     defaultPipeline: 'provider-linear-worker',
     pipelines: [
@@ -538,7 +591,8 @@ function buildValidProviderConfig(version: string): Record<string, unknown> {
               comment_template:
                 'Closing because the Linear issue for branch {{branch}} entered a terminal state without merge.'
             }
-          }
+          },
+          ...metadataOverrides
         },
         stages: [
           {

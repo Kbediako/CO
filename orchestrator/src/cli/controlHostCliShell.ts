@@ -67,6 +67,12 @@ import {
   type ProviderWorkflowConfigStore
 } from './control/providerWorkflowConfigStore.js';
 import {
+  findProviderWorkerHost,
+  normalizeProviderWorkerHostName,
+  PROVIDER_WORKER_HOST_ENV_KEY,
+  type ProviderWorkerHostConfig
+} from './control/providerWorkerHosts.js';
+import {
   shouldEnableControlStatusDashboard,
   startControlStatusDashboard,
   type ControlStatusDashboardHandle
@@ -97,7 +103,24 @@ interface SpawnManifestCorrelation {
 interface ProviderLaunchSpec {
   cwd: string;
   envOverrides: Record<string, string>;
+  transport: ProviderLaunchTransport;
 }
+
+type ProviderLaunchTransport =
+  | {
+      kind: 'local';
+    }
+  | {
+      kind: 'ssh';
+      host: ProviderWorkerHostConfig;
+    };
+
+type ProviderSshLaunchSpec = ProviderLaunchSpec & {
+  transport: {
+    kind: 'ssh';
+    host: ProviderWorkerHostConfig;
+  };
+};
 
 interface ProviderLinearSourceScope {
   provider: 'linear';
@@ -211,10 +234,11 @@ export async function runControlHostCliShell(
             const launchSpec = await resolveProviderStartLaunchSpec(
               env,
               input.taskId,
+              input.workerHost ?? null,
               providerWorkflowConfigStore
             );
             return await spawnBackgroundCliAndWaitForManifest(
-              launchSpec.cwd,
+              launchSpec,
               cliEntrypoint,
               [
                 'start',
@@ -256,7 +280,7 @@ export async function runControlHostCliShell(
               input.runId,
               providerWorkflowConfigStore
             );
-            await spawnBackgroundCli(launchSpec.cwd, cliEntrypoint, [
+            await spawnBackgroundCli(launchSpec, cliEntrypoint, [
               'resume',
               '--run',
               input.runId,
@@ -333,7 +357,7 @@ export async function runControlHostCliShell(
 }
 
 async function spawnBackgroundCliAndWaitForManifest(
-  cwd: string,
+  launchSpec: ProviderLaunchSpec,
   cliEntrypoint: string,
   args: string[],
   taskRunsRoot: string,
@@ -342,7 +366,7 @@ async function spawnBackgroundCliAndWaitForManifest(
   correlation: SpawnManifestCorrelation | null = null
 ): Promise<SpawnedRunManifestInfo | null> {
   const baselineRuns = await snapshotRunManifests(taskRunsRoot);
-  await spawnBackgroundCli(cwd, cliEntrypoint, args, envOverrides);
+  await spawnBackgroundCli(launchSpec, cliEntrypoint, args, envOverrides);
   return await pollForSpawnManifest({
     taskRunsRoot,
     taskId,
@@ -354,14 +378,18 @@ async function spawnBackgroundCliAndWaitForManifest(
 }
 
 async function spawnBackgroundCli(
-  cwd: string,
+  launchSpec: ProviderLaunchSpec,
   cliEntrypoint: string,
   args: string[],
   envOverrides: Record<string, string> = {}
 ): Promise<void> {
+  if (isProviderSshLaunchSpec(launchSpec)) {
+    await spawnBackgroundCliOverSsh(launchSpec, cliEntrypoint, args, envOverrides);
+    return;
+  }
   await new Promise<void>((resolve, reject) => {
     const child = spawn(process.execPath, [...process.execArgv, cliEntrypoint, ...args], {
-      cwd,
+      cwd: launchSpec.cwd,
       env: { ...process.env, ...envOverrides },
       detached: true,
       stdio: 'ignore'
@@ -374,6 +402,74 @@ async function spawnBackgroundCli(
       resolve();
     });
   });
+}
+
+async function spawnBackgroundCliOverSsh(
+  launchSpec: ProviderSshLaunchSpec,
+  cliEntrypoint: string,
+  args: string[],
+  envOverrides: Record<string, string> = {}
+): Promise<void> {
+  const envValues = Object.fromEntries(
+    Object.entries({ ...process.env, ...envOverrides }).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string'
+    )
+  );
+  const remoteCommand = buildRemoteProviderLaunchCommand({
+    cwd: launchSpec.cwd,
+    nodePath: launchSpec.transport.host.node_path ?? process.execPath,
+    cliEntrypoint,
+    args,
+    envValues
+  });
+  const sshArgs = [
+    '-o',
+    'BatchMode=yes',
+    ...launchSpec.transport.host.ssh_options,
+    launchSpec.transport.host.ssh_destination,
+    remoteCommand
+  ];
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('ssh', sshArgs, {
+      cwd: launchSpec.cwd,
+      detached: true,
+      stdio: 'ignore'
+    });
+    const onError = (error: Error) => reject(error);
+    child.once('error', onError);
+    child.once('spawn', () => {
+      child.off('error', onError);
+      child.unref();
+      resolve();
+    });
+  });
+}
+
+function isProviderSshLaunchSpec(launchSpec: ProviderLaunchSpec): launchSpec is ProviderSshLaunchSpec {
+  return launchSpec.transport.kind === 'ssh';
+}
+
+function buildRemoteProviderLaunchCommand(input: {
+  cwd: string;
+  nodePath: string;
+  cliEntrypoint: string;
+  args: string[];
+  envValues: Record<string, string>;
+}): string {
+  const envAssignments = Object.entries(input.envValues)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${quoteShellArg(value)}`);
+  const command = [
+    quoteShellArg(input.nodePath),
+    ...process.execArgv.map((value) => quoteShellArg(value)),
+    quoteShellArg(input.cliEntrypoint),
+    ...input.args.map((value) => quoteShellArg(value))
+  ].join(' ');
+  return `cd ${quoteShellArg(input.cwd)} && exec env ${envAssignments.join(' ')} ${command}`;
+}
+
+function quoteShellArg(value: string): string {
+  return `'${value.replace(/'/gu, `'\\''`)}'`;
 }
 
 function buildProviderOverrideOwnershipEnv(
@@ -510,11 +606,17 @@ async function findSpawnManifest(params: {
 async function resolveProviderStartLaunchSpec(
   env: EnvironmentPaths,
   taskId: string,
+  workerHost: string | null,
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore
 ): Promise<ProviderLaunchSpec> {
   const workspacePath = await ensureProviderWorkspace(env.repoRoot, taskId);
   const configPath = await resolveProviderLaunchConfigPath(env, providerWorkflowConfigStore);
-  return buildProviderLaunchSpec(env, workspacePath, configPath);
+  return buildProviderLaunchSpec(
+    env,
+    workspacePath,
+    configPath,
+    resolveConfiguredProviderWorkerHost(providerWorkflowConfigStore, workerHost)
+  );
 }
 
 async function resolveProviderResumeLaunchSpec(
@@ -537,12 +639,28 @@ async function resolveProviderResumeLaunchSpec(
     manifest as unknown as Record<string, unknown>
   );
   const configPath = await resolveProviderLaunchConfigPath(env, providerWorkflowConfigStore);
-  const launchSpec = buildProviderLaunchSpec(env, workspacePath, configPath);
+  const persistedProofContext = await readProviderLinearLaunchContextFromProof(paths.runDir);
+  const launchSpec = buildProviderLaunchSpec(
+    env,
+    workspacePath,
+    configPath,
+    resolveConfiguredProviderWorkerHost(
+      providerWorkflowConfigStore,
+      persistedProofContext?.workerHost ?? null
+    )
+  );
   return {
     ...launchSpec,
     envOverrides: {
       ...launchSpec.envOverrides,
-      ...(await resolveProviderResumeLinearSourceEnvOverrides(paths.runDir))
+      ...buildProviderLinearSourceEnvOverrides(
+        persistedProofContext?.sourceScope ?? {
+          provider: 'linear',
+          workspaceId: null,
+          teamId: null,
+          projectId: null
+        }
+      )
     }
   };
 }
@@ -571,7 +689,8 @@ function buildProviderLinearSourceEnvOverrides(input: ProviderLinearSourceScope)
 function buildProviderLaunchSpec(
   env: EnvironmentPaths,
   workspacePath: string,
-  repoConfigPath: string
+  repoConfigPath: string,
+  workerHost: ProviderWorkerHostConfig | null = null
 ): ProviderLaunchSpec {
   return {
     cwd: workspacePath,
@@ -580,8 +699,17 @@ function buildProviderLaunchSpec(
       CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
       CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
       [REPO_CONFIG_PATH_ENV_KEY]: repoConfigPath,
-      [REPO_CONFIG_REQUIRED_ENV_KEY]: '1'
-    }
+      [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+      ...(workerHost ? { [PROVIDER_WORKER_HOST_ENV_KEY]: workerHost.name } : {})
+    },
+    transport: workerHost
+      ? {
+          kind: 'ssh',
+          host: workerHost
+        }
+      : {
+          kind: 'local'
+        }
   };
 }
 
@@ -594,46 +722,67 @@ function shouldReleaseTrackedIssueClaim(reason: string): boolean {
   );
 }
 
-async function resolveProviderResumeLinearSourceEnvOverrides(runDir: string): Promise<Record<string, string>> {
-  const sourceScope = await readProviderLinearSourceScopeFromProof(runDir);
-  return buildProviderLinearSourceEnvOverrides(
-    sourceScope ?? {
-      provider: 'linear',
-      workspaceId: null,
-      teamId: null,
-      projectId: null
-    }
-  );
-}
-
-async function readProviderLinearSourceScopeFromProof(
-  runDir: string
-): Promise<ProviderLinearSourceScope | null> {
+async function readProviderLinearLaunchContextFromProof(runDir: string): Promise<{
+  sourceScope: ProviderLinearSourceScope | null;
+  workerHost: string | null;
+} | null> {
   try {
     const raw = await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8');
     const parsed = JSON.parse(raw) as unknown;
-    return parseProviderLinearSourceScopeFromProof(parsed);
+    return parseProviderLinearLaunchContextFromProof(parsed);
   } catch {
     return null;
   }
 }
 
-function parseProviderLinearSourceScopeFromProof(input: unknown): ProviderLinearSourceScope | null {
-  if (!isRecord(input) || !isRecord(input.source_setup) || input.source_setup.provider !== 'linear') {
+function parseProviderLinearLaunchContextFromProof(input: unknown): {
+  sourceScope: ProviderLinearSourceScope | null;
+  workerHost: string | null;
+} | null {
+  if (!isRecord(input)) {
     return null;
   }
+  const sourceSetup = isRecord(input.source_setup) && input.source_setup.provider === 'linear'
+    ? input.source_setup
+    : null;
   return {
-    provider: 'linear',
-    workspaceId:
-      typeof input.source_setup.workspace_id === 'string' ? input.source_setup.workspace_id : null,
-    teamId: typeof input.source_setup.team_id === 'string' ? input.source_setup.team_id : null,
-    projectId: typeof input.source_setup.project_id === 'string' ? input.source_setup.project_id : null
+    sourceScope: sourceSetup
+      ? {
+          provider: 'linear',
+          workspaceId:
+            typeof sourceSetup.workspace_id === 'string' ? sourceSetup.workspace_id : null,
+          teamId: typeof sourceSetup.team_id === 'string' ? sourceSetup.team_id : null,
+          projectId: typeof sourceSetup.project_id === 'string' ? sourceSetup.project_id : null
+        }
+      : null,
+    workerHost: normalizeProviderWorkerHostName(input.worker_host)
   };
+}
+
+function resolveConfiguredProviderWorkerHost(
+  providerWorkflowConfigStore: ProviderWorkflowConfigStore | undefined,
+  workerHost: string | null
+): ProviderWorkerHostConfig | null {
+  const normalizedWorkerHost = normalizeProviderWorkerHostName(workerHost);
+  if (!normalizedWorkerHost) {
+    return null;
+  }
+  const configuredHost = findProviderWorkerHost(
+    providerWorkflowConfigStore?.snapshot().worker_hosts ?? [],
+    normalizedWorkerHost
+  );
+  if (!configuredHost) {
+    throw new Error(
+      `Configured provider worker host "${normalizedWorkerHost}" is unavailable in the current provider workflow snapshot.`
+    );
+  }
+  return configuredHost;
 }
 
 export const __test__ = {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
+  buildRemoteProviderLaunchCommand,
   buildProviderLinearSourceEnvOverrides,
   buildProviderOverrideOwnershipEnv,
   beginProviderIssueHandoffStartupRefresh,

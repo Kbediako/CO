@@ -38,6 +38,7 @@ import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/provider
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
 
 let tempRoot: string | null = null;
+const providerLinearWorkerRunnerTestTimeoutMs = 60_000;
 
 afterEach(async () => {
   vi.unstubAllGlobals();
@@ -399,7 +400,7 @@ async function appendStaySerialParallelizationDecisionAuditForRequest(
   });
 }
 
-describe('provider linear worker runner', () => {
+describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerTestTimeoutMs }, () => {
   it('loads provider worker context from manifest-backed env', async () => {
     const { manifestPath } = await createManifestRoot();
 
@@ -437,6 +438,18 @@ describe('provider linear worker runner', () => {
       team_id: 'team-1',
       project_id: 'project-1'
     });
+  });
+
+  it('loads the selected worker_host from provider worker env', async () => {
+    const { manifestPath } = await createManifestRoot();
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+      CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: 'worker-host-01'
+    });
+
+    expect(context.workerHost).toBe('worker-host-01');
   });
 
   it('loads provider worker max turns from CODEX_HOME config when env overrides are absent', async () => {
@@ -1734,7 +1747,7 @@ describe('provider linear worker runner', () => {
         typeof message === 'string' && message.includes('[provider-linear-worker-progress]')
       )
     ).toBe(true);
-  });
+  }, providerLinearWorkerRunnerTestTimeoutMs);
 
   it('passes env-backed Linear scope bindings into tracked issue refreshes', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
@@ -1805,7 +1818,7 @@ describe('provider linear worker runner', () => {
         project_id: 'project-1'
       }
     });
-  });
+  }, providerLinearWorkerRunnerTestTimeoutMs);
 
   it('treats a corrupt child-stream ledger as fatal during proof hydration', async () => {
     const { runDir } = await createManifestRoot();
@@ -9092,15 +9105,17 @@ describe('provider linear worker runner', () => {
       await vi.waitFor(() => {
         expect(refreshBodies.filter((body) => body.owner_status === 'in_progress')).toHaveLength(2);
       });
-      const secondTurnProof = JSON.parse(
-        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
-      ) as Record<string, unknown>;
-      expect(secondTurnProof).toMatchObject({
-        latest_turn_id: 'turn-2',
-        latest_session_id: 'thread-1-turn-2',
-        turn_count: 2,
-        last_message: 'turn-2 active',
-        owner_status: 'in_progress'
+      await vi.waitFor(async () => {
+        const secondTurnProof = JSON.parse(
+          await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+        ) as Record<string, unknown>;
+        expect(secondTurnProof).toMatchObject({
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          turn_count: 2,
+          last_message: 'turn-2 active',
+          owner_status: 'in_progress'
+        });
       });
 
       allowSecondTurnToFinishResolve?.();

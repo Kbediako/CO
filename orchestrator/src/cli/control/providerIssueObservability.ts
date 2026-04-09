@@ -9,6 +9,7 @@ import {
   classifyProviderLinearWorkflowState,
   normalizeProviderLinearWorkflowState
 } from './providerLinearWorkflowStates.js';
+import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
 
 const PROVIDER_SEMANTIC_STALL_THRESHOLD_MS = 15 * 60 * 1000;
 
@@ -91,6 +92,7 @@ interface ProviderIssueClaimLike {
   reason?: string | null;
   updated_at?: string | null;
   run_id?: string | null;
+  worker_host?: string | null;
   launch_source?: string | null;
   launch_started_at?: string | null;
   issue_state?: string | null;
@@ -183,6 +185,7 @@ interface ProviderIssueProofLike {
   current_turn_started_at?: string | null;
   issue_id?: string | null;
   pid?: string | null;
+  worker_host?: string | null;
   thread_id?: string | null;
   latest_session_id?: string | null;
   turn_count?: number | null;
@@ -212,6 +215,7 @@ export interface ControlProviderDebugSnapshot {
     reason: string | null;
     updated_at: string | null;
     run_id: string | null;
+    worker_host?: string | null;
     launch_source: string | null;
     launch_started_at: string | null;
     freshness: ProviderIntakeClaimFreshness | null;
@@ -222,6 +226,7 @@ export interface ControlProviderDebugSnapshot {
     owner_phase: string | null;
     owner_status: string | null;
     pid: string | null;
+    worker_host?: string | null;
     thread_id: string | null;
     latest_session_id: string | null;
     turn_count: number | null;
@@ -357,6 +362,7 @@ export function buildProviderIssueDebugSnapshot(input: {
           reason: normalizeOptionalString(claim.reason),
           updated_at: normalizeOptionalString(claim.updated_at),
           run_id: normalizeOptionalString(claim.run_id),
+          worker_host: normalizeProviderWorkerHostName(claim.worker_host),
           launch_source: normalizeOptionalString(claim.launch_source),
           launch_started_at: normalizeOptionalString(claim.launch_started_at),
           freshness: claimFreshness,
@@ -369,6 +375,7 @@ export function buildProviderIssueDebugSnapshot(input: {
           owner_phase: normalizeOptionalString(proof.owner_phase),
           owner_status: normalizeOptionalString(proof.owner_status),
           pid: normalizeOptionalString(proof.pid),
+          worker_host: normalizeProviderWorkerHostName(proof.worker_host),
           thread_id: normalizeOptionalString(proof.thread_id),
           latest_session_id: normalizeOptionalString(proof.latest_session_id),
           turn_count: normalizeOptionalInteger(proof.turn_count),

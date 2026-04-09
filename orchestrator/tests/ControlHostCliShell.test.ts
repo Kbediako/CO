@@ -10,6 +10,7 @@ import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import { __test__ as controlHostCliShellTest } from '../src/cli/controlHostCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../src/cli/config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
+import { PROVIDER_WORKER_HOST_ENV_KEY } from '../src/cli/control/providerWorkerHosts.js';
 import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
@@ -118,6 +119,56 @@ describe('controlHostCliShell manifest discovery', () => {
         [REPO_CONFIG_PATH_ENV_KEY]:
           '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1'
+      },
+      transport: {
+        kind: 'local'
+      }
+    });
+  });
+
+  it('builds an ssh transport launch spec when a worker host is selected', () => {
+    const env: EnvironmentPaths = {
+      repoRoot: '/repo',
+      runsRoot: '/repo/.runs',
+      outRoot: '/repo/out',
+      taskId: 'local-mcp'
+    };
+
+    expect(
+      buildProviderLaunchSpec(
+        env,
+        '/repo/.workspaces/provider-task',
+        '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        {
+          name: 'worker-host-01',
+          transport: 'ssh',
+          ssh_destination: 'codex@worker-host-01',
+          ssh_options: ['-p', '2222'],
+          max_concurrent_agents: 2,
+          node_path: '/opt/homebrew/bin/node'
+        }
+      )
+    ).toEqual({
+      cwd: '/repo/.workspaces/provider-task',
+      envOverrides: {
+        CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task',
+        CODEX_ORCHESTRATOR_RUNS_DIR: '/repo/.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: '/repo/out',
+        [REPO_CONFIG_PATH_ENV_KEY]:
+          '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        [PROVIDER_WORKER_HOST_ENV_KEY]: 'worker-host-01'
+      },
+      transport: {
+        kind: 'ssh',
+        host: {
+          name: 'worker-host-01',
+          transport: 'ssh',
+          ssh_destination: 'codex@worker-host-01',
+          ssh_options: ['-p', '2222'],
+          max_concurrent_agents: 2,
+          node_path: '/opt/homebrew/bin/node'
+        }
       }
     });
   });
@@ -365,6 +416,9 @@ describe('controlHostCliShell manifest discovery', () => {
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
+      },
+      transport: {
+        kind: 'local'
       }
     });
   });
@@ -421,6 +475,9 @@ describe('controlHostCliShell manifest discovery', () => {
         CO_LINEAR_WORKSPACE_ID: 'workspace-1',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: 'project-1'
+      },
+      transport: {
+        kind: 'local'
       }
     });
   });
@@ -464,6 +521,9 @@ describe('controlHostCliShell manifest discovery', () => {
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
+      },
+      transport: {
+        kind: 'local'
       }
     });
   });
@@ -500,6 +560,9 @@ describe('controlHostCliShell manifest discovery', () => {
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
+      },
+      transport: {
+        kind: 'local'
       }
     });
   });
@@ -544,6 +607,9 @@ describe('controlHostCliShell manifest discovery', () => {
         CO_LINEAR_WORKSPACE_ID: '',
         CO_LINEAR_TEAM_ID: '',
         CO_LINEAR_PROJECT_ID: ''
+      },
+      transport: {
+        kind: 'local'
       }
     });
   });

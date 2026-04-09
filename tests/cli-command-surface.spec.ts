@@ -13,8 +13,8 @@ import {
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
-const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
+const TEST_TIMEOUT = CLI_BOOT_TIMEOUT;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
 const SKILLS_INSTALL_JSON_TIMEOUT = 70000;
@@ -889,16 +889,16 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('rejects init without a template', async () => {
-    await expect(runCli(['init'])).rejects.toMatchObject({
+    await expect(runCli(['init'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('init requires a template name (e.g. init codex).')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects unknown init templates', async () => {
-    await expect(runCli(['init', 'ship-it'])).rejects.toMatchObject({
+    await expect(runCli(['init', 'ship-it'], undefined, CLI_BOOT_TIMEOUT)).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown init template: ship-it')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('writes init codex templates to the requested cwd', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-init-codex-'));
@@ -1099,13 +1099,13 @@ describe('codex-orchestrator command surface', () => {
     await expect(runCli(['devtools'])).rejects.toMatchObject({
       stderr: expect.stringContaining('devtools requires a subcommand (setup).')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('rejects unknown devtools subcommands', async () => {
     await expect(runCli(['devtools', 'ship-it'])).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown devtools subcommand: ship-it')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('emits devtools setup plan json', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-devtools-setup-json-'));

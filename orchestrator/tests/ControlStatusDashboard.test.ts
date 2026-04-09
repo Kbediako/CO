@@ -6,7 +6,10 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ControlRuntime } from '../src/cli/control/controlRuntime.js';
-import type { OperatorDashboardDataset } from '../src/cli/control/operatorDashboardPresenter.js';
+import {
+  buildUiDataset,
+  type OperatorDashboardDataset
+} from '../src/cli/control/operatorDashboardPresenter.js';
 import {
   renderControlStatusFrame,
   shouldEnableControlStatusDashboard,
@@ -370,6 +373,239 @@ class MockDashboardInput extends EventEmitter {
 }
 
 describe('control status dashboard', () => {
+  it('keeps worker_host in the operator dataset while leaving control-host labels intact', () => {
+    const projection: Parameters<typeof buildUiDataset>[0]['projection'] = {
+      running: [
+        {
+          issue_identifier: 'CO-26',
+          issue_id: 'issue-26',
+          state: 'running',
+          display_state: 'running',
+          status_reason: null,
+          pid: '4242',
+          worker_host: 'worker-host-01',
+          session_id: 'session-26',
+          turn_count: 4,
+          last_event: 'turn_started',
+          last_message: 'Worker turn active',
+          started_at: '2026-03-30T01:00:00.000Z',
+          last_event_at: '2026-03-30T01:14:59.000Z',
+          tokens: {
+            input_tokens: 100,
+            output_tokens: 117,
+            total_tokens: 217
+          }
+        }
+      ],
+      retrying: [
+        {
+          issue_identifier: 'CO-27',
+          issue_id: 'issue-27',
+          task_id: 'linear-b27',
+          run_id: 'run-27',
+          state: 'retrying',
+          display_state: 'retrying',
+          status_reason: 'rate_limited',
+          session_id: 'session-27',
+          worker_host: 'worker-host-02',
+          thread_id: 'thread-27',
+          turn_count: 2,
+          workspace_path: '/repo/.workspaces/linear-b27',
+          attempt: 2,
+          due_at: '2026-03-30T01:16:00.000Z',
+          error: 'rate limit exceeded',
+          last_event: 'retry_scheduled',
+          last_message: 'Retry queued',
+          started_at: '2026-03-30T01:10:00.000Z',
+          last_event_at: '2026-03-30T01:14:40.000Z'
+        }
+      ],
+      maxConcurrentAgents: 4,
+      codexTotals: {
+        input_tokens: 100,
+        output_tokens: 117,
+        total_tokens: 217,
+        seconds_running: 912.5
+      },
+      rateLimits: null,
+      issues: [
+        {
+          issueIdentifier: 'CO-26',
+          aliases: ['CO-26'],
+          payload: {
+            issue_identifier: 'CO-26',
+            issue_id: 'issue-26',
+            task_id: 'linear-a861',
+            run_id: 'run-26',
+            status: 'running',
+            raw_status: 'in_progress',
+            display_status: 'running',
+            status_reason: null,
+            workspace: {
+              path: '/repo/.workspaces/linear-a861'
+            },
+            worker_host: 'worker-host-01',
+            attempts: {
+              restart_count: null,
+              current_retry_attempt: null
+            },
+            running: null,
+            retry: null,
+            logs: {
+              codex_session_logs: []
+            },
+            summary: 'Terminal dashboard renderer in progress',
+            latest_event: null,
+            question_summary: {
+              queued_count: 0,
+              latest_question: null
+            },
+            recent_events: [],
+            last_error: null,
+            tracked: {
+              linear: null
+            },
+            provider_linear_worker_proof: null,
+            provider_debug_snapshot: null
+          }
+        },
+        {
+          issueIdentifier: 'CO-27',
+          aliases: ['CO-27'],
+          payload: {
+            issue_identifier: 'CO-27',
+            issue_id: 'issue-27',
+            task_id: 'linear-b27',
+            run_id: 'run-27',
+            status: 'retrying',
+            raw_status: 'retrying',
+            display_status: 'retrying',
+            status_reason: 'rate_limited',
+            workspace: {
+              path: '/repo/.workspaces/linear-b27'
+            },
+            worker_host: 'worker-host-02',
+            attempts: {
+              restart_count: 1,
+              current_retry_attempt: 2
+            },
+            running: null,
+            retry: {
+              issue_identifier: 'CO-27',
+              issue_id: 'issue-27',
+              task_id: 'linear-b27',
+              run_id: 'run-27',
+              state: 'retrying',
+              display_state: 'retrying',
+              status_reason: 'rate_limited',
+              session_id: 'session-27',
+              worker_host: 'worker-host-02',
+              thread_id: 'thread-27',
+              turn_count: 2,
+              workspace_path: '/repo/.workspaces/linear-b27',
+              attempt: 2,
+              due_at: '2026-03-30T01:16:00.000Z',
+              error: 'rate limit exceeded',
+              last_event: 'retry_scheduled',
+              last_message: 'Retry queued',
+              started_at: '2026-03-30T01:10:00.000Z',
+              last_event_at: '2026-03-30T01:14:40.000Z'
+            },
+            logs: {
+              codex_session_logs: []
+            },
+            summary: 'Waiting for retry backoff',
+            latest_event: null,
+            question_summary: {
+              queued_count: 0,
+              latest_question: null
+            },
+            recent_events: [],
+            last_error: 'rate limit exceeded',
+            tracked: {
+              linear: null
+            },
+            provider_linear_worker_proof: null,
+            provider_debug_snapshot: null
+          }
+        }
+      ],
+      selected: {
+        issue_id: 'issue-26',
+        issue_identifier: 'CO-26',
+        task_id: 'linear-a861',
+        run_id: 'run-26',
+        raw_status: 'in_progress',
+        display_status: 'running',
+        status_reason: null,
+        started_at: '2026-03-30T01:00:00.000Z',
+        updated_at: '2026-03-30T01:14:59.000Z',
+        completed_at: null,
+        summary: 'Terminal dashboard renderer in progress',
+        last_error: null,
+        latest_action: null,
+        latest_event: null,
+        workspace: {
+          path: '/repo/.workspaces/linear-a861'
+        },
+        worker_host: 'worker-host-01',
+        question_summary: {
+          queued_count: 0,
+          latest_question: null
+        },
+        tracked: {
+          linear: null
+        }
+      },
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null,
+      providerWorkflow: null,
+      polling: null
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-30T01:15:00.000Z'
+    });
+
+    expect(dataset.selected).toMatchObject({
+      worker_host: 'worker-host-01'
+    });
+    expect(dataset.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-26',
+        host: expect.any(String),
+        worker_host: 'worker-host-01'
+      })
+    ]);
+    expect(dataset.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-27',
+        host: expect.any(String),
+        worker_host: 'worker-host-02'
+      })
+    ]);
+    expect(dataset.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue_identifier: 'CO-26',
+          worker_host: 'worker-host-01',
+          workspace: expect.objectContaining({
+            host: expect.any(String)
+          })
+        }),
+        expect.objectContaining({
+          issue_identifier: 'CO-27',
+          worker_host: 'worker-host-02',
+          workspace: expect.objectContaining({
+            host: expect.any(String)
+          })
+        })
+      ])
+    );
+  });
+
   it('renders a wide full-frame snapshot with Symphony-style terminal chrome', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset(),
