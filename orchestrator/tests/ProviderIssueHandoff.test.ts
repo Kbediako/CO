@@ -569,6 +569,14 @@ describe('createProviderIssueHandoffService', () => {
       }),
       'utf8'
     );
+    await writeFile(
+      join(activePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:20:00.000Z',
+        worker_host: 'worker-host-02'
+      }),
+      'utf8'
+    );
 
     const launchedAt = new Date().toISOString();
     const state = createProviderIntakeState();
@@ -624,7 +632,8 @@ describe('createProviderIssueHandoffService', () => {
       issue_updated_at: '2026-03-19T04:25:00.000Z',
       run_id: 'run-active',
       run_manifest_path: activePaths.manifestPath,
-      task_id: 'task-1303-active'
+      task_id: 'task-1303-active',
+      worker_host: 'worker-host-02'
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -2463,6 +2472,14 @@ describe('createProviderIssueHandoffService', () => {
         'utf8'
       );
       await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+      await writeFile(
+        join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+        JSON.stringify({
+          attempt_started_at: '2026-03-19T04:20:00.000Z',
+          worker_host: 'worker-host-07'
+        }),
+        'utf8'
+      );
 
       const state = createProviderIntakeState();
       state.claims.push({
@@ -2827,6 +2844,14 @@ describe('createProviderIssueHandoffService', () => {
       'utf8'
     );
     await writeFile(childPaths.controlAuthPath, JSON.stringify({ token: 'child-token' }), 'utf8');
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:20:00.000Z',
+        worker_host: 'worker-host-07'
+      }),
+      'utf8'
+    );
 
     const state = createProviderIntakeState();
     state.claims.push({
@@ -2904,7 +2929,8 @@ describe('createProviderIssueHandoffService', () => {
       issue_assignee_id: null,
       issue_assignee_name: null,
       run_id: 'run-webhook-merging-unassigned-owned',
-      run_manifest_path: childPaths.manifestPath
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-07'
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();

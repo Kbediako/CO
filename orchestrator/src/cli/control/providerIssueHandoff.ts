@@ -125,6 +125,25 @@ interface ProviderLinearWorkerProofRecord {
   worker_host?: unknown;
 }
 
+function resolveRehydratedActiveRunWorkerHost(
+  run: ProviderIssueRunRecord,
+  claim:
+    | Pick<ProviderIntakeClaimRecord, 'run_id' | 'run_manifest_path' | 'worker_host'>
+    | null
+    | undefined
+): string | null {
+  if (run.workerHost) {
+    return run.workerHost;
+  }
+  const claimWorkerHost = normalizeProviderWorkerHostName(claim?.worker_host);
+  if (!claimWorkerHost) {
+    return null;
+  }
+  return claim?.run_id === run.runId || claim?.run_manifest_path === run.manifestPath
+    ? claimWorkerHost
+    : null;
+}
+
 export interface ProviderIssueHandoffService {
   handleAcceptedTrackedIssue(input: {
     trackedIssue: LiveLinearTrackedIssue;
@@ -1298,6 +1317,7 @@ export function createProviderIssueHandoffService(
 
       const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
+        const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
         const preserveMergeCloseoutClaim =
           isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
         const freshTrackedIssue = input?.refreshTrackedIssueMetadata
@@ -1331,6 +1351,7 @@ export function createProviderIssueHandoffService(
           task_id: activeRun.taskId,
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          worker_host: workerHost,
           ...reactivatedMergeCloseoutReset
         });
         upsertProviderIntakeClaim(options.state, {
@@ -1343,6 +1364,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_rehydrated_active_run',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          worker_host: workerHost,
           ...reactivatedMergeCloseoutReset,
           updated_at: now
         });
@@ -1801,6 +1823,9 @@ export function createProviderIssueHandoffService(
       reason: input.reason ?? 'provider_issue_handoff_owned',
       run_id: input.run?.runId ?? input.claim.run_id,
       run_manifest_path: input.run?.manifestPath ?? input.claim.run_manifest_path,
+      worker_host: input.run
+        ? resolveRehydratedActiveRunWorkerHost(input.run, input.claim)
+        : input.claim.worker_host,
     });
 
   const resolveRetryDispatchResolution = async (
@@ -2291,6 +2316,7 @@ export function createProviderIssueHandoffService(
       > = latestExisting ?? clearProviderRetryFields();
       const activeRun = attachableDiscoveredRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
+        const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, latestExisting);
         const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
           task_id: activeRun.taskId,
@@ -2299,6 +2325,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_run_already_active',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          worker_host: workerHost
         });
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
@@ -2720,6 +2747,7 @@ export function createProviderIssueHandoffService(
 
           if (resolution.kind === 'owned') {
             if (activeRun) {
+              const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
               const trackedIssueFreshEnoughForClaim = isTrackedIssueFreshEnoughForClaim(
                 claim,
                 resolution.trackedIssue
@@ -2760,6 +2788,7 @@ export function createProviderIssueHandoffService(
                 task_id: activeRun.taskId,
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
+                worker_host: workerHost,
                 ...reactivatedMergeCloseoutReset
               });
               const refreshActiveRunSnapshot = captureProviderStateSnapshot();
@@ -2773,6 +2802,7 @@ export function createProviderIssueHandoffService(
                 reason: 'provider_issue_rehydrated_active_run',
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
+                worker_host: workerHost,
                 ...reactivatedMergeCloseoutReset
               });
               if (transitioned) {
@@ -2833,6 +2863,7 @@ export function createProviderIssueHandoffService(
           }
 
           if (activeRun) {
+            const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
             const trackedIssueFreshEnoughForClaim = isTrackedIssueFreshEnoughForClaim(
               claim,
               resolution.trackedIssue
@@ -2873,6 +2904,7 @@ export function createProviderIssueHandoffService(
               task_id: activeRun.taskId,
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
+              worker_host: workerHost,
               ...reactivatedMergeCloseoutReset
             });
             const refreshActiveRunSnapshot = captureProviderStateSnapshot();
@@ -2886,6 +2918,7 @@ export function createProviderIssueHandoffService(
               reason: 'provider_issue_rehydrated_active_run',
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
+              worker_host: workerHost,
               ...reactivatedMergeCloseoutReset
             });
             if (transitioned) {
