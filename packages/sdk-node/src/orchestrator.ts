@@ -229,14 +229,23 @@ export class ExecRunHandle extends EventEmitter {
     });
 
     child.once('error', async (error) => {
-      await this.closeStreams({ preserveArtifacts: false });
+      try {
+        await this.closeStreams({ preserveArtifacts: false });
+      } catch {
+        // Preserve the original child-process failure as the terminal result.
+      }
       this.emit('error', error);
       this.rejectResultOnce(error);
     });
 
     child.once('close', async (code, signal) => {
       const preserveArtifacts = this.summaryEvent !== null;
-      await this.closeStreams({ preserveArtifacts });
+      try {
+        await this.closeStreams({ preserveArtifacts });
+      } catch (error) {
+        this.rejectResultOnce(error);
+        return;
+      }
       this.emit('exit', { code, signal });
       if (!this.summaryEvent) {
         const error = new Error('Exec command exited without emitting a summary event.') as Error & {

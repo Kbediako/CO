@@ -59,7 +59,6 @@ CO's active code and its truth surfaces have drifted apart. Some of the drift is
 - Expected codepaths:
   - `orchestrator/src/cli/control/operatorDashboardPresenter.ts`
   - `orchestrator/src/cli/control/uiDataController.ts`
-  - `orchestrator/src/cli/control/operatorDashboardPresenter.ts`
   - `orchestrator/src/persistence/**`
   - `orchestrator/src/cli/services/pipelineResolver.ts`
   - `orchestrator/src/cli/rlm/rlmCodexRuntimeShell.ts`

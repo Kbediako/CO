@@ -85,7 +85,5 @@ async function runGcProbe(script: string): Promise<void> {
       ['--expose-gc', '--loader', 'ts-node/esm', '--input-type=module', '--eval', script],
       { cwd: workspaceRoot }
     )
-  ).resolves.toMatchObject({
-    stderr: expect.stringContaining('')
-  });
+  ).resolves.toBeDefined();
 }
