@@ -32,6 +32,11 @@ import {
 } from '../../../../scripts/lib/review-execution-telemetry.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
 import {
+  applyResolvedProgramInvocationEnvOverrides,
+  resolvePackageProgramInvocation,
+  resolveProviderLinearWorkerProgramInvocation
+} from '../utils/packageProgramResolver.js';
+import {
   buildProviderLinearWorkerTerminalSummary,
   deriveDeterministicProviderMutationSuppressions,
   formatDeterministicProviderMutationDegradationSummary,
@@ -79,6 +84,14 @@ export interface CommandRunHooks {
 interface CommandRunResult {
   exitCode: number;
   summary: string;
+}
+
+interface ResolvedStageInvocation {
+  command: string;
+  args?: string[];
+  preview: string;
+  warning?: string | null;
+  envOverrides?: NodeJS.ProcessEnv;
 }
 
 type CollabToolCallRecord = NonNullable<CliManifest['collab_tool_calls']>[number];
@@ -281,6 +294,11 @@ export async function runCommandStage(
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
     execEnv.CODEX_ORCHESTRATOR_NODE_BIN = process.execPath;
     const invocation = resolveStageInvocation(stage, execEnv);
+    applyResolvedProgramInvocationEnvOverrides(execEnv, invocation.envOverrides);
+    if (invocation.warning) {
+      logger.warn(invocation.warning);
+      writeEvent({ type: 'command:warning', warning: invocation.warning });
+    }
     invocationPreview = invocation.preview;
     writeEvent({ type: 'command:start', command: invocationPreview });
     const timeoutMs = resolveStageTimeoutMs(stage, execEnv);
@@ -727,23 +745,58 @@ function isProviderLinearWorkerCommandStage(stage: CommandStage): boolean {
 function resolveStageInvocation(
   stage: CommandStage,
   env: NodeJS.ProcessEnv
-): {
-  command: string;
-  args?: string[];
-  preview: string;
-} {
+): ResolvedStageInvocation {
   if (isProviderLinearWorkerCommandStage(stage)) {
-    const command = normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath;
-    const args = [join(PACKAGE_ROOT, 'dist/orchestrator/src/cli/providerLinearWorkerRunner.js')];
+    const providerWorkerPackageRoot =
+      normalizeOptionalString(env.CODEX_ORCHESTRATOR_PACKAGE_ROOT) ?? PACKAGE_ROOT;
+    const invocation = resolveProviderLinearWorkerProgramInvocation({
+      allowConfiguredForeignPackageRoot: true,
+      env,
+      execPath: normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath,
+      packageRoot: providerWorkerPackageRoot
+    });
     return {
-      command,
-      args,
-      preview: buildCommandPreview(command, args)
+      command: invocation.command,
+      args: invocation.args,
+      preview: buildCommandPreview(invocation.command, invocation.args),
+      warning: invocation.warning,
+      envOverrides: invocation.envOverrides
     };
+  }
+  const packageRootInvocation = resolvePackageRootDistStageInvocation(stage.command, env);
+  if (packageRootInvocation) {
+    return packageRootInvocation;
   }
   return {
     command: stage.command,
     preview: stage.command
+  };
+}
+
+function resolvePackageRootDistStageInvocation(
+  commandLine: string,
+  env: NodeJS.ProcessEnv
+): ResolvedStageInvocation | null {
+  const match = commandLine.match(
+    /^\s*node\s+["']?\$CODEX_ORCHESTRATOR_PACKAGE_ROOT\/dist\/([^"'\s]+?\.js)["']?(.*)$/u
+  );
+  if (!match) {
+    return null;
+  }
+  const [, distRelativePath, trailingArgsRaw] = match;
+  const invocation = resolvePackageProgramInvocation({
+    allowConfiguredForeignPackageRoot: true,
+    env,
+    packageRoot: PACKAGE_ROOT,
+    execPath: normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath,
+    distRelativePath
+  });
+  const command = `${buildCommandPreview(invocation.command, invocation.args)}${trailingArgsRaw}`;
+  return {
+    command,
+    preview: command,
+    warning: invocation.warning,
+    envOverrides: invocation.envOverrides
   };
 }
 
