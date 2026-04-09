@@ -32,6 +32,10 @@ import {
 } from '../../../../scripts/lib/review-execution-telemetry.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
 import {
+  resolvePackageProgramInvocation,
+  resolveProviderLinearWorkerProgramInvocation
+} from '../utils/packageProgramResolver.js';
+import {
   buildProviderLinearWorkerTerminalSummary,
   deriveDeterministicProviderMutationSuppressions,
   formatDeterministicProviderMutationDegradationSummary,
@@ -79,6 +83,13 @@ export interface CommandRunHooks {
 interface CommandRunResult {
   exitCode: number;
   summary: string;
+}
+
+interface ResolvedStageInvocation {
+  command: string;
+  args?: string[];
+  preview: string;
+  warning?: string | null;
 }
 
 type CollabToolCallRecord = NonNullable<CliManifest['collab_tool_calls']>[number];
@@ -281,6 +292,10 @@ export async function runCommandStage(
     const execEnv: NodeJS.ProcessEnv = { ...baseEnv, ...stage.env };
     execEnv.CODEX_ORCHESTRATOR_NODE_BIN = process.execPath;
     const invocation = resolveStageInvocation(stage, execEnv);
+    if (invocation.warning) {
+      logger.warn(invocation.warning);
+      writeEvent({ type: 'command:warning', message: invocation.warning });
+    }
     invocationPreview = invocation.preview;
     writeEvent({ type: 'command:start', command: invocationPreview });
     const timeoutMs = resolveStageTimeoutMs(stage, execEnv);
@@ -727,24 +742,106 @@ function isProviderLinearWorkerCommandStage(stage: CommandStage): boolean {
 function resolveStageInvocation(
   stage: CommandStage,
   env: NodeJS.ProcessEnv
-): {
-  command: string;
-  args?: string[];
-  preview: string;
-} {
+): ResolvedStageInvocation {
   if (isProviderLinearWorkerCommandStage(stage)) {
-    const command = normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath;
-    const args = [join(PACKAGE_ROOT, 'dist/orchestrator/src/cli/providerLinearWorkerRunner.js')];
+    const invocation = resolveProviderLinearWorkerProgramInvocation({
+      env,
+      execPath: normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath,
+      packageRoot: PACKAGE_ROOT
+    });
     return {
-      command,
-      args,
-      preview: buildCommandPreview(command, args)
+      command: invocation.command,
+      args: invocation.args,
+      preview: buildCommandPreview(invocation.command, invocation.args),
+      warning: invocation.warning
     };
+  }
+  const packageRootInvocation = resolvePackageRootDistStageInvocation(stage.command, env);
+  if (packageRootInvocation) {
+    return packageRootInvocation;
   }
   return {
     command: stage.command,
     preview: stage.command
   };
+}
+
+function resolvePackageRootDistStageInvocation(
+  commandLine: string,
+  env: NodeJS.ProcessEnv
+): ResolvedStageInvocation | null {
+  const match = commandLine.match(
+    /^\s*node\s+["']?\$CODEX_ORCHESTRATOR_PACKAGE_ROOT\/dist\/([^"'\s]+?\.js)["']?(.*)$/u
+  );
+  if (!match) {
+    return null;
+  }
+  const [, distRelativePath, trailingArgsRaw] = match;
+  const trailingArgs = splitShellWords(trailingArgsRaw.trim());
+  const invocation = resolvePackageProgramInvocation({
+    allowConfiguredForeignPackageRoot: true,
+    env,
+    packageRoot: PACKAGE_ROOT,
+    execPath: normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath,
+    distRelativePath
+  });
+  const args = [...invocation.args, ...trailingArgs];
+  return {
+    command: invocation.command,
+    args,
+    preview: buildCommandPreview(invocation.command, args),
+    warning: invocation.warning
+  };
+}
+
+function splitShellWords(value: string): string[] {
+  if (!value) {
+    return [];
+  }
+  const tokens: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+  let escaping = false;
+
+  for (const char of value) {
+    if (escaping) {
+      current += char;
+      escaping = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaping = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/u.test(char)) {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += char;
+  }
+
+  if (escaping) {
+    current += '\\';
+  }
+  if (current.length > 0) {
+    tokens.push(current);
+  }
+  return tokens;
 }
 
 function resolveReviewEvidenceWaiverReason(

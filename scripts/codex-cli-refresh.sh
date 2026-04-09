@@ -156,7 +156,7 @@ if command -v codex-orchestrator >/dev/null 2>&1; then
 else
   SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
-  FALLBACK="$REPO_ROOT/dist/bin/codex-orchestrator.js"
+  FALLBACK="$REPO_ROOT/bin/codex-orchestrator.js"
   if [[ -f "$FALLBACK" ]]; then
     node "$FALLBACK" codex setup --source "$REPO" --yes --force
   else

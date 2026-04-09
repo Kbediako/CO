@@ -17,6 +17,7 @@ import {
   parseProviderLinearWorkerJsonl,
   ProviderLinearTrackedIssueReadError,
   readProviderLinearWorkerChildStreams,
+  resolveProviderLinearHelperCommand,
   refreshProviderLinearWorkerProofSnapshot,
   runProviderLinearWorker,
   transactProviderLinearWorkerChildLanes,
@@ -595,7 +596,7 @@ describe('provider linear worker runner', () => {
   it('builds a full first-turn prompt and a continuation prompt', () => {
     const issue = createTrackedIssue();
 
-    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
     const sharedRepoCheckoutPath = '/tmp/co';
     const manifest = {
       memory: {
@@ -744,9 +745,20 @@ describe('provider linear worker runner', () => {
     expect(continuationPrompt).toContain('- Source payload: `.runs/linear-lin-issue-1/cli/run-child/memory/source-0/source.txt`');
   });
 
+  it('builds a source-aware provider helper command without reverting to the dist bin path', () => {
+    const helperCommand = resolveProviderLinearHelperCommand({
+      CODEX_ORCHESTRATOR_NODE_BIN: '/usr/bin/node'
+    });
+
+    expect(helperCommand).toContain('"/usr/bin/node"');
+    expect(helperCommand).toContain('bin/codex-orchestrator.js');
+    expect(helperCommand).not.toContain('dist/bin/codex-orchestrator.js');
+    expect(helperCommand).toMatch(/ linear$/u);
+  });
+
   it('includes deterministic mutation suppressions in continuation prompts when the same attempt already failed validation', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
     const audit: ProviderLinearAuditSummary = {
       path: '/tmp/provider-linear-worker-linear-audit.jsonl',
       attempted_count: 1,
@@ -791,7 +803,7 @@ describe('provider linear worker runner', () => {
 
   it('ignores deterministic mutation suppressions that predate the current attempt', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
     const audit: ProviderLinearAuditSummary = {
       path: '/tmp/provider-linear-worker-linear-audit.jsonl',
       attempted_count: 1,
@@ -836,7 +848,7 @@ describe('provider linear worker runner', () => {
 
   it('ignores deterministic mutation suppressions when the current attempt start is missing', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
     const audit: ProviderLinearAuditSummary = {
       path: '/tmp/provider-linear-worker-linear-audit.jsonl',
       attempted_count: 1,
@@ -880,7 +892,7 @@ describe('provider linear worker runner', () => {
 
   it('suppresses deterministic workpad validation retries within the same attempt', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
     const audit: ProviderLinearAuditSummary = {
       path: '/tmp/provider-linear-worker-linear-audit.jsonl',
       attempted_count: 1,
@@ -925,7 +937,7 @@ describe('provider linear worker runner', () => {
 
   it('ignores malformed audit summaries when deriving continuation suppressions', () => {
     const issue = createTrackedIssue();
-    const helperCommand = 'node "/tmp/co/dist/bin/codex-orchestrator.js" linear';
+    const helperCommand = 'node "/tmp/co/bin/codex-orchestrator.js" linear';
 
     const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co', {
       linearAudit: {
