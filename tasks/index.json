@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260409-linear-70e83230-4f52-4850-b494-41fd0ec32f13",
+      "title": "CO: Add a guarded resident app-server control seam with drain/restart/resume continuity",
+      "relates_to": "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "task": "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "agent_task": ".agent/task/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "docs": "docs/TECH_SPEC-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md"
+      }
+    },
+    {
       "id": "20260409-linear-51baaff3-2c6d-47e4-b668-088763d36197",
       "title": "CO: Add optional distributed worker-host parity with SSH routing, capacity, and worker_host observability",
       "relates_to": "tasks/tasks-linear-51baaff3-2c6d-47e4-b668-088763d36197.md",

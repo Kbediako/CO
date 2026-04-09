@@ -15,6 +15,7 @@ import {
   buildProviderWorkerPrompt,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
+  PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV,
   ProviderLinearTrackedIssueReadError,
   readProviderLinearWorkerChildStreams,
   resolveProviderLinearHelperCommand,
@@ -265,6 +266,32 @@ function expectRefreshAuthHeaders(
 }
 
 function createRuntimeContext(
+  runtimeOverrides: Partial<RuntimeCodexCommandContext['runtime']> = {},
+  envOverrides: NodeJS.ProcessEnv = {}
+): RuntimeCodexCommandContext {
+  return {
+    env: envOverrides,
+    runtime: {
+      requested_mode: 'cli',
+      selected_mode: 'cli',
+      source: 'default',
+      provider: 'CliRuntimeProvider',
+      runtime_session_id: null,
+      fallback: {
+        occurred: false,
+        code: null,
+        reason: null,
+        from_mode: null,
+        to_mode: null,
+        checked_at: '2026-03-21T09:00:00.000Z'
+      },
+      env_overrides: {},
+      ...runtimeOverrides
+    } as never
+  };
+}
+
+function createAppServerRuntimeContext(
   runtimeOverrides: Partial<RuntimeCodexCommandContext['runtime']> = {},
   envOverrides: NodeJS.ProcessEnv = {}
 ): RuntimeCodexCommandContext {
@@ -757,6 +784,47 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('Stop coding once the issue reaches the team\'s review handoff state (`Human Review` or `In Review`) and end the turn after the handoff is complete.');
     expect(continuationPrompt).toContain('Shared source 0 anchor:');
     expect(continuationPrompt).toContain('- Source payload: `.runs/linear-lin-issue-1/cli/run-child/memory/source-0/source.txt`');
+  });
+
+  it('builds continuation guidance for first-turn guarded resident restarts', () => {
+    const issue = createTrackedIssue({
+      state: 'Rework',
+      description: 'Restart after review feedback without losing the active thread.',
+      recent_activity: [
+        {
+          id: 'activity-2',
+          created_at: '2026-03-21T09:01:00.000Z',
+          actor_name: 'Reviewer',
+          summary: 'Requested changes on the resident continuity seam'
+        }
+      ]
+    });
+    const helperCommand = SOURCE_HELPER_COMMAND;
+
+    const prompt = buildProviderWorkerPrompt(issue, 1, 5, helperCommand, '/tmp/co', {
+      residentSession: {
+        logical_session_id: 'linear:lin-issue-1:resident-session',
+        logical_turn_count: 20,
+        restart_count: 1,
+        continuity_state: 'guarded_resume_pending',
+        source_run_id: 'run-prev',
+        source_updated_at: '2026-03-21T09:00:00.000Z',
+        source_end_reason: 'max_turns_reached_issue_still_active',
+        source_thread_id: 'thread-1'
+      },
+      continueResidentSessionOnBoot: true
+    });
+
+    expect(prompt).toContain('Continuation guidance:');
+    expect(prompt).toContain('guarded restart boundary');
+    expect(prompt).toContain('logical resident turn #21');
+    expect(prompt).toContain('Fresh Linear context for this guarded restart:');
+    expect(prompt).toContain('- Current state: Rework');
+    expect(prompt).toContain('Issue description:');
+    expect(prompt).toContain('Restart after review feedback without losing the active thread.');
+    expect(prompt).toContain('Recent activity:');
+    expect(prompt).toContain('Requested changes on the resident continuity seam');
+    expect(prompt).not.toContain('Treat this as the full first-turn task prompt for the current worker run.');
   });
 
   it('builds a source-aware provider helper command without reverting to the dist bin path', () => {
@@ -1634,7 +1702,13 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       },
       {
         readTrackedIssue,
-        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'cli',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider'
+          })
+        ),
         execRunner,
         now: vi
           .fn()
@@ -1822,6 +1896,153 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       )
     ).toBe(true);
   }, providerLinearWorkerRunnerTestTimeoutMs);
+
+  it('uses guarded resident-session seeds to resume the prior thread on worker turn one', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"turn_context","payload":{"turn_id":"turn-21"}}',
+          '{"type":"event_msg","payload":{"type":"agent_message","message":"guarded resume complete"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-21","timestamp":"2026-03-21T09:00:01.500Z"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        [PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]: JSON.stringify({
+          source_run_id: 'run-prev',
+          source_updated_at: '2026-03-21T08:59:59.000Z',
+          source_end_reason: 'max_turns_reached_issue_still_active',
+          source_thread_id: 'thread-1',
+          logical_turn_count: 20,
+          restart_count: 1
+        })
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    expect(execRunner.mock.calls[0]?.[0].args).toEqual([
+      'exec',
+      'resume',
+      '--json',
+      'thread-1',
+      expect.stringContaining('Continuation guidance')
+    ]);
+    expect(String(execRunner.mock.calls[0]?.[0].args[4] ?? '')).toContain(
+      'logical resident turn #21'
+    );
+    expect(proof).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-21',
+      latest_session_id: 'thread-1-turn-21',
+      turn_count: 1,
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active',
+      resident_session: {
+        logical_session_id: 'linear:lin-issue-1:resident-session',
+        logical_turn_count: 21,
+        restart_count: 1,
+        continuity_state: 'guarded_resume_active',
+        source_run_id: 'run-prev',
+        source_end_reason: 'max_turns_reached_issue_still_active',
+        source_thread_id: 'thread-1'
+      }
+    });
+  });
+
+  it('fails closed when a guarded resident resume changes thread identity', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-2"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-21"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-21","timestamp":"2026-03-21T09:00:01.500Z"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+          [PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]: JSON.stringify({
+            source_run_id: 'run-prev',
+            source_updated_at: '2026-03-21T08:59:59.000Z',
+            source_end_reason: 'max_turns_reached_issue_still_active',
+            source_thread_id: 'thread-1',
+            logical_turn_count: 20,
+            restart_count: 1
+          })
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue({
+            state: 'Merging',
+            state_type: 'started',
+            assignee_id: null,
+            assignee_name: null
+          })),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('guarded resident resume changed thread identity');
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: 'thread-2',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'guarded_resume_thread_mismatch',
+      resident_session: {
+        logical_turn_count: 20,
+        restart_count: 1,
+        continuity_state: 'guarded_resume_pending',
+        source_thread_id: 'thread-1'
+      }
+    });
+  });
 
   it('passes env-backed Linear scope bindings into tracked issue refreshes', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
@@ -5679,7 +5900,13 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         },
         {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
-          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          resolveRuntimeContext: vi.fn(async () =>
+            createRuntimeContext({
+              requested_mode: 'cli',
+              selected_mode: 'cli',
+              provider: 'CliRuntimeProvider'
+            })
+          ),
           execRunner,
           now: vi
             .fn()
@@ -5778,7 +6005,13 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         },
         {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
-          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          resolveRuntimeContext: vi.fn(async () =>
+            createRuntimeContext({
+              requested_mode: 'cli',
+              selected_mode: 'cli',
+              provider: 'CliRuntimeProvider'
+            })
+          ),
           execRunner,
           now: vi
             .fn()
@@ -7791,7 +8024,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       },
       {
         readTrackedIssue: vi.fn(async () => issue),
-        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
         execRunner,
         writeProof,
         now: vi
@@ -8361,6 +8594,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           'utf8'
         );
         const staleMtime = new Date('2026-03-21T09:00:02.000Z');
+        const resumedMtime = new Date('2026-03-21T09:00:03.000Z');
+        await utimes(sessionLogPath, resumedMtime, resumedMtime);
         await utimes(staleSessionLogPath, staleMtime, staleMtime);
       }
       return trackedIssueReadCount >= 3 ? completedIssue : issue;
@@ -8408,7 +8643,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       },
       {
         readTrackedIssue,
-        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
         execRunner,
         writeProof,
         now: vi
@@ -8521,7 +8756,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       },
       {
         readTrackedIssue,
-        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
         execRunner,
         writeProof,
         now: vi
@@ -9860,7 +10095,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     const firstRefresh = await refreshProviderLinearWorkerProofSnapshot(
       runDir,
       auditPath,
-      () => '2026-03-21T09:00:05.000Z'
+      () => '2026-03-21T09:00:05.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
     );
 
     expect(firstRefresh?.parallelization).toBeNull();
@@ -9878,7 +10115,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     const secondRefresh = await refreshProviderLinearWorkerProofSnapshot(
       runDir,
       auditPath,
-      () => '2026-03-21T09:00:35.000Z'
+      () => '2026-03-21T09:00:35.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
     );
 
     expect(secondRefresh).toMatchObject({
@@ -9925,7 +10164,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     const refresh = await refreshProviderLinearWorkerProofSnapshot(
       runDir,
       auditPath,
-      () => '2026-03-21T09:00:05.000Z'
+      () => '2026-03-21T09:00:05.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
     );
 
     expect(refresh?.parallelization).toBeNull();

@@ -288,6 +288,60 @@ describe('createProviderIssueHandoffService', () => {
     ]);
   });
 
+  it('preserves resident-session seeds when the manifest updated_at advances after a succeeded terminal proof', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerRunDir = join(root, '.runs', 'linear-lin-issue-1', 'cli', 'provider-run-1');
+    await mkdir(providerRunDir, { recursive: true });
+    await writeFile(join(providerRunDir, 'manifest.json'), JSON.stringify({
+      run_id: 'provider-run-1',
+      task_id: 'linear-lin-issue-1',
+      pipeline_id: 'provider-linear-worker',
+      parent_run_id: 'control-host-run-1',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      status: 'succeeded',
+      started_at: '2026-03-27T01:00:00.000Z',
+      updated_at: '2026-03-27T01:05:00.000Z'
+    }), 'utf8');
+    await writeFile(join(providerRunDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), JSON.stringify({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      attempt_started_at: '2026-03-27T01:00:01.000Z',
+      owner_phase: 'ended',
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active',
+      thread_id: 'thread-1',
+      turn_count: 20,
+      resident_session: {
+        logical_session_id: 'linear:lin-issue-1:resident-session',
+        logical_turn_count: 20,
+        restart_count: 1,
+        continuity_state: 'guarded_resume_active',
+        source_run_id: 'provider-run-0',
+        source_updated_at: '2026-03-27T00:55:00.000Z',
+        source_end_reason: 'max_turns_reached_issue_still_active',
+        source_thread_id: 'thread-0'
+      },
+      updated_at: '2026-03-27T01:04:59.000Z'
+    }), 'utf8');
+
+    await expect(
+      discoverProviderIssueRuns(paths.runDir, { provider: 'linear', issueId: 'lin-issue-1' })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        runId: 'provider-run-1',
+        residentSessionSeed: {
+          source_run_id: 'provider-run-1',
+          source_updated_at: '2026-03-27T01:04:59.000Z',
+          source_end_reason: 'max_turns_reached_issue_still_active',
+          source_thread_id: 'thread-1',
+          logical_turn_count: 20,
+          restart_count: 2
+        }
+      })
+    ]);
+  });
+
   it('persists a starting claim before launching a deterministic start for a started Linear issue', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -13512,6 +13566,8 @@ describe('createProviderIssueHandoffService', () => {
       JSON.stringify({
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        thread_id: 'thread-merge-drain',
+        turn_count: 20,
         owner_phase: 'ended',
         owner_status: 'succeeded',
         end_reason: 'max_turns_reached_issue_still_active',
@@ -13727,6 +13783,8 @@ describe('createProviderIssueHandoffService', () => {
       JSON.stringify({
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        thread_id: 'thread-merge-drain',
+        turn_count: 20,
         owner_phase: 'ended',
         owner_status: 'succeeded',
         end_reason: 'max_turns_reached_issue_still_active',
@@ -15298,6 +15356,8 @@ describe('createProviderIssueHandoffService', () => {
       JSON.stringify({
         issue_id: 'lin-issue-1',
         issue_identifier: 'CO-2',
+        thread_id: 'thread-merge-drain',
+        turn_count: 20,
         owner_phase: 'ended',
         owner_status: 'succeeded',
         end_reason: 'max_turns_reached_issue_still_active',
@@ -15405,6 +15465,14 @@ describe('createProviderIssueHandoffService', () => {
       issueId: 'lin-issue-1',
       issueIdentifier: 'CO-2',
       issueUpdatedAt: '2026-03-19T04:30:30.000Z',
+      residentSessionSeed: {
+        source_run_id: 'run-merge-drain',
+        source_updated_at: '2026-03-19T04:30:00.000Z',
+        source_end_reason: 'max_turns_reached_issue_still_active',
+        source_thread_id: 'thread-merge-drain',
+        logical_turn_count: 20,
+        restart_count: 1
+      },
       launchToken: expect.any(String)
     }));
     expect(state.claims[0]).toMatchObject({

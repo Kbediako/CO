@@ -128,6 +128,9 @@ describe('executeExecCommand', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.exitCode).toBe(0);
+    await vi.waitFor(() => {
+      expect(output).not.toBe('');
+    });
     const parsed = JSON.parse(output.trim());
     expect(parsed.type).toBe('run:summary');
     expect(parsed.payload.outputs.stdout).toContain('hello-json');

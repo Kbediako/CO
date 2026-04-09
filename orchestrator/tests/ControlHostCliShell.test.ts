@@ -21,6 +21,7 @@ const {
   buildRemoteProviderEnvValues,
   buildRemoteProviderLaunchCommand,
   buildProviderLinearSourceEnvOverrides,
+  buildProviderResidentSessionEnvOverrides,
   buildProviderOverrideOwnershipEnv,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
@@ -246,6 +247,34 @@ describe('controlHostCliShell manifest discovery', () => {
       HTTPS_PROXY: 'https://proxy.internal:8443',
       LINEAR_API_KEY: 'lin-key',
       CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task'
+    });
+  });
+
+  it('serializes guarded resident-session continuity seeds into provider worker env overrides', () => {
+    expect(
+      buildProviderResidentSessionEnvOverrides({
+        source_run_id: 'run-prev',
+        source_updated_at: '2026-04-09T09:00:00.000Z',
+        source_end_reason: 'max_turns_reached_issue_still_active',
+        source_thread_id: 'thread-1',
+        logical_turn_count: 20,
+        restart_count: 1
+      })
+    ).toEqual({
+      CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED: JSON.stringify({
+        source_run_id: 'run-prev',
+        source_updated_at: '2026-04-09T09:00:00.000Z',
+        source_end_reason: 'max_turns_reached_issue_still_active',
+        source_thread_id: 'thread-1',
+        logical_turn_count: 20,
+        restart_count: 1
+      })
+    });
+  });
+
+  it('clears guarded resident-session continuity seeds when the next launch should start fresh', () => {
+    expect(buildProviderResidentSessionEnvOverrides(null)).toEqual({
+      CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED: ''
     });
   });
 

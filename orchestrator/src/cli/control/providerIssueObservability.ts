@@ -229,6 +229,14 @@ interface ProviderIssueProofLike {
   parallelization?: (ProviderLinearParallelizationSnapshot & {
     child_lane_count?: number | null;
   }) | null;
+  resident_session?: {
+    logical_session_id?: string | null;
+    logical_turn_count?: number | null;
+    restart_count?: number | null;
+    continuity_state?: string | null;
+    source_run_id?: string | null;
+    source_end_reason?: string | null;
+  } | null;
   end_reason?: string | null;
 }
 
@@ -258,6 +266,12 @@ export interface ControlProviderDebugSnapshot {
     thread_id: string | null;
     latest_session_id: string | null;
     turn_count: number | null;
+    resident_logical_session_id: string | null;
+    resident_logical_turn_count: number | null;
+    resident_restart_count: number | null;
+    resident_continuity_state: string | null;
+    resident_source_run_id: string | null;
+    resident_source_end_reason: string | null;
     last_event: string | null;
     last_message: string | null;
     last_event_at: string | null;
@@ -416,6 +430,12 @@ export function buildProviderIssueDebugSnapshot(input: {
           thread_id: normalizeOptionalString(proof.thread_id),
           latest_session_id: normalizeOptionalString(proof.latest_session_id),
           turn_count: normalizeOptionalInteger(proof.turn_count),
+          resident_logical_session_id: normalizeOptionalString(proof.resident_session?.logical_session_id),
+          resident_logical_turn_count: normalizeOptionalInteger(proof.resident_session?.logical_turn_count),
+          resident_restart_count: normalizeOptionalInteger(proof.resident_session?.restart_count),
+          resident_continuity_state: normalizeOptionalString(proof.resident_session?.continuity_state),
+          resident_source_run_id: normalizeOptionalString(proof.resident_session?.source_run_id),
+          resident_source_end_reason: normalizeOptionalString(proof.resident_session?.source_end_reason),
           last_event: normalizeOptionalString(proof.last_event),
           last_message: normalizeOptionalString(proof.last_message),
           last_event_at: normalizeOptionalString(proof.last_event_at),
