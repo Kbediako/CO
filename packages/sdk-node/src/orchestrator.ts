@@ -31,18 +31,14 @@ export interface ExecRunResult {
   exitCode: number | null;
   status: 'succeeded' | 'failed';
   manifestPath: string;
-  /** @deprecated Compatibility path to the full JSONL event stream for this run. Call `ExecRunHandle.cleanupArtifacts()` when finished. */
+  /** @deprecated Compatibility path to the full JSONL event stream for this run. Call `ExecRunHandle.cleanupArtifacts()` when finished; otherwise files persist until process exit. */
   eventsPath: string;
-  /** @deprecated Compatibility path to the raw stderr log for this run. Call `ExecRunHandle.cleanupArtifacts()` when finished. */
+  /** @deprecated Compatibility path to the raw stderr log for this run. Call `ExecRunHandle.cleanupArtifacts()` when finished; otherwise files persist until process exit. */
   stderrPath: string;
   rawStderr: string[];
 }
 
 const activeArtifactRoots = new Set<string>();
-const artifactCleanupFinalizer = new FinalizationRegistry<string>((artifactRoot) => {
-  activeArtifactRoots.delete(artifactRoot);
-  void rm(artifactRoot, { recursive: true, force: true }).catch(() => {});
-});
 
 process.once('exit', () => {
   for (const artifactRoot of activeArtifactRoots) {
@@ -126,7 +122,6 @@ export class ExecRunHandle extends EventEmitter {
     this.eventsFilePath = join(this.artifactRoot, 'events.ndjson');
     this.stderrFilePath = join(this.artifactRoot, 'stderr.log');
     activeArtifactRoots.add(this.artifactRoot);
-    artifactCleanupFinalizer.register(this, this.artifactRoot, this);
     this.eventsStream = createWriteStream(this.eventsFilePath, { flags: 'a' });
     this.stderrStream = createWriteStream(this.stderrFilePath, { flags: 'a' });
     this.resultPromise = new Promise<ExecRunResult>((resolve, reject) => {
@@ -282,7 +277,6 @@ export class ExecRunHandle extends EventEmitter {
       return;
     }
     this.artifactsCleaned = true;
-    artifactCleanupFinalizer.unregister(this);
     activeArtifactRoots.delete(this.artifactRoot);
     await rm(this.artifactRoot, { recursive: true, force: true }).catch(() => {});
   }
