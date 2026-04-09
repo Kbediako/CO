@@ -239,7 +239,11 @@ export async function runProviderOperatorAutopilot(
       error: reviewHandoffOutcome.error,
       actions: [],
       holds,
-      pending_actions: resolveEffectivePendingActions(pendingActions, input.previous_result)
+      pending_actions: resolveEffectivePendingActions(
+        pendingActions,
+        input.previous_result,
+        input.config.post_merge_rollout.enabled
+      )
     };
   }
   if (reviewHandoffOutcome.action) {
@@ -267,7 +271,11 @@ export async function runProviderOperatorAutopilot(
         error: backlogOutcome.error,
         actions,
         holds,
-        pending_actions: resolveEffectivePendingActions(pendingActions, input.previous_result)
+        pending_actions: resolveEffectivePendingActions(
+          pendingActions,
+          input.previous_result,
+          input.config.post_merge_rollout.enabled
+        )
       };
     }
     if (backlogOutcome.action) {
@@ -280,7 +288,8 @@ export async function runProviderOperatorAutopilot(
 
   const effectivePendingActions = resolveEffectivePendingActions(
     pendingActions,
-    input.previous_result
+    input.previous_result,
+    input.config.post_merge_rollout.enabled
   );
   const status =
     actions.length > 0 || effectivePendingActions.length > 0 ? 'acted' : 'noop';
@@ -573,10 +582,14 @@ function collectPendingActions(input: {
 
 function resolveEffectivePendingActions(
   pendingActions: ProviderOperatorAutopilotPendingActionRecord[],
-  previousResult: ProviderOperatorAutopilotResult | null | undefined
+  previousResult: ProviderOperatorAutopilotResult | null | undefined,
+  postMergeRolloutEnabled: boolean
 ): ProviderOperatorAutopilotPendingActionRecord[] {
   if (pendingActions.length > 0) {
     return pendingActions.map(clonePendingActionRecord);
+  }
+  if (!postMergeRolloutEnabled) {
+    return [];
   }
   return (previousResult?.pending_actions ?? []).map(clonePendingActionRecord);
 }
