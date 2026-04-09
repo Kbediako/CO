@@ -442,6 +442,7 @@ describe('createProviderIssueHandoffService', () => {
       issueIdentifier: 'CO-3',
       workerHost: 'worker-host-02'
     }));
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
     expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-2')).toMatchObject({
       worker_host: 'worker-host-02',
       state: 'starting'
@@ -538,6 +539,7 @@ describe('createProviderIssueHandoffService', () => {
     ).rejects.toThrow(/at capacity/);
 
     expect(launcher.start).not.toHaveBeenCalled();
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
     expect(state.claims.find((claim) => claim.issue_id === 'lin-issue-2')).toMatchObject({
       state: 'handoff_failed',
       retry_queued: true,
@@ -12590,6 +12592,7 @@ describe('createProviderIssueHandoffService', () => {
       last_webhook_timestamp: 1_742_360_050_000,
       run_id: 'run-failed',
       run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-02',
       launch_source: null,
       launch_token: null
     });
@@ -12625,6 +12628,7 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'task-1303-failed',
       run_id: 'run-failed',
       run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-02',
       retry_queued: true,
       retry_attempt: 1,
       retry_due_at: '2026-03-19T04:30:10.000Z',
@@ -12639,6 +12643,7 @@ describe('createProviderIssueHandoffService', () => {
       runId: 'run-failed',
       actor: 'control-host',
       reason: 'provider-retry',
+      workerHost: 'worker-host-02',
       launchToken: expect.any(String)
     });
     expect(state.claims[0]).toMatchObject({
@@ -12647,6 +12652,7 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'task-1303-failed',
       run_id: 'run-failed',
       run_manifest_path: childPaths.manifestPath,
+      worker_host: 'worker-host-02',
       launch_source: 'control-host',
       launch_token: expect.any(String),
       retry_queued: false,

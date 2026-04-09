@@ -79,6 +79,7 @@ export interface ProviderIssueLauncher {
     runId: string;
     actor: string;
     reason: string;
+    workerHost?: string | null;
     launchToken: string;
   }): Promise<void>;
 }
@@ -544,17 +545,21 @@ export function createProviderIssueHandoffService(
     };
   };
 
-  const resolveConfiguredWorkerHosts = () =>
-    options.providerWorkflowConfigStore?.snapshot().worker_hosts ?? [];
+  const resolveConfiguredWorkerHosts = async () => {
+    if (options.providerWorkflowConfigStore) {
+      await options.providerWorkflowConfigStore.refresh();
+    }
+    return options.providerWorkflowConfigStore?.snapshot().worker_hosts ?? [];
+  };
 
-  const selectLaunchWorkerHost = (input: {
+  const selectLaunchWorkerHost = async (input: {
     claim: Pick<ProviderIntakeClaimRecord, 'provider_key'> & {
       worker_host?: string | null;
     };
     previousRun?: ProviderIssueRunRecord | null;
-  }): string | null => {
+  }): Promise<string | null> => {
     const selection = selectProviderWorkerHost({
-      hosts: resolveConfiguredWorkerHosts(),
+      hosts: await resolveConfiguredWorkerHosts(),
       claims: options.state.claims,
       currentProviderKey: input.claim.provider_key,
       preferredHost: input.claim.worker_host ?? input.previousRun?.workerHost ?? null
@@ -936,6 +941,7 @@ export function createProviderIssueHandoffService(
         runId: input.run.runId,
         actor: 'control-host',
         reason: input.launcherReason ?? 'provider-refresh',
+        workerHost,
         launchToken
       });
     } catch (error) {
@@ -981,7 +987,7 @@ export function createProviderIssueHandoffService(
     );
     let workerHost: string | null = preferredWorkerHost;
     try {
-      workerHost = selectLaunchWorkerHost({
+      workerHost = await selectLaunchWorkerHost({
         claim: input.claim,
         previousRun: input.previousRun ?? null
       });
@@ -2474,7 +2480,7 @@ export function createProviderIssueHandoffService(
       );
       let workerHost: string | null = preferredWorkerHost;
       try {
-        workerHost = selectLaunchWorkerHost({
+        workerHost = await selectLaunchWorkerHost({
           claim: {
             provider_key: providerKey,
             worker_host: preferredWorkerHost

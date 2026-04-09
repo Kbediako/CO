@@ -299,7 +299,8 @@ export async function runControlHostCliShell(
             const launchSpec = await resolveProviderResumeLaunchSpec(
               env,
               input.runId,
-              providerWorkflowConfigStore
+              providerWorkflowConfigStore,
+              input.workerHost ?? null
             );
             await spawnBackgroundCli(launchSpec, cliEntrypoint, [
               'resume',
@@ -660,7 +661,8 @@ async function resolveProviderStartLaunchSpec(
 async function resolveProviderResumeLaunchSpec(
   env: EnvironmentPaths,
   runId: string,
-  providerWorkflowConfigStore?: ProviderWorkflowConfigStore
+  providerWorkflowConfigStore?: ProviderWorkflowConfigStore,
+  preferredWorkerHost?: string | null
 ): Promise<ProviderLaunchSpec> {
   const { manifest, paths } = await loadManifest(env, runId);
   const manifestRecord = manifest as unknown as Record<string, unknown>;
@@ -689,10 +691,11 @@ async function resolveProviderResumeLaunchSpec(
     configPath,
     resolveConfiguredProviderWorkerHost(
       providerWorkflowConfigStore,
-      resolveFreshProviderLaunchContextWorkerHost(
-        persistedProofContext,
-        manifestStartedAt
-      ),
+      normalizeProviderWorkerHostName(preferredWorkerHost)
+        ?? resolveFreshProviderLaunchContextWorkerHost(
+          persistedProofContext,
+          manifestStartedAt
+        ),
       { allowMissing: true }
     )
   );
