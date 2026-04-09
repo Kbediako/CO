@@ -15,6 +15,9 @@ const ACTIVE_PROVIDER_WORKER_HOST_CLAIM_STATES = new Set(['starting', 'running',
 export function resolveProviderWorkerHostConfig(metadata: unknown): ProviderWorkerHostConfig[] {
   const record = asRecord(metadata);
   const workerHostsRecord = asRecord(record?.worker_hosts ?? record?.workerHosts);
+  if (workerHostsRecord && workerHostsRecord.hosts !== undefined && !Array.isArray(workerHostsRecord.hosts)) {
+    throw new Error('provider worker hosts metadata "hosts" must be an array.');
+  }
   const hostEntries = Array.isArray(workerHostsRecord?.hosts)
     ? workerHostsRecord.hosts
     : Array.isArray(record?.worker_hosts)

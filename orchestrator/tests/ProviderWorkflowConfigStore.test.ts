@@ -160,6 +160,37 @@ describe('providerWorkflowConfigStore', () => {
     );
   });
 
+  it('fails closed when worker_hosts.hosts is present but not an array', async () => {
+    await writeRepoConfig(buildValidProviderConfig('v1'));
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    await store.bootstrap();
+    const snapshotPath = await store.getLaunchConfigPath();
+    const initialSnapshot = await readFile(snapshotPath, 'utf8');
+
+    await writeRepoConfig(
+      buildValidProviderConfig('broken-shape', {
+        worker_hosts: {
+          hosts: {}
+        }
+      })
+    );
+    const degraded = await store.refresh();
+
+    expect(degraded.status).toBe('reload_failed');
+    expect(degraded.snapshot_path).toBe(snapshotPath);
+    expect(degraded.last_error).toContain('"hosts" must be an array');
+    expect(await readFile(snapshotPath, 'utf8')).toBe(initialSnapshot);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('keeping last known good configuration')
+    );
+  });
+
   it('replaces the snapshot and clears the error when a later valid reload succeeds', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const store = createProviderWorkflowConfigStore({
