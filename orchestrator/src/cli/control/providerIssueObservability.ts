@@ -823,7 +823,7 @@ function buildLegacyProofMessageProgressCandidate(
     return null;
   }
   return {
-    source: 'legacy_proof_last_message',
+    source: summary ? 'legacy_proof_last_message' : 'legacy_proof_fields',
     event,
     summary,
     // Legacy proof does not preserve an authoritative last-message timestamp.
@@ -958,6 +958,7 @@ function providerLinearWorkerProgressCandidateSourcePriority(source: string): nu
       return 60;
     case 'canonical_session_log_hydration':
       return 50;
+    case 'legacy_proof_fields':
     case 'legacy_proof_last_message':
       return 40;
     case 'child_lane_summary':

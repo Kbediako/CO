@@ -415,6 +415,41 @@ describe('provider issue observability', () => {
     );
   });
 
+  it('uses a neutral legacy proof source label when only last_event survives', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'token_count',
+        last_message: null,
+        last_event_at: '2026-04-05T05:44:30.000Z',
+        updated_at: '2026-04-05T05:44:30.000Z',
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'Provider worker turn is active.',
+      message_recorded_at: null,
+      source_updated_at: '2026-04-05T05:44:30.000Z',
+      event_source: 'legacy_proof_fields'
+    });
+    expect(progress?.event_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'legacy_proof_fields',
+          event: 'token_count',
+          summary: null,
+          accepted: true,
+          rejection_reason: null
+        })
+      ])
+    );
+  });
+
   it('prefers the latest child-lane summary over generic turn-running filler', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

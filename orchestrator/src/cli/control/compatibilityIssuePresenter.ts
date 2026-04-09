@@ -329,6 +329,22 @@ export function buildCompatibilityRunningEntry(
     : preserveLatestControlActionContext
       ? selected.latestEvent?.message ?? selected.summary
       : selected.latestEvent?.message ?? proofMessage ?? selected.summary;
+  const runningMessageSource =
+    preferProofTelemetry
+      ? proofMessage
+        ? 'proof'
+        : selected.latestEvent?.message
+          ? 'latest'
+          : 'fallback'
+      : preserveLatestControlActionContext
+        ? selected.latestEvent?.message
+          ? 'latest'
+          : 'fallback'
+        : selected.latestEvent?.message
+          ? 'latest'
+          : proofMessage
+            ? 'proof'
+            : 'fallback';
   const runningEventAt = preferProofTelemetry
     ? proofEventAt ?? selected.latestEvent?.at ?? selected.updatedAt
     : preserveLatestControlActionContext
@@ -353,12 +369,16 @@ export function buildCompatibilityRunningEntry(
         ? proofEventSource
         : 'fallback';
   const messageRecordedAt =
-    runningEvent.source === 'latest'
+    runningMessageSource === 'latest'
       ? selected.latestEvent?.messageRecordedAt ?? selected.latestEvent?.at ?? null
-      : runningEvent.source === 'proof'
+      : runningMessageSource === 'proof'
         ? useLegacyProofFallback
-          ? proofEventAt ?? null
-          : proofCanonicalRecordedAt ?? null
+          ? proofMessage
+            ? proofEventAt ?? null
+            : null
+          : proofMessage
+            ? proofCanonicalRecordedAt ?? null
+            : null
         : null;
   const sourceUpdatedAt =
     runningEvent.source === 'latest'
