@@ -1355,7 +1355,7 @@ async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promi
   try {
     const [distStats, newestSourceMtime] = await Promise.all([
       stat(distEntry),
-      getNewestSourceMtime(dirname(sourceEntry))
+      getNewestSourceMtimeForRoots([sourceEntry, join(dirname(sourceEntry), 'lib')])
     ]);
     return distStats.mtimeMs >= newestSourceMtime;
   } catch {
@@ -1364,7 +1364,12 @@ async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promi
 }
 
 async function getNewestSourceMtime(root: string): Promise<number> {
-  let newestMtime = 0;
+  const rootStats = await stat(root);
+  if (!rootStats.isDirectory()) {
+    return rootStats.mtimeMs;
+  }
+
+  let newestMtime = rootStats.mtimeMs;
   const entries = await readdir(root, { withFileTypes: true });
   for (const entry of entries) {
     const entryPath = join(root, entry.name);
@@ -1376,6 +1381,22 @@ async function getNewestSourceMtime(root: string): Promise<number> {
     newestMtime = Math.max(newestMtime, entryStats.mtimeMs);
   }
   return newestMtime;
+}
+
+async function getNewestSourceMtimeForRoots(roots: string[]): Promise<number> {
+  const mtimes = await Promise.all(
+    roots.map(async (root) => {
+      try {
+        return await getNewestSourceMtime(root);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return 0;
+        }
+        throw error;
+      }
+    })
+  );
+  return Math.max(0, ...mtimes);
 }
 
 describe('shouldUseFreshDist', () => {
@@ -1400,6 +1421,32 @@ describe('shouldUseFreshDist', () => {
       await utimes(helperPath, helperAt, helperAt);
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores newer sibling scripts outside the run-review surface', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const scriptsRoot = join(tempRoot, 'scripts');
+    const sourceEntry = join(scriptsRoot, 'run-review.ts');
+    const unrelatedSibling = join(scriptsRoot, 'other-script.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(scriptsRoot, { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(sourceEntry, 'export {};\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+      await writeFile(unrelatedSibling, 'export {};\n', 'utf8');
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const siblingAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(unrelatedSibling, siblingAt, siblingAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
