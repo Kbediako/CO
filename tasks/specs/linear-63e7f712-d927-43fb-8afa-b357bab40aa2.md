@@ -110,6 +110,6 @@ CO-114 already landed the retained subprocess smoke speedup and is explicitly no
 
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review` (stalled low-signal drift, manual fallback accepted)
-- Date: 2026-04-10
+- Date: 2026-04-09
 - Manifest: `.runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2-co-123-docs-review/cli/2026-04-09T15-19-12-917Z-b0df389b/manifest.json`
 - Override note: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T152544Z-docs-first/05-docs-review-override.md`

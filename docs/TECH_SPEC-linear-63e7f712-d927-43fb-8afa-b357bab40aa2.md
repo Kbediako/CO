@@ -59,7 +59,7 @@ last_review: 2026-04-10
   - resolve relative `.js` and extensionless specifiers back to the source files present in the checkout (`.ts`, `.js`, and `index.*` variants) so the closure follows checkout source truth rather than built-output paths
   - cache the discovered closure per source entrypoint within the test process so repeated smoke invocations do not repeatedly walk the graph
 - Helper behavior:
-  - recurse only through the discovered relative runtime-dependency closure for that suite
+  - recurse only through the discovered relative runtime-dependency closure for that suite, so the helper stays bounded to the relevant entrypoint graph
   - ignore type-only edges so runtime-unrelated type edits do not force source-entry fallback
   - fail closed when a tracked relative runtime dependency can no longer be resolved, because stale `dist` should not hide a broken source graph
   - fail closed on unreadable `dist` or root-stat errors
@@ -86,6 +86,6 @@ last_review: 2026-04-10
 
 ## Approvals
 - Reviewer: `codex-orchestrator docs-review` (stalled low-signal drift, manual fallback accepted)
-- Date: 2026-04-10
+- Date: 2026-04-09
 - Manifest: `.runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2-co-123-docs-review/cli/2026-04-09T15-19-12-917Z-b0df389b/manifest.json`
 - Override note: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T152544Z-docs-first/05-docs-review-override.md`

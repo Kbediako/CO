@@ -21,17 +21,17 @@
 - [x] Add targeted tests for the expanded freshness roots in both hot suites. Evidence: `tests/cli-command-surface.spec.ts`, `tests/run-review.spec.ts`.
 - [x] Re-run the focused hot-suite commands that cover the freshness logic. Evidence: `npx vitest run tests/cli-command-surface.spec.ts tests/run-review.spec.ts`.
 - [x] Confirm the bounded subprocess smoke matrix still prefers `dist` for unrelated-file changes and still rejects stale `dist` for the newly tracked dependency roots. Evidence: `tests/cli-command-surface.spec.ts`, `tests/run-review.spec.ts`, `npx vitest run tests/cli-command-surface.spec.ts tests/run-review.spec.ts`.
-- [x] `node scripts/delegation-guard.mjs`.
-- [x] `node scripts/spec-guard.mjs --dry-run`.
-- [x] `npm run build`.
-- [x] `npm run lint`.
-- [x] `npm run test`.
-- [x] `npm run docs:check`.
-- [x] `npm run docs:freshness`.
-- [x] `node scripts/diff-budget.mjs`.
-- [x] Standalone review or truthful manual fallback recorded. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`, `../../.runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/cli/2026-04-09T14-58-24-723Z-41832ebb/review/telemetry.json`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
+- [x] `npm run build`. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
+- [x] `npm run lint`. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
+- [x] `npm run test`. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
+- [x] `npm run docs:check`. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
+- [x] `npm run docs:freshness`. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
+- [x] Standalone review or truthful manual fallback recorded. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
 - [x] Explicit elegance pass recorded. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
-- [x] `npm run pack:smoke` if the final diff still touches downstream-facing CLI/review-wrapper surfaces.
+- [x] `npm run pack:smoke` if the final diff still touches downstream-facing CLI/review-wrapper surfaces. Evidence: `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260409T154507Z-review-fallback.md`.
 
 ## Handoff
 - [ ] PR attached to the issue.

@@ -107,7 +107,7 @@ function collectRelativeRuntimeSpecifiers(filePath: string, sourceText: string):
         addSpecifier(getModuleSpecifierText(node.moduleSpecifier));
       }
     } else if (ts.isExportDeclaration(node)) {
-      if (!node.isTypeOnly) {
+      if (!isTypeOnlyExport(node)) {
         addSpecifier(getModuleSpecifierText(node.moduleSpecifier));
       }
     } else if (ts.isImportEqualsDeclaration(node)) {
@@ -147,6 +147,20 @@ function isTypeOnlyImport(node: ts.ImportDeclaration): boolean {
     return false;
   }
   return bindings.elements.length > 0 && bindings.elements.every((element) => element.isTypeOnly);
+}
+
+function isTypeOnlyExport(node: ts.ExportDeclaration): boolean {
+  if (node.isTypeOnly) {
+    return true;
+  }
+  const clause = node.exportClause;
+  if (!clause) {
+    return false;
+  }
+  if (ts.isNamespaceExport(clause)) {
+    return false;
+  }
+  return clause.elements.length > 0 && clause.elements.every((element) => element.isTypeOnly);
 }
 
 function getModuleSpecifierText(node: ts.Expression | undefined): string | null {

@@ -1461,6 +1461,48 @@ describe('shouldUseFreshDist', () => {
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
+
+  it('ignores newer type-only re-export dependencies outside the runtime closure', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const typeOnlyDependency = join(tempRoot, 'scripts', 'lib', 'review-execution-types.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelper,
+        "export { type ReviewExecutionBoundaryPreflightResult } from './review-execution-types.js';\nexport function prepareReviewExecutionBoundaryPreflight() {}\n",
+        'utf8'
+      );
+      await writeFile(
+        typeOnlyDependency,
+        'export interface ReviewExecutionBoundaryPreflightResult { ok: boolean; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const typeOnlyAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelper, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(typeOnlyDependency, typeOnlyAt, typeOnlyAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 afterEach(async () => {

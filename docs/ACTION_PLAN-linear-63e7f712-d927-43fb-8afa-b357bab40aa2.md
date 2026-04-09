@@ -50,4 +50,4 @@
 
 ## Approvals
 - Reviewer: pending audited `linear child-stream --pipeline docs-review`
-- Date: 2026-04-10
+- Date: 2026-04-09
