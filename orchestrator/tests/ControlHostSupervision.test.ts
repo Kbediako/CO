@@ -405,6 +405,46 @@ describe('controlHostSupervision shell helpers', () => {
     );
   });
 
+  it('rejects stored configs whose explicit config path is not the managed config path', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      shellPath: '/bin/zsh'
+    });
+
+    expect(() =>
+      assertStoredControlHostSupervisionConfig('/tmp/copied-config.json', config)
+    ).toThrow(
+      `Invalid control-host supervision config at /tmp/copied-config.json: config path must match the managed path ${config.paths.configPath}.`
+    );
+  });
+
+  it('rejects stored configs whose managed directories do not match the stored home and label', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      shellPath: '/bin/zsh'
+    });
+
+    expect(() =>
+      assertStoredControlHostSupervisionConfig(config.paths.configPath, {
+        ...config,
+        paths: {
+          ...config.paths,
+          supportDir: '/tmp/unmanaged-support'
+        }
+      })
+    ).toThrow(
+      `Invalid control-host supervision config at ${config.paths.configPath}: paths.supportDir must match the managed path ${config.paths.supportDir}.`
+    );
+  });
+
   it('rejects stored config timer and threshold values that exceed the runtime contract', () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',

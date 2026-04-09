@@ -1294,6 +1294,23 @@ function assertStoredControlHostSupervisionConfig(
       );
     }
   }
+  const expectedPaths = resolveControlHostSupervisionPaths({
+    homeDir: record.homeDir as string,
+    label: record.label as string
+  });
+  const resolvedConfigPath = resolve(configPath);
+  if (resolvedConfigPath !== expectedPaths.configPath) {
+    throw new Error(
+      `Invalid control-host supervision config at ${configPath}: config path must match the managed path ${expectedPaths.configPath}.`
+    );
+  }
+  for (const key of REQUIRED_CONTROL_HOST_SUPERVISION_PATH_FIELDS) {
+    if (paths[key] !== expectedPaths[key]) {
+      throw new Error(
+        `Invalid control-host supervision config at ${configPath}: paths.${key} must match the managed path ${expectedPaths[key]}.`
+      );
+    }
+  }
 }
 
 function assertStoredTimerField(
