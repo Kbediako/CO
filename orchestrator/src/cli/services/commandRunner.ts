@@ -747,10 +747,13 @@ function resolveStageInvocation(
   env: NodeJS.ProcessEnv
 ): ResolvedStageInvocation {
   if (isProviderLinearWorkerCommandStage(stage)) {
+    const providerWorkerPackageRoot =
+      normalizeOptionalString(env.CODEX_ORCHESTRATOR_PACKAGE_ROOT) ?? PACKAGE_ROOT;
     const invocation = resolveProviderLinearWorkerProgramInvocation({
+      allowConfiguredForeignPackageRoot: true,
       env,
       execPath: normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath,
-      packageRoot: PACKAGE_ROOT
+      packageRoot: providerWorkerPackageRoot
     });
     return {
       command: invocation.command,

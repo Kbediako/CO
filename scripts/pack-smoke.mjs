@@ -361,7 +361,8 @@ async function main() {
     await assertPathExists(path.join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js'), 'packaged dist bin');
     await assertPathMissing(path.join(packageRoot, 'bin', 'codex-orchestrator.ts'), 'repo-only source CLI');
     await assertPathMissing(path.join(packageRoot, 'orchestrator', 'src'), 'repo-only orchestrator sources');
-    await assertPathMissing(path.join(packageRoot, 'node_modules', 'ts-node'), 'repo-only ts-node dependency');
+    await assertPathMissing(path.join(packageRoot, 'node_modules', 'ts-node'), 'nested repo-only ts-node dependency');
+    await assertPathMissing(path.join(tempDir, 'node_modules', 'ts-node'), 'hoisted repo-only ts-node dependency');
 
     await assertMarkdownLinksResolve(packageRoot);
     await runCommand(binPath, ['--help'], { cwd: tempDir });
