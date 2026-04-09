@@ -2918,12 +2918,12 @@ export function createProviderIssueHandoffService(
         return;
       }
 
-      await maybeRunProviderOperatorAutopilotCycle({
+      const dispatchTrackedIssues = await maybeRunProviderOperatorAutopilotCycle({
         pollInput,
         sourceSetup: resolveMergeCloseoutSourceSetup()
       });
 
-      for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(pollInput.trackedIssues)) {
+      for (const trackedIssue of sortLiveLinearTrackedIssuesForDispatch(dispatchTrackedIssues)) {
         const providerKey = buildProviderIssueKey(trackedIssue.provider, trackedIssue.id);
         if (existingProviderKeys.has(providerKey) || consumedTrackedIssueKeys.has(providerKey)) {
           continue;
@@ -2961,9 +2961,10 @@ export function createProviderIssueHandoffService(
   const maybeRunProviderOperatorAutopilotCycle = async (input: {
     pollInput: ProviderIssueHandoffPollInput;
     sourceSetup: DispatchPilotSourceSetup | null;
-  }): Promise<void> => {
+  }): Promise<LiveLinearTrackedIssue[]> => {
+    const fallbackTrackedIssues = input.pollInput.trackedIssues;
     if (!options.providerWorkflowConfigStore || !runOperatorAutopilot) {
-      return;
+      return fallbackTrackedIssues;
     }
     let providerWorkflow: Awaited<ReturnType<ProviderWorkflowConfigStore['refresh']>>;
     try {
@@ -2974,11 +2975,11 @@ export function createProviderIssueHandoffService(
           (error as Error)?.message ?? String(error)
         }`
       );
-      return;
+      return fallbackTrackedIssues;
     }
     const autopilotConfig = resolveProviderOperatorAutopilotConfigFromPayload(providerWorkflow);
     if (!autopilotConfig) {
-      return;
+      return fallbackTrackedIssues;
     }
     const previousResult = providerWorkflow.operator_autopilot?.last_result ?? null;
     let nextResult: ProviderOperatorAutopilotResult;
@@ -3038,6 +3039,28 @@ export function createProviderIssueHandoffService(
         `[provider-operator-autopilot] ${nextResult.summary} error=${nextResult.error ?? 'unknown'}`
       );
     }
+    if (
+      !nextResult.actions.some((action) => action.transition.status === 'transitioned') ||
+      !input.pollInput.refetchTrackedIssues
+    ) {
+      return fallbackTrackedIssues;
+    }
+    try {
+      const resolution = await input.pollInput.refetchTrackedIssues();
+      if (resolution.kind === 'ready') {
+        return resolution.trackedIssues;
+      }
+      logger.warn(
+        '[provider-operator-autopilot] Tracked-issue refetch skipped after transition; dispatch continues with the pre-transition poll snapshot.'
+      );
+    } catch (error) {
+      logger.warn(
+        `[provider-operator-autopilot] Failed to refetch tracked issues after transition: ${
+          (error as Error)?.message ?? String(error)
+        }`
+      );
+    }
+    return fallbackTrackedIssues;
   };
 
   return {
