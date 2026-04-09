@@ -954,19 +954,26 @@ function applyProviderLinearWorkerJsonlRecord(
   activitySource: ProviderLinearWorkerCurrentTurnActivitySource
 ): boolean {
   let changed = false;
+  let threadChanged = false;
   const payload = isRecord(parsed.payload) ? parsed.payload : null;
   if (parsed.type === 'session_meta' && payload) {
     const nextThreadId = normalizeOptionalString(payload.id);
     if (nextThreadId && nextThreadId !== state.threadId) {
+      threadChanged = state.threadId !== null;
       state.threadId = nextThreadId;
       changed = true;
     }
   }
   if (parsed.type === 'thread.started' && typeof parsed.thread_id === 'string') {
     if (parsed.thread_id !== state.threadId) {
+      threadChanged = state.threadId !== null;
       state.threadId = parsed.thread_id;
       changed = true;
     }
+  }
+  if (threadChanged) {
+    // A bookkeeping-only thread swap should not relabel stale turn-scoped activity onto the new session.
+    resetProviderLinearWorkerTurnScopedTelemetry(state);
   }
   if (parsed.type === 'turn_context' && payload) {
     const nextTurnId = normalizeOptionalString(payload.turn_id);

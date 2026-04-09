@@ -1033,6 +1033,32 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('clears stale current-turn activity when bookkeeping switches to a new thread before new turn activity arrives', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+        '{"type":"event_msg","payload":{"type":"agent_message","message":"Investigating provider-worker EVENT provenance."}}',
+        '{"timestamp":"2026-03-21T09:00:01.000Z","type":"session_meta","payload":{"id":"thread-2","cwd":"/tmp/provider-worker","source":"exec"}}'
+      ].join('\n')
+    );
+
+    expect(parsed).toEqual({
+      threadId: 'thread-2',
+      turnId: 'turn-1',
+      finalMessage: null,
+      lastEvent: null,
+      lastEventAt: null,
+      currentTurnActivity: null,
+      tokens: {
+        input_tokens: null,
+        output_tokens: null,
+        total_tokens: null
+      },
+      rateLimits: null
+    });
+  });
+
   it('parses live turn.completed usage and derives total tokens when the Codex stream omits total_tokens', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
