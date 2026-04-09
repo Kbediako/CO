@@ -36,7 +36,11 @@ import {
   ensureProviderWorkspace,
   resolveProviderResumeWorkspacePath
 } from './run/workspacePath.js';
-import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from './providerLinearWorkerRunner.js';
+import {
+  PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV,
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  type ProviderLinearResidentSessionSeed
+} from './providerLinearWorkerRunner.js';
 import {
   REPO_CONFIG_PATH_ENV_KEY,
 } from './config/userConfig.js';
@@ -235,6 +239,7 @@ export async function runControlHostCliShell(
                 ...launchSpec.envOverrides,
                 ...buildProviderOverrideOwnershipEnv(cliEntrypoint, launchSpec.envOverrides),
                 ...buildProviderLinearSourceEnvOverrides(input),
+                ...buildProviderResidentSessionEnvOverrides(input.residentSessionSeed ?? null),
                 [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: taskId,
                 [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: runId,
                 [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
@@ -568,6 +573,14 @@ function buildProviderLinearSourceEnvOverrides(input: ProviderLinearSourceScope)
   };
 }
 
+function buildProviderResidentSessionEnvOverrides(
+  seed: ProviderLinearResidentSessionSeed | null
+): Record<string, string> {
+  return {
+    [PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]: seed ? JSON.stringify(seed) : ''
+  };
+}
+
 function buildProviderLaunchSpec(
   env: EnvironmentPaths,
   workspacePath: string,
@@ -635,6 +648,7 @@ export const __test__ = {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
   buildProviderLinearSourceEnvOverrides,
+  buildProviderResidentSessionEnvOverrides,
   buildProviderOverrideOwnershipEnv,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,

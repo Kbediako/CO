@@ -17,6 +17,7 @@ const {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
   buildProviderLinearSourceEnvOverrides,
+  buildProviderResidentSessionEnvOverrides,
   buildProviderOverrideOwnershipEnv,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
@@ -119,6 +120,34 @@ describe('controlHostCliShell manifest discovery', () => {
           '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1'
       }
+    });
+  });
+
+  it('serializes guarded resident-session continuity seeds into provider worker env overrides', () => {
+    expect(
+      buildProviderResidentSessionEnvOverrides({
+        source_run_id: 'run-prev',
+        source_updated_at: '2026-04-09T09:00:00.000Z',
+        source_end_reason: 'max_turns_reached_issue_still_active',
+        source_thread_id: 'thread-1',
+        logical_turn_count: 20,
+        restart_count: 1
+      })
+    ).toEqual({
+      CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED: JSON.stringify({
+        source_run_id: 'run-prev',
+        source_updated_at: '2026-04-09T09:00:00.000Z',
+        source_end_reason: 'max_turns_reached_issue_still_active',
+        source_thread_id: 'thread-1',
+        logical_turn_count: 20,
+        restart_count: 1
+      })
+    });
+  });
+
+  it('clears guarded resident-session continuity seeds when the next launch should start fresh', () => {
+    expect(buildProviderResidentSessionEnvOverrides(null)).toEqual({
+      CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED: ''
     });
   });
 
