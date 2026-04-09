@@ -40,7 +40,7 @@ last_review: 2026-04-09
   - `packages/sdk-node` artifact contract truth
   - `packages/design-system` and design-reference task/spec claims
   - stale instruction/archive/demo surfaces such as `docs/AGENTS.md`, `.agent/AGENTS.md`, the old MCP code-mode report archive, and `packages/orchestrator-status-ui/app.js`
-  - compatibility candidates such as `orchestrator/src/sync/**`, the former shared stdio shim, `pipelineResolver.ts`, `rlmCodexRuntimeShell.ts`, and `requiresCloud` vs `requires_cloud`
+  - compatibility candidates such as `orchestrator/src/sync/**`, the deprecated shared stdio shim, `pipelineResolver.ts`, `rlmCodexRuntimeShell.ts`, and `requiresCloud` vs `requires_cloud`
 - Registry/docs integrity:
   - register the new packet in `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`
   - apply the repo-supported task-archive fallback immediately if the new snapshot exceeds the `docs/TASKS.md` budget

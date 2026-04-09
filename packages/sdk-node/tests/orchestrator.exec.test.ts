@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { access, readFile } from 'node:fs/promises';
 import { PassThrough } from 'node:stream';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 
@@ -46,8 +47,13 @@ describe('ExecClient', () => {
     expect(result.summary.payload.outputs.stdout).toBe('ok');
     expect(result.exitCode).toBe(0);
     expect(result.rawStderr).toEqual([]);
-    expect('eventsPath' in (result as Record<string, unknown>)).toBe(false);
-    expect('stderrPath' in (result as Record<string, unknown>)).toBe(false);
+    expect(result.eventsPath).toContain('events.ndjson');
+    expect(result.stderrPath).toContain('stderr.log');
+    await expect(readFile(result.eventsPath, 'utf8')).resolves.toContain('"type":"run:summary"');
+    await expect(readFile(result.stderrPath, 'utf8')).resolves.toBe('');
+    await handle.cleanupArtifacts();
+    await expect(access(result.eventsPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(access(result.stderrPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('supports retrying with overrides', async () => {

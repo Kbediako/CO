@@ -52,7 +52,7 @@ CO's active code and its truth surfaces have drifted apart. Some of the drift is
     - make `packages/design-system` and related design-reference task/docs truthful about what is actually shipped today
     - remove fixed historical demo residue from `packages/orchestrator-status-ui/app.js`
   - compatibility candidates:
-    - audit `orchestrator/src/sync/**`, the former shared stdio shim, `pipelineResolver.ts`, `rlmCodexRuntimeShell.ts`, review classifiers, `requiresCloud` vs `requires_cloud`, and nearby orphan types
+    - audit `orchestrator/src/sync/**`, the deprecated shared stdio shim, `pipelineResolver.ts`, `rlmCodexRuntimeShell.ts`, review classifiers, `requiresCloud` vs `requires_cloud`, and nearby orphan types
     - delete where dead; otherwise preserve with explicit rationale in the touched docs/spec/task packet
 
 ## Implementation Surface
@@ -71,7 +71,7 @@ CO's active code and its truth surfaces have drifted apart. Some of the drift is
   - `packages/sdk-node/src/orchestrator.ts`
   - `packages/design-system/**`
   - `packages/orchestrator-status-ui/app.js`
-  - the former shared stdio shim (removed in this lane)
+  - the deprecated shared stdio shim (retained for published import compatibility)
 - Expected docs/task/instruction surfaces:
   - `docs/AGENTS.md`
   - `.agent/AGENTS.md`
@@ -102,7 +102,7 @@ CO's active code and its truth surfaces have drifted apart. Some of the drift is
 - Historical selected-run docs/task packets still describe a removed legacy selected-run presenter module as current even though the newer control-host truth surfaces now center on `uiDataController.ts`, `operatorDashboardPresenter.ts`, `selectedRunProjection.ts`, and compatibility/read-model seams.
 - The repo still tracks uppercase `.agent/task/*_TEMPLATE.md` files alongside `.agent/task/templates/*`.
 - `packages/design-system` still contains placeholder-oriented scripts while older design-reference tasks/docs describe a more delivered toolkit/regression capability.
-- `packages/sdk-node/src/orchestrator.ts` exposes paths that are not durably available to the caller.
+- `packages/sdk-node/src/orchestrator.ts` needs a compatibility-safe contract for `eventsPath` and `stderrPath` so those fields stay truthful without becoming a silent breaking change.
 - The old MCP code-mode report plus `docs/AGENTS.md` and `.agent/AGENTS.md` still carry stale present-tense historical claims.
 - Several compatibility aliases and deprecated seams still exist without fresh keep-or-delete rationale.
 

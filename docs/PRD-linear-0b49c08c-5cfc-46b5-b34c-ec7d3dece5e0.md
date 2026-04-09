@@ -8,7 +8,7 @@
 - Source issue: `CO-77` / `da28812d-8367-4d94-a273-d0652535f818`
 
 ## Summary
-- Problem Statement: the repo still carries a cluster of stale or contradictory surfaces that were acceptable as intermediate compatibility seams but are now misleading. Historical docs and task packets still describe a removed legacy selected-run presenter module as the `/ui/data.json` authority even though the current control-host truth is centered on `uiDataController.ts`, `operatorDashboardPresenter.ts`, and newer compatibility/read-model seams; uppercase legacy task templates still coexist with `.agent/task/templates/*`; `scripts/lib/review-launch-attempt.ts` and `scripts/run-review.ts` still carry compatibility-era retry and fallback behavior whose live necessity is under-explained; `packages/design-system` and nearby design-reference task/docs still overstate delivered toolkit or regression capability; `packages/sdk-node/src/orchestrator.ts` still advertises deleted-artifact outputs; and stale archive, instruction, and demo surfaces such as the old MCP code-mode report, `docs/AGENTS.md`, `.agent/AGENTS.md`, and `packages/orchestrator-status-ui/app.js` still tell older stories.
+- Problem Statement: the repo still carries a cluster of stale or contradictory surfaces that were acceptable as intermediate compatibility seams but are now misleading. Historical docs and task packets still describe a removed legacy selected-run presenter module as the `/ui/data.json` authority even though the current control-host truth is centered on `uiDataController.ts`, `operatorDashboardPresenter.ts`, and newer compatibility/read-model seams; uppercase legacy task templates still coexist with `.agent/task/templates/*`; `scripts/lib/review-launch-attempt.ts` and `scripts/run-review.ts` still carry compatibility-era retry and fallback behavior whose live necessity is under-explained; `packages/design-system` and nearby design-reference task/docs still overstate delivered toolkit or regression capability; `packages/sdk-node/src/orchestrator.ts` still exposes compatibility artifact paths whose lifetime was not durable under the caller; and stale archive, instruction, and demo surfaces such as the old MCP code-mode report, `docs/AGENTS.md`, `.agent/AGENTS.md`, and `packages/orchestrator-status-ui/app.js` still tell older stories.
 - Desired Outcome: land one integrated cleanup pass that removes dead compatibility surfaces where possible, records explicit rationale where a compatibility seam must remain, and updates the surrounding docs/specs/tasks/instructions in the same lane so the repo's public and internal surfaces all tell the truth together.
 
 ## User Request Translation (Context Anchor)
@@ -60,7 +60,7 @@
   - `tasks/hi-fi-design-toolkit.md`
   - `docs/design/specs/**`
   - `orchestrator/src/sync/**`
-  - the now-removed shared stdio shim (formerly packages/shared/streams/stdio.ts)
+  - the deprecated shared stdio shim (`packages/shared/streams/stdio.ts`)
   - `pipelineResolver.ts`
   - `rlmCodexRuntimeShell.ts`
   - `requiresCloud`
@@ -79,7 +79,7 @@
   - selected-run-era docs and task packets still describe a removed legacy selected-run presenter module as the `/ui/data.json` authority even though the present control-host truth is anchored in `uiDataController.ts`, `operatorDashboardPresenter.ts`, `selectedRunProjection.ts`, and related compatibility/read-model seams
   - uppercase `.agent/task/*_TEMPLATE.md` files are still tracked while current repo guidance points authors at `.agent/task/templates/*`
   - `packages/design-system` still has placeholder-style scripts and minimal package scaffolding while older design-reference task/docs describe a delivered toolkit and visual-regression surface
-  - `packages/sdk-node/src/orchestrator.ts` still returns `eventsPath` and `stderrPath` even though they are deleted before the contract escapes
+  - `packages/sdk-node/src/orchestrator.ts` still needs a compatibility-safe, truthful contract for `eventsPath` and `stderrPath`
   - stale instruction and archive residue remains in active surfaces such as `docs/AGENTS.md`, `.agent/AGENTS.md`, and the old MCP code-mode report archive
   - several compatibility aliases and deprecated seams remain without a fresh keep-or-delete decision
 - Reference truth:
@@ -167,7 +167,7 @@
 - stale MCP code-mode report archive
 
 ## Open Questions
-- Which compatibility candidates still have live consumers that justify retention, especially around `orchestrator/src/sync/**`, the now-removed shared stdio shim, `pipelineResolver.ts`, `rlmCodexRuntimeShell.ts`, and `requiresCloud` vs `requires_cloud`?
+- Which compatibility candidates still have live consumers that justify retention, especially around `orchestrator/src/sync/**`, the deprecated shared stdio shim, `pipelineResolver.ts`, `rlmCodexRuntimeShell.ts`, and `requiresCloud` vs `requires_cloud`?
 - Is the smallest truthful treatment for the design-system surface selective deletion plus docs/task archival, or are there bounded currently-shipped surfaces that need to remain documented?
 
 ## Approvals

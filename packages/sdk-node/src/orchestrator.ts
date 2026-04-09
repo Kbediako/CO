@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { createWriteStream, mkdtempSync, type WriteStream } from 'node:fs';
+import { createWriteStream, mkdtempSync, rmSync, type WriteStream } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
@@ -31,8 +31,28 @@ export interface ExecRunResult {
   exitCode: number | null;
   status: 'succeeded' | 'failed';
   manifestPath: string;
+  /** @deprecated Compatibility path to the full JSONL event stream for this run. Call `ExecRunHandle.cleanupArtifacts()` when finished. */
+  eventsPath: string;
+  /** @deprecated Compatibility path to the raw stderr log for this run. Call `ExecRunHandle.cleanupArtifacts()` when finished. */
+  stderrPath: string;
   rawStderr: string[];
 }
+
+const activeArtifactRoots = new Set<string>();
+const artifactCleanupFinalizer = new FinalizationRegistry<string>((artifactRoot) => {
+  activeArtifactRoots.delete(artifactRoot);
+  void rm(artifactRoot, { recursive: true, force: true }).catch(() => {});
+});
+
+process.once('exit', () => {
+  for (const artifactRoot of activeArtifactRoots) {
+    try {
+      rmSync(artifactRoot, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup only.
+    }
+  }
+});
 
 interface InternalExecOptions extends ExecCommandOptions {
   cliPath: string;
@@ -88,6 +108,8 @@ export class ExecRunHandle extends EventEmitter {
   private readonly maxEventBuffer = 200;
   private readonly maxStderrBuffer = 200;
   private streamsClosed = false;
+  private artifactsCleaned = false;
+  private resultSettled = false;
   private summaryEvent: RunSummaryEvent | null = null;
   private readonly resultPromise: Promise<ExecRunResult>;
   private resolveResult!: (value: ExecRunResult) => void;
@@ -103,6 +125,8 @@ export class ExecRunHandle extends EventEmitter {
     this.artifactRoot = mkdtempSync(join(tmpdir(), 'codex-exec-'));
     this.eventsFilePath = join(this.artifactRoot, 'events.ndjson');
     this.stderrFilePath = join(this.artifactRoot, 'stderr.log');
+    activeArtifactRoots.add(this.artifactRoot);
+    artifactCleanupFinalizer.register(this, this.artifactRoot, this);
     this.eventsStream = createWriteStream(this.eventsFilePath, { flags: 'a' });
     this.stderrStream = createWriteStream(this.stderrFilePath, { flags: 'a' });
     this.resultPromise = new Promise<ExecRunResult>((resolve, reject) => {
@@ -134,7 +158,6 @@ export class ExecRunHandle extends EventEmitter {
       this.emit('event', parsed);
       if (parsed.type === 'run:summary') {
         this.summaryEvent = parsed as RunSummaryEvent;
-        this.resolveResult(this.buildResult());
         this.emit('summary', this.summaryEvent);
       }
     });
@@ -149,14 +172,15 @@ export class ExecRunHandle extends EventEmitter {
       this.emit('stderr', text);
     });
 
-    child.once('error', (error) => {
-      this.closeStreams();
+    child.once('error', async (error) => {
+      await this.closeStreams({ preserveArtifacts: false });
       this.emit('error', error);
-      this.rejectResult(error);
+      this.rejectResultOnce(error);
     });
 
-    child.once('close', (code, signal) => {
-      this.closeStreams();
+    child.once('close', async (code, signal) => {
+      const preserveArtifacts = this.summaryEvent !== null;
+      await this.closeStreams({ preserveArtifacts });
       this.emit('exit', { code, signal });
       if (!this.summaryEvent) {
         const error = new Error('Exec command exited without emitting a summary event.') as Error & {
@@ -165,8 +189,10 @@ export class ExecRunHandle extends EventEmitter {
         };
         error.exitCode = code ?? null;
         error.signal = signal ?? null;
-        this.rejectResult(error);
+        this.rejectResultOnce(error);
+        return;
       }
+      this.resolveResultOnce(this.buildResult());
     });
   }
 
@@ -199,6 +225,11 @@ export class ExecRunHandle extends EventEmitter {
     return this.client.run(merged);
   }
 
+  async cleanupArtifacts(): Promise<void> {
+    await this.result.catch(() => undefined);
+    await this.removeArtifacts();
+  }
+
   private buildResult(): ExecRunResult {
     if (!this.summaryEvent) {
       throw new Error('Summary not available');
@@ -210,18 +241,50 @@ export class ExecRunHandle extends EventEmitter {
       exitCode: payload.result.exitCode ?? null,
       status: payload.status,
       manifestPath: payload.run.manifest,
+      eventsPath: this.eventsFilePath,
+      stderrPath: this.stderrFilePath,
       rawStderr: [...this.stderrLines]
     };
   }
 
-  private closeStreams(): void {
+  private resolveResultOnce(value: ExecRunResult): void {
+    if (this.resultSettled) {
+      return;
+    }
+    this.resultSettled = true;
+    this.resolveResult(value);
+  }
+
+  private rejectResultOnce(reason: unknown): void {
+    if (this.resultSettled) {
+      return;
+    }
+    this.resultSettled = true;
+    this.rejectResult(reason);
+  }
+
+  private async closeStreams(options: { preserveArtifacts: boolean }): Promise<void> {
     if (this.streamsClosed) {
       return;
     }
     this.streamsClosed = true;
-    this.eventsStream.end();
-    this.stderrStream.end();
-    void rm(this.artifactRoot, { recursive: true, force: true }).catch(() => {});
+    await Promise.all([
+      new Promise<void>((resolve) => this.eventsStream.end(resolve)),
+      new Promise<void>((resolve) => this.stderrStream.end(resolve))
+    ]);
+    if (!options.preserveArtifacts) {
+      await this.removeArtifacts();
+    }
+  }
+
+  private async removeArtifacts(): Promise<void> {
+    if (this.artifactsCleaned) {
+      return;
+    }
+    this.artifactsCleaned = true;
+    artifactCleanupFinalizer.unregister(this);
+    activeArtifactRoots.delete(this.artifactRoot);
+    await rm(this.artifactRoot, { recursive: true, force: true }).catch(() => {});
   }
 }
 
