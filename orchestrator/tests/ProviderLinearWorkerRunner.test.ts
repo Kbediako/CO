@@ -3224,6 +3224,9 @@ describe('provider linear worker runner', () => {
           latest_turn_id: 'turn-1',
           latest_session_id: 'thread-1-turn-1',
           latest_session_id_source: 'derived_from_thread_and_turn',
+          last_event: 'agent_message',
+          last_message: 'Turn 1 still running',
+          last_event_at: '2026-03-21T09:00:00.200Z',
           current_turn_activity: {
             event: 'agent_message',
             message_or_payload: 'Turn 1 still running',
@@ -3263,6 +3266,9 @@ describe('provider linear worker runner', () => {
     expect(refreshed).toMatchObject({
       latest_turn_id: 'turn-1',
       latest_session_id: 'thread-1-turn-1',
+      last_event: 'agent_message',
+      last_message: 'Turn 1 still running',
+      last_event_at: '2026-03-21T09:00:00.200Z',
       tokens: { input_tokens: 18, output_tokens: 12, total_tokens: 30 },
       current_turn_activity: {
         event: 'agent_message',

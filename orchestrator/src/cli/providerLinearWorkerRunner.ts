@@ -2356,6 +2356,14 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
     rateLimits: proof.rate_limits
   };
+  const restoreProofTelemetryFloor = () => {
+    parseState.threadId = proof.thread_id;
+    parseState.turnId = proof.latest_turn_id;
+    parseState.lastEvent = proof.last_event;
+    parseState.finalMessage = proof.last_message;
+    parseState.lastEventAt = proof.last_event_at;
+    parseState.currentTurnActivity = proofCurrentTurnActivity;
+  };
   let tailState = buildProviderWorkerSessionLogTailState(sessionLogPath, hydrationState);
   let preserveProofTelemetryFloor = false;
   if (hydrationState && hydrationState.path === sessionLogPath) {
@@ -2407,17 +2415,13 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.turnId !== proof.latest_turn_id &&
     !providerWorkerTokenUsageAdvancesFloor(proofTokenFloor, parseState.tokens)
   ) {
-    parseState.threadId = proof.thread_id;
-    parseState.turnId = proof.latest_turn_id;
-    parseState.currentTurnActivity = proofCurrentTurnActivity;
+    restoreProofTelemetryFloor();
   }
   if (
     preserveProofTelemetryFloor &&
     providerWorkerTokenUsageFallsBehindFloor(proofTokenFloor, parseState.tokens)
   ) {
-    parseState.threadId = proof.thread_id;
-    parseState.turnId = proof.latest_turn_id;
-    parseState.currentTurnActivity = proofCurrentTurnActivity;
+    restoreProofTelemetryFloor();
     parseState.tokens = mergeProviderWorkerTokenUsageFloor(proofTokenFloor, parseState.tokens);
     parseState.rateLimits = proof.rate_limits;
   }
