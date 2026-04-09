@@ -241,7 +241,6 @@ export async function runProviderOperatorAutopilot(
       holds,
       pending_actions: resolveEffectivePendingActions(
         pendingActions,
-        input.previous_result,
         input.config.post_merge_rollout.enabled
       )
     };
@@ -273,7 +272,6 @@ export async function runProviderOperatorAutopilot(
         holds,
         pending_actions: resolveEffectivePendingActions(
           pendingActions,
-          input.previous_result,
           input.config.post_merge_rollout.enabled
         )
       };
@@ -288,7 +286,6 @@ export async function runProviderOperatorAutopilot(
 
   const effectivePendingActions = resolveEffectivePendingActions(
     pendingActions,
-    input.previous_result,
     input.config.post_merge_rollout.enabled
   );
   const status =
@@ -430,16 +427,22 @@ async function maybeRunBacklogPromotion(input: {
       error: transitionRecord.error
     };
   }
+  if (transition.action === 'noop') {
+    return {
+      action: null,
+      hold: null,
+      failed: false,
+      summary: '',
+      error: null
+    };
+  }
   return {
     action: {
       kind: 'backlog_promotion',
       issue_id: candidate.id,
       issue_identifier: candidate.identifier,
       reason: 'backlog_head_promoted',
-      summary:
-        transition.action === 'noop'
-          ? `Backlog head ${candidate.identifier} was already ${input.config.backlog_promotion.target_state_name}.`
-          : `Promoted backlog head ${candidate.identifier} to ${input.config.backlog_promotion.target_state_name}.`,
+      summary: `Promoted backlog head ${candidate.identifier} to ${input.config.backlog_promotion.target_state_name}.`,
       transition: transitionRecord,
       action_required_reasons: []
     },
@@ -544,16 +547,22 @@ async function maybeRunReviewHandoffRework(input: {
       error: transitionRecord.error
     };
   }
+  if (transition.action === 'noop') {
+    return {
+      action: null,
+      hold: null,
+      failed: false,
+      summary: '',
+      error: null
+    };
+  }
   return {
     action: {
       kind: 'review_handoff_rework',
       issue_id: candidate.trackedIssue.id,
       issue_identifier: candidate.trackedIssue.identifier,
       reason: 'author_action_required_rework',
-      summary:
-        transition.action === 'noop'
-          ? `Review handoff ${candidate.trackedIssue.identifier} was already ${input.config.review_handoff_rework.target_state_name}.`
-          : `Moved review handoff ${candidate.trackedIssue.identifier} to ${input.config.review_handoff_rework.target_state_name} because author action is required: ${authorActionReasons.join(', ')}.`,
+      summary: `Moved review handoff ${candidate.trackedIssue.identifier} to ${input.config.review_handoff_rework.target_state_name} because author action is required: ${authorActionReasons.join(', ')}.`,
       transition: transitionRecord,
       action_required_reasons: [...authorActionReasons]
     },
@@ -607,16 +616,12 @@ function collectPendingActions(input: {
 
 function resolveEffectivePendingActions(
   pendingActions: ProviderOperatorAutopilotPendingActionRecord[],
-  previousResult: ProviderOperatorAutopilotResult | null | undefined,
   postMergeRolloutEnabled: boolean
 ): ProviderOperatorAutopilotPendingActionRecord[] {
-  if (pendingActions.length > 0) {
-    return pendingActions.map(clonePendingActionRecord);
-  }
   if (!postMergeRolloutEnabled) {
     return [];
   }
-  return (previousResult?.pending_actions ?? []).map(clonePendingActionRecord);
+  return pendingActions.map(clonePendingActionRecord);
 }
 
 function summarizeOperatorAutopilotResult(input: {
