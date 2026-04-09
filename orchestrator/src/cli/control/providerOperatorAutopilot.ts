@@ -327,11 +327,35 @@ async function maybeRunBacklogPromotion(input: {
     return { action: null, hold: null, failed: false, summary: '', error: null };
   }
   const backlogState = normalizeProviderLinearWorkflowState(input.config.backlog_promotion.state_name);
-  const candidate = input.sortedTrackedIssues.find(
+  const candidateIndex = input.sortedTrackedIssues.findIndex(
     (issue) => normalizeProviderLinearWorkflowState(issue.state) === backlogState
   );
+  const candidate = candidateIndex >= 0 ? input.sortedTrackedIssues[candidateIndex] : null;
   if (!candidate) {
     return { action: null, hold: null, failed: false, summary: '', error: null };
+  }
+  const higherRankedBlockedQueueLane =
+    candidateIndex > 0
+      ? input.sortedTrackedIssues.slice(0, candidateIndex).find((issue) => {
+          const workflowState = classifyProviderLinearWorkflowState(issue);
+          return workflowState.isTodo && providerLinearTodoBlockedByNonTerminal(issue.blocked_by);
+        }) ?? null
+      : null;
+  if (higherRankedBlockedQueueLane) {
+    return {
+      action: null,
+      hold: {
+        kind: 'backlog_promotion',
+        issue_id: candidate.id,
+        issue_identifier: candidate.identifier,
+        reason: 'backlog_head_blocked_by_higher_ranked_lane',
+        summary: `Backlog head ${candidate.identifier} remains parked because higher-ranked queue lane ${higherRankedBlockedQueueLane.identifier} is still blocked by non-terminal work: ${formatBlockedBy(higherRankedBlockedQueueLane.blocked_by)}.`,
+        action_required_reasons: []
+      },
+      failed: false,
+      summary: '',
+      error: null
+    };
   }
   const existingClaim = input.claimsByIssueId.get(candidate.id) ?? null;
   if (existingClaim && isBacklogPromotionBlockedByExistingClaimState(existingClaim.state)) {
