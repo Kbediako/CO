@@ -2272,6 +2272,7 @@ export function createProviderIssueHandoffService(
             existing.reason === 'provider_issue_rehydrated_active_run'
               ? {}
               : { review_promotion: null, merge_closeout: null };
+          const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, existing);
           const claim = await upsertProviderClaimAndPersist({
             ...existing,
             ...trackedIssueFields,
@@ -2282,6 +2283,7 @@ export function createProviderIssueHandoffService(
             reason: 'provider_issue_rehydrated_active_run',
             run_id: activeRun.runId,
             run_manifest_path: activeRun.manifestPath,
+            worker_host: workerHost,
             accepted_at: existing.accepted_at,
             last_delivery_id: input.deliveryId,
             last_event: input.event,

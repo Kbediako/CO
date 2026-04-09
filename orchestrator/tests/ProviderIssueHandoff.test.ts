@@ -2611,7 +2611,8 @@ describe('createProviderIssueHandoffService', () => {
         issue_assignee_id: 'viewer-1',
         issue_assignee_name: 'Codex',
         run_id: 'run-webhook-review-release',
-        run_manifest_path: childPaths.manifestPath
+        run_manifest_path: childPaths.manifestPath,
+        worker_host: 'worker-host-07'
       });
       expect(launcher.start).not.toHaveBeenCalled();
       expect(launcher.resume).not.toHaveBeenCalled();
