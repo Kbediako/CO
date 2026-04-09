@@ -25,6 +25,23 @@
       }
     },
     {
+      "id": "20260409-linear-70e83230-4f52-4850-b494-41fd0ec32f13",
+      "title": "CO: Add a guarded resident app-server control seam with drain/restart/resume continuity",
+      "relates_to": "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "task": "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "agent_task": ".agent/task/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
+        "docs": "docs/TECH_SPEC-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md"
+      }
+    },
+    {
       "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
       "title": "CO: automate truthful In Review -> Merging promotion after clean review handoff",
       "relates_to": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
@@ -45,6 +62,30 @@
         "task": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
         "agent_task": ".agent/task/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
         "docs": "docs/TECH_SPEC-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md"
+      }
+    },
+    {
+      "id": "20260409-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5",
+      "title": "CO STATUS: preserve canonical provider-worker activity truth and EVENT provenance end to end",
+      "relates_to": "tasks/tasks-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5-co-112-docs-review/cli/2026-04-09T05-39-47-373Z-741ea904/manifest.json",
+          "telemetry": ".runs/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5-co-112-docs-review/cli/2026-04-09T05-39-47-373Z-741ea904/review/telemetry.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
+        "task": "tasks/tasks-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
+        "agent_task": ".agent/task/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
+        "docs": "docs/TECH_SPEC-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md"
       }
     },
     {
