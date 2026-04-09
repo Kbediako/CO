@@ -193,7 +193,13 @@ export function buildControlHostSupervisionConfig(
     'shell path'
   );
   const envFiles = (input.envFiles ?? resolveDefaultControlHostSupervisionEnvFiles(homeDir)).map(
-    (value) => resolveOptionalPath(value, cwd)
+    (value, index) => {
+      const trimmed = value.trim();
+      if (trimmed.length === 0) {
+        throw new Error(`env file entry at index ${index} must be non-empty.`);
+      }
+      return resolveOptionalPath(trimmed, cwd);
+    }
   );
   const paths = resolveControlHostSupervisionPaths({
     homeDir,

@@ -32,6 +32,7 @@ interface CommandResult {
   exitCode: number;
   stdout: string;
   stderr: string;
+  timedOut?: boolean;
 }
 
 interface CommandBufferResult {
@@ -70,6 +71,8 @@ interface ControlHostSupervisionStatusPayload {
 
 const execFileAsync = promisify(execFile);
 const COMMAND_BUFFER_MAX_BYTES = 16 * 1024 * 1024;
+const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS = 10_000;
+const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_FLOOR_MS = 1_000;
 
 export interface RunControlHostSupervisionCliShellParams {
   positionals: string[];
@@ -140,7 +143,7 @@ async function installControlHostSupervision(flags: ArgMap): Promise<void> {
     'utf8'
   );
 
-  await runLaunchctl(['bootout', serviceTarget], { allowFailure: true });
+  await bootoutLaunchctlServiceTarget(serviceTarget);
   await runLaunchctl(['bootstrap', resolveLaunchdDomain(), install.config.paths.plistPath]);
 
   const payload = {
@@ -217,7 +220,7 @@ async function uninstallControlHostSupervision(flags: ArgMap): Promise<void> {
   const resolved = await resolveStoredControlHostSupervision(flags, false);
   const serviceTarget = resolveControlHostSupervisionServiceTarget(resolved.label);
 
-  await runLaunchctl(['bootout', serviceTarget], { allowFailure: true });
+  await bootoutLaunchctlServiceTarget(serviceTarget);
   await rm(resolved.paths.plistPath, { force: true });
   await rm(resolved.paths.supportDir, { recursive: true, force: true });
   await rm(resolved.paths.logsDir, { recursive: true, force: true });
@@ -556,9 +559,11 @@ async function loadBootstrapEnvironment(
 
 async function probeControlHostHealth(
   config: ControlHostSupervisionConfig,
-  env: NodeJS.ProcessEnv
+  env: NodeJS.ProcessEnv,
+  commandRunner: typeof runCommand = runCommand
 ): Promise<{ healthy: boolean; reason: string; message: string }> {
-  const result = await runCommand(
+  const probeTimeoutMs = resolveControlHostSupervisionProbeTimeoutMs(config.healthIntervalSeconds);
+  const result = await commandRunner(
     config.nodePath,
     [
       config.cliEntrypoint,
@@ -572,9 +577,17 @@ async function probeControlHostHealth(
     ],
     {
       cwd: config.repoRoot,
-      env
+      env,
+      timeoutMs: probeTimeoutMs
     }
   );
+  if (result.timedOut === true) {
+    return {
+      healthy: false,
+      reason: 'probe_timeout',
+      message: `co-status probe timed out after ${Math.round(probeTimeoutMs / 1_000)}s.`
+    };
+  }
   if (result.exitCode !== 0) {
     const detail = result.stderr.trim() || result.stdout.trim() || 'co-status command failed.';
     return {
@@ -721,6 +734,20 @@ async function runLaunchctl(
   return result;
 }
 
+async function bootoutLaunchctlServiceTarget(serviceTarget: string): Promise<void> {
+  const result = await runLaunchctl(['bootout', serviceTarget], { allowFailure: true });
+  if (result.exitCode === 0 || isIgnorableLaunchctlBootoutFailure(result)) {
+    return;
+  }
+  const detail = result.stderr.trim() || result.stdout.trim() || 'launchctl bootout failed.';
+  throw new Error(`launchctl bootout ${serviceTarget} failed: ${detail}`);
+}
+
+function isIgnorableLaunchctlBootoutFailure(result: CommandResult): boolean {
+  const detail = `${result.stdout}\n${result.stderr}`.toLowerCase();
+  return /could not find service|service.*not found|no such process|not loaded/u.test(detail);
+}
+
 function resolveControlHostSupervisionServiceTarget(label: string): string {
   return `${resolveLaunchdDomain()}/${label}`;
 }
@@ -792,12 +819,14 @@ async function runCommand(
   options?: {
     cwd?: string;
     env?: NodeJS.ProcessEnv;
+    timeoutMs?: number;
   }
 ): Promise<CommandResult> {
   try {
     const { stdout, stderr } = await execFileAsync(command, args, {
       cwd: options?.cwd,
       env: options?.env,
+      ...(typeof options?.timeoutMs === 'number' ? { timeout: options.timeoutMs } : {}),
       maxBuffer: COMMAND_BUFFER_MAX_BYTES
     });
     return {
@@ -810,13 +839,22 @@ async function runCommand(
       code?: string | number;
       stdout?: string | Buffer;
       stderr?: string | Buffer;
+      killed?: boolean;
+      signal?: string | null;
     };
     const exitCode =
       typeof execError.code === 'number' ? execError.code : execError.code === 'ENOENT' ? 127 : 1;
+    const timedOut =
+      typeof options?.timeoutMs === 'number' &&
+      execError.killed === true &&
+      execError.signal === 'SIGTERM';
     return {
       exitCode,
       stdout: bufferLikeToString(execError.stdout),
-      stderr: bufferLikeToString(execError.stderr) || execError.message
+      stderr:
+        bufferLikeToString(execError.stderr) ||
+        (timedOut ? `command timed out after ${options.timeoutMs}ms` : execError.message),
+      timedOut
     };
   }
 }
@@ -942,6 +980,13 @@ function escapeShellSingleQuotes(value: string): string {
   return value.replaceAll("'", "'\\''");
 }
 
+function resolveControlHostSupervisionProbeTimeoutMs(healthIntervalSeconds: number): number {
+  return Math.max(
+    CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_FLOOR_MS,
+    Math.min(healthIntervalSeconds * 1_000, CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS)
+  );
+}
+
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -949,6 +994,9 @@ async function sleep(ms: number): Promise<void> {
 export const __test__ = {
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
+  isIgnorableLaunchctlBootoutFailure,
+  probeControlHostHealth,
   readIntegerFlag,
+  resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
 };

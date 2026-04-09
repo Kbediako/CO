@@ -13,7 +13,10 @@ import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlH
 const {
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
+  isIgnorableLaunchctlBootoutFailure,
+  probeControlHostHealth,
   readIntegerFlag,
+  resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
 } = controlHostSupervisionShellTest;
 
@@ -101,6 +104,8 @@ describe('controlHostSupervision helpers', () => {
       '/env/two'
     ]);
     expect(parseControlHostSupervisionCsv('none')).toEqual([]);
+    expect(parseControlHostSupervisionCsv('-')).toEqual([]);
+    expect(parseControlHostSupervisionCsv('   ')).toBeNull();
   });
 
   it('rejects supervision labels that contain path separators', () => {
@@ -112,6 +117,16 @@ describe('controlHostSupervision helpers', () => {
     ).toThrow(
       'control-host supervision label may only contain letters, numbers, dots, underscores, and hyphens.'
     );
+  });
+
+  it('rejects blank env file entries before resolving paths', () => {
+    expect(() =>
+      buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: '/repo/workspace',
+        envFiles: ['   ']
+      })
+    ).toThrow('env file entry at index 0 must be non-empty.');
   });
 });
 
@@ -180,5 +195,66 @@ describe('controlHostSupervision shell helpers', () => {
       '--kill-timeout must be an integer.'
     );
     expect(readIntegerFlag({ 'unhealthy-threshold': '30' }, 'unhealthy-threshold')).toBe(30);
+  });
+
+  it('bounds co-status probe timeouts and surfaces timeout health state', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      healthIntervalSeconds: 5
+    });
+    let observedTimeoutMs: number | undefined;
+
+    const result = await probeControlHostHealth(
+      config,
+      {},
+      async (
+        _command: string,
+        _args: string[],
+        options?: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number }
+      ) => {
+        observedTimeoutMs = options?.timeoutMs;
+        return {
+          exitCode: 1,
+          stdout: '',
+          stderr: 'command timed out after 5000ms',
+          timedOut: true
+        };
+      }
+    );
+
+    expect(observedTimeoutMs).toBe(resolveControlHostSupervisionProbeTimeoutMs(5));
+    expect(result).toEqual({
+      healthy: false,
+      reason: 'probe_timeout',
+      message: 'co-status probe timed out after 5s.'
+    });
+  });
+
+  it('ignores only missing-service launchctl bootout failures', () => {
+    expect(
+      isIgnorableLaunchctlBootoutFailure({
+        exitCode: 3,
+        stdout: '',
+        stderr: 'Boot-out failed: 3: No such process'
+      })
+    ).toBe(true);
+    expect(
+      isIgnorableLaunchctlBootoutFailure({
+        exitCode: 113,
+        stdout: '',
+        stderr: 'Could not find service "gui/501/com.example.control-host" in domain for system'
+      })
+    ).toBe(true);
+    expect(
+      isIgnorableLaunchctlBootoutFailure({
+        exitCode: 1,
+        stdout: '',
+        stderr: 'Boot-out failed: 1: Operation not permitted'
+      })
+    ).toBe(false);
   });
 });
