@@ -1612,15 +1612,18 @@ function prefixContainsProviderWorkerSessionHeader(
 async function discoverProviderWorkerSessionLogPath(input: {
   env: NodeJS.ProcessEnv;
   workspacePath: string;
+  requireWorkspaceDirectory?: boolean;
   issue: {
     identifier: string;
     title?: string | null;
   };
   startedAt: string | null;
 }): Promise<string | null> {
-  const workspaceStat = await stat(input.workspacePath).catch(() => null);
-  if (!workspaceStat?.isDirectory()) {
-    return null;
+  if (input.requireWorkspaceDirectory === true) {
+    const workspaceStat = await stat(input.workspacePath).catch(() => null);
+    if (!workspaceStat?.isDirectory()) {
+      return null;
+    }
   }
   const sessionRoot = join(resolveCodexHome(input.env), 'sessions');
   const startedAtMs = Date.parse(input.startedAt ?? '');
@@ -3873,6 +3876,7 @@ export async function runProviderLinearWorker(
                         ? { ...childEnv, CODEX_THREAD_ID: liveSessionThreadHint }
                         : childEnv,
                     workspacePath: context.workspacePath ?? context.repoRoot,
+                    requireWorkspaceDirectory: true,
                     issue: {
                       identifier: issue.identifier,
                       title: issue.title

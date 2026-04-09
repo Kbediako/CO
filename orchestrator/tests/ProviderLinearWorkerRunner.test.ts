@@ -7684,6 +7684,100 @@ describe('provider linear worker runner', { timeout: PROVIDER_LINEAR_WORKER_TEST
     });
   });
 
+  it('hydrates released proofs from session logs even after workspace cleanup', async () => {
+    const { runDir } = await createManifestRoot();
+    const issue = createTrackedIssue();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const codexHome = join(tempRoot ?? '', '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2030', '03', '21');
+    const workspacePath = join(tempRoot ?? '', 'released-workspace');
+    const sessionLogPath = join(sessionDir, 'rollout-2030-03-21T09-05-08-000Z-thread-3.jsonl');
+    await mkdir(sessionDir, { recursive: true });
+    await mkdir(workspacePath, { recursive: true });
+    await writeFile(
+      sessionLogPath,
+      [
+        `{"timestamp":"2030-03-21T09:05:08.000Z","type":"session_meta","payload":{"id":"thread-3","cwd":"${workspacePath}","source":"exec"}}`,
+        `{"timestamp":"2030-03-21T09:05:08.050Z","type":"turn_context","payload":{"turn_id":"turn-3","user_instructions":"You are the provider worker for Linear issue ${issue.identifier}: ${issue.title}"}}`,
+        '{"timestamp":"2030-03-21T09:05:08.100Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":21,"output_tokens":13,"total_tokens":34}},"rate_limits":{"primary":{"used_percent":18,"window_minutes":300},"secondary":{"used_percent":52,"window_minutes":10080}}}}'
+      ].join('\n'),
+      'utf8'
+    );
+    const sessionMtime = new Date('2030-03-21T09:05:08.000Z');
+    await utimes(sessionLogPath, sessionMtime, sessionMtime);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        {
+          issue_id: 'lin-issue-1',
+          issue_identifier: issue.identifier,
+          attempt_started_at: '2030-03-21T09:05:07.000Z',
+          pid: '12345',
+          thread_id: null,
+          latest_turn_id: null,
+          latest_session_id: null,
+          latest_session_id_source: null,
+          turn_count: 1,
+          last_event: null,
+          last_message: null,
+          last_event_at: null,
+          tokens: {
+            input_tokens: null,
+            output_tokens: null,
+            total_tokens: null
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: workspacePath,
+          source_setup: null,
+          linear_audit: null,
+          child_streams: [],
+          child_lanes: [],
+          progress: null,
+          tracked_issue_error: null,
+          linear_budget: null,
+          end_reason: null,
+          updated_at: '2030-03-21T09:05:07.000Z'
+        } satisfies ProviderLinearWorkerProof,
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await rm(workspacePath, { recursive: true, force: true });
+
+    const proof = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2030-03-21T09:05:10.000Z',
+      undefined,
+      { ...process.env, CODEX_HOME: codexHome }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-3',
+      latest_turn_id: 'turn-3',
+      latest_session_id: 'thread-3-turn-3',
+      tokens: {
+        input_tokens: 21,
+        output_tokens: 13,
+        total_tokens: 34
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 18,
+          window_minutes: 300
+        },
+        secondary: {
+          used_percent: 52,
+          window_minutes: 10080
+        }
+      },
+      updated_at: '2030-03-21T09:05:10.000Z'
+    });
+  });
+
   it('includes the current day when scanning session-log directories after midnight', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2030-03-22T00:02:00.000Z'));

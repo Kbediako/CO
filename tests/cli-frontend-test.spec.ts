@@ -125,8 +125,7 @@ async function runFrontendTestWithEnv(
   env: NodeJS.ProcessEnv,
   extraArgs: string[]
 ): Promise<{ manifestPath: string; runtimeMode: string | null; runtimeProvider: string | null }> {
-  const distCliStat = await stat(DIST_CLI_ENTRY).catch(() => null);
-  const cliArgs = distCliStat?.isFile()
+  const cliArgs = (await shouldUseFreshDist(CLI_ENTRY, DIST_CLI_ENTRY))
     ? [DIST_CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs]
     : ['--loader', 'ts-node/esm', CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs];
   const { stdout } = await execFileAsync(
@@ -153,6 +152,15 @@ async function runFrontendTestWithEnv(
     runtimeMode: payload.runtime_mode ?? null,
     runtimeProvider: payload.runtime_provider ?? null
   };
+}
+
+async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
+  const distCliStat = await stat(distEntry).catch(() => null);
+  if (!distCliStat?.isFile()) {
+    return false;
+  }
+  const sourceCliStat = await stat(sourceEntry).catch(() => null);
+  return !sourceCliStat || distCliStat.mtimeMs >= sourceCliStat.mtimeMs;
 }
 
 async function writeFrontendTestingFixtureConfig(

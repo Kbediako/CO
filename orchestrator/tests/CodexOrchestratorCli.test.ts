@@ -17,10 +17,18 @@ async function runCli(args: string[]): Promise<{ stdout: string; stderr: string 
 }
 
 async function buildCliArgs(args: string[]): Promise<string[]> {
-  const distCliStat = await stat(distCliEntrypoint).catch(() => null);
-  return distCliStat?.isFile()
+  return (await shouldUseFreshDist(cliEntrypoint, distCliEntrypoint))
     ? [distCliEntrypoint, ...args]
     : ['--loader', 'ts-node/esm', cliEntrypoint, ...args];
+}
+
+async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
+  const distCliStat = await stat(distEntry).catch(() => null);
+  if (!distCliStat?.isFile()) {
+    return false;
+  }
+  const sourceCliStat = await stat(sourceEntry).catch(() => null);
+  return !sourceCliStat || distCliStat.mtimeMs >= sourceCliStat.mtimeMs;
 }
 
 describe('codex-orchestrator CLI monitor alias', () => {
