@@ -27,6 +27,7 @@ const sessionManager = new ExecSessionManager<CliExecSessionHandle>({
 
 const privacyGuard = new PrivacyGuard({ mode: resolvePrivacyGuardMode() });
 const handleService = new RemoteExecHandleService({ guard: privacyGuard, now: () => new Date() });
+const POST_EXIT_STDIO_DRAIN_GRACE_MS = 20;
 
 const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) => {
   const hasExplicitArgs = Array.isArray(request.args);
@@ -43,28 +44,101 @@ const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) =
     throw new Error('CLI exec commands require stdout/stderr streams.');
   }
 
-  child.stdout.on('data', request.onStdout);
-  child.stderr.on('data', request.onStderr);
-
   return await new Promise((resolve, reject) => {
-    const handleClose = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+    let settled = false;
+    let exitResult: { exitCode: number | null; signal: NodeJS.Signals | null } | null = null;
+    let stdoutClosed = false;
+    let stderrClosed = false;
+    let drainHandle: NodeJS.Timeout | null = null;
+
+    const clearDrainHandle = () => {
+      if (drainHandle) {
+        clearTimeout(drainHandle);
+        drainHandle = null;
+      }
+    };
+
+    const finalize = () => {
+      if (settled || !exitResult) {
+        return;
+      }
+      settled = true;
       cleanup();
-      resolve({ exitCode, signal });
+      resolve(exitResult);
+    };
+
+    const scheduleFinalize = () => {
+      if (!exitResult || settled) {
+        return;
+      }
+      if (stdoutClosed && stderrClosed) {
+        finalize();
+        return;
+      }
+      clearDrainHandle();
+      // Allow one short quiet window after `exit` so buffered stdout/stderr
+      // chunks can arrive without waiting indefinitely on background children
+      // that inherited the same pipes.
+      drainHandle = setTimeout(() => {
+        drainHandle = null;
+        finalize();
+      }, POST_EXIT_STDIO_DRAIN_GRACE_MS);
+      drainHandle.unref?.();
     };
 
     const handleError = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       cleanup();
       reject(error);
     };
 
+    const handleStdoutData = (chunk: Buffer | string) => {
+      request.onStdout(chunk);
+      if (exitResult) {
+        scheduleFinalize();
+      }
+    };
+
+    const handleStderrData = (chunk: Buffer | string) => {
+      request.onStderr(chunk);
+      if (exitResult) {
+        scheduleFinalize();
+      }
+    };
+
+    const handleStdoutClose = () => {
+      stdoutClosed = true;
+      scheduleFinalize();
+    };
+
+    const handleStderrClose = () => {
+      stderrClosed = true;
+      scheduleFinalize();
+    };
+
+    const handleExit = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+      exitResult = { exitCode, signal };
+      scheduleFinalize();
+    };
+
     const cleanup = () => {
-      child.off('close', handleClose);
+      clearDrainHandle();
+      child.stdout.off('data', handleStdoutData);
+      child.stdout.off('close', handleStdoutClose);
+      child.stderr.off('data', handleStderrData);
+      child.stderr.off('close', handleStderrClose);
+      child.off('exit', handleExit);
       child.off('error', handleError);
     };
 
-    // Wait for `close`, not just `exit`, so stdout/stderr pipes finish draining
-    // before UnifiedExecRunner snapshots the buffered output.
-    child.once('close', handleClose);
+    child.stdout.on('data', handleStdoutData);
+    child.stdout.once('close', handleStdoutClose);
+    child.stderr.on('data', handleStderrData);
+    child.stderr.once('close', handleStderrClose);
+    child.once('exit', handleExit);
     child.once('error', handleError);
   });
 };

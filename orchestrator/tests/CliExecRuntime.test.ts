@@ -23,4 +23,21 @@ describe('CLI exec runtime', () => {
 
     expect(result.stdout.trim()).toBe('foo bar');
   });
+
+  it('does not wait for background descendants that keep stdio open', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+
+    const { getCliExecRunner } = await import('../src/cli/services/execRuntime.js');
+    const runner = getCliExecRunner();
+    const result = await runner.run({
+      command: '/bin/sh',
+      args: ['-c', 'sleep 2 & echo foreground-done']
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.stdout.trim()).toBe('foreground-done');
+    expect(result.durationMs).toBeLessThan(1_000);
+  });
 });
