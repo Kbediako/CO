@@ -11,10 +11,12 @@ import {
 import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlHostSupervisionCliShell.js';
 
 const {
+  buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
   probeControlHostHealth,
+  readFormatFlag,
   readIntegerFlag,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
@@ -197,6 +199,14 @@ describe('controlHostSupervision shell helpers', () => {
     expect(readIntegerFlag({ 'unhealthy-threshold': '30' }, 'unhealthy-threshold')).toBe(30);
   });
 
+  it('rejects unsupported format values', () => {
+    expect(readFormatFlag({ format: 'json' })).toBe('json');
+    expect(readFormatFlag({ format: 'text' })).toBe('text');
+    expect(() => readFormatFlag({ format: 'yaml' })).toThrow(
+      '--format must be either "text" or "json".'
+    );
+  });
+
   it('bounds co-status probe timeouts and surfaces timeout health state', async () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',
@@ -256,5 +266,61 @@ describe('controlHostSupervision shell helpers', () => {
         stderr: 'Boot-out failed: 1: Operation not permitted'
       })
     ).toBe(false);
+  });
+
+  it('clears stale exit and health fields when a new child run starts', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+
+    const nextState = buildNextControlHostSupervisionState({
+      priorState: {
+        version: 1,
+        status: 'restart_required',
+        updated_at: '2026-04-09T09:00:00.000Z',
+        label: config.label,
+        repo_root: config.repoRoot,
+        service_target: serviceTarget,
+        child_pid: null,
+        last_started_at: '2026-04-09T08:30:00.000Z',
+        last_exit_at: '2026-04-09T09:00:00.000Z',
+        last_exit_code: 75,
+        last_signal: 'SIGTERM',
+        last_health_check_at: '2026-04-09T08:59:30.000Z',
+        last_health_status: 'restart_required',
+        consecutive_unhealthy_samples: 3,
+        restart_count: 2,
+        unhealthy_threshold: 3,
+        health_interval_seconds: 30,
+        last_restart_reason: 'restart_required',
+        last_restart_requested_at: '2026-04-09T09:00:00.000Z',
+        message: 'launchd restart requested'
+      },
+      update: {
+        status: 'running',
+        updated_at: '2026-04-09T09:01:00.000Z',
+        child_pid: 1234,
+        last_started_at: '2026-04-09T09:01:00.000Z',
+        message: 'control-host supervision runner started.'
+      },
+      config,
+      serviceTarget
+    });
+
+    expect(nextState.status).toBe('running');
+    expect(nextState.child_pid).toBe(1234);
+    expect(nextState.last_exit_at).toBeNull();
+    expect(nextState.last_exit_code).toBeNull();
+    expect(nextState.last_signal).toBeNull();
+    expect(nextState.last_health_check_at).toBeNull();
+    expect(nextState.last_health_status).toBeNull();
+    expect(nextState.consecutive_unhealthy_samples).toBe(0);
+    expect(nextState.last_restart_reason).toBe('restart_required');
   });
 });

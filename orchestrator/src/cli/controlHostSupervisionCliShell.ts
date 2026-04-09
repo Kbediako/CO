@@ -262,15 +262,12 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
   const writeState = async (
     update: Partial<ControlHostSupervisionState> & { status: string; updated_at: string }
   ): Promise<ControlHostSupervisionState> => {
-    const nextState: ControlHostSupervisionState = {
-      ...priorState,
-      ...update,
-      label: config.label,
-      repo_root: config.repoRoot,
-      service_target: serviceTarget,
-      unhealthy_threshold: config.unhealthyThreshold,
-      health_interval_seconds: config.healthIntervalSeconds
-    };
+    const nextState = buildNextControlHostSupervisionState({
+      priorState,
+      update,
+      config,
+      serviceTarget
+    });
     await writeJsonFile(config.paths.statePath, nextState);
     Object.assign(priorState, nextState);
     return nextState;
@@ -695,7 +692,14 @@ function emitOutput(format: OutputFormat, payload: unknown, text: string): void 
 }
 
 function readFormatFlag(flags: ArgMap): OutputFormat {
-  return readStringFlag(flags, 'format') === 'json' ? 'json' : 'text';
+  const format = readStringFlag(flags, 'format');
+  if (format === undefined || format === 'text') {
+    return 'text';
+  }
+  if (format === 'json') {
+    return 'json';
+  }
+  throw new Error('--format must be either "text" or "json".');
 }
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
@@ -732,6 +736,35 @@ async function runLaunchctl(
     throw new Error(`launchctl ${args.join(' ')} failed: ${detail}`);
   }
   return result;
+}
+
+function buildNextControlHostSupervisionState(input: {
+  priorState: ControlHostSupervisionState;
+  update: Partial<ControlHostSupervisionState> & { status: string; updated_at: string };
+  config: ControlHostSupervisionConfig;
+  serviceTarget: string;
+}): ControlHostSupervisionState {
+  const resetForRunning: Partial<ControlHostSupervisionState> =
+    input.update.status === 'running'
+      ? {
+          last_exit_at: null,
+          last_exit_code: null,
+          last_signal: null,
+          last_health_check_at: null,
+          last_health_status: null,
+          consecutive_unhealthy_samples: 0
+        }
+      : {};
+  return {
+    ...input.priorState,
+    ...resetForRunning,
+    ...input.update,
+    label: input.config.label,
+    repo_root: input.config.repoRoot,
+    service_target: input.serviceTarget,
+    unhealthy_threshold: input.config.unhealthyThreshold,
+    health_interval_seconds: input.config.healthIntervalSeconds
+  };
 }
 
 async function bootoutLaunchctlServiceTarget(serviceTarget: string): Promise<void> {
@@ -992,10 +1025,12 @@ async function sleep(ms: number): Promise<void> {
 }
 
 export const __test__ = {
+  buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
   probeControlHostHealth,
+  readFormatFlag,
   readIntegerFlag,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
