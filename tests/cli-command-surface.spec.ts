@@ -1124,13 +1124,13 @@ describe('codex-orchestrator command surface', () => {
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Conflicting --multi-agent and --collab values.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('requires a goal for rlm runs', async () => {
     await expect(runCli(['rlm'])).rejects.toMatchObject({
       stderr: expect.stringContaining('rlm requires a goal. Use: codex-orchestrator rlm "<goal>".')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('prints self-check text output through the binary shell', async () => {
     const { stdout } = await runCliSubprocess(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
@@ -2416,7 +2416,7 @@ describe('codex-orchestrator command surface', () => {
     await expect(runCli(['exec'])).rejects.toMatchObject({
       stderr: expect.stringContaining('exec requires a command to run.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('preserves backslashes in quoted single-token exec commands', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
@@ -2438,7 +2438,7 @@ describe('codex-orchestrator command surface', () => {
     };
 
     expect(payload.payload?.command?.argv).toEqual(['echo', 'C:\\tmp\\foo']);
-  }, TEST_TIMEOUT);
+  }, CLI_BOOT_TIMEOUT);
 
   it('handles escaped quotes inside quoted single-token exec commands', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
