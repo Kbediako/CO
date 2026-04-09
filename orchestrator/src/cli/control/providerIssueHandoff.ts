@@ -2970,9 +2970,13 @@ export function createProviderIssueHandoffService(
       env: process.env,
       previous_result: previousResult
     });
+    const resultChanged = !areProviderOperatorAutopilotResultsMeaningfullyEqual(
+      previousResult,
+      nextResult
+    );
     if (
       providerWorkflow.operator_autopilot?.audit_path &&
-      !areProviderOperatorAutopilotResultsMeaningfullyEqual(previousResult, nextResult)
+      resultChanged
     ) {
       try {
         await appendOperatorAutopilotAuditResult(
@@ -2987,8 +2991,10 @@ export function createProviderIssueHandoffService(
         );
       }
     }
-    options.providerWorkflowConfigStore.recordOperatorAutopilotResult(nextResult);
-    if (nextResult.status === 'failed') {
+    if (resultChanged) {
+      options.providerWorkflowConfigStore.recordOperatorAutopilotResult(nextResult);
+    }
+    if (resultChanged && nextResult.status === 'failed') {
       logger.warn(
         `[provider-operator-autopilot] ${nextResult.summary} error=${nextResult.error ?? 'unknown'}`
       );
