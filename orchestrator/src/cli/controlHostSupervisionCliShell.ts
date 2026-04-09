@@ -360,6 +360,8 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
     env: childEnv,
     stdio: 'inherit'
   });
+  const { childExitPromise, childErrorPromise } =
+    createControlHostSupervisionChildEventPromises(child);
 
   const startedAt = new Date().toISOString();
   await writeState({
@@ -371,8 +373,6 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
   });
 
   const stopWaiter = createStopSignalWaiter();
-  const { childExitPromise, childErrorPromise } =
-    createControlHostSupervisionChildEventPromises(child);
 
   let consecutiveUnhealthySamples = 0;
   const restartCount = priorState.restart_count ?? 0;
@@ -1001,10 +1001,12 @@ async function terminateChildProcess(
     child.once('exit', () => resolve());
   });
   child.kill('SIGTERM');
+  const killWaiter = createSleepWaiter(killTimeoutSeconds * 1_000);
   const timedOut = await Promise.race([
     exitPromise.then(() => false),
-    sleep(killTimeoutSeconds * 1_000).then(() => true)
+    killWaiter.promise.then(() => true)
   ]);
+  killWaiter.dispose();
   if (!timedOut) {
     return;
   }
