@@ -3,6 +3,7 @@ import process from 'node:process';
 import { promisify } from 'node:util';
 
 import type { DispatchPilotSourceSetup } from './trackerDispatchPilot.js';
+import { classifyProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 import {
   getProviderLinearIssueContext,
   transitionProviderLinearIssueState,
@@ -81,6 +82,31 @@ export interface ProviderMergeCloseoutLinearTransitionRecord {
   issue_state_type: string | null;
   issue_updated_at: string | null;
   error: string | null;
+}
+
+export type ProviderReviewHandoffPromotionStatus =
+  | 'watching'
+  | 'action_required'
+  | 'promoted'
+  | 'promotion_failed'
+  | 'transition_failed';
+
+export interface ProviderReviewHandoffPromotionRecord {
+  recorded_at: string;
+  issue_id: string;
+  issue_identifier: string | null;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  issue_updated_at: string | null;
+  status: ProviderReviewHandoffPromotionStatus;
+  reason: string;
+  summary: string;
+  attached_pr_urls: string[];
+  ignored_historical_pr_urls: string[];
+  conflicting_attached_pr_urls: string[];
+  pr: ProviderMergeCloseoutPullRequestRecord | null;
+  snapshot: ProviderMergeCloseoutSnapshotRecord | null;
+  linear_transition: ProviderMergeCloseoutLinearTransitionRecord | null;
 }
 
 export interface ProviderMergeCloseoutRecord {
@@ -624,6 +650,297 @@ export async function runProviderDeterministicMergeCloseout(
   };
 }
 
+export async function runProviderReviewHandoffPromotion(
+  input: {
+    issueId: string;
+    issueIdentifier?: string | null;
+    issueState?: string | null;
+    issueStateType?: string | null;
+    issueUpdatedAt?: string | null;
+    repoRoot: string;
+    sourceSetup?: DispatchPilotSourceSetup | null;
+    env?: NodeJS.ProcessEnv;
+  },
+  deps: ProviderMergeCloseoutDependencies = {}
+): Promise<ProviderReviewHandoffPromotionRecord> {
+  const env = input.env ?? process.env;
+  const now = deps.now ?? isoTimestamp;
+  const readIssueContext = deps.readIssueContext ?? getProviderLinearIssueContext;
+  const transitionIssueState = deps.transitionIssueState ?? transitionProviderLinearIssueState;
+  const runCommand = deps.runCommand ?? runProviderMergeCloseoutCommand;
+  const resolveSnapshot = deps.fetchSnapshot ?? fetchPrStatusSnapshot;
+  const resolveSnapshotActionRequiredReasons =
+    deps.resolveSnapshotActionRequiredReasons ??
+    ((snapshot: ProviderPrSnapshotRecord, options?: { readinessMode?: 'merge' | 'review' }) =>
+      resolveActionRequiredReasons(snapshot as PrWatchMergeSnapshot, options));
+
+  const recordedAt = now();
+  const base = {
+    recorded_at: recordedAt,
+    issue_id: input.issueId,
+    issue_identifier: normalizeOptionalString(input.issueIdentifier),
+    issue_state: normalizeOptionalString(input.issueState),
+    issue_state_type: normalizeOptionalString(input.issueStateType),
+    issue_updated_at: normalizeOptionalString(input.issueUpdatedAt),
+    attached_pr_urls: [] as string[],
+    ignored_historical_pr_urls: [] as string[],
+    conflicting_attached_pr_urls: [] as string[],
+    pr: null as ProviderMergeCloseoutPullRequestRecord | null,
+    snapshot: null as ProviderMergeCloseoutSnapshotRecord | null,
+    linear_transition: null as ProviderMergeCloseoutLinearTransitionRecord | null
+  };
+
+  const repoOriginResult = await runCommand({
+    command: 'git',
+    args: ['-C', input.repoRoot, 'remote', 'get-url', 'origin'],
+    cwd: input.repoRoot
+  });
+  if (!repoOriginResult.ok) {
+    return {
+      ...base,
+      status: 'promotion_failed',
+      reason: 'shared_root_origin_unavailable',
+      summary: 'Shared repo origin remote could not be resolved.'
+    };
+  }
+  const parsedRepo = parseGitHubRepoFromRemoteUrl(repoOriginResult.stdout);
+  const repoKey = parsedRepo
+    ? `${parsedRepo.owner.toLowerCase()}/${parsedRepo.repo.toLowerCase()}`
+    : null;
+  if (!repoKey) {
+    return {
+      ...base,
+      status: 'promotion_failed',
+      reason: 'shared_root_repo_unrecognized',
+      summary: 'Shared repo origin is not a GitHub repository URL.'
+    };
+  }
+
+  const issueContext = await readIssueContext({
+    issueId: input.issueId,
+    env,
+    sourceSetup: input.sourceSetup,
+    fallbackToCacheOnFailure: false
+  });
+  if (!issueContext.ok) {
+    return {
+      ...base,
+      status: 'promotion_failed',
+      reason: 'linear_issue_context_failed',
+      summary: `Linear issue context could not be loaded (${issueContext.error.code}).`
+    };
+  }
+
+  const attachedPrUrls = collectAttachedGitHubPrUrls(issueContext.issue.attachments);
+  const sameRepoPrs = attachedPrUrls
+    .map((url) => parseGitHubPullRequestUrl(url))
+    .filter((value): value is ProviderMergeCloseoutPullRequestRecord => Boolean(value))
+    .filter((value) => `${value.owner.toLowerCase()}/${value.repo.toLowerCase()}` === repoKey);
+  const currentIssueState = issueContext.issue.state?.name ?? base.issue_state;
+  const currentIssueStateType = issueContext.issue.state?.type ?? base.issue_state_type;
+  const currentIssueUpdatedAt = issueContext.issue.updated_at ?? base.issue_updated_at;
+  const currentWorkflowState = classifyProviderLinearWorkflowState({
+    state: currentIssueState,
+    state_type: currentIssueStateType
+  });
+  const baseWithContext = {
+    ...base,
+    issue_state: currentIssueState,
+    issue_state_type: currentIssueStateType,
+    issue_updated_at: currentIssueUpdatedAt,
+    attached_pr_urls: [...attachedPrUrls]
+  };
+
+  if (!currentWorkflowState.isHandoff) {
+    return {
+      ...baseWithContext,
+      status: 'action_required',
+      reason: 'issue_no_longer_review_handoff',
+      summary:
+        currentIssueState && currentIssueState.trim().length > 0
+          ? `Live Linear issue state is ${currentIssueState}, so review-handoff promotion is not armed.`
+          : 'Live Linear issue state is no longer a review handoff state, so review-handoff promotion is not armed.'
+    };
+  }
+
+  if (sameRepoPrs.length === 0) {
+    return {
+      ...baseWithContext,
+      status: 'action_required',
+      reason: attachedPrUrls.length === 0 ? 'no_attached_pr' : 'attached_pr_repo_mismatch',
+      summary:
+        attachedPrUrls.length === 0
+          ? 'No attached GitHub pull request is present for this review handoff issue.'
+          : 'Attached GitHub pull requests do not match the shared repository root.'
+    };
+  }
+
+  let ignoredHistoricalPrUrls: string[] = [];
+  let conflictingAttachedPrUrls: string[] = [];
+  let selectionNote: string | null = null;
+  let pr = sameRepoPrs[0]!;
+  let snapshot: ProviderMergeCloseoutSnapshotRecord | null = null;
+
+  if (sameRepoPrs.length > 1) {
+    let resolution: ProviderMergeCloseoutAttachedPrResolution;
+    try {
+      resolution = await resolveAttachedSameRepoPullRequestCandidate({
+        candidates: sameRepoPrs,
+        resolveSnapshot,
+        resolveSnapshotActionRequiredReasons
+      });
+    } catch (error) {
+      return {
+        ...baseWithContext,
+        status: 'promotion_failed',
+        reason: 'snapshot_read_failed',
+        summary: `GitHub merge-readiness snapshot could not be loaded while disambiguating attached pull requests: ${(error as Error)?.message ?? String(error)}.`
+      };
+    }
+
+    ignoredHistoricalPrUrls = resolution.ignored_historical_pr_urls;
+    conflictingAttachedPrUrls = resolution.conflicting_attached_pr_urls;
+    selectionNote = resolution.selection_note;
+    if (!resolution.selected_pr) {
+      return {
+        ...baseWithContext,
+        ignored_historical_pr_urls: [...ignoredHistoricalPrUrls],
+        conflicting_attached_pr_urls: [...conflictingAttachedPrUrls],
+        status: 'action_required',
+        reason: 'multiple_attached_prs',
+        summary: buildMultipleAttachedPrsPromotionSummary({
+          repoKey,
+          ignoredHistoricalPrUrls,
+          conflictingAttachedPrUrls
+        })
+      };
+    }
+
+    pr = resolution.selected_pr;
+    snapshot = resolution.selected_snapshot;
+  }
+
+  const baseWithResolution = {
+    ...baseWithContext,
+    ignored_historical_pr_urls: [...ignoredHistoricalPrUrls],
+    conflicting_attached_pr_urls: [...conflictingAttachedPrUrls]
+  };
+  const summarizeSelection = (summary: string): string =>
+    selectionNote ? `${summary} ${selectionNote}` : summary;
+
+  if (!snapshot) {
+    try {
+      const rawSnapshot = await resolveSnapshot({
+        owner: pr.owner,
+        repo: pr.repo,
+        prNumber: pr.number,
+        readinessMode: 'merge'
+      });
+      const actionRequiredReasons = resolveSnapshotActionRequiredReasons(rawSnapshot as never, {
+        readinessMode: 'merge'
+      });
+      snapshot = mapSnapshotRecord(rawSnapshot, actionRequiredReasons);
+    } catch (error) {
+      return {
+        ...baseWithResolution,
+        pr,
+        status: 'promotion_failed',
+        reason: 'snapshot_read_failed',
+        summary: summarizeSelection(
+          `GitHub merge-readiness snapshot could not be loaded: ${(error as Error)?.message ?? String(error)}`
+        ),
+        snapshot: null
+      };
+    }
+  }
+
+  if (!snapshot) {
+    return {
+      ...baseWithResolution,
+      pr,
+      status: 'promotion_failed',
+      reason: 'snapshot_read_failed',
+      summary: summarizeSelection('GitHub merge-readiness snapshot could not be loaded.'),
+      snapshot: null
+    };
+  }
+
+  const alreadyMerged = isMergedPullRequestSnapshot(snapshot);
+
+  if (!alreadyMerged && !snapshot.ready_to_merge) {
+    const promotionOutcome = classifyNonMergedReviewPromotionSnapshot(snapshot, pr.number)!;
+    return {
+      ...baseWithResolution,
+      pr,
+      snapshot,
+      ...promotionOutcome,
+      summary: summarizeSelection(promotionOutcome.summary)
+    };
+  }
+
+  const transitionAttemptedAt = now();
+  const transitionResult = await transitionIssueState({
+    issueId: input.issueId,
+    stateName: 'Merging',
+    env,
+    sourceSetup: input.sourceSetup
+  });
+  const linearTransition: ProviderMergeCloseoutLinearTransitionRecord = transitionResult.ok
+    ? {
+        status: transitionResult.action === 'noop' ? 'noop' : 'transitioned',
+        attempted_at: transitionAttemptedAt,
+        previous_state: transitionResult.previous_state?.name ?? currentIssueState ?? null,
+        target_state: transitionResult.target_state.name,
+        issue_state: transitionResult.issue.state?.name ?? null,
+        issue_state_type: transitionResult.issue.state?.type ?? null,
+        issue_updated_at: transitionResult.issue.updated_at ?? currentIssueUpdatedAt,
+        error: null
+      }
+    : {
+        status: 'failed',
+        attempted_at: transitionAttemptedAt,
+        previous_state: currentIssueState ?? null,
+        target_state: 'Merging',
+        issue_state: currentIssueState ?? null,
+        issue_state_type: currentIssueStateType ?? null,
+        issue_updated_at: currentIssueUpdatedAt,
+        error: `${transitionResult.error.code}: ${transitionResult.error.message}`
+      };
+
+  if (!transitionResult.ok) {
+    return {
+      ...baseWithResolution,
+      pr,
+      snapshot,
+      linear_transition: linearTransition,
+      status: 'transition_failed',
+      reason: 'linear_merging_transition_failed',
+      summary: summarizeSelection(
+        alreadyMerged
+          ? `Attached PR #${pr.number} is already merged, but the Linear issue could not transition to Merging for deterministic closeout.`
+          : `Attached PR #${pr.number} is merge-ready, but the Linear issue could not transition to Merging.`
+      )
+    };
+  }
+
+  return {
+    ...baseWithResolution,
+    issue_state: linearTransition.issue_state,
+    issue_state_type: linearTransition.issue_state_type,
+    issue_updated_at: linearTransition.issue_updated_at,
+    pr,
+    snapshot,
+    linear_transition: linearTransition,
+    status: 'promoted',
+    reason: 'promoted_to_merging',
+    summary: summarizeSelection(
+      alreadyMerged
+        ? `Attached PR #${pr.number} is already merged; promoted the issue from review handoff into Merging for deterministic closeout.`
+        : `Promoted attached PR #${pr.number} from review handoff into Merging.`
+    )
+  };
+}
+
 async function reconcileSharedRootAfterMerge(input: {
   repoRoot: string;
   now: () => string;
@@ -896,6 +1213,21 @@ function buildMultipleAttachedPrsSummary(input: {
   return `Multiple attached GitHub pull requests match ${input.repoKey}; conflicting attached PR URLs still require deterministic disambiguation: ${input.conflictingAttachedPrUrls.join(', ')}.${ignoredHistoricalSummary}`;
 }
 
+function buildMultipleAttachedPrsPromotionSummary(input: {
+  repoKey: string;
+  ignoredHistoricalPrUrls: string[];
+  conflictingAttachedPrUrls: string[];
+}): string {
+  const ignoredHistoricalSummary =
+    input.ignoredHistoricalPrUrls.length > 0
+      ? ` Ignored historical merged PR URLs: ${input.ignoredHistoricalPrUrls.join(', ')}.`
+      : '';
+  if (input.conflictingAttachedPrUrls.length === 0) {
+    return `Attached GitHub pull requests match ${input.repoKey}, but no current review-handoff promotion candidate remains after historical filtering.${ignoredHistoricalSummary}`;
+  }
+  return `Multiple attached GitHub pull requests match ${input.repoKey}; conflicting attached PR URLs still require deterministic disambiguation before review-handoff promotion can continue: ${input.conflictingAttachedPrUrls.join(', ')}.${ignoredHistoricalSummary}`;
+}
+
 function classifyNonMergedSnapshot(
   snapshot: ProviderMergeCloseoutSnapshotRecord,
   prNumber: number
@@ -926,6 +1258,42 @@ function classifyNonMergedSnapshot(
         snapshot.gate_reasons.length > 0
           ? `Merge closeout is waiting for readiness gates to clear: ${snapshot.gate_reasons.join(', ')}.`
           : 'Merge closeout is waiting for the attached pull request to become merge-ready.'
+    };
+  }
+  return null;
+}
+
+function classifyNonMergedReviewPromotionSnapshot(
+  snapshot: ProviderMergeCloseoutSnapshotRecord,
+  prNumber: number
+): {
+  status: 'watching' | 'action_required';
+  reason: string;
+  summary: string;
+} | null {
+  if (snapshot.state === 'CLOSED') {
+    return {
+      status: 'action_required',
+      reason: 'pr_closed_unmerged',
+      summary:
+        `Attached PR #${prNumber} is closed without merging; reopen it or attach a replacement PR before review-handoff promotion can continue.`
+    };
+  }
+  if (snapshot.action_required_reasons.length > 0) {
+    return {
+      status: 'action_required',
+      reason: snapshot.action_required_reasons[0] ?? 'review_handoff_promotion_blocked',
+      summary: `Review-handoff promotion is blocked by: ${snapshot.action_required_reasons.join(', ')}.`
+    };
+  }
+  if (snapshot.gate_reasons.length > 0 || !snapshot.ready_to_merge) {
+    return {
+      status: 'watching',
+      reason: snapshot.gate_reasons[0] ?? 'waiting_for_merge_ready',
+      summary:
+        snapshot.gate_reasons.length > 0
+          ? `Review-handoff promotion is waiting for readiness gates to clear: ${snapshot.gate_reasons.join(', ')}.`
+          : 'Review-handoff promotion is waiting for the attached pull request to become merge-ready.'
     };
   }
   return null;
