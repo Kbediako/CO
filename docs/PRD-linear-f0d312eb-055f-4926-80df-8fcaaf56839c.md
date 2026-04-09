@@ -1,120 +1,126 @@
-# PRD - CO workflow: unblock repo-wide spec/docs freshness review blockers
+# PRD - CO workflow: stop repo-wide docs baseline regressions from forcing manual fallback in unrelated lanes
 
 ## Added by Bootstrap 2026-04-06
+## Refreshed 2026-04-09
+
+## Traceability
+- Linear issue: `CO-102` / `f0d312eb-055f-4926-80df-8fcaaf56839c`
+- Linear URL: https://linear.app/asabeko/issue/CO-102/co-workflow-stop-repo-wide-docs-baseline-regressions-from-forcing
+- Prior attempt: PR `#370` / `CO-102 Refresh repo-wide spec/docs freshness blockers`
 
 ## Summary
-- Problem Statement: active CO review handoffs were blocked by repo-wide docs/spec freshness drift on clean `main`, with `Spec guard` failing on stale 2026-03-06 task specs (`1001`, `1009`-`1031`) and `docs:freshness` reporting a separate `stale docs: 19` registry cohort.
-- Desired Outcome: refresh or otherwise reconcile the stale repo-wide task/spec docs surfaces so `Spec guard` and `docs:freshness` return cleanly on the current branch without weakening either guardrail or reopening unrelated CO-99 runtime telemetry scope.
-
-## Execution Update 2026-04-06
-- The exact stale split is now confirmed:
-  - `Spec guard`: stale task specs `1001` and `1009`-`1031`.
-  - `docs:freshness`: `.agent/SOPs/instruction-stamps.md` plus the `0932`-`0934` packet family as recorded in `docs/docs-freshness-registry.json`.
-- The lane fixed the blocker at the source by refreshing the stale `last_review` values on those exact surfaces instead of changing any guardrail behavior.
-- Current branch validation is green on `node scripts/spec-guard.mjs --dry-run`, `npm run docs:freshness`, `npm run docs:check`, `npm run build`, `npm run lint`, `npm run test`, and the rerun audited `docs-review` child stream.
+- Problem Statement: the April 6 stale-cohort repair landed and PR `#370` merged, but current `main` is red again for a different reason. On 2026-04-09, `node scripts/spec-guard.mjs --dry-run` and `npm run docs:check` are clean while `npm run docs:freshness` fails on `282` stale docs (`Task Packet=205`, `Task Mirror=41`, `Report Only=36`). The daily implementation-docs archive automation is healthy, and a fresh local `node scripts/implementation-docs-archive.mjs --dry-run` agrees with it (`Archived docs: 0`, `Skipped docs: 313`, `Stray candidates: 146`), so the relapse is not a dead scheduler. The current root cause is narrower and more concrete: `scripts/implementation-docs-archive.mjs` only creates task-linked archive candidates when `tasks/index.json` reports `status === "succeeded"`, but current completed lanes now use `status: "completed"` with `completed_at` and `gate.status: "succeeded"`. Completed March packets therefore never leave the active baseline, and unrelated lanes accept truthful manual fallback again.
+- Desired Outcome: refresh `CO-102` as the repo-baseline prevention lane, fix the archive-eligibility seam so completed task packets are archived truthfully under the existing policy, reconcile any residual truly-active stale docs that remain after the fix, and restore a clean repo-wide docs baseline without weakening review or freshness policy.
 
 ## User Request Translation (Context Anchor)
-- User intent / needs (in your own words): fix the shared repo validation blocker at the source by refreshing or reconciling the stale spec/docs packet cohort that is keeping unrelated Linear lanes from handing off cleanly.
+- User intent / needs (in your own words): stop shared docs/spec baseline regressions from forcing unrelated provider-worker lanes into accepted manual fallback, and make the issue explicitly about preventing that repo-baseline relapse rather than blaming or loosening review policy.
 - Success criteria / acceptance:
-  - on clean current `main`, `node scripts/spec-guard.mjs --dry-run` no longer fails because of stale 2026-03-06 task specs
-  - on clean current `main`, `npm run docs:freshness` no longer reports stale docs
-  - the packet and workpad record exactly which stale specs/docs were refreshed, archived, or otherwise reconciled
+  - clean current `main` passes `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run docs:freshness`
+  - `docs/TASKS.md` and related docs-registry surfaces stay within their intended guardrails instead of relapsing immediately after cleanup
+  - unrelated provider-worker lanes no longer need accepted manual fallback purely because the shared docs baseline is already red
+  - the packet and workpad record which surfaces were fixed and what prevention was added
 - Constraints / non-goals:
-  - do not disable, bypass, or loosen `Spec guard` or `docs:freshness`
-  - do not expand back into CO-99 runtime telemetry or `refreshProviderLinearWorkerProofSnapshot`
-  - keep the change bounded to the stale repo-wide docs/spec surfaces that cause review handoff blockers
+  - do not weaken or disable standalone-review, provider-worker review policy, or `docs:freshness`
+  - do not reopen child-stream architecture or review-wrapper redesign
+  - do not turn this into a broad umbrella about manual review generally being bad
 
 ## Intent Checksum
 - Exact user wording / phrases to preserve:
-  - `Spec guard`
+  - `docs:check`
   - `docs:freshness`
-  - `last_review`
-  - `stale docs: 19`
-  - `Core Lane`
-  - `review handoff blockers`
+  - `docs/TASKS.md`
+  - `manual fallback`
+  - `shared baseline`
+  - `unrelated lanes`
 - Protected terms / exact artifact and surface names:
   - `node scripts/spec-guard.mjs --dry-run`
+  - `npm run docs:check`
   - `npm run docs:freshness`
-  - `tasks/specs/1001-coordinator-appserver-dynamic-tool-bridge-experimental-lane.md`
-  - `tasks/specs/1009-...` through `tasks/specs/1031-...`
-  - `docs/TASKS.md`
+  - `node scripts/implementation-docs-archive.mjs --dry-run`
+  - `scripts/implementation-docs-archive.mjs`
+  - `docs/implementation-docs-archive-policy.json`
   - `docs/docs-freshness-registry.json`
+  - `tasks/index.json`
 - Nearby wrong interpretations to reject:
-  - the fix is to disable or weaken `Spec guard` or `docs:freshness`
-  - this is only a CO-99-local problem instead of a clean-`main` repo-wide blocker
-  - provider-proof runtime telemetry or unrelated app behavior should be reopened in this lane
+  - the review wrapper is the primary bug here
+  - the fix is to waive, weaken, or bypass docs/review gates
+  - the fix is another one-off `last_review` sweep with no prevention against the same relapse class
 
 ## Parity / Alignment Matrix
-- Not applicable.
 - Current truth:
-  - the stale `Spec guard` and `docs:freshness` cohorts have been identified exactly and refreshed on branch
-  - current branch freshness gates are green again without any guardrail weakening
-  - active implementation lanes are no longer blocked by this repo-wide baseline drift on the patched branch
+  - `spec-guard --dry-run` is clean on current `main`
+  - `docs:check` is clean on current `main`
+  - `docs:freshness` fails on `282` stale docs concentrated in completed March task packets, mirrors, and linked findings docs
+  - implementation-docs archive automation ran successfully on 2026-04-08 but archived nothing because the script never considers `status: "completed"` task items eligible
 - Reference truth:
-  - a clean repo baseline should allow active lanes to hand off when their own implementation and review gates are green
+  - completed implementation packets should leave the active docs baseline through the existing archive policy once they are old enough
+  - unrelated lanes should not inherit a red docs baseline after their own packet shape is correct
 - Target truth / intended delta:
-  - the stale cohort is refreshed or reconciled so both freshness gates pass again on current `main`
-  - the repo keeps the same strict freshness policy
-  - the fix is documented as repo-wide validation hygiene rather than as a CO-99 runtime change
+  - implementation-docs archive eligibility matches the current `tasks/index.json` completion vocabulary
+  - the stale completed-packet cohort archives or reclassifies truthfully under the existing policy
+  - any residual stale active docs are reconciled explicitly instead of hidden
+  - shared docs guards return green without policy weakening
 - Explicitly out-of-scope differences:
-  - changing the meaning or thresholds of the freshness guards
-  - altering unrelated implementation behavior
-  - broad archival or refactor work outside the stale blocker cohort
+  - changing review-state semantics
+  - loosening docs or review gates
+  - broad docs tooling redesign beyond the minimum truthful prevention fix needed now
 
 ## Not Done If
-- `node scripts/spec-guard.mjs --dry-run` still fails on clean current `main` because the stale 2026-03-06 task specs were not refreshed or otherwise reconciled.
-- `npm run docs:freshness` still reports stale docs on clean current `main`.
-- Unrelated issue lanes remain blocked from review handoff solely because repo-wide docs/spec freshness is still red.
+- `docs:freshness` still fails because completed task packets remain active solely due to the `completed` versus `succeeded` mismatch.
+- unrelated issue lanes still record accepted manual fallback because the shared docs baseline is red again.
+- the only outcome is another one-off refresh with no prevention against the same relapse class.
 
 ## Goals
-- Register a docs-first packet for the CO-102 repo-wide freshness unblock lane.
-- Confirm the exact stale surfaces behind `Spec guard` and `docs:freshness`.
-- Refresh or reconcile the stale docs/spec cohort with the smallest truthful change set.
-- Record machine-checkable validation and handoff evidence for future lanes.
+- Refresh the `CO-102` packet to the reopened baseline-prevention scope.
+- Capture the current repo-baseline failure shape and archive-automation behavior with machine-checkable evidence.
+- Fix the implementation-doc archive eligibility seam that prevents completed packets from leaving the active baseline.
+- Reconcile any residual truly-active stale docs that remain after the archive fix.
+- Record the repaired baseline surfaces and prevention seam in the packet and workpad.
 
 ## Non-Goals
-- Runtime telemetry changes for CO-99.
-- Guardrail weakening, waivers, or policy bypasses in place of a real freshness fix.
-- Unrelated repository cleanup outside the stale blocker cohort.
+- Review-wrapper redesign or review-policy changes.
+- Reopening unrelated runtime or app behavior lanes.
+- Silent review-date churn without a truthful active-doc review or archive rationale.
 
 ## Stakeholders
-- Product: CO operators and maintainers depending on truthful review handoff readiness.
-- Engineering: docs/spec owners and worker lanes blocked by repo-wide freshness drift.
+- Product: CO operators and maintainers relying on truthful handoff readiness.
+- Engineering: docs/archive tooling owners and provider-worker lane owners blocked by shared baseline drift.
 - Design: not applicable.
 
 ## Metrics & Guardrails
 - Primary Success Metrics:
-  - `spec-guard --dry-run` passes on the current branch after the stale cohort refresh
-  - `docs:freshness` passes on the current branch after the stale cohort refresh
-  - the packet/workpad accurately enumerate the refreshed or reconciled surfaces
+  - `spec-guard --dry-run`, `docs:check`, and `docs:freshness` all exit `0`
+  - completed implementation packets archive truthfully under the existing policy rather than staying active due to stale status matching
+  - unrelated lanes stop citing repo-baseline drift as the reason for accepted manual fallback
 - Guardrails / Error Budgets:
-  - no freshness-policy weakening
-  - no false claims about the stale set without command output
-  - no reopening unrelated implementation scope
+  - preserve strict review and docs-policy semantics
+  - avoid speculative claims about the stale set without current command output
+  - create a follow-up instead of expanding scope if a larger archive-policy redesign is uncovered
 
 ## User Experience
 - Personas:
   - provider workers preparing review handoff
-  - maintainers who need repo-wide docs/spec hygiene to stay truthful
+  - maintainers auditing docs/archive automation
 - User Journeys:
-  - a worker completes a bounded implementation lane
-  - required validation reaches the shared freshness gates
-  - the lane is no longer blocked by unrelated stale specs/docs on clean `main`
+  - a worker finishes a bounded lane and runs the required docs gates
+  - the lane is no longer blocked by unrelated stale implementation packets that should already be archived
+  - a maintainer can trace which docs remained active versus which moved under the archive policy
 
 ## Technical Considerations
 - Architectural Notes:
-  - start by auditing the exact `Spec guard` and `docs:freshness` failure surfaces on the current tree
-  - bias toward direct `last_review` refresh or documented archival reconciliation on the stale cohort instead of policy changes
-  - keep task mirrors, docs registry, and packet mirrors aligned as the stale cohort is refreshed
+  - the current seam is in the archive selection path, not the docs-freshness reporter and not the review wrapper
+  - the archive automation workflow is already running successfully, so prevention should prefer fixing candidate eligibility over adding another scheduler
+  - after the eligibility fix, rerun the archive path and only do explicit active-doc refreshes where a doc really should stay live
 - Dependencies / Integrations:
-  - `scripts/spec-guard.mjs`
   - `scripts/docs-freshness.mjs`
-  - `tasks/specs/**`
+  - `scripts/implementation-docs-archive.mjs`
+  - `.github/workflows/implementation-docs-archive-automation.yml`
+  - `docs/implementation-docs-archive-policy.json`
   - `docs/docs-freshness-registry.json`
-  - `docs/TASKS.md`
+  - `tasks/index.json`
 
 ## Open Questions
-- None. `docs:freshness` required the separate 19-entry registry cohort rooted in `.agent/SOPs/instruction-stamps.md` and the `0932`-`0934` packet family.
+- After the archive eligibility fix lands, do any residual stale active docs remain that need a truthful refresh or a separate follow-up? Current evidence suggests the long-tail candidates are the older still-`in-progress` `0935`-`0939` packet family, but the exact post-fix remainder should be confirmed by rerunning `docs:freshness`.
 
 ## Approvals
 - Product: pending
