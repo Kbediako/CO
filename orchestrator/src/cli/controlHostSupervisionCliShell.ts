@@ -1,7 +1,6 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { execFile, spawn } from 'node:child_process';
-import { once } from 'node:events';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
@@ -67,6 +66,17 @@ interface ControlHostSupervisionStatusPayload {
     summary: string | null;
     stderr: string | null;
   };
+}
+
+interface ControlHostSupervisionChildExitEvent {
+  type: 'child_exit';
+  code: number | null;
+  signal: string | null;
+}
+
+interface ControlHostSupervisionChildErrorEvent {
+  type: 'child_error';
+  error: Error;
 }
 
 const execFileAsync = promisify(execFile);
@@ -318,15 +328,8 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
   });
 
   const stopWaiter = createStopSignalWaiter();
-  const childExitPromise = once(child, 'exit').then(([code, signal]) => ({
-    type: 'child_exit' as const,
-    code: typeof code === 'number' ? code : null,
-    signal: typeof signal === 'string' ? signal : null
-  }));
-  const childErrorPromise = once(child, 'error').then(([error]) => ({
-    type: 'child_error' as const,
-    error: error as Error
-  }));
+  const { childExitPromise, childErrorPromise } =
+    createControlHostSupervisionChildEventPromises(child);
 
   let consecutiveUnhealthySamples = 0;
   const restartCount = priorState.restart_count ?? 0;
@@ -821,6 +824,33 @@ async function removeInstalledControlHostSupervisionArtifacts(
   return managedPaths;
 }
 
+function createControlHostSupervisionChildEventPromises(
+  child: Pick<NodeJS.EventEmitter, 'once'>
+): {
+  childExitPromise: Promise<ControlHostSupervisionChildExitEvent>;
+  childErrorPromise: Promise<ControlHostSupervisionChildErrorEvent>;
+} {
+  return {
+    childExitPromise: new Promise((resolve) => {
+      child.once('exit', (code: number | null, signal: NodeJS.Signals | null) => {
+        resolve({
+          type: 'child_exit',
+          code: typeof code === 'number' ? code : null,
+          signal: typeof signal === 'string' ? signal : null
+        });
+      });
+    }),
+    childErrorPromise: new Promise((resolve) => {
+      child.once('error', (error: Error) => {
+        resolve({
+          type: 'child_error',
+          error
+        });
+      });
+    })
+  };
+}
+
 function isIgnorableLaunchctlBootoutFailure(result: CommandResult): boolean {
   const detail = `${result.stdout}\n${result.stderr}`.toLowerCase();
   return /could not find service|service.*not found|no such process|not loaded/u.test(detail);
@@ -1083,6 +1113,7 @@ export const __test__ = {
   assertControlHostSupervisionInstallPaths,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
+  createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
   parseNulDelimitedEnv,

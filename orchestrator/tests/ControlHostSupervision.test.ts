@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,6 +19,7 @@ const {
   assertControlHostSupervisionInstallPaths,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
+  createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
   parseNulDelimitedEnv,
@@ -478,5 +480,30 @@ describe('controlHostSupervision shell helpers', () => {
       CONTROL_HOST_MODE: 'managed'
     });
     expect(parsed.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it('keeps child error handling reachable when spawn fails before exit', async () => {
+    const child = new EventEmitter();
+    const spawnError = new Error('spawn failed');
+    const { childExitPromise, childErrorPromise } =
+      createControlHostSupervisionChildEventPromises(child);
+
+    child.emit('error', spawnError);
+
+    const exitOutcome = await Promise.race([
+      childExitPromise.then(
+        () => 'exit',
+        (error) => `rejected:${(error as Error).message}`
+      ),
+      new Promise<string>((resolve) => {
+        setTimeout(() => resolve('pending'), 0);
+      })
+    ]);
+
+    expect(exitOutcome).toBe('pending');
+    await expect(childErrorPromise).resolves.toEqual({
+      type: 'child_error',
+      error: spawnError
+    });
   });
 });
