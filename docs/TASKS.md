@@ -374,8 +374,7 @@
 - Update - Implementation: Phase 9 resolver unification + dist shipping executed; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-02T09-16-35-400Z-28b143d5/manifest.json`, `.runs/0101-slimdown-audit/cli/2026-01-02T14-55-28-935Z-24c71173/manifest.json`.
 - Update - Implementation: Phase 10 helper dedupe executed; implementation-gate manifest at `.runs/0101-slimdown-audit/cli/2026-01-02T10-23-28-082Z-dc336fd7/manifest.json`; diagnostics at `.runs/0101-slimdown-audit/cli/2026-01-02T10-25-10-663Z-a1a4cd8f/manifest.json`.
 - Notes: Export `MCP_RUNNER_TASK_ID=0101-slimdown-audit` before orchestrator commands.
-## Checklist Mirror
-Mirror status with `tasks/tasks-0101-slimdown-audit.md` and `.agent/task/0101-slimdown-audit.md`. Keep `[ ]` until evidence is recorded.
+## Checklist Mirror - Mirror status with `tasks/tasks-0101-slimdown-audit.md` and `.agent/task/0101-slimdown-audit.md`. Keep `[ ]` until evidence is recorded.
 - [x] Docs + checklist drafted - Evidence: `docs/PRD-slimdown.md`, `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`, `tasks/tasks-0101-slimdown-audit.md`.
 - [x] Action plan drafted - Evidence: `docs/ACTION_PLAN-slimdown.md`.
 - [x] Phase 5–17 consolidation targets captured - Evidence: `docs/TECH_SPEC-slimdown.md`, `docs/findings/slimdown-audit.md`.
