@@ -134,5 +134,5 @@ last_review: 2026-04-09
 - Whether the explicit source-checkout package-fallback contract should be an env flag, a targeted call-site option, or both for the touched seams.
 
 ## Approvals
-- Reviewer: Pending docs-review and implementation validation
+- Reviewer: Rework rerun docs gates are clean after the repo-supported `docs/TASKS.md` archive trim, but the child stream forced review ended `failed-other` with `termination_boundary: null` because the selected model was at capacity; manual docs-review fallback recorded in `out/linear-057747d0-a472-4cba-ac18-2d7342f2a168/manual/20260409T095801Z-docs-review-fallback.md`. Implementation validation, full-suite rerun, standalone review, `pack:smoke`, and explicit elegance pass are now clean; PR/handoff pending.
 - Date: 2026-04-09
