@@ -1407,10 +1407,6 @@ function resolveControlHostSupervisionProbeTimeoutMs(healthIntervalSeconds: numb
   );
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function createSleepWaiter(ms: number): {
   promise: Promise<{ type: 'tick' }>;
   dispose: () => void;
