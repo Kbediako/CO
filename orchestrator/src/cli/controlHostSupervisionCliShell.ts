@@ -378,12 +378,14 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
 
   try {
     for (;;) {
+      const tickWaiter = createSleepWaiter(config.healthIntervalSeconds * 1_000);
       const event = await Promise.race([
         childExitPromise,
         childErrorPromise,
         stopWaiter.promise,
-        sleep(config.healthIntervalSeconds * 1_000).then(() => ({ type: 'tick' as const }))
+        tickWaiter.promise
       ]);
+      tickWaiter.dispose();
 
       if (event.type === 'tick') {
         const probe = await probeControlHostHealth(config, childEnv);
@@ -1161,11 +1163,25 @@ async function assertExecutablePath(
   }
 }
 
+async function assertDirectoryPath(
+  path: string,
+  label: string,
+  exists: (path: string) => Promise<boolean> = pathExists,
+  isDirectory: (path: string) => Promise<boolean> = pathIsDirectory
+): Promise<void> {
+  await assertPathExists(path, label, exists);
+  if (!(await isDirectory(path))) {
+    throw new Error(`${label} is not a directory: ${path}`);
+  }
+}
+
 async function assertControlHostSupervisionInstallPaths(
   config: ControlHostSupervisionConfig,
   exists: (path: string) => Promise<boolean> = pathExists,
-  isExecutable: (path: string) => Promise<boolean> = pathIsExecutable
+  isExecutable: (path: string) => Promise<boolean> = pathIsExecutable,
+  isDirectory: (path: string) => Promise<boolean> = pathIsDirectory
 ): Promise<void> {
+  await assertDirectoryPath(config.repoRoot, 'Control-host supervision repo root', exists, isDirectory);
   await assertExecutablePath(config.nodePath, 'Node executable', exists, isExecutable);
   await assertPathExists(config.cliEntrypoint, 'Control-host supervision entrypoint', exists);
   await assertExecutablePath(config.shellPath, 'Shell executable', exists, isExecutable);
@@ -1240,6 +1256,14 @@ async function pathIsExecutable(path: string): Promise<boolean> {
   try {
     await access(path, fsConstants.X_OK);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+async function pathIsDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
   } catch {
     return false;
   }
@@ -1324,12 +1348,35 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function createSleepWaiter(ms: number): {
+  promise: Promise<{ type: 'tick' }>;
+  dispose: () => void;
+} {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const promise = new Promise<{ type: 'tick' }>((resolve) => {
+    timer = setTimeout(() => {
+      timer = null;
+      resolve({ type: 'tick' });
+    }, ms);
+  });
+  return {
+    promise,
+    dispose: () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }
+  };
+}
+
 export const __test__ = {
   assertControlHostSupervisionInstallPaths,
   assertStoredControlHostSupervisionConfig,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
   captureExistingControlHostSupervisionInstall,
+  createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,

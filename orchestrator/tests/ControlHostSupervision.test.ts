@@ -22,6 +22,7 @@ const {
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
   captureExistingControlHostSupervisionInstall,
+  createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
   isIgnorableLaunchctlBootoutFailure,
@@ -288,6 +289,7 @@ describe('controlHostSupervision shell helpers', () => {
       assertControlHostSupervisionInstallPaths(
         config,
         async (path) => path !== config.shellPath,
+        async () => true,
         async () => true
       )
     ).rejects.toThrow(
@@ -309,7 +311,8 @@ describe('controlHostSupervision shell helpers', () => {
       assertControlHostSupervisionInstallPaths(
         config,
         async () => true,
-        async (path) => path !== config.nodePath
+        async (path) => path !== config.nodePath,
+        async () => true
       )
     ).rejects.toThrow(`Node executable is not executable: ${config.nodePath}`);
 
@@ -317,9 +320,30 @@ describe('controlHostSupervision shell helpers', () => {
       assertControlHostSupervisionInstallPaths(
         config,
         async () => true,
-        async (path) => path !== config.shellPath
+        async (path) => path !== config.shellPath,
+        async () => true
       )
     ).rejects.toThrow(`Shell executable is not executable: ${config.shellPath}`);
+  });
+
+  it('requires repo root to be an existing directory during install validation', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      shellPath: '/bin/zsh'
+    });
+
+    await expect(
+      assertControlHostSupervisionInstallPaths(
+        config,
+        async () => true,
+        async () => true,
+        async (path) => path !== config.repoRoot
+      )
+    ).rejects.toThrow(`Control-host supervision repo root is not a directory: ${config.repoRoot}`);
   });
 
   it('rejects malformed stored config payloads before using label or path fields', () => {
@@ -710,5 +734,19 @@ describe('controlHostSupervision shell helpers', () => {
       type: 'child_error',
       error: spawnError
     });
+  });
+
+  it('disposes sleep waiters before the tick fires', async () => {
+    const waiter = createSleepWaiter(25);
+    waiter.dispose();
+
+    const outcome = await Promise.race([
+      waiter.promise.then(() => 'tick'),
+      new Promise<string>((resolve) => {
+        setTimeout(() => resolve('pending'), 50);
+      })
+    ]);
+
+    expect(outcome).toBe('pending');
   });
 });
