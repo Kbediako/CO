@@ -14987,6 +14987,108 @@ describe('createProviderIssueHandoffService', () => {
     expect(recordOperatorAutopilotResult).toHaveBeenCalledWith(autopilotResult);
   });
 
+  it('does not rewrite unchanged operator autopilot results during steady-state refresh', async () => {
+    const { paths } = await createHostPaths();
+    const trackedIssue = createTrackedIssue({
+      id: 'lin-issue-1',
+      identifier: 'CO-118',
+      state: 'Backlog',
+      state_type: 'backlog'
+    });
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    let lastResult: {
+      recorded_at: string;
+      status: 'noop';
+      summary: string;
+      error: null;
+      actions: [];
+      holds: [];
+      pending_actions: [];
+    } | null = null;
+    const recordOperatorAutopilotResult = vi.fn((result) => {
+      lastResult = result;
+    });
+    const appendOperatorAutopilotAuditResult = vi.fn(async () => undefined);
+    const buildProviderWorkflowState = () => ({
+      status: 'ready' as const,
+      pipeline_id: 'provider-linear-worker',
+      source_path: '/repo/codex.orchestrator.json',
+      snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      last_reload_attempt_at: '2026-04-09T10:00:00.000Z',
+      last_success_at: '2026-04-09T10:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      operator_autopilot: {
+        enabled: true,
+        backlog_promotion: {
+          enabled: true,
+          state_name: 'Backlog',
+          target_state_name: 'Ready'
+        },
+        review_handoff_rework: {
+          enabled: true,
+          target_state_name: 'Rework',
+          excluded_action_required_reasons: [
+            'draft',
+            'label:do-not-merge',
+            'review=REVIEW_REQUIRED',
+            'required_checks_query_failed'
+          ]
+        },
+        post_merge_rollout: {
+          enabled: true,
+          summary: 'Merge closeout completed; local rollout follow-up may still be required.'
+        },
+        audit_path: join(paths.runDir, 'provider-operator-autopilot.jsonl'),
+        last_result: lastResult
+      }
+    });
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => buildProviderWorkflowState()),
+      refresh: vi.fn(async () => buildProviderWorkflowState()),
+      snapshot: () => buildProviderWorkflowState(),
+      getLaunchConfigPath: vi.fn(async () => '/repo/.runs/local-mcp/cli/control-host/provider-workflow.json'),
+      recordTerminalCleanupResult: vi.fn(),
+      recordOperatorAutopilotResult
+    };
+    const autopilotResult = {
+      recorded_at: '2026-04-09T10:00:00.000Z',
+      status: 'noop' as const,
+      summary: 'Operator autopilot found no queue actions.',
+      error: null,
+      actions: [],
+      holds: [],
+      pending_actions: []
+    };
+    const runOperatorAutopilot = vi.fn(async () => autopilotResult);
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      providerWorkflowConfigStore,
+      runOperatorAutopilot,
+      appendOperatorAutopilotAuditResult,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssues: async () => ({
+        kind: 'ready',
+        trackedIssues: [trackedIssue]
+      })
+    });
+
+    await service.refresh();
+    await service.refresh();
+
+    expect(runOperatorAutopilot).toHaveBeenCalledTimes(2);
+    expect(appendOperatorAutopilotAuditResult).toHaveBeenCalledTimes(1);
+    expect(recordOperatorAutopilotResult).toHaveBeenCalledTimes(1);
+    expect(recordOperatorAutopilotResult).toHaveBeenCalledWith(autopilotResult);
+  });
+
   it('cleans terminal released provider workspaces during refresh startup replay even when the assignee changed', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
