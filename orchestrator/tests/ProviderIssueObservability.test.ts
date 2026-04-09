@@ -741,6 +741,60 @@ describe('provider issue observability', () => {
     );
   });
 
+  it('keeps message freshness null when canonical current-turn activity has no message payload', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-05T05:40:00.000Z',
+        current_turn_activity: {
+          event: 'token_count',
+          message_or_payload: null,
+          recorded_at: '2026-04-05T05:44:10.000Z',
+          source: 'stdout_jsonl',
+          turn_id: 'turn-2',
+          session_id: 'thread-1-turn-2'
+        },
+        last_event: 'token_count',
+        last_message: null,
+        last_event_at: '2026-04-05T05:44:10.000Z',
+        updated_at: '2026-04-05T05:44:10.000Z',
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'Provider worker turn is active.',
+      summary_recorded_at: null,
+      message_recorded_at: null,
+      source_updated_at: '2026-04-05T05:44:10.000Z',
+      event_source: 'canonical_stdout_jsonl'
+    });
+    expect(progress?.event_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'canonical_stdout_jsonl',
+          event: 'token_count',
+          summary: null,
+          message_recorded_at: null,
+          source_updated_at: '2026-04-05T05:44:10.000Z',
+          accepted: true,
+          rejection_reason: null
+        }),
+        expect.objectContaining({
+          source: 'generic_phase_fallback',
+          summary: 'Provider worker turn is active.',
+          message_recorded_at: null,
+          accepted: false,
+          rejection_reason: 'less_authoritative_than_winner'
+        })
+      ])
+    );
+  });
+
   it('keeps an authoritative legacy proof message ahead of older derived child summaries when message freshness is unknown', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

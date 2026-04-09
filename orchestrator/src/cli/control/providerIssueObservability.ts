@@ -873,7 +873,7 @@ function buildCurrentTurnActivityProgressCandidate(
     source,
     event,
     summary,
-    message_recorded_at: recordedAt,
+    message_recorded_at: summary ? recordedAt : null,
     source_updated_at: recordedAt,
     derived: false
   };
