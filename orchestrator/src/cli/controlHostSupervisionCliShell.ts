@@ -1179,11 +1179,24 @@ async function assertExecutablePath(
   path: string,
   label: string,
   exists: (path: string) => Promise<boolean> = pathExists,
-  isExecutable: (path: string) => Promise<boolean> = pathIsExecutable
+  isExecutable: (path: string) => Promise<boolean> = pathIsExecutable,
+  isFile: (path: string) => Promise<boolean> = pathIsFile
 ): Promise<void> {
-  await assertPathExists(path, label, exists);
+  await assertFilePath(path, label, exists, isFile);
   if (!(await isExecutable(path))) {
     throw new Error(`${label} is not executable: ${path}`);
+  }
+}
+
+async function assertFilePath(
+  path: string,
+  label: string,
+  exists: (path: string) => Promise<boolean> = pathExists,
+  isFile: (path: string) => Promise<boolean> = pathIsFile
+): Promise<void> {
+  await assertPathExists(path, label, exists);
+  if (!(await isFile(path))) {
+    throw new Error(`${label} is not a regular file: ${path}`);
   }
 }
 
@@ -1203,12 +1216,18 @@ async function assertControlHostSupervisionInstallPaths(
   config: ControlHostSupervisionConfig,
   exists: (path: string) => Promise<boolean> = pathExists,
   isExecutable: (path: string) => Promise<boolean> = pathIsExecutable,
-  isDirectory: (path: string) => Promise<boolean> = pathIsDirectory
+  isDirectory: (path: string) => Promise<boolean> = pathIsDirectory,
+  isFile: (path: string) => Promise<boolean> = pathIsFile
 ): Promise<void> {
   await assertDirectoryPath(config.repoRoot, 'Control-host supervision repo root', exists, isDirectory);
-  await assertExecutablePath(config.nodePath, 'Node executable', exists, isExecutable);
-  await assertPathExists(config.cliEntrypoint, 'Control-host supervision entrypoint', exists);
-  await assertExecutablePath(config.shellPath, 'Shell executable', exists, isExecutable);
+  await assertExecutablePath(config.nodePath, 'Node executable', exists, isExecutable, isFile);
+  await assertFilePath(
+    config.cliEntrypoint,
+    'Control-host supervision entrypoint',
+    exists,
+    isFile
+  );
+  await assertExecutablePath(config.shellPath, 'Shell executable', exists, isExecutable, isFile);
 }
 
 function assertStoredControlHostSupervisionConfig(
@@ -1300,6 +1319,14 @@ async function pathIsExecutable(path: string): Promise<boolean> {
 async function pathIsDirectory(path: string): Promise<boolean> {
   try {
     return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function pathIsFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
   } catch {
     return false;
   }

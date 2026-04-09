@@ -291,6 +291,7 @@ describe('controlHostSupervision shell helpers', () => {
         config,
         async (path) => path !== config.shellPath,
         async () => true,
+        async () => true,
         async () => true
       )
     ).rejects.toThrow(
@@ -298,7 +299,7 @@ describe('controlHostSupervision shell helpers', () => {
     );
   });
 
-  it('requires node and shell install paths to be executable', async () => {
+  it('requires node and shell install paths to be executable regular files', async () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',
       cwd: '/repo/workspace',
@@ -313,6 +314,7 @@ describe('controlHostSupervision shell helpers', () => {
         config,
         async () => true,
         async (path) => path !== config.nodePath,
+        async () => true,
         async () => true
       )
     ).rejects.toThrow(`Node executable is not executable: ${config.nodePath}`);
@@ -322,9 +324,53 @@ describe('controlHostSupervision shell helpers', () => {
         config,
         async () => true,
         async (path) => path !== config.shellPath,
+        async () => true,
         async () => true
       )
     ).rejects.toThrow(`Shell executable is not executable: ${config.shellPath}`);
+
+    await expect(
+      assertControlHostSupervisionInstallPaths(
+        config,
+        async () => true,
+        async () => true,
+        async () => true,
+        async (path) => path !== config.nodePath
+      )
+    ).rejects.toThrow(`Node executable is not a regular file: ${config.nodePath}`);
+
+    await expect(
+      assertControlHostSupervisionInstallPaths(
+        config,
+        async () => true,
+        async () => true,
+        async () => true,
+        async (path) => path !== config.shellPath
+      )
+    ).rejects.toThrow(`Shell executable is not a regular file: ${config.shellPath}`);
+  });
+
+  it('requires the control-host supervision entrypoint to be a regular file', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      shellPath: '/bin/zsh'
+    });
+
+    await expect(
+      assertControlHostSupervisionInstallPaths(
+        config,
+        async () => true,
+        async () => true,
+        async () => true,
+        async (path) => path !== config.cliEntrypoint
+      )
+    ).rejects.toThrow(
+      `Control-host supervision entrypoint is not a regular file: ${config.cliEntrypoint}`
+    );
   });
 
   it('requires repo root to be an existing directory during install validation', async () => {
