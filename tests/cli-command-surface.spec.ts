@@ -1,12 +1,13 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { runCodexOrchestratorCli } from '../bin/codex-orchestrator.js';
+import { isDirectExecution, runCodexOrchestratorCli } from '../bin/codex-orchestrator.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../orchestrator/src/cli/config/userConfig.js';
 import {
   PROVIDER_OVERRIDE_ENV_KEYS,
@@ -111,6 +112,25 @@ describe('shouldUseFreshDist', () => {
       await expect(shouldUseFreshDist(join(tempRoot, 'missing-source.ts'), distEntry)).resolves.toBe(
         true
       );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('isDirectExecution', () => {
+  it('treats symlink-preserved entrypoints as direct execution', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-direct-exec-'));
+    const targetEntry = join(tempRoot, 'target.js');
+    const symlinkEntry = join(tempRoot, 'symlink.js');
+    try {
+      await writeFile(targetEntry, 'export {};', 'utf8');
+      await symlink(targetEntry, symlinkEntry);
+
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(await realpath(symlinkEntry)).href)).toBe(
+        true
+      );
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(symlinkEntry).href)).toBe(true);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

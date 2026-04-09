@@ -89,16 +89,23 @@ function writeStderrLine(message: string): void {
   process.stderr.write(`${message}\n`);
 }
 
-function isDirectExecution(entryArg = process.argv[1], metaUrl = import.meta.url): boolean {
+export function isDirectExecution(entryArg = process.argv[1], metaUrl = import.meta.url): boolean {
   if (typeof entryArg !== 'string' || entryArg.length === 0) {
     return false;
   }
 
+  const candidateUrls = new Set<string>();
   try {
-    return pathToFileURL(realpathSync(entryArg)).href === metaUrl;
+    candidateUrls.add(pathToFileURL(resolve(entryArg)).href);
   } catch {
-    return pathToFileURL(resolve(entryArg)).href === metaUrl;
+    // Fall through to the realpath check so missing/cwd issues still fail closed.
   }
+  try {
+    candidateUrls.add(pathToFileURL(realpathSync(entryArg)).href);
+  } catch {
+    // Missing or unreadable entry points should not be treated as direct execution.
+  }
+  return candidateUrls.has(metaUrl);
 }
 
 export async function runCodexOrchestratorCli(rawArgs: string[] = process.argv.slice(2)): Promise<number> {
