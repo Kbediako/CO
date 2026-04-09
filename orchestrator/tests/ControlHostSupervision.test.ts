@@ -1,3 +1,7 @@
+import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -21,6 +25,7 @@ const {
   readFormatFlag,
   readStringFlag,
   readIntegerFlag,
+  rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
 } = controlHostSupervisionShellTest;
@@ -133,6 +138,25 @@ describe('controlHostSupervision helpers', () => {
       })
     ).toThrow('env file entry at index 0 must be non-empty.');
   });
+
+  it('rejects timer-backed settings that exceed Node timeout limits', () => {
+    const tooLarge = 2_147_484;
+
+    expect(() =>
+      buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: '/repo/workspace',
+        healthIntervalSeconds: tooLarge
+      })
+    ).toThrow('health interval must be <= 2147483 seconds to stay within Node timer limits.');
+    expect(() =>
+      buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: '/repo/workspace',
+        killTimeoutSeconds: tooLarge
+      })
+    ).toThrow('kill timeout must be <= 2147483 seconds to stay within Node timer limits.');
+  });
 });
 
 describe('controlHostSupervision shell helpers', () => {
@@ -235,6 +259,45 @@ describe('controlHostSupervision shell helpers', () => {
     ).rejects.toThrow(
       `Shell executable not found: ${config.shellPath}`
     );
+  });
+
+  it('rolls back generated install artifacts when launchd registration fails', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-rollback-'));
+    const paths = {
+      supportDir: join(tempRoot, 'support'),
+      configPath: join(tempRoot, 'support', 'config.json'),
+      statePath: join(tempRoot, 'support', 'state.json'),
+      plistPath: join(tempRoot, 'LaunchAgents', 'com.example.control-host.plist'),
+      logsDir: join(tempRoot, 'logs'),
+      stdoutLogPath: join(tempRoot, 'logs', 'stdout.log'),
+      stderrLogPath: join(tempRoot, 'logs', 'stderr.log')
+    };
+    const serviceTarget = 'gui/501/com.example.control-host';
+    const bootouts: string[] = [];
+
+    try {
+      await mkdir(join(tempRoot, 'LaunchAgents'), { recursive: true });
+      await mkdir(paths.supportDir, { recursive: true });
+      await mkdir(paths.logsDir, { recursive: true });
+      await writeFile(paths.plistPath, '<plist/>', 'utf8');
+      await writeFile(paths.configPath, '{}', 'utf8');
+      await writeFile(paths.statePath, '{}', 'utf8');
+      await writeFile(paths.stdoutLogPath, '', 'utf8');
+      await writeFile(paths.stderrLogPath, '', 'utf8');
+
+      await rollbackFailedControlHostSupervisionInstall(paths, serviceTarget, {
+        bootout: async (target) => {
+          bootouts.push(target);
+        }
+      });
+
+      expect(bootouts).toEqual([serviceTarget]);
+      await expect(stat(paths.plistPath)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(paths.supportDir)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(paths.logsDir)).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it('bounds co-status probe timeouts and surfaces timeout health state', async () => {

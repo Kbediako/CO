@@ -12,6 +12,7 @@ export const DEFAULT_CONTROL_HOST_SUPERVISION_LAUNCHD_THROTTLE_SECONDS = 15;
 export const DEFAULT_CONTROL_HOST_SUPERVISION_KILL_TIMEOUT_SECONDS = 10;
 export const DEFAULT_CONTROL_HOST_SUPERVISION_RESTART_EXIT_CODE = 75;
 export const DEFAULT_CONTROL_HOST_SUPERVISION_SHELL_PATH = '/bin/zsh';
+const CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS = Math.floor(2_147_483_647 / 1_000);
 
 export interface ControlHostSupervisionPaths {
   supportDir: string;
@@ -167,7 +168,7 @@ export function buildControlHostSupervisionConfig(
     input.pipelineId,
     DEFAULT_CONTROL_HOST_SUPERVISION_PIPELINE_ID
   );
-  const healthIntervalSeconds = coercePositiveInteger(
+  const healthIntervalSeconds = coercePositiveTimerSeconds(
     input.healthIntervalSeconds,
     DEFAULT_CONTROL_HOST_SUPERVISION_HEALTH_INTERVAL_SECONDS,
     'health interval'
@@ -182,7 +183,7 @@ export function buildControlHostSupervisionConfig(
     DEFAULT_CONTROL_HOST_SUPERVISION_LAUNCHD_THROTTLE_SECONDS,
     'launchd throttle'
   );
-  const killTimeoutSeconds = coercePositiveInteger(
+  const killTimeoutSeconds = coercePositiveTimerSeconds(
     input.killTimeoutSeconds,
     DEFAULT_CONTROL_HOST_SUPERVISION_KILL_TIMEOUT_SECONDS,
     'kill timeout'
@@ -405,6 +406,20 @@ function coercePositiveInteger(
     throw new Error(`${label} must be a positive integer.`);
   }
   return value;
+}
+
+function coercePositiveTimerSeconds(
+  value: number | null | undefined,
+  fallback: number,
+  label: string
+): number {
+  const parsed = coercePositiveInteger(value, fallback, label);
+  if (parsed > CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS) {
+    throw new Error(
+      `${label} must be <= ${CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS} seconds to stay within Node timer limits.`
+    );
+  }
+  return parsed;
 }
 
 function coerceNonNegativeInteger(

@@ -125,25 +125,35 @@ async function installControlHostSupervision(flags: ArgMap): Promise<void> {
   await mkdir(install.config.paths.supportDir, { recursive: true });
   await mkdir(install.config.paths.logsDir, { recursive: true });
 
-  await writeJsonFile(install.config.paths.configPath, install.config);
-  await writeJsonFile(
-    install.config.paths.statePath,
-    buildInitialControlHostSupervisionState({
-      config: install.config,
-      serviceTarget,
-      status: 'installed',
-      updatedAt: new Date().toISOString(),
-      message: 'LaunchAgent installed; waiting for launchd supervision.'
-    })
-  );
-  await writeFile(
-    install.config.paths.plistPath,
-    buildControlHostSupervisionPlist(install.config),
-    'utf8'
-  );
+  try {
+    await writeJsonFile(install.config.paths.configPath, install.config);
+    await writeJsonFile(
+      install.config.paths.statePath,
+      buildInitialControlHostSupervisionState({
+        config: install.config,
+        serviceTarget,
+        status: 'installed',
+        updatedAt: new Date().toISOString(),
+        message: 'LaunchAgent installed; waiting for launchd supervision.'
+      })
+    );
+    await writeFile(
+      install.config.paths.plistPath,
+      buildControlHostSupervisionPlist(install.config),
+      'utf8'
+    );
 
-  await bootoutLaunchctlServiceTarget(serviceTarget);
-  await runLaunchctl(['bootstrap', resolveLaunchdDomain(), install.config.paths.plistPath]);
+    await bootoutLaunchctlServiceTarget(serviceTarget);
+    await runLaunchctl(['bootstrap', resolveLaunchdDomain(), install.config.paths.plistPath]);
+  } catch (error) {
+    const detail = (error as Error).message;
+    try {
+      await rollbackFailedControlHostSupervisionInstall(install.config.paths, serviceTarget);
+    } catch (rollbackError) {
+      throw new Error(`${detail} (rollback failed: ${(rollbackError as Error).message})`);
+    }
+    throw error;
+  }
 
   const payload = {
     status: 'installed',
@@ -219,10 +229,7 @@ async function uninstallControlHostSupervision(flags: ArgMap): Promise<void> {
   const resolved = await resolveStoredControlHostSupervision(flags, false);
   const serviceTarget = resolveControlHostSupervisionServiceTarget(resolved.label);
 
-  await bootoutLaunchctlServiceTarget(serviceTarget);
-  await rm(resolved.paths.plistPath, { force: true });
-  await rm(resolved.paths.supportDir, { recursive: true, force: true });
-  await rm(resolved.paths.logsDir, { recursive: true, force: true });
+  await rollbackFailedControlHostSupervisionInstall(resolved.paths, serviceTarget);
 
   const payload = {
     status: 'uninstalled',
@@ -781,6 +788,22 @@ async function bootoutLaunchctlServiceTarget(serviceTarget: string): Promise<voi
   throw new Error(`launchctl bootout ${serviceTarget} failed: ${detail}`);
 }
 
+async function rollbackFailedControlHostSupervisionInstall(
+  paths: ControlHostSupervisionPaths,
+  serviceTarget: string,
+  options?: {
+    bootout?: (serviceTarget: string) => Promise<void>;
+    remove?: typeof rm;
+  }
+): Promise<void> {
+  const bootout = options?.bootout ?? bootoutLaunchctlServiceTarget;
+  const remove = options?.remove ?? rm;
+  await bootout(serviceTarget);
+  await remove(paths.plistPath, { force: true });
+  await remove(paths.supportDir, { recursive: true, force: true });
+  await remove(paths.logsDir, { recursive: true, force: true });
+}
+
 function isIgnorableLaunchctlBootoutFailure(result: CommandResult): boolean {
   const detail = `${result.stdout}\n${result.stderr}`.toLowerCase();
   return /could not find service|service.*not found|no such process|not loaded/u.test(detail);
@@ -1050,6 +1073,7 @@ export const __test__ = {
   readFormatFlag,
   readStringFlag,
   readIntegerFlag,
+  rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
 };
