@@ -249,8 +249,7 @@ function isCompletedTaskItem(item) {
   }
 
   const status = typeof item.status === 'string' ? item.status : '';
-  const gateStatus = typeof item.gate?.status === 'string' ? item.gate.status : '';
-  return TERMINAL_TASK_STATUSES.has(status) || gateStatus === 'succeeded';
+  return TERMINAL_TASK_STATUSES.has(status);
 }
 
 function extractNumericTaskId(taskKey) {

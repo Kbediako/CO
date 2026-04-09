@@ -310,6 +310,9 @@ describe('implementation-docs-archive script', () => {
               id: '9999',
               slug: 'archive-test-active',
               status: 'in_progress',
+              gate: {
+                status: 'succeeded'
+              },
               relates_to: 'tasks/tasks-9999-archive-test-active.md',
               paths: {
                 docs: 'docs/PRD-archive-test-active.md'
