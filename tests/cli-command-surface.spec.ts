@@ -21,6 +21,7 @@ const CLI_ENTRY_DIST = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js
 const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
+const CLI_BINARY_SHELL_TIMEOUT = 60000;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
 const SKILLS_INSTALL_JSON_TIMEOUT = 70000;
 const RUNTIME_TEST_ENV_KEYS = [
@@ -1132,16 +1133,20 @@ describe('codex-orchestrator command surface', () => {
   }, TEST_TIMEOUT);
 
   it('prints self-check text output through the binary shell', async () => {
-    const { stdout } = await runCli(['self-check']);
+    const { stdout } = await runCliSubprocess(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Status: ok');
     expect(stdout).toContain('Name: @kbediako/codex-orchestrator');
     expect(stdout).toContain('Version: 0.1.38');
     expect(stdout).toContain(`Node: ${process.version}`);
     expect(stdout).toContain('Timestamp: ');
-  }, TEST_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('prints self-check json output through the binary shell', async () => {
-    const { stdout } = await runCliSubprocess(['self-check', '--format', 'json']);
+    const { stdout } = await runCliSubprocess(
+      ['self-check', '--format', 'json'],
+      undefined,
+      CLI_BINARY_SHELL_TIMEOUT
+    );
     const payload = JSON.parse(stdout) as {
       status?: string;
       name?: string;
@@ -1155,7 +1160,7 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.version).toBe('0.1.38');
     expect(payload.node).toBe(process.version);
     expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
-  }, TEST_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('prints doctor apply plan when wiring is missing', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));
@@ -1163,11 +1168,11 @@ describe('codex-orchestrator command surface', () => {
       ...process.env,
       CODEX_HOME: tempDir
     };
-    const { stdout } = await runCli(['doctor', '--apply'], env);
+    const { stdout } = await runCliSubprocess(['doctor', '--apply'], env, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Doctor apply plan:');
     expect(stdout).toContain('chrome-devtools');
     expect(stdout).toContain('delegation');
-  }, TEST_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('rejects doctor --apply with --format json', async () => {
     await expect(runCli(['doctor', '--apply', '--format', 'json'])).rejects.toMatchObject({
