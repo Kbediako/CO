@@ -289,6 +289,39 @@ describe('providerWorkflowConfigStore', () => {
     ]);
   });
 
+  it('defaults optional worker-host max_concurrent_agents to one when omitted', async () => {
+    await writeRepoConfig(
+      buildValidProviderConfig('v1', {
+        worker_hosts: {
+          hosts: [
+            {
+              name: 'worker-host-01',
+              ssh_destination: 'codex@worker-host-01'
+            }
+          ]
+        }
+      })
+    );
+    const store = createProviderWorkflowConfigStore({
+      env: buildEnv(workspaceRoot),
+      runDir: join(workspaceRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+
+    const bootstrapped = await store.bootstrap();
+
+    expect(bootstrapped.worker_hosts).toEqual([
+      {
+        name: 'worker-host-01',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-01',
+        ssh_options: [],
+        max_concurrent_agents: 1,
+        node_path: null
+      }
+    ]);
+  });
+
   it('retries a failed revision when the config is repaired without metadata change', async () => {
     await writeRepoConfig(buildValidProviderConfig('v1'));
     const store = createProviderWorkflowConfigStore({

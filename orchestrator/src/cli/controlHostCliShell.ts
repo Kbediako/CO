@@ -417,7 +417,7 @@ async function spawnBackgroundCliOverSsh(
   );
   const remoteCommand = buildRemoteProviderLaunchCommand({
     cwd: launchSpec.cwd,
-    nodePath: launchSpec.transport.host.node_path ?? process.execPath,
+    nodePath: resolveRemoteProviderNodePath(launchSpec.transport.host),
     cliEntrypoint,
     args,
     envValues
@@ -646,7 +646,8 @@ async function resolveProviderResumeLaunchSpec(
     configPath,
     resolveConfiguredProviderWorkerHost(
       providerWorkflowConfigStore,
-      persistedProofContext?.workerHost ?? null
+      persistedProofContext?.workerHost ?? null,
+      { allowMissing: true }
     )
   );
   return {
@@ -761,7 +762,10 @@ function parseProviderLinearLaunchContextFromProof(input: unknown): {
 
 function resolveConfiguredProviderWorkerHost(
   providerWorkflowConfigStore: ProviderWorkflowConfigStore | undefined,
-  workerHost: string | null
+  workerHost: string | null,
+  options: {
+    allowMissing?: boolean;
+  } = {}
 ): ProviderWorkerHostConfig | null {
   const normalizedWorkerHost = normalizeProviderWorkerHostName(workerHost);
   if (!normalizedWorkerHost) {
@@ -772,11 +776,18 @@ function resolveConfiguredProviderWorkerHost(
     normalizedWorkerHost
   );
   if (!configuredHost) {
+    if (options.allowMissing === true) {
+      return null;
+    }
     throw new Error(
       `Configured provider worker host "${normalizedWorkerHost}" is unavailable in the current provider workflow snapshot.`
     );
   }
   return configuredHost;
+}
+
+function resolveRemoteProviderNodePath(workerHost: ProviderWorkerHostConfig): string {
+  return workerHost.node_path ?? 'node';
 }
 
 export const __test__ = {
@@ -789,6 +800,7 @@ export const __test__ = {
   findSpawnManifest,
   rehydrateProviderIssueHandoffOnStartup,
   refreshProviderIssueHandoffOnStartup,
+  resolveRemoteProviderNodePath,
   resolveProviderResumeLaunchSpec,
   resolveProviderResumeTaskId,
   resolveProviderOverridePackageRoot,

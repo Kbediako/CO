@@ -10,6 +10,7 @@ import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 import { __test__ as controlHostCliShellTest } from '../src/cli/controlHostCliShell.js';
 import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../src/cli/config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
+import { createProviderWorkflowConfigStore } from '../src/cli/control/providerWorkflowConfigStore.js';
 import { PROVIDER_WORKER_HOST_ENV_KEY } from '../src/cli/control/providerWorkerHosts.js';
 import { PROVIDER_LINEAR_WORKER_PROOF_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
@@ -17,12 +18,14 @@ import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 const {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   buildProviderLaunchSpec,
+  buildRemoteProviderLaunchCommand,
   buildProviderLinearSourceEnvOverrides,
   buildProviderOverrideOwnershipEnv,
   beginProviderIssueHandoffStartupRefresh,
   findSpawnManifest,
   rehydrateProviderIssueHandoffOnStartup,
   refreshProviderIssueHandoffOnStartup,
+  resolveRemoteProviderNodePath,
   resolveProviderResumeLaunchSpec,
   resolveProviderOverridePackageRoot,
   snapshotRunManifests
@@ -171,6 +174,30 @@ describe('controlHostCliShell manifest discovery', () => {
         }
       }
     });
+  });
+
+  it('defaults remote worker launches to `node` when node_path is omitted', () => {
+    const workerHost = {
+      name: 'worker-host-01',
+      transport: 'ssh' as const,
+      ssh_destination: 'codex@worker-host-01',
+      ssh_options: [],
+      max_concurrent_agents: 1,
+      node_path: null
+    };
+
+    expect(resolveRemoteProviderNodePath(workerHost)).toBe('node');
+    expect(
+      buildRemoteProviderLaunchCommand({
+        cwd: '/repo/.workspaces/provider-task',
+        nodePath: resolveRemoteProviderNodePath(workerHost),
+        cliEntrypoint: '/repo/dist/bin/codex-orchestrator.js',
+        args: ['start', 'provider-linear-worker'],
+        envValues: {
+          CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task'
+        }
+      })
+    ).toContain("'node' '/repo/dist/bin/codex-orchestrator.js' 'start' 'provider-linear-worker'");
   });
 
   it('prefers launch-time package-root overrides when stamping provider ownership markers', () => {
@@ -643,6 +670,102 @@ describe('controlHostCliShell manifest discovery', () => {
     await expect(resolveProviderResumeLaunchSpec(env, 'run-child')).rejects.toThrow(
       'Invalid provider resume manifest task_id for run run-child'
     );
+  });
+
+  it('falls back to a local resume when the persisted worker_host is no longer configured', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    await initializeRepo(tempRoot);
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const childPaths = resolveRunPaths(
+      {
+        ...env,
+        taskId: 'linear-lin-issue-1'
+      },
+      'run-child'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        workspace_path: join(tempRoot, '.workspaces', 'linear-lin-issue-1')
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(tempRoot, 'codex.orchestrator.json'),
+      JSON.stringify({
+        defaultPipeline: 'provider-linear-worker',
+        pipelines: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider worker',
+            metadata: {
+              worker_hosts: {
+                hosts: [
+                  {
+                    name: 'worker-host-02',
+                    ssh_destination: 'codex@worker-host-02',
+                    max_concurrent_agents: 1
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const providerWorkflowConfigStore = createProviderWorkflowConfigStore({
+      env,
+      runDir: join(tempRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+    await providerWorkflowConfigStore.bootstrap();
+
+    const spec = await resolveProviderResumeLaunchSpec(
+      env,
+      'run-child',
+      providerWorkflowConfigStore
+    );
+
+    expect(spec).toEqual({
+      cwd: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
+      envOverrides: {
+        CODEX_ORCHESTRATOR_ROOT: join(tempRoot, '.workspaces', 'linear-lin-issue-1'),
+        CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
+        CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
+        [REPO_CONFIG_PATH_ENV_KEY]:
+          join(
+            tempRoot,
+            '.runs',
+            'local-mcp',
+            'cli',
+            'control-host',
+            'provider-workflow.last-known-good.json'
+          ),
+        [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
+        CO_LINEAR_WORKSPACE_ID: '',
+        CO_LINEAR_TEAM_ID: '',
+        CO_LINEAR_PROJECT_ID: ''
+      },
+      transport: {
+        kind: 'local'
+      }
+    });
   });
 });
 

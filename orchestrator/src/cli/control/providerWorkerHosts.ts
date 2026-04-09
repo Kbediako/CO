@@ -1,4 +1,5 @@
 export const PROVIDER_WORKER_HOST_ENV_KEY = 'CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST';
+const DEFAULT_PROVIDER_WORKER_HOST_MAX_CONCURRENT_AGENTS = 1;
 
 export interface ProviderWorkerHostConfig {
   name: string;
@@ -52,11 +53,9 @@ export function resolveProviderWorkerHostConfig(metadata: unknown): ProviderWork
       transport: 'ssh',
       ssh_destination: sshDestination,
       ssh_options: readStringArray(host, 'ssh_options'),
-      max_concurrent_agents: readPositiveInteger(
-        host,
-        'max_concurrent_agents',
-        `provider worker host "${name}"`
-      ),
+      max_concurrent_agents:
+        readOptionalPositiveInteger(host, 'max_concurrent_agents', `provider worker host "${name}"`) ??
+        DEFAULT_PROVIDER_WORKER_HOST_MAX_CONCURRENT_AGENTS,
       node_path: readOptionalString(host, 'node_path')
     };
   });
@@ -268,4 +267,15 @@ function readPositiveInteger(
     }
   }
   throw new Error(`${source} requires ${key} to be a positive integer.`);
+}
+
+function readOptionalPositiveInteger(
+  record: Record<string, unknown>,
+  key: string,
+  source: string
+): number | null {
+  if (record[key] === undefined || record[key] === null) {
+    return null;
+  }
+  return readPositiveInteger(record, key, source);
 }
