@@ -30,4 +30,4 @@
 - [x] The issue is in `In Progress`, and exactly one persistent `## Codex Workpad` comment is maintained for the issue. Evidence: Linear workpad comment `ce7c900b-b3ea-4223-aaae-799a1b183e1b`, `out/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0/manual/workpad.md`.
 - [x] A PR is attached before any review-state handoff. Evidence: PR `#394` (`https://github.com/Kbediako/CO/pull/394`), Linear attachment on issue `CO-88`.
 - [x] Latest `origin/main` is merged into the branch before review-state transition. Evidence: merge commit `236e2123b`.
-- [ ] PR checks are green, actionable review feedback is handled or explicitly pushed back, `pr ready-review` drains cleanly, and the issue moves to `In Review` only after coding stops. Evidence: pending.
+- [ ] PR checks are green, actionable review feedback is handled or explicitly pushed back, `pr ready-review` drains cleanly, and the issue moves to `In Review` only after coding stops. Evidence: pending fresh PR workflow registration after sync commit `f5fa88f05` so `Core Lane` consumes the current diff-budget override metadata.
