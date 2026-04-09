@@ -89,7 +89,8 @@ type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
-const SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 5_000;
+const LOCAL_SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 5_000;
+const REMOTE_SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 20_000;
 const SPAWN_MANIFEST_WAIT_INTERVAL_MS = 100;
 export const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
 const ALLOWED_REMOTE_PROVIDER_ENV_KEYS = [
@@ -405,9 +406,15 @@ async function spawnBackgroundCliAndWaitForManifest(
     taskId,
     baselineRuns,
     correlation,
-    timeoutMs: SPAWN_MANIFEST_WAIT_TIMEOUT_MS,
+    timeoutMs: resolveSpawnManifestWaitTimeoutMs(launchSpec),
     intervalMs: SPAWN_MANIFEST_WAIT_INTERVAL_MS
   });
+}
+
+function resolveSpawnManifestWaitTimeoutMs(launchSpec: ProviderLaunchSpec): number {
+  return isProviderSshLaunchSpec(launchSpec)
+    ? REMOTE_SPAWN_MANIFEST_WAIT_TIMEOUT_MS
+    : LOCAL_SPAWN_MANIFEST_WAIT_TIMEOUT_MS;
 }
 
 async function spawnBackgroundCli(
@@ -898,6 +905,7 @@ export const __test__ = {
   rehydrateProviderIssueHandoffOnStartup,
   refreshProviderIssueHandoffOnStartup,
   resolveRemoteProviderNodePath,
+  resolveSpawnManifestWaitTimeoutMs,
   resolveProviderResumeLaunchSpec,
   resolveProviderResumeTaskId,
   resolveProviderOverridePackageRoot,

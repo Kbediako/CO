@@ -28,6 +28,7 @@ const {
   rehydrateProviderIssueHandoffOnStartup,
   refreshProviderIssueHandoffOnStartup,
   resolveRemoteProviderNodePath,
+  resolveSpawnManifestWaitTimeoutMs,
   resolveProviderResumeLaunchSpec,
   resolveProviderOverridePackageRoot,
   snapshotRunManifests
@@ -205,6 +206,36 @@ describe('controlHostCliShell manifest discovery', () => {
     expect(command).toContain("'node'");
     expect(command).toContain("'/repo/dist/bin/codex-orchestrator.js'");
     expect(command).toContain("'start' 'provider-linear-worker'");
+  });
+
+  it('uses a longer spawn-manifest wait window for ssh worker launches', () => {
+    const env: EnvironmentPaths = {
+      repoRoot: '/repo',
+      runsRoot: '/repo/.runs',
+      outRoot: '/repo/out',
+      taskId: 'local-mcp'
+    };
+    const localSpec = buildProviderLaunchSpec(
+      env,
+      '/repo/.workspaces/provider-task',
+      '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json'
+    );
+    const remoteSpec = buildProviderLaunchSpec(
+      env,
+      '/repo/.workspaces/provider-task',
+      '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+      {
+        name: 'worker-host-01',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-01',
+        ssh_options: [],
+        max_concurrent_agents: 1,
+        node_path: null
+      }
+    );
+
+    expect(resolveSpawnManifestWaitTimeoutMs(localSpec)).toBe(5_000);
+    expect(resolveSpawnManifestWaitTimeoutMs(remoteSpec)).toBe(20_000);
   });
 
   it('quotes special shell characters in remote worker launch commands', () => {
