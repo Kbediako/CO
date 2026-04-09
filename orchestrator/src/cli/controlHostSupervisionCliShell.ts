@@ -1,7 +1,8 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
 import { execFile, spawn } from 'node:child_process';
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
+import { access, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -78,6 +79,34 @@ interface ControlHostSupervisionChildErrorEvent {
   type: 'child_error';
   error: Error;
 }
+
+const REQUIRED_CONTROL_HOST_SUPERVISION_STRING_FIELDS = [
+  'label',
+  'repoRoot',
+  'nodePath',
+  'cliEntrypoint',
+  'taskId',
+  'runId',
+  'pipelineId',
+  'shellPath',
+  'homeDir'
+] as const;
+const REQUIRED_CONTROL_HOST_SUPERVISION_INTEGER_FIELDS = [
+  'version',
+  'healthIntervalSeconds',
+  'unhealthyThreshold',
+  'launchdThrottleSeconds',
+  'killTimeoutSeconds'
+] as const;
+const REQUIRED_CONTROL_HOST_SUPERVISION_PATH_FIELDS = [
+  'supportDir',
+  'configPath',
+  'statePath',
+  'plistPath',
+  'logsDir',
+  'stdoutLogPath',
+  'stderrLogPath'
+] as const;
 
 const execFileAsync = promisify(execFile);
 const COMMAND_BUFFER_MAX_BYTES = 16 * 1024 * 1024;
@@ -493,10 +522,11 @@ async function resolveStoredControlHostSupervision(
   const explicitConfigPath = readStringFlag(flags, 'config');
   if (explicitConfigPath) {
     const configPath = resolve(explicitConfigPath);
-    const config = await readJsonFileIfExists<ControlHostSupervisionConfig>(configPath);
+    const config = await readJsonFileIfExists<unknown>(configPath);
     if (!config) {
       throw new Error(`Control-host supervision config not found: ${configPath}`);
     }
+    assertStoredControlHostSupervisionConfig(configPath, config);
     return {
       label: config.label,
       paths: config.paths,
@@ -508,6 +538,9 @@ async function resolveStoredControlHostSupervision(
   const label = readStringFlag(flags, 'label') ?? undefined;
   const paths = resolveControlHostSupervisionPaths({ homeDir, label });
   const config = await readJsonFileIfExists<ControlHostSupervisionConfig>(paths.configPath);
+  if (config) {
+    assertStoredControlHostSupervisionConfig(paths.configPath, config);
+  }
   if (requireConfig && !config) {
     throw new Error(
       `Control-host supervision is not installed for ${label ?? 'the default label'} (missing ${paths.configPath}).`
@@ -1030,6 +1063,10 @@ function firstNonEmptyLine(value: string): string | null {
   return null;
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 async function assertPathExists(
   path: string,
   label: string,
@@ -1040,18 +1077,78 @@ async function assertPathExists(
   }
 }
 
+async function assertExecutablePath(
+  path: string,
+  label: string,
+  exists: (path: string) => Promise<boolean> = pathExists,
+  isExecutable: (path: string) => Promise<boolean> = pathIsExecutable
+): Promise<void> {
+  await assertPathExists(path, label, exists);
+  if (!(await isExecutable(path))) {
+    throw new Error(`${label} is not executable: ${path}`);
+  }
+}
+
 async function assertControlHostSupervisionInstallPaths(
   config: ControlHostSupervisionConfig,
-  exists: (path: string) => Promise<boolean> = pathExists
+  exists: (path: string) => Promise<boolean> = pathExists,
+  isExecutable: (path: string) => Promise<boolean> = pathIsExecutable
 ): Promise<void> {
-  await assertPathExists(config.nodePath, 'Node executable', exists);
+  await assertExecutablePath(config.nodePath, 'Node executable', exists, isExecutable);
   await assertPathExists(config.cliEntrypoint, 'Control-host supervision entrypoint', exists);
-  await assertPathExists(config.shellPath, 'Shell executable', exists);
+  await assertExecutablePath(config.shellPath, 'Shell executable', exists, isExecutable);
+}
+
+function assertStoredControlHostSupervisionConfig(
+  configPath: string,
+  config: unknown
+): asserts config is ControlHostSupervisionConfig {
+  if (typeof config !== 'object' || config === null) {
+    throw new Error(`Invalid control-host supervision config at ${configPath}: expected an object.`);
+  }
+  const record = config as Record<string, unknown>;
+  for (const key of REQUIRED_CONTROL_HOST_SUPERVISION_STRING_FIELDS) {
+    if (!isNonEmptyString(record[key])) {
+      throw new Error(
+        `Invalid control-host supervision config at ${configPath}: missing ${key}.`
+      );
+    }
+  }
+  for (const key of REQUIRED_CONTROL_HOST_SUPERVISION_INTEGER_FIELDS) {
+    if (!Number.isInteger(record[key])) {
+      throw new Error(
+        `Invalid control-host supervision config at ${configPath}: invalid ${key}.`
+      );
+    }
+  }
+  if (!Array.isArray(record.envFiles) || record.envFiles.some((entry) => !isNonEmptyString(entry))) {
+    throw new Error(`Invalid control-host supervision config at ${configPath}: invalid envFiles.`);
+  }
+  if (typeof record.paths !== 'object' || record.paths === null) {
+    throw new Error(`Invalid control-host supervision config at ${configPath}: missing paths.`);
+  }
+  const paths = record.paths as Record<string, unknown>;
+  for (const key of REQUIRED_CONTROL_HOST_SUPERVISION_PATH_FIELDS) {
+    if (!isNonEmptyString(paths[key])) {
+      throw new Error(
+        `Invalid control-host supervision config at ${configPath}: missing paths.${key}.`
+      );
+    }
+  }
 }
 
 async function pathExists(path: string): Promise<boolean> {
   try {
     await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function pathIsExecutable(path: string): Promise<boolean> {
+  try {
+    await access(path, fsConstants.X_OK);
     return true;
   } catch {
     return false;
@@ -1111,6 +1208,7 @@ async function sleep(ms: number): Promise<void> {
 
 export const __test__ = {
   assertControlHostSupervisionInstallPaths,
+  assertStoredControlHostSupervisionConfig,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
   createControlHostSupervisionChildEventPromises,

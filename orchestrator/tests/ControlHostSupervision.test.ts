@@ -17,6 +17,7 @@ import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlH
 
 const {
   assertControlHostSupervisionInstallPaths,
+  assertStoredControlHostSupervisionConfig,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
   createControlHostSupervisionChildEventPromises,
@@ -258,9 +259,51 @@ describe('controlHostSupervision shell helpers', () => {
     });
 
     await expect(
-      assertControlHostSupervisionInstallPaths(config, async (path) => path !== config.shellPath)
+      assertControlHostSupervisionInstallPaths(
+        config,
+        async (path) => path !== config.shellPath,
+        async () => true
+      )
     ).rejects.toThrow(
       `Shell executable not found: ${config.shellPath}`
+    );
+  });
+
+  it('requires node and shell install paths to be executable', async () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js',
+      shellPath: '/bin/zsh'
+    });
+
+    await expect(
+      assertControlHostSupervisionInstallPaths(
+        config,
+        async () => true,
+        async (path) => path !== config.nodePath
+      )
+    ).rejects.toThrow(`Node executable is not executable: ${config.nodePath}`);
+
+    await expect(
+      assertControlHostSupervisionInstallPaths(
+        config,
+        async () => true,
+        async (path) => path !== config.shellPath
+      )
+    ).rejects.toThrow(`Shell executable is not executable: ${config.shellPath}`);
+  });
+
+  it('rejects malformed stored config payloads before using label or path fields', () => {
+    expect(() =>
+      assertStoredControlHostSupervisionConfig('/tmp/invalid-config.json', {
+        version: 1,
+        paths: {}
+      })
+    ).toThrow(
+      'Invalid control-host supervision config at /tmp/invalid-config.json: missing label.'
     );
   });
 
