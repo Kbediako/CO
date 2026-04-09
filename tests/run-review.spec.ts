@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -1390,10 +1390,14 @@ describe('shouldUseFreshDist', () => {
       await mkdir(dirname(helperPath), { recursive: true });
       await mkdir(dirname(distEntry), { recursive: true });
       await writeFile(sourceEntry, 'export {};\n', 'utf8');
-      await new Promise((resolve) => setTimeout(resolve, 20));
       await writeFile(distEntry, 'export {};\n', 'utf8');
-      await new Promise((resolve) => setTimeout(resolve, 20));
       await writeFile(helperPath, 'export {};\n', 'utf8');
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const helperAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(helperPath, helperAt, helperAt);
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
     } finally {
