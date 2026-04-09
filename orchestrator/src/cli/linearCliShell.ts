@@ -254,6 +254,7 @@ export async function runLinearCliShell(
         const result = await dependencies.getProviderLinearIssueContext({
           issueId: requireFlag(params.flags, 'issue-id'),
           sourceSetup: readSourceSetup(params.flags),
+          allowReadOnlyCacheReuse: true,
           env
         });
         await recordAuditResult(result, params.flags, env, dependencies);

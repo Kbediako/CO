@@ -754,6 +754,7 @@ export async function getProviderLinearIssueContext(input: {
   issueId: string;
   sourceSetup?: DispatchPilotSourceSetup | null;
   fallbackToCacheOnFailure?: boolean;
+  allowReadOnlyCacheReuse?: boolean;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }): Promise<ProviderLinearIssueContextResult> {
@@ -788,12 +789,17 @@ export async function getProviderLinearIssueContext(input: {
     }
     return failureFromWorkflowError('issue-context', preflight.error);
   }
-  if (cachedRecord && shouldReuseCachedIssueContextForRead(cachedRecord, budget)) {
+  if (
+    input.allowReadOnlyCacheReuse === true &&
+    cachedRecord &&
+    shouldReuseCachedIssueContextForRead(cachedRecord, budget)
+  ) {
     return {
       ok: true,
       operation: 'issue-context',
       issue: cachedRecord.issue,
-      source_setup: session.session.sourceSetup
+      source_setup: session.session.sourceSetup,
+      cache_fallback_used: true
     };
   }
 
