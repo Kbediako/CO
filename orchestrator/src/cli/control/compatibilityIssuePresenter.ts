@@ -373,9 +373,7 @@ export function buildCompatibilityRunningEntry(
       ? selected.latestEvent?.messageRecordedAt ?? selected.latestEvent?.at ?? null
       : runningMessageSource === 'proof'
         ? useLegacyProofFallback
-          ? proofMessage
-            ? proofEventAt ?? null
-            : null
+          ? null
           : proofMessage
             ? proofCanonicalRecordedAt ?? null
             : null

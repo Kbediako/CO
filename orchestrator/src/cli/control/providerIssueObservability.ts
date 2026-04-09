@@ -982,16 +982,22 @@ function explainProviderLinearWorkerProgressCandidateRejection(
   ) {
     return 'lower_signal_than_winner';
   }
+  if (candidate.message_recorded_at && winner.message_recorded_at) {
+    const messageFreshnessComparison = compareIsoTimestamp(
+      candidate.message_recorded_at,
+      winner.message_recorded_at
+    );
+    if (messageFreshnessComparison < 0) {
+      return 'older_than_winner';
+    }
+  }
   if (
     providerLinearWorkerProgressCandidateSourcePriority(candidate.source) <
     providerLinearWorkerProgressCandidateSourcePriority(winner.source)
   ) {
     return 'less_authoritative_than_winner';
   }
-  if (
-    compareIsoTimestamp(candidate.message_recorded_at, winner.message_recorded_at) < 0 ||
-    compareIsoTimestamp(candidate.source_updated_at, winner.source_updated_at) < 0
-  ) {
+  if (compareIsoTimestamp(candidate.source_updated_at, winner.source_updated_at) < 0) {
     return 'older_than_winner';
   }
   return 'ranked_below_winner';
