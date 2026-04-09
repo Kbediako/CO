@@ -974,6 +974,7 @@ function applyProviderLinearWorkerJsonlRecord(
   if (threadChanged) {
     // A bookkeeping-only thread swap should not relabel stale turn-scoped activity onto the new session.
     resetProviderLinearWorkerTurnScopedTelemetry(state);
+    state.turnId = null;
   }
   if (parsed.type === 'turn_context' && payload) {
     const nextTurnId = normalizeOptionalString(payload.turn_id);

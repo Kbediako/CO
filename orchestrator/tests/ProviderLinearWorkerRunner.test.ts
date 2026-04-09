@@ -1045,7 +1045,7 @@ describe('provider linear worker runner', () => {
 
     expect(parsed).toEqual({
       threadId: 'thread-2',
-      turnId: 'turn-1',
+      turnId: null,
       finalMessage: null,
       lastEvent: null,
       lastEventAt: null,
@@ -1056,6 +1056,33 @@ describe('provider linear worker runner', () => {
         total_tokens: null
       },
       rateLimits: null
+    });
+  });
+
+  it('does not reuse a stale turn id after a bookkeeping-only thread swap', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+        '{"type":"event_msg","payload":{"type":"agent_message","message":"Investigating provider-worker EVENT provenance."}}',
+        '{"timestamp":"2026-03-21T09:00:01.000Z","type":"session_meta","payload":{"id":"thread-2","cwd":"/tmp/provider-worker","source":"exec"}}',
+        '{"type":"notification","method":"item/completed","params":{"item":{"type":"fileChange","status":"completed"}},"timestamp":"2026-03-21T09:00:02.000Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed).toMatchObject({
+      threadId: 'thread-2',
+      turnId: null,
+      lastEvent: 'item/completed',
+      lastEventAt: '2026-03-21T09:00:02.000Z',
+      currentTurnActivity: {
+        event: 'item/completed',
+        message_or_payload: 'item completed: file change',
+        recorded_at: '2026-03-21T09:00:02.000Z',
+        source: 'stdout_jsonl',
+        turn_id: null,
+        session_id: null
+      }
     });
   });
 
