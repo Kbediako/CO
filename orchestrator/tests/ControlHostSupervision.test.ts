@@ -273,7 +273,9 @@ describe('controlHostSupervision shell helpers', () => {
       stdoutLogPath: join(tempRoot, 'logs', 'stdout.log'),
       stderrLogPath: join(tempRoot, 'logs', 'stderr.log')
     };
-    const serviceTarget = 'gui/501/com.example.control-host';
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(
+      'com.example.control-host'
+    );
     const bootouts: string[] = [];
 
     try {
@@ -335,7 +337,9 @@ describe('controlHostSupervision shell helpers', () => {
       );
 
       expect(removedPaths).toEqual(managedPaths);
-      expect(bootouts).toEqual(['gui/501/com.example.control-host']);
+      expect(bootouts).toEqual([
+        resolveControlHostSupervisionServiceTarget('com.example.control-host')
+      ]);
       await expect(stat(managedPaths.plistPath)).rejects.toMatchObject({ code: 'ENOENT' });
       await expect(stat(managedPaths.supportDir)).rejects.toMatchObject({ code: 'ENOENT' });
       await expect(stat(managedPaths.logsDir)).rejects.toMatchObject({ code: 'ENOENT' });
