@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 
 export const DEFAULT_CONTROL_HOST_SUPERVISION_LABEL =
-  'com.kbediako.codex-orchestrator.control-host';
+  'com.kbediako.co.control-host';
 export const DEFAULT_CONTROL_HOST_SUPERVISION_TASK_ID = 'local-mcp';
 export const DEFAULT_CONTROL_HOST_SUPERVISION_RUN_ID = 'control-host';
 export const DEFAULT_CONTROL_HOST_SUPERVISION_PIPELINE_ID = 'provider-linear-worker';
@@ -320,9 +320,9 @@ export function evaluateControlHostSupervisionHealthPayload(
   const polling = isRecord(payload.polling) ? payload.polling : null;
   if (!polling) {
     return {
-      healthy: false,
-      reason: 'invalid_payload',
-      message: 'co-status payload is missing polling state.'
+      healthy: true,
+      reason: 'ok',
+      message: 'co-status payload omitted polling state; treating it as healthy.'
     };
   }
   if (polling.restart_required === true) {

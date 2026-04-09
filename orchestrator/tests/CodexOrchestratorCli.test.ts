@@ -105,6 +105,9 @@ describe('codex-orchestrator CLI monitor alias', () => {
     expect(stdout).toContain(
       '--unhealthy-threshold <n>   Consecutive unhealthy samples before launchd restart (default: 3).'
     );
+    expect(stdout).toContain(
+      '--label <value>             LaunchAgent label (default: com.kbediako.co.control-host).'
+    );
   }, cliHelpTimeoutMs);
 
   for (const helpArg of ['help', '-h']) {

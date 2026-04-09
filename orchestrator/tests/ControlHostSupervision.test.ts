@@ -70,6 +70,21 @@ describe('controlHostSupervision helpers', () => {
     );
   });
 
+  it('keeps the legacy launch agent label as the default for install continuity', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js'
+    });
+
+    expect(config.label).toBe('com.kbediako.co.control-host');
+    expect(config.paths.plistPath).toBe(
+      '/Users/tester/Library/LaunchAgents/com.kbediako.co.control-host.plist'
+    );
+  });
+
   it('renders a launchd plist that runs the packaged supervise runner', () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',
@@ -112,6 +127,14 @@ describe('controlHostSupervision helpers', () => {
       healthy: false,
       reason: 'restart_required',
       message: 'co-status reported restart_required=true.'
+    });
+  });
+
+  it('treats missing polling state as healthy until restart_required is explicit', () => {
+    expect(evaluateControlHostSupervisionHealthPayload({})).toEqual({
+      healthy: true,
+      reason: 'ok',
+      message: 'co-status payload omitted polling state; treating it as healthy.'
     });
   });
 

@@ -1736,7 +1736,7 @@ Subcommands:
   run                   Internal long-lived supervision runner for launchd use.
 
 Common options:
-  --label <value>             LaunchAgent label (default: com.kbediako.codex-orchestrator.control-host).
+  --label <value>             LaunchAgent label (default: com.kbediako.co.control-host).
   --config <path>             Explicit config path for status, restart, uninstall, or run.
   --format json               Emit machine-readable output for install, status, restart, or uninstall.
 
