@@ -9615,18 +9615,6 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           owner_status: 'in_progress'
         });
       });
-      await vi.waitFor(async () => {
-        const secondTurnProof = JSON.parse(
-          await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
-        ) as Record<string, unknown>;
-        expect(secondTurnProof).toMatchObject({
-          latest_turn_id: 'turn-2',
-          latest_session_id: 'thread-1-turn-2',
-          turn_count: 2,
-          last_message: 'turn-2 active',
-          owner_status: 'in_progress'
-        });
-      });
 
       allowSecondTurnToFinishResolve?.();
       const proof = await workerPromise;

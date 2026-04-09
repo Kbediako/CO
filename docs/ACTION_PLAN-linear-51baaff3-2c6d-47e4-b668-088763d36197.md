@@ -27,7 +27,7 @@
 
 ## Milestones & Sequencing
 1) Register the `linear-51baaff3-2c6d-47e4-b668-088763d36197` docs packet, task mirrors, registry entries, and workpad mirror, then run the audited `docs-review` child stream and fold back any packet-only fixes.
-2) Add additive worker-host metadata plus control-host selection logic so provider dispatch can choose eligible hosts with explicit per-host capacity and truthful retry behavior.
+2) Add additive worker-host metadata plus control-host selection logic, so provider dispatch can choose eligible hosts with explicit per-host capacity and truthful retry behavior.
 3) Wire bounded SSH launch or resume handling through the provider launcher and persist `worker_host` through proof or state surfaces.
 4) Integrate `worker_host` into read-model and operator surfaces, add focused regressions, complete validation, then run standalone review plus an explicit elegance pass before PR handoff.
 

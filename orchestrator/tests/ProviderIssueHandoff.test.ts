@@ -254,6 +254,40 @@ describe('createProviderIssueHandoffService', () => {
     ]);
   });
 
+  it('ignores stale proof worker_host values when discovering prior provider runs', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerRunDir = join(root, '.runs', 'linear-lin-issue-1', 'cli', 'provider-run-1');
+    await mkdir(providerRunDir, { recursive: true });
+    await writeFile(join(providerRunDir, 'manifest.json'), JSON.stringify({
+      run_id: 'provider-run-1',
+      task_id: 'linear-lin-issue-1',
+      pipeline_id: 'provider-linear-worker',
+      parent_run_id: 'control-host-run-1',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      started_at: '2026-03-27T01:05:00.000Z',
+      updated_at: '2026-03-27T01:06:00.000Z'
+    }), 'utf8');
+    await writeFile(
+      join(providerRunDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-27T01:00:00.000Z',
+        updated_at: '2026-03-27T01:04:00.000Z',
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+
+    await expect(
+      discoverProviderIssueRuns(paths.runDir, { provider: 'linear', issueId: 'lin-issue-1' })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        runId: 'provider-run-1',
+        workerHost: null
+      })
+    ]);
+  });
+
   it('persists a starting claim before launching a deterministic start for a started Linear issue', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

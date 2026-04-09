@@ -78,7 +78,12 @@ export function createProviderWorkflowConfigStore(
       }
       const raw = await readFile(path, 'utf8');
       const config = parseUserConfigRaw(raw, 'repo');
-      return Boolean(config && findPipeline(config, createOptions.pipelineId));
+      const pipeline = config ? findPipeline(config, createOptions.pipelineId) : null;
+      if (!pipeline) {
+        return false;
+      }
+      buildWorkerHostsPayload(pipeline.metadata);
+      return true;
     } catch {
       return false;
     }

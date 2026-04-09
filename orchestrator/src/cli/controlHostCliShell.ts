@@ -73,6 +73,9 @@ import {
   type ProviderWorkerHostConfig
 } from './control/providerWorkerHosts.js';
 import {
+  isProviderLinearWorkerProofFreshForStage,
+} from './control/providerLinearWorkerTruth.js';
+import {
   shouldEnableControlStatusDashboard,
   startControlStatusDashboard,
   type ControlStatusDashboardHandle
@@ -87,8 +90,11 @@ const SPAWN_MANIFEST_WAIT_INTERVAL_MS = 100;
 export const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
 const ALLOWED_REMOTE_PROVIDER_ENV_KEYS = [
   'ALL_PROXY',
+  'CO_LINEAR_API_KEY',
+  'CO_LINEAR_API_TOKEN',
   'HTTPS_PROXY',
   'HTTP_PROXY',
+  'LINEAR_API_KEY',
   'NODE_EXTRA_CA_CERTS',
   'NO_PROXY',
   'OPENAI_API_KEY',
@@ -467,16 +473,19 @@ function buildRemoteProviderLaunchCommand(input: {
   args: string[];
   envValues: Record<string, string>;
 }): string {
-  const envAssignments = Object.entries(input.envValues)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, value]) => `${key}=${quoteShellArg(value)}`);
+  const envAssignments = [
+    'PATH="$PATH"',
+    ...Object.entries(input.envValues)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => `${key}=${quoteShellArg(value)}`)
+  ];
   const command = [
     quoteShellArg(input.nodePath),
     ...process.execArgv.map((value) => quoteShellArg(value)),
     quoteShellArg(input.cliEntrypoint),
     ...input.args.map((value) => quoteShellArg(value))
   ].join(' ');
-  return `cd ${quoteShellArg(input.cwd)} && exec env ${envAssignments.join(' ')} ${command}`;
+  return `cd ${quoteShellArg(input.cwd)} && exec env -i ${envAssignments.join(' ')} ${command}`;
 }
 
 function buildRemoteProviderEnvValues(
@@ -654,8 +663,9 @@ async function resolveProviderResumeLaunchSpec(
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore
 ): Promise<ProviderLaunchSpec> {
   const { manifest, paths } = await loadManifest(env, runId);
+  const manifestRecord = manifest as unknown as Record<string, unknown>;
   const resumeTaskId = await resolveProviderResumeTaskId(
-    manifest as unknown as Record<string, unknown>,
+    manifestRecord,
     runId,
     {
       runDir: paths.runDir,
@@ -665,17 +675,24 @@ async function resolveProviderResumeLaunchSpec(
   const workspacePath = await resolveProviderResumeWorkspacePath(
     env.repoRoot,
     resumeTaskId,
-    manifest as unknown as Record<string, unknown>
+    manifestRecord
   );
   const configPath = await resolveProviderLaunchConfigPath(env, providerWorkflowConfigStore);
   const persistedProofContext = await readProviderLinearLaunchContextFromProof(paths.runDir);
+  const manifestStartedAt =
+    typeof manifestRecord.started_at === 'string'
+      ? manifestRecord.started_at
+      : null;
   const launchSpec = buildProviderLaunchSpec(
     env,
     workspacePath,
     configPath,
     resolveConfiguredProviderWorkerHost(
       providerWorkflowConfigStore,
-      persistedProofContext?.workerHost ?? null,
+      resolveFreshProviderLaunchContextWorkerHost(
+        persistedProofContext,
+        manifestStartedAt
+      ),
       { allowMissing: true }
     )
   );
@@ -754,6 +771,7 @@ function shouldReleaseTrackedIssueClaim(reason: string): boolean {
 
 async function readProviderLinearLaunchContextFromProof(runDir: string): Promise<{
   sourceScope: ProviderLinearSourceScope | null;
+  attemptStartedAt: string | null;
   workerHost: string | null;
 } | null> {
   try {
@@ -767,6 +785,7 @@ async function readProviderLinearLaunchContextFromProof(runDir: string): Promise
 
 function parseProviderLinearLaunchContextFromProof(input: unknown): {
   sourceScope: ProviderLinearSourceScope | null;
+  attemptStartedAt: string | null;
   workerHost: string | null;
 } | null {
   if (!isRecord(input)) {
@@ -785,8 +804,33 @@ function parseProviderLinearLaunchContextFromProof(input: unknown): {
           projectId: typeof sourceSetup.project_id === 'string' ? sourceSetup.project_id : null
         }
       : null,
+    attemptStartedAt:
+      typeof input.attempt_started_at === 'string' ? input.attempt_started_at : null,
     workerHost: normalizeProviderWorkerHostName(input.worker_host)
   };
+}
+
+function resolveFreshProviderLaunchContextWorkerHost(
+  context:
+    | {
+        attemptStartedAt: string | null;
+        workerHost: string | null;
+      }
+    | null
+    | undefined,
+  manifestStartedAt: string | null | undefined
+): string | null {
+  if (!context?.workerHost) {
+    return null;
+  }
+  return isProviderLinearWorkerProofFreshForStage(
+    {
+      attempt_started_at: context.attemptStartedAt
+    },
+    manifestStartedAt ?? null
+  )
+    ? context.workerHost
+    : null;
 }
 
 function resolveConfiguredProviderWorkerHost(

@@ -8,6 +8,7 @@ import type {
   ControlCompatibilityRuntimeSnapshot,
   ControlCompatibilitySourceContext
 } from '../src/cli/control/observabilityReadModel.js';
+import { resolveProviderWorkerHost } from '../src/cli/control/observabilityReadModel.js';
 
 function buildCompatibilitySource(
   overrides: Partial<ControlCompatibilitySourceContext> = {}
@@ -95,6 +96,20 @@ function buildExhaustedLinearPolling() {
 }
 
 describe('CompatibilityIssuePresenter', () => {
+  it('ignores stale proof-derived worker_host values for the current attempt', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          attempt_started_at: '2026-04-06T02:00:00.000Z',
+          worker_host: 'worker-host-stale'
+        },
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBeNull();
+  });
+
   it('surfaces worker_host through selected, running, retrying, and issue payloads', () => {
     const workerHost = 'worker-host-01';
     const source = buildCompatibilitySource({

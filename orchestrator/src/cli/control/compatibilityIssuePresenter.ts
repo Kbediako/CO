@@ -293,7 +293,8 @@ export function buildCompatibilityRunningEntry(
   const proof = selected.providerLinearWorkerProof ?? null;
   const workerHost = resolveProviderWorkerHost({
     providerLinearWorkerProof: proof,
-    providerDebugSnapshot: selected.providerDebugSnapshot
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    stageStartedAt: selected.startedAt
   });
   const proofCurrentTurnActivity = proof?.current_turn_activity ?? null;
   const proofCanonicalEvent = normalizeCompatibilityMessage(proofCurrentTurnActivity?.event);
@@ -438,7 +439,8 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
   const proof = selected.providerLinearWorkerProof ?? null;
   const workerHost = resolveProviderWorkerHost({
     providerLinearWorkerProof: proof,
-    providerDebugSnapshot: selected.providerDebugSnapshot
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    stageStartedAt: selected.startedAt
   });
   return {
     issue_id: selected.issueId,
@@ -474,7 +476,8 @@ export function buildCompatibilityIssuePayload(input: {
   const recentEvents = latestEvent ? [latestEvent] : [];
   const workerHost = resolveProviderWorkerHost({
     providerLinearWorkerProof: input.source.providerLinearWorkerProof,
-    providerDebugSnapshot: input.source.providerDebugSnapshot
+    providerDebugSnapshot: input.source.providerDebugSnapshot,
+    stageStartedAt: input.source.startedAt
   });
 
   return {

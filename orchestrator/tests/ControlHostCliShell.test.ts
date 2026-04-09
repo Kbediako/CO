@@ -188,25 +188,51 @@ describe('controlHostCliShell manifest discovery', () => {
     };
 
     expect(resolveRemoteProviderNodePath(workerHost)).toBe('node');
-    expect(
-      buildRemoteProviderLaunchCommand({
-        cwd: '/repo/.workspaces/provider-task',
-        nodePath: resolveRemoteProviderNodePath(workerHost),
-        cliEntrypoint: '/repo/dist/bin/codex-orchestrator.js',
-        args: ['start', 'provider-linear-worker'],
-        envValues: {
-          CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task'
-        }
-      })
-    ).toContain("'node' '/repo/dist/bin/codex-orchestrator.js' 'start' 'provider-linear-worker'");
+    const command = buildRemoteProviderLaunchCommand({
+      cwd: '/repo/.workspaces/provider-task',
+      nodePath: resolveRemoteProviderNodePath(workerHost),
+      cliEntrypoint: '/repo/dist/bin/codex-orchestrator.js',
+      args: ['start', 'provider-linear-worker'],
+      envValues: {
+        CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task'
+      }
+    });
+
+    expect(command).toContain(
+      "exec env -i PATH=\"$PATH\" CODEX_ORCHESTRATOR_ROOT='/repo/.workspaces/provider-task'"
+    );
+    expect(command).toContain("'node'");
+    expect(command).toContain("'/repo/dist/bin/codex-orchestrator.js'");
+    expect(command).toContain("'start' 'provider-linear-worker'");
+  });
+
+  it('quotes special shell characters in remote worker launch commands', () => {
+    const command = buildRemoteProviderLaunchCommand({
+      cwd: '/repo/.workspaces/provider-task',
+      nodePath: '/opt/homebrew/bin/node',
+      cliEntrypoint: '/repo/dist/bin/codex-orchestrator.js',
+      args: ['start', "O'Reilly", 'line-1\nline-2'],
+      envValues: {
+        CODEX_ORCHESTRATOR_ROOT: "/repo/O'Reilly",
+        LINEAR_API_KEY: 'line-1\nline-2'
+      }
+    });
+
+    expect(command).toContain("CODEX_ORCHESTRATOR_ROOT='/repo/O'\\''Reilly'");
+    expect(command).toContain("LINEAR_API_KEY='line-1\nline-2'");
+    expect(command).toContain("'/opt/homebrew/bin/node'");
+    expect(command).toContain("'/repo/dist/bin/codex-orchestrator.js'");
+    expect(command).toContain("'start' 'O'\\''Reilly' 'line-1\nline-2'");
   });
 
   it('only forwards the bounded inherited env allowlist to remote worker launches', () => {
     expect(
       buildRemoteProviderEnvValues(
         {
+          CO_LINEAR_API_TOKEN: 'lin-token',
           OPENAI_API_KEY: 'sk-test',
           HTTPS_PROXY: 'https://proxy.internal:8443',
+          LINEAR_API_KEY: 'lin-key',
           SSH_AUTH_SOCK: '/tmp/launchd.sock',
           HOME: '/Users/kbediako'
         },
@@ -215,8 +241,10 @@ describe('controlHostCliShell manifest discovery', () => {
         }
       )
     ).toEqual({
+      CO_LINEAR_API_TOKEN: 'lin-token',
       OPENAI_API_KEY: 'sk-test',
       HTTPS_PROXY: 'https://proxy.internal:8443',
+      LINEAR_API_KEY: 'lin-key',
       CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task'
     });
   });
@@ -786,6 +814,83 @@ describe('controlHostCliShell manifest discovery', () => {
       transport: {
         kind: 'local'
       }
+    });
+  });
+
+  it('ignores a stale persisted proof worker_host when resuming a newer attempt', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    await initializeRepo(tempRoot);
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const childPaths = resolveRunPaths(
+      {
+        ...env,
+        taskId: 'linear-lin-issue-1'
+      },
+      'run-child'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        started_at: '2026-03-30T01:15:00.000Z',
+        workspace_path: join(tempRoot, '.workspaces', 'linear-lin-issue-1')
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-30T01:00:00.000Z',
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(tempRoot, 'codex.orchestrator.json'),
+      JSON.stringify({
+        defaultPipeline: 'provider-linear-worker',
+        pipelines: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider worker',
+            metadata: {
+              worker_hosts: {
+                hosts: [
+                  {
+                    name: 'worker-host-01',
+                    ssh_destination: 'codex@worker-host-01',
+                    max_concurrent_agents: 1
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const providerWorkflowConfigStore = createProviderWorkflowConfigStore({
+      env,
+      runDir: join(tempRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+    await providerWorkflowConfigStore.bootstrap();
+
+    const spec = await resolveProviderResumeLaunchSpec(
+      env,
+      'run-child',
+      providerWorkflowConfigStore
+    );
+
+    expect(spec.transport).toEqual({
+      kind: 'local'
     });
   });
 });

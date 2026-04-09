@@ -196,11 +196,17 @@ function buildIssuePayload(
   const proof = issue.provider_linear_worker_proof ?? null;
   const trackedLinear = issue.tracked && 'linear' in issue.tracked ? issue.tracked.linear : null;
   const running = issue.running ?? null;
+  const stageStartedAt =
+    running?.started_at ??
+    issue.retry?.started_at ??
+    issue.provider_debug_snapshot?.claim?.launch_started_at ??
+    null;
   const workerHost =
     issue.worker_host ??
     resolveProviderWorkerHost({
       providerLinearWorkerProof: proof,
-      providerDebugSnapshot: issue.provider_debug_snapshot ?? null
+      providerDebugSnapshot: issue.provider_debug_snapshot ?? null,
+      stageStartedAt
     });
 
   return {
@@ -255,7 +261,12 @@ function buildRunningSessionPayload(
     issue?.worker_host ??
     resolveProviderWorkerHost({
       providerLinearWorkerProof: proof,
-      providerDebugSnapshot: issue?.provider_debug_snapshot ?? null
+      providerDebugSnapshot: issue?.provider_debug_snapshot ?? null,
+      stageStartedAt:
+        entry.started_at ??
+        issue?.running?.started_at ??
+        issue?.provider_debug_snapshot?.claim?.launch_started_at ??
+        null
     });
   return {
     issue_identifier: entry.issue_identifier,
@@ -291,7 +302,12 @@ function buildRetryQueuePayload(
     issue?.worker_host ??
     resolveProviderWorkerHost({
       providerLinearWorkerProof: proof,
-      providerDebugSnapshot: issue?.provider_debug_snapshot ?? null
+      providerDebugSnapshot: issue?.provider_debug_snapshot ?? null,
+      stageStartedAt:
+        entry.started_at ??
+        issue?.retry?.started_at ??
+        issue?.provider_debug_snapshot?.claim?.launch_started_at ??
+        null
     });
   return {
     issue_identifier: entry.issue_identifier,

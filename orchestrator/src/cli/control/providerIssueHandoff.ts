@@ -3560,6 +3560,7 @@ export async function discoverProviderIssueRuns(
       const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
         join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
       );
+      const manifestStartedAt = readStringValue(manifest, 'started_at');
       discovered.push({
         provider: issueProvider,
         issueId,
@@ -3574,9 +3575,16 @@ export async function discoverProviderIssueRuns(
         ),
         summary: resolveProviderIssueRunSummary(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
-        startedAt: readStringValue(manifest, 'started_at'),
+        startedAt: manifestStartedAt,
         updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof),
-        workerHost: normalizeProviderWorkerHostName(proof?.worker_host)
+        workerHost:
+          proof
+          && isProviderLinearWorkerProofFreshForStage(
+            proof as ProviderLinearWorkerProofRecord & Record<string, unknown>,
+            manifestStartedAt
+          )
+            ? normalizeProviderWorkerHostName(proof.worker_host)
+            : null
       });
     }
   }

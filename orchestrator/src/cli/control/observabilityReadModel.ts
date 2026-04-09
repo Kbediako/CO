@@ -7,6 +7,7 @@ import type {
   ControlProviderDebugSnapshot,
   ProviderLinearWorkerProgressCandidate
 } from './providerIssueObservability.js';
+import { isProviderLinearWorkerProofFreshForStage } from './providerLinearWorkerTruth.js';
 import type { ProviderWorkerHostConfig } from './providerWorkerHosts.js';
 import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
 
@@ -420,9 +421,16 @@ export function buildSelectedRunLatestEventPayload(
 }
 
 export function readProviderLinearWorkerHost(
-  proof: ProviderLinearWorkerProof | null | undefined
+  proof: ProviderLinearWorkerProof | null | undefined,
+  stageStartedAt: string | null | undefined
 ): string | null {
-  if (!proof) {
+  if (
+    !proof
+    || !isProviderLinearWorkerProofFreshForStage(
+      proof as ProviderLinearWorkerProof & Record<string, unknown>,
+      stageStartedAt ?? null
+    )
+  ) {
     return null;
   }
   return normalizeProviderWorkerHostName(
@@ -434,12 +442,16 @@ export function resolveProviderWorkerHost(input: {
   providerLinearWorkerProof?: ProviderLinearWorkerProof | null | undefined;
   providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined;
   providerIntake?: ProviderIntakeSummaryPayload | null | undefined;
+  stageStartedAt?: string | null | undefined;
 }): string | null {
+  const stageStartedAt =
+    input.stageStartedAt
+    ?? input.providerDebugSnapshot?.claim?.launch_started_at
+    ?? null;
   return (
-    normalizeProviderWorkerHostName(input.providerDebugSnapshot?.worker?.worker_host) ??
     normalizeProviderWorkerHostName(input.providerDebugSnapshot?.claim?.worker_host) ??
     normalizeProviderWorkerHostName(input.providerIntake?.worker_host) ??
-    readProviderLinearWorkerHost(input.providerLinearWorkerProof)
+    readProviderLinearWorkerHost(input.providerLinearWorkerProof, stageStartedAt)
   );
 }
 
@@ -448,7 +460,8 @@ export function buildProjectionSelectedPayload(
 ): ControlSelectedRunPayload {
   const workerHost = resolveProviderWorkerHost({
     providerLinearWorkerProof: selected.providerLinearWorkerProof,
-    providerDebugSnapshot: selected.providerDebugSnapshot
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    stageStartedAt: selected.startedAt
   });
   return {
     issue_id: selected.issueId,

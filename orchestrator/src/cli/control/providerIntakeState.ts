@@ -257,7 +257,9 @@ export function upsertProviderIntakeClaim(
     run_manifest_path: nextRunManifestPath,
     worker_host:
       input.worker_host === undefined
-        ? existing?.worker_host ?? null
+        ? runIdentityChanged
+          ? null
+          : existing?.worker_host ?? null
         : normalizeProviderWorkerHostName(input.worker_host),
     launch_source:
       input.launch_source === undefined
