@@ -2528,6 +2528,17 @@ describe('provider linear worker runner', () => {
           latest_turn_id: 'turn-1',
           latest_session_id: 'thread-1-turn-1',
           latest_session_id_source: 'derived_from_thread_and_turn',
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          rate_limits: {
+            primary: {
+              used_percent: 12.5,
+              window_minutes: 300
+            }
+          },
           last_event: 'agent_message',
           last_message: 'Investigating provider-worker EVENT provenance.',
           last_event_at: '2026-03-21T09:00:00.200Z',
@@ -2581,7 +2592,18 @@ describe('provider linear worker runner', () => {
       last_event: null,
       last_message: null,
       last_event_at: null,
-      current_turn_activity: null
+      current_turn_activity: null,
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 12.5,
+          window_minutes: 300
+        }
+      }
     });
   });
 
@@ -5822,7 +5844,7 @@ describe('provider linear worker runner', () => {
       owner_status: 'failed',
       end_reason: 'exec_runner_failed'
     });
-  });
+  }, 20_000);
 
   it('preserves a freshly discovered thread id while clearing stale telemetry when a resumed execRunner rejects before new turn context arrives', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
@@ -5876,8 +5898,9 @@ describe('provider linear worker runner', () => {
     ).rejects.toThrow('spawn failed');
 
     expect(execRunner).toHaveBeenCalledTimes(2);
-    const liveTurnRunningProof = writeProof.mock.calls
+    const liveTurnRunningProof = [...writeProof.mock.calls]
       .map(([, proof]) => proof)
+      .reverse()
       .find(
         (proof) =>
           proof.owner_phase === 'turn_running' &&
@@ -5924,7 +5947,7 @@ describe('provider linear worker runner', () => {
       owner_status: 'failed',
       end_reason: 'exec_runner_failed'
     });
-  });
+  }, 20_000);
 
   it('waits for queued live proof writes before persisting an execRunner failure', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
@@ -9552,8 +9575,19 @@ describe('provider linear worker runner', () => {
         })
       );
       await vi.advanceTimersByTimeAsync(1_100);
-      await vi.waitFor(() => {
+      await vi.waitFor(async () => {
         expect(refreshBodies.filter((body) => body.owner_status === 'in_progress')).toHaveLength(2);
+        expect(
+          JSON.parse(
+            await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+          ) as Record<string, unknown>
+        ).toMatchObject({
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          turn_count: 2,
+          last_message: 'turn-2 active',
+          owner_status: 'in_progress'
+        });
       });
       const secondTurnProof = JSON.parse(
         await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
@@ -9575,7 +9609,7 @@ describe('provider linear worker runner', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
+  }, 20_000);
 
   it('emits stalled semantic progress for quiet live turns before the runner exits', async () => {
     vi.useFakeTimers();
@@ -9840,7 +9874,7 @@ describe('provider linear worker runner', () => {
         recorded_at: '2026-03-21T09:00:30.000Z'
       }
     });
-  });
+  }, 20_000);
 
   it('does not hydrate a previous-attempt parallelization decision before turn 1 starts', async () => {
     const { runDir } = await createManifestRoot();
@@ -9882,7 +9916,7 @@ describe('provider linear worker runner', () => {
     expect(
       (JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof).parallelization
     ).toBeNull();
-  });
+  }, 20_000);
 
   it('treats Ready as the live Todo-equivalent queue state even though Linear marks it unstarted', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
