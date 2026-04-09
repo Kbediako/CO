@@ -8581,6 +8581,8 @@ describe('provider linear worker runner', () => {
           'utf8'
         );
         const staleMtime = new Date('2026-03-21T09:00:02.000Z');
+        const resumedMtime = new Date('2026-03-21T09:00:03.000Z');
+        await utimes(sessionLogPath, resumedMtime, resumedMtime);
         await utimes(staleSessionLogPath, staleMtime, staleMtime);
       }
       return trackedIssueReadCount >= 3 ? completedIssue : issue;
