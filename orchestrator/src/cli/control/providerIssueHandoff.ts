@@ -3002,7 +3002,9 @@ export function createProviderIssueHandoffService(
         actions: [],
         holds: [],
         pending_actions:
-          previousResult?.pending_actions.map((pendingAction) => ({ ...pendingAction })) ?? []
+          providerWorkflow.operator_autopilot?.post_merge_rollout.enabled
+            ? (previousResult?.pending_actions.map((pendingAction) => ({ ...pendingAction })) ?? [])
+            : []
       };
       loggedAutopilotFailure = true;
       logger.warn(`[provider-operator-autopilot] ${nextResult.summary} error=${message}`);

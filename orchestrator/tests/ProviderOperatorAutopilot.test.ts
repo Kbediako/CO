@@ -275,6 +275,51 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('does not emit a backlog promotion action when the state transition noops', async () => {
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'noop' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+        updated_at: '2026-04-09T10:03:00.000Z'
+      },
+      previous_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      target_state: { id: 'ready', name: 'Ready', type: 'unstarted' },
+      source_setup: null
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog'
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:03:00.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: [],
+      pending_actions: []
+    });
+  });
+
   it('moves author-action-required review handoffs into Rework', async () => {
     const transitionIssueState = vi.fn(async () => ({
       ok: true as const,
@@ -553,6 +598,61 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('does not emit a review handoff rework action when the state transition noops', async () => {
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'noop' as const,
+      issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-118',
+        state: { id: 'rework', name: 'Rework', type: 'started' },
+        updated_at: '2026-04-09T10:08:00.000Z'
+      },
+      previous_state: { id: 'rework', name: 'Rework', type: 'started' },
+      target_state: { id: 'rework', name: 'Rework', type: 'started' },
+      source_setup: null
+    }));
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-118',
+            state: 'In Review',
+            state_type: 'started'
+          })
+        ],
+        claims: [
+          createClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            issue_state: 'In Review',
+            review_promotion: createReviewPromotion({
+              status: 'action_required',
+              action_required_reasons: ['review=CHANGES_REQUESTED']
+            })
+          })
+        ],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        now: () => '2026-04-09T10:08:00.000Z',
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      actions: [],
+      holds: [],
+      pending_actions: []
+    });
+  });
+
   it('surfaces pending local rollout follow-up after merged closeout truth lands', async () => {
     const result = await runProviderOperatorAutopilot({
       tracked_issues: [],
@@ -596,6 +696,38 @@ describe('providerOperatorAutopilot', () => {
       },
       previous_result: {
         recorded_at: '2026-04-09T10:10:00.000Z',
+        status: 'acted',
+        summary: 'Surfaced 1 pending local rollout action (CO-118).',
+        error: null,
+        actions: [],
+        holds: [],
+        pending_actions: [
+          {
+            kind: 'local_rollout',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            summary: 'stale rollout reminder',
+            merge_closeout_reason: 'merged_and_transitioned_done',
+            shared_root_status: 'clean_main_fast_forwarded',
+            linear_transition_status: 'transitioned'
+          }
+        ]
+      }
+    });
+
+    expect(result).toMatchObject({
+      status: 'noop',
+      pending_actions: []
+    });
+  });
+
+  it('clears stale pending rollout actions when no live merged closeout remains', async () => {
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [],
+      config: buildConfig(),
+      previous_result: {
+        recorded_at: '2026-04-09T10:11:00.000Z',
         status: 'acted',
         summary: 'Surfaced 1 pending local rollout action (CO-118).',
         error: null,
