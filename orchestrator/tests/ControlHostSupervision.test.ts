@@ -483,9 +483,11 @@ describe('controlHostSupervision shell helpers', () => {
       await writeFile(join(tamperedPath, 'sentinel.txt'), 'keep', 'utf8');
 
       const removedPaths = await removeInstalledControlHostSupervisionArtifacts(
-        'com.example.control-host',
         {
-          homeDir,
+          label: 'com.example.control-host',
+          paths: managedPaths
+        },
+        {
           bootout: async (target) => {
             bootouts.push(target);
           }
@@ -503,6 +505,55 @@ describe('controlHostSupervision shell helpers', () => {
     } finally {
       await rm(homeDir, { recursive: true, force: true });
       await rm(tamperedRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('uninstall cleanup uses the resolved install paths instead of recomputing from HOME', async () => {
+    const installedHome = await mkdtemp(join(tmpdir(), 'co-supervision-installed-home-'));
+    const currentHome = await mkdtemp(join(tmpdir(), 'co-supervision-current-home-'));
+    const installedPaths = resolveControlHostSupervisionPaths({
+      homeDir: installedHome,
+      label: 'com.example.control-host'
+    });
+    const currentHomePaths = resolveControlHostSupervisionPaths({
+      homeDir: currentHome,
+      label: 'com.example.control-host'
+    });
+
+    try {
+      await mkdir(join(installedHome, 'Library', 'LaunchAgents'), { recursive: true });
+      await mkdir(installedPaths.supportDir, { recursive: true });
+      await mkdir(installedPaths.logsDir, { recursive: true });
+      await writeFile(installedPaths.plistPath, '<plist/>', 'utf8');
+      await writeFile(installedPaths.configPath, '{}', 'utf8');
+      await writeFile(installedPaths.statePath, '{}', 'utf8');
+      await writeFile(installedPaths.stdoutLogPath, '', 'utf8');
+      await writeFile(installedPaths.stderrLogPath, '', 'utf8');
+
+      await mkdir(join(currentHome, 'Library', 'LaunchAgents'), { recursive: true });
+      await mkdir(currentHomePaths.supportDir, { recursive: true });
+      await mkdir(currentHomePaths.logsDir, { recursive: true });
+      await writeFile(currentHomePaths.plistPath, '<plist/>', 'utf8');
+      await writeFile(currentHomePaths.configPath, '{}', 'utf8');
+      await writeFile(currentHomePaths.statePath, '{}', 'utf8');
+      await writeFile(currentHomePaths.stdoutLogPath, '', 'utf8');
+      await writeFile(currentHomePaths.stderrLogPath, '', 'utf8');
+
+      const removedPaths = await removeInstalledControlHostSupervisionArtifacts({
+        label: 'com.example.control-host',
+        paths: installedPaths
+      });
+
+      expect(removedPaths).toEqual(installedPaths);
+      await expect(stat(installedPaths.plistPath)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(installedPaths.supportDir)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(installedPaths.logsDir)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(currentHomePaths.plistPath)).resolves.toBeTruthy();
+      await expect(stat(currentHomePaths.supportDir)).resolves.toBeTruthy();
+      await expect(stat(currentHomePaths.logsDir)).resolves.toBeTruthy();
+    } finally {
+      await rm(installedHome, { recursive: true, force: true });
+      await rm(currentHome, { recursive: true, force: true });
     }
   });
 

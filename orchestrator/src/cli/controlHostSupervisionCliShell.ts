@@ -258,7 +258,7 @@ async function printControlHostSupervisionStatus(flags: ArgMap): Promise<void> {
 
 async function restartControlHostSupervision(flags: ArgMap): Promise<void> {
   const format = readFormatFlag(flags);
-  const resolved = await resolveStoredControlHostSupervision(flags, false);
+  const resolved = await resolveStoredControlHostSupervision(flags, true);
   const serviceTarget = resolveControlHostSupervisionServiceTarget(resolved.label);
   await runLaunchctl(['kickstart', '-k', serviceTarget]);
 
@@ -278,8 +278,8 @@ async function restartControlHostSupervision(flags: ArgMap): Promise<void> {
 
 async function uninstallControlHostSupervision(flags: ArgMap): Promise<void> {
   const format = readFormatFlag(flags);
-  const resolved = await resolveStoredControlHostSupervision(flags, false);
-  const removedPaths = await removeInstalledControlHostSupervisionArtifacts(resolved.label);
+  const resolved = await resolveStoredControlHostSupervision(flags, true);
+  const removedPaths = await removeInstalledControlHostSupervisionArtifacts(resolved);
   const serviceTarget = resolveControlHostSupervisionServiceTarget(resolved.label);
 
   const payload = {
@@ -915,21 +915,18 @@ async function restoreExistingControlHostSupervisionInstall(
 }
 
 async function removeInstalledControlHostSupervisionArtifacts(
-  label: string,
+  resolved: Pick<ResolvedSupervisionInstall, 'label' | 'paths'>,
   options?: {
-    homeDir?: string;
     bootout?: (serviceTarget: string) => Promise<void>;
     remove?: typeof rm;
   }
 ): Promise<ControlHostSupervisionPaths> {
-  const homeDir = resolve(options?.homeDir ?? process.env.HOME ?? process.cwd());
-  const managedPaths = resolveControlHostSupervisionPaths({ homeDir, label });
   await rollbackFailedControlHostSupervisionInstall(
-    managedPaths,
-    resolveControlHostSupervisionServiceTarget(label),
+    resolved.paths,
+    resolveControlHostSupervisionServiceTarget(resolved.label),
     options
   );
-  return managedPaths;
+  return resolved.paths;
 }
 
 function createControlHostSupervisionChildEventPromises(
