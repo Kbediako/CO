@@ -921,7 +921,7 @@ export function createProviderIssueHandoffService(
     launcherReason?: string;
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<void> => {
-    const workerHost = input.claim.worker_host ?? input.run.workerHost ?? null;
+    const workerHost = input.run.workerHost ?? input.claim.worker_host ?? null;
     const launchToken = createProviderLaunchToken();
     await upsertProviderClaimAndPersist({
       ...input.claim,

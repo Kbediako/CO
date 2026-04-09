@@ -12624,6 +12624,14 @@ describe('createProviderIssueHandoffService', () => {
       }),
       'utf8'
     );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:29:59.000Z',
+        worker_host: 'worker-host-03'
+      }),
+      'utf8'
+    );
 
     const state = createProviderIntakeState();
     state.claims.push({
@@ -12698,7 +12706,7 @@ describe('createProviderIssueHandoffService', () => {
       runId: 'run-failed',
       actor: 'control-host',
       reason: 'provider-retry',
-      workerHost: 'worker-host-02',
+      workerHost: 'worker-host-03',
       launchToken: expect.any(String)
     });
     expect(state.claims[0]).toMatchObject({
@@ -12707,7 +12715,7 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'task-1303-failed',
       run_id: 'run-failed',
       run_manifest_path: childPaths.manifestPath,
-      worker_host: 'worker-host-02',
+      worker_host: 'worker-host-03',
       launch_source: 'control-host',
       launch_token: expect.any(String),
       retry_queued: false,
