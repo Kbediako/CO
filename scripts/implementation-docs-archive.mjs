@@ -696,6 +696,10 @@ async function main() {
   for (const [taskId, taskContext] of reportOnlyRetentionCandidates.entries()) {
     const findingPaths = reportOnlyFindingsByTaskId.get(taskId) ?? [];
     for (const relativePath of findingPaths) {
+      if (excludeSet.has(relativePath)) {
+        continue;
+      }
+
       const registryEntry = registryMap.get(relativePath);
       if (!registryEntry || registryEntry.status === 'archived') {
         continue;
