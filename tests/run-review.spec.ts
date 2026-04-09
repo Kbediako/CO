@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { chmod, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -9,6 +9,7 @@ import type { ReviewOutcomeDisposition } from '../scripts/lib/review-execution-t
 
 const execFileAsync = promisify(execFile);
 const runReviewScript = join(process.cwd(), 'scripts', 'run-review.ts');
+const distRunReviewScript = join(process.cwd(), 'dist', 'scripts', 'run-review.js');
 const createdSandboxes: string[] = [];
 const shellBinary = 'bash';
 const LONG_WAIT_TEST_TIMEOUT_MS = 20_000;
@@ -127,6 +128,7 @@ async function makeFakeCodex(sandbox: string): Promise<string> {
   const binPath = join(sandbox, 'codex-mock.sh');
   const script = `#!/usr/bin/env bash
 set -euo pipefail
+trap 'exit 143' TERM INT HUP
 config_overrides=()
 while [[ "\${1:-}" == "-c" ]]; do
   if [[ "$#" -lt 2 ]]; then
@@ -1288,7 +1290,7 @@ async function runReviewCommand(
   env: Record<string, string | undefined>,
   extraArgs: string[] = []
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const args = ['--loader', 'ts-node/esm', runReviewScript, ...extraArgs];
+  const args = await buildRunReviewArgs(extraArgs);
   if (manifestPath) {
     args.push('--manifest', manifestPath);
   }
@@ -1321,6 +1323,13 @@ async function runReviewCommand(
     const exitCode = typeof err.code === 'number' && Number.isFinite(err.code) ? err.code : 1;
     return { exitCode, stdout, stderr };
   }
+}
+
+async function buildRunReviewArgs(extraArgs: string[]): Promise<string[]> {
+  const distEntry = await stat(distRunReviewScript).catch(() => null);
+  return distEntry?.isFile()
+    ? [distRunReviewScript, ...extraArgs]
+    : ['--loader', 'ts-node/esm', runReviewScript, ...extraArgs];
 }
 
 afterEach(async () => {

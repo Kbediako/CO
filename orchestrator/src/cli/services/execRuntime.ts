@@ -47,7 +47,7 @@ const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) =
   child.stderr.on('data', request.onStderr);
 
   return await new Promise((resolve, reject) => {
-    const handleExit = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+    const handleClose = (exitCode: number | null, signal: NodeJS.Signals | null) => {
       cleanup();
       resolve({ exitCode, signal });
     };
@@ -58,11 +58,13 @@ const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) =
     };
 
     const cleanup = () => {
-      child.off('exit', handleExit);
+      child.off('close', handleClose);
       child.off('error', handleError);
     };
 
-    child.once('exit', handleExit);
+    // Wait for `close`, not just `exit`, so stdout/stderr pipes finish draining
+    // before UnifiedExecRunner snapshots the buffered output.
+    child.once('close', handleClose);
     child.once('error', handleError);
   });
 };

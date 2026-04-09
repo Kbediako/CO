@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmod, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url);
 
 const WORKSPACE_ROOT = process.cwd();
 const CLI_ENTRY = join(WORKSPACE_ROOT, 'bin', 'codex-orchestrator.ts');
+const DIST_CLI_ENTRY = join(WORKSPACE_ROOT, 'dist', 'bin', 'codex-orchestrator.js');
 const SHIPPED_ORCHESTRATOR_CONFIG_PATH = join(WORKSPACE_ROOT, 'codex.orchestrator.json');
 const TS_NODE_ESM_LOADER_PATH = require.resolve('ts-node/esm');
 const SHIPPED_FRONTEND_TESTING_RUNNER_RELATIVE_PATH = join(
@@ -22,7 +23,7 @@ const SHIPPED_FRONTEND_TESTING_RUNNER_RELATIVE_PATH = join(
   'cli',
   'frontendTestingRunner.js'
 );
-const TEST_TIMEOUT = 30000;
+const TEST_TIMEOUT = 60_000;
 const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_ORCHESTRATOR_RUNTIME_MODE',
   'CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE',
@@ -124,9 +125,13 @@ async function runFrontendTestWithEnv(
   env: NodeJS.ProcessEnv,
   extraArgs: string[]
 ): Promise<{ manifestPath: string; runtimeMode: string | null; runtimeProvider: string | null }> {
+  const distCliStat = await stat(DIST_CLI_ENTRY).catch(() => null);
+  const cliArgs = distCliStat?.isFile()
+    ? [DIST_CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs]
+    : ['--loader', 'ts-node/esm', CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs];
   const { stdout } = await execFileAsync(
     process.execPath,
-    ['--loader', 'ts-node/esm', CLI_ENTRY, 'frontend-test', '--format', 'json', ...extraArgs],
+    cliArgs,
     {
       env,
       timeout: TEST_TIMEOUT

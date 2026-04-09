@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { UnifiedExecRunner } from '../src/exec/unified-exec.js';
 import { ExecSessionManager, type ExecSessionHandle } from '../src/exec/session-manager.js';
 import { RemoteExecHandleService } from '../src/exec/handle-service.js';
@@ -25,6 +26,18 @@ function createSessionManager() {
 function createClock(start = Date.parse('2025-11-04T00:00:00.000Z')) {
   let ticks = 0;
   return () => new Date(start + ticks++ * 1000);
+}
+
+async function waitForFile(path: string, timeoutMs = 2_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const fileStat = await stat(path).catch(() => null);
+    if (fileStat?.isFile()) {
+      return;
+    }
+    await delay(50);
+  }
+  throw new Error(`Timed out waiting for file: ${path}`);
 }
 
 describe('UnifiedExecRunner', () => {
@@ -304,11 +317,12 @@ describe('UnifiedExecRunner', () => {
         sessionId: 'shell',
         // Allow slower CI runners enough startup time to persist child.pid
         // before timeout escalation begins.
-        timeoutMs: 250
+        timeoutMs: 1000
       });
 
       expect(result.status).toBe('failed');
       expect(result.timedOut).toBe(true);
+      await waitForFile(pidFile);
       const pidRaw = await readFile(pidFile, 'utf8');
       childPid = Number.parseInt(pidRaw.trim(), 10);
       expect(Number.isInteger(childPid)).toBe(true);

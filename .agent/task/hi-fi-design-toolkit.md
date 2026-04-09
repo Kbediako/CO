@@ -1,5 +1,7 @@
 # Task List — Hi-Fi Design Toolkit (0410-hi-fi-design-toolkit)
 
+> Historical note (CO-88, 2026-04-09): the current repo no longer ships the token/component publication surface described below. `packages/design-system` is now only a placeholder scaffold with helper scripts, so treat this task mirror as historical implementation evidence rather than the current public package contract.
+
 ## Context
 - PRD: `docs/design/PRD-hi-fi-design-toolkit.md`
 - Spec: `docs/design/specs/HI_FI_DESIGN_TOOLKIT.md`

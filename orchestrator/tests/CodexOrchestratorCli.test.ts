@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -7,15 +8,24 @@ import { describe, expect, it } from 'vitest';
 const execFileAsync = promisify(execFile);
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const cliEntrypoint = fileURLToPath(new URL('../../bin/codex-orchestrator.ts', import.meta.url));
+const distCliEntrypoint = fileURLToPath(new URL('../../dist/bin/codex-orchestrator.js', import.meta.url));
 const cliHelpTimeoutMs = 30_000;
+
+async function runCli(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  const cliArgs = await buildCliArgs(args);
+  return await execFileAsync(process.execPath, cliArgs, { cwd: repoRoot });
+}
+
+async function buildCliArgs(args: string[]): Promise<string[]> {
+  const distCliStat = await stat(distCliEntrypoint).catch(() => null);
+  return distCliStat?.isFile()
+    ? [distCliEntrypoint, ...args]
+    : ['--loader', 'ts-node/esm', cliEntrypoint, ...args];
+}
 
 describe('codex-orchestrator CLI monitor alias', () => {
   it('lists co-status in the top-level help output', async () => {
-    const { stdout } = await execFileAsync(
-      process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, '--help'],
-      { cwd: repoRoot }
-    );
+    const { stdout } = await runCli(['--help']);
 
     expect(stdout).toContain('co-status [options]');
     expect(stdout).toContain(
@@ -24,11 +34,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
   }, cliHelpTimeoutMs);
 
   it('prints dedicated co-status help', async () => {
-    const { stdout } = await execFileAsync(
-      process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', '--help'],
-      { cwd: repoRoot }
-    );
+    const { stdout } = await runCli(['co-status', '--help']);
 
     expect(stdout).toContain('Usage:');
     expect(stdout).toContain('codex-orchestrator co-status [options]');
@@ -43,11 +49,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
   }, cliHelpTimeoutMs);
 
   it('prints dedicated co-status attach help', async () => {
-    const { stdout } = await execFileAsync(
-      process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', 'attach', '--help'],
-      { cwd: repoRoot }
-    );
+    const { stdout } = await runCli(['co-status', 'attach', '--help']);
 
     expect(stdout).toContain('Usage: codex-orchestrator co-status attach [options]');
     expect(stdout).toContain(
@@ -60,11 +62,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
   }, cliHelpTimeoutMs);
 
   it('prints control-host help with the provider worker default pipeline', async () => {
-    const { stdout } = await execFileAsync(
-      process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, 'control-host', '--help'],
-      { cwd: repoRoot }
-    );
+    const { stdout } = await runCli(['control-host', '--help']);
 
     expect(stdout).toContain('Usage: codex-orchestrator control-host [options]');
     expect(stdout).toContain('Pipeline used for provider-driven starts (default: provider-linear-worker).');
@@ -72,11 +70,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
 
   for (const helpArg of ['help', '-h']) {
     it(`treats co-status ${helpArg} as a help request`, async () => {
-      const { stdout } = await execFileAsync(
-        process.execPath,
-        ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', helpArg],
-        { cwd: repoRoot }
-      );
+      const { stdout } = await runCli(['co-status', helpArg]);
 
       expect(stdout).toContain('codex-orchestrator co-status [options]');
       expect(stdout).toContain('codex-orchestrator co-status attach [options]');
@@ -85,10 +79,8 @@ describe('codex-orchestrator CLI monitor alias', () => {
 
   it('rejects unexpected positional arguments for co-status attach', async () => {
     await expect(
-      execFileAsync(
-        process.execPath,
-        ['--loader', 'ts-node/esm', cliEntrypoint, 'co-status', 'attach', 'unexpected-arg'],
-        { cwd: repoRoot }
+      buildCliArgs(['co-status', 'attach', 'unexpected-arg']).then((args) =>
+        execFileAsync(process.execPath, args, { cwd: repoRoot })
       )
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown co-status attach argument(s): unexpected-arg')
@@ -97,10 +89,8 @@ describe('codex-orchestrator CLI monitor alias', () => {
 
   it('rejects unexpected positional arguments for doctor', async () => {
     await expect(
-      execFileAsync(
-        process.execPath,
-        ['--loader', 'ts-node/esm', cliEntrypoint, 'doctor', 'unexpected-arg'],
-        { cwd: repoRoot }
+      buildCliArgs(['doctor', 'unexpected-arg']).then((args) =>
+        execFileAsync(process.execPath, args, { cwd: repoRoot })
       )
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Unknown doctor argument(s): unexpected-arg')
@@ -108,11 +98,7 @@ describe('codex-orchestrator CLI monitor alias', () => {
   }, cliHelpTimeoutMs);
 
   it('prints dedicated doctor help with the apply/json limitation', async () => {
-    const { stdout } = await execFileAsync(
-      process.execPath,
-      ['--loader', 'ts-node/esm', cliEntrypoint, 'doctor', '--help'],
-      { cwd: repoRoot }
-    );
+    const { stdout } = await runCli(['doctor', '--help']);
 
     expect(stdout).toContain('Usage: codex-orchestrator doctor [options]');
     expect(stdout).toContain(

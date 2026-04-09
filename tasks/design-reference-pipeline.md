@@ -1,5 +1,7 @@
 # Task Checklist — Design Reference Pipeline (0401-design-reference)
 
+> Historical note (CO-88, 2026-04-09): the current repo no longer ships the componentization/publication surface described below. `packages/design-system` is now only a placeholder scaffold with helper scripts, so treat this checklist as historical implementation evidence rather than the current public package contract.
+
 > Export `MCP_RUNNER_TASK_ID=0401-design-reference` before launching orchestrator commands. Mirror checklist status across `/tasks`, `docs/TASKS.md`, and `.agent/task/design-reference-pipeline.md`. Keep entries at `[ ]` until the manifest path (e.g., `.runs/0401-design-reference/cli/<run-id>/manifest.json`) confirming completion is attached.
 
 ## Foundation

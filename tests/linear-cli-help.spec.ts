@@ -1,13 +1,19 @@
 import { spawnSync } from 'node:child_process';
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
 import process from 'node:process';
 
 import { describe, expect, it } from 'vitest';
 
 describe('codex-orchestrator linear help', () => {
   it('lists the delete-workpad helper subcommand', () => {
+    const distCliEntry = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
+    const cliArgs = statSync(distCliEntry, { throwIfNoEntry: false })?.isFile()
+      ? ['--no-warnings', distCliEntry, 'linear', 'help']
+      : ['--no-warnings', '--loader', 'ts-node/esm', 'bin/codex-orchestrator.ts', 'linear', 'help'];
     const result = spawnSync(
       process.execPath,
-      ['--no-warnings', '--loader', 'ts-node/esm', 'bin/codex-orchestrator.ts', 'linear', 'help'],
+      cliArgs,
       {
         cwd: process.cwd(),
         encoding: 'utf8'

@@ -1618,6 +1618,10 @@ async function discoverProviderWorkerSessionLogPath(input: {
   };
   startedAt: string | null;
 }): Promise<string | null> {
+  const workspaceStat = await stat(input.workspacePath).catch(() => null);
+  if (!workspaceStat?.isDirectory()) {
+    return null;
+  }
   const sessionRoot = join(resolveCodexHome(input.env), 'sessions');
   const startedAtMs = Date.parse(input.startedAt ?? '');
   const referenceDate = Number.isFinite(startedAtMs) ? new Date(startedAtMs) : new Date();

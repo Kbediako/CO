@@ -49,7 +49,7 @@
   - `operatorDashboardPresenter.ts`
   - `controlStatusDashboard.ts`
   - `controlRuntime.ts`
-  - `selectedRunPresenter.ts`
+  - `operatorDashboardPresenter.ts`
   - `ControlStatusDashboard.test.ts`
   - `ControlServer.test.ts`
   - `UiDataController.test.ts`

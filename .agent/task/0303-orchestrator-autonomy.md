@@ -37,7 +37,7 @@
      - Acceptance: Reusable PTY handles + opt-out flows validated via tests; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-59-37-568Z-8065982c/manifest.json`.
      - [x] Status: _completed 2025-11-04_
    - Subtask: Streamed unified exec events
-     - Files: `packages/orchestrator/src/exec/unified-exec.ts`, `packages/shared/streams/stdio.ts`
+     - Files: `packages/orchestrator/src/exec/unified-exec.ts`, the former shared stdio shim that has since been collapsed into the package-local exec stdio implementation
      - Acceptance: Emits `exec:begin|chunk|end`, caps streams at 64 KiB, integrates sandbox retries; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-04T01-59-37-568Z-8065982c/manifest.json`.
      - [x] Status: _completed 2025-11-04_
 4. **CLI & SDK Interfaces**
@@ -90,7 +90,7 @@
      - Acceptance: Snapshots/subscriptions reuse stored frame tail (O(replayed frames)); Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/orchestrator/tests/HandleService.test.ts`.
      - [x] Status: _completed 2025-11-06_
    - Subtask: Sliding stdio buffer
-     - Files: `packages/shared/streams/stdio.ts`
+     - Files: the former shared stdio shim (now replaced by the package-local exec stdio implementation)
      - Acceptance: O(chunk) sliding window with unit coverage; Evidence: `.runs/0303-orchestrator-autonomy/cli/2025-11-06T07-19-49-813Z-8dd5ff38/manifest.json`, tests `packages/shared/tests/StdioTracker.test.ts`.
      - [x] Status: _completed 2025-11-06_
    - Subtask: O(1) TaskStateStore append

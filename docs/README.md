@@ -294,6 +294,8 @@ Check readiness with `codex-orchestrator doctor --format json` (reports DevTools
 - `npm run mirror:check -- --project <name> [--port <port>]`: boots a temporary mirror server when needed and verifies all configured routes with Playwright, failing on outbound hosts outside the allowlist, tracker strings (gtag/gtm/analytics/hotjar/facebook/clarity/etc.), unresolved assets, absolute https:// references, or non-200 responses. Keep this opt-in and trigger it when `packages/<project>/public` changes.
 
 ## Hi-Fi Design Toolkit Captures
+Historical note: the current repo no longer ships the token/component publication surface described below. `packages/design-system` is now only a placeholder scaffold with helper scripts, so use this section as historical capture-process reference rather than a current package capability promise.
+
 Use the hi-fi pipeline to snapshot complex marketing sites (motion, interactions, tokens) while keeping the repo cloneable:
 
 1. **Configure the source:** Update `design.config.yaml` → `pipelines.hi_fi_design_toolkit.sources` with the target URL, slug, title, and breakpoints (the repo defaults to an empty `sources` list until you add one).

@@ -1,5 +1,7 @@
 # Task List — Design Reference Pipeline (0401-design-reference)
 
+> Historical note (CO-88, 2026-04-09): the current repo no longer ships the componentization/publication surface described below. `packages/design-system` is now only a placeholder scaffold with helper scripts, so treat this task mirror as historical implementation evidence rather than the current public package contract.
+
 ## Context
 - Link to PRD: `docs/design/PRD-design-reference-pipeline.md`
 - Summary: Deliver an opt-in `design-reference` pipeline that extracts design assets via Playwright, composes a canonical reference page, componentizes artifacts inside `packages/design-system`, optionally emits advanced motion/video assets, and records evidence with retention/privacy guardrails in manifests and `out/**` outputs.

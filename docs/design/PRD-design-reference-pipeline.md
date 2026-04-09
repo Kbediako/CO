@@ -1,5 +1,7 @@
 # PRD — Design Reference Pipeline (Task 0401)
 
+> Historical note (CO-88, 2026-04-09): this PRD captures an earlier implementation plan. The current repo no longer ships the componentization/publication surface described below, and `packages/design-system` is now only a placeholder scaffold with helper scripts.
+
 ## Summary
 - Problem Statement: Front-end teams lack a reproducible pipeline for capturing high-fidelity design references, resulting in manual screenshot diffs, unsourced component snapshots, and missing privacy controls for staged assets.
 - Desired Outcome: Provide an opt-in `design-reference` pipeline that extracts DOM/CSS/screenshots via Playwright, builds a canonical reference page, componentizes the output inside `packages/design-system`, generates advanced motion/video assets when enabled, performs visual regression checks, and mirrors summarized evidence into manifests and run artifacts.

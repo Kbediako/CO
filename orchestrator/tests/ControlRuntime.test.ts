@@ -39,6 +39,8 @@ interface CreateFixtureOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+const CONTROL_RUNTIME_TEST_TIMEOUT_MS = 30_000;
+
 const cleanupRoots: string[] = [];
 
 afterEach(async () => {
@@ -310,7 +312,7 @@ function buildLiveLinearGraphqlResponse(): Response {
   );
 }
 
-describe('ControlRuntime', () => {
+describe('ControlRuntime', { timeout: CONTROL_RUNTIME_TEST_TIMEOUT_MS }, () => {
   it('reads max concurrent agents from control feature toggles into the compatibility projection', async () => {
     const fixture = await createFixture({
       featureToggles: {

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 import { promisify } from 'node:util';
@@ -13,6 +13,7 @@ import {
 
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
+const DIST_CLI_ENTRY = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
 const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
@@ -55,10 +56,17 @@ async function runCli(
   explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
 ): Promise<{ stdout: string; stderr: string }> {
   const cliEnv = buildCliEnv(env, explicitProviderOverrideKeys);
-  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+  return await execFileAsync(process.execPath, await buildCliArgs(args), {
     env: cliEnv,
     timeout: timeoutMs
   });
+}
+
+async function buildCliArgs(args: string[]): Promise<string[]> {
+  const distCliStat = await stat(DIST_CLI_ENTRY).catch(() => null);
+  return distCliStat?.isFile()
+    ? [DIST_CLI_ENTRY, ...args]
+    : ['--loader', 'ts-node/esm', CLI_ENTRY, ...args];
 }
 
 function buildCliEnv(
@@ -203,18 +211,20 @@ describe('codex-orchestrator command surface', () => {
     const stdoutPath = join(tempDir, 'stdout.txt');
     const stderrPath = join(tempDir, 'stderr.txt');
     const exitCodePath = join(tempDir, 'exit-code.txt');
+    const cliArgs = await buildCliArgs(['unknown-command']);
 
     await execFileAsync(
       '/bin/sh',
       [
         '-c',
-        '"$NODE_BIN" --loader ts-node/esm "$CLI_ENTRY_PATH" unknown-command >"$CLI_STDOUT_PATH" 2>"$CLI_STDERR_PATH"; printf "%s" "$?" >"$CLI_EXIT_CODE_PATH"'
+        '"$NODE_BIN" "$@" >"$CLI_STDOUT_PATH" 2>"$CLI_STDERR_PATH"; printf "%s" "$?" >"$CLI_EXIT_CODE_PATH"',
+        'cli-shell',
+        ...cliArgs
       ],
       {
         env: {
           ...buildCliEnv(),
           NODE_BIN: process.execPath,
-          CLI_ENTRY_PATH: CLI_ENTRY,
           CLI_STDOUT_PATH: stdoutPath,
           CLI_STDERR_PATH: stderrPath,
           CLI_EXIT_CODE_PATH: exitCodePath

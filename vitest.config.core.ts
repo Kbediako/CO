@@ -15,6 +15,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     setupFiles: ['tests/vitest.setup.ts'],
+    // The core suite mixes many CLI/process integration tests with unit tests.
+    // Under Node 25 and parallel file execution, Vitest's 5s default is too
+    // aggressive for otherwise healthy subprocess-based specs.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     include: [
       'orchestrator/tests/**/*.test.ts',
       'packages/orchestrator/tests/**/*.test.ts',

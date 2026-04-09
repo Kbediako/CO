@@ -1,5 +1,7 @@
 # PRD — Hi-Fi Design Toolkit (Task 0410)
 
+> Historical note (CO-88, 2026-04-09): this PRD captures an earlier implementation plan. The current repo no longer ships the token/component publication surface described below, and `packages/design-system` is now only a placeholder scaffold with helper scripts.
+
 ## Summary
 - Problem Statement: The design reference pipeline produces raw captures, but teams still lack an automated path to convert those captures into reusable tokens, documentation, and component libraries. Today each team reimplements CSS extraction, tokenization, and self-correction flows, often without manifest evidence or retention controls.
 - Desired Outcome: Launch a standalone "hi-fi design toolkit" pipeline that orchestrates CSS extraction, token generation, reference page creation, style guide docs, self-correction loops, and package updates using the autonomous hi-fi design starter. The pipeline must log approvals, surface artifacts under `.runs/0410-hi-fi-design-toolkit/**`, and publish summaries to `out/0410-hi-fi-design-toolkit/design/runs/<run>.json` so downstream agents can act without bespoke setup.

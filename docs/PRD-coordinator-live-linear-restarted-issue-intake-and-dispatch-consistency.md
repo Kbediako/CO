@@ -70,7 +70,7 @@
   - `.runs/local-mcp/cli/control-host/control_auth.json`
   - `.runs/local-mcp/cli/control-host-tmux.log`
   - `orchestrator/src/cli/control/selectedRunProjection.ts`
-  - `orchestrator/src/cli/control/selectedRunPresenter.ts`
+  - `orchestrator/src/cli/control/operatorDashboardPresenter.ts`
   - `orchestrator/src/cli/control/uiDataController.ts`
   - `orchestrator/src/cli/control/observabilitySurface.ts`
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`

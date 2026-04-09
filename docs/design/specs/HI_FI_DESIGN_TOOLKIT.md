@@ -4,6 +4,8 @@ last_review: 2026-04-09
 
 # Technical Spec — Hi-Fi Design Toolkit (Task 0410)
 
+> Historical note (CO-88, 2026-04-09): this spec records an earlier implementation plan. The current repo no longer ships the token/component publication surface described below, and `packages/design-system` is now only a placeholder scaffold with helper scripts.
+
 ## Overview
 - Objective: Ship a standalone hi-fi design toolkit pipeline that wraps the autonomous hi-fi design starter commands, orchestrates CSS extraction through token publication, logs approvals/retention data, and publishes evidence usable by downstream agents without manual setup.
 - Scope: Config-driven pipeline activation, CLI surface area, stage wrappers (context acquisition, token/styleguide generation, reference/self-correction, toolkit publication), manifest/schema updates, approval logging, retention/privacy enforcement, integration with `packages/design-system`, testing/rollout hooks, and spec guard coverage.

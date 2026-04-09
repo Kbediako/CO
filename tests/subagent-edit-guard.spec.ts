@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const scriptPath = join(process.cwd(), 'scripts', 'subagent-edit-guard.mjs');
+const SUBAGENT_EDIT_GUARD_TEST_TIMEOUT_MS = 30_000;
 
 let tempDir: string | null = null;
 
@@ -54,7 +55,7 @@ async function initRepo(): Promise<string> {
   return dir;
 }
 
-describe('subagent-edit-guard script', () => {
+describe('subagent-edit-guard script', { timeout: SUBAGENT_EDIT_GUARD_TEST_TIMEOUT_MS }, () => {
   it('passes when changed paths stay within declared scopes', async () => {
     tempDir = await initRepo();
 

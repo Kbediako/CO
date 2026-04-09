@@ -28,12 +28,10 @@ export interface ExecCommandOptions {
 export interface ExecRunResult {
   summary: RunSummaryEvent;
   events: JsonlEvent[];
-  eventsPath: string;
   exitCode: number | null;
   status: 'succeeded' | 'failed';
   manifestPath: string;
   rawStderr: string[];
-  stderrPath: string;
 }
 
 interface InternalExecOptions extends ExecCommandOptions {
@@ -209,12 +207,10 @@ export class ExecRunHandle extends EventEmitter {
     return {
       summary: this.summaryEvent,
       events: [...this.eventsList],
-      eventsPath: this.eventsFilePath,
       exitCode: payload.result.exitCode ?? null,
       status: payload.status,
       manifestPath: payload.run.manifest,
-      rawStderr: [...this.stderrLines],
-      stderrPath: this.stderrFilePath
+      rawStderr: [...this.stderrLines]
     };
   }
 
