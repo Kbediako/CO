@@ -231,6 +231,7 @@ describe('controlHostCliShell manifest discovery', () => {
       buildRemoteProviderEnvValues(
         {
           CO_LINEAR_API_TOKEN: 'lin-token',
+          CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
           CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
           CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
           CODEX_RUNTIME_MODE: 'cli',
@@ -246,6 +247,7 @@ describe('controlHostCliShell manifest discovery', () => {
       )
     ).toEqual({
       CO_LINEAR_API_TOKEN: 'lin-token',
+      CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
       CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
       CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
       CODEX_RUNTIME_MODE: 'cli',
