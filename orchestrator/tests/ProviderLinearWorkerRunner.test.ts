@@ -2517,6 +2517,74 @@ describe('provider linear worker runner', () => {
     });
   });
 
+  it('clears stale proof current-turn activity when hydration only swaps to a new thread', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          last_event: 'agent_message',
+          last_message: 'Investigating provider-worker EVENT provenance.',
+          last_event_at: '2026-03-21T09:00:00.200Z',
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: 'Investigating provider-worker EVENT provenance.',
+            recorded_at: '2026-03-21T09:00:00.200Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-1',
+            session_id: 'thread-1-turn-1'
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    await writeFile(
+      sessionLogPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'thread-2',
+            cwd: tempRoot,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title',
+            source: 'exec'
+          }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-2-turn-1',
+      last_event: null,
+      last_message: null,
+      last_event_at: null,
+      current_turn_activity: null
+    });
+  });
+
   it('preserves unfinished session-log tails across refreshes until the line completes', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);

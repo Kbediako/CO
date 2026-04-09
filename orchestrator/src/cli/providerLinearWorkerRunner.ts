@@ -2436,6 +2436,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
 
   const liveThreadId = parseState.threadId ?? proof.thread_id;
   const liveTurnId = parseState.turnId ?? proof.latest_turn_id;
+  const liveThreadChanged = Boolean(liveThreadId && liveThreadId !== proof.thread_id);
   const liveTurnChanged = Boolean(liveTurnId && liveTurnId !== proof.latest_turn_id);
   const session = deriveLatestTurnSessionId({
     threadId: liveThreadId,
@@ -2461,7 +2462,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
         parseState.currentTurnActivity,
         liveThreadId,
         liveTurnId
-      ) ?? (liveTurnChanged ? null : proofCurrentTurnActivity),
+      ) ?? (liveThreadChanged || liveTurnChanged ? null : proofCurrentTurnActivity),
     tokens: hasProviderWorkerTokenUsage(parseState.tokens)
       ? parseState.tokens
       : liveTurnChanged
