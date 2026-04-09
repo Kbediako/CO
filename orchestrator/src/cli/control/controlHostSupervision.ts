@@ -354,7 +354,13 @@ export function sanitizeControlHostSupervisionPathSegment(value: string): string
 }
 
 function normalizeLabel(value: string | null | undefined): string {
-  return normalizeNonEmptyValue(value, DEFAULT_CONTROL_HOST_SUPERVISION_LABEL);
+  const normalized = normalizeNonEmptyValue(value, DEFAULT_CONTROL_HOST_SUPERVISION_LABEL);
+  if (!/^[A-Za-z0-9._-]+$/u.test(normalized)) {
+    throw new Error(
+      'control-host supervision label may only contain letters, numbers, dots, underscores, and hyphens.'
+    );
+  }
+  return normalized;
 }
 
 function normalizeNonEmptyValue(value: string | null | undefined, fallback: string): string {

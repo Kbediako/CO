@@ -699,7 +699,10 @@ function readIntegerFlag(flags: ArgMap, key: string): number | undefined {
   if (!value) {
     return undefined;
   }
-  const parsed = Number.parseInt(value, 10);
+  if (!/^[+-]?\d+$/u.test(value)) {
+    throw new Error(`--${key} must be an integer.`);
+  }
+  const parsed = Number(value);
   if (!Number.isInteger(parsed)) {
     throw new Error(`--${key} must be an integer.`);
   }
@@ -946,5 +949,6 @@ async function sleep(ms: number): Promise<void> {
 export const __test__ = {
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
+  readIntegerFlag,
   resolveControlHostSupervisionServiceTarget
 };

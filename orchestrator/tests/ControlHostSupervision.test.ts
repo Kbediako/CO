@@ -5,6 +5,7 @@ import {
   buildControlHostSupervisionPlist,
   evaluateControlHostSupervisionHealthPayload,
   parseControlHostSupervisionCsv,
+  resolveControlHostSupervisionPaths,
   resolveDefaultControlHostSupervisionEntrypoint
 } from '../src/cli/control/controlHostSupervision.js';
 import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlHostSupervisionCliShell.js';
@@ -12,6 +13,7 @@ import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlH
 const {
   buildControlHostSupervisionStatusPayload,
   formatControlHostSupervisionStatus,
+  readIntegerFlag,
   resolveControlHostSupervisionServiceTarget
 } = controlHostSupervisionShellTest;
 
@@ -100,6 +102,17 @@ describe('controlHostSupervision helpers', () => {
     ]);
     expect(parseControlHostSupervisionCsv('none')).toEqual([]);
   });
+
+  it('rejects supervision labels that contain path separators', () => {
+    expect(() =>
+      resolveControlHostSupervisionPaths({
+        homeDir: '/Users/tester',
+        label: '../../../tmp/agent'
+      })
+    ).toThrow(
+      'control-host supervision label may only contain letters, numbers, dots, underscores, and hyphens.'
+    );
+  });
 });
 
 describe('controlHostSupervision shell helpers', () => {
@@ -157,5 +170,15 @@ describe('controlHostSupervision shell helpers', () => {
     expect(rendered).toContain(`Service target: ${serviceTarget}`);
     expect(rendered).toContain('Last restart reason: restart_required');
     expect(rendered).toContain(`launchctl: ${serviceTarget} = {`);
+  });
+
+  it('rejects integer flags with non-numeric suffixes', () => {
+    expect(() => readIntegerFlag({ 'health-interval': '30s' }, 'health-interval')).toThrow(
+      '--health-interval must be an integer.'
+    );
+    expect(() => readIntegerFlag({ 'kill-timeout': '1.5' }, 'kill-timeout')).toThrow(
+      '--kill-timeout must be an integer.'
+    );
+    expect(readIntegerFlag({ 'unhealthy-threshold': '30' }, 'unhealthy-threshold')).toBe(30);
   });
 });
