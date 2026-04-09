@@ -466,11 +466,25 @@ export function createProviderIssueHandoffService(
       if (mergeCloseoutClaim) {
         return mergeCloseoutClaim;
       }
+      const refreshedWorkflowState = classifyProviderLinearWorkflowState(refreshedTrackedIssue);
+      const refreshedLifecycle = refreshedWorkflowState.isTerminal
+        ? {
+            state: 'ignored' as const,
+            reason: 'provider_issue_state_not_active' as const,
+            ...clearProviderRetryFields()
+          }
+        : {
+            state: 'accepted' as const,
+            reason: 'provider_issue_rehydration_pending_revalidation' as const,
+            ...clearProviderRetryFields()
+          };
       return await upsertProviderClaimAndPersist({
         ...refreshedClaim,
         task_id: input.latestRun?.taskId ?? input.claim.task_id,
         run_id: input.latestRun?.runId ?? input.claim.run_id,
         run_manifest_path: input.latestRun?.manifestPath ?? input.claim.run_manifest_path,
+        merge_closeout: null,
+        ...refreshedLifecycle
       });
     }
     return await upsertProviderClaimAndPersist({
@@ -2136,6 +2150,31 @@ export function createProviderIssueHandoffService(
               claim: reviewPromotionClaim
             };
           }
+        }
+        if (activeRun) {
+          const trackedIssueFields = buildFreshTrackedIssueClaimFields(existing, input.trackedIssue);
+          const reactivatedMergeCloseoutReset =
+            existing.reason === 'provider_issue_rehydrated_active_run'
+              ? {}
+              : { review_promotion: null, merge_closeout: null };
+          const claim = await upsertProviderClaimAndPersist({
+            ...existing,
+            ...trackedIssueFields,
+            launch_source: undefined,
+            launch_token: undefined,
+            task_id: activeRun.taskId,
+            state: 'running',
+            reason: 'provider_issue_rehydrated_active_run',
+            run_id: activeRun.runId,
+            run_manifest_path: activeRun.manifestPath,
+            accepted_at: existing.accepted_at,
+            last_delivery_id: input.deliveryId,
+            last_event: input.event,
+            last_action: input.action,
+            last_webhook_timestamp: input.webhookTimestamp,
+            ...reactivatedMergeCloseoutReset
+          });
+          return { kind: 'ignored', reason: 'provider_issue_rehydrated_active_run', claim };
         }
         const claim = await retainOwnedHandoffClaim({
           claim: existing,

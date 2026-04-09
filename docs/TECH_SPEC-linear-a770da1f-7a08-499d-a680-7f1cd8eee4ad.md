@@ -83,8 +83,8 @@ last_review: 2026-04-09
   - rely on persisted review-promotion record plus existing provider debug and merge-closeout surfaces
 
 ## Open Questions
-- Determine whether the bridge should use the existing review-mode readiness classifier or the stricter merge-mode classifier; the final implementation must record the chosen truth in the canonical spec and tests.
+- Resolved 2026-04-09: the bridge uses the stricter merge-mode readiness classifier, so review-only readiness is insufficient and blockers such as `review=REVIEW_REQUIRED`, `mergeStateStatus=BEHIND`, failing required checks, or unresolved actionable review threads keep the issue out of `Merging`.
 
 ## Approvals
-- Reviewer: pending `codex-orchestrator docs-review`
+- Reviewer: `codex-orchestrator docs-review (clean-success)`
 - Date: 2026-04-09

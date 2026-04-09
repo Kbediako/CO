@@ -1459,7 +1459,10 @@ describe('runProviderDeterministicMergeCloseout', () => {
         'https://github.com/asabeko/CO/pull/360',
         'https://github.com/asabeko/CO/pull/372'
       ],
-      ignored_historical_pr_urls: ['https://github.com/asabeko/CO/pull/355'],
+      ignored_historical_pr_urls: [
+        'https://github.com/asabeko/CO/pull/355',
+        'https://github.com/asabeko/CO/pull/360'
+      ],
       conflicting_attached_pr_urls: [],
       pr: {
         owner: 'asabeko',
@@ -1927,25 +1930,60 @@ describe('runProviderReviewHandoffPromotion', () => {
     }));
   });
 
-  it('promotes an already-merged review handoff into Merging for deterministic closeout', async () => {
+  it('promotes an already-merged review handoff into Merging and preserves older attached PR URLs in structured truth', async () => {
     const runCommand = vi.fn().mockResolvedValueOnce({
       ok: true,
       exitCode: 0,
       stdout: 'git@github.com:asabeko/CO.git\n',
       stderr: ''
     });
-    const fetchSnapshot = vi.fn().mockResolvedValue({
-      state: 'MERGED',
-      reviewDecision: 'APPROVED',
-      mergeStateStatus: 'UNKNOWN',
-      readyToMerge: false,
-      gateReasons: ['state=MERGED'],
-      unresolvedThreadCount: 0,
-      updatedAt: '2026-04-09T03:06:00.000Z',
-      mergedAt: '2026-04-09T03:06:00.000Z',
-      headOid: 'abc123',
-      checks: { pending: [], failed: [] },
-      requiredChecks: { pending: [], failed: [] }
+    const fetchSnapshot = vi.fn(async ({ prNumber }: { prNumber: number }) => {
+      if (prNumber === 355) {
+        return {
+          state: 'MERGED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=MERGED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-09T03:02:00.000Z',
+          mergedAt: '2026-04-09T03:02:00.000Z',
+          headOid: 'old355',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 360) {
+        return {
+          state: 'OPEN',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'BEHIND',
+          readyToMerge: false,
+          gateReasons: ['mergeStateStatus=BEHIND'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-09T03:03:00.000Z',
+          mergedAt: null,
+          headOid: 'old360',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      if (prNumber === 416) {
+        return {
+          state: 'MERGED',
+          reviewDecision: 'APPROVED',
+          mergeStateStatus: 'UNKNOWN',
+          readyToMerge: false,
+          gateReasons: ['state=MERGED'],
+          unresolvedThreadCount: 0,
+          updatedAt: '2026-04-09T03:06:00.000Z',
+          mergedAt: '2026-04-09T03:06:00.000Z',
+          headOid: 'abc123',
+          checks: { pending: [], failed: [] },
+          requiredChecks: { pending: [], failed: [] }
+        };
+      }
+      throw new Error(`Unexpected PR ${String(prNumber)}`);
     });
     const transitionIssueState = vi.fn(async () => ({
       ok: true as const,
@@ -1965,7 +2003,11 @@ describe('runProviderReviewHandoffPromotion', () => {
         team: null,
         project: null,
         comments: [],
-        attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/416' }],
+        attachments: [
+          { id: 'att-355', title: 'Historical merged PR', url: 'https://github.com/asabeko/CO/pull/355' },
+          { id: 'att-360', title: 'Stale PR', url: 'https://github.com/asabeko/CO/pull/360' },
+          { id: 'att-416', title: 'Merged replacement PR', url: 'https://github.com/asabeko/CO/pull/416' }
+        ],
         workpad_comment: null
       },
       source_setup: null
@@ -1997,7 +2039,11 @@ describe('runProviderReviewHandoffPromotion', () => {
             team: null,
             project: null,
             comments: [],
-            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/416' }],
+            attachments: [
+              { id: 'att-355', title: 'Historical merged PR', url: 'https://github.com/asabeko/CO/pull/355' },
+              { id: 'att-360', title: 'Stale PR', url: 'https://github.com/asabeko/CO/pull/360' },
+              { id: 'att-416', title: 'Merged replacement PR', url: 'https://github.com/asabeko/CO/pull/416' }
+            ],
             workpad_comment: null
           },
           source_setup: null
@@ -2013,6 +2059,15 @@ describe('runProviderReviewHandoffPromotion', () => {
       status: 'promoted',
       reason: 'promoted_to_merging',
       issue_state: 'Merging',
+      attached_pr_urls: [
+        'https://github.com/asabeko/CO/pull/355',
+        'https://github.com/asabeko/CO/pull/360',
+        'https://github.com/asabeko/CO/pull/416'
+      ],
+      ignored_historical_pr_urls: [
+        'https://github.com/asabeko/CO/pull/355',
+        'https://github.com/asabeko/CO/pull/360'
+      ],
       pr: {
         number: 416
       },
@@ -2028,6 +2083,8 @@ describe('runProviderReviewHandoffPromotion', () => {
       }
     });
     expect(result.summary).toContain('already merged');
+    expect(result.summary).toContain('Older unmerged PR URLs');
+    expect(result.summary).toContain('https://github.com/asabeko/CO/pull/360');
     expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'lin-issue-1',
       stateName: 'Merging'

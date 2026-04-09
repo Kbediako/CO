@@ -2282,7 +2282,7 @@ describe('createProviderIssueHandoffService', () => {
 
         expect(result).toMatchObject({
           kind: 'ignored',
-          reason: 'provider_issue_handoff_owned'
+          reason: 'provider_issue_rehydrated_active_run'
         });
         await vi.waitFor(() => {
           expect(endpoint.actions).toEqual([]);
@@ -2295,7 +2295,7 @@ describe('createProviderIssueHandoffService', () => {
 
       expect(state.claims[0]).toMatchObject({
         state: 'running',
-        reason: 'provider_issue_handoff_owned',
+        reason: 'provider_issue_rehydrated_active_run',
         issue_state: reviewState,
         issue_state_type: 'started',
         issue_assignee_id: 'viewer-1',
@@ -2531,7 +2531,7 @@ describe('createProviderIssueHandoffService', () => {
 
         expect(result).toMatchObject({
           kind: 'ignored',
-          reason: 'provider_issue_handoff_owned'
+          reason: 'provider_issue_rehydrated_active_run'
         });
         await vi.waitFor(() => {
           expect(endpoint.actions).toEqual([]);
@@ -2542,7 +2542,7 @@ describe('createProviderIssueHandoffService', () => {
 
       expect(state.claims[0]).toMatchObject({
         state: 'running',
-        reason: 'provider_issue_handoff_owned',
+        reason: 'provider_issue_rehydrated_active_run',
         issue_state: reviewState,
         issue_state_type: 'started',
         issue_assignee_id: null,
@@ -18281,6 +18281,316 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_merge_closeout_watching',
       issue_state: 'Merging',
       review_promotion: null
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('recomputes a stale direct-webhook review handoff into refresh-pending accepted state when live state moved back to active work', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-09T03:05:00.000Z'));
+    vi.stubEnv('CO_LINEAR_API_TOKEN', 'linear-token-1');
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'linear-lin-issue-1';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, 'review-promotion-live-active');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'review-promotion-live-active',
+        task_id: taskId,
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-116',
+        issue_updated_at: '2026-04-09T03:04:00.000Z',
+        updated_at: '2026-04-09T03:05:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-116',
+      issue_title: 'Review handoff promotion',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-09T03:04:00.000Z',
+      issue_viewer_id: 'viewer-1',
+      issue_viewer_auth_fingerprint: createLinearTokenFingerprint('linear-token-1'),
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_review_promotion_action_required',
+      accepted_at: '2026-04-09T03:00:05.000Z',
+      updated_at: '2026-04-09T03:00:10.000Z',
+      last_delivery_id: 'delivery-review-promotion-live-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_168_300_000,
+      run_id: 'review-promotion-live-active',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      review_promotion: {
+        recorded_at: '2026-04-09T03:04:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-116',
+        issue_state: 'In Review',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-09T03:04:30.000Z',
+        status: 'action_required',
+        reason: 'review=REVIEW_REQUIRED',
+        summary: 'Review-handoff promotion is blocked by: review=REVIEW_REQUIRED.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: null,
+        snapshot: null,
+        linear_transition: null
+      },
+      merge_closeout: {
+        recorded_at: '2026-04-09T03:04:45.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-116',
+        issue_state: 'In Review',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-09T03:04:45.000Z',
+        status: 'watching',
+        reason: 'required_checks_pending',
+        summary: 'Waiting for required checks before merge.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: null,
+        snapshot: null,
+        merge_attempt: null,
+        shared_root: null,
+        linear_transition: null
+      }
+    });
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runReviewHandoffPromotion = vi.fn(async () => ({
+      recorded_at: '2026-04-09T03:05:00.000Z',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-116',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-09T03:05:00.000Z',
+      status: 'action_required' as const,
+      reason: 'issue_no_longer_review_handoff',
+      summary: 'Live Linear issue state is In Progress, so review-handoff promotion is not armed.',
+      attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+      ignored_historical_pr_urls: [],
+      conflicting_attached_pr_urls: [],
+      pr: null,
+      snapshot: null,
+      linear_transition: null
+    }));
+    const runMergeCloseout = vi.fn(async () => {
+      throw new Error('runMergeCloseout should not be called when live state is no longer Merging.');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runReviewHandoffPromotion,
+      runMergeCloseout,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        identifier: 'CO-116',
+        title: 'Review handoff promotion',
+        state: 'In Review',
+        state_type: 'started',
+        updated_at: '2026-04-09T03:05:00.000Z'
+      }),
+      deliveryId: 'delivery-review-promotion-live-active',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_168_300_000
+    });
+
+    expect(runReviewHandoffPromotion).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-116',
+      issueState: 'In Review',
+      repoRoot: paths.repoRoot
+    }));
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      claim: {
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-09T03:05:00.000Z',
+        review_promotion: null,
+        merge_closeout: null,
+        retry_queued: null,
+        retry_attempt: null
+      }
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      issue_state: 'In Progress',
+      review_promotion: null,
+      merge_closeout: null
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('rehydrates direct-webhook review handoff ownership onto an active run without overwriting newer run-bound metadata', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'linear-lin-issue-1';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, 'review-promotion-active-run');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'review-promotion-active-run',
+        task_id: taskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-116',
+        issue_updated_at: '2026-04-09T03:05:00.000Z',
+        updated_at: '2026-04-09T03:05:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-116',
+      issue_title: 'Review handoff promotion',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-09T03:04:00.000Z',
+      issue_viewer_id: 'viewer-1',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: 'stale-task-id',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_review_promotion_promoted',
+      accepted_at: '2026-04-09T03:00:05.000Z',
+      updated_at: '2026-04-09T03:00:10.000Z',
+      last_delivery_id: 'delivery-review-promotion-active-run-old',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_168_200_000,
+      run_id: 'stale-run-id',
+      run_manifest_path: '/tmp/provider-run/stale-manifest.json',
+      launch_source: null,
+      launch_token: null,
+      review_promotion: {
+        recorded_at: '2026-04-09T03:04:30.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-116',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-09T03:04:30.000Z',
+        status: 'promoted',
+        reason: 'promoted_to_merging',
+        summary: 'Promoted attached PR #416 from review handoff into Merging.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: null,
+        snapshot: null,
+        linear_transition: null
+      }
+    });
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runReviewHandoffPromotion = vi.fn(async () => {
+      throw new Error('runReviewHandoffPromotion should not be called while an active run is still present.');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runReviewHandoffPromotion,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        identifier: 'CO-116',
+        title: 'Review handoff promotion',
+        state: 'In Review',
+        state_type: 'started',
+        updated_at: '2026-04-09T03:05:00.000Z'
+      }),
+      deliveryId: 'delivery-review-promotion-active-run',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_744_168_300_000
+    });
+
+    expect(runReviewHandoffPromotion).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_rehydrated_active_run',
+      claim: {
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        task_id: taskId,
+        run_id: 'review-promotion-active-run',
+        run_manifest_path: childPaths.manifestPath,
+        issue_updated_at: '2026-04-09T03:05:00.000Z',
+        review_promotion: null
+      }
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      task_id: taskId,
+      run_id: 'review-promotion-active-run',
+      run_manifest_path: childPaths.manifestPath,
+      issue_updated_at: '2026-04-09T03:05:00.000Z',
+      last_delivery_id: 'delivery-review-promotion-active-run',
+      review_promotion: null,
+      merge_closeout: null
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();

@@ -1165,13 +1165,20 @@ async function resolveAttachedSameRepoPullRequestCandidate(input: {
       ignoredHistoricalMergedCandidates.length === otherMergedCandidates.length &&
       staleUnmergedCandidates.length === nonMergedCandidates.length
     ) {
-      const ignoredHistoricalPrUrls = ignoredHistoricalMergedCandidates.map((candidate) => candidate.pr.url);
+      const ignoredHistoricalMergedPrUrls = ignoredHistoricalMergedCandidates.map(
+        (candidate) => candidate.pr.url
+      );
+      const staleUnmergedPrUrls = staleUnmergedCandidates.map((candidate) => candidate.pr.url);
+      const ignoredHistoricalPrUrls = [
+        ...ignoredHistoricalMergedPrUrls,
+        ...staleUnmergedPrUrls
+      ];
       return {
         selected_pr: selectedMergedCandidate.pr,
         selected_snapshot: selectedMergedCandidate.snapshot,
         ignored_historical_pr_urls: ignoredHistoricalPrUrls,
         conflicting_attached_pr_urls: [],
-        selection_note: `Selected already-merged PR ${selectedMergedCandidate.pr.url} because all remaining attached same-repo PR URLs are older.${ignoredHistoricalPrUrls.length > 0 ? ` Ignored older merged PR URLs: ${ignoredHistoricalPrUrls.join(', ')}.` : ''}${staleUnmergedCandidates.length > 0 ? ` Older unmerged PR URLs: ${staleUnmergedCandidates.map((candidate) => candidate.pr.url).join(', ')}.` : ''}`
+        selection_note: `Selected already-merged PR ${selectedMergedCandidate.pr.url} because all remaining attached same-repo PR URLs are older.${ignoredHistoricalMergedPrUrls.length > 0 ? ` Ignored older merged PR URLs: ${ignoredHistoricalMergedPrUrls.join(', ')}.` : ''}${staleUnmergedPrUrls.length > 0 ? ` Older unmerged PR URLs: ${staleUnmergedPrUrls.join(', ')}.` : ''}`
       };
     }
   }
