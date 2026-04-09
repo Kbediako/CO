@@ -25,6 +25,7 @@ const {
   readFormatFlag,
   readStringFlag,
   readIntegerFlag,
+  removeInstalledControlHostSupervisionArtifacts,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
@@ -297,6 +298,51 @@ describe('controlHostSupervision shell helpers', () => {
       await expect(stat(paths.logsDir)).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('uninstall cleanup only removes managed supervision directories for the current home', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'co-supervision-managed-home-'));
+    const managedPaths = resolveControlHostSupervisionPaths({
+      homeDir,
+      label: 'com.example.control-host'
+    });
+    const tamperedRoot = await mkdtemp(join(tmpdir(), 'co-supervision-tampered-'));
+    const tamperedPath = join(tamperedRoot, 'keep-me');
+    const bootouts: string[] = [];
+
+    try {
+      await mkdir(join(homeDir, 'Library', 'LaunchAgents'), { recursive: true });
+      await mkdir(managedPaths.supportDir, { recursive: true });
+      await mkdir(managedPaths.logsDir, { recursive: true });
+      await writeFile(managedPaths.plistPath, '<plist/>', 'utf8');
+      await writeFile(managedPaths.configPath, '{}', 'utf8');
+      await writeFile(managedPaths.statePath, '{}', 'utf8');
+      await writeFile(managedPaths.stdoutLogPath, '', 'utf8');
+      await writeFile(managedPaths.stderrLogPath, '', 'utf8');
+
+      await mkdir(tamperedPath, { recursive: true });
+      await writeFile(join(tamperedPath, 'sentinel.txt'), 'keep', 'utf8');
+
+      const removedPaths = await removeInstalledControlHostSupervisionArtifacts(
+        'com.example.control-host',
+        {
+          homeDir,
+          bootout: async (target) => {
+            bootouts.push(target);
+          }
+        }
+      );
+
+      expect(removedPaths).toEqual(managedPaths);
+      expect(bootouts).toEqual(['gui/501/com.example.control-host']);
+      await expect(stat(managedPaths.plistPath)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(managedPaths.supportDir)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(managedPaths.logsDir)).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(tamperedPath)).resolves.toBeTruthy();
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+      await rm(tamperedRoot, { recursive: true, force: true });
     }
   });
 

@@ -227,17 +227,16 @@ async function restartControlHostSupervision(flags: ArgMap): Promise<void> {
 async function uninstallControlHostSupervision(flags: ArgMap): Promise<void> {
   const format = readFormatFlag(flags);
   const resolved = await resolveStoredControlHostSupervision(flags, false);
+  const removedPaths = await removeInstalledControlHostSupervisionArtifacts(resolved.label);
   const serviceTarget = resolveControlHostSupervisionServiceTarget(resolved.label);
-
-  await rollbackFailedControlHostSupervisionInstall(resolved.paths, serviceTarget);
 
   const payload = {
     status: 'uninstalled',
     label: resolved.label,
     service_target: serviceTarget,
-    config_path: resolved.paths.configPath,
-    plist_path: resolved.paths.plistPath,
-    logs_dir: resolved.paths.logsDir
+    config_path: removedPaths.configPath,
+    plist_path: removedPaths.plistPath,
+    logs_dir: removedPaths.logsDir
   };
   emitOutput(
     format,
@@ -804,6 +803,24 @@ async function rollbackFailedControlHostSupervisionInstall(
   await remove(paths.logsDir, { recursive: true, force: true });
 }
 
+async function removeInstalledControlHostSupervisionArtifacts(
+  label: string,
+  options?: {
+    homeDir?: string;
+    bootout?: (serviceTarget: string) => Promise<void>;
+    remove?: typeof rm;
+  }
+): Promise<ControlHostSupervisionPaths> {
+  const homeDir = resolve(options?.homeDir ?? process.env.HOME ?? process.cwd());
+  const managedPaths = resolveControlHostSupervisionPaths({ homeDir, label });
+  await rollbackFailedControlHostSupervisionInstall(
+    managedPaths,
+    resolveControlHostSupervisionServiceTarget(label),
+    options
+  );
+  return managedPaths;
+}
+
 function isIgnorableLaunchctlBootoutFailure(result: CommandResult): boolean {
   const detail = `${result.stdout}\n${result.stderr}`.toLowerCase();
   return /could not find service|service.*not found|no such process|not loaded/u.test(detail);
@@ -1073,6 +1090,7 @@ export const __test__ = {
   readFormatFlag,
   readStringFlag,
   readIntegerFlag,
+  removeInstalledControlHostSupervisionArtifacts,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget
