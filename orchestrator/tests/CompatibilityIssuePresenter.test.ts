@@ -319,6 +319,62 @@ describe('CompatibilityIssuePresenter', () => {
     });
   });
 
+  it('does not backfill legacy proof freshness or session ids when canonical activity is incomplete', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'turn_started',
+          last_message: 'older legacy message',
+          last_event_at: '2026-04-06T02:34:30.000Z',
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: 'Investigating provider-worker EVENT provenance.',
+            recorded_at: null,
+            source: 'stdout_jsonl',
+            turn_id: 'turn-2',
+            session_id: null
+          },
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:30.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+      })
+    );
+
+    expect(runningEntry).toMatchObject({
+      session_id: null,
+      last_event: 'agent_message',
+      last_message: 'Investigating provider-worker EVENT provenance.',
+      display_event: 'Investigating provider-worker EVENT provenance.',
+      event_source: 'canonical_stdout_jsonl',
+      message_recorded_at: null,
+      source_updated_at: '2026-04-06T02:35:30.000Z',
+      last_event_at: '2026-04-06T02:35:00.000Z'
+    });
+  });
+
   it('does not leak latest-event candidates when proof telemetry wins the running row', () => {
     const runningEntry = buildCompatibilityRunningEntry(
       buildCompatibilitySource({

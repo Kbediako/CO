@@ -299,10 +299,17 @@ export function buildCompatibilityRunningEntry(
     proofCurrentTurnActivity?.recorded_at
   );
   const proofCanonicalSessionId = normalizeCompatibilityMessage(proofCurrentTurnActivity?.session_id);
+  const useLegacyProofFallback = proofCurrentTurnActivity === null;
   const hasCanonicalProofTelemetry = Boolean(proofCanonicalEvent || proofCanonicalMessage);
-  const proofEvent = proofCanonicalEvent ?? proof?.last_event ?? null;
-  const proofMessage = proofCanonicalMessage ?? proof?.last_message ?? null;
-  const proofEventAt = proofCanonicalRecordedAt ?? proof?.last_event_at ?? null;
+  const proofEvent = useLegacyProofFallback
+    ? normalizeCompatibilityMessage(proof?.last_event)
+    : proofCanonicalEvent;
+  const proofMessage = useLegacyProofFallback
+    ? normalizeCompatibilityMessage(proof?.last_message)
+    : proofCanonicalMessage;
+  const proofEventAt = useLegacyProofFallback
+    ? normalizeCompatibilityMessage(proof?.last_event_at)
+    : proofCanonicalRecordedAt;
   const runningEvent = selectRunningEvent({
     latestEvent: selected.latestEvent?.event ?? null,
     latestEventAt: selected.latestEvent?.at ?? null,
@@ -338,7 +345,7 @@ export function buildCompatibilityRunningEntry(
       ? 'canonical_session_log_hydration'
       : hasCanonicalProofTelemetry
         ? 'canonical_stdout_jsonl'
-        : 'legacy_proof_last_message';
+        : 'legacy_proof_fields';
   const eventSource =
     runningEvent.source === 'latest'
       ? selected.latestEvent?.source ?? 'latest_event'
@@ -349,13 +356,17 @@ export function buildCompatibilityRunningEntry(
     runningEvent.source === 'latest'
       ? selected.latestEvent?.messageRecordedAt ?? selected.latestEvent?.at ?? null
       : runningEvent.source === 'proof'
-        ? proofCanonicalRecordedAt ?? proofEventAt ?? null
+        ? useLegacyProofFallback
+          ? proofEventAt ?? null
+          : proofCanonicalRecordedAt ?? null
         : null;
   const sourceUpdatedAt =
     runningEvent.source === 'latest'
       ? selected.latestEvent?.sourceUpdatedAt ?? selected.latestEvent?.at ?? selected.updatedAt
       : runningEvent.source === 'proof'
-        ? proofCanonicalRecordedAt ?? proof?.updated_at ?? proofEventAt ?? null
+        ? useLegacyProofFallback
+          ? normalizeCompatibilityMessage(proof?.updated_at) ?? proofEventAt ?? null
+          : proofCanonicalRecordedAt ?? normalizeCompatibilityMessage(proof?.updated_at) ?? null
         : selected.updatedAt;
   const eventCandidates =
     runningEvent.source === 'latest'
@@ -381,7 +392,9 @@ export function buildCompatibilityRunningEntry(
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
     pid: selected.providerLinearWorkerProof?.pid ?? null,
-    session_id: proofCanonicalSessionId ?? proof?.latest_session_id ?? null,
+    session_id: useLegacyProofFallback
+      ? normalizeCompatibilityMessage(proof?.latest_session_id)
+      : proofCanonicalSessionId,
     turn_count: proof?.turn_count ?? null,
     last_event: runningEvent.event,
     last_message: runningMessage,
