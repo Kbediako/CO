@@ -362,9 +362,15 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
   });
   const { childExitPromise, childErrorPromise } =
     createControlHostSupervisionChildEventPromises(child);
+  // Fail closed if state persistence breaks after spawn; otherwise launchd can
+  // restart while an orphaned control-host keeps running outside supervision.
+  const writeRuntimeState = async (
+    update: Partial<ControlHostSupervisionState> & { status: string; updated_at: string }
+  ): Promise<ControlHostSupervisionState> =>
+    writeRuntimeStateWithCleanup(child, config.killTimeoutSeconds, () => writeState(update));
 
   const startedAt = new Date().toISOString();
-  await writeState({
+  await writeRuntimeState({
     status: 'running',
     updated_at: startedAt,
     child_pid: child.pid ?? null,
@@ -393,7 +399,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
         const checkedAt = new Date().toISOString();
         if (probe.healthy) {
           consecutiveUnhealthySamples = 0;
-          await writeState({
+          await writeRuntimeState({
             status: 'healthy',
             updated_at: checkedAt,
             last_health_check_at: checkedAt,
@@ -405,7 +411,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
         }
 
         consecutiveUnhealthySamples += 1;
-        await writeState({
+        await writeRuntimeState({
           status: 'unhealthy',
           updated_at: checkedAt,
           last_health_check_at: checkedAt,
@@ -419,7 +425,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
         }
 
         const restartRequestedAt = new Date().toISOString();
-        await writeState({
+        await writeRuntimeState({
           status: 'restart_required',
           updated_at: restartRequestedAt,
           last_health_check_at: restartRequestedAt,
@@ -440,7 +446,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
 
       if (event.type === 'stop') {
         const stoppedAt = new Date().toISOString();
-        await writeState({
+        await writeRuntimeState({
           status: 'stopping',
           updated_at: stoppedAt,
           message: `Supervisor received ${event.signal}; stopping child process.`
@@ -448,7 +454,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
         await terminateChildProcess(child, config.killTimeoutSeconds);
         const exitResult = await childExitPromise;
         const finishedAt = new Date().toISOString();
-        await writeState({
+        await writeRuntimeState({
           status: 'stopped',
           updated_at: finishedAt,
           child_pid: null,
@@ -463,7 +469,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
 
       if (event.type === 'child_error') {
         const failedAt = new Date().toISOString();
-        await writeState({
+        await writeRuntimeState({
           status: 'child_error',
           updated_at: failedAt,
           child_pid: null,
@@ -474,7 +480,7 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
       }
 
       const exitedAt = new Date().toISOString();
-      await writeState({
+      await writeRuntimeState({
         status: 'child_exited',
         updated_at: exitedAt,
         child_pid: null,
@@ -1016,6 +1022,25 @@ async function terminateChildProcess(
   }
 }
 
+async function writeRuntimeStateWithCleanup<T>(
+  child: ReturnType<typeof spawn>,
+  killTimeoutSeconds: number,
+  persist: () => Promise<T>
+): Promise<T> {
+  try {
+    return await persist();
+  } catch (error) {
+    await terminateChildProcess(child, killTimeoutSeconds).catch((cleanupError) => {
+      console.error(
+        `Failed to stop control-host after supervision state write failure: ${
+          cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+        }`
+      );
+    });
+    throw error;
+  }
+}
+
 function createStopSignalWaiter(): {
   promise: Promise<{ type: 'stop'; signal: NodeJS.Signals }>;
   dispose: () => void;
@@ -1449,5 +1474,6 @@ export const __test__ = {
   restoreExistingControlHostSupervisionInstall,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
-  resolveControlHostSupervisionServiceTarget
+  resolveControlHostSupervisionServiceTarget,
+  writeRuntimeStateWithCleanup
 };

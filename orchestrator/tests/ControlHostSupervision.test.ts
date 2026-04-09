@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   CONTROL_HOST_SUPERVISION_MAX_NODE_TIMER_SECONDS,
@@ -36,7 +36,8 @@ const {
   restoreExistingControlHostSupervisionInstall,
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
-  resolveControlHostSupervisionServiceTarget
+  resolveControlHostSupervisionServiceTarget,
+  writeRuntimeStateWithCleanup
 } = controlHostSupervisionShellTest;
 
 describe('controlHostSupervision helpers', () => {
@@ -844,6 +845,30 @@ describe('controlHostSupervision shell helpers', () => {
       type: 'child_error',
       error: spawnError
     });
+  });
+
+  it('terminates the spawned child when post-spawn state persistence fails', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        queueMicrotask(() => {
+          child.exitCode = signal === 'SIGTERM' ? 0 : child.exitCode;
+          child.signalCode = signal;
+          child.emit('exit', child.exitCode, signal);
+        });
+        return true;
+      })
+    });
+    const writeError = new Error('state write failed');
+
+    await expect(
+      writeRuntimeStateWithCleanup(child as never, 1, async () => {
+        throw writeError;
+      })
+    ).rejects.toBe(writeError);
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
   });
 
   it('disposes sleep waiters before the tick fires', async () => {
