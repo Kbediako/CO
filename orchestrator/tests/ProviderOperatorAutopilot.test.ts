@@ -461,6 +461,45 @@ describe('providerOperatorAutopilot', () => {
       ]
     });
   });
+
+  it('clears stale pending rollout actions when post-merge rollout is disabled', async () => {
+    const config = buildConfig();
+    const result = await runProviderOperatorAutopilot({
+      tracked_issues: [],
+      claims: [],
+      config: {
+        ...config,
+        post_merge_rollout: {
+          ...config.post_merge_rollout,
+          enabled: false
+        }
+      },
+      previous_result: {
+        recorded_at: '2026-04-09T10:10:00.000Z',
+        status: 'acted',
+        summary: 'Surfaced 1 pending local rollout action (CO-118).',
+        error: null,
+        actions: [],
+        holds: [],
+        pending_actions: [
+          {
+            kind: 'local_rollout',
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-118',
+            summary: 'stale rollout reminder',
+            merge_closeout_reason: 'merged_and_transitioned_done',
+            shared_root_status: 'clean_main_fast_forwarded',
+            linear_transition_status: 'transitioned'
+          }
+        ]
+      }
+    });
+
+    expect(result).toMatchObject({
+      status: 'noop',
+      pending_actions: []
+    });
+  });
 });
 
 function buildConfig(): ProviderOperatorAutopilotConfig {
