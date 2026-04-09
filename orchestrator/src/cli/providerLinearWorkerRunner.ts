@@ -2282,10 +2282,13 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
 }
 
 function shouldPreservePreviousTurnTelemetryOnLaunchFailure(
-  parseState: ProviderLinearWorkerJsonlParseResult
+  parseState: ProviderLinearWorkerJsonlParseResult,
+  previousThreadId: string | null
 ): boolean {
   const lastEvent = normalizeOptionalString(parseState.lastEvent);
+  const nextThreadId = normalizeOptionalString(parseState.threadId);
   return (
+    (nextThreadId === null || nextThreadId === previousThreadId) &&
     parseState.turnId === null &&
     (lastEvent === null || lastEvent === 'thread.started') &&
     parseState.finalMessage === null &&
@@ -2435,9 +2438,10 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   }
 
   const liveThreadId = parseState.threadId ?? proof.thread_id;
-  const liveTurnId = parseState.turnId ?? proof.latest_turn_id;
   const liveThreadChanged = Boolean(liveThreadId && liveThreadId !== proof.thread_id);
+  const liveTurnId = parseState.turnId ?? (liveThreadChanged ? null : proof.latest_turn_id);
   const liveTurnChanged = Boolean(liveTurnId && liveTurnId !== proof.latest_turn_id);
+  const liveScopeChanged = liveThreadChanged || liveTurnChanged;
   const session = deriveLatestTurnSessionId({
     threadId: liveThreadId,
     turnId: liveTurnId
@@ -2452,8 +2456,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     ...proof,
     thread_id: liveThreadId,
     latest_turn_id: liveTurnId,
-    latest_session_id: session.sessionId ?? proof.latest_session_id,
-    latest_session_id_source: session.source ?? proof.latest_session_id_source,
+    latest_session_id: session.sessionId,
+    latest_session_id_source: session.source,
     last_event: parseState.lastEvent ?? null,
     last_message: parseState.finalMessage ?? null,
     last_event_at: parseState.lastEventAt ?? null,
@@ -2462,7 +2466,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
         parseState.currentTurnActivity,
         liveThreadId,
         liveTurnId
-      ) ?? (liveThreadChanged || liveTurnChanged ? null : proofCurrentTurnActivity),
+      ) ?? (liveScopeChanged ? null : proofCurrentTurnActivity),
     tokens: hasProviderWorkerTokenUsage(parseState.tokens)
       ? parseState.tokens
       : liveTurnChanged
@@ -3890,7 +3894,9 @@ export async function runProviderLinearWorker(
       const queueLiveProofWrite = (): void => {
         const liveThreadId = liveParseState.threadId ?? threadId;
         const liveTurnId = liveParseState.turnId;
+        const liveThreadChanged = Boolean(liveThreadId && liveThreadId !== finalProof.thread_id);
         const liveTurnChanged = Boolean(liveTurnId && liveTurnId !== finalProof.latest_turn_id);
+        const liveScopeChanged = liveThreadChanged || liveTurnChanged;
         const session = deriveLatestTurnSessionId({
           threadId: liveThreadId,
           turnId: liveTurnId
@@ -3903,15 +3909,18 @@ export async function runProviderLinearWorker(
           latest_session_id: session.sessionId,
           latest_session_id_source: session.source,
           turn_count: turnNumber,
-          last_event: liveParseState.lastEvent ?? (liveTurnChanged ? null : finalProof.last_event),
-          last_message: liveParseState.finalMessage ?? (liveTurnChanged ? null : finalProof.last_message),
-          last_event_at: liveParseState.lastEventAt ?? (liveTurnChanged ? null : finalProof.last_event_at),
+          last_event: liveParseState.lastEvent ?? (liveScopeChanged ? null : finalProof.last_event),
+          last_message:
+            liveParseState.finalMessage ?? (liveScopeChanged ? null : finalProof.last_message),
+          last_event_at:
+            liveParseState.lastEventAt ?? (liveScopeChanged ? null : finalProof.last_event_at),
           current_turn_activity:
             synchronizeProviderLinearWorkerCurrentTurnActivity(
               liveParseState.currentTurnActivity,
               liveThreadId,
               liveTurnId
-            ) ?? (liveTurnChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
+            ) ??
+            (liveScopeChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
           tokens: hasProviderWorkerTokenUsage(liveParseState.tokens)
             ? liveParseState.tokens
             : liveTurnChanged
@@ -4116,7 +4125,10 @@ export async function runProviderLinearWorker(
         clearLiveSemanticStallTimer();
         flushLiveStdoutTail();
         await liveProofWrite;
-        const failedProofBase = shouldPreservePreviousTurnTelemetryOnLaunchFailure(liveParseState)
+        const failedProofBase = shouldPreservePreviousTurnTelemetryOnLaunchFailure(
+          liveParseState,
+          previousTurnProof.thread_id ?? null
+        )
           ? {
               ...finalProof,
               thread_id: finalProof.thread_id ?? previousTurnProof.thread_id,
@@ -4130,7 +4142,13 @@ export async function runProviderLinearWorker(
               tokens: previousTurnProof.tokens,
               rate_limits: previousTurnProof.rate_limits
             }
-          : finalProof;
+          : {
+              ...finalProof,
+              tokens: hasProviderWorkerTokenUsage(finalProof.tokens)
+                ? finalProof.tokens
+                : previousTurnProof.tokens,
+              rate_limits: finalProof.rate_limits ?? previousTurnProof.rate_limits
+            };
         finalProof = {
           ...failedProofBase,
           owner_phase: 'ended',
@@ -4150,7 +4168,10 @@ export async function runProviderLinearWorker(
       await liveProofWrite;
       const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
       threadId = parsed.threadId ?? finalProof.thread_id ?? threadId;
-      turnId = parsed.turnId ?? finalProof.latest_turn_id ?? turnId;
+      const parsedThreadChanged = Boolean(threadId && threadId !== finalProof.thread_id);
+      turnId = parsed.turnId ?? (parsedThreadChanged ? null : finalProof.latest_turn_id ?? turnId);
+      const parsedTurnChanged = Boolean(turnId && turnId !== finalProof.latest_turn_id);
+      const parsedScopeChanged = parsedThreadChanged || parsedTurnChanged;
       const session = deriveLatestTurnSessionId({ threadId, turnId });
 
       finalProof = {
@@ -4164,15 +4185,16 @@ export async function runProviderLinearWorker(
         latest_session_id: session.sessionId,
         latest_session_id_source: session.source,
         turn_count: turnNumber,
-        last_event: parsed.lastEvent ?? finalProof.last_event,
-        last_message: parsed.finalMessage ?? finalProof.last_message,
-        last_event_at: parsed.lastEventAt ?? finalProof.last_event_at,
+        last_event: parsed.lastEvent ?? (parsedScopeChanged ? null : finalProof.last_event),
+        last_message: parsed.finalMessage ?? (parsedScopeChanged ? null : finalProof.last_message),
+        last_event_at:
+          parsed.lastEventAt ?? (parsedScopeChanged ? null : finalProof.last_event_at),
         current_turn_activity:
           synchronizeProviderLinearWorkerCurrentTurnActivity(
             parsed.currentTurnActivity,
             threadId,
             turnId
-          ) ?? selectProviderLinearWorkerCurrentTurnActivity(finalProof),
+          ) ?? (parsedScopeChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
         tokens: hasProviderWorkerTokenUsage(parsed.tokens) ? parsed.tokens : finalProof.tokens,
         rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',

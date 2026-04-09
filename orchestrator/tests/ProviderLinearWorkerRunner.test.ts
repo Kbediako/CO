@@ -2576,8 +2576,8 @@ describe('provider linear worker runner', () => {
 
     expect(refreshed).toMatchObject({
       thread_id: 'thread-2',
-      latest_turn_id: 'turn-1',
-      latest_session_id: 'thread-2-turn-1',
+      latest_turn_id: null,
+      latest_session_id: null,
       last_event: null,
       last_message: null,
       last_event_at: null,
@@ -5824,9 +5824,12 @@ describe('provider linear worker runner', () => {
     });
   });
 
-  it('preserves a freshly discovered thread id when a resumed execRunner rejects before new turn context arrives', async () => {
+  it('preserves a freshly discovered thread id while clearing stale telemetry when a resumed execRunner rejects before new turn context arrives', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     let execCallCount = 0;
+    const writeProof = vi.fn(async (path: string, proof: ProviderLinearWorkerProof) => {
+      await writeFile(path, JSON.stringify(proof), 'utf8');
+    });
     const execRunner = vi.fn(
       async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
         execCallCount += 1;
@@ -5862,6 +5865,7 @@ describe('provider linear worker runner', () => {
           readTrackedIssue: vi.fn(async () => createTrackedIssue()),
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner,
+          writeProof,
           now: vi
             .fn()
             .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
@@ -5872,13 +5876,35 @@ describe('provider linear worker runner', () => {
     ).rejects.toThrow('spawn failed');
 
     expect(execRunner).toHaveBeenCalledTimes(2);
+    const liveTurnRunningProof = writeProof.mock.calls
+      .map(([, proof]) => proof)
+      .find(
+        (proof) =>
+          proof.owner_phase === 'turn_running' &&
+          proof.thread_id === 'thread-2'
+      );
+    expect(liveTurnRunningProof).toMatchObject({
+      thread_id: 'thread-2',
+      latest_turn_id: null,
+      latest_session_id: null,
+      last_event: null,
+      last_message: null,
+      last_event_at: null,
+      current_turn_activity: null,
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress'
+    });
     const written = JSON.parse(
       await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
     ) as Record<string, unknown>;
     expect(written).toMatchObject({
       thread_id: 'thread-2',
-      latest_turn_id: 'turn-1',
-      latest_session_id: 'thread-1-turn-1',
+      latest_turn_id: null,
+      latest_session_id: null,
+      last_event: null,
+      last_message: null,
+      last_event_at: null,
+      current_turn_activity: null,
       tokens: {
         input_tokens: 12,
         output_tokens: 8,
