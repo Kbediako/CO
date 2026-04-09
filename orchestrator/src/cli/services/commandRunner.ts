@@ -777,7 +777,6 @@ function resolvePackageRootDistStageInvocation(
     return null;
   }
   const [, distRelativePath, trailingArgsRaw] = match;
-  const trailingArgs = splitShellWords(trailingArgsRaw.trim());
   const invocation = resolvePackageProgramInvocation({
     allowConfiguredForeignPackageRoot: true,
     env,
@@ -785,63 +784,12 @@ function resolvePackageRootDistStageInvocation(
     execPath: normalizeOptionalString(env.CODEX_ORCHESTRATOR_NODE_BIN) ?? process.execPath,
     distRelativePath
   });
-  const args = [...invocation.args, ...trailingArgs];
+  const command = `${buildCommandPreview(invocation.command, invocation.args)}${trailingArgsRaw}`;
   return {
-    command: invocation.command,
-    args,
-    preview: buildCommandPreview(invocation.command, args),
+    command,
+    preview: command,
     warning: invocation.warning
   };
-}
-
-function splitShellWords(value: string): string[] {
-  if (!value) {
-    return [];
-  }
-  const tokens: string[] = [];
-  let current = '';
-  let quote: '"' | "'" | null = null;
-  let escaping = false;
-
-  for (const char of value) {
-    if (escaping) {
-      current += char;
-      escaping = false;
-      continue;
-    }
-    if (char === '\\') {
-      escaping = true;
-      continue;
-    }
-    if (quote) {
-      if (char === quote) {
-        quote = null;
-      } else {
-        current += char;
-      }
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (/\s/u.test(char)) {
-      if (current.length > 0) {
-        tokens.push(current);
-        current = '';
-      }
-      continue;
-    }
-    current += char;
-  }
-
-  if (escaping) {
-    current += '\\';
-  }
-  if (current.length > 0) {
-    tokens.push(current);
-  }
-  return tokens;
 }
 
 function resolveReviewEvidenceWaiverReason(
