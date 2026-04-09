@@ -590,6 +590,17 @@ function buildSelectedRunLatestEvent(input: {
         input.updatedAt,
       event: input.terminalMergeCloseoutProgress.phase,
       message: input.terminalMergeCloseoutProgress.summary ?? input.summary,
+      source: input.terminalMergeCloseoutProgress.event_source ?? 'merge_closeout',
+      messageRecordedAt:
+        input.terminalMergeCloseoutProgress.message_recorded_at ??
+        input.terminalMergeCloseoutProgress.summary_recorded_at ??
+        null,
+      sourceUpdatedAt:
+        input.terminalMergeCloseoutProgress.source_updated_at ??
+        input.terminalMergeCloseoutProgress.last_semantic_progress_at ??
+        input.providerDebugSnapshot.last_semantic_progress_at ??
+        input.updatedAt,
+      candidates: input.terminalMergeCloseoutProgress.event_candidates ?? [],
       requestedBy: null,
       reason: input.terminalMergeCloseoutProgress.stall_reason ?? null
     };
@@ -603,11 +614,26 @@ function buildSelectedRunLatestEvent(input: {
     return {
       at:
         input.providerDebugSnapshot.progress.summary_recorded_at ??
+        input.providerDebugSnapshot.progress.message_recorded_at ??
+        input.providerDebugSnapshot.progress.source_updated_at ??
         input.providerDebugSnapshot.progress.last_semantic_progress_at ??
         input.providerDebugSnapshot.last_semantic_progress_at ??
         input.updatedAt,
-      event: input.providerDebugSnapshot.progress.phase,
+      event:
+        input.providerDebugSnapshot.progress.selected_event ??
+        input.providerDebugSnapshot.progress.phase,
       message: input.providerDebugSnapshot.progress.summary ?? input.summary,
+      source: input.providerDebugSnapshot.progress.event_source ?? 'provider_debug_progress',
+      messageRecordedAt:
+        input.providerDebugSnapshot.progress.message_recorded_at ??
+        input.providerDebugSnapshot.progress.summary_recorded_at ??
+        null,
+      sourceUpdatedAt:
+        input.providerDebugSnapshot.progress.source_updated_at ??
+        input.providerDebugSnapshot.progress.last_semantic_progress_at ??
+        input.providerDebugSnapshot.last_semantic_progress_at ??
+        input.updatedAt,
+      candidates: input.providerDebugSnapshot.progress.event_candidates ?? [],
       requestedBy: null,
       reason: input.providerDebugSnapshot.progress.stall_reason ?? null
     };
@@ -619,6 +645,10 @@ function buildSelectedRunLatestEvent(input: {
     at: input.controlAction?.requested_at ?? input.updatedAt,
     event: input.controlAction?.action ?? input.fallbackEvent,
     message: input.summary,
+    source: input.controlAction ? 'control_action' : 'run_summary',
+    messageRecordedAt: null,
+    sourceUpdatedAt: input.controlAction?.requested_at ?? input.updatedAt,
+    candidates: [],
     requestedBy: input.controlAction?.requested_by ?? null,
     reason: input.controlAction?.reason ?? null
   };
