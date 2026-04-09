@@ -535,6 +535,7 @@ describe('controlHostSupervision shell helpers', () => {
   it('uninstall cleanup uses the resolved install paths instead of recomputing from HOME', async () => {
     const installedHome = await mkdtemp(join(tmpdir(), 'co-supervision-installed-home-'));
     const currentHome = await mkdtemp(join(tmpdir(), 'co-supervision-current-home-'));
+    const bootouts: string[] = [];
     const installedPaths = resolveControlHostSupervisionPaths({
       homeDir: installedHome,
       label: 'com.example.control-host'
@@ -563,12 +564,22 @@ describe('controlHostSupervision shell helpers', () => {
       await writeFile(currentHomePaths.stdoutLogPath, '', 'utf8');
       await writeFile(currentHomePaths.stderrLogPath, '', 'utf8');
 
-      const removedPaths = await removeInstalledControlHostSupervisionArtifacts({
-        label: 'com.example.control-host',
-        paths: installedPaths
-      });
+      const removedPaths = await removeInstalledControlHostSupervisionArtifacts(
+        {
+          label: 'com.example.control-host',
+          paths: installedPaths
+        },
+        {
+          bootout: async (target) => {
+            bootouts.push(target);
+          }
+        }
+      );
 
       expect(removedPaths).toEqual(installedPaths);
+      expect(bootouts).toEqual([
+        resolveControlHostSupervisionServiceTarget('com.example.control-host')
+      ]);
       await expect(stat(installedPaths.plistPath)).rejects.toMatchObject({ code: 'ENOENT' });
       await expect(stat(installedPaths.supportDir)).rejects.toMatchObject({ code: 'ENOENT' });
       await expect(stat(installedPaths.logsDir)).rejects.toMatchObject({ code: 'ENOENT' });
