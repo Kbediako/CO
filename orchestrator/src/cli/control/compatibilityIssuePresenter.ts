@@ -370,7 +370,7 @@ export function buildCompatibilityRunningEntry(
         : 'fallback';
   const messageRecordedAt =
     runningMessageSource === 'latest'
-      ? selected.latestEvent?.messageRecordedAt ?? selected.latestEvent?.at ?? null
+      ? selected.latestEvent?.messageRecordedAt ?? null
       : runningMessageSource === 'proof'
         ? useLegacyProofFallback
           ? null

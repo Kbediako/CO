@@ -614,6 +614,35 @@ describe('CompatibilityIssuePresenter', () => {
     ]);
   });
 
+  it('keeps latest-message freshness null when the latest source has no explicit message timestamp', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'running',
+        displayStatus: 'Running',
+        summary: 'Provider worker turn is active.',
+        latestEvent: {
+          event: 'turn_running',
+          message: 'Provider worker turn is active.',
+          at: '2026-04-06T02:35:30.000Z',
+          source: 'provider_debug_snapshot',
+          messageRecordedAt: null,
+          sourceUpdatedAt: '2026-04-06T02:35:30.000Z',
+          candidates: [],
+          requestedBy: null,
+          reason: null
+        }
+      })
+    );
+
+    expect(runningEntry).toMatchObject({
+      last_event: 'turn_running',
+      last_message: 'Provider worker turn is active.',
+      event_source: 'provider_debug_snapshot',
+      message_recorded_at: null,
+      source_updated_at: '2026-04-06T02:35:30.000Z'
+    });
+  });
+
   it('does not reuse legacy proof last_event_at as message freshness when legacy proof wins', () => {
     const runningEntry = buildCompatibilityRunningEntry(
       buildCompatibilitySource({
