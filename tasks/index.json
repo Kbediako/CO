@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
+      "title": "CO: automate truthful In Review -> Merging promotion after clean review handoff",
+      "relates_to": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-09",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad-co-116-docs-review/cli/2026-04-09T02-47-50-041Z-2edb5399/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
+        "task": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
+        "agent_task": ".agent/task/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
+        "docs": "docs/TECH_SPEC-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md"
+      }
+    },
+    {
       "id": "20260409-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5",
       "title": "CO STATUS: preserve canonical provider-worker activity truth and EVENT provenance end to end",
       "relates_to": "tasks/tasks-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",

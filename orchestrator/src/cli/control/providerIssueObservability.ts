@@ -120,10 +120,30 @@ interface ProviderIssueClaimLike {
   run_id?: string | null;
   launch_source?: string | null;
   launch_started_at?: string | null;
+  issue_state?: string | null;
+  issue_state_type?: string | null;
+  review_promotion?: ProviderIssueReviewPromotionLike | null;
   merge_closeout?: ProviderIssueMergeCloseoutLike | null;
 }
 
-interface ProviderIssueMergeCloseoutLike {
+interface ProviderIssuePullRequestSnapshotLike {
+  state?: string | null;
+  review_decision?: string | null;
+  merge_state_status?: string | null;
+  ready_to_merge?: boolean | null;
+  gate_reasons?: string[] | null;
+  action_required_reasons?: string[] | null;
+  unresolved_thread_count?: number | null;
+  checks_pending?: number | null;
+  checks_failed?: number | null;
+  required_checks_pending?: number | null;
+  required_checks_failed?: number | null;
+  updated_at?: string | null;
+  merged_at?: string | null;
+  head_oid?: string | null;
+}
+
+interface ProviderIssuePullRequestLifecycleLike {
   recorded_at?: string | null;
   status?: string | null;
   reason?: string | null;
@@ -137,22 +157,23 @@ interface ProviderIssueMergeCloseoutLike {
     repo?: string | null;
     number?: number | null;
   } | null;
-  snapshot?: {
-    state?: string | null;
-    review_decision?: string | null;
-    merge_state_status?: string | null;
-    ready_to_merge?: boolean | null;
-    gate_reasons?: string[] | null;
-    action_required_reasons?: string[] | null;
-    unresolved_thread_count?: number | null;
-    checks_pending?: number | null;
-    checks_failed?: number | null;
-    required_checks_pending?: number | null;
-    required_checks_failed?: number | null;
-    updated_at?: string | null;
-    merged_at?: string | null;
-    head_oid?: string | null;
+  snapshot?: ProviderIssuePullRequestSnapshotLike | null;
+}
+
+interface ProviderIssueReviewPromotionLike extends ProviderIssuePullRequestLifecycleLike {
+  linear_transition?: {
+    status?: string | null;
+    attempted_at?: string | null;
+    previous_state?: string | null;
+    target_state?: string | null;
+    issue_state?: string | null;
+    issue_state_type?: string | null;
+    issue_updated_at?: string | null;
+    error?: string | null;
   } | null;
+}
+
+interface ProviderIssueMergeCloseoutLike extends ProviderIssuePullRequestLifecycleLike {
   shared_root?: {
     status?: string | null;
     reason?: string | null;
@@ -253,6 +274,7 @@ export interface ControlProviderDebugSnapshot {
     child_lane_count: number | null;
   } | null;
   pull_request: {
+    review_promotion_status: string | null;
     attached_pr_urls: string[];
     ignored_historical_pr_urls: string[];
     conflicting_attached_pr_urls: string[];
@@ -339,12 +361,19 @@ export function buildProviderIssueDebugSnapshot(input: {
   const proof = input.proof ?? null;
   const latestAudit = selectLatestProviderLinearAuditEntry(proof?.linear_audit);
   const parallelization = resolveProviderParallelizationSnapshot(proof);
+  const trackedWorkflowState = trackedIssue ? classifyProviderLinearWorkflowState(trackedIssue) : null;
+  const claimWorkflowState = !trackedIssue ? resolveClaimWorkflowStateClassification(claim) : null;
   const progress = deriveProviderLinearWorkerProgressSnapshot({
     tracked_issue: trackedIssue,
     claim,
     proof
   });
-  const pullRequest = buildProviderDebugPullRequestSnapshot(claim?.merge_closeout ?? null);
+  const pullRequest = buildProviderDebugPullRequestSnapshot({
+    reviewPromotion: claim?.review_promotion ?? null,
+    mergeCloseout: claim?.merge_closeout ?? null,
+    preferReviewPromotion:
+      trackedWorkflowState?.isHandoff === true || claimWorkflowState?.isHandoff === true
+  });
   if (!trackedIssue && !claim && !proof && !latestAudit && !pullRequest && !progress) {
     return null;
   }
@@ -483,14 +512,19 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const proof = input.proof ?? null;
   const now = input.now ?? (() => new Date().toISOString());
   const latestAudit = selectLatestProviderLinearAuditEntry(proof?.linear_audit);
+  const reviewPromotion = claim?.review_promotion ?? null;
   const mergeCloseout = claim?.merge_closeout ?? null;
   const activeChildLane = selectActiveChildLane(proof?.child_lanes ?? null);
   const activeChildStream = selectActiveChildStream(proof?.child_streams ?? null);
   const trackedWorkflowState = trackedIssue ? classifyProviderLinearWorkflowState(trackedIssue) : null;
+  const claimWorkflowState = !trackedIssue ? resolveClaimWorkflowStateClassification(claim) : null;
   const ownerPhase = normalizeOptionalString(proof?.owner_phase);
   const ownerStatus = normalizeOptionalString(proof?.owner_status);
   const endReason = normalizeOptionalString(proof?.end_reason);
   const claimState = normalizeProviderLinearWorkflowState(claim?.state);
+  const workflowStateName = normalizeProviderLinearWorkflowState(
+    normalizeOptionalString(trackedIssue?.state) ?? normalizeOptionalString(claim?.issue_state)
+  );
   const currentTurnStartedAt = normalizeOptionalString(proof?.current_turn_started_at);
   const latestChildProgressAt = latestIsoTimestamp(
     selectLatestChildLaneProgressAt(proof?.child_lanes ?? null, currentTurnStartedAt),
@@ -507,6 +541,15 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
     latestChildProgressAt,
     normalizeOptionalString(proof?.attempt_started_at)
   );
+  const workerProgressSuppressedByStaleClaim =
+    claimState === 'stale'
+    && hasAuthoritativeWorkerProgressSignal({
+      proof,
+      ownerPhase,
+      ownerStatus,
+      endReason,
+      lastSemanticProgressAt
+    });
 
   if (ownerStatus === 'failed' || ownerPhase === 'turn_failed') {
     return {
@@ -524,17 +567,25 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   }
 
   if (
+    reviewPromotion &&
+    workflowStateName === 'merging' &&
+    !mergeCloseout &&
+    !workerProgressSuppressedByStaleClaim
+  ) {
+    return derivePendingMergeCloseoutProgressSnapshot(reviewPromotion);
+  }
+
+  if (
+    reviewPromotion &&
+    (trackedWorkflowState?.isHandoff || claimWorkflowState?.isHandoff) &&
+    !workerProgressSuppressedByStaleClaim
+  ) {
+    return deriveReviewPromotionProgressSnapshot(reviewPromotion);
+  }
+
+  if (
     mergeCloseout
-    && !(
-      claimState === 'stale'
-      && hasAuthoritativeWorkerProgressSignal({
-        proof,
-        ownerPhase,
-        ownerStatus,
-        endReason,
-        lastSemanticProgressAt
-      })
-    )
+    && !workerProgressSuppressedByStaleClaim
   ) {
     return deriveMergeCloseoutProgressSnapshot(mergeCloseout);
   }
@@ -701,6 +752,20 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   }
 
   return null;
+}
+
+function resolveClaimWorkflowStateClassification(
+  claim: Pick<ProviderIssueClaimLike, 'issue_state' | 'issue_state_type'> | null | undefined
+) {
+  const state = normalizeOptionalString(claim?.issue_state);
+  const stateType = normalizeOptionalString(claim?.issue_state_type);
+  if (!state && !stateType) {
+    return null;
+  }
+  return classifyProviderLinearWorkflowState({
+    state,
+    state_type: stateType
+  });
 }
 
 function resolveAuthoritativeWorkerProgress(input: {
@@ -1208,6 +1273,159 @@ function deriveMergeCloseoutProgressSnapshot(
   };
 }
 
+function deriveReviewPromotionProgressSnapshot(
+  reviewPromotion: ProviderIssueReviewPromotionLike
+): ProviderLinearWorkerProgressSnapshot {
+  const promotionStatus = normalizeOptionalString(reviewPromotion.status);
+  const snapshot = reviewPromotion.snapshot ?? null;
+  const checksPending =
+    normalizeOptionalInteger(snapshot?.required_checks_pending) ??
+    normalizeOptionalInteger(snapshot?.checks_pending);
+  const checksFailed =
+    normalizeOptionalInteger(snapshot?.required_checks_failed) ??
+    normalizeOptionalInteger(snapshot?.checks_failed);
+  const unresolvedThreadCount = normalizeOptionalInteger(snapshot?.unresolved_thread_count);
+  const actionRequiredReasons = normalizeStringArray(snapshot?.action_required_reasons);
+  const gateReasons = normalizeStringArray(snapshot?.gate_reasons);
+  const lastSemanticProgressAt = latestIsoTimestamp(
+    normalizeOptionalString(reviewPromotion.recorded_at),
+    normalizeOptionalString(snapshot?.updated_at),
+    normalizeOptionalString(reviewPromotion.linear_transition?.attempted_at)
+  );
+  const summary =
+    normalizeOptionalString(reviewPromotion.summary) ??
+    'Review-handoff promotion status updated.';
+  const reviewBlockerReason = resolveMergeCloseoutReviewBlockerReason({
+    unresolvedThreadCount,
+    actionRequiredReasons
+  });
+  const checksFailedReason = resolveMergeCloseoutChecksFailedReason({
+    checksFailed,
+    actionRequiredReasons
+  });
+
+  if (promotionStatus === 'promoted') {
+    return {
+      phase: 'review_handoff',
+      kind: 'workflow',
+      status: 'completed',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'completed',
+      stall_reason: null,
+      recovery_recommendation: 'no_action'
+    };
+  }
+
+  if (promotionStatus === 'transition_failed' || promotionStatus === 'promotion_failed') {
+    return {
+      phase: 'failed',
+      kind: 'workflow',
+      status: 'failed',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'failed',
+      stall_reason:
+        normalizeOptionalString(reviewPromotion.reason) ?? promotionStatus,
+      recovery_recommendation: 'inspect_merge_closeout'
+    };
+  }
+
+  if (
+    reviewBlockerReason
+    || (unresolvedThreadCount ?? 0) > 0
+  ) {
+    return {
+      phase: 'waiting_on_review',
+      kind: 'workflow',
+      status: 'waiting',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'waiting_on_review',
+      stall_reason: reviewBlockerReason,
+      recovery_recommendation: 'address_review_feedback'
+    };
+  }
+
+  if (checksFailedReason) {
+    return {
+      phase: 'waiting_on_checks',
+      kind: 'workflow',
+      status: 'stalled',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'stalled',
+      stall_reason: checksFailedReason,
+      recovery_recommendation: 'inspect_merge_closeout'
+    };
+  }
+
+  if ((checksPending ?? 0) > 0) {
+    return {
+      phase: 'waiting_on_checks',
+      kind: 'workflow',
+      status: 'waiting',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'waiting_on_checks',
+      stall_reason: gateReasons[0] ?? 'checks_pending',
+      recovery_recommendation: 'wait_for_checks'
+    };
+  }
+
+  if (promotionStatus === 'action_required' || actionRequiredReasons.length > 0) {
+    return {
+      phase: 'review_handoff',
+      kind: 'workflow',
+      status: 'stalled',
+      summary,
+      last_semantic_progress_at: lastSemanticProgressAt,
+      stall_classification: 'stalled',
+      stall_reason:
+        actionRequiredReasons[0] ??
+        normalizeOptionalString(reviewPromotion.reason) ??
+        'review_handoff_promotion_blocked',
+      recovery_recommendation: 'inspect_merge_closeout'
+    };
+  }
+
+  return {
+    phase: 'review_handoff',
+    kind: 'workflow',
+    status: promotionStatus === 'watching' ? 'waiting' : 'progressing',
+    summary,
+    last_semantic_progress_at: lastSemanticProgressAt,
+    stall_classification: promotionStatus === 'watching' ? 'waiting_on_review' : 'progressing',
+    stall_reason: normalizeOptionalString(reviewPromotion.reason),
+    recovery_recommendation:
+      promotionStatus === 'watching' ? 'continue_waiting' : 'continue_waiting'
+  };
+}
+
+function derivePendingMergeCloseoutProgressSnapshot(
+  reviewPromotion: ProviderIssueReviewPromotionLike
+): ProviderLinearWorkerProgressSnapshot {
+  const snapshot = reviewPromotion.snapshot ?? null;
+  const lastSemanticProgressAt = latestIsoTimestamp(
+    normalizeOptionalString(reviewPromotion.recorded_at),
+    normalizeOptionalString(snapshot?.updated_at),
+    normalizeOptionalString(reviewPromotion.linear_transition?.attempted_at)
+  );
+  const summary = normalizeOptionalString(reviewPromotion.summary);
+  return {
+    phase: 'watching_merge',
+    kind: 'workflow',
+    status: 'progressing',
+    summary: summary
+      ? `${summary} Waiting for merge closeout to start.`
+      : 'Review handoff was promoted to Merging; waiting for merge closeout to start.',
+    last_semantic_progress_at: lastSemanticProgressAt,
+    stall_classification: 'progressing',
+    stall_reason: null,
+    recovery_recommendation: 'continue_waiting'
+  };
+}
+
 function resolveMergeCloseoutReviewBlockerReason(input: {
   unresolvedThreadCount: number | null;
   actionRequiredReasons: string[];
@@ -1250,28 +1468,35 @@ function isMergeCloseoutChecksFailedReason(reason: string): boolean {
   return reason.startsWith('required_checks_failed=') || reason.startsWith('checks_failed=');
 }
 
-function buildProviderDebugPullRequestSnapshot(
-  mergeCloseout: ProviderIssueMergeCloseoutLike | null
-): ControlProviderDebugSnapshot['pull_request'] {
-  if (!mergeCloseout) {
+function buildProviderDebugPullRequestSnapshot(input: {
+  reviewPromotion: ProviderIssueReviewPromotionLike | null;
+  mergeCloseout: ProviderIssueMergeCloseoutLike | null;
+  preferReviewPromotion: boolean;
+}): ControlProviderDebugSnapshot['pull_request'] {
+  const selectedRecord =
+    input.preferReviewPromotion && input.reviewPromotion
+      ? input.reviewPromotion
+      : input.mergeCloseout ?? input.reviewPromotion;
+  if (!selectedRecord) {
     return null;
   }
-  const snapshot = mergeCloseout.snapshot ?? null;
+  const snapshot = selectedRecord.snapshot ?? null;
   return {
-    attached_pr_urls: normalizeStringArray(mergeCloseout.attached_pr_urls),
-    ignored_historical_pr_urls: normalizeStringArray(mergeCloseout.ignored_historical_pr_urls),
-    conflicting_attached_pr_urls: normalizeStringArray(mergeCloseout.conflicting_attached_pr_urls),
-    url: normalizeOptionalString(mergeCloseout.pr?.url),
-    owner: normalizeOptionalString(mergeCloseout.pr?.owner),
-    repo: normalizeOptionalString(mergeCloseout.pr?.repo),
-    number: normalizeOptionalInteger(mergeCloseout.pr?.number),
-    merge_closeout_status: normalizeOptionalString(mergeCloseout.status),
-    reason: normalizeOptionalString(mergeCloseout.reason),
-    summary: normalizeOptionalString(mergeCloseout.summary),
-    shared_root_status: normalizeOptionalString(mergeCloseout.shared_root?.status),
-    shared_root_reason: normalizeOptionalString(mergeCloseout.shared_root?.reason),
-    shared_root_before_status: normalizeOptionalString(mergeCloseout.shared_root?.before_status),
-    shared_root_after_status: normalizeOptionalString(mergeCloseout.shared_root?.after_status),
+    review_promotion_status: normalizeOptionalString(input.reviewPromotion?.status),
+    attached_pr_urls: normalizeStringArray(selectedRecord.attached_pr_urls),
+    ignored_historical_pr_urls: normalizeStringArray(selectedRecord.ignored_historical_pr_urls),
+    conflicting_attached_pr_urls: normalizeStringArray(selectedRecord.conflicting_attached_pr_urls),
+    url: normalizeOptionalString(selectedRecord.pr?.url),
+    owner: normalizeOptionalString(selectedRecord.pr?.owner),
+    repo: normalizeOptionalString(selectedRecord.pr?.repo),
+    number: normalizeOptionalInteger(selectedRecord.pr?.number),
+    merge_closeout_status: normalizeOptionalString(input.mergeCloseout?.status),
+    reason: normalizeOptionalString(selectedRecord.reason),
+    summary: normalizeOptionalString(selectedRecord.summary),
+    shared_root_status: normalizeOptionalString(input.mergeCloseout?.shared_root?.status),
+    shared_root_reason: normalizeOptionalString(input.mergeCloseout?.shared_root?.reason),
+    shared_root_before_status: normalizeOptionalString(input.mergeCloseout?.shared_root?.before_status),
+    shared_root_after_status: normalizeOptionalString(input.mergeCloseout?.shared_root?.after_status),
     ready_to_merge:
       typeof snapshot?.ready_to_merge === 'boolean' ? snapshot.ready_to_merge : null,
     review_decision: normalizeOptionalString(snapshot?.review_decision),

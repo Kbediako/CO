@@ -1,7 +1,10 @@
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
-import type { ProviderMergeCloseoutRecord } from './providerMergeCloseout.js';
+import type {
+  ProviderMergeCloseoutRecord,
+  ProviderReviewHandoffPromotionRecord
+} from './providerMergeCloseout.js';
 import {
   deriveProviderIntakeClaimFreshness,
   type ProviderIntakeClaimFreshness
@@ -62,6 +65,7 @@ export interface ProviderIntakeClaimRecord {
   retry_attempt?: number | null;
   retry_due_at?: string | null;
   retry_error?: string | null;
+  review_promotion?: ProviderReviewHandoffPromotionRecord | null;
   merge_closeout?: ProviderMergeCloseoutRecord | null;
 }
 
@@ -277,6 +281,10 @@ export function upsertProviderIntakeClaim(
       input.retry_error === undefined
         ? retryStateDefaults.retryError
         : normalizeRetryError(input.retry_error),
+    review_promotion:
+      input.review_promotion === undefined
+        ? cloneProviderReviewHandoffPromotionRecord(existing?.review_promotion)
+        : cloneProviderReviewHandoffPromotionRecord(input.review_promotion),
     merge_closeout:
       input.merge_closeout === undefined
         ? cloneProviderMergeCloseoutRecord(existing?.merge_closeout)
@@ -454,6 +462,7 @@ function normalizeProviderIntakeClaim(
     retry_attempt: normalizeRetryAttempt(input.retry_attempt),
     retry_due_at: normalizeRetryTimestamp(input.retry_due_at),
     retry_error: normalizeRetryError(input.retry_error),
+    review_promotion: cloneProviderReviewHandoffPromotionRecord(input.review_promotion),
     merge_closeout: cloneProviderMergeCloseoutRecord(input.merge_closeout)
   };
 }
@@ -497,6 +506,14 @@ function cloneProviderMergeCloseoutRecord(
 ): ProviderMergeCloseoutRecord | null {
   return isRecordLike(value)
     ? (JSON.parse(JSON.stringify(value)) as ProviderMergeCloseoutRecord)
+    : null;
+}
+
+function cloneProviderReviewHandoffPromotionRecord(
+  value: ProviderReviewHandoffPromotionRecord | null | undefined
+): ProviderReviewHandoffPromotionRecord | null {
+  return isRecordLike(value)
+    ? (JSON.parse(JSON.stringify(value)) as ProviderReviewHandoffPromotionRecord)
     : null;
 }
 

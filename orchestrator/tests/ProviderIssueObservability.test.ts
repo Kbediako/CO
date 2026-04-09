@@ -115,6 +115,384 @@ describe('provider issue observability', () => {
     expect(snapshot?.last_semantic_progress_at).toBe('2026-04-05T06:02:00.000Z');
   });
 
+  it('surfaces review-handoff promotion blocker truth before an issue reaches Merging', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'In Review',
+        state_type: 'started',
+        updated_at: '2026-04-09T03:15:00.000Z'
+      },
+      claim: {
+        state: 'handoff_failed',
+        reason: 'provider_issue_review_promotion_action_required',
+        updated_at: '2026-04-09T03:15:00.000Z',
+        run_id: 'run-116',
+        review_promotion: {
+          recorded_at: '2026-04-09T03:15:00.000Z',
+          status: 'action_required',
+          reason: 'review=REVIEW_REQUIRED',
+          summary: 'Review-handoff promotion is blocked by: review=REVIEW_REQUIRED.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/416',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 416
+          },
+          snapshot: {
+            review_decision: 'REVIEW_REQUIRED',
+            merge_state_status: 'CLEAN',
+            ready_to_merge: false,
+            gate_reasons: ['review=REVIEW_REQUIRED'],
+            action_required_reasons: ['review=REVIEW_REQUIRED'],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-09T03:14:30.000Z',
+            merged_at: null
+          },
+          linear_transition: null
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        last_event: 'task_complete',
+        last_message: 'Provider worker completed successfully.',
+        last_event_at: '2026-04-09T03:14:00.000Z',
+        updated_at: '2026-04-09T03:15:00.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        review_promotion_status: 'action_required',
+        merge_closeout_status: null,
+        number: 416,
+        review_decision: 'REVIEW_REQUIRED',
+        action_required_reasons: ['review=REVIEW_REQUIRED']
+      },
+      progress: {
+        phase: 'waiting_on_review',
+        kind: 'workflow',
+        status: 'waiting',
+        stall_classification: 'waiting_on_review',
+        recovery_recommendation: 'address_review_feedback'
+      },
+      stall_classification: 'waiting_on_review',
+      recovery_recommendation: 'address_review_feedback'
+    });
+    expect(snapshot?.progress?.summary).toBe(
+      'Review-handoff promotion is blocked by: review=REVIEW_REQUIRED.'
+    );
+  });
+
+  it('prefers merge closeout pull-request truth once the issue leaves review handoff', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-04-09T03:31:00.000Z'
+      },
+      claim: {
+        state: 'completed',
+        reason: 'provider_issue_merge_closeout_watching',
+        updated_at: '2026-04-09T03:31:00.000Z',
+        run_id: 'run-116',
+        review_promotion: {
+          recorded_at: '2026-04-09T03:15:00.000Z',
+          status: 'action_required',
+          reason: 'review=REVIEW_REQUIRED',
+          summary: 'Review-handoff promotion is blocked by: review=REVIEW_REQUIRED.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/416',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 416
+          },
+          snapshot: {
+            state: 'OPEN',
+            review_decision: 'REVIEW_REQUIRED',
+            merge_state_status: 'CLEAN',
+            ready_to_merge: false,
+            gate_reasons: ['review=REVIEW_REQUIRED'],
+            action_required_reasons: ['review=REVIEW_REQUIRED'],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-09T03:14:30.000Z',
+            merged_at: null
+          },
+          linear_transition: null
+        },
+        merge_closeout: {
+          recorded_at: '2026-04-09T03:31:00.000Z',
+          status: 'watching',
+          reason: 'required_checks_pending',
+          summary: 'Waiting for required checks before merge.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/416',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 416
+          },
+          snapshot: {
+            state: 'OPEN',
+            review_decision: 'APPROVED',
+            merge_state_status: 'BLOCKED',
+            ready_to_merge: false,
+            gate_reasons: ['required_checks_pending'],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 1,
+            checks_failed: 0,
+            required_checks_pending: 1,
+            required_checks_failed: 0,
+            updated_at: '2026-04-09T03:31:00.000Z',
+            merged_at: null
+          },
+          merge_attempt: null,
+          shared_root: null,
+          linear_transition: null
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        last_event: 'task_complete',
+        last_message: 'Worker exited after handing merge closeout to the watcher.',
+        last_event_at: '2026-04-09T03:30:45.000Z',
+        updated_at: '2026-04-09T03:31:00.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        review_promotion_status: 'action_required',
+        merge_closeout_status: 'watching',
+        number: 416,
+        reason: 'required_checks_pending',
+        review_decision: 'APPROVED',
+        required_checks_pending: 1,
+        gate_reasons: ['required_checks_pending'],
+        action_required_reasons: []
+      },
+      progress: {
+        phase: 'waiting_on_checks',
+        kind: 'merge_closeout',
+        status: 'waiting',
+        stall_classification: 'waiting_on_checks',
+        recovery_recommendation: 'wait_for_checks'
+      }
+    });
+    expect(snapshot?.pull_request?.summary).toBe('Waiting for required checks before merge.');
+  });
+
+  it('falls back to claim handoff state when live tracked issue data is unavailable', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      claim: {
+        state: 'handoff_failed',
+        reason: 'provider_issue_review_promotion_action_required',
+        updated_at: '2026-04-09T03:15:00.000Z',
+        run_id: 'run-116',
+        issue_state: 'In Review',
+        issue_state_type: 'started',
+        review_promotion: {
+          recorded_at: '2026-04-09T03:15:00.000Z',
+          status: 'action_required',
+          reason: 'review=REVIEW_REQUIRED',
+          summary: 'Review-handoff promotion is blocked by: review=REVIEW_REQUIRED.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/416',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 416
+          },
+          snapshot: {
+            state: 'OPEN',
+            review_decision: 'REVIEW_REQUIRED',
+            merge_state_status: 'CLEAN',
+            ready_to_merge: false,
+            gate_reasons: ['review=REVIEW_REQUIRED'],
+            action_required_reasons: ['review=REVIEW_REQUIRED'],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-09T03:14:30.000Z',
+            merged_at: null
+          },
+          linear_transition: null
+        },
+        merge_closeout: {
+          recorded_at: '2026-04-09T03:31:00.000Z',
+          status: 'watching',
+          reason: 'required_checks_pending',
+          summary: 'Waiting for required checks before merge.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/416',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 416
+          },
+          snapshot: {
+            state: 'OPEN',
+            review_decision: 'APPROVED',
+            merge_state_status: 'BLOCKED',
+            ready_to_merge: false,
+            gate_reasons: ['required_checks_pending'],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 1,
+            checks_failed: 0,
+            required_checks_pending: 1,
+            required_checks_failed: 0,
+            updated_at: '2026-04-09T03:31:00.000Z',
+            merged_at: null
+          },
+          merge_attempt: null,
+          shared_root: null,
+          linear_transition: null
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        last_event: 'task_complete',
+        last_message: 'Provider worker completed successfully.',
+        last_event_at: '2026-04-09T03:14:00.000Z',
+        updated_at: '2026-04-09T03:15:00.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        review_promotion_status: 'action_required',
+        merge_closeout_status: 'watching',
+        number: 416,
+        reason: 'review=REVIEW_REQUIRED',
+        review_decision: 'REVIEW_REQUIRED',
+        action_required_reasons: ['review=REVIEW_REQUIRED']
+      },
+      progress: {
+        phase: 'waiting_on_review',
+        kind: 'workflow',
+        status: 'waiting',
+        stall_classification: 'waiting_on_review',
+        recovery_recommendation: 'address_review_feedback'
+      }
+    });
+    expect(snapshot?.pull_request?.summary).toBe(
+      'Review-handoff promotion is blocked by: review=REVIEW_REQUIRED.'
+    );
+  });
+
+  it('keeps merge closeout pending visible after review promotion reaches Merging', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      claim: {
+        state: 'completed',
+        reason: 'provider_issue_review_promotion_promoted',
+        updated_at: '2026-04-09T03:32:00.000Z',
+        run_id: 'run-116',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        review_promotion: {
+          recorded_at: '2026-04-09T03:32:00.000Z',
+          status: 'promoted',
+          reason: 'promoted_to_merging',
+          summary: 'Promoted the issue from In Review to Merging after confirming the attached PR is merge-ready.',
+          attached_pr_urls: ['https://github.com/asabeko/CO/pull/416'],
+          ignored_historical_pr_urls: [],
+          conflicting_attached_pr_urls: [],
+          pr: {
+            url: 'https://github.com/asabeko/CO/pull/416',
+            owner: 'asabeko',
+            repo: 'CO',
+            number: 416
+          },
+          snapshot: {
+            state: 'OPEN',
+            review_decision: 'APPROVED',
+            merge_state_status: 'CLEAN',
+            ready_to_merge: true,
+            gate_reasons: [],
+            action_required_reasons: [],
+            unresolved_thread_count: 0,
+            checks_pending: 0,
+            checks_failed: 0,
+            required_checks_pending: 0,
+            required_checks_failed: 0,
+            updated_at: '2026-04-09T03:31:45.000Z',
+            merged_at: null
+          },
+          linear_transition: {
+            status: 'transitioned',
+            attempted_at: '2026-04-09T03:32:00.000Z',
+            previous_state: 'In Review',
+            target_state: 'Merging',
+            issue_state: 'Merging',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-04-09T03:32:00.000Z',
+            error: null
+          }
+        }
+      },
+      proof: {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        last_event: 'task_complete',
+        last_message: 'Provider worker completed successfully.',
+        last_event_at: '2026-04-09T03:31:30.000Z',
+        updated_at: '2026-04-09T03:32:00.000Z',
+        linear_audit: null
+      }
+    });
+
+    expect(snapshot).toMatchObject({
+      pull_request: {
+        review_promotion_status: 'promoted',
+        merge_closeout_status: null,
+        number: 416,
+        review_decision: 'APPROVED',
+        ready_to_merge: true
+      },
+      progress: {
+        phase: 'watching_merge',
+        kind: 'workflow',
+        status: 'progressing',
+        stall_classification: 'progressing',
+        recovery_recommendation: 'continue_waiting'
+      },
+      stall_classification: 'progressing',
+      recovery_recommendation: 'continue_waiting'
+    });
+    expect(snapshot?.progress?.summary).toBe(
+      'Promoted the issue from In Review to Merging after confirming the attached PR is merge-ready. Waiting for merge closeout to start.'
+    );
+  });
+
   it('classifies active worker lanes as stalled when semantic progress stops moving', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {
