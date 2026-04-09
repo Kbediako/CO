@@ -119,6 +119,59 @@ describe('providerOperatorAutopilot', () => {
     });
   });
 
+  it('holds backlog promotion when a higher-ranked todo lane is still blocked ahead of the first backlog issue', async () => {
+    const transitionIssueState = vi.fn(async () => {
+      throw new Error('transition should not run while a higher-ranked queue lane is blocked');
+    });
+
+    const result = await runProviderOperatorAutopilot(
+      {
+        tracked_issues: [
+          createTrackedIssue({
+            id: 'lin-issue-1',
+            identifier: 'CO-117',
+            state: 'Ready',
+            state_type: 'unstarted',
+            priority: 1,
+            blocked_by: [
+              {
+                id: 'lin-issue-0',
+                identifier: 'CO-116',
+                state: 'In Progress',
+                state_type: 'started'
+              }
+            ]
+          }),
+          createTrackedIssue({
+            id: 'lin-issue-2',
+            identifier: 'CO-118',
+            state: 'Backlog',
+            state_type: 'backlog',
+            priority: 2
+          })
+        ],
+        claims: [],
+        config: buildConfig(),
+        previous_result: null
+      },
+      {
+        transition_issue_state: transitionIssueState
+      }
+    );
+
+    expect(transitionIssueState).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      status: 'noop',
+      holds: [
+        {
+          kind: 'backlog_promotion',
+          issue_identifier: 'CO-118',
+          reason: 'backlog_head_blocked_by_higher_ranked_lane'
+        }
+      ]
+    });
+  });
+
   it('holds backlog promotion when the head issue is owned by another operator', async () => {
     const transitionIssueState = vi.fn(async () => {
       throw new Error('transition should not run for foreign-owned backlog heads');

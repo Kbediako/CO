@@ -2956,20 +2956,48 @@ export function createProviderIssueHandoffService(
     if (!options.providerWorkflowConfigStore || !runOperatorAutopilot) {
       return;
     }
-    const providerWorkflow = await options.providerWorkflowConfigStore.refresh();
+    let providerWorkflow: Awaited<ReturnType<ProviderWorkflowConfigStore['refresh']>>;
+    try {
+      providerWorkflow = await options.providerWorkflowConfigStore.refresh();
+    } catch (error) {
+      logger.warn(
+        `[provider-operator-autopilot] Failed to refresh provider workflow config: ${
+          (error as Error)?.message ?? String(error)
+        }`
+      );
+      return;
+    }
     const autopilotConfig = resolveProviderOperatorAutopilotConfigFromPayload(providerWorkflow);
     if (!autopilotConfig) {
       return;
     }
     const previousResult = providerWorkflow.operator_autopilot?.last_result ?? null;
-    const nextResult = await runOperatorAutopilot({
-      tracked_issues: input.pollInput.trackedIssues,
-      claims: options.state.claims,
-      config: autopilotConfig,
-      source_setup: input.sourceSetup,
-      env: process.env,
-      previous_result: previousResult
-    });
+    let nextResult: ProviderOperatorAutopilotResult;
+    let loggedAutopilotFailure = false;
+    try {
+      nextResult = await runOperatorAutopilot({
+        tracked_issues: input.pollInput.trackedIssues,
+        claims: options.state.claims,
+        config: autopilotConfig,
+        source_setup: input.sourceSetup,
+        env: process.env,
+        previous_result: previousResult
+      });
+    } catch (error) {
+      const message = (error as Error)?.message ?? String(error);
+      nextResult = {
+        recorded_at: isoTimestamp(),
+        status: 'failed',
+        summary: 'Operator autopilot evaluation failed.',
+        error: message,
+        actions: [],
+        holds: [],
+        pending_actions:
+          previousResult?.pending_actions.map((pendingAction) => ({ ...pendingAction })) ?? []
+      };
+      loggedAutopilotFailure = true;
+      logger.warn(`[provider-operator-autopilot] ${nextResult.summary} error=${message}`);
+    }
     const resultChanged = !areProviderOperatorAutopilotResultsMeaningfullyEqual(
       previousResult,
       nextResult
@@ -2994,7 +3022,7 @@ export function createProviderIssueHandoffService(
     if (resultChanged) {
       options.providerWorkflowConfigStore.recordOperatorAutopilotResult(nextResult);
     }
-    if (resultChanged && nextResult.status === 'failed') {
+    if (resultChanged && nextResult.status === 'failed' && !loggedAutopilotFailure) {
       logger.warn(
         `[provider-operator-autopilot] ${nextResult.summary} error=${nextResult.error ?? 'unknown'}`
       );

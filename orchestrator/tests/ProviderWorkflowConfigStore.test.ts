@@ -313,8 +313,10 @@ describe('providerWorkflowConfigStore', () => {
       ]
     });
 
-    if (bootstrapped.operator_autopilot?.last_result) {
-      bootstrapped.operator_autopilot.last_result.status = 'failed';
+    const snapshotted = store.snapshot();
+    expect(snapshotted.operator_autopilot?.last_result).toBeTruthy();
+    if (snapshotted.operator_autopilot?.last_result) {
+      snapshotted.operator_autopilot.last_result.status = 'failed';
     }
 
     expect(store.snapshot().operator_autopilot?.last_result?.status).toBe('acted');
