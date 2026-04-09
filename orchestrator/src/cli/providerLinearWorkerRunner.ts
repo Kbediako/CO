@@ -44,6 +44,7 @@ import {
 import { deriveDeterministicProviderMutationSuppressions } from './control/providerLinearWorkerTruth.js';
 import {
   deriveProviderLinearWorkerProgressSnapshot,
+  isHighSignalProviderProgressSummary,
   type ProviderLinearWorkerProgressSnapshot
 } from './control/providerIssueObservability.js';
 import type { DispatchPilotSourceSetup } from './control/trackerDispatchPilot.js';
@@ -242,6 +243,7 @@ export interface ProviderLinearWorkerProof {
   last_event: string | null;
   last_message: string | null;
   last_event_at: string | null;
+  current_turn_activity?: ProviderLinearWorkerCurrentTurnActivity | null;
   tokens: ProviderLinearWorkerTokenUsage;
   rate_limits: Record<string, unknown> | null;
   owner_phase: string;
@@ -257,6 +259,19 @@ export interface ProviderLinearWorkerProof {
   tracked_issue_error?: ProviderLinearTrackedIssueError | null;
   end_reason: string | null;
   updated_at: string;
+}
+
+export type ProviderLinearWorkerCurrentTurnActivitySource =
+  | 'stdout_jsonl'
+  | 'session_log_hydration';
+
+export interface ProviderLinearWorkerCurrentTurnActivity {
+  event: string | null;
+  message_or_payload: string | null;
+  recorded_at: string | null;
+  source: ProviderLinearWorkerCurrentTurnActivitySource;
+  turn_id: string | null;
+  session_id: string | null;
 }
 
 export interface ProviderLinearWorkerParallelizationRecord
@@ -279,6 +294,7 @@ export interface ProviderLinearWorkerJsonlParseResult {
   finalMessage: string | null;
   lastEvent: string | null;
   lastEventAt: string | null;
+  currentTurnActivity: ProviderLinearWorkerCurrentTurnActivity | null;
   tokens: ProviderLinearWorkerTokenUsage;
   rateLimits: Record<string, unknown> | null;
 }
@@ -909,6 +925,7 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
     finalMessage: null,
     lastEvent: null,
     lastEventAt: null,
+    currentTurnActivity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rateLimits: null
   };
@@ -916,7 +933,8 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
 
 function applyProviderLinearWorkerJsonlLine(
   state: ProviderLinearWorkerJsonlParseResult,
-  line: string
+  line: string,
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource = 'stdout_jsonl'
 ): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith('{')) {
@@ -924,7 +942,7 @@ function applyProviderLinearWorkerJsonlLine(
   }
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    return applyProviderLinearWorkerJsonlRecord(state, parsed);
+    return applyProviderLinearWorkerJsonlRecord(state, parsed, activitySource);
   } catch {
     return false;
   }
@@ -932,9 +950,54 @@ function applyProviderLinearWorkerJsonlLine(
 
 function applyProviderLinearWorkerJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
-  parsed: Record<string, unknown>
+  parsed: Record<string, unknown>,
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource
 ): boolean {
   let changed = false;
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  if (parsed.type === 'session_meta' && payload) {
+    const nextThreadId = normalizeOptionalString(payload.id);
+    if (nextThreadId && nextThreadId !== state.threadId) {
+      state.threadId = nextThreadId;
+      changed = true;
+    }
+  }
+  if (parsed.type === 'thread.started' && typeof parsed.thread_id === 'string') {
+    if (parsed.thread_id !== state.threadId) {
+      state.threadId = parsed.thread_id;
+      changed = true;
+    }
+  }
+  if (parsed.type === 'turn_context' && payload) {
+    const nextTurnId = normalizeOptionalString(payload.turn_id);
+    if (nextTurnId && nextTurnId !== state.turnId) {
+      resetProviderLinearWorkerTurnScopedTelemetry(state);
+      state.turnId = nextTurnId;
+      changed = true;
+    }
+  }
+  if (parsed.type === 'event_msg' && payload && payload.type === 'task_complete') {
+    const nextTurnId = normalizeOptionalString(payload.turn_id);
+    if (nextTurnId && nextTurnId !== state.turnId) {
+      resetProviderLinearWorkerTurnScopedTelemetry(state);
+      state.turnId = nextTurnId;
+      changed = true;
+    }
+  }
+  if (isProviderLinearWorkerBookkeepingRecord(parsed)) {
+    const synchronizedCurrentTurnActivity = synchronizeProviderLinearWorkerCurrentTurnActivity(
+      state.currentTurnActivity,
+      state.threadId,
+      state.turnId
+    );
+    if (
+      JSON.stringify(synchronizedCurrentTurnActivity) !== JSON.stringify(state.currentTurnActivity)
+    ) {
+      state.currentTurnActivity = synchronizedCurrentTurnActivity;
+      changed = true;
+    }
+    return changed;
+  }
   const eventSummary = extractProviderWorkerEventSummary(parsed);
   if (eventSummary.event && eventSummary.event !== state.lastEvent) {
     state.lastEvent = eventSummary.event;
@@ -948,6 +1011,22 @@ function applyProviderLinearWorkerJsonlRecord(
     state.finalMessage = eventSummary.message;
     changed = true;
   }
+  const nextCurrentTurnActivity = selectPreferredProviderLinearWorkerCurrentTurnActivity(
+    state.currentTurnActivity,
+    buildProviderLinearWorkerCurrentTurnActivityCandidate({
+      parsed,
+      eventSummary,
+      threadId: state.threadId,
+      defaultTurnId: state.turnId,
+      source: activitySource
+    })
+  );
+  if (
+    JSON.stringify(nextCurrentTurnActivity) !== JSON.stringify(state.currentTurnActivity)
+  ) {
+    state.currentTurnActivity = nextCurrentTurnActivity;
+    changed = true;
+  }
   const observedTokens = extractProviderWorkerTokenUsage(parsed);
   if (observedTokens && hasProviderWorkerTokenUsage(observedTokens)) {
     state.tokens = observedTokens;
@@ -958,63 +1037,16 @@ function applyProviderLinearWorkerJsonlRecord(
     state.rateLimits = observedRateLimits;
     changed = true;
   }
-  if (parsed.type === 'session_meta' && isRecord(parsed.payload)) {
-    const nextThreadId = normalizeOptionalString(parsed.payload.id);
-    if (nextThreadId && nextThreadId !== state.threadId) {
-      state.threadId = nextThreadId;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'thread.started' && typeof parsed.thread_id === 'string') {
-    if (parsed.thread_id !== state.threadId) {
-      state.threadId = parsed.thread_id;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'turn_context' && isRecord(parsed.payload)) {
-    const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
-    if (nextTurnId && nextTurnId !== state.turnId) {
-      state.turnId = nextTurnId;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'event_msg' && isRecord(parsed.payload)) {
-    if (parsed.payload.type === 'task_complete') {
-      const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
-      if (nextTurnId && nextTurnId !== state.turnId) {
-        state.turnId = nextTurnId;
-        changed = true;
-      }
-    }
-    if (parsed.payload.type === 'agent_message') {
-      const nextMessage = normalizeOptionalString(parsed.payload.message);
-      if (nextMessage && nextMessage !== state.finalMessage) {
-        state.finalMessage = nextMessage;
-        changed = true;
-      }
-    }
-    return changed;
-  }
+  const synchronizedCurrentTurnActivity = synchronizeProviderLinearWorkerCurrentTurnActivity(
+    state.currentTurnActivity,
+    state.threadId,
+    state.turnId
+  );
   if (
-    parsed.type === 'response_item' &&
-    isRecord(parsed.payload) &&
-    parsed.payload.type === 'message' &&
-    Array.isArray(parsed.payload.content)
+    JSON.stringify(synchronizedCurrentTurnActivity) !== JSON.stringify(state.currentTurnActivity)
   ) {
-    for (const item of parsed.payload.content) {
-      if (
-        isRecord(item) &&
-        item.type === 'output_text' &&
-        typeof item.text === 'string' &&
-        item.text !== state.finalMessage
-      ) {
-        state.finalMessage = item.text;
-        changed = true;
-      }
-    }
+    state.currentTurnActivity = synchronizedCurrentTurnActivity;
+    changed = true;
   }
   return changed;
 }
@@ -1034,45 +1066,24 @@ function applyProviderLinearWorkerSessionJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>
 ): boolean {
-  let changed = false;
-  const observedTokens = extractProviderWorkerTokenUsage(parsed);
-  if (observedTokens && hasProviderWorkerTokenUsage(observedTokens)) {
-    state.tokens = observedTokens;
-    changed = true;
-  }
-  const observedRateLimits = extractProviderWorkerRateLimits(parsed);
-  if (observedRateLimits) {
-    state.rateLimits = observedRateLimits;
-    changed = true;
-  }
-  if (parsed.type === 'session_meta' && isRecord(parsed.payload)) {
-    const nextThreadId = normalizeOptionalString(parsed.payload.id);
-    if (nextThreadId && nextThreadId !== state.threadId) {
-      state.threadId = nextThreadId;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'turn_context' && isRecord(parsed.payload)) {
-    const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
-    if (nextTurnId && nextTurnId !== state.turnId) {
-      state.turnId = nextTurnId;
-      changed = true;
-    }
-    return changed;
-  }
-  if (parsed.type === 'event_msg' && isRecord(parsed.payload) && parsed.payload.type === 'task_complete') {
-    const nextTurnId = normalizeOptionalString(parsed.payload.turn_id);
-    if (nextTurnId && nextTurnId !== state.turnId) {
-      state.turnId = nextTurnId;
-      changed = true;
-    }
-  }
-  return changed;
+  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resetProviderLinearWorkerTurnScopedTelemetry(
+  state: ProviderLinearWorkerJsonlParseResult
+): void {
+  state.lastEvent = null;
+  state.finalMessage = null;
+  state.lastEventAt = null;
+  state.currentTurnActivity = null;
+}
+
+function isProviderLinearWorkerBookkeepingRecord(parsed: Record<string, unknown>): boolean {
+  return parsed.type === 'session_meta' || parsed.type === 'turn_context' || parsed.type === 'thread.started';
 }
 
 function hasProviderWorkerTokenUsage(value: ProviderLinearWorkerTokenUsage): boolean {
@@ -1176,6 +1187,119 @@ function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
     message: null,
     at: timestamp
   };
+}
+
+function buildProviderLinearWorkerCurrentTurnActivityCandidate(input: {
+  parsed: Record<string, unknown>;
+  eventSummary: { event: string | null; message: string | null; at: string | null };
+  threadId: string | null;
+  defaultTurnId: string | null;
+  source: ProviderLinearWorkerCurrentTurnActivitySource;
+}): ProviderLinearWorkerCurrentTurnActivity | null {
+  const event = normalizeOptionalString(input.eventSummary.event);
+  const message = normalizeOptionalString(input.eventSummary.message);
+  const recordedAt = normalizeOptionalString(input.eventSummary.at);
+  if (!event && !message) {
+    return null;
+  }
+  const turnId = extractProviderWorkerActivityTurnId(input.parsed) ?? input.defaultTurnId;
+  const session = deriveLatestTurnSessionId({
+    threadId: input.threadId,
+    turnId
+  });
+  return {
+    event,
+    message_or_payload: message,
+    recorded_at: recordedAt,
+    source: input.source,
+    turn_id: turnId,
+    session_id: session.sessionId
+  };
+}
+
+function extractProviderWorkerActivityTurnId(parsed: Record<string, unknown>): string | null {
+  if (typeof parsed.turn_id === 'string') {
+    return normalizeOptionalString(parsed.turn_id);
+  }
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  return normalizeOptionalString(payload?.turn_id);
+}
+
+function synchronizeProviderLinearWorkerCurrentTurnActivity(
+  activity: ProviderLinearWorkerCurrentTurnActivity | null,
+  threadId: string | null,
+  defaultTurnId: string | null
+): ProviderLinearWorkerCurrentTurnActivity | null {
+  if (!activity) {
+    return null;
+  }
+  const turnId = activity.turn_id ?? defaultTurnId;
+  const session = deriveLatestTurnSessionId({
+    threadId,
+    turnId
+  });
+  return {
+    ...activity,
+    turn_id: turnId,
+    session_id: session.sessionId
+  };
+}
+
+function selectPreferredProviderLinearWorkerCurrentTurnActivity(
+  current: ProviderLinearWorkerCurrentTurnActivity | null,
+  candidate: ProviderLinearWorkerCurrentTurnActivity | null
+): ProviderLinearWorkerCurrentTurnActivity | null {
+  if (!candidate) {
+    return current;
+  }
+  if (!current) {
+    return candidate;
+  }
+  const currentSignalRank = scoreProviderLinearWorkerCurrentTurnActivity(current);
+  const candidateSignalRank = scoreProviderLinearWorkerCurrentTurnActivity(candidate);
+  if (candidateSignalRank !== currentSignalRank) {
+    return candidateSignalRank > currentSignalRank ? candidate : current;
+  }
+  const recordedAtComparison = compareIsoTimestamp(candidate.recorded_at, current.recorded_at);
+  if (recordedAtComparison !== 0) {
+    return recordedAtComparison > 0 ? candidate : current;
+  }
+  const sourcePriorityComparison =
+    providerLinearWorkerCurrentTurnActivitySourcePriority(candidate.source) -
+    providerLinearWorkerCurrentTurnActivitySourcePriority(current.source);
+  if (sourcePriorityComparison !== 0) {
+    return sourcePriorityComparison > 0 ? candidate : current;
+  }
+  return current;
+}
+
+function scoreProviderLinearWorkerCurrentTurnActivity(
+  activity: ProviderLinearWorkerCurrentTurnActivity
+): number {
+  const message = normalizeOptionalString(activity.message_or_payload);
+  if (message && isHighSignalProviderProgressSummary(message)) {
+    return 3;
+  }
+  if (message) {
+    return 2;
+  }
+  if (normalizeOptionalString(activity.event)) {
+    return 1;
+  }
+  return 0;
+}
+
+function providerLinearWorkerCurrentTurnActivitySourcePriority(
+  source: ProviderLinearWorkerCurrentTurnActivitySource
+): number {
+  switch (source) {
+    case 'stdout_jsonl':
+      return 2;
+    case 'session_log_hydration':
+      return 1;
+    default:
+      return 0;
+  }
 }
 
 function extractProviderWorkerTokenUsage(input: unknown): ProviderLinearWorkerTokenUsage | null {
@@ -1748,6 +1872,37 @@ function snapshotProviderWorkerSessionLogTailState(
   };
 }
 
+function selectProviderLinearWorkerCurrentTurnActivity(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerCurrentTurnActivity | null {
+  const hydrated = proof.current_turn_activity ?? null;
+  if (hydrated) {
+    return synchronizeProviderLinearWorkerCurrentTurnActivity(
+      hydrated,
+      proof.thread_id ?? null,
+      proof.latest_turn_id ?? null
+    );
+  }
+  const legacyEvent = normalizeOptionalString(proof.last_event);
+  const legacyMessage = normalizeOptionalString(proof.last_message);
+  const legacyRecordedAt = normalizeOptionalString(proof.last_event_at);
+  if (!legacyEvent && !legacyMessage) {
+    return null;
+  }
+  return synchronizeProviderLinearWorkerCurrentTurnActivity(
+    {
+      event: legacyEvent,
+      message_or_payload: legacyMessage,
+      recorded_at: legacyRecordedAt,
+      source: 'stdout_jsonl',
+      turn_id: proof.latest_turn_id ?? null,
+      session_id: proof.latest_session_id ?? null
+    },
+    proof.thread_id ?? null,
+    proof.latest_turn_id ?? null
+  );
+}
+
 function buildProviderWorkerSessionLogHydrationProofSignature(
   proof: ProviderLinearWorkerProof
 ): string {
@@ -1759,6 +1914,15 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
     last_event: proof.last_event ?? null,
     last_message: proof.last_message ?? null,
     last_event_at: proof.last_event_at ?? null,
+    current_turn_activity:
+      synchronizeProviderLinearWorkerCurrentTurnActivity(
+        selectPreferredProviderLinearWorkerCurrentTurnActivity(
+          null,
+          selectProviderLinearWorkerCurrentTurnActivity(proof)
+        ),
+        proof.thread_id ?? null,
+        proof.latest_turn_id ?? null
+      ) ?? null,
     tokens: proof.tokens ?? null,
     rate_limits: proof.rate_limits ?? null
   });
@@ -1935,6 +2099,7 @@ function selectProviderLinearWorkerProofTelemetryFields(
     last_event: proof.last_event ?? null,
     last_message: proof.last_message ?? null,
     last_event_at: proof.last_event_at ?? null,
+    current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(proof) ?? null,
     tokens: proof.tokens,
     rate_limits: proof.rate_limits ?? null,
     owner_phase: proof.owner_phase,
@@ -1981,6 +2146,7 @@ function buildProviderLinearWorkerTurnBootstrapProof(
     last_event: null,
     last_message: null,
     last_event_at: null,
+    current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
     owner_phase: 'turn_running',
@@ -2179,12 +2345,14 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     };
   }
 
+  const proofCurrentTurnActivity = selectProviderLinearWorkerCurrentTurnActivity(proof);
   const parseState: ProviderLinearWorkerJsonlParseResult = {
     threadId: proof.thread_id,
     turnId: proof.latest_turn_id,
     lastEvent: proof.last_event,
     finalMessage: proof.last_message,
     lastEventAt: proof.last_event_at,
+    currentTurnActivity: proofCurrentTurnActivity,
     tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
     rateLimits: proof.rate_limits
   };
@@ -2241,6 +2409,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   ) {
     parseState.threadId = proof.thread_id;
     parseState.turnId = proof.latest_turn_id;
+    parseState.currentTurnActivity = proofCurrentTurnActivity;
   }
   if (
     preserveProofTelemetryFloor &&
@@ -2248,6 +2417,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   ) {
     parseState.threadId = proof.thread_id;
     parseState.turnId = proof.latest_turn_id;
+    parseState.currentTurnActivity = proofCurrentTurnActivity;
     parseState.tokens = mergeProviderWorkerTokenUsageFloor(proofTokenFloor, parseState.tokens);
     parseState.rateLimits = proof.rate_limits;
   }
@@ -2271,6 +2441,15 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     latest_turn_id: liveTurnId,
     latest_session_id: session.sessionId ?? proof.latest_session_id,
     latest_session_id_source: session.source ?? proof.latest_session_id_source,
+    last_event: parseState.lastEvent ?? null,
+    last_message: parseState.finalMessage ?? null,
+    last_event_at: parseState.lastEventAt ?? null,
+    current_turn_activity:
+      synchronizeProviderLinearWorkerCurrentTurnActivity(
+        parseState.currentTurnActivity,
+        liveThreadId,
+        liveTurnId
+      ) ?? (liveTurnChanged ? null : proofCurrentTurnActivity),
     tokens: hasProviderWorkerTokenUsage(parseState.tokens)
       ? parseState.tokens
       : liveTurnChanged
@@ -3436,6 +3615,7 @@ export async function runProviderLinearWorker(
     last_event: null,
     last_message: null,
     last_event_at: null,
+    current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
     owner_phase: 'bootstrapping',
@@ -3713,6 +3893,12 @@ export async function runProviderLinearWorker(
           last_event: liveParseState.lastEvent ?? (liveTurnChanged ? null : finalProof.last_event),
           last_message: liveParseState.finalMessage ?? (liveTurnChanged ? null : finalProof.last_message),
           last_event_at: liveParseState.lastEventAt ?? (liveTurnChanged ? null : finalProof.last_event_at),
+          current_turn_activity:
+            synchronizeProviderLinearWorkerCurrentTurnActivity(
+              liveParseState.currentTurnActivity,
+              liveThreadId,
+              liveTurnId
+            ) ?? (liveTurnChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
           tokens: hasProviderWorkerTokenUsage(liveParseState.tokens)
             ? liveParseState.tokens
             : liveTurnChanged
@@ -3733,6 +3919,7 @@ export async function runProviderLinearWorker(
           last_event: nextProof.last_event,
           last_message: nextProof.last_message,
           last_event_at: nextProof.last_event_at,
+          current_turn_activity: nextProof.current_turn_activity ?? null,
           tokens: nextProof.tokens,
           rate_limits: nextProof.rate_limits,
           owner_phase: nextProof.owner_phase
@@ -3926,6 +4113,7 @@ export async function runProviderLinearWorker(
               last_event: previousTurnProof.last_event,
               last_message: previousTurnProof.last_message,
               last_event_at: previousTurnProof.last_event_at,
+              current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(previousTurnProof),
               tokens: previousTurnProof.tokens,
               rate_limits: previousTurnProof.rate_limits
             }
@@ -3966,6 +4154,12 @@ export async function runProviderLinearWorker(
         last_event: parsed.lastEvent ?? finalProof.last_event,
         last_message: parsed.finalMessage ?? finalProof.last_message,
         last_event_at: parsed.lastEventAt ?? finalProof.last_event_at,
+        current_turn_activity:
+          synchronizeProviderLinearWorkerCurrentTurnActivity(
+            parsed.currentTurnActivity,
+            threadId,
+            turnId
+          ) ?? selectProviderLinearWorkerCurrentTurnActivity(finalProof),
         tokens: hasProviderWorkerTokenUsage(parsed.tokens) ? parsed.tokens : finalProof.tokens,
         rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',

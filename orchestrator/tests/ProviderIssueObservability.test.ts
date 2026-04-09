@@ -203,6 +203,115 @@ describe('provider issue observability', () => {
     expect(progress?.last_semantic_progress_at).toBe('2026-04-05T05:44:00.000Z');
   });
 
+  it('records child-summary provenance when last_message is null and the richer child summary wins', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-05T05:40:00.000Z',
+        last_event: 'turn_started',
+        last_message: null,
+        last_event_at: '2026-04-05T05:40:00.000Z',
+        updated_at: '2026-04-05T05:45:00.000Z',
+        child_streams: [
+          {
+            stream: 'co-112-docs-review',
+            task_id: 'linear-co-112-docs-review',
+            run_id: 'run-child-112',
+            status: 'failed',
+            launched_at: '2026-04-05T05:43:30.000Z',
+            recorded_at: '2026-04-05T05:44:10.000Z',
+            summary: 'docs-review failed at docs:freshness after spec-guard passed'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'docs-review failed at docs:freshness after spec-guard passed',
+      summary_recorded_at: '2026-04-05T05:44:10.000Z',
+      message_recorded_at: '2026-04-05T05:44:10.000Z',
+      source_updated_at: '2026-04-05T05:44:10.000Z',
+      event_source: 'child_stream_summary'
+    });
+    expect(progress?.event_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'child_stream_summary',
+          accepted: true,
+          rejection_reason: null
+        }),
+        expect.objectContaining({
+          source: 'generic_phase_fallback',
+          accepted: false,
+          rejection_reason: 'lower_signal_than_winner'
+        })
+      ])
+    );
+  });
+
+  it('prefers fresher child-summary progress over older canonical activity with the same signal strength', () => {
+    const progress = deriveProviderLinearWorkerProgressSnapshot({
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-05T05:40:00.000Z',
+        current_turn_activity: {
+          event: 'agent_message',
+          message_or_payload: 'Investigating provider-worker EVENT provenance.',
+          recorded_at: '2026-04-05T05:41:00.000Z',
+          source: 'stdout_jsonl',
+          turn_id: 'turn-2',
+          session_id: 'thread-1-turn-2'
+        },
+        last_event: 'agent_message',
+        last_message: 'Investigating provider-worker EVENT provenance.',
+        last_event_at: '2026-04-05T05:41:00.000Z',
+        child_streams: [
+          {
+            stream: 'co-112-docs-review',
+            task_id: 'linear-co-112-docs-review',
+            run_id: 'run-child-112',
+            status: 'failed',
+            launched_at: '2026-04-05T05:43:30.000Z',
+            recorded_at: '2026-04-05T05:44:10.000Z',
+            summary: 'docs-review failed at docs:freshness after spec-guard passed'
+          }
+        ],
+        linear_audit: null
+      },
+      now: () => '2026-04-05T05:45:00.000Z'
+    });
+
+    expect(progress).toMatchObject({
+      phase: 'turn_running',
+      status: 'progressing',
+      summary: 'docs-review failed at docs:freshness after spec-guard passed',
+      summary_recorded_at: '2026-04-05T05:44:10.000Z',
+      message_recorded_at: '2026-04-05T05:44:10.000Z',
+      source_updated_at: '2026-04-05T05:44:10.000Z',
+      event_source: 'child_stream_summary'
+    });
+    expect(progress?.event_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'child_stream_summary',
+          accepted: true,
+          rejection_reason: null
+        }),
+        expect.objectContaining({
+          source: 'canonical_stdout_jsonl',
+          accepted: false,
+          rejection_reason: 'older_than_winner'
+        })
+      ])
+    );
+  });
+
   it('prefers the latest child-lane summary over generic turn-running filler', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       proof: {

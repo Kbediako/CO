@@ -960,6 +960,14 @@ describe('provider linear worker runner', () => {
       finalMessage: 'done',
       lastEvent: 'task_complete',
       lastEventAt: null,
+      currentTurnActivity: {
+        event: 'agent_message',
+        message_or_payload: 'done',
+        recorded_at: null,
+        source: 'stdout_jsonl',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      },
       tokens: {
         input_tokens: null,
         output_tokens: null,
@@ -2352,6 +2360,110 @@ describe('provider linear worker runner', () => {
     expect(secondHydration.offset_bytes).toBeGreaterThan(firstHydration.offset_bytes);
   });
 
+  it('persists canonical current-turn activity from session-log hydration across refreshes', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(proofPath, JSON.stringify(buildInProgressProof()), 'utf8');
+
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const firstSessionLog = [
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.000Z',
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.050Z',
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-1'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.200Z',
+        type: 'event_msg',
+        payload: {
+          type: 'agent_message',
+          message: 'Investigating provider-worker EVENT provenance.'
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, firstSessionLog, 'utf8');
+
+    const firstRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    expect(firstRefresh).toMatchObject({
+      latest_turn_id: 'turn-1',
+      current_turn_activity: {
+        event: 'agent_message',
+        message_or_payload: 'Investigating provider-worker EVENT provenance.',
+        recorded_at: '2026-03-21T09:00:00.200Z',
+        source: 'session_log_hydration',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      }
+    });
+
+    const secondSessionLog = [
+      firstSessionLog,
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.500Z',
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              input_tokens: 12,
+              output_tokens: 8,
+              total_tokens: 20
+            }
+          }
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, secondSessionLog, 'utf8');
+
+    const secondRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:20.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    expect(secondRefresh).toMatchObject({
+      current_turn_activity: {
+        event: 'agent_message',
+        message_or_payload: 'Investigating provider-worker EVENT provenance.',
+        recorded_at: '2026-03-21T09:00:00.200Z',
+        source: 'session_log_hydration',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      },
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      }
+    });
+  });
+
   it('preserves unfinished session-log tails across refreshes until the line completes', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
@@ -2650,6 +2762,10 @@ describe('provider linear worker runner', () => {
     expect(refreshed).toMatchObject({
       latest_turn_id: 'turn-2',
       latest_session_id: 'thread-1-turn-2',
+      last_event: null,
+      last_message: null,
+      last_event_at: null,
+      current_turn_activity: null,
       tokens: {
         input_tokens: null,
         output_tokens: null,
@@ -2667,6 +2783,105 @@ describe('provider linear worker runner', () => {
     expect(typeof hydration?.proof_signature).toBe('string');
     expect(hydration?.proof_signature).not.toBe('');
     expect(hydration?.proof_signature).not.toBe('stale-proof-signature');
+  });
+
+  it('replaces previous-turn activity when hydration advances into a newer turn with fresh telemetry', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const firstSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-1' } })
+    ].join('\n');
+    const secondSessionLog = [
+      firstSessionLog,
+      JSON.stringify({
+        timestamp: '2026-03-21T09:01:00.000Z',
+        type: 'turn_context',
+        payload: { turn_id: 'turn-2' }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:01:00.200Z',
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 19, output_tokens: 13, total_tokens: 32 } }
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, secondSessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          last_event: 'agent_message',
+          last_message: 'Turn 1 still running',
+          last_event_at: '2026-03-21T09:00:00.200Z',
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: 'Turn 1 still running',
+            recorded_at: '2026-03-21T09:00:00.200Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-1',
+            session_id: 'thread-1-turn-1'
+          },
+          tokens: { input_tokens: 18, output_tokens: 12, total_tokens: 30 },
+          updated_at: '2026-03-21T09:00:30.000Z'
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: Buffer.byteLength(firstSessionLog, 'utf8') + 1,
+        trailing_text: '',
+        bootstrap_pending: false,
+        proof_signature: 'stale-proof-signature'
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:02:00.000Z',
+      undefined,
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    expect(refreshed).toMatchObject({
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-1-turn-2',
+      last_event: 'token_count',
+      last_message: null,
+      last_event_at: '2026-03-21T09:01:00.200Z',
+      tokens: { input_tokens: 19, output_tokens: 13, total_tokens: 32 },
+      current_turn_activity: {
+        event: 'token_count',
+        message_or_payload: null,
+        recorded_at: '2026-03-21T09:01:00.200Z',
+        source: 'session_log_hydration',
+        turn_id: 'turn-2',
+        session_id: 'thread-1-turn-2'
+      }
+    });
   });
 
   it('accepts newer rate-limit updates when a stale cursor does not advance token totals', async () => {
@@ -2963,6 +3178,101 @@ describe('provider linear worker runner', () => {
     expect(typeof hydration?.proof_signature).toBe('string');
     expect(hydration?.proof_signature).not.toBe('');
     expect(hydration?.proof_signature).not.toBe('stale-proof-signature');
+  });
+
+  it('keeps current-turn activity on the preserved proof floor when stale cursor refresh sees a newer turn without token advancement', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const firstSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-1' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 18, output_tokens: 12, total_tokens: 30 } }
+        }
+      })
+    ].join('\n');
+    const secondSessionLog = [
+      firstSessionLog,
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-2' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'agent_message',
+          message: 'Turn 2 started'
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, secondSessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: 'Turn 1 still running',
+            recorded_at: '2026-03-21T09:00:00.200Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-1',
+            session_id: 'thread-1-turn-1'
+          },
+          tokens: { input_tokens: 18, output_tokens: 12, total_tokens: 30 },
+          updated_at: '2026-03-21T09:00:30.000Z'
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: Buffer.byteLength(firstSessionLog, 'utf8') + 1,
+        trailing_text: '',
+        bootstrap_pending: false,
+        proof_signature: 'stale-proof-signature'
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:02:00.000Z',
+      undefined,
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    expect(refreshed).toMatchObject({
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      tokens: { input_tokens: 18, output_tokens: 12, total_tokens: 30 },
+      current_turn_activity: {
+        event: 'agent_message',
+        message_or_payload: 'Turn 1 still running',
+        recorded_at: '2026-03-21T09:00:00.200Z',
+        source: 'session_log_hydration',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      }
+    });
   });
 
   it('does not preserve stale proof floors when a mismatched session log truncates', async () => {

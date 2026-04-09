@@ -535,8 +535,24 @@ describe('SelectedRunProjection', () => {
     expect(selected?.latestEvent).toMatchObject({
       event: 'turn_running',
       message: 'docs-review failed at docs:freshness after spec-guard passed',
-      at: childStreamRecordedAt
+      at: childStreamRecordedAt,
+      source: 'child_stream_summary',
+      messageRecordedAt: childStreamRecordedAt,
+      sourceUpdatedAt: childStreamRecordedAt
     });
+    expect(selected?.latestEvent?.candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'child_stream_summary',
+          accepted: true,
+          rejection_reason: null
+        }),
+        expect.objectContaining({
+          source: 'generic_phase_fallback',
+          accepted: false
+        })
+      ])
+    );
   });
 
   it('surfaces pending shared-root reconciliation instead of terminal success after merge closeout', async () => {

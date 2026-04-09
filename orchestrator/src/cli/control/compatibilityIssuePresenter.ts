@@ -290,36 +290,90 @@ export function buildCompatibilityRunningEntry(
   polling: ControlPollingHealthPayload | null = null
 ): ControlRunningPayload {
   const proof = selected.providerLinearWorkerProof ?? null;
+  const proofCurrentTurnActivity = proof?.current_turn_activity ?? null;
+  const proofCanonicalEvent = normalizeCompatibilityMessage(proofCurrentTurnActivity?.event);
+  const proofCanonicalMessage = normalizeCompatibilityMessage(
+    proofCurrentTurnActivity?.message_or_payload
+  );
+  const proofCanonicalRecordedAt = normalizeCompatibilityMessage(
+    proofCurrentTurnActivity?.recorded_at
+  );
+  const proofCanonicalSessionId = normalizeCompatibilityMessage(proofCurrentTurnActivity?.session_id);
+  const hasCanonicalProofTelemetry = Boolean(proofCanonicalEvent || proofCanonicalMessage);
+  const proofEvent = proofCanonicalEvent ?? proof?.last_event ?? null;
+  const proofMessage = proofCanonicalMessage ?? proof?.last_message ?? null;
+  const proofEventAt = proofCanonicalRecordedAt ?? proof?.last_event_at ?? null;
   const runningEvent = selectRunningEvent({
     latestEvent: selected.latestEvent?.event ?? null,
     latestEventAt: selected.latestEvent?.at ?? null,
     latestMessage: selected.latestEvent?.message ?? null,
     latestAction: selected.latestAction ?? null,
     rawStatus: selected.rawStatus,
-    proofEvent: proof?.last_event ?? null,
-    proofMessage: proof?.last_message ?? null,
-    proofEventAt: proof?.last_event_at ?? null
+    proofEvent,
+    proofMessage,
+    proofEventAt
   });
   const preferProofTelemetry = runningEvent.source === 'proof';
   const latestEventKey = normalizeCompatibilityEventKey(selected.latestEvent?.event ?? null);
   const preserveLatestControlActionContext =
     runningEvent.source === 'latest' && isExplicitControlActionEventKey(latestEventKey);
   const runningMessage = preferProofTelemetry
-    ? proof?.last_message ?? selected.latestEvent?.message ?? selected.summary
+    ? proofMessage ?? selected.latestEvent?.message ?? selected.summary
     : preserveLatestControlActionContext
       ? selected.latestEvent?.message ?? selected.summary
-      : selected.latestEvent?.message ?? proof?.last_message ?? selected.summary;
+      : selected.latestEvent?.message ?? proofMessage ?? selected.summary;
   const runningEventAt = preferProofTelemetry
-    ? proof?.last_event_at ?? selected.latestEvent?.at ?? selected.updatedAt
+    ? proofEventAt ?? selected.latestEvent?.at ?? selected.updatedAt
     : preserveLatestControlActionContext
       ? selected.latestEvent?.at ?? selected.updatedAt
-      : selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt;
+      : selected.latestEvent?.at ?? proofEventAt ?? selected.updatedAt;
   const displayEvent = resolveCompatibilityRunningDisplayEvent({
     selected,
     runningEvent: runningEvent.event,
     runningMessage,
     polling
   });
+  const proofEventSource =
+    normalizeCompatibilityMessage(proofCurrentTurnActivity?.source) === 'session_log_hydration'
+      ? 'canonical_session_log_hydration'
+      : hasCanonicalProofTelemetry
+        ? 'canonical_stdout_jsonl'
+        : 'legacy_proof_last_message';
+  const eventSource =
+    runningEvent.source === 'latest'
+      ? selected.latestEvent?.source ?? 'latest_event'
+      : runningEvent.source === 'proof'
+        ? proofEventSource
+        : 'fallback';
+  const messageRecordedAt =
+    runningEvent.source === 'latest'
+      ? selected.latestEvent?.messageRecordedAt ?? selected.latestEvent?.at ?? null
+      : runningEvent.source === 'proof'
+        ? proofCanonicalRecordedAt ?? proofEventAt ?? null
+        : null;
+  const sourceUpdatedAt =
+    runningEvent.source === 'latest'
+      ? selected.latestEvent?.sourceUpdatedAt ?? selected.latestEvent?.at ?? selected.updatedAt
+      : runningEvent.source === 'proof'
+        ? proofCanonicalRecordedAt ?? proof?.updated_at ?? proofEventAt ?? null
+        : selected.updatedAt;
+  const eventCandidates =
+    runningEvent.source === 'latest'
+      ? selected.latestEvent?.candidates ?? []
+      : runningEvent.source === 'proof'
+        ? [
+            {
+              source: eventSource,
+              event: runningEvent.event,
+              summary: runningMessage,
+              message_recorded_at: messageRecordedAt,
+              source_updated_at: sourceUpdatedAt,
+              derived: false,
+              accepted: true,
+              rejection_reason: null
+            }
+          ]
+        : [];
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -327,11 +381,15 @@ export function buildCompatibilityRunningEntry(
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
     pid: selected.providerLinearWorkerProof?.pid ?? null,
-    session_id: proof?.latest_session_id ?? null,
+    session_id: proofCanonicalSessionId ?? proof?.latest_session_id ?? null,
     turn_count: proof?.turn_count ?? null,
     last_event: runningEvent.event,
     last_message: runningMessage,
     display_event: displayEvent,
+    event_source: eventSource,
+    message_recorded_at: messageRecordedAt,
+    source_updated_at: sourceUpdatedAt,
+    event_candidates: eventCandidates,
     started_at: selected.startedAt,
     last_event_at: runningEventAt,
     tokens: proof?.tokens ?? buildEmptyTokenUsage()
