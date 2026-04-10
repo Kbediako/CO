@@ -34,9 +34,9 @@ The first CO-88 attempt mixed valid truthfulness cleanup with unrelated implemen
 
 ## Design
 - Delete:
-  - `orchestrator/src/cli/control/`
-  - uppercase `.agent/task/*_TEMPLATE.md`
-  - `archives/`
+  - the deleted selected-run presenter seam files under orchestrator/src/cli/control and orchestrator/tests
+  - the deleted uppercase task template duplicates under .agent/task
+  - the deleted stale archive report at archives/REPORT.mcp_code_mode.md
 - Rewrite truth surfaces:
   - update `docs/AGENTS.md` and `.agent/AGENTS.md` to remove stale task-specific historical blocks from repo-wide instructions
   - update `docs/README.md`, design PRDs/specs, and paired task mirrors to mark design-system/package claims as historical where the code is still placeholder
@@ -51,7 +51,7 @@ The first CO-88 attempt mixed valid truthfulness cleanup with unrelated implemen
 
 ## Implementation Surface
 - Code:
-  - `orchestrator/src/cli/control/`
+  - the removed selected-run presenter seam files
   - `orchestrator/src/cli/rlm/alignment.ts`
   - `orchestrator/src/cli/rlmRunner.ts`
   - `packages/orchestrator-status-ui/app.js`
