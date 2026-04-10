@@ -214,14 +214,11 @@ describe('shouldUseFreshDist', () => {
       await utimes(transitiveDependency, trackedUpdateAt, trackedUpdateAt);
       await utimes(newlyTrackedDependency, trackedUpdateAt, trackedUpdateAt);
 
-      const rebuiltDistAt = new Date('2026-01-01T00:00:03.000Z');
-      await utimes(distEntry, rebuiltDistAt, rebuiltDistAt);
+      await writeFile(distEntry, 'export const rebuiltProviderContract = true;\n', 'utf8');
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
 
-      const newerDependencyAt = new Date('2026-01-01T00:00:04.000Z');
       await writeFile(newlyTrackedDependency, 'export function runProviderContract() { return true; }\n', 'utf8');
-      await utimes(newlyTrackedDependency, newerDependencyAt, newerDependencyAt);
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
     } finally {
@@ -263,6 +260,51 @@ describe('shouldUseFreshDist', () => {
         'utf8'
       );
       await utimes(transitiveDependencyJs, higherPriorityAt, higherPriorityAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist stale after a higher-priority source candidate appears until dist mtime changes', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const higherPriorityAt = new Date('2026-01-01T00:00:01.000Z');
+      await writeFile(
+        transitiveDependencyJs,
+        'export function runDoctorCliShell() { return true; }\n',
+        'utf8'
+      );
+      await utimes(transitiveDependencyJs, higherPriorityAt, higherPriorityAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+
+      await chmod(distEntry, 0o755);
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
     } finally {
@@ -342,8 +384,7 @@ describe('shouldUseFreshDist', () => {
 
       await rm(transitiveDependencyJs);
 
-      const rebuiltDistAt = new Date('2026-01-01T00:00:06.000Z');
-      await utimes(distEntry, rebuiltDistAt, rebuiltDistAt);
+      await writeFile(distEntry, 'export const rebuiltDoctorCliShell = "ts";\n', 'utf8');
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
     } finally {
@@ -391,8 +432,7 @@ describe('shouldUseFreshDist', () => {
       );
       await utimes(initiallyMissingDependency, dependencyAt, dependencyAt);
 
-      const rebuiltDistAt = new Date('2026-01-01T00:00:03.000Z');
-      await utimes(distEntry, rebuiltDistAt, rebuiltDistAt);
+      await writeFile(distEntry, 'export const rebuiltProviderContract = true;\n', 'utf8');
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
     } finally {

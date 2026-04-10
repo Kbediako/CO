@@ -11,13 +11,8 @@ type DependencyClosure = {
 type CachedDependencyClosure = {
   closure: DependencyClosure;
   newestClosureFreshnessToken: number;
+  newestResolutionChangeToken: number | null;
   trackedFileStates: ReadonlyMap<string, TrackedFileState>;
-};
-
-type DependencyClosureLookup = {
-  cachedClosure: CachedDependencyClosure;
-  newestTrackedAppearanceToken: number | null;
-  newestTrackedDisappearanceToken: number | null;
 };
 
 type TrackedFileState = {
@@ -62,64 +57,48 @@ export async function shouldUseFreshDist(sourceEntry: string, distEntry: string)
   }
 
   try {
-    const {
-      cachedClosure,
-      newestTrackedAppearanceToken,
-      newestTrackedDisappearanceToken
-    } =
+    const { closure, newestClosureFreshnessToken, newestResolutionChangeToken } =
       await getDependencyClosureCached(sourceEntry);
-    const { closure, newestClosureFreshnessToken } = cachedClosure;
-    const distChangeToken = getChangeToken(distStats);
+    const distFreshnessToken = getFreshnessToken(distStats);
     if (closure.hasUnresolvedTrackedDependency) {
       return false;
     }
-    if (
-      newestTrackedDisappearanceToken !== null &&
-      distChangeToken < newestTrackedDisappearanceToken
-    ) {
+    if (newestResolutionChangeToken !== null && distFreshnessToken < newestResolutionChangeToken) {
       return false;
     }
-    if (
-      newestTrackedAppearanceToken !== null &&
-      distChangeToken < newestTrackedAppearanceToken
-    ) {
-      return false;
-    }
-    return getFreshnessToken(distStats) >= newestClosureFreshnessToken;
+    return distFreshnessToken >= newestClosureFreshnessToken;
   } catch {
     return false;
   }
 }
 
-async function getDependencyClosureCached(sourceEntry: string): Promise<DependencyClosureLookup> {
+async function getDependencyClosureCached(sourceEntry: string): Promise<CachedDependencyClosure> {
   const cacheKey = resolve(sourceEntry);
   const cached = dependencyClosureCache.get(cacheKey);
   if (!cached) {
-    return {
-      cachedClosure: await refreshDependencyClosure(cacheKey),
-      newestTrackedAppearanceToken: null,
-      newestTrackedDisappearanceToken: null
-    };
+    return await refreshDependencyClosure(cacheKey);
   }
   const cachedClosure = await cached;
   const trackedChangeSet = await getTrackedChangeSet(cachedClosure.trackedFileStates);
   if (trackedChangeSet === null) {
-    return {
-      cachedClosure,
-      newestTrackedAppearanceToken: null,
-      newestTrackedDisappearanceToken: null
-    };
+    return cachedClosure;
   }
 
-  const refreshedClosure = await refreshDependencyClosure(cacheKey);
-  const resolutionChange = closureChanged(cachedClosure, refreshedClosure)
-    ? getResolutionChange(trackedChangeSet)
-    : { newestTrackedAppearanceToken: null, newestTrackedDisappearanceToken: null };
-  return {
-    cachedClosure: refreshedClosure,
-    newestTrackedAppearanceToken: resolutionChange.newestTrackedAppearanceToken,
-    newestTrackedDisappearanceToken: resolutionChange.newestTrackedDisappearanceToken
-  };
+  const discoveredClosure = await refreshDependencyClosure(cacheKey);
+  const newestResolutionChangeToken = closureChanged(cachedClosure, discoveredClosure)
+    ? getNewestResolutionChangeToken(
+        cachedClosure.newestResolutionChangeToken,
+        getResolutionChangeToken(trackedChangeSet)
+      )
+    : cachedClosure.newestResolutionChangeToken;
+  const refreshedClosure =
+    discoveredClosure.newestResolutionChangeToken === newestResolutionChangeToken
+      ? discoveredClosure
+      : { ...discoveredClosure, newestResolutionChangeToken };
+  if (refreshedClosure !== discoveredClosure) {
+    dependencyClosureCache.set(cacheKey, Promise.resolve(refreshedClosure));
+  }
+  return refreshedClosure;
 }
 
 function refreshDependencyClosure(sourceEntry: string): Promise<CachedDependencyClosure> {
@@ -168,6 +147,7 @@ async function discoverDependencyClosure(sourceEntry: string): Promise<CachedDep
   return {
     closure: { files, hasUnresolvedTrackedDependency },
     newestClosureFreshnessToken: getNewestClosureFreshnessToken(files, trackedFileStates),
+    newestResolutionChangeToken: null,
     trackedFileStates
   };
 }
@@ -377,18 +357,14 @@ function closureChanged(previous: CachedDependencyClosure, current: CachedDepend
   return false;
 }
 
-function getResolutionChange(
+function getResolutionChangeToken(
   trackedChangeSet: ReadonlyMap<string, TrackedChangeSetEntry>
-): Pick<
-  DependencyClosureLookup,
-  'newestTrackedAppearanceToken' | 'newestTrackedDisappearanceToken'
-> {
-  let newestTrackedAppearanceToken: number | null = null;
-  let newestTrackedDisappearanceToken: number | null = null;
+): number | null {
+  let newestResolutionChangeToken: number | null = null;
   for (const { previousState, currentState } of trackedChangeSet.values()) {
     if (previousState.freshnessToken !== null && currentState.freshnessToken === null) {
-      newestTrackedDisappearanceToken = Math.max(
-        newestTrackedDisappearanceToken ?? 0,
+      newestResolutionChangeToken = Math.max(
+        newestResolutionChangeToken ?? 0,
         currentState.parentDirectoryChangeToken ?? previousState.changeToken ?? 0
       );
       continue;
@@ -396,9 +372,25 @@ function getResolutionChange(
     if (previousState.freshnessToken !== null || currentState.changeToken === null) {
       continue;
     }
-    newestTrackedAppearanceToken = Math.max(newestTrackedAppearanceToken ?? 0, currentState.changeToken);
+    newestResolutionChangeToken = Math.max(
+      newestResolutionChangeToken ?? 0,
+      currentState.changeToken
+    );
   }
-  return { newestTrackedAppearanceToken, newestTrackedDisappearanceToken };
+  return newestResolutionChangeToken;
+}
+
+function getNewestResolutionChangeToken(
+  previousResolutionChangeToken: number | null,
+  currentResolutionChangeToken: number | null
+): number | null {
+  if (previousResolutionChangeToken === null) {
+    return currentResolutionChangeToken;
+  }
+  if (currentResolutionChangeToken === null) {
+    return previousResolutionChangeToken;
+  }
+  return Math.max(previousResolutionChangeToken, currentResolutionChangeToken);
 }
 
 async function readTrackedFileState(file: string): Promise<TrackedFileState> {
