@@ -26,7 +26,7 @@
 
 ## Investigation
 - [x] Source blocker evidence from `CO-94` is captured in this packet. Evidence: `/Users/kbediako/Code/CO/.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d/cli/2026-04-09T08-36-05-967Z-014680f3/provider-linear-worker-proof.json`, `/Users/kbediako/Code/CO/.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d/cli/2026-04-09T08-36-05-967Z-014680f3/provider-linear-issue-context-cache.json`.
-- [x] Prior `CO-132` attempts are preserved only as historical comparison. Evidence: closed PR `#400`, closed PR `#410`, and backup ref `backup/linear-co-132-rework-20260410T095713Z`.
+- [x] Prior `CO-132` attempts are preserved only for historical comparison. Evidence: closed PR `#400`, closed PR `#410`, and backup ref `backup/linear-co-132-rework-20260410T095713Z`.
 - [x] Fresh broad-lane evidence is recollected and classified on the reset branch. Evidence: `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T101130Z-reset-baseline-repro/01-npm-test-run-1.log`, `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T101130Z-closeout-validation/05-test.log`, and `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T101130Z-closeout-validation/06-test-maxworkers4-min1.log`.
 - [x] The smallest truthful owner seam is identified. Evidence: the live timeout family narrowed to `tests/cli-command-surface.spec.ts` and `tests/cli-frontend-test.spec.ts` on uncapped broad-lane runs, while the capped rerun and post-fix broad lane passed; see `docs/PRD-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`, `docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md`, and the manual logs above.
 
