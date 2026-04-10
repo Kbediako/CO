@@ -95,6 +95,7 @@ const SPAWN_MANIFEST_WAIT_INTERVAL_MS = 100;
 export const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
 const ALLOWED_REMOTE_PROVIDER_ENV_KEYS = [
   'ALL_PROXY',
+  'all_proxy',
   'CO_LINEAR_API_KEY',
   'CO_LINEAR_API_TOKEN',
   ...CONFIG_OVERRIDE_ENV_KEYS,
@@ -108,9 +109,12 @@ const ALLOWED_REMOTE_PROVIDER_ENV_KEYS = [
   'CODEX_RUNTIME_MODE',
   'HTTPS_PROXY',
   'HTTP_PROXY',
+  'https_proxy',
+  'http_proxy',
   'LINEAR_API_KEY',
   'NODE_EXTRA_CA_CERTS',
   'NO_PROXY',
+  'no_proxy',
   'OPENAI_API_KEY',
   'OPENAI_BASE_URL',
   'OPENAI_ORGANIZATION',
@@ -507,7 +511,6 @@ function buildRemoteProviderLaunchCommand(input: {
   ];
   const command = [
     quoteShellArg(input.nodePath),
-    ...process.execArgv.map((value) => quoteShellArg(value)),
     quoteShellArg(input.cliEntrypoint),
     ...input.args.map((value) => quoteShellArg(value))
   ].join(' ');
