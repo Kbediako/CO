@@ -925,7 +925,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('requests bounded fresh discovery after claim reconcile when slots remain', async () => {
+  it('requests bounded fresh discovery after claim reconcile and conservatively blocks capped states under a partial snapshot', async () => {
     const { root, paths } = await createHostPaths();
     const occupiedPaths = resolveRunPaths(
       {
@@ -994,12 +994,8 @@ describe('createProviderIssueHandoffService', () => {
       eligibleStateSlotCounts: {},
       excludedIssueIds: ['lin-issue-occupied']
     });
-    expect(launcher.start).toHaveBeenCalledTimes(1);
-    expect(launcher.start.mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({
-        issueId: 'lin-issue-fresh'
-      })
-    );
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
   });
 
   it('skips bounded fresh discovery when occupied work already consumes the global slot budget', async () => {

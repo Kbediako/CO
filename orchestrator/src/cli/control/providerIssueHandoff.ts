@@ -3685,6 +3685,7 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
   const limits = resolveProviderPollDispatchLimits(featureToggles);
   let occupiedGlobalSlots = 0;
   const occupiedStateSlots = new Map<string, number>();
+  let occupiedUnknownStateSlots = 0;
   let hasPartialStateSnapshot = false;
 
   const hasGlobalSlots = (): boolean => occupiedGlobalSlots < limits.maxConcurrentAgents;
@@ -3709,7 +3710,8 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
     if (!normalizedState) {
       return true;
     }
-    const usedSlots = occupiedStateSlots.get(normalizedState) ?? 0;
+    const usedSlots =
+      (occupiedStateSlots.get(normalizedState) ?? 0) + occupiedUnknownStateSlots;
     const stateLimit = limits.maxConcurrentAgentsByState.get(normalizedState) ?? limits.maxConcurrentAgents;
     return usedSlots < stateLimit;
   };
@@ -3718,6 +3720,7 @@ function createProviderPollDispatchBudget(featureToggles: Record<string, unknown
     occupiedGlobalSlots += 1;
     const normalizedState = normalizeProviderLinearWorkflowState(trackedIssue.state);
     if (!normalizedState) {
+      occupiedUnknownStateSlots += 1;
       hasPartialStateSnapshot = true;
       return;
     }
