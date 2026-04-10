@@ -1547,11 +1547,11 @@ function extractPlistStringValue(plistContents: string, key: string): string | n
 
 function decodePlistString(value: string): string {
   return value
-    .replaceAll('&amp;', '&')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
     .replaceAll('&quot;', '"')
-    .replaceAll('&apos;', "'");
+    .replaceAll('&apos;', "'")
+    .replaceAll('&amp;', '&');
 }
 
 function escapeRegExp(value: string): string {

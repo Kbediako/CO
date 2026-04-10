@@ -323,6 +323,26 @@ describe('controlHostSupervision shell helpers', () => {
     });
   });
 
+  it('preserves literal encoded plist entities when decoding string fields', () => {
+    const launchAgent = inspectControlHostSupervisionLaunchAgent(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/tmp/&amp;lt;literal&amp;gt;.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/tmp/&amp;lt;literal&amp;gt;</string>
+</dict>
+</plist>`,
+      null
+    );
+
+    expect(launchAgent.detected_program).toBe('/tmp/&lt;literal&gt;.js');
+    expect(launchAgent.working_directory).toBe('/tmp/&lt;literal&gt;');
+  });
+
   it('does not report managed rollout when launchctl does not confirm the service is loaded', () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',
