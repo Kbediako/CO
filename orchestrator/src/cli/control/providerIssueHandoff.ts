@@ -670,6 +670,68 @@ export function createProviderIssueHandoffService(
     );
   };
 
+  const buildWorkerHostSelectionClaims = async (): Promise<Array<{
+    provider_key?: string | null;
+    state?: string | null;
+    worker_host?: string | null;
+  }>> => {
+    const occupancyClaims = options.state.claims.map((claim) => ({
+      provider_key: claim.provider_key,
+      state: claim.state,
+      worker_host: claim.worker_host
+    }));
+    const seededOccupancyKeys = new Set<string>();
+    const activeDiscoveredRuns =
+      (await discoverProviderIssueRunsForCurrentOperation()).filter((run) => run.status === 'in_progress');
+    const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
+
+    for (const claim of options.state.claims) {
+      if (
+        claim.state !== 'starting' &&
+        claim.state !== 'resuming' &&
+        claim.state !== 'running'
+      ) {
+        continue;
+      }
+      const activeClaimRun =
+        resolveProviderClaimRunIdentity(
+          claim,
+          activeRunsByProviderIssue.get(claim.provider_key) ?? []
+        ) ??
+        activeRunsByProviderIssue.get(claim.provider_key)?.[0] ??
+        null;
+      const occupancyKey =
+        activeClaimRun?.manifestPath ??
+        activeClaimRun?.runId ??
+        (
+          claim.state === 'running'
+            ? null
+            : claim.run_manifest_path ??
+              claim.run_id ??
+              `claim:${claim.provider_key}:${claim.state}`
+        );
+      if (!occupancyKey) {
+        continue;
+      }
+      seededOccupancyKeys.add(occupancyKey);
+    }
+
+    for (const run of activeDiscoveredRuns) {
+      const occupancyKey = run.manifestPath || run.runId;
+      if (!occupancyKey || seededOccupancyKeys.has(occupancyKey)) {
+        continue;
+      }
+      seededOccupancyKeys.add(occupancyKey);
+      occupancyClaims.push({
+        provider_key: buildProviderIssueKey(run.provider, run.issueId),
+        state: 'running',
+        worker_host: run.workerHost
+      });
+    }
+
+    return occupancyClaims;
+  };
+
   const selectLaunchWorkerHost = async (input: {
     claim: Pick<ProviderIntakeClaimRecord, 'provider_key'> & {
       worker_host?: string | null;
@@ -682,7 +744,7 @@ export function createProviderIssueHandoffService(
     });
     const selection = selectProviderWorkerHost({
       hosts: await resolveConfiguredWorkerHosts(),
-      claims: options.state.claims,
+      claims: await buildWorkerHostSelectionClaims(),
       currentProviderKey: input.claim.provider_key,
       preferredHost
     });

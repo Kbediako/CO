@@ -20,6 +20,7 @@ const {
   buildProviderLaunchSpec,
   buildRemoteProviderEnvValues,
   buildRemoteProviderLaunchCommand,
+  buildRemoteProviderSshInvocation,
   buildProviderLinearSourceEnvOverrides,
   buildProviderResidentSessionEnvOverrides,
   buildProviderOverrideOwnershipEnv,
@@ -257,6 +258,43 @@ describe('controlHostCliShell manifest discovery', () => {
     expect(command).toContain("'/opt/homebrew/bin/node'");
     expect(command).toContain("'/repo/dist/bin/codex-orchestrator.js'");
     expect(command).toContain("'start' 'O'\\''Reilly' 'line-1\nline-2'");
+  });
+
+  it('keeps remote worker secrets out of ssh argv while preserving them in stdin script', () => {
+    const invocation = buildRemoteProviderSshInvocation({
+      host: {
+        name: 'worker-host-01',
+        transport: 'ssh',
+        ssh_destination: 'codex@worker-host-01',
+        ssh_options: ['-p', '2222'],
+        max_concurrent_agents: 1,
+        node_path: null
+      },
+      cwd: '/repo/.workspaces/provider-task',
+      nodePath: '/opt/homebrew/bin/node',
+      cliEntrypoint: '/repo/dist/bin/codex-orchestrator.js',
+      args: ['start', 'provider-linear-worker'],
+      envValues: {
+        CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task',
+        LINEAR_API_KEY: 'lin-secret',
+        OPENAI_API_KEY: 'sk-secret'
+      }
+    });
+
+    expect(invocation.sshArgs).toEqual([
+      '-o',
+      'BatchMode=yes',
+      '-p',
+      '2222',
+      'codex@worker-host-01',
+      'sh',
+      '-s'
+    ]);
+    expect(invocation.sshArgs.join(' ')).not.toContain('lin-secret');
+    expect(invocation.sshArgs.join(' ')).not.toContain('sk-secret');
+    expect(invocation.remoteScript).toContain("LINEAR_API_KEY='lin-secret'");
+    expect(invocation.remoteScript).toContain("OPENAI_API_KEY='sk-secret'");
+    expect(invocation.remoteScript).toContain("'/opt/homebrew/bin/node'");
   });
 
   it('does not inherit local process.execArgv in remote worker launch commands', () => {

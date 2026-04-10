@@ -462,30 +462,25 @@ async function spawnBackgroundCliOverSsh(
   envOverrides: Record<string, string> = {}
 ): Promise<void> {
   const envValues = buildRemoteProviderEnvValues(process.env, envOverrides);
-  const remoteCommand = buildRemoteProviderLaunchCommand({
+  const sshInvocation = buildRemoteProviderSshInvocation({
+    host: launchSpec.transport.host,
     cwd: launchSpec.cwd,
     nodePath: resolveRemoteProviderNodePath(launchSpec.transport.host),
     cliEntrypoint,
     args,
     envValues
   });
-  const sshArgs = [
-    '-o',
-    'BatchMode=yes',
-    ...launchSpec.transport.host.ssh_options,
-    launchSpec.transport.host.ssh_destination,
-    remoteCommand
-  ];
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('ssh', sshArgs, {
+    const child = spawn('ssh', sshInvocation.sshArgs, {
       cwd: launchSpec.cwd,
       detached: true,
-      stdio: 'ignore'
+      stdio: ['pipe', 'ignore', 'ignore']
     });
     const onError = (error: Error) => reject(error);
     child.once('error', onError);
     child.once('spawn', () => {
       child.off('error', onError);
+      child.stdin?.end(sshInvocation.remoteScript);
       child.unref();
       resolve();
     });
@@ -515,6 +510,36 @@ function buildRemoteProviderLaunchCommand(input: {
     ...input.args.map((value) => quoteShellArg(value))
   ].join(' ');
   return `cd ${quoteShellArg(input.cwd)} && exec env -i ${envAssignments.join(' ')} ${command}`;
+}
+
+function buildRemoteProviderSshInvocation(input: {
+  host: ProviderWorkerHostConfig;
+  cwd: string;
+  nodePath: string;
+  cliEntrypoint: string;
+  args: string[];
+  envValues: Record<string, string>;
+}): {
+  sshArgs: string[];
+  remoteScript: string;
+} {
+  return {
+    sshArgs: [
+      '-o',
+      'BatchMode=yes',
+      ...input.host.ssh_options,
+      input.host.ssh_destination,
+      'sh',
+      '-s'
+    ],
+    remoteScript: `${buildRemoteProviderLaunchCommand({
+      cwd: input.cwd,
+      nodePath: input.nodePath,
+      cliEntrypoint: input.cliEntrypoint,
+      args: input.args,
+      envValues: input.envValues
+    })}\n`
+  };
 }
 
 function buildRemoteProviderEnvValues(
@@ -915,6 +940,7 @@ export const __test__ = {
   buildProviderLaunchSpec,
   buildRemoteProviderEnvValues,
   buildRemoteProviderLaunchCommand,
+  buildRemoteProviderSshInvocation,
   buildProviderLinearSourceEnvOverrides,
   buildProviderResidentSessionEnvOverrides,
   buildProviderOverrideOwnershipEnv,
