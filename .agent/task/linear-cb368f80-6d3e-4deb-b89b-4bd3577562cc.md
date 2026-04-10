@@ -20,12 +20,12 @@
 ## Validation
 - [x] Focused regressions cover the `CO-127` stale-retry rehydrate shape and preserved retry-owned behavior. Evidence: `npx vitest run orchestrator/tests/ProviderIntakeState.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts`, `npx vitest run orchestrator/tests/ControlRuntime.test.ts`, `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T101952Z-review-boundary-fallback.md`.
 - [x] `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, and `node scripts/diff-budget.mjs` pass on the current rework branch head. Evidence: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/run-summary.json`, `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T101952Z-review-boundary-fallback.md`.
-- [x] Parent standalone review ran, and its `failed-boundary` / `command-intent` result is recorded as a wrapper boundary failure with manual review fallback rather than as a code defect. Evidence: `/Users/kbediako/Code/CO/.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/cli/2026-04-10T09-55-38-871Z-33f6541e/review/telemetry.json`, `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T101952Z-review-boundary-fallback.md`.
+- [x] Parent standalone review ran, and its `failed-boundary` / `command-intent` result is recorded as a wrapper boundary failure with manual review fallback rather than as a code defect. Evidence: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/cli/2026-04-10T09-55-38-871Z-33f6541e/review/telemetry.json`, `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T101952Z-review-boundary-fallback.md`.
 - [x] Explicit elegance/minimality pass is recorded before review handoff. Evidence: `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T101952Z-elegance-review-rework.md`.
 - [ ] `npm run pack:smoke` passes on the current rework branch head. Evidence: pending.
 
 ## Handoff
-- [x] The issue remains in active `Rework`, and exactly one persistent `## Codex Workpad` comment is maintained for the issue. Evidence: Linear workpad comment `62920a97-6b4c-48dd-b63d-c2f2ff1589ce`, sourced from `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/workpad.md`.
-- [ ] A PR is attached before any review-state handoff. Evidence: pending.
+- [x] The issue remains in active `Merging`, and exactly one persistent `## Codex Workpad` comment is maintained for the issue. Evidence: Linear workpad comment `62920a97-6b4c-48dd-b63d-c2f2ff1589ce`, sourced from `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/workpad.md`.
+- [x] A PR is attached before any review-state handoff. Evidence: PR `#423`.
 - [ ] Latest `origin/main` is merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks are green, actionable review feedback is handled or explicitly pushed back, `pr ready-review` drains cleanly, and the issue moves to `In Review` only after coding stops. Evidence: pending.
