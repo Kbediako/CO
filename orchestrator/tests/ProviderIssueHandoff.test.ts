@@ -6552,13 +6552,14 @@ describe('createProviderIssueHandoffService', () => {
 
     await service.rehydrate();
     await waitForMockCalls(setTimeoutSpy);
+    const queuedRetryCallback = getLatestScheduledTimeoutCallback(setTimeoutSpy);
 
     const refreshPromise = service.refresh();
     await waitForCondition(() => persist.mock.calls.length >= 2 && activePersistCalls === 1);
 
     const blockedPersistCalls = persist.mock.calls.length;
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    queuedRetryCallback();
     await flushAsyncWork();
 
     expect(launcher.start).not.toHaveBeenCalled();
