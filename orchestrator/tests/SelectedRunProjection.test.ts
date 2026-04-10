@@ -1243,6 +1243,52 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('rebinds fallback-only provider-worker task ids from tracked issue state when only pipeline_id survives', async () => {
+    const taskId = 'linear-lin-issue-146';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Legacy worker manifest only retained pipeline_id provenance.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, createProviderIntakeState(paths.manifestPath));
+    projectionContext.providerIntakeState = undefined;
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: 'lin-issue-146',
+      taskId,
+      runId: 'provider-run-1'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-146',
+      id: 'lin-issue-146'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-146', 'lin-issue-146', taskId, 'provider-run-1'])
+    );
+  });
+
   it('rebinds fallback-only parent provider-worker task ids from a canonical claim when only task_id matches', async () => {
     const taskId = 'linear-lin-issue-147';
     const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });

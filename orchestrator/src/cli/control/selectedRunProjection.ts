@@ -297,6 +297,8 @@ function buildProjectionContextFromParts(
   const issueProvider = snapshot.issueProvider ?? providerClaim?.provider ?? null;
   const allowTrackedIssueFallbackIdentityRebinding =
     issueProvider === 'linear' ||
+    readStringValue(manifestRecord, 'pipeline_id', 'pipelineId') ===
+      PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
     readStringValue(manifestRecord, 'pipeline_title', 'pipelineTitle') ===
       PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
     parts.providerLinearWorkerProof != null;
