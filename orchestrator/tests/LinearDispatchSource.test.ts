@@ -723,27 +723,26 @@ describe('resolveLiveLinearTrackedIssues', () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         query?: string;
-        variables?: { after?: string | null; limit?: number };
+        variables?: { before?: string | null; limit?: number; priority?: number };
       };
-      expect(body.query).toContain('issues(orderBy: priority');
+
+      expect(body.query).toContain('issues(orderBy: createdAt, last: $limit, before: $before');
       expect(body.query).not.toContain('description');
       expect(body.query).not.toContain('history(');
       expect(body.query).toContain('inverseRelations');
       expect(body.variables?.limit).toBe(50);
 
-      if ((body.variables?.after ?? null) === null) {
+      if ((body.variables?.priority ?? null) === 1 && (body.variables?.before ?? null) === null) {
         return jsonResponse({
           data: {
             viewer: {
               id: 'viewer-1',
-              organization: {
-                id: 'lin-workspace-1'
-              }
+              organization: { id: 'lin-workspace-1' }
             },
             issues: {
               pageInfo: {
-                hasNextPage: true,
-                endCursor: 'cursor-1'
+                hasPreviousPage: true,
+                startCursor: 'cursor-1'
               },
               nodes: [
                 {
@@ -772,14 +771,33 @@ describe('resolveLiveLinearTrackedIssues', () => {
                     name: 'Icon Agency (Bookings)'
                   },
                   inverseRelations: { nodes: [] }
-                },
+                }
+              ]
+            }
+          }
+        });
+      }
+
+      if ((body.variables?.priority ?? null) === 1 && body.variables?.before === 'cursor-1') {
+        return jsonResponse({
+          data: {
+            viewer: {
+              id: 'viewer-1',
+              organization: { id: 'lin-workspace-1' }
+            },
+            issues: {
+              pageInfo: {
+                hasPreviousPage: false,
+                startCursor: null
+              },
+              nodes: [
                 {
-                  id: 'lin-issue-eligible-1',
-                  identifier: 'CO-2',
-                  title: 'First eligible',
-                  priority: 2,
-                  createdAt: '2026-03-17T04:00:00.000Z',
-                  updatedAt: '2026-03-20T04:05:00.000Z',
+                  id: 'lin-issue-eligible-2',
+                  identifier: 'CO-1',
+                  title: 'Second eligible',
+                  priority: 1,
+                  createdAt: '2026-03-16T04:00:00.000Z',
+                  updatedAt: '2026-03-20T04:10:00.000Z',
                   assignee: null,
                   state: {
                     name: 'In Progress',
@@ -802,28 +820,27 @@ describe('resolveLiveLinearTrackedIssues', () => {
         });
       }
 
-      expect(body.variables?.after).toBe('cursor-1');
+      expect(body.variables?.priority).toBe(2);
+      expect(body.variables?.before ?? null).toBe(null);
       return jsonResponse({
         data: {
           viewer: {
             id: 'viewer-1',
-            organization: {
-              id: 'lin-workspace-1'
-            }
+            organization: { id: 'lin-workspace-1' }
           },
           issues: {
             pageInfo: {
-              hasNextPage: true,
-              endCursor: 'cursor-2'
+              hasPreviousPage: false,
+              startCursor: null
             },
             nodes: [
               {
-                id: 'lin-issue-eligible-2',
-                identifier: 'CO-1',
-                title: 'Second eligible',
-                priority: 1,
-                createdAt: '2026-03-16T04:00:00.000Z',
-                updatedAt: '2026-03-20T04:10:00.000Z',
+                id: 'lin-issue-eligible-1',
+                identifier: 'CO-2',
+                title: 'First eligible',
+                priority: 2,
+                createdAt: '2026-03-17T04:00:00.000Z',
+                updatedAt: '2026-03-20T04:05:00.000Z',
                 assignee: null,
                 state: {
                   name: 'In Progress',
@@ -861,7 +878,7 @@ describe('resolveLiveLinearTrackedIssues', () => {
       eligibleIssueTargetCount: 2
     });
 
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(result).toMatchObject({
       kind: 'ready',
       tracked_issues: [
@@ -884,22 +901,61 @@ describe('resolveLiveLinearTrackedIssues', () => {
   it('keeps scanning discovery pages until it fills constrained state capacity with dispatchable candidates', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
-        variables?: { after?: string | null };
+        variables?: { before?: string | null; priority?: number };
       };
 
-      if ((body.variables?.after ?? null) === null) {
+      if ((body.variables?.priority ?? null) === 1 && (body.variables?.before ?? null) === null) {
         return jsonResponse({
           data: {
             viewer: {
               id: 'viewer-1',
-              organization: {
-                id: 'lin-workspace-1'
-              }
+              organization: { id: 'lin-workspace-1' }
             },
             issues: {
               pageInfo: {
-                hasNextPage: true,
-                endCursor: 'cursor-1'
+                hasPreviousPage: true,
+                startCursor: 'cursor-1'
+              },
+              nodes: [
+                {
+                  id: 'lin-issue-in-progress-2',
+                  identifier: 'CO-3',
+                  title: 'Second in-progress candidate',
+                  priority: 1,
+                  createdAt: '2026-03-18T04:00:00.000Z',
+                  updatedAt: '2026-03-20T04:10:00.000Z',
+                  assignee: null,
+                  state: {
+                    name: 'In Progress',
+                    type: 'started'
+                  },
+                  team: {
+                    id: 'lin-team-1',
+                    key: 'PREPROD',
+                    name: 'PRE-PRO/PRODUCTION'
+                  },
+                  project: {
+                    id: 'lin-project-1',
+                    name: 'Icon Agency (Bookings)'
+                  },
+                  inverseRelations: { nodes: [] }
+                }
+              ]
+            }
+          }
+        });
+      }
+      if ((body.variables?.priority ?? null) === 1 && body.variables?.before === 'cursor-1') {
+        return jsonResponse({
+          data: {
+            viewer: {
+              id: 'viewer-1',
+              organization: { id: 'lin-workspace-1' }
+            },
+            issues: {
+              pageInfo: {
+                hasPreviousPage: false,
+                startCursor: null
               },
               nodes: [
                 {
@@ -924,14 +980,33 @@ describe('resolveLiveLinearTrackedIssues', () => {
                     name: 'Icon Agency (Bookings)'
                   },
                   inverseRelations: { nodes: [] }
-                },
+                }
+              ]
+            }
+          }
+        });
+      }
+      if ((body.variables?.priority ?? null) === 2) {
+        expect(body.variables?.before ?? null).toBe(null);
+        return jsonResponse({
+          data: {
+            viewer: {
+              id: 'viewer-1',
+              organization: { id: 'lin-workspace-1' }
+            },
+            issues: {
+              pageInfo: {
+                hasPreviousPage: false,
+                startCursor: null
+              },
+              nodes: [
                 {
-                  id: 'lin-issue-in-progress-2',
-                  identifier: 'CO-3',
-                  title: 'Second in-progress candidate',
+                  id: 'lin-issue-in-progress-3',
+                  identifier: 'CO-4',
+                  title: 'Third in-progress candidate',
                   priority: 2,
-                  createdAt: '2026-03-18T04:00:00.000Z',
-                  updatedAt: '2026-03-20T04:10:00.000Z',
+                  createdAt: '2026-03-19T04:00:00.000Z',
+                  updatedAt: '2026-03-20T04:12:00.000Z',
                   assignee: null,
                   state: {
                     name: 'In Progress',
@@ -953,20 +1028,18 @@ describe('resolveLiveLinearTrackedIssues', () => {
           }
         });
       }
-
-      expect(body.variables?.after).toBe('cursor-1');
+      expect(body.variables?.priority).toBe(3);
+      expect(body.variables?.before ?? null).toBe(null);
       return jsonResponse({
         data: {
           viewer: {
             id: 'viewer-1',
-            organization: {
-              id: 'lin-workspace-1'
-            }
+            organization: { id: 'lin-workspace-1' }
           },
           issues: {
             pageInfo: {
-              hasNextPage: true,
-              endCursor: 'cursor-2'
+              hasPreviousPage: false,
+              startCursor: null
             },
             nodes: [
               {
@@ -1016,7 +1089,7 @@ describe('resolveLiveLinearTrackedIssues', () => {
       }
     });
 
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
     expect(result).toMatchObject({
       kind: 'ready',
       tracked_issues: [
@@ -1025,6 +1098,9 @@ describe('resolveLiveLinearTrackedIssues', () => {
         },
         {
           id: 'lin-issue-in-progress-2'
+        },
+        {
+          id: 'lin-issue-in-progress-3'
         },
         {
           id: 'lin-issue-todo'
