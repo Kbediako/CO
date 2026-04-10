@@ -793,7 +793,7 @@ function hasSyntheticLinearFallbackProvenance(
   return (
     source.issueProvider === 'linear' ||
     source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
-    source.providerLinearWorkerProof !== null
+    source.providerLinearWorkerProof != null
   );
 }
 
