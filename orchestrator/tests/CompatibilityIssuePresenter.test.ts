@@ -189,6 +189,27 @@ describe('CompatibilityIssuePresenter', () => {
     expect(projection.issues).toEqual([]);
   });
 
+  it('keeps non-linear selected rows even when their task id matches the synthetic linear pattern', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'github',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'non-linear selected source'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
   it('keeps the projected child-summary message and timestamp when newer proof telemetry is generic', () => {
     const runningEntry = buildCompatibilityRunningEntry(
       buildCompatibilitySource({

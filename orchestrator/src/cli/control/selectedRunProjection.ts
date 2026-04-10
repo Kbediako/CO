@@ -49,6 +49,9 @@ import {
   shouldUseProviderLinearWorkerTerminalProofForSelectedRun
 } from './providerLinearWorkerTruth.js';
 
+const SYNTHETIC_LINEAR_PARENT_TASK_ID_PATTERN =
+  /^linear-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
   manifestPath: string;
@@ -1207,6 +1210,9 @@ function providerIntakeClaimMatchesSyntheticChildTaskPrefix(
   snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
 ): boolean {
   if (!claim.task_id || !snapshot.taskId) {
+    return false;
+  }
+  if (!SYNTHETIC_LINEAR_PARENT_TASK_ID_PATTERN.test(claim.task_id)) {
     return false;
   }
   if (!snapshot.taskId.startsWith(`${claim.task_id}-`)) {

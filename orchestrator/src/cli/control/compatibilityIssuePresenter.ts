@@ -16,10 +16,12 @@ import {
 } from './observabilityReadModel.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 
+const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-.+)?$/i;
 
 export interface CompatibilityIssueSourceRecord {
+  issueProvider: string | null;
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;
@@ -28,6 +30,8 @@ export interface CompatibilityIssueSourceRecord {
   updatedAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  pipelineTitle?: string | null;
+  providerLinearWorkerProof?: ControlCompatibilitySourceContext['providerLinearWorkerProof'];
   latestEvent: {
     at: string | null;
   } | null;
@@ -1089,7 +1093,10 @@ function buildCompatibilityIssueAliases<TSource extends CompatibilityIssueSource
 }
 
 function hasExplicitCompatibilityIssueIdentity(
-  source: Pick<CompatibilityIssueSourceRecord, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'
+  >
 ): boolean {
   const fallbackIdentities = new Set(
     [source.taskId, source.runId].filter((value): value is string => typeof value === 'string')
@@ -1104,13 +1111,27 @@ function hasExplicitCompatibilityIssueIdentity(
 }
 
 function isSyntheticLinearFallbackOnlyIssueSource(
-  source: Pick<CompatibilityIssueSourceRecord, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'> | null
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'issueIdentifier' | 'issueId' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId' | 'runId'
+  > | null
 ): boolean {
   return (
     source !== null &&
+    hasSyntheticLinearFallbackProvenance(source) &&
     source.taskId !== null &&
     SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(source.taskId) &&
     !hasExplicitCompatibilityIssueIdentity(source)
+  );
+}
+
+function hasSyntheticLinearFallbackProvenance(
+  source: Pick<CompatibilityIssueSourceRecord, 'issueProvider' | 'pipelineTitle' | 'providerLinearWorkerProof'>
+): boolean {
+  return (
+    source.issueProvider === 'linear' ||
+    source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    source.providerLinearWorkerProof !== null
   );
 }
 
