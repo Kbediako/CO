@@ -10,7 +10,8 @@ type DependencyClosure = {
 
 type CachedDependencyClosure = {
   closure: DependencyClosure;
-  trackedMtimes: ReadonlyMap<string, number | null>;
+  newestClosureFreshnessToken: number;
+  trackedFreshnessTokens: ReadonlyMap<string, number | null>;
 };
 
 const SOURCE_EXTENSION_PRIORITY = [
@@ -44,20 +45,14 @@ export async function shouldUseFreshDist(sourceEntry: string, distEntry: string)
   }
 
   try {
-    const closure = await getDependencyClosure(sourceEntry);
+    const { closure, newestClosureFreshnessToken } = await getDependencyClosureCached(sourceEntry);
     if (closure.hasUnresolvedTrackedDependency) {
       return false;
     }
-    const newestTrackedMtime = await getNewestTrackedMtime(closure.files);
-    return distStats.mtimeMs >= newestTrackedMtime;
+    return getFreshnessToken(distStats) >= newestClosureFreshnessToken;
   } catch {
     return false;
   }
-}
-
-function getDependencyClosure(sourceEntry: string): Promise<DependencyClosure> {
-  const cacheKey = resolve(sourceEntry);
-  return getDependencyClosureCached(cacheKey).then(({ closure }) => closure);
 }
 
 async function getDependencyClosureCached(sourceEntry: string): Promise<CachedDependencyClosure> {
@@ -67,7 +62,7 @@ async function getDependencyClosureCached(sourceEntry: string): Promise<CachedDe
     return await refreshDependencyClosure(cacheKey);
   }
   const cachedClosure = await cached;
-  if (await trackedFilesChanged(cachedClosure.trackedMtimes)) {
+  if (await trackedFilesChanged(cachedClosure.trackedFreshnessTokens)) {
     return await refreshDependencyClosure(cacheKey);
   }
   return cachedClosure;
@@ -115,9 +110,11 @@ async function discoverDependencyClosure(sourceEntry: string): Promise<CachedDep
     }
   }
 
+  const trackedFreshnessTokens = await readTrackedFreshnessTokens(trackedPaths);
   return {
     closure: { files, hasUnresolvedTrackedDependency },
-    trackedMtimes: await readTrackedMtimes(trackedPaths)
+    newestClosureFreshnessToken: getNewestClosureFreshnessToken(files, trackedFreshnessTokens),
+    trackedFreshnessTokens
   };
 }
 
@@ -249,47 +246,53 @@ function buildResolutionCandidates(candidateBase: string): string[] {
   return [...candidates];
 }
 
-async function getNewestTrackedMtime(files: Iterable<string>): Promise<number> {
-  const trackedFiles = [...files];
-  const stats = await Promise.all(trackedFiles.map((file) => stat(file)));
-  return stats.reduce((newest, entry) => Math.max(newest, entry.mtimeMs), 0);
+function getNewestClosureFreshnessToken(
+  files: Iterable<string>,
+  trackedFreshnessTokens: ReadonlyMap<string, number | null>
+): number {
+  let newestFreshnessToken = 0;
+  for (const file of files) {
+    const freshnessToken = trackedFreshnessTokens.get(file);
+    if (freshnessToken === null || freshnessToken === undefined) {
+      throw new Error(`Missing freshness token for tracked dependency: ${file}`);
+    }
+    newestFreshnessToken = Math.max(newestFreshnessToken, freshnessToken);
+  }
+  return newestFreshnessToken;
 }
 
-async function readTrackedMtimes(files: Iterable<string>): Promise<ReadonlyMap<string, number | null>> {
+async function readTrackedFreshnessTokens(
+  files: Iterable<string>
+): Promise<ReadonlyMap<string, number | null>> {
   const trackedFiles = [...files];
-  const mtimes = await Promise.all(
-    trackedFiles.map(async (file) => {
-      try {
-        return (await stat(file)).mtimeMs;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-          return null;
-        }
-        throw error;
-      }
-    })
-  );
-  return new Map(trackedFiles.map((file, index) => [file, mtimes[index]]));
+  const freshnessTokens = await Promise.all(trackedFiles.map(async (file) => await readFreshnessToken(file)));
+  return new Map(trackedFiles.map((file, index) => [file, freshnessTokens[index]]));
 }
 
 async function trackedFilesChanged(
-  trackedMtimes: ReadonlyMap<string, number | null>
+  trackedFreshnessTokens: ReadonlyMap<string, number | null>
 ): Promise<boolean> {
-  const trackedFiles = [...trackedMtimes.keys()];
-  const currentMtimes = await Promise.all(
-    trackedFiles.map(async (file) => {
-      try {
-        return (await stat(file)).mtimeMs;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-          return null;
-        }
-        throw error;
-      }
-    })
+  const trackedFiles = [...trackedFreshnessTokens.keys()];
+  const currentFreshnessTokens = await Promise.all(
+    trackedFiles.map(async (file) => await readFreshnessToken(file))
   );
 
   return trackedFiles.some((file, index) => {
-    return currentMtimes[index] !== trackedMtimes.get(file);
+    return currentFreshnessTokens[index] !== trackedFreshnessTokens.get(file);
   });
+}
+
+function getFreshnessToken(stats: { ctimeMs: number; mtimeMs: number }): number {
+  return Math.max(stats.mtimeMs, stats.ctimeMs);
+}
+
+async function readFreshnessToken(file: string): Promise<number | null> {
+  try {
+    return getFreshnessToken(await stat(file));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
 }

@@ -229,7 +229,7 @@ describe('shouldUseFreshDist', () => {
     }
   });
 
-  it('refreshes a cached dependency closure when a higher-priority source candidate appears', async () => {
+  it('refreshes a cached dependency closure when a higher-priority source candidate appears with an older mtime', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
     const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
     const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
@@ -249,14 +249,14 @@ describe('shouldUseFreshDist', () => {
       await writeFile(distEntry, 'export {};\n', 'utf8');
 
       const sourceAt = new Date('2026-01-01T00:00:00.000Z');
-      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
       await utimes(sourceEntry, sourceAt, sourceAt);
       await utimes(transitiveDependencyTs, sourceAt, sourceAt);
       await utimes(distEntry, distAt, distAt);
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
 
-      const higherPriorityAt = new Date('2026-01-01T00:00:02.000Z');
+      const higherPriorityAt = new Date('2026-01-01T00:00:01.000Z');
       await writeFile(
         transitiveDependencyJs,
         'export function runDoctorCliShell() { return true; }\n',
