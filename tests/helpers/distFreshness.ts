@@ -11,7 +11,22 @@ type DependencyClosure = {
 type CachedDependencyClosure = {
   closure: DependencyClosure;
   newestClosureFreshnessToken: number;
-  trackedFreshnessTokens: ReadonlyMap<string, number | null>;
+  trackedFileStates: ReadonlyMap<string, TrackedFileState>;
+};
+
+type DependencyClosureLookup = {
+  cachedClosure: CachedDependencyClosure;
+  newestTrackedAppearanceToken: number | null;
+};
+
+type TrackedFileState = {
+  freshnessToken: number | null;
+  changeToken: number | null;
+};
+
+type TrackedChangeSetEntry = {
+  previousState: TrackedFileState;
+  currentState: TrackedFileState;
 };
 
 const SOURCE_EXTENSION_PRIORITY = [
@@ -45,8 +60,15 @@ export async function shouldUseFreshDist(sourceEntry: string, distEntry: string)
   }
 
   try {
-    const { closure, newestClosureFreshnessToken } = await getDependencyClosureCached(sourceEntry);
+    const { cachedClosure, newestTrackedAppearanceToken } = await getDependencyClosureCached(sourceEntry);
+    const { closure, newestClosureFreshnessToken } = cachedClosure;
     if (closure.hasUnresolvedTrackedDependency) {
+      return false;
+    }
+    if (
+      newestTrackedAppearanceToken !== null &&
+      getChangeToken(distStats) < newestTrackedAppearanceToken
+    ) {
       return false;
     }
     return getFreshnessToken(distStats) >= newestClosureFreshnessToken;
@@ -55,17 +77,29 @@ export async function shouldUseFreshDist(sourceEntry: string, distEntry: string)
   }
 }
 
-async function getDependencyClosureCached(sourceEntry: string): Promise<CachedDependencyClosure> {
+async function getDependencyClosureCached(sourceEntry: string): Promise<DependencyClosureLookup> {
   const cacheKey = resolve(sourceEntry);
   const cached = dependencyClosureCache.get(cacheKey);
   if (!cached) {
-    return await refreshDependencyClosure(cacheKey);
+    return {
+      cachedClosure: await refreshDependencyClosure(cacheKey),
+      newestTrackedAppearanceToken: null
+    };
   }
   const cachedClosure = await cached;
-  if (await trackedFilesChanged(cachedClosure.trackedFreshnessTokens)) {
-    return await refreshDependencyClosure(cacheKey);
+  const trackedChangeSet = await getTrackedChangeSet(cachedClosure.trackedFileStates);
+  if (trackedChangeSet === null) {
+    return { cachedClosure, newestTrackedAppearanceToken: null };
   }
-  return cachedClosure;
+
+  const refreshedClosure = await refreshDependencyClosure(cacheKey);
+  const newestTrackedAppearanceToken = closureChanged(cachedClosure, refreshedClosure)
+    ? getNewestTrackedAppearanceToken(trackedChangeSet)
+    : null;
+  return {
+    cachedClosure: refreshedClosure,
+    newestTrackedAppearanceToken
+  };
 }
 
 function refreshDependencyClosure(sourceEntry: string): Promise<CachedDependencyClosure> {
@@ -110,11 +144,11 @@ async function discoverDependencyClosure(sourceEntry: string): Promise<CachedDep
     }
   }
 
-  const trackedFreshnessTokens = await readTrackedFreshnessTokens(trackedPaths);
+  const trackedFileStates = await readTrackedFileStates(trackedPaths);
   return {
     closure: { files, hasUnresolvedTrackedDependency },
-    newestClosureFreshnessToken: getNewestClosureFreshnessToken(files, trackedFreshnessTokens),
-    trackedFreshnessTokens
+    newestClosureFreshnessToken: getNewestClosureFreshnessToken(files, trackedFileStates),
+    trackedFileStates
   };
 }
 
@@ -248,11 +282,11 @@ function buildResolutionCandidates(candidateBase: string): string[] {
 
 function getNewestClosureFreshnessToken(
   files: Iterable<string>,
-  trackedFreshnessTokens: ReadonlyMap<string, number | null>
+  trackedFileStates: ReadonlyMap<string, TrackedFileState>
 ): number {
   let newestFreshnessToken = 0;
   for (const file of files) {
-    const freshnessToken = trackedFreshnessTokens.get(file);
+    const freshnessToken = trackedFileStates.get(file)?.freshnessToken;
     if (freshnessToken === null || freshnessToken === undefined) {
       throw new Error(`Missing freshness token for tracked dependency: ${file}`);
     }
@@ -261,37 +295,91 @@ function getNewestClosureFreshnessToken(
   return newestFreshnessToken;
 }
 
-async function readTrackedFreshnessTokens(
+async function readTrackedFileStates(
   files: Iterable<string>
-): Promise<ReadonlyMap<string, number | null>> {
+): Promise<ReadonlyMap<string, TrackedFileState>> {
   const trackedFiles = [...files];
-  const freshnessTokens = await Promise.all(trackedFiles.map(async (file) => await readFreshnessToken(file)));
-  return new Map(trackedFiles.map((file, index) => [file, freshnessTokens[index]]));
+  const trackedFileStates = await Promise.all(
+    trackedFiles.map(async (file) => await readTrackedFileState(file))
+  );
+  return new Map(trackedFiles.map((file, index) => [file, trackedFileStates[index]]));
 }
 
-async function trackedFilesChanged(
-  trackedFreshnessTokens: ReadonlyMap<string, number | null>
-): Promise<boolean> {
-  const trackedFiles = [...trackedFreshnessTokens.keys()];
-  const currentFreshnessTokens = await Promise.all(
-    trackedFiles.map(async (file) => await readFreshnessToken(file))
+async function getTrackedChangeSet(
+  trackedFileStates: ReadonlyMap<string, TrackedFileState>
+): Promise<ReadonlyMap<string, TrackedChangeSetEntry> | null> {
+  const trackedFiles = [...trackedFileStates.keys()];
+  const currentTrackedFileStates = await Promise.all(
+    trackedFiles.map(async (file) => await readTrackedFileState(file))
   );
 
-  return trackedFiles.some((file, index) => {
-    return currentFreshnessTokens[index] !== trackedFreshnessTokens.get(file);
-  });
+  const changedTrackedFiles = new Map<string, TrackedChangeSetEntry>();
+  for (const [index, file] of trackedFiles.entries()) {
+    const previousState = trackedFileStates.get(file);
+    const currentState = currentTrackedFileStates[index];
+    if (
+      previousState?.freshnessToken !== currentState.freshnessToken ||
+      previousState.changeToken !== currentState.changeToken
+    ) {
+      changedTrackedFiles.set(file, {
+        previousState: previousState ?? { freshnessToken: null, changeToken: null },
+        currentState
+      });
+    }
+  }
+
+  return changedTrackedFiles.size > 0 ? changedTrackedFiles : null;
 }
 
 function getFreshnessToken(stats: { ctimeMs: number; mtimeMs: number }): number {
+  return stats.mtimeMs;
+}
+
+function getChangeToken(stats: { ctimeMs: number; mtimeMs: number }): number {
   return Math.max(stats.mtimeMs, stats.ctimeMs);
 }
 
-async function readFreshnessToken(file: string): Promise<number | null> {
+function closureChanged(previous: CachedDependencyClosure, current: CachedDependencyClosure): boolean {
+  if (previous.closure.hasUnresolvedTrackedDependency !== current.closure.hasUnresolvedTrackedDependency) {
+    return true;
+  }
+
+  if (previous.closure.files.size !== current.closure.files.size) {
+    return true;
+  }
+
+  for (const file of previous.closure.files) {
+    if (!current.closure.files.has(file)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getNewestTrackedAppearanceToken(
+  trackedChangeSet: ReadonlyMap<string, TrackedChangeSetEntry>
+): number | null {
+  let newestTrackedAppearanceToken: number | null = null;
+  for (const { previousState, currentState } of trackedChangeSet.values()) {
+    if (previousState.freshnessToken !== null || currentState.changeToken === null) {
+      continue;
+    }
+    newestTrackedAppearanceToken = Math.max(newestTrackedAppearanceToken ?? 0, currentState.changeToken);
+  }
+  return newestTrackedAppearanceToken;
+}
+
+async function readTrackedFileState(file: string): Promise<TrackedFileState> {
   try {
-    return getFreshnessToken(await stat(file));
+    const stats = await stat(file);
+    return {
+      freshnessToken: getFreshnessToken(stats),
+      changeToken: getChangeToken(stats)
+    };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
+      return { freshnessToken: null, changeToken: null };
     }
     throw error;
   }
