@@ -37,13 +37,14 @@ async function flushAsyncWork(turns = 8): Promise<void> {
 
 async function waitForCondition(
   predicate: () => boolean,
-  turns = 256
+  turns = 256,
+  stepMs = 0
 ): Promise<void> {
   for (let index = 0; index < turns; index += 1) {
     if (predicate()) {
       return;
     }
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(stepMs);
     await flushAsyncWork();
   }
   throw new Error(`Condition not met after ${turns} timer turns.`);
@@ -51,13 +52,13 @@ async function waitForCondition(
 
 function getLatestScheduledTimeoutCallback(
   setTimeoutSpy: { mock: { calls: unknown[][] } }
-): () => void {
+): () => void | Promise<void> {
   for (let index = setTimeoutSpy.mock.calls.length - 1; index >= 0; index -= 1) {
     const [callback] = setTimeoutSpy.mock.calls[index] ?? [];
     if (typeof callback !== 'function') {
       continue;
     }
-    return callback as () => void;
+    return callback as () => void | Promise<void>;
   }
   throw new Error('No scheduled timeout callback found.');
 }
@@ -661,7 +662,7 @@ describe('createProviderIssueHandoffService admission cache', () => {
     await waitForCondition(() => persist.mock.calls.length >= 2 && activePersistCalls === 1);
 
     const blockedPersistCalls = persist.mock.calls.length;
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await Promise.resolve(getLatestScheduledTimeoutCallback(setTimeoutSpy)());
     await flushAsyncWork();
 
     expect(persist).toHaveBeenCalledTimes(blockedPersistCalls);
