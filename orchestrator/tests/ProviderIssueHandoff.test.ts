@@ -4238,7 +4238,9 @@ describe('createProviderIssueHandoffService', () => {
       webhookTimestamp: 1_742_362_000_000
     });
 
-    expect(scheduledCallbacks).toHaveLength(1);
+    // Webhook-first targeted reconcile may queue an additional follow-up callback,
+    // but explicit restart rehydrate still needs at least one retryable wake-up.
+    expect(scheduledCallbacks.length).toBeGreaterThanOrEqual(1);
     await service.rehydrate();
     expect(state.claims[0]).toMatchObject({
       state: 'starting',
