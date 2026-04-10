@@ -177,6 +177,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    previousBranchRecovery?: ProviderReviewHandoffPromotionRecord['branch_recovery'] | null;
     sourceSetup?: DispatchPilotSourceSetup | null;
     repoRoot: string;
     env?: NodeJS.ProcessEnv;
@@ -188,6 +189,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
     mode?: 'full' | 'probe-merged-recovery';
+    previousBranchRecovery?: ProviderMergeCloseoutRecord['branch_recovery'] | null;
     sourceSetup?: DispatchPilotSourceSetup | null;
     repoRoot: string;
     env?: NodeJS.ProcessEnv;
@@ -413,6 +415,7 @@ export function createProviderIssueHandoffService(
       issueState: input.trackedIssue.state,
       issueStateType: input.trackedIssue.state_type,
       issueUpdatedAt: input.trackedIssue.updated_at,
+      previousBranchRecovery: input.claim.merge_closeout?.branch_recovery ?? null,
       sourceSetup: resolveMergeCloseoutSourceSetup(),
       env: buildMergeCloseoutEnv(input.latestRun?.manifestPath ?? input.claim.run_manifest_path),
       repoRoot
@@ -453,6 +456,7 @@ export function createProviderIssueHandoffService(
       issueState: input.trackedIssue.state,
       issueStateType: input.trackedIssue.state_type,
       issueUpdatedAt: input.trackedIssue.updated_at,
+      previousBranchRecovery: input.claim.review_promotion?.branch_recovery ?? null,
       sourceSetup: resolveMergeCloseoutSourceSetup(),
       env: buildMergeCloseoutEnv(input.latestRun?.manifestPath ?? input.claim.run_manifest_path),
       repoRoot
@@ -620,6 +624,7 @@ export function createProviderIssueHandoffService(
       issueState: input.trackedIssue.state,
       issueStateType: input.trackedIssue.state_type,
       issueUpdatedAt: input.trackedIssue.updated_at,
+      previousBranchRecovery: input.claim.merge_closeout?.branch_recovery ?? null,
       sourceSetup: resolveMergeCloseoutSourceSetup(),
       env: buildMergeCloseoutEnv(input.latestRun.manifestPath),
       mode: 'probe-merged-recovery',

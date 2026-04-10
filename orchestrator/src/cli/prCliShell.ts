@@ -8,6 +8,7 @@ type PrSubcommandMode = {
   usage: string;
   defaultAutoMerge?: boolean;
   defaultExitOnActionRequired?: boolean;
+  enableAutomaticBranchRecovery?: boolean;
   readinessMode?: 'merge' | 'review';
 };
 
@@ -35,6 +36,7 @@ const MODE_BY_SUBCOMMAND: Record<string, PrSubcommandMode> = {
   'resolve-merge': {
     usage: 'codex-orchestrator pr resolve-merge',
     defaultExitOnActionRequired: true,
+    enableAutomaticBranchRecovery: true,
     readinessMode: 'merge'
   },
   'ready-review': {
