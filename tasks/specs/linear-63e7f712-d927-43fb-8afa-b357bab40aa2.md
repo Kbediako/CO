@@ -12,6 +12,8 @@ related_action_plan: docs/ACTION_PLAN-linear-63e7f712-d927-43fb-8afa-b357bab40aa
 related_tasks:
   - tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md
 review_notes:
+  - 2026-04-10: Review approval found the bounded CO-123 follow-up aligned with the ticketed request, so the docs-first packet was approved to proceed without blocking clarification.
+  - 2026-04-10: Issue-quality review confirmed the lane was not plausibly narrower than the user request and preserved the protected terms, wrong-interpretation rejections, non-goals, and `Not Done If` contract before implementation.
   - 2026-04-11: Current rework continuation is running on branch `linear/co-123-transitive-dist-freshness-r3` from fresh `origin/main` `16223531e` after closing stale PR `#420`, deleting the old workpad, and replaying only the bounded 12-file CO-123 packet onto current main.
   - 2026-04-11: The current attempt's focused hot-suite commands and repo floor passed on `r3`; `diff-budget` required an explicit override at `1635/1200` lines, and the live attempt artifact is `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260411T014544Z-validation-closeout.json`.
   - 2026-04-11: The manifest-backed standalone review rerun again hit `review_outcome: failed-boundary` / `termination_boundary: command-intent` after launching `npm test`, so the truthful closeout path is manual correctness plus explicit elegance review after the stale task-mirror refresh rather than treating the wrapper boundary as a code defect.

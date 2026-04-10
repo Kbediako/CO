@@ -23,6 +23,10 @@
   - do not regress back to broad whole-tree invalidation that erases the local speedup
   - keep the protected CI path and local focused reruns conceptually separate where the evidence supports it
 
+## Pre-Implementation Review Notes
+- Review approval: 2026-04-10 standalone issue/spec review found that the ticketed CO-123 follow-up matched the intended bounded lane, so the docs-first packet was approved to proceed without additional blocking questions.
+- Issue-quality review: 2026-04-10 issue-quality review confirmed that the lane is not plausibly narrower than the user request and already preserves the protected terms, nearby wrong interpretations, non-goals, and `Not Done If` conditions before implementation.
+
 ## Intent Checksum
 - Exact user wording / phrases to preserve:
   - `Harden hot-suite dist freshness heuristics`

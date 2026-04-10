@@ -6,6 +6,10 @@
 - TECH_SPEC: `tasks/specs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md`
 
+## Pre-Implementation Reviews
+- [x] Review approval recorded before implementation started. Evidence: `docs/PRD-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md` (`Pre-Implementation Review Notes`), `tasks/specs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md` (`review_notes`).
+- [x] Issue-quality review recorded before implementation started. Evidence: `docs/PRD-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md` (`Pre-Implementation Review Notes`), `tasks/specs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md` (`review_notes`).
+
 ## Docs
 - [x] Docs packet created and mirrored in `docs/`, `tasks/`, `.agent/`, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`. Evidence: `docs/PRD-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md`, `docs/TECH_SPEC-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md`, `docs/ACTION_PLAN-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md`, `tasks/specs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md`, `tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md`, `.agent/task/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md`.
 - [x] The refreshed `r3` docs-review rerun reached a terminal state and the truthful manual fallback is recorded for this packet. Evidence: `.runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2-docs-review/cli/2026-04-10T15-54-09-224Z-cab1c2ab/manifest.json`, `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260410T160253Z-review-closeout.json`.
