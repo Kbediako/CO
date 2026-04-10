@@ -4966,6 +4966,7 @@ describe('createProviderIssueHandoffService', () => {
       }
     });
 
+    const scheduledCallbacksBeforeRehydrate = scheduledCallbacks.length;
     await service.rehydrate();
 
     expect(state.claims[0]).toMatchObject({
@@ -4975,7 +4976,7 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: childPaths.manifestPath,
       task_id: 'task-1303-child'
     });
-    expect(scheduledCallbacks).toHaveLength(1);
+    expect(scheduledCallbacks).toHaveLength(scheduledCallbacksBeforeRehydrate + 1);
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
