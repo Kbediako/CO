@@ -51,7 +51,8 @@ export function createControlAuthenticatedRouteContext(
     refreshProviderIssues: (): Promise<ProviderIssueHandoffRefreshRequestOutcome | null> =>
       input.context.providerIssueHandoff
         ? runProviderIssueHandoffRefresh(input.context.providerIssueHandoff, {
-            queueIfBusy: true
+            queueIfBusy: true,
+            acknowledgeAccepted: true
           })
         : Promise.resolve(null),
     readRequestBody: () => readJsonBody(input.req),
