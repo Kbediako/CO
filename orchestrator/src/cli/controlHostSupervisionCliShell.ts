@@ -713,6 +713,7 @@ function buildControlHostSupervisionStatusPayload(input: {
   launchctl: CommandResult;
   launchAgent: ControlHostSupervisionLaunchAgentStatus;
 }): ControlHostSupervisionStatusPayload {
+  const serviceLoaded = input.launchctl.exitCode === 0;
   const summarySource =
     input.launchctl.stdout.trim() || input.launchctl.stderr.trim() || null;
   return {
@@ -732,10 +733,11 @@ function buildControlHostSupervisionStatusPayload(input: {
     launch_agent: input.launchAgent,
     rollout: classifyControlHostSupervisionRollout({
       config: input.resolved.config,
-      launchAgent: input.launchAgent
+      launchAgent: input.launchAgent,
+      serviceLoaded
     }),
     service: {
-      loaded: input.launchctl.exitCode === 0,
+      loaded: serviceLoaded,
       exit_code: input.launchctl.exitCode,
       summary: summarySource ? firstNonEmptyLine(summarySource) : null,
       stderr: input.launchctl.stderr.trim().length > 0 ? input.launchctl.stderr.trim() : null
@@ -854,12 +856,21 @@ function buildExpectedControlHostSupervisionProgramArguments(
 function classifyControlHostSupervisionRollout(input: {
   config: ControlHostSupervisionConfig | null;
   launchAgent: ControlHostSupervisionLaunchAgentStatus;
+  serviceLoaded: boolean;
 }): ControlHostSupervisionRolloutStatus {
   if (
     input.config &&
     input.launchAgent.exists &&
     input.launchAgent.classification === 'managed_supervision'
   ) {
+    if (!input.serviceLoaded) {
+      return {
+        mode: 'mixed',
+        migration_required: true,
+        summary:
+          'Managed LaunchAgent plist exists, but launchctl does not report the managed service target as loaded.'
+      };
+    }
     return {
       mode: 'managed_supervision',
       migration_required: false,
@@ -1187,7 +1198,11 @@ function resolveLaunchdDomain(): string {
 
 async function terminateChildProcess(
   child: ReturnType<typeof spawn>,
-  killTimeoutSeconds: number
+  killTimeoutSeconds: number,
+  options?: {
+    listDescendantPids?: (rootPid: number) => Promise<number[]>;
+    killProcess?: (pid: number, signal: NodeJS.Signals) => void;
+  }
 ): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) {
     return;
@@ -1210,9 +1225,72 @@ async function terminateChildProcess(
     return;
   }
   if (child.exitCode === null && child.signalCode === null) {
+    const rootPid = child.pid;
+    if (typeof rootPid === 'number' && Number.isInteger(rootPid) && rootPid > 0) {
+      const descendantPids = await (
+        options?.listDescendantPids ?? listDescendantProcessIds
+      )(rootPid).catch(() => []);
+      for (const pid of descendantPids) {
+        killTrackedPid(pid, 'SIGKILL', options?.killProcess);
+      }
+    }
     child.kill('SIGKILL');
     await exitPromise.catch(() => undefined);
   }
+}
+
+async function listDescendantProcessIds(rootPid: number): Promise<number[]> {
+  const snapshot = await runCommand('ps', ['-ax', '-o', 'pid=,ppid=']);
+  if (snapshot.exitCode !== 0) {
+    throw new Error(snapshot.stderr || `ps exited with code ${snapshot.exitCode}`);
+  }
+  const childrenByParent = new Map<number, number[]>();
+  for (const line of snapshot.stdout.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    const [pidToken, parentPidToken] = trimmed.split(/\s+/u, 2);
+    const pid = Number.parseInt(pidToken ?? '', 10);
+    const parentPid = Number.parseInt(parentPidToken ?? '', 10);
+    if (!Number.isInteger(pid) || !Number.isInteger(parentPid)) {
+      continue;
+    }
+    const children = childrenByParent.get(parentPid) ?? [];
+    children.push(pid);
+    childrenByParent.set(parentPid, children);
+  }
+  const descendants: number[] = [];
+  const visit = (parentPid: number) => {
+    for (const childPid of childrenByParent.get(parentPid) ?? []) {
+      visit(childPid);
+      descendants.push(childPid);
+    }
+  };
+  visit(rootPid);
+  return descendants;
+}
+
+function killTrackedPid(
+  pid: number,
+  signal: NodeJS.Signals,
+  killProcess: (pid: number, signal: NodeJS.Signals) => void = process.kill.bind(process)
+): void {
+  try {
+    killProcess(pid, signal);
+  } catch (error) {
+    if (!isMissingProcessError(error)) {
+      throw error;
+    }
+  }
+}
+
+function isMissingProcessError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as NodeJS.ErrnoException).code === 'ESRCH'
+  );
 }
 
 async function writeRuntimeStateWithCleanup<T>(
@@ -1735,5 +1813,6 @@ export const __test__ = {
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
+  terminateChildProcess,
   writeRuntimeStateWithCleanup
 };
