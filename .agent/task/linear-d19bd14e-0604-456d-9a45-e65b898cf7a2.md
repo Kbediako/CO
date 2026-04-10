@@ -49,5 +49,6 @@
 - [ ] Workpad refreshed after docs, after implementation, and immediately before any review or merge handoff. Evidence: local source refreshed at `out/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2/manual/workpad.md`, but the latest Linear `upsert-workpad` attempt hit `linear_rate_limited` shared-budget cooldown until `2026-04-10T08:06:28.015Z`.
 - [ ] PR attached to the Linear issue before review-state transition. Evidence: pending.
 - [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge commit `31d8a9aeb`.
+- [ ] Unresolved actionable review threads = `0` or waived with evidence before review-state transition. Evidence: pending.
 - [ ] PR checks green and actionable review feedback handled or explicitly pushed back before review-state transition. Evidence: pending.
 - [x] Issue remains active until review handoff prerequisites are complete. Evidence: current issue state is `In Progress`.

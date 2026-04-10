@@ -813,6 +813,42 @@ export function createProviderIssueHandoffService(
         ? { merge_closeout: null }
         : {};
 
+  const buildFreshTrackedIssueActiveRunFields = (
+    claim: Pick<
+      ProviderIntakeClaimRecord,
+      | 'merge_closeout'
+      | 'issue_identifier'
+      | 'issue_title'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_viewer_id'
+      | 'issue_viewer_auth_fingerprint'
+      | 'issue_assignee_id'
+      | 'issue_assignee_name'
+      | 'issue_blocked_by'
+    >,
+    trackedIssue: LiveLinearTrackedIssue
+  ): Partial<
+    Pick<
+      ProviderIntakeClaimRecord,
+      | 'issue_identifier'
+      | 'issue_title'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_viewer_id'
+      | 'issue_viewer_auth_fingerprint'
+      | 'issue_assignee_id'
+      | 'issue_assignee_name'
+      | 'issue_blocked_by'
+      | 'merge_closeout'
+    >
+  > => ({
+    ...buildFreshTrackedIssueClaimFields(claim, trackedIssue),
+    ...buildTrackedIssueMergeCloseoutResetFields(claim, trackedIssue)
+  });
+
   const resolveFreshTrackedIssueForActiveClaim = async (
     claim: Pick<
       ProviderIntakeClaimRecord,
@@ -2187,7 +2223,10 @@ export function createProviderIssueHandoffService(
           }
         }
         if (activeRun) {
-          const trackedIssueFields = buildFreshTrackedIssueClaimFields(existing, input.trackedIssue);
+          const trackedIssueFields = buildFreshTrackedIssueActiveRunFields(
+            existing,
+            input.trackedIssue
+          );
           const reactivatedMergeCloseoutReset =
             existing.reason === 'provider_issue_rehydrated_active_run'
               ? {}
@@ -2250,14 +2289,26 @@ export function createProviderIssueHandoffService(
       > = latestExisting ?? clearProviderRetryFields();
       const activeRun = attachableDiscoveredRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
+        const trackedIssueFields = latestExisting
+          ? buildFreshTrackedIssueActiveRunFields(latestExisting, input.trackedIssue)
+          : buildTrackedIssueClaimFields(input.trackedIssue);
+        const trackedIssueFreshEnoughForLatestClaim =
+          latestExisting ? isTrackedIssueFreshEnoughForClaim(latestExisting, input.trackedIssue) : true;
+        const reactivatedMergeCloseoutReset =
+          !trackedIssueFreshEnoughForLatestClaim ||
+          latestExisting?.reason === 'provider_issue_rehydrated_active_run'
+            ? {}
+            : { review_promotion: null, merge_closeout: null };
         const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
+          ...trackedIssueFields,
           task_id: activeRun.taskId,
           mapping_source: mappingSource,
           state: 'running',
           reason: 'provider_issue_run_already_active',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          ...reactivatedMergeCloseoutReset
         });
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
@@ -2663,7 +2714,7 @@ export function createProviderIssueHandoffService(
                   continue;
                 }
               }
-              const trackedIssueFields = buildFreshTrackedIssueClaimFields(
+              const trackedIssueFields = buildFreshTrackedIssueActiveRunFields(
                 claim,
                 resolution.trackedIssue
               );
@@ -2776,7 +2827,7 @@ export function createProviderIssueHandoffService(
                 continue;
               }
             }
-            const trackedIssueFields = buildFreshTrackedIssueClaimFields(
+            const trackedIssueFields = buildFreshTrackedIssueActiveRunFields(
               claim,
               resolution.trackedIssue
             );

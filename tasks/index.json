@@ -50,7 +50,14 @@
         "Codex"
       ],
       "last_review": "2026-04-10",
-      "approvals": {},
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2-co-138-docs-review/cli/2026-04-10T07-04-13-496Z-80cbb02d/manifest.json",
+          "override_reason": "The audited docs-review child stream passed delegation-guard, spec-guard, and docs:check, then failed only on the pre-existing repo-wide `docs:freshness` stale-doc baseline (`119` stale docs). The newly added CO-138 packet contributed `0` stale entries, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
         "task": "tasks/tasks-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",

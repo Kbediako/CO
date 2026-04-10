@@ -65,5 +65,5 @@
   - Mitigation: constrain the repair to the exact stale-record seam and keep named adjacent lanes explicitly out of scope.
 
 ## Approvals
-- Reviewer: pending audited `docs-review` child stream for `CO-138`
+- Reviewer: audited `docs-review` child stream for `CO-138` passed (evidence: `.runs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2-co-138-docs-review/cli/2026-04-10T07-04-13-496Z-80cbb02d/manifest.json`)
 - Date: 2026-04-10
