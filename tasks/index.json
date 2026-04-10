@@ -179,6 +179,22 @@
       }
     },
     {
+      "id": "20260410-linear-7105185a-05da-4f49-89d9-35efbba38f3c",
+      "title": "CO: capture live Linear request-burn telemetry after webhook-first targeted reconcile rollout",
+      "relates_to": "tasks/tasks-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "paths": {
+        "spec": "tasks/specs/linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "task": "tasks/tasks-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "agent_task": ".agent/task/linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
+        "docs": "docs/TECH_SPEC-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md"
+      }
+    },
+    {
       "id": "20260410-linear-710e37a2-a7bb-4976-859f-0378d6a7104f",
       "title": "CO: clear repo-wide stale spec-review dates that are blocking unrelated merge-ready PRs at spec-guard",
       "relates_to": "tasks/tasks-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
