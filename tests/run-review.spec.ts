@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { ReviewOutcomeDisposition } from '../scripts/lib/review-execution-telemetry.js';
 import { runReviewCli } from '../scripts/run-review.js';
+import { shouldUseFreshDist } from './helpers/distFreshness.js';
 import { runEntrypointInProcess } from './helpers/inProcessEntrypoint.js';
 
 const execFileAsync = promisify(execFile);
@@ -1347,78 +1347,53 @@ async function runReviewCommandSubprocess(
   }
 }
 
-async function shouldUseFreshDist(sourceEntry: string, distEntry: string): Promise<boolean> {
-  if (!existsSync(distEntry)) {
-    return false;
-  }
-
-  try {
-    const [distStats, newestSourceMtime] = await Promise.all([
-      stat(distEntry),
-      getNewestSourceMtimeForRoots([sourceEntry, join(dirname(sourceEntry), 'lib')])
-    ]);
-    return distStats.mtimeMs >= newestSourceMtime;
-  } catch {
-    return false;
-  }
-}
-
-async function getNewestSourceMtime(root: string): Promise<number> {
-  const rootStats = await stat(root);
-  if (!rootStats.isDirectory()) {
-    return rootStats.mtimeMs;
-  }
-
-  let newestMtime = rootStats.mtimeMs;
-  const entries = await readdir(root, { withFileTypes: true });
-  for (const entry of entries) {
-    const entryPath = join(root, entry.name);
-    if (entry.isDirectory()) {
-      newestMtime = Math.max(newestMtime, await getNewestSourceMtime(entryPath));
-      continue;
-    }
-    const entryStats = await stat(entryPath);
-    newestMtime = Math.max(newestMtime, entryStats.mtimeMs);
-  }
-  return newestMtime;
-}
-
-async function getNewestSourceMtimeForRoots(roots: string[]): Promise<number> {
-  const mtimes = await Promise.all(
-    roots.map(async (root) => {
-      try {
-        return await getNewestSourceMtime(root);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-          return 0;
-        }
-        throw error;
-      }
-    })
-  );
-  return Math.max(0, ...mtimes);
-}
-
 describe('shouldUseFreshDist', () => {
-  it('treats dist as stale when a newer source dependency exists under scripts/', async () => {
+  it('treats dist as stale when a newer transitive runtime dependency exists', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
-    const scriptsRoot = join(tempRoot, 'scripts');
-    const helperPath = join(scriptsRoot, 'lib', 'helper.ts');
-    const sourceEntry = join(scriptsRoot, 'run-review.ts');
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const runtimeIndex = join(tempRoot, 'orchestrator', 'src', 'cli', 'runtime', 'index.ts');
+    const runtimeProvider = join(tempRoot, 'orchestrator', 'src', 'cli', 'runtime', 'provider.ts');
+    const runtimeUtility = join(tempRoot, 'orchestrator', 'src', 'cli', 'utils', 'codexCli.ts');
     const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
 
     try {
-      await mkdir(dirname(helperPath), { recursive: true });
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
+      await mkdir(dirname(runtimeIndex), { recursive: true });
+      await mkdir(dirname(runtimeUtility), { recursive: true });
       await mkdir(dirname(distEntry), { recursive: true });
-      await writeFile(sourceEntry, 'export {};\n', 'utf8');
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelper,
+        "export { resolveRuntimeSelection } from '../../orchestrator/src/cli/runtime/index.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        runtimeIndex,
+        "export { resolveRuntimeSelection } from './provider.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        runtimeProvider,
+        "export { resolveCodexCliBin as resolveRuntimeSelection } from '../utils/codexCli.js';\n",
+        'utf8'
+      );
+      await writeFile(runtimeUtility, 'export function resolveCodexCliBin() {}\n', 'utf8');
       await writeFile(distEntry, 'export {};\n', 'utf8');
-      await writeFile(helperPath, 'export {};\n', 'utf8');
       const sourceAt = new Date('2026-01-01T00:00:00.000Z');
       const distAt = new Date('2026-01-01T00:00:01.000Z');
-      const helperAt = new Date('2026-01-01T00:00:02.000Z');
+      const dependencyAt = new Date('2026-01-01T00:00:02.000Z');
       await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelper, sourceAt, sourceAt);
+      await utimes(runtimeIndex, sourceAt, sourceAt);
+      await utimes(runtimeProvider, sourceAt, sourceAt);
       await utimes(distEntry, distAt, distAt);
-      await utimes(helperPath, helperAt, helperAt);
+      await utimes(runtimeUtility, dependencyAt, dependencyAt);
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
     } finally {
@@ -1426,25 +1401,102 @@ describe('shouldUseFreshDist', () => {
     }
   });
 
-  it('ignores newer sibling scripts outside the run-review surface', async () => {
+  it('treats dist as stale when a tracked transitive dependency cannot be resolved', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
-    const scriptsRoot = join(tempRoot, 'scripts');
-    const sourceEntry = join(scriptsRoot, 'run-review.ts');
-    const unrelatedSibling = join(scriptsRoot, 'other-script.ts');
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
     const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
 
     try {
-      await mkdir(scriptsRoot, { recursive: true });
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
       await mkdir(dirname(distEntry), { recursive: true });
-      await writeFile(sourceEntry, 'export {};\n', 'utf8');
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelper,
+        "export { resolveRuntimeSelection } from '../../orchestrator/src/cli/runtime/missing.js';\n",
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores newer sibling scripts outside the run-review dependency closure', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const unrelatedSibling = join(tempRoot, 'scripts', 'other-script.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(boundaryHelper, 'export function prepareReviewExecutionBoundaryPreflight() {}\n', 'utf8');
       await writeFile(distEntry, 'export {};\n', 'utf8');
       await writeFile(unrelatedSibling, 'export {};\n', 'utf8');
       const sourceAt = new Date('2026-01-01T00:00:00.000Z');
       const distAt = new Date('2026-01-01T00:00:01.000Z');
       const siblingAt = new Date('2026-01-01T00:00:02.000Z');
       await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelper, sourceAt, sourceAt);
       await utimes(distEntry, distAt, distAt);
       await utimes(unrelatedSibling, siblingAt, siblingAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores newer type-only re-export dependencies outside the runtime closure', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelper = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const typeOnlyDependency = join(tempRoot, 'scripts', 'lib', 'review-execution-types.ts');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelper), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelper,
+        "export { type ReviewExecutionBoundaryPreflightResult } from './review-execution-types.js';\nexport function prepareReviewExecutionBoundaryPreflight() {}\n",
+        'utf8'
+      );
+      await writeFile(
+        typeOnlyDependency,
+        'export interface ReviewExecutionBoundaryPreflightResult { ok: boolean; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      const typeOnlyAt = new Date('2026-01-01T00:00:02.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelper, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+      await utimes(typeOnlyDependency, typeOnlyAt, typeOnlyAt);
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
     } finally {
