@@ -247,6 +247,43 @@ describe('CompatibilityIssuePresenter', () => {
     expect(projection.issues).toEqual([]);
   });
 
+  it('does not surface child-shaped parent fallback aliases from running or retry registration', () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const runningTaskId = `${parentTaskId}-docs-review`;
+    const retryTaskId = `${parentTaskId}-implementation-gate`;
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      running: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: runningTaskId,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          completedAt: null,
+          summary: 'child-shaped running source still reporting the parent fallback alias'
+        })
+      ],
+      retrying: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: retryTaskId,
+          rawStatus: 'failed',
+          displayStatus: 'retrying',
+          completedAt: null,
+          summary: 'child-shaped retry source still reporting the parent fallback alias'
+        })
+      ]
+    });
+
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    expect(projection.issues).toEqual([]);
+  });
+
   it('keeps non-linear selected rows even when their task id matches the synthetic linear pattern', () => {
     const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
     const projection = buildCompatibilityProjectionSnapshot(

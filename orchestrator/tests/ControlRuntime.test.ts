@@ -1809,6 +1809,58 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('suppresses child-shaped parent fallback aliases when no canonical child match exists', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const parentTaskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const childTaskId = `${parentTaskId}-docs-review`;
+      const fixture = await createFixture({
+        taskId: 'task-current'
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-current',
+        issue_provider: 'linear',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      await createSiblingRun(fixture.root, childTaskId, 'run-child', {
+        manifest: {
+          task_id: childTaskId,
+          issue_provider: 'linear',
+          issue_id: parentTaskId,
+          issue_identifier: parentTaskId,
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          summary: 'child-shaped provider worker fallback manifest without canonical identity'
+        }
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.selected).toMatchObject({
+        issue_identifier: 'ISSUE-CURRENT',
+        run_id: 'run-1'
+      });
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT'
+      ]);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual([
+        'ISSUE-CURRENT'
+      ]);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === parentTaskId)
+      ).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not treat fallback-only local-mcp claim aliases as authoritative selected activity', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));

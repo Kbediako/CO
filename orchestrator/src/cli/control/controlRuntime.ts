@@ -749,19 +749,35 @@ function isFallbackCompatibilityIdentityValue(
   value: string,
   source: Pick<ControlCompatibilitySourceContext, 'taskId' | 'runId'>
 ): boolean {
-  return value === source.taskId || value === source.runId;
+  return (
+    isFallbackCompatibilityIdentityAlias(value, source.taskId) ||
+    isFallbackCompatibilityIdentityAlias(value, source.runId)
+  );
+}
+
+function isFallbackCompatibilityIdentityAlias(
+  value: string,
+  candidate: string | null
+): boolean {
+  if (!candidate) {
+    return false;
+  }
+  if (value === candidate) {
+    return true;
+  }
+  return SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(value) && candidate.startsWith(`${value}-`);
 }
 
 function hasExplicitCompatibilityIssueIdentity(
   source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
 ): boolean {
-  const fallbackIdentities = new Set(
-    [source.taskId, source.runId].filter((value): value is string => typeof value === 'string')
-  );
-  if (source.issueIdentifier && !fallbackIdentities.has(source.issueIdentifier)) {
+  if (
+    source.issueIdentifier &&
+    !isFallbackCompatibilityIdentityValue(source.issueIdentifier, source)
+  ) {
     return true;
   }
-  if (source.issueId && !fallbackIdentities.has(source.issueId)) {
+  if (source.issueId && !isFallbackCompatibilityIdentityValue(source.issueId, source)) {
     return true;
   }
   return false;
