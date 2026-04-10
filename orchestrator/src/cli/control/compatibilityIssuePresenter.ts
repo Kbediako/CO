@@ -81,7 +81,9 @@ export function buildCompatibilityProjectionSnapshot(
   });
   const runningByIssue = new Map(running.map((entry) => [entry.issue_identifier, entry] as const));
   const retryingByIssue = new Map(retrying.map((entry) => [entry.issue_identifier, entry] as const));
-  const selectedPayload = snapshot.selected ? buildProjectionSelectedPayload(snapshot.selected) : null;
+  const selectedPayload = snapshot.selected
+    ? buildProjectionSelectedPayload(snapshot.selected, snapshot.providerIntake ?? null)
+    : null;
   const issues = index.issues
     .map((issue) => {
       const preferredSource = issue.runningSource ?? issue.retrySource ?? issue.selectedSource;
@@ -95,7 +97,8 @@ export function buildCompatibilityProjectionSnapshot(
           source: preferredSource,
           running: runningByIssue.get(issue.issueIdentifier) ?? null,
           retry: retryingByIssue.get(issue.issueIdentifier) ?? null,
-          dispatchPilotSummary: issue.dispatchPilotSummary
+          dispatchPilotSummary: issue.dispatchPilotSummary,
+          providerIntake: snapshot.providerIntake ?? null
         })
       };
     })
@@ -470,13 +473,18 @@ export function buildCompatibilityIssuePayload(input: {
   running: ControlRunningPayload | null;
   retry: ControlRetryPayload | null;
   dispatchPilotSummary: ControlDispatchPilotPayload | null;
+  providerIntake?: ControlCompatibilityRuntimeSnapshot['providerIntake'];
 }): ControlIssuePayload {
-  const selectedPayload = buildProjectionSelectedPayload(input.source);
+  const selectedPayload = buildProjectionSelectedPayload(
+    input.source,
+    input.providerIntake ?? null
+  );
   const latestEvent = buildSelectedRunLatestEventPayload(input.source.latestEvent);
   const recentEvents = latestEvent ? [latestEvent] : [];
   const workerHost = resolveProviderWorkerHost({
     providerLinearWorkerProof: input.source.providerLinearWorkerProof,
     providerDebugSnapshot: input.source.providerDebugSnapshot,
+    providerIntake: input.providerIntake ?? null,
     stageStartedAt: input.source.startedAt
   });
 

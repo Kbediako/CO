@@ -33,8 +33,11 @@ export interface SelectedRunPresenterContext {
 
 const BUCKET_ACTIONS = new Set<ControlAction['action']>(['pause', 'resume', 'fail', 'cancel']);
 
-export function buildSelectedRunPublicPayload(selected: SelectedRunContext): ControlSelectedRunPayload {
-  return buildProjectionSelectedPayload(selected);
+export function buildSelectedRunPublicPayload(
+  selected: SelectedRunContext,
+  providerIntake: ControlSelectedRunRuntimeSnapshot['providerIntake'] = null
+): ControlSelectedRunPayload {
+  return buildProjectionSelectedPayload(selected, providerIntake ?? null);
 }
 
 export function buildUiSelectedRunSharedFields(selected: SelectedRunContext): UiSelectedRunSharedFields {
@@ -164,7 +167,7 @@ export function buildUiDataset(input: {
     runs: [runEntry],
     codebase: null,
     activity: [],
-    selected: selected ? buildSelectedRunPublicPayload(selected) : null
+    selected: selected ? buildSelectedRunPublicPayload(selected, input.snapshot.providerIntake ?? null) : null
   };
 }
 

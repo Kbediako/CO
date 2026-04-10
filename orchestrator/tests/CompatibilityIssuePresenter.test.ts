@@ -173,6 +173,86 @@ describe('CompatibilityIssuePresenter', () => {
     expect(projection.issues[0]?.payload.worker_host).toBeUndefined();
   });
 
+  it('prefers a fresh proof worker_host over a stale intake fallback', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          attempt_started_at: '2026-04-06T02:30:00.000Z',
+          updated_at: '2026-04-06T02:35:00.000Z',
+          worker_host: 'worker-host-proof'
+        },
+        providerIntake: {
+          provider: 'linear',
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          issue_title: 'CO-100',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-06T02:35:00.000Z',
+          task_id: 'linear-co-100',
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          run_id: 'run-co-100',
+          worker_host: 'worker-host-stale',
+          freshness: 'current',
+          rehydrated_at: '2026-04-06T02:35:00.000Z',
+          is_rehydrated: false,
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBe('worker-host-proof');
+  });
+
+  it('uses provider intake fallback for selected and issue payloads when no claim or proof host is present', () => {
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress'
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: source,
+      running: [],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: {
+        provider: 'linear',
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        issue_title: 'CO-100',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-06T02:35:00.000Z',
+        task_id: 'linear-co-100',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-co-100',
+        worker_host: 'worker-host-intake',
+        freshness: 'current',
+        rehydrated_at: '2026-04-06T02:35:00.000Z',
+        is_rehydrated: false,
+        updated_at: '2026-04-06T02:35:00.000Z'
+      },
+      providerWorkflow: null,
+      polling: null
+    });
+
+    expect(projection.selected?.worker_host).toBe('worker-host-intake');
+    expect(projection.issues[0]?.payload.worker_host).toBe('worker-host-intake');
+  });
+
   it('surfaces worker_host through selected, running, retrying, and issue payloads', () => {
     const workerHost = 'worker-host-01';
     const source = buildCompatibilitySource({

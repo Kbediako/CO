@@ -449,19 +449,25 @@ export function resolveProviderWorkerHost(input: {
     claimLaunchStartedAt
     ?? input.stageStartedAt
     ?? null;
+  const proofHost = readProviderLinearWorkerHost(
+    input.providerLinearWorkerProof,
+    stageStartedAt
+  );
   return (
     normalizeProviderWorkerHostName(input.providerDebugSnapshot?.claim?.worker_host) ??
-    normalizeProviderWorkerHostName(input.providerIntake?.worker_host) ??
-    readProviderLinearWorkerHost(input.providerLinearWorkerProof, stageStartedAt)
+    proofHost ??
+    normalizeProviderWorkerHostName(input.providerIntake?.worker_host)
   );
 }
 
 export function buildProjectionSelectedPayload(
-  selected: SelectedRunContext | ControlCompatibilitySourceContext
+  selected: SelectedRunContext | ControlCompatibilitySourceContext,
+  providerIntake: ProviderIntakeSummaryPayload | null = null
 ): ControlSelectedRunPayload {
   const workerHost = resolveProviderWorkerHost({
     providerLinearWorkerProof: selected.providerLinearWorkerProof,
     providerDebugSnapshot: selected.providerDebugSnapshot,
+    providerIntake,
     stageStartedAt: selected.startedAt
   });
   return {
