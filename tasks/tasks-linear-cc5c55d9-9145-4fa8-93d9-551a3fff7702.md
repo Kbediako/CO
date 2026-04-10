@@ -32,14 +32,14 @@
 - [x] Fresh `linear child-stream --pipeline implementation-gate` evidence recorded after the review-fix follow-up patch. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/manifest.json`, `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/review/telemetry.json` (`status: succeeded`, `review_outcome: clean-success`).
 - [x] Focused linked-worktree helper regression coverage in a temporary repo on the fresh `origin/main` base. Evidence: `npx vitest run tests/worktree-git-identity.spec.ts` (`10` tests passed on `2026-04-11` after adding existing non-repo directory coverage alongside the explicit invalid-worktree failure path).
 - [x] Exact shared repo git-config before/after verification commands recorded and rerun locally, including the `extensions.worktreeConfig=true` helper path when explicit worktree-local identity is requested. Evidence: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/20260411T0148Z-manual-verification.log`, direct invalid-worktree probe on `2026-04-11`.
-- [x] `node scripts/delegation-guard.mjs`
-- [x] `node scripts/spec-guard.mjs --dry-run`
-- [x] `npm run build`
-- [x] `npm run lint`
-- [x] `npm run test`
-- [x] `npm run docs:check`
-- [x] `npm run docs:freshness`
-- [x] `node scripts/diff-budget.mjs`
+- [x] `node scripts/delegation-guard.mjs`. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/commands/01-delegation-guard.ndjson`.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/commands/02-spec-guard.ndjson`.
+- [x] `npm run build`. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/commands/03-build.ndjson`.
+- [x] `npm run lint`. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/commands/04-lint.ndjson`.
+- [x] `npm run test`. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/commands/05-test.ndjson`.
+- [x] `npm run docs:check`. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/commands/06-docs-check.ndjson`.
+- [x] `npm run docs:freshness`. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/commands/07-docs-freshness.ndjson`.
+- [x] `node scripts/diff-budget.mjs`. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/commands/08-diff-budget.ndjson`.
 - [x] Standalone review plus explicit elegance pass completed for the final diff before handoff. Evidence: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/20260410T160541Z-review-fallback.md`, `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/20260410T160541Z-elegance-review.md`.
 
 ## Handoff
