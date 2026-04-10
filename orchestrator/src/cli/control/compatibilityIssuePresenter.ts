@@ -16,6 +16,9 @@ import {
 } from './observabilityReadModel.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 
+const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
+  /^linear-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-.+)?$/i;
+
 export interface CompatibilityIssueSourceRecord {
   issueIdentifier: string;
   issueId: string | null;
@@ -196,10 +199,12 @@ export function buildCompatibilityIssueIndex<
     issuesByIdentifier.set(source.issueIdentifier, existing);
   };
 
-  registerIssue(snapshot.selected, {
-    kind: 'selected',
-    dispatchPilotSummary: snapshot.dispatchPilot
-  });
+  if (!isSyntheticLinearFallbackOnlyIssueSource(snapshot.selected)) {
+    registerIssue(snapshot.selected, {
+      kind: 'selected',
+      dispatchPilotSummary: snapshot.dispatchPilot
+    });
+  }
   snapshot.running.forEach((entry) => {
     registerIssue(entry, { kind: 'running' });
   });
@@ -1081,6 +1086,32 @@ function buildCompatibilityIssueAliases<TSource extends CompatibilityIssueSource
     }
   }
   return Array.from(aliases);
+}
+
+function hasExplicitCompatibilityIssueIdentity(
+  source: Pick<CompatibilityIssueSourceRecord, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
+): boolean {
+  const fallbackIdentities = new Set(
+    [source.taskId, source.runId].filter((value): value is string => typeof value === 'string')
+  );
+  if (source.issueIdentifier && !fallbackIdentities.has(source.issueIdentifier)) {
+    return true;
+  }
+  if (source.issueId && !fallbackIdentities.has(source.issueId)) {
+    return true;
+  }
+  return false;
+}
+
+function isSyntheticLinearFallbackOnlyIssueSource(
+  source: Pick<CompatibilityIssueSourceRecord, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'> | null
+): boolean {
+  return (
+    source !== null &&
+    source.taskId !== null &&
+    SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(source.taskId) &&
+    !hasExplicitCompatibilityIssueIdentity(source)
+  );
 }
 
 function pickPreferredCompatibilitySource<TSource extends CompatibilityIssueSourceRecord>(

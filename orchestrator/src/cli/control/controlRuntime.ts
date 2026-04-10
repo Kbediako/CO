@@ -63,6 +63,8 @@ interface ControlRuntimeContext {
 }
 
 const NULL_PROVIDER_RUNNING_FRESHNESS_MS = 10 * 60 * 1000;
+const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
+  /^linear-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-.+)?$/i;
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
@@ -493,13 +495,19 @@ function isAuthoritativeSelectedCurrentRunningSource(
   if (!source || source.rawStatus !== 'in_progress') {
     return false;
   }
+  const syntheticLinearFallbackOnly = isSyntheticLinearFallbackOnlySource(source);
   if (!providerIntakeState) {
+    if (source.taskId !== 'local-mcp') {
+      return !syntheticLinearFallbackOnly;
+    }
     return (
-      source.taskId !== 'local-mcp' ||
-      (!isControlHostSelectedFallbackSource(source) && isFreshNullProviderRunningSource(source))
+      !isControlHostSelectedFallbackSource(source) && isFreshNullProviderRunningSource(source)
     );
   }
   if (source.taskId !== 'local-mcp') {
+    if (syntheticLinearFallbackOnly) {
+      return false;
+    }
     return true;
   }
   const claim = findMatchingProviderIntakeClaim(providerIntakeState, source);
@@ -662,9 +670,10 @@ function isAuthoritativeCurrentRunningSource(
   source: ControlCompatibilitySourceContext,
   providerIntakeState: ProviderIntakeState | undefined
 ): boolean {
+  const syntheticLinearFallbackOnly = isSyntheticLinearFallbackOnlySource(source);
   if (!providerIntakeState) {
     return (
-      source.issueProvider !== null ||
+      (source.issueProvider !== null && !syntheticLinearFallbackOnly) ||
       (hasExplicitCompatibilityIssueIdentity(source) && isFreshNullProviderRunningSource(source))
     );
   }
@@ -679,6 +688,9 @@ function isAuthoritativeCurrentRunningSource(
     );
   }
   if (!isProviderIntakeScopedRunningSource(source)) {
+    if (syntheticLinearFallbackOnly) {
+      return false;
+    }
     return true;
   }
   return claim !== null && isProviderIntakeClaimActiveCurrentActivity(claim);
@@ -752,6 +764,16 @@ function hasExplicitCompatibilityIssueIdentity(
     return true;
   }
   return false;
+}
+
+function isSyntheticLinearFallbackOnlySource(
+  source: Pick<ControlCompatibilitySourceContext, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'>
+): boolean {
+  return isSyntheticLinearTaskId(source.taskId) && !hasExplicitCompatibilityIssueIdentity(source);
+}
+
+function isSyntheticLinearTaskId(taskId: string | null): boolean {
+  return taskId !== null && SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(taskId);
 }
 
 function isFreshNullProviderRunningSource(

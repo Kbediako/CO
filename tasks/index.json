@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "id": "20260410-linear-aa307fdc-53a1-4225-8d09-28457165fbc8",
+      "title": "CO STATUS: stop synthetic linear-* task-id fallback rows from rendering as running issues",
+      "relates_to": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "task": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "agent_task": ".agent/task/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "docs": "docs/TECH_SPEC-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md"
+      }
+    },
+    {
       "id": "20260410-linear-d3f1af87-57da-46ab-901d-75a6cc60420e",
       "title": "CO: restore current-main docs:freshness green baseline after CO-134 validation repair",
       "relates_to": "tasks/tasks-linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md",

@@ -1019,6 +1019,92 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('rebinds fallback-only task-id identity from tracked issue state when manifest identity is missing', async () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const { paths } = await createHostPaths(undefined, { taskId });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: taskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: 'lin-issue-146'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-146', 'lin-issue-146', taskId, 'control-host'])
+    );
+  });
+
+  it('rebinds fallback-only synthetic child task ids from the parent claim task prefix', async () => {
+    const parentTaskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-146',
+      issue_identifier: 'CO-146',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: 'lin-issue-146',
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-146', 'lin-issue-146', childTaskId, 'run-child'])
+    );
+  });
+
   it('keeps the generic latest event when provider evidence is only a stale claim', async () => {
     const { paths } = await createHostPaths();
     await writeFile(

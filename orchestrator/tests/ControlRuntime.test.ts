@@ -1480,6 +1480,225 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('suppresses selected synthetic linear task-id running rows when no canonical issue identity exists', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const fixture = await createFixture({
+        taskId
+      });
+      await seedManifest(fixture.paths, {
+        task_id: taskId,
+        issue_provider: 'linear',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'provider worker fallback manifest without canonical issue identity'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.issues).toEqual([]);
+      expect(compatibilityProjection.selected?.issue_identifier).toBe(taskId);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rebinds selected synthetic linear task-id rows to the canonical claim-backed issue identity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const providerIntakeState = createProviderIntakeState();
+      const fixture = await createFixture({
+        taskId,
+        providerIntakeState
+      });
+      providerIntakeState.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-146',
+        issue_id: 'lin-issue-146',
+        issue_identifier: 'CO-146',
+        issue_title: 'Claim-backed active issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-07T00:29:30.000Z',
+        task_id: taskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:30.000Z',
+        last_delivery_id: 'delivery-co-146',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_170_000,
+        run_id: 'run-1',
+        run_manifest_path: fixture.paths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-146'
+      });
+      providerIntakeState.latest_provider_key = 'linear:lin-issue-146';
+      providerIntakeState.latest_reason = 'provider_issue_rehydrated_active_run';
+
+      await seedManifest(fixture.paths, {
+        task_id: taskId,
+        issue_provider: 'linear',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'provider worker fallback manifest matched by claim'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.selected?.issue_identifier).toBe('CO-146');
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual(['CO-146']);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['CO-146']);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === taskId)
+      ).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rebinds discovered synthetic linear task-id running rows to the canonical claim-backed issue identity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const providerIntakeState = createProviderIntakeState();
+      const fixture = await createFixture({
+        taskId: 'task-current',
+        providerIntakeState
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'task-current',
+        issue_provider: 'linear',
+        issue_id: 'issue-current',
+        issue_identifier: 'ISSUE-CURRENT',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:20:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z'
+      });
+
+      const siblingPaths = await createSiblingRun(fixture.root, taskId, 'run-2', {
+        manifest: {
+          task_id: taskId,
+          issue_provider: 'linear',
+          status: 'in_progress',
+          started_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          summary: 'discovered provider worker fallback manifest matched by claim'
+        }
+      });
+      providerIntakeState.claims.push({
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-146',
+        issue_id: 'lin-issue-146',
+        issue_identifier: 'CO-146',
+        issue_title: 'Claim-backed active sibling issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-07T00:29:30.000Z',
+        task_id: taskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:30.000Z',
+        last_delivery_id: 'delivery-co-146-sibling',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_742_360_170_000,
+        run_id: 'run-2',
+        run_manifest_path: siblingPaths.manifestPath,
+        launch_source: 'control-host',
+        launch_token: 'launch-co-146-sibling'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
+        'ISSUE-CURRENT',
+        'CO-146'
+      ]);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual([
+        'ISSUE-CURRENT',
+        'CO-146'
+      ]);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === taskId)
+      ).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rebinds synthetic child linear task-id rows to the canonical parent issue identity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const parentTaskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const childTaskId = `${parentTaskId}-docs-review`;
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:lin-issue-146',
+          issue_id: 'lin-issue-146',
+          issue_identifier: 'CO-146',
+          issue_title: 'Claim-backed active issue',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-07T00:29:30.000Z',
+          task_id: parentTaskId,
+          mapping_source: 'provider_id_fallback',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          accepted_at: '2026-03-07T00:25:00.000Z',
+          updated_at: '2026-03-07T00:29:30.000Z',
+          last_delivery_id: 'delivery-co-146',
+          last_event: 'Issue',
+          last_action: 'update',
+          last_webhook_timestamp: 1_742_360_170_000,
+          run_id: null,
+          run_manifest_path: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-co-146'
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: childTaskId,
+        providerIntakeState
+      });
+
+      await seedManifest(fixture.paths, {
+        run_id: 'run-child',
+        task_id: childTaskId,
+        issue_provider: 'linear',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'provider worker child stream fallback manifest matched by parent claim'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.selected?.issue_identifier).toBe('CO-146');
+      expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual(['CO-146']);
+      expect(compatibilityProjection.issues.map((issue) => issue.issueIdentifier)).toEqual(['CO-146']);
+      expect(
+        compatibilityProjection.issues.find((issue) => issue.issueIdentifier === childTaskId)
+      ).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not treat fallback-only local-mcp claim aliases as authoritative selected activity', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
