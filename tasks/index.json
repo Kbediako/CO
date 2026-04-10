@@ -66,6 +66,23 @@
       }
     },
     {
+      "id": "20260410-linear-aa307fdc-53a1-4225-8d09-28457165fbc8",
+      "title": "CO STATUS: stop synthetic linear-* task-id fallback rows from rendering as running issues",
+      "relates_to": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "task": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "agent_task": ".agent/task/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
+        "docs": "docs/TECH_SPEC-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md"
+      }
+    },
+    {
       "id": "20260410-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc",
       "title": "CO STATUS: clear stale retry state when active claims rehydrate so one issue cannot appear in both Running and Backoff",
       "relates_to": "tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",

@@ -30,6 +30,7 @@ function buildCompatibilitySource(
     latestAction: null,
     latestEvent: null,
     workspacePath: '/repo/.workspaces/co-100',
+    pipelineId: null,
     pipelineTitle: 'Implementation gate',
     stages: [],
     approvalsTotal: 0,
@@ -165,6 +166,219 @@ describe('CompatibilityIssuePresenter', () => {
     );
 
     expect(runningEntry.display_event).toBe('updated TECH_SPEC + validating status parity');
+  });
+
+  it('does not surface selected-only synthetic linear task-id fallback sources as issue rows', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'fallback-only selected source'
+        })
+      )
+    );
+
+    expect(projection.selected?.issue_identifier).toBe(taskId);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface slug-shaped synthetic linear fallback task ids as issue rows', () => {
+    const taskId = 'linear-lin-issue-1';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'fallback-only selected source using slug fallback task id'
+        })
+      )
+    );
+
+    expect(projection.selected?.issue_identifier).toBe(taskId);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface synthetic linear fallback rows from running or retry registration', () => {
+    const runningTaskId = 'linear-lin-issue-1';
+    const retryTaskId = 'linear-lin-issue-2';
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      running: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: runningTaskId,
+          issueId: runningTaskId,
+          taskId: runningTaskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          completedAt: null,
+          summary: 'fallback-only running source using slug fallback task id'
+        })
+      ],
+      retrying: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: retryTaskId,
+          issueId: retryTaskId,
+          taskId: retryTaskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'failed',
+          displayStatus: 'retrying',
+          completedAt: null,
+          summary: 'fallback-only retry source using slug fallback task id'
+        })
+      ]
+    });
+
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface child-shaped parent fallback aliases from running or retry registration', () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const runningTaskId = `${parentTaskId}-docs-review`;
+    const retryTaskId = `${parentTaskId}-implementation-gate`;
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      running: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: runningTaskId,
+          pipelineId: 'docs-review',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          completedAt: null,
+          summary: 'child-shaped running source still reporting the parent fallback alias'
+        })
+      ],
+      retrying: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: retryTaskId,
+          pipelineId: 'implementation-gate',
+          rawStatus: 'failed',
+          displayStatus: 'retrying',
+          completedAt: null,
+          summary: 'child-shaped retry source still reporting the parent fallback alias'
+        })
+      ]
+    });
+
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('keeps non-linear selected rows even when their task id matches the synthetic linear pattern', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'github',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'non-linear selected source'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
+  it('keeps linear-tagged selected rows when provider-worker provenance is absent', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'custom-background-pipeline',
+          pipelineTitle: 'Custom Background Pipeline',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'linear-tagged custom pipeline should stay visible'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
+  it('keeps null-provider child-pipeline fallback rows when worker evidence is absent', () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: null,
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: childTaskId,
+          pipelineId: 'docs-review',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'generic docs-review run with fallback-shaped issue fields'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([parentTaskId]);
+  });
+
+  it('keeps selected rows when optional provider-worker provenance fields are omitted', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: null,
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineTitle: undefined,
+          providerLinearWorkerProof: undefined,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'generic selected source with omitted provenance helpers'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
   });
 
   it('keeps the projected child-summary message and timestamp when newer proof telemetry is generic', () => {
