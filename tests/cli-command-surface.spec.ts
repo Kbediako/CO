@@ -276,6 +276,10 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
+    let stdout = '';
+    let stderr = '';
+    let exitCode = 0;
+
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-unknown-command-'));
     const stdoutPath = join(tempDir, 'stdout.txt');
     const stderrPath = join(tempDir, 'stderr.txt');
@@ -300,9 +304,10 @@ describe('codex-orchestrator command surface', () => {
       }
     );
 
-    const stdout = await readFile(stdoutPath, 'utf8');
-    const stderr = await readFile(stderrPath, 'utf8');
-    const exitCode = Number((await readFile(exitCodePath, 'utf8')).trim());
+    stdout = await readFile(stdoutPath, 'utf8');
+    stderr = await readFile(stderrPath, 'utf8');
+    exitCode = Number((await readFile(exitCodePath, 'utf8')).trim());
+
     expect(exitCode).not.toBe(0);
     if (stderr.trim().length > 0) {
       expect(stderr).toMatch(/Unknown command: unknown-command|Command failed:/);

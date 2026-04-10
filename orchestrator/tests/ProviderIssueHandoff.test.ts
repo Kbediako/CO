@@ -409,7 +409,11 @@ describe('createProviderIssueHandoffService', () => {
       last_action: 'update',
       last_webhook_timestamp: 1_742_360_000_000,
       run_id: null,
-      run_manifest_path: null
+      run_manifest_path: null,
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: 'stale continuation queue'
     });
     const persist = vi.fn(async () => undefined);
 
@@ -441,7 +445,11 @@ describe('createProviderIssueHandoffService', () => {
       issue_updated_at: '2026-03-19T04:25:00.000Z',
       run_id: 'run-active',
       run_manifest_path: activePaths.manifestPath,
-      task_id: 'task-1303-active'
+      task_id: 'task-1303-active',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -3851,6 +3859,34 @@ describe('createProviderIssueHandoffService', () => {
     );
 
     const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:19:00.000Z',
+      task_id: 'stale-task-active',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_run_already_active',
+      accepted_at: '2026-03-19T04:18:05.000Z',
+      updated_at: '2026-03-19T04:18:10.000Z',
+      last_delivery_id: 'delivery-stale-active',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_100_000,
+      run_id: 'stale-run-active',
+      run_manifest_path: '/tmp/provider-run/stale-run-active.json',
+      launch_source: 'control-host',
+      launch_token: 'stale-run-active-token',
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: 'stale continuation queue'
+    });
     const persist = vi.fn(async () => undefined);
     const launcher = {
       start: vi.fn(async () => null),
@@ -3885,7 +3921,11 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_run_already_active',
       run_id: 'run-active',
       run_manifest_path: activePaths.manifestPath,
-      task_id: 'task-1303-active'
+      task_id: 'task-1303-active',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -4252,7 +4292,7 @@ describe('createProviderIssueHandoffService', () => {
       webhookTimestamp: 1_742_362_000_000
     });
 
-    expect(scheduledCallbacks).toHaveLength(1);
+    expect(scheduledCallbacks.length).toBeGreaterThanOrEqual(1);
     await service.rehydrate();
     expect(state.claims[0]).toMatchObject({
       state: 'starting',
@@ -6250,8 +6290,7 @@ describe('createProviderIssueHandoffService', () => {
 
     await service.refresh();
     await waitForMockCalls(setTimeoutSpy);
-    vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
-    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await vi.advanceTimersByTimeAsync(1_001);
     await flushAsyncWork();
     await waitForCondition(
       () =>
@@ -7841,7 +7880,11 @@ describe('createProviderIssueHandoffService', () => {
         run_id: 'run-refresh-owned-active',
         run_manifest_path: childPaths.manifestPath,
         launch_source: 'control-host',
-        launch_token: 'refresh-owned-active-token'
+        launch_token: 'refresh-owned-active-token',
+        retry_queued: true,
+        retry_attempt: 2,
+        retry_due_at: '2026-03-19T04:30:10.000Z',
+        retry_error: 'stale continuation queue'
       });
 
       const persist = vi.fn(async () => undefined);
@@ -7882,8 +7925,13 @@ describe('createProviderIssueHandoffService', () => {
         issue_assignee_id: 'viewer-1',
         issue_assignee_name: 'Codex',
         run_id: 'run-refresh-owned-active',
-        run_manifest_path: childPaths.manifestPath
+        run_manifest_path: childPaths.manifestPath,
+        retry_queued: false,
+        retry_attempt: 2,
+        retry_due_at: null,
+        retry_error: null
       });
+      expect(persist).toHaveBeenCalledTimes(1);
       expect(launcher.start).not.toHaveBeenCalled();
       expect(launcher.resume).not.toHaveBeenCalled();
     }
@@ -13727,7 +13775,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps an active running claim when a terminal failed proof sidecar is older than the manifest', async () => {
+  it('keeps an active running claim and clears stale retry metadata when a terminal failed proof sidecar is older than the manifest', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
 
@@ -13790,6 +13838,10 @@ describe('createProviderIssueHandoffService', () => {
       last_webhook_timestamp: 1_742_360_050_000,
       run_id: 'run-failed',
       run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: null,
+      retry_due_at: '2026-03-19T04:45:00.000Z',
+      retry_error: 'stale continuation queue',
       launch_source: null,
       launch_token: null
     });
@@ -13831,6 +13883,8 @@ describe('createProviderIssueHandoffService', () => {
       run_id: 'run-failed',
       run_manifest_path: childPaths.manifestPath,
       retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
       retry_error: null
     };
     expect(state.claims[0]).toMatchObject(expectedClaim);

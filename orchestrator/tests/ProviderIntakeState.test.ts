@@ -262,6 +262,61 @@ describe('upsertProviderIntakeClaim', () => {
     expect(claim.launch_started_at).toBe(initialClaim.launch_started_at);
   });
 
+  it('clears stale queued retry state while preserving retry attempt on a running rehydrate override', () => {
+    const state = createProviderIntakeState();
+
+    upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-1',
+      run_manifest_path: '/tmp/run-1/manifest.json',
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: 'stale continuation queue'
+    });
+
+    const claim = upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:01.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-1',
+      run_manifest_path: '/tmp/run-1/manifest.json',
+      retry_queued: false,
+      retry_attempt: 2,
+      retry_due_at: null,
+      retry_error: null
+    });
+
+    expect(claim).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      retry_queued: false,
+      retry_attempt: 2,
+      retry_due_at: null,
+      retry_error: null
+    });
+  });
+
   it('preserves launch provenance when the run id is first discovered during rehydrate', () => {
     const state = createProviderIntakeState();
 
