@@ -8,6 +8,17 @@ import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
 
 const execFileAsync = promisify(execFile);
+const ARCHIVE_STUB_MARKER = '<!-- docs-archive:stub -->';
+const INACTIVE_SPEC_STATUSES = new Set([
+  'archived',
+  'canceled',
+  'cancelled',
+  'closed',
+  'completed',
+  'deprecated',
+  'done',
+  'succeeded'
+]);
 
 /**
  * Print usage information and available command-line options for the spec-guard script.
@@ -20,7 +31,7 @@ function showUsage() {
 Ensures that implementation changes adhere to Codex-Orchestrator spec guardrails.
 Checks include:
   • Tracked implementation/migration edits must accompany a spec update under tasks/specs, docs/design/specs, or tasks/index.json
-  • Spec last_review dates under tasks/specs and docs/design/specs must be ≤30 days old
+  • Active spec last_review dates under tasks/specs and docs/design/specs must be ≤30 days old
 
 Options:
   --dry-run   Report failures without exiting non-zero
@@ -163,6 +174,10 @@ async function checkSpecFreshness(specFiles) {
       continue;
     }
 
+    if (isArchivedSpecStub(content) || isInactiveSpec(content)) {
+      continue;
+    }
+
     const reviewLine = content
       .split(/\r?\n/)
       .find((line) => line.trim().startsWith('last_review:'));
@@ -187,6 +202,67 @@ async function checkSpecFreshness(specFiles) {
   }
 
   return failures;
+}
+
+function isInactiveSpec(content) {
+  const lines = content.split(/\r?\n/);
+  let index = 0;
+  while (index < lines.length && lines[index].trim() === '') {
+    index += 1;
+  }
+
+  if (lines[index]?.trim() !== '---') {
+    return false;
+  }
+
+  for (index += 1; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (trimmed === '---') {
+      break;
+    }
+    if (!trimmed.startsWith('status:')) {
+      continue;
+    }
+    const status = trimmed.split(':', 2)[1]?.trim().toLowerCase() ?? '';
+    return INACTIVE_SPEC_STATUSES.has(status);
+  }
+
+  return false;
+}
+
+function isArchivedSpecStub(content) {
+  const lines = content.split(/\r?\n/);
+  let index = 0;
+  while (index < lines.length && lines[index].trim() === '') {
+    index += 1;
+  }
+
+  if (!lines[index]?.trim().startsWith('#')) {
+    return false;
+  }
+
+  index += 1;
+  while (index < lines.length && lines[index].trim() === '') {
+    index += 1;
+  }
+
+  if (lines[index]?.trim().startsWith('last_review:')) {
+    index += 1;
+    while (index < lines.length && lines[index].trim() === '') {
+      index += 1;
+    }
+  }
+
+  if (lines[index]?.trim() !== ARCHIVE_STUB_MARKER) {
+    return false;
+  }
+
+  const trailingLines = lines.slice(index + 1).map((line) => line.trim());
+  return (
+    trailingLines.some((line) => line.startsWith('> Archived on ')) &&
+    trailingLines.some((line) => line.startsWith('- Archive branch:')) &&
+    trailingLines.some((line) => line.startsWith('- Archive path:'))
+  );
 }
 
 async function main() {

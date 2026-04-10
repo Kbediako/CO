@@ -1,6 +1,29 @@
 {
   "items": [
     {
+      "id": "20260410-linear-710e37a2-a7bb-4976-859f-0378d6a7104f",
+      "title": "CO: clear repo-wide stale spec-review dates that are blocking unrelated merge-ready PRs at spec-guard",
+      "relates_to": "tasks/tasks-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-710e37a2-a7bb-4976-859f-0378d6a7104f-co-142-docs-review/cli/2026-04-10T01-49-53-645Z-585fd8cc/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
+        "task": "tasks/tasks-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
+        "agent_task": ".agent/task/linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
+        "docs": "docs/TECH_SPEC-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md"
+      }
+    },
+    {
       "id": "20260409-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee",
       "title": "CO: ship installable local control-host supervision instead of host-local co-control-host-supervisor.sh",
       "relates_to": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
