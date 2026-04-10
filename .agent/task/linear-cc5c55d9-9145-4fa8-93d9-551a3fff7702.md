@@ -8,8 +8,8 @@
 
 ## Docs
 - [x] Docs packet recreated and mirrored in `docs/`, `tasks/`, `.agent/`, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`. Evidence: `docs/PRD-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md`, `docs/TECH_SPEC-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md`, `docs/ACTION_PLAN-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md`, `tasks/specs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md`, `tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md`, `.agent/task/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md`.
-- [ ] docs-review child-stream evidence recorded on the rework-reset packet, and any surfaced packet-shape feedback resolved before code changes.
-- [ ] Exactly one persistent Linear workpad comment is current for this reset attempt.
+- [x] Audited docs-review child-stream attempts were recorded on the rework-reset packet; the latest `co-120-docs-review-r2` run completed delegation/spec/docs checks and then stalled inside bounded review, so packet truth was finalized with manual packet review plus green `docs:check` / `docs:freshness` fallback evidence. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r2/cli/2026-04-10T08-33-39-957Z-ee6cd206/manifest.json`, `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r2/cli/2026-04-10T08-33-39-957Z-ee6cd206/commands/01-delegation-guard.ndjson`, `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r2/cli/2026-04-10T08-33-39-957Z-ee6cd206/commands/03-docs-check.ndjson`, `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r2/cli/2026-04-10T08-33-39-957Z-ee6cd206/commands/04-docs-freshness.ndjson`, `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r2/cli/2026-04-10T08-33-39-957Z-ee6cd206/review/output.log`.
+- [ ] Exactly one persistent Linear workpad comment is current for this reset attempt. Pending: retry `linear upsert-workpad` after the active shared-budget cooldown lifts at `2026-04-10T09:37:42.699Z`. Local source: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/workpad.md`.
 
 ## Investigation
 - [x] Live Linear workflow states were rechecked in `Rework` before active coding. Evidence: `linear issue-context`.
@@ -17,27 +17,28 @@
 - [x] The stale PR `#395` was closed and the stale Linear workpad was deleted as part of the required rework reset. Evidence: `gh pr close 395`, `linear delete-workpad`.
 - [x] The workspace was reset onto fresh branch `linear/co-120-worktree-git-identity-isolation-rework` from `origin/main` before repo edits. Evidence: `git fetch origin refs/heads/main:refs/remotes/origin/main`, `git switch -c linear/co-120-worktree-git-identity-isolation-rework origin/main`.
 - [x] Baseline audit confirmed the bounded seam: the CO-102 archive-sync session log and the checked-in archive automation workflow both use plain `git config user.*` inside linked worktrees, while the repo currently has no repo-owned `git config --worktree` identity path on `origin/main`. Evidence: `/Users/kbediako/.codex/sessions/2026/04/09/rollout-2026-04-09T08-32-53-019d6f3a-208e-7220-a6c7-2e2046309ec0.jsonl`, `.github/workflows/archive-automation-base.yml`.
+- [x] Filed same-project follow-up `CO-148` for explicit historical shared-config remediation/detection rather than widening CO-120 beyond future leak prevention. Evidence: https://linear.app/asabeko/issue/CO-148/co-workflow-add-explicit-remediation-for-historical-shared-git
 
 ## Implementation
-- [ ] Add a repo-owned helper that preserves global identity inheritance by default and uses `git config --worktree` for explicit alternate identity only.
-- [ ] Make the helper own the `extensions.worktreeConfig` precondition explicitly before any first `git config --worktree` identity write.
-- [ ] Switch the linked-worktree archive automation workflow to the safe helper path.
-- [ ] Add focused regression coverage proving the shared repo git config file remains free of a repo-local `[user]` override after linked-worktree helper execution.
-- [ ] Record the exact verification path that proves the cloud/Codex-upgrade hypothesis is not the root cause of this bug.
+- [x] Add a repo-owned helper that preserves global identity inheritance by default and uses `git config --worktree` for explicit alternate identity only. Evidence: `scripts/worktree-git-identity.mjs`.
+- [x] Make the helper own the `extensions.worktreeConfig` precondition explicitly before any first `git config --worktree` identity write. Evidence: `scripts/worktree-git-identity.mjs`.
+- [x] Switch the linked-worktree archive automation workflow to the safe helper path. Evidence: `.github/workflows/archive-automation-base.yml`.
+- [x] Add focused regression coverage proving the shared repo git config file remains free of a repo-local `[user]` override after linked-worktree helper execution. Evidence: `tests/worktree-git-identity.spec.ts`.
+- [x] Record the exact verification path that proves the cloud/Codex-upgrade hypothesis is not the root cause of this bug. Evidence: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/workpad.md`.
 
 ## Validation
-- [ ] `MCP_RUNNER_TASK_ID=linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702 node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --stream co-120-docs-review-r2 --format json`
-- [ ] Focused linked-worktree helper regression coverage in a temporary repo on the fresh `origin/main` base.
-- [ ] Exact shared repo git-config before/after verification commands recorded and rerun locally, including any one-time `extensions.worktreeConfig=true` setup step.
-- [ ] `node scripts/delegation-guard.mjs`
-- [ ] `node scripts/spec-guard.mjs --dry-run`
-- [ ] `npm run build`
-- [ ] `npm run lint`
-- [ ] `npm run test`
-- [ ] `npm run docs:check`
-- [ ] `npm run docs:freshness`
-- [ ] `node scripts/diff-budget.mjs`
-- [ ] Standalone review plus explicit elegance pass completed for the final diff before handoff.
+- [x] `MCP_RUNNER_TASK_ID=linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702 "/opt/homebrew/Cellar/node/25.2.1/bin/node" "/Users/kbediako/Code/CO/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --stream co-120-docs-review-r2 --format json` reached the bounded docs-review lane and recorded its manifest/log evidence before stalling inside the review phase. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r2/cli/2026-04-10T08-33-39-957Z-ee6cd206/manifest.json`, `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r2/cli/2026-04-10T08-33-39-957Z-ee6cd206/review/output.log`.
+- [x] Focused linked-worktree helper regression coverage in a temporary repo on the fresh `origin/main` base. Evidence: `npx vitest run tests/worktree-git-identity.spec.ts`.
+- [x] Exact shared repo git-config before/after verification commands recorded and rerun locally, including the `extensions.worktreeConfig=true` helper path when explicit worktree-local identity is requested. Evidence: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/workpad.md`.
+- [x] `node scripts/delegation-guard.mjs`
+- [x] `node scripts/spec-guard.mjs --dry-run`
+- [x] `npm run build`
+- [x] `npm run lint`
+- [x] `npm run test`
+- [x] `npm run docs:check`
+- [x] `npm run docs:freshness`
+- [x] `node scripts/diff-budget.mjs`
+- [x] Standalone review plus explicit elegance pass completed for the final diff before handoff via wrapper-boundary fallback. Evidence: `/Users/kbediako/Code/CO/.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/cli/2026-04-10T06-49-36-514Z-4c2d9b1b/review/telemetry.json`, `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/workpad.md`.
 
 ## Handoff
 - [ ] Fresh PR attached to the issue.
