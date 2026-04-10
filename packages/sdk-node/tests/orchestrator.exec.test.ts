@@ -46,12 +46,15 @@ describe('ExecClient', () => {
     expect(handle.summary?.payload.result.exitCode).toBe(0);
     expect(result.summary.payload.outputs.stdout).toBe('ok');
     expect(result.exitCode).toBe(0);
-    expect(result.rawStderr).toEqual([]);
-    expect(result.eventsPath).toContain('events.ndjson');
-    expect(result.stderrPath).toContain('stderr.log');
-    await expect(readFile(result.eventsPath, 'utf8')).resolves.toContain('"type":"run:summary"');
-    await expect(readFile(result.stderrPath, 'utf8')).resolves.toBe('');
-    await handle.cleanupArtifacts();
+    try {
+      expect(result.rawStderr).toEqual([]);
+      expect(result.eventsPath).toContain('events.ndjson');
+      expect(result.stderrPath).toContain('stderr.log');
+      await expect(readFile(result.eventsPath, 'utf8')).resolves.toContain('"type":"run:summary"');
+      await expect(readFile(result.stderrPath, 'utf8')).resolves.toBe('');
+    } finally {
+      await handle.cleanupArtifacts();
+    }
     await expect(access(result.eventsPath)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(access(result.stderrPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });

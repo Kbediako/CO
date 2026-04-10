@@ -28,7 +28,7 @@ import {
   resolveCollabRolePolicyConfig,
   type RlmCodexRuntimeShell
 } from './rlm/rlmCodexRuntimeShell.js';
-import type { AlignmentPolicy } from './rlm/alignment.js';
+import { DEFAULT_ALIGNMENT_POLICY, type AlignmentPolicy } from './rlm/alignment.js';
 import type {
   RlmAgentInput,
   RlmAgentResult,
@@ -71,9 +71,9 @@ const DEFAULT_ALIGNMENT_COOLDOWN_TURNS = 2;
 const DEFAULT_ALIGNMENT_CONSENSUS_TOP_SCORE_MIN = 0.7;
 const DEFAULT_ALIGNMENT_CONSENSUS_MARGIN_MIN = 0.15;
 const DEFAULT_ALIGNMENT_CONSENSUS_REQUIRED_VOTES = 2;
-const DEFAULT_ALIGNMENT_SENTINEL_MODEL = 'gpt-5.4';
-const DEFAULT_ALIGNMENT_HIGH_REASONING_MODEL = 'gpt-5.4';
-const DEFAULT_ALIGNMENT_ARBITRATION_MODEL = 'gpt-5.4';
+const DEFAULT_ALIGNMENT_SENTINEL_MODEL = DEFAULT_ALIGNMENT_POLICY.route.sentinel_model;
+const DEFAULT_ALIGNMENT_HIGH_REASONING_MODEL = DEFAULT_ALIGNMENT_POLICY.route.high_reasoning_model;
+const DEFAULT_ALIGNMENT_ARBITRATION_MODEL = DEFAULT_ALIGNMENT_POLICY.route.arbitration_model;
 const DEFAULT_ALIGNMENT_HIGH_REASONING_AVAILABLE = true;
 const UNBOUNDED_ITERATION_ALIASES = new Set(['unbounded', 'unlimited', 'infinite', 'infinity']);
 

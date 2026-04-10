@@ -46,7 +46,7 @@ describe('ExecClient artifact retention', () => {
       import { setTimeout as delay } from 'node:timers/promises';
       import { ExecClient } from ${JSON.stringify(sdkModuleUrl)};
 
-      const retainedArtifactPath = await (async () => {
+      const { retainedEventsPath, retainedStderrPath } = await (async () => {
         const client = new ExecClient({
           cliPath: ${JSON.stringify(cliBootstrapPath)},
           cwd: ${JSON.stringify(workspaceRoot)}
@@ -57,22 +57,30 @@ describe('ExecClient artifact retention', () => {
           args: ['-e', 'console.log("ok")']
         }).result;
 
-        return result.eventsPath;
+        return {
+          retainedEventsPath: result.eventsPath,
+          retainedStderrPath: result.stderrPath
+        };
       })();
 
       let cleaned = false;
+      let eventsStillExist = true;
+      let stderrStillExist = true;
       for (let attempt = 0; attempt < 50; attempt += 1) {
         global.gc();
         await delay(20);
-        const artifactStillExists = await access(retainedArtifactPath).then(() => true, () => false);
-        if (!artifactStillExists) {
+        eventsStillExist = await access(retainedEventsPath).then(() => true, () => false);
+        stderrStillExist = await access(retainedStderrPath).then(() => true, () => false);
+        if (!eventsStillExist && !stderrStillExist) {
           cleaned = true;
           break;
         }
       }
 
       if (!cleaned) {
-        throw new Error('compatibility artifact path was not reclaimed after references were released');
+        throw new Error(
+          \`compatibility artifact paths were not reclaimed after references were released: events=\${eventsStillExist} stderr=\${stderrStillExist}\`
+        );
       }
     `);
   }, 30_000);
