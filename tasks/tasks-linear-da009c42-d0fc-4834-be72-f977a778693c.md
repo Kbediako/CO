@@ -39,8 +39,8 @@
 - [x] `npm run pack:smoke` if the final diff touches downstream-facing CLI/runtime surfaces. Evidence: `✅ pack smoke passed` on 2026-04-10.
 
 ## Handoff
-- [ ] PR attached to the issue.
-- [x] Latest `origin/main` merged into the branch before review-state transition.
+- [ ] PR attached to the issue. Pending live Linear attachment verification after the shared-budget cooldown ending `2026-04-10T08:06:28.015Z`.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge-sync commits `6016ca4cd` and `2aba4aeba`.
 - [ ] PR checks green and `pr ready-review` drain clean before review-state transition.
 - [ ] Unresolved actionable review threads: `0` (or explicit waiver plus evidence recorded here before handoff).
 - [ ] Issue moved to `Human Review` or `In Review`.
