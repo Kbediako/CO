@@ -258,10 +258,34 @@ describe('controlHostCliShell manifest discovery', () => {
     expect(command).toContain("'start' 'O'\\''Reilly' 'line-1\nline-2'");
   });
 
+  it('does not inherit local process.execArgv in remote worker launch commands', () => {
+    const originalExecArgv = process.execArgv;
+    process.execArgv = ['--require', '/tmp/local-only-register.js', '--inspect=9230'];
+
+    try {
+      const command = buildRemoteProviderLaunchCommand({
+        cwd: '/repo/.workspaces/provider-task',
+        nodePath: '/opt/homebrew/bin/node',
+        cliEntrypoint: '/repo/dist/bin/codex-orchestrator.js',
+        args: ['start', 'provider-linear-worker'],
+        envValues: {
+          CODEX_ORCHESTRATOR_ROOT: '/repo/.workspaces/provider-task'
+        }
+      });
+
+      expect(command).not.toContain('/tmp/local-only-register.js');
+      expect(command).not.toContain('--inspect=9230');
+      expect(command).toContain("'/opt/homebrew/bin/node' '/repo/dist/bin/codex-orchestrator.js'");
+    } finally {
+      process.execArgv = originalExecArgv;
+    }
+  });
+
   it('only forwards the bounded inherited env allowlist to remote worker launches', () => {
     expect(
       buildRemoteProviderEnvValues(
         {
+          all_proxy: 'socks5://lowercase-proxy.internal:1080',
           CO_LINEAR_API_TOKEN: 'lin-token',
           CO_PROVIDER_WORKER_MAX_TURNS: '12',
           CODEX_CONFIG_OVERRIDES: 'model_reasoning_effort="xhigh"',
@@ -273,6 +297,9 @@ describe('controlHostCliShell manifest discovery', () => {
           CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
           CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
           CODEX_RUNTIME_MODE: 'cli',
+          http_proxy: 'http://proxy.internal:8080',
+          https_proxy: 'https://proxy.internal:8444',
+          no_proxy: 'localhost,127.0.0.1',
           OPENAI_API_KEY: 'sk-test',
           HTTPS_PROXY: 'https://proxy.internal:8443',
           LINEAR_API_KEY: 'lin-key',
@@ -284,6 +311,7 @@ describe('controlHostCliShell manifest discovery', () => {
         }
       )
     ).toEqual({
+      all_proxy: 'socks5://lowercase-proxy.internal:1080',
       CO_LINEAR_API_TOKEN: 'lin-token',
       CO_PROVIDER_WORKER_MAX_TURNS: '12',
       CODEX_CONFIG_OVERRIDES: 'model_reasoning_effort="xhigh"',
@@ -295,6 +323,9 @@ describe('controlHostCliShell manifest discovery', () => {
       CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
       CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
       CODEX_RUNTIME_MODE: 'cli',
+      http_proxy: 'http://proxy.internal:8080',
+      https_proxy: 'https://proxy.internal:8444',
+      no_proxy: 'localhost,127.0.0.1',
       OPENAI_API_KEY: 'sk-test',
       HTTPS_PROXY: 'https://proxy.internal:8443',
       LINEAR_API_KEY: 'lin-key',
