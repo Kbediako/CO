@@ -582,10 +582,10 @@ export function createProviderIssueHandoffService(
     claimWorkerHost?: string | null;
     previousRun?: Pick<ProviderIssueRunRecord, 'workerHost'> | null;
   }): string | null => {
-    if (input.previousRun) {
-      return normalizeProviderWorkerHostName(input.previousRun.workerHost ?? null);
-    }
-    return normalizeProviderWorkerHostName(input.claimWorkerHost ?? null);
+    return (
+      normalizeProviderWorkerHostName(input.previousRun?.workerHost ?? null) ??
+      normalizeProviderWorkerHostName(input.claimWorkerHost ?? null)
+    );
   };
 
   const selectLaunchWorkerHost = async (input: {
