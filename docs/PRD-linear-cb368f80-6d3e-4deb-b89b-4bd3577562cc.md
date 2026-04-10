@@ -115,6 +115,7 @@
   - `providerIssueHandoff.ts` owns the active-run rehydrate/write paths
   - `providerIntakeState.ts` owns claim upsert defaults and retry-field persistence behavior
   - runtime/dashboard layers already mostly reflect current claim truth, so the source-of-truth fix should stay upstream
+  - the current shared-root intake artifact no longer reproduces the stale `CO-127` shape, so the rework branch treats focused regressions as the authoritative proof instead of overstating live local artifact coverage
 - Dependencies / Integrations:
   - `orchestrator/src/cli/control/providerIssueHandoff.ts`
   - `orchestrator/src/cli/control/providerIntakeState.ts`
@@ -127,5 +128,5 @@
 
 ## Approvals
 - Product: Self-approved from the Linear issue scope
-- Engineering: Audited `codex-orchestrator docs-review` child stream `co-145-docs-review` passed `spec-guard` and `docs:check`, then failed only on the standing repo `docs:freshness` baseline (`stale docs: 119`, `Task Packet stale=85`, `Task Mirror stale=17`, `Report Only stale=17`). Manual fallback accepted because the `CO-145` packet was freshly registered in this run. Evidence: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-co-145-docs-review/cli/2026-04-10T06-58-45-966Z-acba9f0e/manifest.json`, `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T065845Z-docs-review-fallback.md`.
+- Engineering: Audited `codex-orchestrator docs-review` child stream `docs-review-rework-rerun` passed `spec-guard`, `docs:check`, `docs:freshness`, and forced standalone review cleanly after the one-line `docs/TASKS.md` budget fix. Evidence: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json`, `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/run-summary.json`.
 - Design: N/A

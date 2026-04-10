@@ -34,6 +34,7 @@ last_review: 2026-04-10
   - rehydrate paths write `state: running` / `reason: provider_issue_rehydrated_active_run` and clear `merge_closeout`, but stale retry metadata can remain
   - `upsertProviderIntakeClaim(...)` can preserve existing retry fields when the incoming write does not explicitly supersede them
   - runtime/dashboard surfaces are mostly truthful about current claim state
+  - the current shared-root intake artifact no longer preserves the original stale-shape claim, so focused tests are the authoritative reproducer in this rework attempt
 - Reference truth:
   - running claims should not retain stale retry metadata unless they are still intentionally retry-owned
 - Target truth / intended delta:
@@ -69,8 +70,8 @@ last_review: 2026-04-10
 
 ## Architecture & Data
 - Architecture / design adjustments:
-  - centralize or consistently reuse the existing retry-field clearing helper for active-run rehydrate writes
-  - tighten any intake-state defaulting that still permits stale retry metadata to survive on running claims
+  - centralize authoritative active-running claim writes through `buildActiveRunRetryFields()` and `buildRehydratedActiveRunClaimFields()` in `providerIssueHandoff.ts`
+  - keep `providerIntakeState.ts` unchanged in this lane because explicit authoritative running writers now supersede stale retry metadata with lower blast radius than a broader intake-state default rewrite
 - Data model changes / migrations:
   - none; this is a bounded behavior fix on existing claim fields
 - External dependencies / integrations:
@@ -83,7 +84,8 @@ last_review: 2026-04-10
   - `ControlRuntime` or related projection test proving the same issue no longer renders in both `Running` and `Backoff` after rehydrate
   - full repo validation floor before review handoff
 - Rollout verification:
-  - confirm the `CO-127` shape is covered by tests/artifacts and resolves through claim truth rather than renderer dedupe
+  - confirm the `CO-127` shape is covered by focused regressions and resolves through claim truth rather than renderer dedupe
+  - record that the current shared-root intake artifact no longer reproduces the stale shape so the rework proof stays test-backed rather than overstating live local artifact coverage
 - Monitoring / alerts:
   - none beyond existing claim/runtime visibility
 
@@ -91,7 +93,7 @@ last_review: 2026-04-10
 - Is one shared `clearProviderRetryState(...)` helper already sufficient for all affected rehydrate paths, or is there one additional active-running upsert seam that must be made explicit to avoid future drift?
 
 ## Approvals
-- Reviewer: `codex-orchestrator docs-review` child stream `co-145-docs-review` (`failed-other`, manual fallback accepted)
-- Manifest: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-co-145-docs-review/cli/2026-04-10T06-58-45-966Z-acba9f0e/manifest.json`
-- Override reason: The audited docs-review child stream passed `spec-guard` and `docs:check`, then failed only on the standing repo `docs:freshness` baseline (`stale docs: 119`; `Task Packet stale=85`, `Task Mirror stale=17`, `Report Only stale=17`). The `CO-145` packet was created and registered in this run with `last_review: 2026-04-10`, so this is recorded as a truthful repo-baseline fallback rather than a packet-shape blocker. See `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T065845Z-docs-review-fallback.md`.
+- Reviewer: `codex-orchestrator docs-review` child stream `docs-review-rework-rerun` (`succeeded`, `clean-success`)
+- Manifest: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json`
+- Override reason: This rerun supersedes the earlier temporary `docs/TASKS.md` line-budget stop. See `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/run-summary.json`.
 - Date: 2026-04-10

@@ -12,10 +12,11 @@ related_action_plan: docs/ACTION_PLAN-linear-cb368f80-6d3e-4deb-b89b-4bd3577562c
 related_tasks:
   - tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md
 review_notes:
-  - 2026-04-10: Opened from Linear issue `CO-145` in the provider-worker workspace after rechecking live CO team states with the packaged `linear issue-context` helper, confirming the issue is already in `In Progress`, recording the required same-turn `stay_serial` / `single_bounded_change` parallelization decision, and switching the detached workspace at `f75e702ea` onto branch `linear/co-145-clear-stale-retry-state-active-claims`.
+  - 2026-04-10: Restarted from Linear issue `CO-145` in the provider-worker workspace after rechecking live CO team states with the packaged `linear issue-context` helper, confirming the issue is in active `Rework`, closing prior PR `#412`, deleting the prior workpad comment, recording the required same-turn `stay_serial` / `single_bounded_change` parallelization decision, and switching the detached workspace at `f75e702ea` onto branch `linear/co-145-clear-stale-retry-state-active-claims-rework`.
   - 2026-04-10: Pre-implementation issue-quality review confirms this is a claim-state source-of-truth lane, not mainly a renderer lane. `providerIssueHandoff.ts` has active-run rehydrate writes that clear `merge_closeout` but can still preserve stale retry metadata, while `providerIntakeState.ts` can carry forward existing retry fields by default.
   - 2026-04-10: The lane remains narrower than generic retry redesign. Real `resumable` / `handoff_failed` flows still need retry ownership preserved, and the fix should stay focused on stale retry metadata surviving authoritative running rehydrate.
-  - 2026-04-10: Audited docs-first approval completed via child stream `co-145-docs-review` with truthful repo-baseline fallback. Manifest `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-co-145-docs-review/cli/2026-04-10T06-58-45-966Z-acba9f0e/manifest.json` passed `spec-guard` and `docs:check`; the only stop was `docs:freshness` on the standing repo baseline (`stale docs: 119`, `Task Packet stale=85`, `Task Mirror stale=17`, `Report Only stale=17`).
+  - 2026-04-10: The first rework `docs-review` child stream stopped only because the replay temporarily pushed `docs/TASKS.md` to `451` lines. After restoring the one-line budget trim, rerun `docs-review-rework-rerun` passed `spec-guard`, `docs:check`, `docs:freshness`, and forced standalone review cleanly. Manifest: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json`.
+  - 2026-04-10: The current shared-root intake artifact no longer preserves a live running claim with stale retry queue metadata, so focused regressions are now the authoritative reproducer and proof for the `CO-127` stale-shape contract while the fix remains at the claim-state source seam.
 ---
 
 # Technical Specification
@@ -58,6 +59,7 @@ The live `CO-127` shape is a claim inconsistency. One claim can be restored to `
 - `providerIssueHandoff.ts` rehydrate writers already clear `merge_closeout` but not all stale retry metadata.
 - `providerIntakeState.ts` can preserve retry metadata from the existing claim when incoming writes do not explicitly supersede it.
 - runtime/dashboard layers already mostly reflect the underlying claim truth, which is why the same issue can currently appear in both sections.
+- The current shared-root intake artifact no longer contains the original stale-shape claim, so tests rather than live local intake JSON are the authoritative rework reproducer.
 
 ## Proposed Design
 - Explicitly clear retry metadata on authoritative running rehydrate writes.
@@ -90,7 +92,7 @@ The live `CO-127` shape is a claim inconsistency. One claim can be restored to `
 - Full repo validation floor before review handoff
 
 ## Approvals
-- Reviewer: `codex-orchestrator docs-review` child stream `co-145-docs-review` (`failed-other`, manual fallback accepted)
-- Manifest: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-co-145-docs-review/cli/2026-04-10T06-58-45-966Z-acba9f0e/manifest.json`
-- Override note: `docs:freshness` failed only on the standing repo baseline, not on the `CO-145` packet. See `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T065845Z-docs-review-fallback.md`.
+- Reviewer: `codex-orchestrator docs-review` child stream `docs-review-rework-rerun` (`succeeded`, `clean-success`)
+- Manifest: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json`
+- Override note: This rerun supersedes the earlier temporary `docs/TASKS.md` line-budget stop. See `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/run-summary.json`.
 - Date: 2026-04-10

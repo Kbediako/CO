@@ -26,10 +26,10 @@
 
 ## Milestones & Sequencing
 - [x] Register the `linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc` docs packet, task mirrors, freshness registry entries, `docs/TASKS.md` snapshot, and initial workpad source.
-- [x] Run audited `linear child-stream --pipeline docs-review` and record the manifest-backed result or truthful fallback. Evidence: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-co-145-docs-review/cli/2026-04-10T06-58-45-966Z-acba9f0e/manifest.json`, `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T065845Z-docs-review-fallback.md`.
-- [ ] Reproduce the stale retry rehydrate shape from current tests or local intake artifacts and enumerate every active-run rehydrate/upsert path that must clear retry metadata.
-- [ ] Implement the smallest source-of-truth fix in `providerIssueHandoff.ts` and any bounded `providerIntakeState.ts` defaulting seam that still preserves stale retry metadata on running claims.
-- [ ] Add focused regressions proving the same issue no longer projects into both `Running` and `Backoff` after rehydrate while real retry-owned flows still queue correctly.
+- [x] Run audited `linear child-stream --pipeline docs-review` and record the manifest-backed result. Evidence: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json`, `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/run-summary.json`.
+- [x] Reproduce the stale retry rehydrate shape from current tests or local intake artifacts and enumerate every active-run rehydrate/upsert path that must clear retry metadata.
+- [x] Implement the smallest source-of-truth fix in `providerIssueHandoff.ts` and any bounded `providerIntakeState.ts` defaulting seam that still preserves stale retry metadata on running claims.
+- [x] Add focused regressions proving the same issue no longer projects into both `Running` and `Backoff` after rehydrate while real retry-owned flows still queue correctly.
 - [ ] Run the required validation floor, standalone review, and elegance pass before PR/review handoff.
 
 ## Dependencies
@@ -40,10 +40,10 @@
 - `orchestrator/tests/ControlRuntime.test.ts`
 
 ## Validation
-- [x] Audited `linear child-stream --pipeline docs-review` with truthful repo-baseline fallback. Evidence: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-co-145-docs-review/cli/2026-04-10T06-58-45-966Z-acba9f0e/manifest.json`, `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/20260410T065845Z-docs-review-fallback.md`.
-- [ ] Focused stale-retry rehydrate regressions in handoff/intake/runtime tests.
-- [ ] Required local validation floor (`node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `FORCE_CODEX_REVIEW=1 npm run review`, `npm run pack:smoke`).
-- [ ] Explicit elegance/minimality pass recorded before review handoff.
+- [x] Audited `linear child-stream --pipeline docs-review` rerun passed cleanly. Evidence: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json`, `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/run-summary.json`.
+- [x] Focused stale-retry rehydrate regressions in handoff/intake/runtime tests.
+- [ ] Required local validation floor (`node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`, `FORCE_CODEX_REVIEW=1 npm run review`, `npm run pack:smoke`) is still in progress because the parent review hit a wrapper `failed-boundary` stop and `npm run pack:smoke` has not yet been rerun on the rework branch head.
+- [x] Explicit elegance/minimality pass recorded before review handoff.
 - Rollback plan:
   - keep the change bounded to claim retry-state management so revert remains isolated if needed
 
@@ -56,5 +56,5 @@
   - Mitigation: record truthful manifest-backed fallback rather than treating repo-baseline drift as a packet-shape blocker.
 
 ## Approvals
-- Reviewer: `codex-orchestrator docs-review` child stream `co-145-docs-review` (`failed-other`, manual fallback accepted)
+- Reviewer: `codex-orchestrator docs-review` child stream `docs-review-rework-rerun` (`succeeded`, `clean-success`)
 - Date: 2026-04-10
