@@ -1,6 +1,31 @@
 {
   "items": [
     {
+      "id": "20260410-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6",
+      "title": "CO: Recover frontend-test CLI from pre-manifest hang under ts-node entrypoint",
+      "relates_to": "tasks/tasks-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success after repo-supported docs:archive-tasks fallback)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6-co-128-docs-review-rerun/cli/2026-04-10T10-09-13-856Z-2911fdb0/manifest.json",
+          "telemetry": ".runs/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6-co-128-docs-review-rerun/cli/2026-04-10T10-09-13-856Z-2911fdb0/review/telemetry.json",
+          "override_reason": "The initial docs-review child stream failed only because `docs/TASKS.md` crossed the enforced line budget (`451 > 450`) after the CO-128 packet was added. After the repo-supported `npm run docs:archive-tasks` fallback reduced the file back to budget, the rerun passed spec-guard, docs:check, docs:freshness, and the forced review wrapper with telemetry `status: succeeded`, `review_outcome: clean-success`."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "task": "tasks/tasks-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "agent_task": ".agent/task/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
+        "docs": "docs/TECH_SPEC-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md"
+      }
+    },
+    {
       "id": "20260410-linear-d3f1af87-57da-46ab-901d-75a6cc60420e",
       "title": "CO: restore current-main docs:freshness green baseline after CO-134 validation repair",
       "relates_to": "tasks/tasks-linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md",

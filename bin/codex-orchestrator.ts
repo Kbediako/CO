@@ -5,63 +5,29 @@ import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
-import { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
-import { type ExecOutputMode } from '../orchestrator/src/cli/exec/command.js';
-import { runExecCliShell, type RunExecCliShellParams } from '../orchestrator/src/cli/execCliShell.js';
-import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
-import { normalizeEnvironmentPaths, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
-import { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
+import type { CodexOrchestrator } from '../orchestrator/src/cli/orchestrator.js';
+import type { ExecOutputMode } from '../orchestrator/src/cli/exec/command.js';
+import type { RunExecCliShellParams } from '../orchestrator/src/cli/execCliShell.js';
+import type { DoctorIssueLogResult } from '../orchestrator/src/cli/doctorIssueLog.js';
+import type { RunEventEmitter } from '../orchestrator/src/cli/events/runEvents.js';
 import type { HudController } from '../orchestrator/src/cli/ui/controller.js';
-import { evaluateInteractiveGate } from '../orchestrator/src/cli/utils/interactive.js';
-import { buildSelfCheckResult } from '../orchestrator/src/cli/selfCheck.js';
-import {
-  runDoctor
-} from '../orchestrator/src/cli/doctor.js';
-import { runDoctorUsage } from '../orchestrator/src/cli/doctorUsage.js';
-import { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';
-import {
-  formatDoctorIssueLogSummary,
-  type DoctorIssueLogResult,
-  writeDoctorIssueLog
-} from '../orchestrator/src/cli/doctorIssueLog.js';
-import { runInitCliShell } from '../orchestrator/src/cli/initCliShell.js';
-import { runCodexCliShell } from '../orchestrator/src/cli/codexCliShell.js';
-import { runDevtoolsCliShell } from '../orchestrator/src/cli/devtoolsCliShell.js';
-import { runDelegationCliShell } from '../orchestrator/src/cli/delegationCliShell.js';
-import { runLinearCliShell } from '../orchestrator/src/cli/linearCliShell.js';
-import { runSkillsCliShell } from '../orchestrator/src/cli/skillsCliShell.js';
-import { runFlowCliRequestShell } from '../orchestrator/src/cli/flowCliRequestShell.js';
-import { runStartCliRequestShell } from '../orchestrator/src/cli/startCliRequestShell.js';
-import { runFrontendTestCliShell } from '../orchestrator/src/cli/frontendTestCliShell.js';
-import { runFrontendTestCliRequestShell } from '../orchestrator/src/cli/frontendTestCliRequestShell.js';
-import { runPlanCliShell } from '../orchestrator/src/cli/planCliShell.js';
-import { runDoctorCliRequestShell } from '../orchestrator/src/cli/doctorCliRequestShell.js';
-import { runRlmCliRequestShell } from '../orchestrator/src/cli/rlmCliRequestShell.js';
-import { runRlmCompletionCliShell } from '../orchestrator/src/cli/rlmCompletionCliShell.js';
-import { runResumeCliShell } from '../orchestrator/src/cli/resumeCliShell.js';
-import { runStatusCliShell } from '../orchestrator/src/cli/statusCliShell.js';
-import { runSelfCheckCliShell } from '../orchestrator/src/cli/selfCheckCliShell.js';
-import { printSetupCliHelp, runSetupCliShell } from '../orchestrator/src/cli/setupCliShell.js';
-import { runReviewCliLaunchShell } from '../orchestrator/src/cli/reviewCliLaunchShell.js';
-import { findPackageRoot, loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
+import { resolveEnvironmentPaths } from '../scripts/lib/run-manifests.js';
+import { normalizeTaskId, sanitizeTaskId } from '../orchestrator/src/cli/run/environment.js';
+import { loadPackageInfo } from '../orchestrator/src/cli/utils/packageInfo.js';
 import { slugify } from '../orchestrator/src/cli/utils/strings.js';
-import { serveMcp } from '../orchestrator/src/cli/mcp.js';
-import { runMcpEnableCliShell } from '../orchestrator/src/cli/mcpEnableCliShell.js';
-import { runDelegationServerCliShell } from '../orchestrator/src/cli/delegationServerCliShell.js';
-import {
-  DEFAULT_PROVIDER_START_PIPELINE_ID,
-  runControlHostCliShell
-} from '../orchestrator/src/cli/controlHostCliShell.js';
-import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/controlHostSupervisionCliShell.js';
-import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
-import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 type ExecutionModeOption = 'mcp' | 'cloud';
 type RuntimeModeOption = 'cli' | 'appserver';
 const AUTO_ISSUE_LOG_ENV_KEY = 'CODEX_ORCHESTRATOR_AUTO_ISSUE_LOG';
+const REPO_CONFIG_REQUIRED_ENV_KEY = 'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED';
+const DEFAULT_PROVIDER_START_PIPELINE_ID = 'provider-linear-worker';
+
+interface InteractiveGate {
+  enabled: boolean;
+  reason: string | null;
+}
 
 interface RunOutputPayload {
   run_id: string;
@@ -109,6 +75,28 @@ export function isDirectExecution(entryArg = process.argv[1], metaUrl = import.m
   return candidateUrls.has(metaUrl);
 }
 
+async function createOrchestrator(): Promise<CodexOrchestrator> {
+  const { CodexOrchestrator } = await import('../orchestrator/src/cli/orchestrator.js');
+  return new CodexOrchestrator();
+}
+
+function validateEnvironmentTaskId(): void {
+  normalizeTaskId(resolveEnvironmentPaths().taskId);
+}
+
+function formatDoctorIssueLogSummary(result: DoctorIssueLogResult): string[] {
+  const lines: string[] = [];
+  lines.push(`Issue log: ${result.issue_id}`);
+  lines.push(`  - markdown: ${result.issue_log_path}`);
+  lines.push(`  - bundle: ${result.bundle_path}`);
+  if (result.run_context) {
+    lines.push(`  - run: ${result.run_context.run_id} (${result.run_context.status})`);
+  } else {
+    lines.push('  - run: <none found>');
+  }
+  return lines;
+}
+
 export async function runCodexOrchestratorCli(rawArgs: string[] = process.argv.slice(2)): Promise<number> {
   process.exitCode = 0;
   const args = [...rawArgs];
@@ -123,31 +111,33 @@ export async function runCodexOrchestratorCli(rawArgs: string[] = process.argv.s
   }
 
   try {
-    const orchestrator = new CodexOrchestrator();
+    // Preserve the historical fail-fast task-id validation even when the selected
+    // command no longer needs to construct the full orchestrator graph.
+    validateEnvironmentTaskId();
     switch (command) {
       case 'start':
-        await handleStart(orchestrator, args);
+        await handleStart(await createOrchestrator(), args);
         break;
       case 'frontend-test':
-        await handleFrontendTest(orchestrator, args);
+        await handleFrontendTest(await createOrchestrator(), args);
         break;
       case 'flow':
-        await handleFlow(orchestrator, args);
+        await handleFlow(await createOrchestrator(), args);
         break;
       case 'review':
         await handleReview(args);
         break;
       case 'plan':
-        await handlePlan(orchestrator, args);
+        await handlePlan(await createOrchestrator(), args);
         break;
       case 'rlm':
-        await handleRlm(orchestrator, args);
+        await handleRlm(await createOrchestrator(), args);
         break;
       case 'resume':
-        await handleResume(orchestrator, args);
+        await handleResume(await createOrchestrator(), args);
         break;
       case 'status':
-        await handleStatus(orchestrator, args);
+        await handleStatus(await createOrchestrator(), args);
         break;
       case 'control-host':
         await handleControlHost(args);
@@ -525,6 +515,10 @@ async function maybeCaptureAutoIssueLog(params: {
     return { issueLog: null, issueLogError: null };
   }
   try {
+    const [{ writeDoctorIssueLog }, { runDoctor }] = await Promise.all([
+      import('../orchestrator/src/cli/doctorIssueLog.js'),
+      import('../orchestrator/src/cli/doctor.js')
+    ]);
     const issueLog = await writeDoctorIssueLog({
       doctor: runDoctor(),
       issueTitle: params.issueTitle,
@@ -579,6 +573,7 @@ async function handleStart(orchestrator: CodexOrchestrator, rawArgs: string[]): 
     printStartHelp();
     return;
   }
+  const { runStartCliRequestShell } = await import('../orchestrator/src/cli/startCliRequestShell.js');
   await runStartCliRequestShell({
     orchestrator,
     positionals,
@@ -615,6 +610,7 @@ async function handleFrontendTest(orchestrator: CodexOrchestrator, rawArgs: stri
     printFrontendTestHelp();
     return;
   }
+  const { runFrontendTestCliRequestShell } = await import('../orchestrator/src/cli/frontendTestCliRequestShell.js');
   await runFrontendTestCliRequestShell({
     orchestrator,
     positionals,
@@ -634,6 +630,7 @@ async function handleFlow(orchestrator: CodexOrchestrator, rawArgs: string[]): P
     printFlowHelp();
     return;
   }
+  const { runFlowCliRequestShell } = await import('../orchestrator/src/cli/flowCliRequestShell.js');
   await runFlowCliRequestShell({
     orchestrator,
     positionals,
@@ -660,6 +657,7 @@ async function handleReview(rawArgs: string[]): Promise<void> {
     printReviewHelp();
     return;
   }
+  const { runReviewCliLaunchShell } = await import('../orchestrator/src/cli/reviewCliLaunchShell.js');
   const exitCode = await runReviewCliLaunchShell({ rawArgs });
   if (exitCode !== 0) {
     process.exitCode = exitCode;
@@ -675,6 +673,7 @@ async function handlePlan(orchestrator: CodexOrchestrator, rawArgs: string[]): P
   applyRepoConfigRequiredPolicy(flags);
   const pipelineId = positionals[0];
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const { runPlanCliShell } = await import('../orchestrator/src/cli/planCliShell.js');
   await runPlanCliShell({
     orchestrator,
     pipelineId,
@@ -690,6 +689,11 @@ async function handleRlm(orchestrator: CodexOrchestrator, rawArgs: string[]): Pr
     printRlmHelp();
     return;
   }
+  const [{ runRlmCliRequestShell }, { runDoctor }, { runRlmCompletionCliShell }] = await Promise.all([
+    import('../orchestrator/src/cli/rlmCliRequestShell.js'),
+    import('../orchestrator/src/cli/doctor.js'),
+    import('../orchestrator/src/cli/rlmCompletionCliShell.js')
+  ]);
   await runRlmCliRequestShell({
     orchestrator,
     positionals,
@@ -736,6 +740,7 @@ async function handleResume(orchestrator: CodexOrchestrator, rawArgs: string[]):
     throw new Error('resume requires --run <run-id>.');
   }
   const format: OutputFormat = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const { runResumeCliShell } = await import('../orchestrator/src/cli/resumeCliShell.js');
   await runResumeCliShell({
     orchestrator,
     runId,
@@ -763,12 +768,16 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
   const watch = Boolean(flags['watch']);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
   const interval = parseInt((flags['interval'] as string | undefined) ?? '10', 10);
+  const { runStatusCliShell } = await import('../orchestrator/src/cli/statusCliShell.js');
   await runStatusCliShell({ orchestrator, runId, watch, format, interval });
 }
 
 async function handleControlHost(rawArgs: string[]): Promise<void> {
   if (rawArgs[0] === 'supervise') {
     const { positionals, flags } = parseArgs(rawArgs.slice(1));
+    const { runControlHostSupervisionCliShell } = await import(
+      '../orchestrator/src/cli/controlHostSupervisionCliShell.js'
+    );
     await runControlHostSupervisionCliShell({
       positionals,
       flags,
@@ -784,6 +793,7 @@ async function handleControlHost(rawArgs: string[]): Promise<void> {
   if (positionals.length > 0) {
     throw new Error(`Unknown control-host argument(s): ${positionals.join(' ')}`);
   }
+  const { runControlHostCliShell } = await import('../orchestrator/src/cli/controlHostCliShell.js');
   await runControlHostCliShell({
     flags,
     printHelp: printControlHostHelp
@@ -800,6 +810,7 @@ async function handleCoStatus(rawArgs: string[]): Promise<void> {
     if (positionals.length > 0) {
       throw new Error(`Unknown co-status attach argument(s): ${positionals.join(' ')}`);
     }
+    const { runCoStatusAttachCliShell } = await import('../orchestrator/src/cli/coStatusAttachCliShell.js');
     await runCoStatusAttachCliShell({
       flags,
       printHelp: printCoStatusAttachHelp
@@ -811,6 +822,7 @@ async function handleCoStatus(rawArgs: string[]): Promise<void> {
     printCoStatusHelp();
     return;
   }
+  const { runCoStatusCliShell } = await import('../orchestrator/src/cli/coStatusCliShell.js');
   await runCoStatusCliShell({
     flags,
     printHelp: printCoStatusHelp
@@ -818,7 +830,7 @@ async function handleCoStatus(rawArgs: string[]): Promise<void> {
 }
 
 async function maybeStartHud(
-  gate: ReturnType<typeof evaluateInteractiveGate>,
+  gate: InteractiveGate,
   emitter: RunEventEmitter
 ): Promise<HudController | null> {
   if (!gate.enabled) {
@@ -833,6 +845,10 @@ async function withRunUi(
   format: OutputFormat,
   action: (runEvents: RunEventEmitter) => Promise<void>
 ): Promise<void> {
+  const [{ RunEventEmitter }, { evaluateInteractiveGate }] = await Promise.all([
+    import('../orchestrator/src/cli/events/runEvents.js'),
+    import('../orchestrator/src/cli/utils/interactive.js')
+  ]);
   const interactiveRequested = Boolean(flags['interactive'] || flags['ui']);
   const interactiveDisabled = Boolean(flags['no-interactive']);
   const runEvents = new RunEventEmitter();
@@ -965,6 +981,7 @@ function toRunOutputPayload(
 }
 
 async function handleExec(rawArgs: string[]): Promise<void> {
+  const { runExecCliShell } = await import('../orchestrator/src/cli/execCliShell.js');
   await runExecCliShell(parseExecArgs(rawArgs), {
     maybeEmitAdoptionHint: maybeEmitExecAdoptionHint
   });
@@ -1004,6 +1021,7 @@ async function maybeEmitAdoptionHint(taskFilter: string | null | undefined): Pro
     if (!(await shouldScanAdoptionHint(taskFilter))) {
       return;
     }
+    const { runDoctorUsage } = await import('../orchestrator/src/cli/doctorUsage.js');
     const usage = await runDoctorUsage({ windowDays: 7, taskFilter });
     const recommendation = usage.adoption.recommendations[0];
     if (!recommendation) {
@@ -1029,6 +1047,10 @@ async function maybeEmitExecAdoptionHint(taskFilter: string | null | undefined):
 async function handleSelfCheck(rawArgs: string[]): Promise<void> {
   const { flags } = parseArgs(rawArgs);
   const format = (flags['format'] as string | undefined) === 'json' ? 'json' : 'text';
+  const [{ runSelfCheckCliShell }, { buildSelfCheckResult }] = await Promise.all([
+    import('../orchestrator/src/cli/selfCheckCliShell.js'),
+    import('../orchestrator/src/cli/selfCheck.js')
+  ]);
   await runSelfCheckCliShell({
     format,
     buildResult: buildSelfCheckResult,
@@ -1042,16 +1064,19 @@ async function handleInit(rawArgs: string[]): Promise<void> {
     printInitHelp();
     return;
   }
+  const { runInitCliShell } = await import('../orchestrator/src/cli/initCliShell.js');
   await runInitCliShell({ positionals, flags });
 }
 
 async function handleSetup(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
   if (isHelpRequest(positionals, flags)) {
+    const { printSetupCliHelp } = await import('../orchestrator/src/cli/setupCliShell.js');
     printSetupCliHelp();
     return;
   }
 
+  const { runSetupCliShell } = await import('../orchestrator/src/cli/setupCliShell.js');
   await runSetupCliShell({ flags });
 }
 
@@ -1064,31 +1089,37 @@ async function handleDoctor(rawArgs: string[]): Promise<void> {
   if (positionals.length > 0) {
     throw new Error(`Unknown doctor argument(s): ${positionals.join(' ')}`);
   }
+  const { runDoctorCliRequestShell } = await import('../orchestrator/src/cli/doctorCliRequestShell.js');
   await runDoctorCliRequestShell({ flags });
 }
 
 async function handleDevtools(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  const { runDevtoolsCliShell } = await import('../orchestrator/src/cli/devtoolsCliShell.js');
   await runDevtoolsCliShell({ positionals, flags });
 }
 
 async function handleDelegation(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  const { runDelegationCliShell } = await import('../orchestrator/src/cli/delegationCliShell.js');
   await runDelegationCliShell({ positionals, flags });
 }
 
 async function handleCodex(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  const { runCodexCliShell } = await import('../orchestrator/src/cli/codexCliShell.js');
   await runCodexCliShell({ positionals, flags, printHelp: printCodexHelp });
 }
 
 async function handleSkills(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  const { runSkillsCliShell } = await import('../orchestrator/src/cli/skillsCliShell.js');
   await runSkillsCliShell({ positionals, flags, printHelp: printSkillsHelp });
 }
 
 async function handleLinear(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  const { runLinearCliShell } = await import('../orchestrator/src/cli/linearCliShell.js');
   await runLinearCliShell({ positionals, flags, printHelp: printLinearHelp });
 }
 
@@ -1105,10 +1136,12 @@ async function handleMcp(rawArgs: string[]): Promise<void> {
   if (subcommand === 'serve') {
     const repoRoot = typeof flags['repo'] === 'string' ? (flags['repo'] as string) : undefined;
     const dryRun = Boolean(flags['dry-run']);
+    const { serveMcp } = await import('../orchestrator/src/cli/mcp.js');
     await serveMcp({ repoRoot, dryRun, extraArgs: positionals });
     return;
   }
   if (subcommand === 'enable') {
+    const { runMcpEnableCliShell } = await import('../orchestrator/src/cli/mcpEnableCliShell.js');
     await runMcpEnableCliShell({ rawArgs: rawArgs.slice(1) });
     return;
   }
@@ -1131,6 +1164,7 @@ async function handlePr(rawArgs: string[]): Promise<void> {
 
 async function handleDelegationServer(rawArgs: string[]): Promise<void> {
   const { positionals, flags } = parseArgs(rawArgs);
+  const { runDelegationServerCliShell } = await import('../orchestrator/src/cli/delegationServerCliShell.js');
   await runDelegationServerCliShell({
     positionals,
     flags,

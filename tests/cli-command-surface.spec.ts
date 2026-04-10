@@ -1162,6 +1162,14 @@ describe('codex-orchestrator command surface', () => {
     expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
   }, CLI_BINARY_SHELL_TIMEOUT);
 
+  it('fails fast on invalid MCP_RUNNER_TASK_ID for non-orchestrator commands', async () => {
+    await expect(
+      runCli(['self-check', '--format', 'json'], { MCP_RUNNER_TASK_ID: '../bad' }, CLI_BOOT_TIMEOUT)
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('Invalid MCP_RUNNER_TASK_ID')
+    });
+  }, CLI_BOOT_TIMEOUT);
+
   it('prints doctor apply plan when wiring is missing', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-apply-'));
     const env = {
