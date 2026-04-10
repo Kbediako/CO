@@ -65,7 +65,7 @@ interface ControlRuntimeContext {
 const NULL_PROVIDER_RUNNING_FRESHNESS_MS = 10 * 60 * 1000;
 const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
-  /^linear-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:-.+)?$/i;
+  /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
