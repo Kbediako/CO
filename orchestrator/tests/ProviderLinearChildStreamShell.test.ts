@@ -88,6 +88,9 @@ function createPreludeExecResult(pipelineId: 'docs-review' | 'docs-relevance-adv
 describe('runProviderLinearChildStreamShell', () => {
   it('launches an allowlisted provider child stream and records parent lineage', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
+    externalRoot = await mkdtemp(join(tmpdir(), 'provider-linear-child-stream-package-'));
+    await mkdir(join(externalRoot, 'bin'), { recursive: true });
+    await writeFile(join(externalRoot, 'bin', 'codex-orchestrator.js'), '#!/usr/bin/env node\n', 'utf8');
     const execRunner = vi.fn(async () => createExecResult('docs-review', 'docs-run-1', 'docs-review passed'));
     const result = await runProviderLinearChildStreamShell(
       {
@@ -107,10 +110,10 @@ describe('runProviderLinearChildStreamShell', () => {
             runDir,
             'provider-workflow.last-known-good.json'
           ),
-          CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT: '/tmp/co-package-root',
+          CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT: externalRoot,
           CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: join(runDir, 'provider-workflow.last-known-good.json'),
           CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1',
-          CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/co-package-root',
+          CODEX_ORCHESTRATOR_PACKAGE_ROOT: externalRoot,
           MCP_RUNNER_TASK_ID: TASK_ID
         })
       },
@@ -120,7 +123,7 @@ describe('runProviderLinearChildStreamShell', () => {
     expect(execRunner).toHaveBeenCalledWith(expect.objectContaining({
       command: process.execPath,
       cwd: tempRoot,
-      args: expect.arrayContaining(['/tmp/co-package-root/dist/bin/codex-orchestrator.js', 'start', 'docs-review', '--task', `${TASK_ID}-docs-review`, '--parent-run', RUN_ID, '--runtime-mode', 'appserver'])
+      args: expect.arrayContaining([join(process.cwd(), 'bin', 'codex-orchestrator.js'), 'start', 'docs-review', '--task', `${TASK_ID}-docs-review`, '--parent-run', RUN_ID, '--runtime-mode', 'appserver'])
     }));
     const request = execRunner.mock.calls[0]?.[0];
     expect(request?.env.CODEX_ORCHESTRATOR_ROOT).toBe(tempRoot);

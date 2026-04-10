@@ -30,6 +30,7 @@ function buildCompatibilitySource(
     latestAction: null,
     latestEvent: null,
     workspacePath: '/repo/.workspaces/co-100',
+    pipelineId: null,
     pipelineTitle: 'Implementation gate',
     stages: [],
     approvalsTotal: 0,
@@ -167,6 +168,219 @@ describe('CompatibilityIssuePresenter', () => {
     expect(runningEntry.display_event).toBe('updated TECH_SPEC + validating status parity');
   });
 
+  it('does not surface selected-only synthetic linear task-id fallback sources as issue rows', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'fallback-only selected source'
+        })
+      )
+    );
+
+    expect(projection.selected?.issue_identifier).toBe(taskId);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface slug-shaped synthetic linear fallback task ids as issue rows', () => {
+    const taskId = 'linear-lin-issue-1';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'fallback-only selected source using slug fallback task id'
+        })
+      )
+    );
+
+    expect(projection.selected?.issue_identifier).toBe(taskId);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface synthetic linear fallback rows from running or retry registration', () => {
+    const runningTaskId = 'linear-lin-issue-1';
+    const retryTaskId = 'linear-lin-issue-2';
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      running: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: runningTaskId,
+          issueId: runningTaskId,
+          taskId: runningTaskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          completedAt: null,
+          summary: 'fallback-only running source using slug fallback task id'
+        })
+      ],
+      retrying: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: retryTaskId,
+          issueId: retryTaskId,
+          taskId: retryTaskId,
+          pipelineId: 'provider-linear-worker',
+          rawStatus: 'failed',
+          displayStatus: 'retrying',
+          completedAt: null,
+          summary: 'fallback-only retry source using slug fallback task id'
+        })
+      ]
+    });
+
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('does not surface child-shaped parent fallback aliases from running or retry registration', () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const runningTaskId = `${parentTaskId}-docs-review`;
+    const retryTaskId = `${parentTaskId}-implementation-gate`;
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      running: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: runningTaskId,
+          pipelineId: 'docs-review',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          completedAt: null,
+          summary: 'child-shaped running source still reporting the parent fallback alias'
+        })
+      ],
+      retrying: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: retryTaskId,
+          pipelineId: 'implementation-gate',
+          rawStatus: 'failed',
+          displayStatus: 'retrying',
+          completedAt: null,
+          summary: 'child-shaped retry source still reporting the parent fallback alias'
+        })
+      ]
+    });
+
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    expect(projection.issues).toEqual([]);
+  });
+
+  it('keeps non-linear selected rows even when their task id matches the synthetic linear pattern', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'github',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'non-linear selected source'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
+  it('keeps linear-tagged selected rows when provider-worker provenance is absent', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineId: 'custom-background-pipeline',
+          pipelineTitle: 'Custom Background Pipeline',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'linear-tagged custom pipeline should stay visible'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
+  it('keeps null-provider child-pipeline fallback rows when worker evidence is absent', () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: null,
+          issueIdentifier: parentTaskId,
+          issueId: parentTaskId,
+          taskId: childTaskId,
+          pipelineId: 'docs-review',
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'generic docs-review run with fallback-shaped issue fields'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([parentTaskId]);
+  });
+
+  it('keeps selected rows when optional provider-worker provenance fields are omitted', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: null,
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineTitle: undefined,
+          providerLinearWorkerProof: undefined,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'generic selected source with omitted provenance helpers'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
   it('keeps the projected child-summary message and timestamp when newer proof telemetry is generic', () => {
     const runningEntry = buildCompatibilityRunningEntry(
       buildCompatibilitySource({
@@ -177,6 +391,21 @@ describe('CompatibilityIssuePresenter', () => {
           event: 'turn_running',
           message: 'docs-review failed at docs:freshness after spec-guard passed',
           at: '2026-04-06T02:34:00.000Z',
+          source: 'child_stream_summary',
+          messageRecordedAt: '2026-04-06T02:34:00.000Z',
+          sourceUpdatedAt: '2026-04-06T02:34:00.000Z',
+          candidates: [
+            {
+              source: 'child_stream_summary',
+              event: null,
+              summary: 'docs-review failed at docs:freshness after spec-guard passed',
+              message_recorded_at: '2026-04-06T02:34:00.000Z',
+              source_updated_at: '2026-04-06T02:34:00.000Z',
+              derived: true,
+              accepted: true,
+              rejection_reason: null
+            }
+          ],
           requestedBy: null,
           reason: null
         },
@@ -231,6 +460,459 @@ describe('CompatibilityIssuePresenter', () => {
     expect(runningEntry.display_event).toBe(
       'docs-review failed at docs:freshness after spec-guard passed'
     );
+    expect(runningEntry.event_source).toBe('child_stream_summary');
+    expect(runningEntry.message_recorded_at).toBe('2026-04-06T02:34:00.000Z');
+    expect(runningEntry.source_updated_at).toBe('2026-04-06T02:34:00.000Z');
+    expect(runningEntry.event_candidates).toEqual([
+      {
+        source: 'child_stream_summary',
+        event: null,
+        summary: 'docs-review failed at docs:freshness after spec-guard passed',
+        message_recorded_at: '2026-04-06T02:34:00.000Z',
+        source_updated_at: '2026-04-06T02:34:00.000Z',
+        derived: true,
+        accepted: true,
+        rejection_reason: null
+      }
+    ]);
+  });
+
+  it('uses canonical proof activity content when current-turn activity outruns legacy proof fields', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'turn_started',
+          last_message: null,
+          last_event_at: '2026-04-06T02:35:00.000Z',
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: 'Investigating provider-worker EVENT provenance.',
+            recorded_at: '2026-04-06T02:35:30.000Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:30.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+      })
+    );
+
+    expect(runningEntry).toMatchObject({
+      session_id: 'thread-1-turn-2',
+      last_event: 'agent_message',
+      last_message: 'Investigating provider-worker EVENT provenance.',
+      display_event: 'Investigating provider-worker EVENT provenance.',
+      event_source: 'canonical_session_log_hydration',
+      message_recorded_at: '2026-04-06T02:35:30.000Z',
+      source_updated_at: '2026-04-06T02:35:30.000Z',
+      last_event_at: '2026-04-06T02:35:30.000Z',
+      event_candidates: [
+        {
+          source: 'canonical_session_log_hydration',
+          event: 'agent_message',
+          summary: 'Investigating provider-worker EVENT provenance.',
+          message_recorded_at: '2026-04-06T02:35:30.000Z',
+          source_updated_at: '2026-04-06T02:35:30.000Z',
+          derived: false,
+          accepted: true,
+          rejection_reason: null
+        }
+      ]
+    });
+  });
+
+  it('does not backfill legacy proof freshness or session ids when canonical activity is incomplete', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'in_progress',
+        displayStatus: 'In Progress',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'turn_started',
+          last_message: 'older legacy message',
+          last_event_at: '2026-04-06T02:34:30.000Z',
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: 'Investigating provider-worker EVENT provenance.',
+            recorded_at: null,
+            source: 'stdout_jsonl',
+            turn_id: 'turn-2',
+            session_id: null
+          },
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:30.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+      })
+    );
+
+    expect(runningEntry).toMatchObject({
+      session_id: null,
+      last_event: 'agent_message',
+      last_message: 'Investigating provider-worker EVENT provenance.',
+      display_event: 'Investigating provider-worker EVENT provenance.',
+      event_source: 'canonical_stdout_jsonl',
+      message_recorded_at: null,
+      source_updated_at: '2026-04-06T02:35:30.000Z',
+      last_event_at: '2026-04-06T02:35:00.000Z'
+    });
+  });
+
+  it('does not leak latest-event candidates when proof telemetry wins the running row', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'running',
+        displayStatus: 'Running',
+        summary: 'Provider worker turn is active.',
+        latestEvent: {
+          event: 'running',
+          message: null,
+          at: '2026-04-06T02:34:00.000Z',
+          source: 'child_stream_summary',
+          messageRecordedAt: '2026-04-06T02:34:00.000Z',
+          sourceUpdatedAt: '2026-04-06T02:34:00.000Z',
+          candidates: [
+            {
+              source: 'child_stream_summary',
+              event: null,
+              summary: 'old child summary',
+              message_recorded_at: '2026-04-06T02:34:00.000Z',
+              source_updated_at: '2026-04-06T02:34:00.000Z',
+              derived: true,
+              accepted: true,
+              rejection_reason: null
+            }
+          ],
+          requestedBy: null,
+          reason: null
+        },
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'turn_started',
+          last_message: null,
+          last_event_at: '2026-04-06T02:35:00.000Z',
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: 'Investigating provider-worker EVENT provenance.',
+            recorded_at: '2026-04-06T02:35:30.000Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:30.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+      })
+    );
+
+    expect(runningEntry.event_source).toBe('canonical_session_log_hydration');
+    expect(runningEntry.event_candidates).toEqual([
+      {
+        source: 'canonical_session_log_hydration',
+        event: 'agent_message',
+        summary: 'Investigating provider-worker EVENT provenance.',
+        message_recorded_at: '2026-04-06T02:35:30.000Z',
+        source_updated_at: '2026-04-06T02:35:30.000Z',
+        derived: false,
+        accepted: true,
+        rejection_reason: null
+      }
+    ]);
+  });
+
+  it('keeps proof-origin event candidates self-contained when proof wins on message alone', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'running',
+        displayStatus: 'Running',
+        summary: 'Provider worker turn is active.',
+        latestEvent: {
+          event: 'running',
+          message: null,
+          at: '2026-04-06T02:34:00.000Z',
+          source: 'child_stream_summary',
+          messageRecordedAt: '2026-04-06T02:34:00.000Z',
+          sourceUpdatedAt: '2026-04-06T02:34:00.000Z',
+          candidates: [],
+          requestedBy: null,
+          reason: null
+        },
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: null,
+          last_message: null,
+          last_event_at: null,
+          current_turn_activity: {
+            event: null,
+            message_or_payload: 'Investigating provider-worker EVENT provenance.',
+            recorded_at: '2026-04-06T02:35:30.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:30.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+      })
+    );
+
+    expect(runningEntry.last_event).toBe('running');
+    expect(runningEntry.last_message).toBe('Investigating provider-worker EVENT provenance.');
+    expect(runningEntry.event_candidates).toEqual([
+      {
+        source: 'canonical_stdout_jsonl',
+        event: null,
+        summary: 'Investigating provider-worker EVENT provenance.',
+        message_recorded_at: '2026-04-06T02:35:30.000Z',
+        source_updated_at: '2026-04-06T02:35:30.000Z',
+        derived: false,
+        accepted: true,
+        rejection_reason: null
+      }
+    ]);
+  });
+
+  it('keeps message_recorded_at aligned with the source of the displayed message', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'running',
+        displayStatus: 'Running',
+        summary: 'Provider worker turn is active.',
+        latestEvent: {
+          event: 'running',
+          message: 'docs-review failed at docs:freshness after spec-guard passed',
+          at: '2026-04-06T02:34:00.000Z',
+          source: 'child_stream_summary',
+          messageRecordedAt: '2026-04-06T02:34:00.000Z',
+          sourceUpdatedAt: '2026-04-06T02:34:00.000Z',
+          candidates: [],
+          requestedBy: null,
+          reason: null
+        },
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: null,
+          last_message: null,
+          last_event_at: null,
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: null,
+            recorded_at: '2026-04-06T02:35:30.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:30.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+      })
+    );
+
+    expect(runningEntry).toMatchObject({
+      last_event: 'agent_message',
+      last_message: 'docs-review failed at docs:freshness after spec-guard passed',
+      message_recorded_at: '2026-04-06T02:34:00.000Z',
+      source_updated_at: '2026-04-06T02:35:30.000Z'
+    });
+    expect(runningEntry.event_candidates).toEqual([
+      {
+        source: 'canonical_stdout_jsonl',
+        event: 'agent_message',
+        summary: null,
+        message_recorded_at: null,
+        source_updated_at: '2026-04-06T02:35:30.000Z',
+        derived: false,
+        accepted: true,
+        rejection_reason: null
+      }
+    ]);
+  });
+
+  it('keeps latest-message freshness null when the latest source has no explicit message timestamp', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'running',
+        displayStatus: 'Running',
+        summary: 'Provider worker turn is active.',
+        latestEvent: {
+          event: 'turn_running',
+          message: 'Provider worker turn is active.',
+          at: '2026-04-06T02:35:30.000Z',
+          source: 'provider_debug_snapshot',
+          messageRecordedAt: null,
+          sourceUpdatedAt: '2026-04-06T02:35:30.000Z',
+          candidates: [],
+          requestedBy: null,
+          reason: null
+        }
+      })
+    );
+
+    expect(runningEntry).toMatchObject({
+      last_event: 'turn_running',
+      last_message: 'Provider worker turn is active.',
+      event_source: 'provider_debug_snapshot',
+      message_recorded_at: null,
+      source_updated_at: '2026-04-06T02:35:30.000Z'
+    });
+  });
+
+  it('does not reuse legacy proof last_event_at as message freshness when legacy proof wins', () => {
+    const runningEntry = buildCompatibilityRunningEntry(
+      buildCompatibilitySource({
+        rawStatus: 'running',
+        displayStatus: 'Running',
+        summary: 'Provider worker turn is active.',
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          pid: '123',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'turn_started',
+          last_message: 'Investigating provider-worker EVENT provenance.',
+          last_event_at: '2026-04-06T02:35:30.000Z',
+          current_turn_activity: null,
+          tokens: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0
+          },
+          rate_limits: null,
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          workspace_path: '/repo/.workspaces/co-100',
+          linear_audit: null,
+          progress: null,
+          tracked_issue_error: null,
+          end_reason: null,
+          updated_at: '2026-04-06T02:35:30.000Z'
+        } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+      })
+    );
+
+    expect(runningEntry).toMatchObject({
+      last_event: 'turn_started',
+      last_message: 'Investigating provider-worker EVENT provenance.',
+      event_source: 'legacy_proof_fields',
+      message_recorded_at: null,
+      source_updated_at: '2026-04-06T02:35:30.000Z'
+    });
+    expect(runningEntry.event_candidates).toEqual([
+      {
+        source: 'legacy_proof_fields',
+        event: 'turn_started',
+        summary: 'Investigating provider-worker EVENT provenance.',
+        message_recorded_at: null,
+        source_updated_at: '2026-04-06T02:35:30.000Z',
+        derived: false,
+        accepted: true,
+        rejection_reason: null
+      }
+    ]);
   });
 
   it('prefers the source with newer semantic progress even when its displayed summary is older', () => {

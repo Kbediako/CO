@@ -130,3 +130,35 @@ codex-orchestrator co-status --help
 ```
 
 `control-host --format json` is a persistent host startup handshake, not a one-shot status dump.
+
+## macOS launchd supervision
+
+On macOS, use the shipped supervision surface instead of a copied local shell wrapper:
+
+1. Make sure the `codex-orchestrator` currently on `PATH` is current enough to expose `control-host supervise`:
+   - source-checkout operator: from the checkout root, run `npm link` so the active `codex-orchestrator` bin points at this checkout's `bin/codex-orchestrator.js`
+   - packaged/global install operator: upgrade the active package (for example `npm install -g @kbediako/codex-orchestrator@latest`) before attempting the migration
+   - verify the active CLI with:
+   ```bash
+   codex-orchestrator control-host supervise status --format json
+   ```
+   If the current machine is still on the legacy shim rollout, the JSON status now reports that rollout mode and that migration is still required.
+2. Install the LaunchAgent-backed supervisor from the repo root:
+   ```bash
+   codex-orchestrator control-host supervise install --format json
+   ```
+   This rewrites the existing `com.kbediako.co.control-host` LaunchAgent in place, replacing the legacy shim rollout when present, and records the active package's `bin/codex-orchestrator.js` bootstrap as the managed entrypoint.
+3. Inspect the current launchd, rollout mode, config, and restart-reason state:
+   ```bash
+   codex-orchestrator control-host supervise status --format json
+   ```
+4. Restart the supervised host after config or env changes:
+   ```bash
+   codex-orchestrator control-host supervise restart --format json
+   ```
+5. Remove the generated LaunchAgent, config, state, and logs:
+   ```bash
+   codex-orchestrator control-host supervise uninstall --format json
+   ```
+
+`control-host supervise status --format json` is the machine-checkable operator surface for whether the LaunchAgent is still on the legacy shim rollout or the managed packaged rollout, whether migration is still required, whether launchd is loaded, and what last restart reason or health state the supervisor recorded.

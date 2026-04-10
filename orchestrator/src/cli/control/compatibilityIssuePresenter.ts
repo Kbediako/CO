@@ -16,7 +16,13 @@ import {
 } from './observabilityReadModel.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 
+const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
+const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
+  /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+
 export interface CompatibilityIssueSourceRecord {
+  issueProvider: string | null;
   issueIdentifier: string;
   issueId: string | null;
   taskId: string | null;
@@ -25,6 +31,9 @@ export interface CompatibilityIssueSourceRecord {
   updatedAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  pipelineId?: string | null;
+  pipelineTitle?: string | null;
+  providerLinearWorkerProof?: ControlCompatibilitySourceContext['providerLinearWorkerProof'];
   latestEvent: {
     at: string | null;
   } | null;
@@ -196,15 +205,21 @@ export function buildCompatibilityIssueIndex<
     issuesByIdentifier.set(source.issueIdentifier, existing);
   };
 
-  registerIssue(snapshot.selected, {
-    kind: 'selected',
-    dispatchPilotSummary: snapshot.dispatchPilot
-  });
+  if (!isSyntheticLinearFallbackOnlyIssueSource(snapshot.selected)) {
+    registerIssue(snapshot.selected, {
+      kind: 'selected',
+      dispatchPilotSummary: snapshot.dispatchPilot
+    });
+  }
   snapshot.running.forEach((entry) => {
-    registerIssue(entry, { kind: 'running' });
+    if (!isSyntheticLinearFallbackOnlyIssueSource(entry)) {
+      registerIssue(entry, { kind: 'running' });
+    }
   });
   snapshot.retrying.forEach((entry) => {
-    registerIssue(entry, { kind: 'retry' });
+    if (!isSyntheticLinearFallbackOnlyIssueSource(entry)) {
+      registerIssue(entry, { kind: 'retry' });
+    }
   });
 
   return {
@@ -290,36 +305,119 @@ export function buildCompatibilityRunningEntry(
   polling: ControlPollingHealthPayload | null = null
 ): ControlRunningPayload {
   const proof = selected.providerLinearWorkerProof ?? null;
+  const proofCurrentTurnActivity = proof?.current_turn_activity ?? null;
+  const proofCanonicalEvent = normalizeCompatibilityMessage(proofCurrentTurnActivity?.event);
+  const proofCanonicalMessage = normalizeCompatibilityMessage(
+    proofCurrentTurnActivity?.message_or_payload
+  );
+  const proofCanonicalRecordedAt = normalizeCompatibilityMessage(
+    proofCurrentTurnActivity?.recorded_at
+  );
+  const proofCanonicalSessionId = normalizeCompatibilityMessage(proofCurrentTurnActivity?.session_id);
+  const useLegacyProofFallback = proofCurrentTurnActivity === null;
+  const hasCanonicalProofTelemetry = Boolean(proofCanonicalEvent || proofCanonicalMessage);
+  const proofEvent = useLegacyProofFallback
+    ? normalizeCompatibilityMessage(proof?.last_event)
+    : proofCanonicalEvent;
+  const proofMessage = useLegacyProofFallback
+    ? normalizeCompatibilityMessage(proof?.last_message)
+    : proofCanonicalMessage;
+  const proofEventAt = useLegacyProofFallback
+    ? normalizeCompatibilityMessage(proof?.last_event_at)
+    : proofCanonicalRecordedAt;
   const runningEvent = selectRunningEvent({
     latestEvent: selected.latestEvent?.event ?? null,
     latestEventAt: selected.latestEvent?.at ?? null,
     latestMessage: selected.latestEvent?.message ?? null,
     latestAction: selected.latestAction ?? null,
     rawStatus: selected.rawStatus,
-    proofEvent: proof?.last_event ?? null,
-    proofMessage: proof?.last_message ?? null,
-    proofEventAt: proof?.last_event_at ?? null
+    proofEvent,
+    proofMessage,
+    proofEventAt
   });
   const preferProofTelemetry = runningEvent.source === 'proof';
   const latestEventKey = normalizeCompatibilityEventKey(selected.latestEvent?.event ?? null);
   const preserveLatestControlActionContext =
     runningEvent.source === 'latest' && isExplicitControlActionEventKey(latestEventKey);
   const runningMessage = preferProofTelemetry
-    ? proof?.last_message ?? selected.latestEvent?.message ?? selected.summary
+    ? proofMessage ?? selected.latestEvent?.message ?? selected.summary
     : preserveLatestControlActionContext
       ? selected.latestEvent?.message ?? selected.summary
-      : selected.latestEvent?.message ?? proof?.last_message ?? selected.summary;
+      : selected.latestEvent?.message ?? proofMessage ?? selected.summary;
+  const runningMessageSource =
+    preferProofTelemetry
+      ? proofMessage
+        ? 'proof'
+        : selected.latestEvent?.message
+          ? 'latest'
+          : 'fallback'
+      : preserveLatestControlActionContext
+        ? selected.latestEvent?.message
+          ? 'latest'
+          : 'fallback'
+        : selected.latestEvent?.message
+          ? 'latest'
+          : proofMessage
+            ? 'proof'
+            : 'fallback';
   const runningEventAt = preferProofTelemetry
-    ? proof?.last_event_at ?? selected.latestEvent?.at ?? selected.updatedAt
+    ? proofEventAt ?? selected.latestEvent?.at ?? selected.updatedAt
     : preserveLatestControlActionContext
       ? selected.latestEvent?.at ?? selected.updatedAt
-      : selected.latestEvent?.at ?? proof?.last_event_at ?? selected.updatedAt;
+      : selected.latestEvent?.at ?? proofEventAt ?? selected.updatedAt;
   const displayEvent = resolveCompatibilityRunningDisplayEvent({
     selected,
     runningEvent: runningEvent.event,
     runningMessage,
     polling
   });
+  const proofEventSource =
+    normalizeCompatibilityMessage(proofCurrentTurnActivity?.source) === 'session_log_hydration'
+      ? 'canonical_session_log_hydration'
+      : hasCanonicalProofTelemetry
+        ? 'canonical_stdout_jsonl'
+        : 'legacy_proof_fields';
+  const eventSource =
+    runningEvent.source === 'latest'
+      ? selected.latestEvent?.source ?? 'latest_event'
+      : runningEvent.source === 'proof'
+        ? proofEventSource
+        : 'fallback';
+  const messageRecordedAt =
+    runningMessageSource === 'latest'
+      ? selected.latestEvent?.messageRecordedAt ?? null
+      : runningMessageSource === 'proof'
+        ? useLegacyProofFallback
+          ? null
+          : proofMessage
+            ? proofCanonicalRecordedAt ?? null
+            : null
+        : null;
+  const sourceUpdatedAt =
+    runningEvent.source === 'latest'
+      ? selected.latestEvent?.sourceUpdatedAt ?? selected.latestEvent?.at ?? selected.updatedAt
+      : runningEvent.source === 'proof'
+        ? useLegacyProofFallback
+          ? normalizeCompatibilityMessage(proof?.updated_at) ?? proofEventAt ?? null
+          : proofCanonicalRecordedAt ?? normalizeCompatibilityMessage(proof?.updated_at) ?? null
+        : selected.updatedAt;
+  const eventCandidates =
+    runningEvent.source === 'latest'
+      ? selected.latestEvent?.candidates ?? []
+      : runningEvent.source === 'proof'
+        ? [
+            {
+              source: eventSource,
+              event: proofEvent,
+              summary: proofMessage,
+              message_recorded_at: proofMessage ? messageRecordedAt : null,
+              source_updated_at: sourceUpdatedAt,
+              derived: false,
+              accepted: true,
+              rejection_reason: null
+            }
+          ]
+        : [];
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -327,11 +425,17 @@ export function buildCompatibilityRunningEntry(
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
     pid: selected.providerLinearWorkerProof?.pid ?? null,
-    session_id: proof?.latest_session_id ?? null,
+    session_id: useLegacyProofFallback
+      ? normalizeCompatibilityMessage(proof?.latest_session_id)
+      : proofCanonicalSessionId,
     turn_count: proof?.turn_count ?? null,
     last_event: runningEvent.event,
     last_message: runningMessage,
     display_event: displayEvent,
+    event_source: eventSource,
+    message_recorded_at: messageRecordedAt,
+    source_updated_at: sourceUpdatedAt,
+    event_candidates: eventCandidates,
     started_at: selected.startedAt,
     last_event_at: runningEventAt,
     tokens: proof?.tokens ?? buildEmptyTokenUsage()
@@ -992,6 +1096,90 @@ function buildCompatibilityIssueAliases<TSource extends CompatibilityIssueSource
     }
   }
   return Array.from(aliases);
+}
+
+function hasExplicitCompatibilityIssueIdentity(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'issueIdentifier' | 'issueId' | 'taskId' | 'runId'
+  >
+): boolean {
+  if (
+    source.issueIdentifier &&
+    !isFallbackCompatibilityIdentityValue(source.issueIdentifier, source)
+  ) {
+    return true;
+  }
+  if (source.issueId && !isFallbackCompatibilityIdentityValue(source.issueId, source)) {
+    return true;
+  }
+  return false;
+}
+
+function isFallbackCompatibilityIdentityValue(
+  value: string,
+  source: Pick<CompatibilityIssueSourceRecord, 'taskId' | 'runId'>
+): boolean {
+  return (
+    isFallbackCompatibilityIdentityAlias(value, source.taskId) ||
+    isFallbackCompatibilityIdentityAlias(value, source.runId)
+  );
+}
+
+function isFallbackCompatibilityIdentityAlias(
+  value: string,
+  candidate: string | null
+): boolean {
+  if (!candidate) {
+    return false;
+  }
+  if (value === candidate) {
+    return true;
+  }
+  return SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(value) && candidate.startsWith(`${value}-`);
+}
+
+function isSyntheticLinearFallbackOnlyIssueSource(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    | 'issueProvider'
+    | 'issueIdentifier'
+    | 'issueId'
+    | 'pipelineId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'taskId'
+    | 'runId'
+  > | null
+): boolean {
+  return (
+    source !== null &&
+    hasSyntheticLinearFallbackProvenance(source) &&
+    source.taskId !== null &&
+    SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(source.taskId) &&
+    !hasExplicitCompatibilityIssueIdentity(source)
+  );
+}
+
+function hasSyntheticLinearFallbackProvenance(
+  source: Pick<
+    CompatibilityIssueSourceRecord,
+    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof'
+  >
+): boolean {
+  if (source.issueProvider !== null && source.issueProvider !== 'linear') {
+    return false;
+  }
+  return (
+    source.pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
+    source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    source.providerLinearWorkerProof != null ||
+    (source.issueProvider === 'linear' &&
+      (source.pipelineId === 'docs-review' ||
+        source.pipelineId === 'implementation-gate' ||
+        source.pipelineId === 'docs-relevance-advisory' ||
+        source.pipelineId === 'provider-linear-child-lane'))
+  );
 }
 
 function pickPreferredCompatibilitySource<TSource extends CompatibilityIssueSourceRecord>(

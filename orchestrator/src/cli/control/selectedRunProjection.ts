@@ -26,6 +26,7 @@ import type { QuestionRecord } from './questions.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderIntakeClaimRecord, ProviderIntakeState } from './providerIntakeState.js';
 import {
+  buildProviderFallbackTaskId,
   buildProviderIssueKey,
   hasQueuedProviderIntakeRetry,
   readProviderIntakeClaim,
@@ -48,6 +49,17 @@ import {
   resolveProviderLinearWorkerTerminalStatus,
   shouldUseProviderLinearWorkerTerminalProofForSelectedRun
 } from './providerLinearWorkerTruth.js';
+
+const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
+const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
+const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
+  /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+const PROVIDER_LINEAR_CHILD_PIPELINE_IDS = new Set([
+  'docs-review',
+  'implementation-gate',
+  'docs-relevance-advisory',
+  'provider-linear-child-lane'
+]);
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
@@ -99,6 +111,14 @@ interface ProjectionContextParts {
   questions: QuestionRecord[];
   runDir: string;
   trackedIssue: LiveLinearTrackedIssue | null;
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null;
+}
+
+interface SelectedRunProviderClaimMatchSource
+  extends Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'manifestRecord' | 'runId' | 'taskId'
+  > {
   providerLinearWorkerProof: ProviderLinearWorkerProof | null;
 }
 
@@ -224,7 +244,11 @@ async function buildSelectedRunContextFromSnapshot(
     resolveProjectionContextParts(context, snapshot),
     resolveControlWorkspacePath(context)
   ]);
-  const providerClaim = findMatchingProviderIntakeClaim(context.providerIntakeState, snapshot);
+  const providerClaim = findMatchingProviderIntakeClaim(
+    context.providerIntakeState,
+    snapshot,
+    parts.providerLinearWorkerProof
+  );
   return buildProjectionContextFromParts(
     snapshot,
     parts,
@@ -243,7 +267,11 @@ async function buildCompatibilitySourceContextFromSnapshot(
     resolveProjectionContextParts(context, snapshot),
     resolveControlWorkspacePath(context)
   ]);
-  const providerClaim = findMatchingProviderIntakeClaim(context.providerIntakeState, snapshot);
+  const providerClaim = findMatchingProviderIntakeClaim(
+    context.providerIntakeState,
+    snapshot,
+    parts.providerLinearWorkerProof
+  );
   return buildProjectionContextFromParts(
     snapshot,
     parts,
@@ -265,7 +293,24 @@ function buildProjectionContextFromParts(
   if (!snapshot) {
     return null;
   }
-  const { manifestRecord, issueIdentifier, issueId, taskId, runId } = snapshot;
+  const { manifestRecord, taskId, runId } = snapshot;
+  const issueProvider = snapshot.issueProvider ?? providerClaim?.provider ?? null;
+  const allowTrackedIssueFallbackIdentityRebinding = hasProviderLinearClaimBindingProvenance(
+    snapshot,
+    parts.providerLinearWorkerProof
+  );
+  const { issueIdentifier, issueId, lookupAliases } = resolveProjectionIssueIdentity(
+    snapshot,
+    parts.trackedIssue,
+    providerClaim,
+    allowTrackedIssueFallbackIdentityRebinding
+  );
+  const matchedTrackedIssue = resolveProjectionTrackedIssue(parts.trackedIssue, {
+    issueIdentifier,
+    issueId,
+    taskId,
+    runId
+  });
   const control = parts.control;
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
@@ -310,7 +355,7 @@ function buildProjectionContextFromParts(
         })
       : null;
   const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
-    tracked_issue: parts.trackedIssue,
+    tracked_issue: matchedTrackedIssue,
     claim: providerClaim,
     proof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null,
     rehydrated_at: providerIntakeState?.rehydrated_at ?? null
@@ -318,7 +363,7 @@ function buildProjectionContextFromParts(
   const terminalMergeCloseoutProgress = resolveTerminalMergeCloseoutProgress({
     rawStatus,
     providerDebugSnapshot,
-    trackedIssue: parts.trackedIssue
+    trackedIssue: matchedTrackedIssue
   });
   const summary = resolveSelectedRunDisplaySummary({
     manifestRecord,
@@ -334,7 +379,12 @@ function buildProjectionContextFromParts(
   });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
-  const compatibilityState = resolveCompatibilityState(parts.trackedIssue, providerClaim);
+  const compatibilityState = resolveCompatibilityState(
+    shouldPreferTrackedIssueCompatibilityState(matchedTrackedIssue, providerClaim)
+      ? matchedTrackedIssue
+      : null,
+    providerClaim
+  );
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
     rawStatus,
     latestAction,
@@ -342,7 +392,7 @@ function buildProjectionContextFromParts(
     compatibilityState,
     terminalMergeCloseoutProgress
   });
-  const tracked = buildTrackedLinearPayload(parts.trackedIssue);
+  const tracked = buildTrackedLinearPayload(matchedTrackedIssue);
   const latestEvent = buildSelectedRunLatestEvent({
     controlAction: control.latest_action ?? null,
     updatedAt,
@@ -363,12 +413,12 @@ function buildProjectionContextFromParts(
         : null;
 
   return {
-    issueProvider: snapshot.issueProvider ?? providerClaim?.provider ?? null,
+    issueProvider,
     issueIdentifier,
     issueId,
     taskId,
     runId,
-    lookupAliases: snapshot.lookupAliases,
+    lookupAliases,
     rawStatus,
     displayStatus,
     statusReason,
@@ -380,6 +430,7 @@ function buildProjectionContextFromParts(
     latestAction,
     latestEvent,
     workspacePath,
+    pipelineId: readStringValue(manifestRecord, 'pipeline_id', 'pipelineId') ?? null,
     pipelineTitle: readStringValue(manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null,
     stages: readManifestStageSummaries(manifestRecord),
     approvalsTotal: readManifestApprovalsTotal(manifestRecord),
@@ -392,6 +443,106 @@ function buildProjectionContextFromParts(
     providerDebugSnapshot,
     providerRetryState: buildProviderRetryState(providerClaim)
   };
+}
+
+function resolveProjectionIssueIdentity(
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId' | 'lookupAliases'>,
+  trackedIssue: LiveLinearTrackedIssue | null,
+  providerClaim: ProviderIntakeClaimRecord | null,
+  allowTrackedIssueFallbackIdentityRebinding: boolean
+): {
+  issueIdentifier: string;
+  issueId: string | null;
+  lookupAliases: string[];
+} {
+  const manifestIssueIdentifier = isProjectionFallbackIdentityValue(snapshot.issueIdentifier, snapshot)
+    ? null
+    : snapshot.issueIdentifier;
+  const manifestIssueId = isProjectionFallbackIdentityValue(snapshot.issueId, snapshot)
+    ? null
+    : snapshot.issueId;
+  const issueIdentifier =
+    manifestIssueIdentifier ??
+    providerClaim?.issue_identifier ??
+    (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.identifier : null) ??
+    snapshot.issueIdentifier;
+  const trackedIssueId =
+    allowTrackedIssueFallbackIdentityRebinding &&
+    trackedIssue?.identifier === issueIdentifier
+      ? trackedIssue.id
+      : null;
+  const issueId =
+    manifestIssueId ??
+    providerClaim?.issue_id ??
+    trackedIssueId ??
+    snapshot.issueId;
+
+  return {
+    issueIdentifier,
+    issueId,
+    lookupAliases: Array.from(
+      new Set(
+        snapshot.lookupAliases.concat(
+          buildProjectionLookupAliases({
+            issueIdentifier,
+            issueId,
+            taskId: snapshot.taskId,
+            runId: snapshot.runId
+          })
+        )
+      )
+    )
+  };
+}
+
+function resolveProjectionTrackedIssue(
+  trackedIssue: LiveLinearTrackedIssue | null,
+  identity: {
+    issueIdentifier: string;
+    issueId: string | null;
+    taskId: string | null;
+    runId: string | null;
+  }
+): LiveLinearTrackedIssue | null {
+  if (!trackedIssue) {
+    return null;
+  }
+  if (!hasAuthoritativeProjectionIssueIdentity(identity)) {
+    return trackedIssue;
+  }
+  if (identity.issueId && trackedIssue.id === identity.issueId) {
+    return trackedIssue;
+  }
+  if (trackedIssue.identifier === identity.issueIdentifier) {
+    return trackedIssue;
+  }
+  return null;
+}
+
+function isProjectionFallbackIdentityValue(
+  value: string | null,
+  input: Pick<SelectedRunManifestSnapshot, 'taskId' | 'runId'>
+): boolean {
+  if (!value) {
+    return false;
+  }
+  return (
+    isProjectionFallbackIdentityAlias(value, input.taskId) ||
+    isProjectionFallbackIdentityAlias(value, input.runId)
+  );
+}
+
+function isProjectionFallbackIdentityAlias(
+  value: string,
+  candidate: string | null
+): boolean {
+  if (!candidate) {
+    return false;
+  }
+  if (value === candidate) {
+    return true;
+  }
+  return SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(value) && candidate.startsWith(`${value}-`);
 }
 
 function resolveSelectedRunWorkspacePath(input: {
@@ -426,6 +577,27 @@ function resolveCompatibilityState(
     state,
     stateType
   };
+}
+
+function shouldPreferTrackedIssueCompatibilityState(
+  trackedIssue: LiveLinearTrackedIssue | null,
+  providerClaim: ProviderIntakeClaimRecord | null
+): boolean {
+  if (!trackedIssue) {
+    return false;
+  }
+  if (providerClaim?.reason !== 'provider_issue_rehydrated_active_run') {
+    return true;
+  }
+  const trackedUpdatedAt = trackedIssue.updated_at ?? null;
+  const claimUpdatedAt = providerClaim.issue_updated_at ?? null;
+  if (!claimUpdatedAt) {
+    return true;
+  }
+  if (!trackedUpdatedAt) {
+    return false;
+  }
+  return compareIsoTimestamp(trackedUpdatedAt, claimUpdatedAt) > 0;
 }
 
 function isCliRunManifestPathWithinRunsRoot(manifestPath: string, runsRoot: string): boolean {
@@ -590,6 +762,17 @@ function buildSelectedRunLatestEvent(input: {
         input.updatedAt,
       event: input.terminalMergeCloseoutProgress.phase,
       message: input.terminalMergeCloseoutProgress.summary ?? input.summary,
+      source: input.terminalMergeCloseoutProgress.event_source ?? 'merge_closeout',
+      messageRecordedAt:
+        input.terminalMergeCloseoutProgress.message_recorded_at ??
+        input.terminalMergeCloseoutProgress.summary_recorded_at ??
+        null,
+      sourceUpdatedAt:
+        input.terminalMergeCloseoutProgress.source_updated_at ??
+        input.terminalMergeCloseoutProgress.last_semantic_progress_at ??
+        input.providerDebugSnapshot.last_semantic_progress_at ??
+        input.updatedAt,
+      candidates: input.terminalMergeCloseoutProgress.event_candidates ?? [],
       requestedBy: null,
       reason: input.terminalMergeCloseoutProgress.stall_reason ?? null
     };
@@ -603,11 +786,26 @@ function buildSelectedRunLatestEvent(input: {
     return {
       at:
         input.providerDebugSnapshot.progress.summary_recorded_at ??
+        input.providerDebugSnapshot.progress.message_recorded_at ??
+        input.providerDebugSnapshot.progress.source_updated_at ??
         input.providerDebugSnapshot.progress.last_semantic_progress_at ??
         input.providerDebugSnapshot.last_semantic_progress_at ??
         input.updatedAt,
-      event: input.providerDebugSnapshot.progress.phase,
+      event:
+        input.providerDebugSnapshot.progress.selected_event ??
+        input.providerDebugSnapshot.progress.phase,
       message: input.providerDebugSnapshot.progress.summary ?? input.summary,
+      source: input.providerDebugSnapshot.progress.event_source ?? 'provider_debug_progress',
+      messageRecordedAt:
+        input.providerDebugSnapshot.progress.message_recorded_at ??
+        input.providerDebugSnapshot.progress.summary_recorded_at ??
+        null,
+      sourceUpdatedAt:
+        input.providerDebugSnapshot.progress.source_updated_at ??
+        input.providerDebugSnapshot.progress.last_semantic_progress_at ??
+        input.providerDebugSnapshot.last_semantic_progress_at ??
+        input.updatedAt,
+      candidates: input.providerDebugSnapshot.progress.event_candidates ?? [],
       requestedBy: null,
       reason: input.providerDebugSnapshot.progress.stall_reason ?? null
     };
@@ -619,6 +817,10 @@ function buildSelectedRunLatestEvent(input: {
     at: input.controlAction?.requested_at ?? input.updatedAt,
     event: input.controlAction?.action ?? input.fallbackEvent,
     message: input.summary,
+    source: input.controlAction ? 'control_action' : 'run_summary',
+    messageRecordedAt: null,
+    sourceUpdatedAt: input.controlAction?.requested_at ?? input.updatedAt,
+    candidates: [],
     requestedBy: input.controlAction?.requested_by ?? null,
     reason: input.controlAction?.reason ?? null
   };
@@ -943,6 +1145,7 @@ async function readTaskCompatibilityContexts(
     const advisoryState = await readJsonFile<LinearAdvisoryStateSnapshot>(
       join(runDir, LINEAR_ADVISORY_STATE_FILE)
     );
+    const providerLinearWorkerProof = await readProviderLinearWorkerProofForProjection(runDir);
 
     const context = buildProjectionContextFromParts(
       snapshot,
@@ -951,11 +1154,11 @@ async function readTaskCompatibilityContexts(
         questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
         runDir,
         trackedIssue: advisoryState?.tracked_issue ?? null,
-        providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(runDir)
+        providerLinearWorkerProof
       },
       resolveRunsRootFromRunDir(runDir),
       options.controlWorkspacePath ?? resolveSafeLegacyWorkspacePathFromRunDir(runDir),
-      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot),
+      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot, providerLinearWorkerProof),
       options.providerIntakeState ?? null
     );
     if (context) {
@@ -1037,21 +1240,26 @@ function isManifestRetryFallbackCandidate(manifestRecord: Record<string, unknown
 
 function findMatchingProviderIntakeClaim(
   state: ProviderIntakeState | null | undefined,
-  snapshot: SelectedRunManifestSnapshot | null
+  snapshot: SelectedRunManifestSnapshot | null,
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null = null
 ): ProviderIntakeClaimRecord | null {
   if (!state || !snapshot) {
     return null;
   }
-  const issueScopedClaim = findIssueScopedProviderIntakeClaim(state, snapshot);
+  const claimMatchSource = buildSelectedRunProviderClaimMatchSource(snapshot, providerLinearWorkerProof);
+  const issueScopedClaim = findIssueScopedProviderIntakeClaim(state, claimMatchSource);
   if (issueScopedClaim) {
-    return providerIntakeClaimCanFallbackByIssue(issueScopedClaim, snapshot) ? issueScopedClaim : null;
+    return providerIntakeClaimCanFallbackByIssue(issueScopedClaim, claimMatchSource) ? issueScopedClaim : null;
   }
-  return state.claims.find((claim) => providerIntakeClaimMatchesSelectedRun(claim, snapshot)) ?? null;
+  const matchedClaims = state.claims
+    .filter((claim) => providerIntakeClaimMatchesSelectedRun(claim, claimMatchSource))
+    .sort((left, right) => compareProviderIntakeClaimSpecificity(right, left, claimMatchSource));
+  return matchedClaims[0] ?? null;
 }
 
 function findIssueScopedProviderIntakeClaim(
   state: ProviderIntakeState,
-  snapshot: SelectedRunManifestSnapshot
+  snapshot: SelectedRunProviderClaimMatchSource
 ): ProviderIntakeClaimRecord | null {
   if (snapshot.issueId) {
     const byIssueId = readProviderIntakeClaim(state, buildProviderIssueKey('linear', snapshot.issueId));
@@ -1067,16 +1275,13 @@ function providerIntakeClaimMatchesSelectedRun(
     ProviderIntakeClaimRecord,
     'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
   >,
-  snapshot: Pick<
-    SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
-  >
+  snapshot: SelectedRunProviderClaimMatchSource
 ): boolean {
   if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
     return true;
   }
   if (!providerIntakeClaimMatchesIssueIdentity(claim, snapshot)) {
-    return false;
+    return providerIntakeClaimMatchesSyntheticFallbackTaskBinding(claim, snapshot);
   }
   if (claim.run_id && snapshot.runId) {
     if (claim.task_id && snapshot.taskId && claim.task_id !== snapshot.taskId) {
@@ -1090,15 +1295,58 @@ function providerIntakeClaimMatchesSelectedRun(
   return false;
 }
 
+function compareProviderIntakeClaimSpecificity(
+  left: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  right: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  snapshot: SelectedRunProviderClaimMatchSource
+): number {
+  const leftPriority = scoreProviderIntakeClaimSpecificity(left, snapshot);
+  const rightPriority = scoreProviderIntakeClaimSpecificity(right, snapshot);
+  if (leftPriority !== rightPriority) {
+    return leftPriority - rightPriority;
+  }
+  const leftTaskLength = left.task_id?.length ?? 0;
+  const rightTaskLength = right.task_id?.length ?? 0;
+  if (leftTaskLength !== rightTaskLength) {
+    return leftTaskLength - rightTaskLength;
+  }
+  return (left.issue_identifier ?? '').localeCompare(right.issue_identifier ?? '');
+}
+
+function scoreProviderIntakeClaimSpecificity(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  snapshot: SelectedRunProviderClaimMatchSource
+): number {
+  if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
+    return 4;
+  }
+  if (claim.run_id && snapshot.runId && claim.run_id === snapshot.runId) {
+    return 3;
+  }
+  if (claim.task_id && snapshot.taskId && claim.task_id === snapshot.taskId) {
+    return 2;
+  }
+  if (providerIntakeClaimMatchesSyntheticFallbackTaskBinding(claim, snapshot)) {
+    return 1;
+  }
+  return 0;
+}
+
 function providerIntakeClaimCanFallbackByIssue(
   claim: Pick<
     ProviderIntakeClaimRecord,
     'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
   >,
-  snapshot: Pick<
-    SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
-  >
+  snapshot: SelectedRunProviderClaimMatchSource
 ): boolean {
   return (
     providerIntakeClaimMatchesSelectedRun(claim, snapshot) ||
@@ -1114,6 +1362,93 @@ function providerIntakeClaimMatchesIssueIdentity(
     (claim.issue_id != null && snapshot.issueId != null && claim.issue_id === snapshot.issueId) ||
     claim.issue_identifier === snapshot.issueIdentifier
   );
+}
+
+function providerIntakeClaimMatchesSyntheticFallbackTaskBinding(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'task_id'>,
+  snapshot: SelectedRunProviderClaimMatchSource
+): boolean {
+  if (!claim.task_id || !snapshot.taskId) {
+    return false;
+  }
+  if (!hasProviderLinearClaimBindingProvenance(snapshot, snapshot.providerLinearWorkerProof)) {
+    return false;
+  }
+  if (claim.task_id !== buildProviderFallbackTaskId({ id: claim.issue_id })) {
+    return false;
+  }
+  if (snapshot.taskId === claim.task_id) {
+    return !hasAuthoritativeProjectionIssueIdentity(snapshot);
+  }
+  const pipelineId = readStringValue(snapshot.manifestRecord, 'pipeline_id', 'pipelineId') ?? null;
+  return (
+    matchesSyntheticProviderChildTaskId(claim.task_id, snapshot.taskId, pipelineId) &&
+    !hasAuthoritativeProjectionIssueIdentity(snapshot)
+  );
+}
+
+function isProviderLinearChildPipelineId(pipelineId: string | null): boolean {
+  return pipelineId !== null && PROVIDER_LINEAR_CHILD_PIPELINE_IDS.has(pipelineId);
+}
+
+function matchesSyntheticProviderChildTaskId(
+  claimTaskId: string,
+  snapshotTaskId: string,
+  pipelineId: string | null
+): boolean {
+  if (!isProviderLinearChildPipelineId(pipelineId)) {
+    return false;
+  }
+  if (pipelineId === 'provider-linear-child-lane') {
+    return snapshotTaskId.startsWith(`${claimTaskId}-`);
+  }
+  return snapshotTaskId === `${claimTaskId}-${pipelineId}`;
+}
+
+function hasProviderLinearClaimBindingProvenance(
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueProvider' | 'manifestRecord'>,
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null
+): boolean {
+  if (snapshot.issueProvider !== null && snapshot.issueProvider !== 'linear') {
+    return false;
+  }
+  const pipelineId = readStringValue(snapshot.manifestRecord, 'pipeline_id', 'pipelineId') ?? null;
+  const pipelineTitle =
+    readStringValue(snapshot.manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null;
+  return (
+    pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
+    pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    providerLinearWorkerProof != null ||
+    (snapshot.issueProvider === 'linear' && isProviderLinearChildPipelineId(pipelineId))
+  );
+}
+
+function buildSelectedRunProviderClaimMatchSource(
+  snapshot: SelectedRunManifestSnapshot,
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null
+): SelectedRunProviderClaimMatchSource {
+  return {
+    issueId: snapshot.issueId,
+    issueIdentifier: snapshot.issueIdentifier,
+    issueProvider: snapshot.issueProvider,
+    manifestPath: snapshot.manifestPath,
+    manifestRecord: snapshot.manifestRecord,
+    runId: snapshot.runId,
+    taskId: snapshot.taskId,
+    providerLinearWorkerProof
+  };
+}
+
+function hasAuthoritativeProjectionIssueIdentity(
+  snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
+): boolean {
+  if (snapshot.issueIdentifier && !isProjectionFallbackIdentityValue(snapshot.issueIdentifier, snapshot)) {
+    return true;
+  }
+  if (snapshot.issueId && !isProjectionFallbackIdentityValue(snapshot.issueId, snapshot)) {
+    return true;
+  }
+  return false;
 }
 
 function buildProviderRetryState(

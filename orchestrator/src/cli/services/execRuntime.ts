@@ -27,6 +27,7 @@ const sessionManager = new ExecSessionManager<CliExecSessionHandle>({
 
 const privacyGuard = new PrivacyGuard({ mode: resolvePrivacyGuardMode() });
 const handleService = new RemoteExecHandleService({ guard: privacyGuard, now: () => new Date() });
+const POST_EXIT_STDIO_DRAIN_TIMEOUT_MS = 500;
 
 const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) => {
   const hasExplicitArgs = Array.isArray(request.args);
@@ -47,9 +48,61 @@ const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) =
   child.stderr.on('data', request.onStderr);
 
   return await new Promise((resolve, reject) => {
-    const handleExit = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+    let settled = false;
+    let exited = false;
+    let exitCode: number | null = null;
+    let signal: NodeJS.Signals | null = null;
+    let stdoutEnded = false;
+    let stderrEnded = false;
+    let drainTimeout: NodeJS.Timeout | null = null;
+
+    const finalize = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       cleanup();
       resolve({ exitCode, signal });
+    };
+
+    const setExitState = (nextExitCode: number | null, nextSignal: NodeJS.Signals | null) => {
+      if (exited) {
+        return;
+      }
+      exited = true;
+      exitCode = nextExitCode;
+      signal = nextSignal;
+    };
+
+    const maybeFinalizeAfterExit = () => {
+      if (!exited || !stdoutEnded || !stderrEnded) {
+        return;
+      }
+      finalize();
+    };
+
+    const armDrainTimeout = () => {
+      if (drainTimeout) {
+        return;
+      }
+      drainTimeout = setTimeout(() => {
+        finalize();
+      }, POST_EXIT_STDIO_DRAIN_TIMEOUT_MS);
+      drainTimeout.unref?.();
+    };
+
+    const handleExit = (nextExitCode: number | null, nextSignal: NodeJS.Signals | null) => {
+      setExitState(nextExitCode, nextSignal);
+      if (stdoutEnded && stderrEnded) {
+        finalize();
+        return;
+      }
+      armDrainTimeout();
+    };
+
+    const handleClose = (nextExitCode: number | null, nextSignal: NodeJS.Signals | null) => {
+      setExitState(nextExitCode, nextSignal);
+      finalize();
     };
 
     const handleError = (error: Error) => {
@@ -57,12 +110,32 @@ const cliExecutor: ExecCommandExecutor<CliExecSessionHandle> = async (request) =
       reject(error);
     };
 
-    const cleanup = () => {
-      child.off('exit', handleExit);
-      child.off('error', handleError);
+    const handleStdoutEnd = () => {
+      stdoutEnded = true;
+      maybeFinalizeAfterExit();
     };
 
+    const handleStderrEnd = () => {
+      stderrEnded = true;
+      maybeFinalizeAfterExit();
+    };
+
+    const cleanup = () => {
+      child.stdout.off('end', handleStdoutEnd);
+      child.stderr.off('end', handleStderrEnd);
+      child.off('exit', handleExit);
+      child.off('close', handleClose);
+      child.off('error', handleError);
+      if (drainTimeout) {
+        clearTimeout(drainTimeout);
+        drainTimeout = null;
+      }
+    };
+
+    child.stdout.once('end', handleStdoutEnd);
+    child.stderr.once('end', handleStderrEnd);
     child.once('exit', handleExit);
+    child.once('close', handleClose);
     child.once('error', handleError);
   });
 };

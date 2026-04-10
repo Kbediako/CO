@@ -3,7 +3,10 @@ import type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 import type { ProviderIntakeSummaryPayload } from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
 import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
-import type { ControlProviderDebugSnapshot } from './providerIssueObservability.js';
+import type {
+  ControlProviderDebugSnapshot,
+  ProviderLinearWorkerProgressCandidate
+} from './providerIssueObservability.js';
 
 export type { ControlPollingHealthPayload } from './providerPollingHealth.js';
 
@@ -21,6 +24,10 @@ export interface SelectedRunLatestEvent {
   at: string | null;
   event: string | null;
   message: string | null;
+  source?: string | null;
+  messageRecordedAt?: string | null;
+  sourceUpdatedAt?: string | null;
+  candidates?: ProviderLinearWorkerProgressCandidate[];
   requestedBy: string | null;
   reason: string | null;
 }
@@ -112,6 +119,7 @@ interface SharedSelectedProjectionFields {
   latestAction: string | null;
   latestEvent: SelectedRunLatestEvent | null;
   workspacePath: string | null;
+  pipelineId?: string | null;
   pipelineTitle: string | null;
   stages: SelectedRunStageSummary[];
   approvalsTotal: number;
@@ -141,6 +149,10 @@ export interface ControlLatestEventPayload {
   event: string | null;
   message: string | null;
   at: string | null;
+  source?: string | null;
+  message_recorded_at?: string | null;
+  source_updated_at?: string | null;
+  candidates?: ProviderLinearWorkerProgressCandidate[];
   requested_by?: string | null;
   reason?: string | null;
 }
@@ -198,6 +210,10 @@ export interface ControlRunningPayload {
   last_event: string | null;
   last_message: string | null;
   display_event?: string | null;
+  event_source?: string | null;
+  message_recorded_at?: string | null;
+  source_updated_at?: string | null;
+  event_candidates?: ProviderLinearWorkerProgressCandidate[];
   started_at: string | null;
   last_event_at: string | null;
   tokens: ControlTokenUsagePayload;
@@ -382,6 +398,10 @@ export function buildSelectedRunLatestEventPayload(
     at: latestEvent.at,
     event: latestEvent.event,
     message: latestEvent.message,
+    source: latestEvent.source ?? null,
+    message_recorded_at: latestEvent.messageRecordedAt ?? null,
+    source_updated_at: latestEvent.sourceUpdatedAt ?? null,
+    candidates: latestEvent.candidates ?? [],
     ...(options.includeRequestMetadata
       ? {
           requested_by: latestEvent.requestedBy,
