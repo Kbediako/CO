@@ -24,6 +24,6 @@
 
 ## Handoff
 - [x] The issue is in `In Progress`, and exactly one persistent `## Codex Workpad` comment is maintained for the issue. Evidence: Linear workpad comment `f98fff55-04c9-4089-bb66-3d21e0ef561a`, sourced from `out/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc/manual/workpad.md`.
+- [x] Latest `origin/main` is merged into the branch before review-state transition. Evidence: merge commit `a6a156be6`, follow-up docs-budget commit `c84beeb25`, plus merged-head reruns of `node scripts/spec-guard.mjs --dry-run` and `npm run docs:check`.
 - [ ] A PR is attached before any review-state handoff. Evidence: pending.
-- [ ] Latest `origin/main` is merged into the branch before review-state transition. Evidence: pending.
 - [ ] PR checks are green, actionable review feedback is handled or explicitly pushed back, `pr ready-review` drains cleanly, and the issue moves to `In Review` only after coding stops. Evidence: pending.
