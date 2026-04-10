@@ -935,8 +935,74 @@ export function createProviderIssueHandoffService(
     result: ProviderIssueHandoffResult
   ): boolean => result.kind !== 'ignored' || result.claim.retry_queued === true;
 
+  const buildTrackedIssueMergeCloseoutResetFields = (
+    claim: Pick<
+      ProviderIntakeClaimRecord,
+      'merge_closeout' | 'review_promotion' | 'issue_updated_at'
+    >,
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
+  ): Partial<Pick<ProviderIntakeClaimRecord, 'merge_closeout' | 'review_promotion'>> => {
+    if (!isTrackedIssueFreshEnoughForClaim(claim, trackedIssue)) {
+      return {};
+    }
+    const clearMergeCloseout = shouldClearStaleMergeCloseoutForTrackedIssue({
+      claim,
+      trackedIssue
+    });
+    if (!clearMergeCloseout) {
+      return {};
+    }
+    return shouldClearStaleReviewPromotionForTrackedIssue({
+      claim,
+      trackedIssue
+    })
+      ? { merge_closeout: null, review_promotion: null }
+      : { merge_closeout: null };
+  };
+
+  const buildFreshTrackedIssueActiveRunFields = (
+    claim: Pick<
+      ProviderIntakeClaimRecord,
+      | 'merge_closeout'
+      | 'review_promotion'
+      | 'issue_identifier'
+      | 'issue_title'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_viewer_id'
+      | 'issue_viewer_auth_fingerprint'
+      | 'issue_assignee_id'
+      | 'issue_assignee_name'
+      | 'issue_blocked_by'
+    >,
+    trackedIssue: LiveLinearTrackedIssue
+  ): Partial<
+    Pick<
+      ProviderIntakeClaimRecord,
+      | 'issue_identifier'
+      | 'issue_title'
+      | 'issue_state'
+      | 'issue_state_type'
+      | 'issue_updated_at'
+      | 'issue_viewer_id'
+      | 'issue_viewer_auth_fingerprint'
+      | 'issue_assignee_id'
+      | 'issue_assignee_name'
+      | 'issue_blocked_by'
+      | 'merge_closeout'
+      | 'review_promotion'
+    >
+  > => ({
+    ...buildFreshTrackedIssueClaimFields(claim, trackedIssue),
+    ...buildTrackedIssueMergeCloseoutResetFields(claim, trackedIssue)
+  });
+
   const resolveFreshTrackedIssueForActiveClaim = async (
-    claim: Pick<ProviderIntakeClaimRecord, 'provider' | 'issue_id' | 'issue_updated_at'>
+    claim: Pick<
+      ProviderIntakeClaimRecord,
+      'provider' | 'issue_id' | 'issue_updated_at' | 'merge_closeout' | 'review_promotion'
+    >
   ): Promise<{
     trackedIssue: LiveLinearTrackedIssue | null;
     claimFields: Partial<
@@ -952,6 +1018,8 @@ export function createProviderIssueHandoffService(
         | 'issue_assignee_id'
         | 'issue_assignee_name'
         | 'issue_blocked_by'
+        | 'merge_closeout'
+        | 'review_promotion'
       >
     >;
   }> => {
@@ -991,7 +1059,10 @@ export function createProviderIssueHandoffService(
 
     return {
       trackedIssue: resolution.trackedIssue,
-      claimFields: buildFreshTrackedIssueClaimFields(claim, resolution.trackedIssue)
+      claimFields: {
+        ...buildFreshTrackedIssueClaimFields(claim, resolution.trackedIssue),
+        ...buildTrackedIssueMergeCloseoutResetFields(claim, resolution.trackedIssue)
+      }
     };
   };
 
@@ -1536,15 +1607,16 @@ export function createProviderIssueHandoffService(
           didRunMatchClaimAttempt(claim, completedRun)
         )
       ) {
+        let completedClaim = claim;
         if (input?.refreshTrackedIssueMetadata) {
           const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
           if (freshTrackedIssue.trackedIssue) {
-            const refreshedClaim = {
-              ...claim,
+            completedClaim = {
+              ...completedClaim,
               ...freshTrackedIssue.claimFields
             };
             const reviewPromotionClaim = await maybeHandleReviewHandoffPromotion({
-              claim: refreshedClaim,
+              claim: completedClaim,
               trackedIssue: freshTrackedIssue.trackedIssue,
               latestRun: completedRun
             });
@@ -1554,13 +1626,13 @@ export function createProviderIssueHandoffService(
             }
             if (
               shouldAttemptDeterministicMergeCloseoutForRecoveredRun({
-                claim: refreshedClaim,
+                claim: completedClaim,
                 trackedIssue: freshTrackedIssue.trackedIssue,
                 run: completedRun
               })
             ) {
               const mergeCloseoutClaim = await maybeHandleDeterministicMergingCloseout({
-                claim: refreshedClaim,
+                claim: completedClaim,
                 trackedIssue: freshTrackedIssue.trackedIssue,
                 latestRun: completedRun
               });
@@ -1572,21 +1644,22 @@ export function createProviderIssueHandoffService(
           }
         }
         const completedState = buildProviderCompletedRunRehydrateState({
-          claim,
+          claim: completedClaim,
           run: completedRun,
-          preserveCurrentAttempt: claim.retry_queued === true,
-          preserveExistingDueAt: claim.retry_queued === true,
-          queueContinuationRetry: shouldQueuePostWorkerRetryClaim(claim)
+          preserveCurrentAttempt: completedClaim.retry_queued === true,
+          preserveExistingDueAt: completedClaim.retry_queued === true,
+          queueContinuationRetry: shouldQueuePostWorkerRetryClaim(completedClaim)
         });
-        publishRuntime ||= hasProviderClaimTransitioned(claim, {
-          ...completedState
-        });
-        upsertProviderIntakeClaim(options.state, {
-          ...claim,
+        const nextCompletedClaim = {
+          ...completedClaim,
           launch_source: undefined,
           launch_token: undefined,
           ...completedState,
           updated_at: now
+        };
+        publishRuntime ||= hasProviderClaimTransitioned(claim, nextCompletedClaim);
+        upsertProviderIntakeClaim(options.state, {
+          ...nextCompletedClaim
         });
         continue;
       }
@@ -2367,8 +2440,43 @@ export function createProviderIssueHandoffService(
           }
         }
         if (activeRun) {
-          const trackedIssueFields = buildFreshTrackedIssueClaimFields(existing, input.trackedIssue);
+          const trackedIssueFreshEnoughForClaim = isTrackedIssueFreshEnoughForClaim(
+            existing,
+            input.trackedIssue
+          );
+          const preserveRecoveredMergeCloseoutClaim =
+            !trackedIssueFreshEnoughForClaim &&
+            (
+              isProviderMergeCloseoutWatchingClaim(existing) ||
+              isTerminalProviderMergeCloseoutClaim(existing)
+            );
+          if (preserveRecoveredMergeCloseoutClaim) {
+            return {
+              kind: 'ignored',
+              reason: existing.reason ?? 'provider_issue_handoff_owned',
+              claim: existing
+            };
+          }
+          if (trackedIssueFreshEnoughForClaim) {
+            const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
+              claim: existing,
+              trackedIssue: input.trackedIssue,
+              latestRun: activeRun
+            });
+            if (mergeCloseoutClaim) {
+              return {
+                kind: 'ignored',
+                reason: mergeCloseoutClaim.reason ?? 'provider_issue_rehydrated_active_run',
+                claim: mergeCloseoutClaim
+              };
+            }
+          }
+          const trackedIssueFields = buildFreshTrackedIssueActiveRunFields(
+            existing,
+            input.trackedIssue
+          );
           const reactivatedMergeCloseoutReset =
+            !trackedIssueFreshEnoughForClaim ||
             existing.reason === 'provider_issue_rehydrated_active_run'
               ? {}
               : { review_promotion: null, merge_closeout: null };
@@ -2430,14 +2538,54 @@ export function createProviderIssueHandoffService(
       > = latestExisting ?? clearProviderRetryFields();
       const activeRun = attachableDiscoveredRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
+        const trackedIssueFreshEnoughForLatestClaim =
+          latestExisting ? isTrackedIssueFreshEnoughForClaim(latestExisting, input.trackedIssue) : true;
+        const preserveRecoveredMergeCloseoutClaim =
+          latestExisting &&
+          !trackedIssueFreshEnoughForLatestClaim &&
+          (
+            isProviderMergeCloseoutWatchingClaim(latestExisting) ||
+            isTerminalProviderMergeCloseoutClaim(latestExisting)
+          );
+        if (preserveRecoveredMergeCloseoutClaim) {
+          return {
+            kind: 'ignored',
+            reason: latestExisting.reason ?? 'provider_issue_run_already_active',
+            claim: latestExisting
+          };
+        }
+        if (trackedIssueFreshEnoughForLatestClaim && latestExisting) {
+          const mergeCloseoutClaim = await maybeHandleRecoveredActiveRunMergedCloseout({
+            claim: latestExisting,
+            trackedIssue: input.trackedIssue,
+            latestRun: activeRun
+          });
+          if (mergeCloseoutClaim) {
+            return {
+              kind: 'ignored',
+              reason: mergeCloseoutClaim.reason ?? 'provider_issue_rehydrated_active_run',
+              claim: mergeCloseoutClaim
+            };
+          }
+        }
+        const trackedIssueFields = latestExisting
+          ? buildFreshTrackedIssueActiveRunFields(latestExisting, input.trackedIssue)
+          : buildTrackedIssueClaimFields(input.trackedIssue);
+        const reactivatedMergeCloseoutReset =
+          !trackedIssueFreshEnoughForLatestClaim ||
+          latestExisting?.reason === 'provider_issue_rehydrated_active_run'
+            ? {}
+            : { review_promotion: null, merge_closeout: null };
         const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
+          ...trackedIssueFields,
           task_id: activeRun.taskId,
           mapping_source: mappingSource,
           state: 'running',
           reason: 'provider_issue_run_already_active',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          ...reactivatedMergeCloseoutReset
         });
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
@@ -3029,7 +3177,7 @@ export function createProviderIssueHandoffService(
                   continue;
                 }
               }
-              const trackedIssueFields = buildFreshTrackedIssueClaimFields(
+              const trackedIssueFields = buildFreshTrackedIssueActiveRunFields(
                 claim,
                 resolution.trackedIssue
               );
@@ -3142,7 +3290,7 @@ export function createProviderIssueHandoffService(
                 continue;
               }
             }
-            const trackedIssueFields = buildFreshTrackedIssueClaimFields(
+            const trackedIssueFields = buildFreshTrackedIssueActiveRunFields(
               claim,
               resolution.trackedIssue
             );
@@ -3243,19 +3391,28 @@ export function createProviderIssueHandoffService(
           }
 
           if (latestRun?.status === 'succeeded') {
+            const trackedIssueClaimFields = {
+              ...buildFreshTrackedIssueClaimFields(currentClaim, resolution.trackedIssue),
+              ...buildTrackedIssueMergeCloseoutResetFields(currentClaim, resolution.trackedIssue)
+            };
             const completedState = buildProviderCompletedRunRehydrateState({
-              claim: currentClaim,
+              claim: {
+                ...currentClaim,
+                ...trackedIssueClaimFields
+              },
               run: latestRun
             });
-            const transitioned = hasProviderClaimTransitioned(currentClaim, {
-              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
+            const nextCompletedClaim = {
+              ...currentClaim,
+              ...trackedIssueClaimFields,
               ...completedState
+            };
+            const transitioned = hasProviderClaimTransitioned(currentClaim, {
+              ...nextCompletedClaim
             });
             const refreshCompletedSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
-              ...currentClaim,
-              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
-              ...completedState
+              ...nextCompletedClaim
             });
             if (transitioned) {
               await persistStateOrRollback(refreshCompletedSnapshot);
@@ -3591,6 +3748,57 @@ function isTrackedIssueFreshEnoughForMergeCloseout(
     return false;
   }
   return true;
+}
+
+function shouldClearStaleMergeCloseoutForTrackedIssue(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'merge_closeout'>;
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'updated_at'>;
+}): boolean {
+  const mergeCloseout = input.claim.merge_closeout ?? null;
+  if (!mergeCloseout || mergeCloseout.status === 'watching') {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(input.trackedIssue.state) === 'merging') {
+    return false;
+  }
+  if (normalizeProviderLinearWorkflowState(mergeCloseout.issue_state) !== 'merging') {
+    return false;
+  }
+  return (
+    compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: mergeCloseout.issue_updated_at ?? null,
+      nextIssueUpdatedAt: input.trackedIssue.updated_at
+    }) === 'newer'
+  );
+}
+
+function shouldClearStaleReviewPromotionForTrackedIssue(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'review_promotion'>;
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>;
+}): boolean {
+  const reviewPromotion = input.claim.review_promotion ?? null;
+  if (!reviewPromotion) {
+    return false;
+  }
+  if (!classifyProviderLinearWorkflowState(input.trackedIssue).isActive) {
+    return false;
+  }
+  const reviewPromotionWorkflowState = classifyProviderLinearWorkflowState({
+    state: reviewPromotion.issue_state,
+    state_type: reviewPromotion.issue_state_type
+  });
+  if (
+    !reviewPromotionWorkflowState.isHandoff &&
+    reviewPromotionWorkflowState.normalizedState !== 'merging'
+  ) {
+    return false;
+  }
+  return (
+    compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
+      nextIssueUpdatedAt: input.trackedIssue.updated_at
+    }) === 'newer'
+  );
 }
 
 function assessProviderTrackedIssueEligibility(
