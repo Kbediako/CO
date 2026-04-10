@@ -133,7 +133,7 @@
 - The lane closes by making the narrower supported contract explicit in tests and docs.
 - If a future lane introduces a supported standalone `run-review` symlink-preserved entrypoint, that lane can widen `isDirectExecution(...)` with evidence and add the corresponding subprocess-safe regression coverage.
 
-## Non-Goals
+## Deferred Scope (Reiterated)
 - `CO-114` performance work.
 - `bin/codex-orchestrator.ts` changes.
 - Generic standalone-review wrapper refactors.
