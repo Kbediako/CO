@@ -25,6 +25,23 @@
       }
     },
     {
+      "id": "20260410-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58",
+      "title": "CO: stabilize broad timeout-heavy repo test lane so unrelated failures stop blocking narrow issue handoffs",
+      "relates_to": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "task": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "agent_task": ".agent/task/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "docs": "docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md"
+      }
+    },
+    {
       "id": "20260410-linear-97d69ad8-ba75-432f-b8b2-21ca83754325",
       "title": "CO: add autonomous branch refresh and conflict recovery for green-but-dirty PRs before and during Merging",
       "relates_to": "tasks/tasks-linear-97d69ad8-ba75-432f-b8b2-21ca83754325.md",

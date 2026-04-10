@@ -5,6 +5,12 @@ import { createVitestProgressReporter } from './scripts/lib/vitest-progress-repo
 const reporters = shouldEnableVitestProgressReporter(process.env)
   ? ['default', createVitestProgressReporter()]
   : null;
+const workerLimits = shouldCapVitestWorkers(process.env)
+  ? {
+      maxWorkers: 4,
+      minWorkers: 1
+    }
+  : null;
 
 export default defineConfig({
   // Vitest runs through Vite middleware mode, which otherwise spins up the
@@ -25,6 +31,7 @@ export default defineConfig({
       'tests/**/*.spec.ts'
     ],
     ...(reporters ? { reporters } : {}),
+    ...(workerLimits ? workerLimits : {}),
     coverage: {
       enabled: false
     }
@@ -51,4 +58,11 @@ function shouldEnableVitestProgressReporter(env: NodeJS.ProcessEnv): boolean {
     envFlagEnabled(env.CODEX_NONINTERACTIVE) ||
     envFlagEnabled(env.CODEX_NO_INTERACTIVE)
   );
+}
+
+function shouldCapVitestWorkers(env: NodeJS.ProcessEnv): boolean {
+  // CLI-heavy suites spawn nested Node processes and become timeout-prone when
+  // the broad lane fully saturates worker threads in CI or explicit
+  // stage-owned Vitest runs that opt into progress reporting.
+  return envFlagEnabled(env.CI) || envFlagEnabled(env.CODEX_VITEST_PROGRESS);
 }

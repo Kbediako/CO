@@ -82,6 +82,26 @@ describe('vitest progress reporter config', () => {
   });
 });
 
+describe('vitest worker-cap config', () => {
+  it('caps workers for CI broad-lane runs', async () => {
+    const config = await loadConfig({ CI: '1' });
+    expect(config.test?.maxWorkers).toBe(4);
+    expect(config.test?.minWorkers).toBe(1);
+  });
+
+  it('caps workers for explicit stage-owned Vitest progress runs', async () => {
+    const config = await loadConfig({ CODEX_VITEST_PROGRESS: '1' });
+    expect(config.test?.maxWorkers).toBe(4);
+    expect(config.test?.minWorkers).toBe(1);
+  });
+
+  it('leaves workers uncapped for plain non-interactive runs without the broad-lane signals', async () => {
+    const config = await loadConfig({ CODEX_NON_INTERACTIVE: '1' });
+    expect(config.test?.maxWorkers).toBeUndefined();
+    expect(config.test?.minWorkers).toBeUndefined();
+  });
+});
+
 async function loadConfig(env: Partial<NodeJS.ProcessEnv>) {
   applyTrackedEnv(env);
 
