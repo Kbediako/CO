@@ -235,6 +235,41 @@ describe('worktree-git-identity script', () => {
     expect(result.stdout).toBe('');
   }, integrationTimeoutMs);
 
+  it('fails closed when the inherited-identity path points at an existing non-repo directory', async () => {
+    const sandboxRoot = await mkdtemp(join(tmpdir(), 'worktree-git-identity-invalid-'));
+    cleanupRoots.push(sandboxRoot);
+    const nonRepoRoot = join(sandboxRoot, 'not-a-repo');
+    await mkdir(nonRepoRoot, { recursive: true });
+
+    const result = await runScript(['--worktree', nonRepoRoot]);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('--worktree can only be used inside a git repository');
+    expect(result.stderr).not.toContain('node:internal/errors');
+    expect(result.stdout).toBe('');
+  }, integrationTimeoutMs);
+
+  it('fails closed when the explicit-identity path points at an existing non-repo directory', async () => {
+    const sandboxRoot = await mkdtemp(join(tmpdir(), 'worktree-git-identity-invalid-'));
+    cleanupRoots.push(sandboxRoot);
+    const nonRepoRoot = join(sandboxRoot, 'not-a-repo');
+    await mkdir(nonRepoRoot, { recursive: true });
+
+    const result = await runScript([
+      '--worktree',
+      nonRepoRoot,
+      '--name',
+      'github-actions[bot]',
+      '--email',
+      '41898282+github-actions[bot]@users.noreply.github.com'
+    ]);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('not a git repository');
+    expect(result.stderr).not.toContain('node:internal/errors');
+    expect(result.stdout).toBe('');
+  }, integrationTimeoutMs);
+
   it('fails when a required flag value is missing', async () => {
     const result = await runScript(['--worktree']);
 

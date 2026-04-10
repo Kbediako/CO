@@ -29,7 +29,7 @@
 
 ## Validation
 - Checks / tests:
-  - `MCP_RUNNER_TASK_ID=linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702 node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --stream co-120-docs-review-r2 --format json`
+  - `MCP_RUNNER_TASK_ID=linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702 node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --stream co-120-docs-review-r3b --format json`
   - focused helper regression in a temporary linked-worktree repo
   - exact verification path that inspects the shared repo git config file before and after helper execution
   - required repo validation floor after implementation

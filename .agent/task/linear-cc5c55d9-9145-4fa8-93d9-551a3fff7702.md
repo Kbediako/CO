@@ -29,7 +29,8 @@
 
 ## Validation
 - [x] Fresh `linear child-stream --pipeline docs-review` evidence recorded for the `r3` reset packet. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r3b/cli/2026-04-10T15-45-44-565Z-4cf696ae/manifest.json`, `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-docs-review-r3c/cli/2026-04-10T15-53-39-501Z-d84c7389/manifest.json`, `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/20260410T160541Z-review-fallback.md`.
-- [x] Focused linked-worktree helper regression coverage in a temporary repo on the fresh `origin/main` base. Evidence: `npx vitest run tests/worktree-git-identity.spec.ts` (`8` tests passed on `2026-04-11` after fixing the explicit invalid-worktree failure path).
+- [x] Fresh `linear child-stream --pipeline implementation-gate` evidence recorded after the review-fix follow-up patch. Evidence: `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/manifest.json`, `.runs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702-co-120-implementation-gate-r3d/cli/2026-04-10T16-39-17-053Z-9ed164e7/review/telemetry.json` (`status: succeeded`, `review_outcome: clean-success`).
+- [x] Focused linked-worktree helper regression coverage in a temporary repo on the fresh `origin/main` base. Evidence: `npx vitest run tests/worktree-git-identity.spec.ts` (`10` tests passed on `2026-04-11` after adding existing non-repo directory coverage alongside the explicit invalid-worktree failure path).
 - [x] Exact shared repo git-config before/after verification commands recorded and rerun locally, including the `extensions.worktreeConfig=true` helper path when explicit worktree-local identity is requested. Evidence: `out/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702/manual/20260411T0148Z-manual-verification.log`, direct invalid-worktree probe on `2026-04-11`.
 - [x] `node scripts/delegation-guard.mjs`
 - [x] `node scripts/spec-guard.mjs --dry-run`
