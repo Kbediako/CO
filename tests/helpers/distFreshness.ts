@@ -98,15 +98,15 @@ async function discoverDependencyClosure(sourceEntry: string): Promise<CachedDep
 
     const sourceText = await readFile(currentFile, 'utf8');
     for (const specifier of collectRelativeRuntimeSpecifiers(currentFile, sourceText)) {
-      const {
-        resolvedDependency,
-        unresolvedCandidates
-      } = await resolveRelativeSourceDependency(currentFile, specifier);
+      const { resolvedDependency, trackedCandidates } = await resolveRelativeSourceDependency(
+        currentFile,
+        specifier
+      );
+      for (const candidate of trackedCandidates) {
+        trackedPaths.add(candidate);
+      }
       if (!resolvedDependency) {
         hasUnresolvedTrackedDependency = true;
-        for (const candidate of unresolvedCandidates) {
-          trackedPaths.add(candidate);
-        }
         continue;
       }
       if (!files.has(resolvedDependency)) {
@@ -211,20 +211,23 @@ function getCallSpecifier(node: ts.CallExpression): string | null {
 async function resolveRelativeSourceDependency(
   fromFile: string,
   specifier: string
-): Promise<{ resolvedDependency: string | null; unresolvedCandidates: string[] }> {
+): Promise<{ resolvedDependency: string | null; trackedCandidates: string[] }> {
   const candidateBase = resolve(dirname(fromFile), specifier);
   const candidates = buildResolutionCandidates(candidateBase);
-  for (const candidate of candidates) {
+  for (const [index, candidate] of candidates.entries()) {
     try {
       const candidateStats = await stat(candidate);
       if (candidateStats.isFile()) {
-        return { resolvedDependency: candidate, unresolvedCandidates: [] };
+        return {
+          resolvedDependency: candidate,
+          trackedCandidates: candidates.slice(0, index + 1)
+        };
       }
     } catch {
       continue;
     }
   }
-  return { resolvedDependency: null, unresolvedCandidates: candidates };
+  return { resolvedDependency: null, trackedCandidates: candidates };
 }
 
 function buildResolutionCandidates(candidateBase: string): string[] {

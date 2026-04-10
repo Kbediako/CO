@@ -229,6 +229,47 @@ describe('shouldUseFreshDist', () => {
     }
   });
 
+  it('refreshes a cached dependency closure when a higher-priority source candidate appears', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() {}\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const distAt = new Date('2026-01-01T00:00:01.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, sourceAt, sourceAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      const higherPriorityAt = new Date('2026-01-01T00:00:02.000Z');
+      await writeFile(
+        transitiveDependencyJs,
+        'export function runDoctorCliShell() { return true; }\n',
+        'utf8'
+      );
+      await utimes(transitiveDependencyJs, higherPriorityAt, higherPriorityAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('refreshes a cached unresolved dependency when the missing runtime import becomes resolvable', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
     const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');

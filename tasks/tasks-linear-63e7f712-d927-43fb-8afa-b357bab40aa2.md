@@ -19,18 +19,18 @@
 
 ## Validation
 - [x] Add targeted tests for the expanded freshness roots in both hot suites. Evidence: `tests/cli-command-surface.spec.ts`, `tests/run-review.spec.ts`.
-- [x] Re-run the focused hot-suite commands that cover the freshness logic. Evidence: `npx vitest run tests/cli-command-surface.spec.ts tests/run-review.spec.ts` (`262` tests passed).
+- [x] Re-run the focused hot-suite commands that cover the freshness logic. Evidence: `npx vitest run tests/cli-command-surface.spec.ts tests/run-review.spec.ts` (`263` tests passed after the higher-priority candidate fix).
 - [x] Confirm the bounded subprocess smoke matrix still prefers `dist` for unrelated-file changes and still rejects stale `dist` for the newly tracked dependency roots. Evidence: focused stale-vs-unrelated cases in `tests/cli-command-surface.spec.ts` and `tests/run-review.spec.ts`, plus `npx vitest run tests/cli-command-surface.spec.ts tests/run-review.spec.ts`.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: completed successfully after docs-review and implementation validation.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: completed successfully on the synced `origin/main` baseline.
 - [x] `npm run build`. Evidence: completed successfully.
 - [x] `npm run lint`. Evidence: completed successfully.
-- [x] `npm run test`. Evidence: completed successfully (`3322` tests passed).
+- [x] `npm run test`. Evidence: completed successfully (`3323` tests passed after the higher-priority candidate fix).
 - [x] `npm run docs:check`. Evidence: completed successfully.
 - [x] `npm run docs:freshness`. Evidence: completed successfully (`3488` docs, `3491` registry entries).
 - [x] `node scripts/diff-budget.mjs`. Evidence: completed successfully (`files=10/25`, `lines=1147/1200`, `+1054/-93`).
-- [x] Standalone review recorded. Evidence: `../../.runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/cli/2026-04-10T06-49-36-719Z-253d7dad/review/telemetry.json` (`status: succeeded`, `review_outcome: clean-success`, `termination_boundary: null`).
-- [x] Explicit elegance pass recorded. Evidence: bounded manual pass confirmed the smallest correct design remains one shared test-local helper with no broader product/runtime extraction.
+- [x] Standalone review recorded. Evidence: `../../.runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/cli/2026-04-10T06-49-36-719Z-253d7dad/review/telemetry.json` (`status: succeeded`, `review_outcome: clean-success`, `termination_boundary: null`) after the Codex-thread follow-up fix.
+- [x] Explicit elegance pass recorded. Evidence: bounded manual pass confirmed the smallest correct design remains one shared test-local helper, now tracking only resolution-priority candidates that can change the winning source path.
 - [x] `npm run pack:smoke` because the final diff still touches downstream-facing CLI/review-wrapper surfaces. Evidence: completed successfully.
 
 ## Handoff
