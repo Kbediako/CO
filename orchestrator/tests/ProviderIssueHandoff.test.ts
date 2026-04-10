@@ -991,7 +991,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(refetchTrackedIssues).toHaveBeenCalledWith({
       mode: 'fresh_discovery',
       eligibleTargetCount: 1,
-      eligibleStateSlotCounts: {}
+      eligibleStateSlotCounts: {},
+      excludedIssueIds: ['lin-issue-occupied']
     });
     expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.start.mock.calls[0]?.[0]).toEqual(

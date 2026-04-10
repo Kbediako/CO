@@ -331,6 +331,7 @@ export async function resolveLiveLinearTrackedIssues(input: {
   stopWhenEligibleForExecution?: boolean;
   eligibleIssueTargetCount?: number;
   eligibleStateSlotCounts?: Record<string, number>;
+  excludedIssueIds?: string[];
   queryMode?: LiveLinearTrackedIssuesQueryMode;
 }): Promise<LiveLinearTrackedIssuesResolution> {
   const env = input.env ?? process.env;
@@ -352,6 +353,7 @@ export async function resolveLiveLinearTrackedIssues(input: {
     eligibleIssueTargetCount: input.eligibleIssueTargetCount
   });
   const eligibleStateSlotCounts = normalizeEligibleStateSlotCounts(input.eligibleStateSlotCounts);
+  const excludedIssueIds = new Set(input.excludedIssueIds ?? []);
   if (queryMode === 'fresh_discovery') {
     return await resolveFreshDiscoveryTrackedIssues({
       sourceSetup,
@@ -362,6 +364,7 @@ export async function resolveLiveLinearTrackedIssues(input: {
       limit: input.limit,
       eligibleIssueTargetCount,
       eligibleStateSlotCounts,
+      excludedIssueIds,
       sortForDispatch: input.sortForDispatch !== false
     });
   }
@@ -418,6 +421,7 @@ export async function resolveLiveLinearTrackedIssues(input: {
       seenIssueIds.add(trackedIssue.id);
       trackedIssues.push(trackedIssue);
       if (
+        !excludedIssueIds.has(trackedIssue.id) &&
         shouldCountTrackedIssueTowardEligibilityTarget(
           trackedIssue,
           eligibleStateSlotCounts,
@@ -473,6 +477,7 @@ async function resolveFreshDiscoveryTrackedIssues(input: {
   limit?: number;
   eligibleIssueTargetCount: number | null;
   eligibleStateSlotCounts: Map<string, number>;
+  excludedIssueIds: Set<string>;
   sortForDispatch: boolean;
 }): Promise<LiveLinearTrackedIssuesResolution> {
   const trackedIssues: LiveLinearTrackedIssue[] = [];
@@ -540,6 +545,7 @@ async function resolveFreshDiscoveryTrackedIssues(input: {
         seenIssueIds.add(trackedIssue.id);
         trackedIssues.push(trackedIssue);
         if (
+          !input.excludedIssueIds.has(trackedIssue.id) &&
           shouldCountTrackedIssueTowardEligibilityTarget(
             trackedIssue,
             input.eligibleStateSlotCounts,

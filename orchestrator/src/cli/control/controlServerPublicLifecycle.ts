@@ -491,7 +491,8 @@ async function resolveProviderPollTrackedIssues(
     env: process.env,
     queryMode: input?.mode,
     eligibleIssueTargetCount: input?.eligibleTargetCount,
-    eligibleStateSlotCounts: input?.eligibleStateSlotCounts
+    eligibleStateSlotCounts: input?.eligibleStateSlotCounts,
+    excludedIssueIds: input?.excludedIssueIds
   });
   if (resolution.kind !== 'ready') {
     return {

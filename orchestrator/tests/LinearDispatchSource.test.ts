@@ -965,6 +965,73 @@ describe('resolveLiveLinearTrackedIssues', () => {
       tracked_issues: [{ id: 'lin-issue-in-progress-1' }, { id: 'lin-issue-todo-1' }]
     });
   });
+
+  it('keeps scanning discovery pages until it finds a non-excluded eligible issue', async () => {
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const priority = (JSON.parse(String(init?.body ?? '{}')) as { variables?: { priority?: number } }).variables
+        ?.priority;
+      return jsonResponse({
+        data: {
+          viewer: { id: 'viewer-1', organization: { id: 'lin-workspace-1' } },
+          issues: {
+            pageInfo: { hasPreviousPage: false, startCursor: null },
+            nodes:
+              priority === 1
+                ? [
+                    {
+                      id: 'lin-issue-existing',
+                      identifier: 'CO-1',
+                      title: 'Existing eligible issue',
+                      priority: 1,
+                      createdAt: '2026-03-17T04:00:00.000Z',
+                      updatedAt: '2026-03-20T04:05:00.000Z',
+                      assignee: null,
+                      state: { name: 'Todo', type: 'unstarted' },
+                      team: { id: 'lin-team-1', key: 'PREPROD', name: 'PRE-PRO/PRODUCTION' },
+                      project: { id: 'lin-project-1', name: 'Icon Agency (Bookings)' },
+                      inverseRelations: { nodes: [] }
+                    }
+                  ]
+                : [
+                    {
+                      id: 'lin-issue-new',
+                      identifier: 'CO-2',
+                      title: 'New eligible issue',
+                      priority: 2,
+                      createdAt: '2026-03-18T04:00:00.000Z',
+                      updatedAt: '2026-03-20T04:10:00.000Z',
+                      assignee: null,
+                      state: { name: 'Todo', type: 'unstarted' },
+                      team: { id: 'lin-team-1', key: 'PREPROD', name: 'PRE-PRO/PRODUCTION' },
+                      project: { id: 'lin-project-1', name: 'Icon Agency (Bookings)' },
+                      inverseRelations: { nodes: [] }
+                    }
+                  ]
+          }
+        }
+      });
+    });
+
+    const result = await resolveLiveLinearTrackedIssues({
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'lin-workspace-1',
+        team_id: 'lin-team-1',
+        project_id: 'lin-project-1'
+      },
+      env: { CO_LINEAR_API_TOKEN: 'lin-api-token' },
+      fetchImpl,
+      queryMode: 'fresh_discovery',
+      eligibleIssueTargetCount: 1,
+      excludedIssueIds: ['lin-issue-existing']
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      kind: 'ready',
+      tracked_issues: [{ id: 'lin-issue-existing' }, { id: 'lin-issue-new' }]
+    });
+  });
 });
 
 describe('resolveLiveLinearDispatchRecommendation', () => {

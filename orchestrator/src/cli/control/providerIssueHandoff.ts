@@ -96,6 +96,7 @@ export interface ProviderTrackedIssueRefetchInput {
   mode?: LiveLinearTrackedIssuesQueryMode;
   eligibleTargetCount?: number;
   eligibleStateSlotCounts?: Record<string, number>;
+  excludedIssueIds?: string[];
 }
 
 type ProviderTrackedIssueRefetch = (
@@ -2919,7 +2920,10 @@ export function createProviderIssueHandoffService(
         const freshDiscoveryResolution = await trackedIssueRefetch({
           mode: 'fresh_discovery',
           eligibleTargetCount: pollDispatchBudget.remainingGlobalSlots(),
-          eligibleStateSlotCounts: pollDispatchBudget.remainingStateSlots()
+          eligibleStateSlotCounts: pollDispatchBudget.remainingStateSlots(),
+          excludedIssueIds: Array.from(
+            new Set([...existingProviderKeys, ...occupiedPollDispatchKeys, ...consumedTrackedIssueKeys])
+          ).map((providerKey) => providerKey.slice(providerKey.indexOf(':') + 1))
         });
         if (freshDiscoveryResolution.kind === 'ready') {
           freshDiscoveryTrackedIssues = freshDiscoveryResolution.trackedIssues;

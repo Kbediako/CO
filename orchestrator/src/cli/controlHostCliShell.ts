@@ -206,7 +206,8 @@ export async function runControlHostCliShell(
             env: runtimeEnv,
             queryMode: input?.mode,
             eligibleIssueTargetCount: input?.eligibleTargetCount,
-            eligibleStateSlotCounts: input?.eligibleStateSlotCounts
+            eligibleStateSlotCounts: input?.eligibleStateSlotCounts,
+            excludedIssueIds: input?.excludedIssueIds
           });
           if (resolution.kind === 'ready') {
             return { kind: 'ready', trackedIssues: resolution.tracked_issues } as const;
