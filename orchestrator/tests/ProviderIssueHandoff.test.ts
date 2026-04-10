@@ -15506,6 +15506,162 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('clears worker_host before retry resume when the previously chosen remote host is no longer configured', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const failedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-1303-failed-remote'
+    };
+    const failedPaths = resolveRunPaths(failedEnv, 'run-failed-remote');
+    await mkdir(failedPaths.runDir, { recursive: true });
+    await writeFile(
+      failedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-failed-remote',
+        task_id: 'task-1303-failed-remote',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(failedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:29:59.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z',
+        worker_host: 'worker-host-03'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: 'task-1303-failed-remote',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-03-19T04:20:05.000Z',
+      updated_at: '2026-03-19T04:20:10.000Z',
+      last_delivery_id: 'delivery-failed',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_050_000,
+      run_id: 'run-failed-remote',
+      run_manifest_path: failedPaths.manifestPath,
+      worker_host: 'worker-host-02',
+      launch_source: null,
+      launch_token: null
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: null,
+        last_success_at: null,
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'worker-host-04',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@worker-host-04',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          }
+        ]
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      providerWorkflowConfigStore,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          updated_at: '2026-03-19T04:20:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+    await waitForMockCalls(setTimeoutSpy);
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      task_id: 'task-1303-failed-remote',
+      run_id: 'run-failed-remote',
+      run_manifest_path: failedPaths.manifestPath,
+      worker_host: 'worker-host-03',
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: null
+    });
+
+    await vi.advanceTimersByTimeAsync(10_001);
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.resume, 1, 1024);
+
+    expect(launcher.resume.mock.calls[0]?.[0]).toEqual({
+      runId: 'run-failed-remote',
+      actor: 'control-host',
+      reason: 'provider-retry',
+      workerHost: null,
+      launchToken: expect.any(String)
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'resuming',
+      reason: 'provider_issue_retry_resume_launched',
+      task_id: 'task-1303-failed-remote',
+      run_id: 'run-failed-remote',
+      run_manifest_path: failedPaths.manifestPath,
+      worker_host: null,
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      retry_queued: false,
+      retry_attempt: 1,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(providerWorkflowConfigStore.refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks queued retry resume when real in-progress manifests already consume provider capacity', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));

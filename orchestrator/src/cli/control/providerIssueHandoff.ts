@@ -51,6 +51,7 @@ import {
 import { createProviderIssueRetryQueue } from './providerIssueRetryQueue.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
+  findProviderWorkerHost,
   normalizeProviderWorkerHostName,
   selectProviderWorkerHost
 } from './providerWorkerHosts.js';
@@ -657,6 +658,20 @@ export function createProviderIssueHandoffService(
     return options.providerWorkflowConfigStore?.snapshot().worker_hosts ?? [];
   };
 
+  const resolveResumeWorkerHost = async (preferredWorkerHost: string | null): Promise<string | null> => {
+    const normalizedWorkerHost = normalizeProviderWorkerHostName(preferredWorkerHost);
+    if (!normalizedWorkerHost) {
+      return null;
+    }
+    if (!options.providerWorkflowConfigStore) {
+      return normalizedWorkerHost;
+    }
+    return findProviderWorkerHost(
+      await resolveConfiguredWorkerHosts(),
+      normalizedWorkerHost
+    )?.name ?? null;
+  };
+
   const resolvePreferredStartWorkerHost = (input: {
     claimWorkerHost?: string | null;
     previousRun?: Pick<ProviderIssueRunRecord, 'hasFreshWorkerHostContext' | 'workerHost'> | null;
@@ -1252,6 +1267,7 @@ export function createProviderIssueHandoffService(
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<void> => {
     const workerHost = resolveRehydratedActiveRunWorkerHost(input.run, input.claim);
+    const resumeWorkerHost = await resolveResumeWorkerHost(workerHost);
     const admissionGate = await createProviderAdmissionGate();
     if (!admissionGate.canDispatch(input.trackedIssue)) {
       await upsertProviderClaimAndPersist({
@@ -1262,7 +1278,7 @@ export function createProviderIssueHandoffService(
         reason: deriveProviderCapacityBlockedReason(input.reason),
         run_id: input.run.runId,
         run_manifest_path: input.run.manifestPath,
-        worker_host: workerHost,
+        worker_host: resumeWorkerHost,
         launch_source: null,
         launch_token: null,
         review_promotion: null,
@@ -1289,7 +1305,7 @@ export function createProviderIssueHandoffService(
       reason: input.reason,
       run_id: input.run.runId,
       run_manifest_path: input.run.manifestPath,
-      worker_host: workerHost,
+      worker_host: resumeWorkerHost,
       launch_source: PROVIDER_LAUNCH_SOURCE,
       launch_token: launchToken,
       review_promotion: null,
@@ -1306,7 +1322,7 @@ export function createProviderIssueHandoffService(
         runId: input.run.runId,
         actor: 'control-host',
         reason: input.launcherReason ?? 'provider-refresh',
-        workerHost,
+        workerHost: resumeWorkerHost,
         launchToken
       });
       resetProviderIssueRunDiscoveryCache();
@@ -1320,7 +1336,7 @@ export function createProviderIssueHandoffService(
         reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
         run_id: input.run.runId,
         run_manifest_path: input.run.manifestPath,
-        worker_host: workerHost,
+        worker_host: resumeWorkerHost,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
         review_promotion: null,
