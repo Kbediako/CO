@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { access } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 
 import { ExecClient } from '../src/orchestrator.js';
 import type { JsonlEvent, RunSummaryEvent } from '../../shared/events/types.js';
@@ -46,20 +46,14 @@ describe('ExecClient', () => {
     expect(handle.summary?.payload.result.exitCode).toBe(0);
     expect(result.summary.payload.outputs.stdout).toBe('ok');
     expect(result.exitCode).toBe(0);
-
-    const deadline = Date.now() + 2000;
-    let eventsExist = true;
-    while (Date.now() < deadline) {
-      eventsExist = await access(result.eventsPath).then(
-        () => true,
-        () => false
-      );
-      if (!eventsExist) {
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-    expect(eventsExist).toBe(false);
+    expect(result.rawStderr).toEqual([]);
+    expect(result.eventsPath).toContain('events.ndjson');
+    expect(result.stderrPath).toContain('stderr.log');
+    await expect(readFile(result.eventsPath, 'utf8')).resolves.toContain('"type":"run:summary"');
+    await expect(readFile(result.stderrPath, 'utf8')).resolves.toBe('');
+    await handle.cleanupArtifacts();
+    await expect(access(result.eventsPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(access(result.stderrPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('supports retrying with overrides', async () => {

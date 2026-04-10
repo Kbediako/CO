@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260410-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0",
+      "title": "CO: Repo-wide cleanup of stale compatibility debt, contradictory docs, and placeholder surfaces",
+      "relates_to": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0-co-88-docs-review-rerun/cli/2026-04-10T00-24-41-527Z-7e610bc7/manifest.json",
+          "override_reason": "The first audited docs-review child stream failed only because the fresh packet referenced a future SDK artifact test path before that file existed; after removing the packet-local missing path, the rerun passed spec-guard dry-run and docs:check, then failed only on the existing repo-wide docs:freshness baseline (`stale docs: 119`; Task Packet stale=85, Task Mirror stale=17, Report Only stale=17). The CO-88 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the rerun is recorded as truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "task": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "agent_task": ".agent/task/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "docs": "docs/TECH_SPEC-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md"
+      }
+    },
+    {
       "id": "20260409-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee",
       "title": "CO: ship installable local control-host supervision instead of host-local co-control-host-supervisor.sh",
       "relates_to": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",

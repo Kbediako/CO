@@ -3,6 +3,7 @@
 ## Context
 - Link to PRD: `docs/design/PRD-design-reference-pipeline.md`
 - Summary: Deliver an opt-in `design-reference` pipeline that extracts design assets via Playwright, composes a canonical reference page, componentizes artifacts inside `packages/design-system`, optionally emits advanced motion/video assets, and records evidence with retention/privacy guardrails in manifests and `out/**` outputs.
+- Current repo truth after `CO-88`: checked-in `packages/design-system` remains scaffold-level, and its `test:visual` command is placeholder smoke rather than a shipped diff suite. Use this checklist as pipeline history/intent, not proof of a mature current-branch design-system surface.
 
 ### Checklist Convention
 - Keep `[ ]` until acceptance criteria is met. Flip to `[x]` only after attaching the manifest path from `.runs/0401-design-reference/cli/<run-id>/manifest.json` that proves completion.
@@ -33,7 +34,7 @@
 3. **Componentization**
    - Files: `packages/design-system/**`.
    - Commands: `DESIGN_PIPELINE=1 npm --prefix packages/design-system run generate:stories`.
-   - Acceptance: Component assets staged under `design/components/`.
+   - Acceptance: Historical pipeline artifacts staged component outputs under `design/components/`; current checked-in package remains scaffold-level.
    - [x] Status: `Completed — .runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`
 4. **Advanced assets**
    - Files: scripts for Framer Motion + FFmpeg.
@@ -62,7 +63,7 @@
 ## Verification & Approvals
 1. **Visual regression evidence**
    - Files: `design/visual-regression/**`.
-   - Acceptance: Pass/fail summary + diff artifacts staged with manifest link.
+   - Acceptance: Historical pipeline artifacts staged review outputs with a manifest link; current checked-in `test:visual` remains placeholder smoke.
    - [x] Status: `Completed — .runs/0401-design-reference/cli/2025-11-06T11-59-59-680Z-34fe7972/manifest.json`
 2. **Diagnostics run**
    - Commands: `npx codex-orchestrator start diagnostics --pipeline design-reference --format json`.

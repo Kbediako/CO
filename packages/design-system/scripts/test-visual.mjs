@@ -16,17 +16,17 @@ async function main() {
       passed: 0
     },
     report: {
-      message: 'Visual regression placeholder run complete.'
+      message: 'Visual smoke placeholder run complete. No real baseline or diff assertions were executed.'
     }
   };
 
   await writeFile(join(codexDir, 'visual-regression-summary.json'), JSON.stringify(summary, null, 2));
-  await writeFile(join(reportDir, 'diffs.txt'), 'Placeholder diff artifacts for design pipeline.\n');
-  console.log('[design-system] visual regression placeholder complete');
+  await writeFile(join(reportDir, 'diffs.txt'), 'Placeholder smoke artifacts only. No visual regression diffing is implemented here.\n');
+  console.log('[design-system] visual smoke placeholder complete');
 }
 
 main().catch((error) => {
-  console.error('[design-system] visual regression placeholder failed');
+  console.error('[design-system] visual smoke placeholder failed');
   console.error(error);
   process.exit(1);
 });

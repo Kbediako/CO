@@ -106,11 +106,16 @@ console.log(`Status: ${result.status}, exit code ${result.exitCode}`);
 if (result.status === 'failed') {
   await run.retry({ taskId: '0303-orchestrator-autonomy-retry' }).result;
 }
+
+// If you inspect deprecated compatibility files such as result.eventsPath or
+// result.stderrPath, clean them up explicitly when finished.
+await run.cleanupArtifacts();
 ```
 
 Notable behaviors:
 
-- `run.result` resolves to the parsed summary payload plus all intermediate events.
+- `run.result` resolves after the child process closes and returns the parsed summary payload plus all intermediate events.
+- `result.eventsPath` and `result.stderrPath` are deprecated compatibility artifacts. They remain available while the associated handle/result is retained; call `await run.cleanupArtifacts()` when you are done with them.
 - `run.retry(overrides)` reruns the same command (optionally overriding flags like `taskId` or `notify`).
 
 This combination allows CI jobs to trigger a command, stream logs for real-time visibility, and deterministically resume or retry using the manifest evidence captured by the CLI.
