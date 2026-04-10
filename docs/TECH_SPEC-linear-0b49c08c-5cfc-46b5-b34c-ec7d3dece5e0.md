@@ -65,6 +65,6 @@ last_review: 2026-04-11
 
 ## Validation
 - Run audited `linear child-stream --pipeline docs-review`.
-- Run focused tests around the SDK and touched truth surfaces.
-- Run the repo validation floor before review handoff.
+- Perform focused tests around the SDK and touched truth surfaces.
+- Validate the repo validation floor before review handoff.
 - Run manifest-backed standalone review and an explicit elegance pass before any PR handoff.

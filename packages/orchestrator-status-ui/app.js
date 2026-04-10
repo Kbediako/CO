@@ -97,6 +97,12 @@ async function boot() {
     await initSession();
   }
   await loadData();
+  if (!dataUrl) {
+    return;
+  }
+  if (refreshTimer !== null) {
+    window.clearInterval(refreshTimer);
+  }
   refreshTimer = window.setInterval(() => {
     void loadData();
   }, refreshMs);
