@@ -5,7 +5,7 @@ status: completed
 owners:
   - Codex
 created: 2026-03-10
-last_review: 2026-03-10
+last_review: 2026-04-10
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-control-request-predispatch-shell-extraction.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-control-request-predispatch-shell-extraction.md
@@ -37,6 +37,8 @@ Extract the remaining inline pre-dispatch request assembly from `controlServer.t
 - Review-wrapper work.
 
 ## Notes
+
+- 2026-04-10: Re-reviewed for CO-143 docs:freshness baseline restoration. The completed March 10 packet still reads as a truthful historical record, so the packet freshness metadata was refreshed after the cohort audit recorded in `out/linear-d3f1af87-57da-46ab-901d-75a6cc60420e/manual/20260410T0545Z-cohort-audit.md`.
 
 - 2026-03-10: Approved for docs-first registration based on the `1101` closeout evidence showing the remaining `handleRequest()` work is now only the missing-request, URL parse, presenter/runtime assembly, and dispatcher-input shaping shell. Evidence: `docs/findings/1102-control-request-predispatch-shell-extraction-deliberation.md`, `out/1101-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction/manual/20260310T022901Z-closeout/14-next-slice-note.md`.
 - 2026-03-10: Completed. `controlServer.ts` now delegates the remaining request pre-dispatch assembly to `controlRequestPredispatch.ts`, focused regressions passed `99/99`, the full suite passed `187/187` files and `1265/1265` tests, the bounded standalone review returned a clean verdict, and pack-smoke passed. Evidence: `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/00-summary.md`, `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/05-targeted-tests.log`, `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/05-test.log`, `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/09-review.log`, `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/10-pack-smoke.log`, `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/11-manual-request-predispatch-check.json`, `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/12-elegance-review.md`, `out/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction/manual/20260310T025103Z-closeout/13-override-notes.md`.
