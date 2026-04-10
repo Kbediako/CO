@@ -42,6 +42,30 @@
       }
     },
     {
+      "id": "20260410-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc",
+      "title": "CO STATUS: clear stale retry state when active claims rehydrate so one issue cannot appear in both Running and Backoff",
+      "relates_to": "tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (succeeded, clean-success)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json",
+          "override_reason": "This rerun supersedes the earlier temporary `docs/TASKS.md` line-budget stop; after restoring the one-line budget trim, the rerun passed `spec-guard`, `docs:check`, `docs:freshness`, and forced standalone review cleanly. See `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/run-summary.json`."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
+        "task": "tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
+        "agent_task": ".agent/task/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
+        "docs": "docs/TECH_SPEC-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md"
+      }
+    },
+    {
       "id": "20260410-linear-97d69ad8-ba75-432f-b8b2-21ca83754325",
       "title": "CO: add autonomous branch refresh and conflict recovery for green-but-dirty PRs before and during Merging",
       "relates_to": "tasks/tasks-linear-97d69ad8-ba75-432f-b8b2-21ca83754325.md",
