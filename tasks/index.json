@@ -113,6 +113,30 @@
       }
     },
     {
+      "id": "20260410-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0",
+      "title": "CO: Repo-wide cleanup of stale compatibility debt, contradictory docs, and placeholder surfaces",
+      "relates_to": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+        "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+        "date": "2026-04-10",
+        "manifest": ".runs/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0-co-88-docs-review-r3/cli/2026-04-10T10-05-02-883Z-e91fa8b2/manifest.json",
+        "override_reason": "The fresh `r3` docs-review child stream passed spec-guard and docs:check, then failed only on the standing repo-wide docs:freshness baseline (`missing registry entries: 18`, `stale docs: 119`; Task Packet stale=85, Task Mirror stale=17, Report Only stale=17). The CO-88 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the new manifest is recorded as truthful manual fallback rather than a packet-local blocker."
+      }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "task": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "agent_task": ".agent/task/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+        "docs": "docs/TECH_SPEC-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md"
+      }
+    },
+    {
       "id": "20260409-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee",
       "title": "CO: ship installable local control-host supervision instead of host-local co-control-host-supervisor.sh",
       "relates_to": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
@@ -5427,7 +5451,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md",
         "task": "tasks/tasks-1109-coordinator-symphony-aligned-standalone-review-audit-exported-env-startup-anchor-propagation.md",
@@ -5443,7 +5467,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary.md",
         "task": "tasks/tasks-1108-coordinator-symphony-aligned-standalone-review-audit-startup-surface-boundary.md",
@@ -5459,7 +5483,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary.md",
         "task": "tasks/tasks-1107-coordinator-symphony-aligned-standalone-review-startup-anchor-boundary.md",
@@ -5475,7 +5499,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md",
         "task": "tasks/tasks-1106-coordinator-symphony-aligned-control-server-live-instance-host-shell-extraction.md",
@@ -5491,7 +5515,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
         "task": "tasks/tasks-1105-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
@@ -5507,7 +5531,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md",
         "task": "tasks/tasks-1104-coordinator-symphony-aligned-control-server-request-shell-binding-extraction.md",
@@ -5523,7 +5547,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1103-coordinator-symphony-aligned-control-request-controller-shell-extraction.md",
         "task": "tasks/tasks-1103-coordinator-symphony-aligned-control-request-controller-shell-extraction.md",
@@ -5539,7 +5563,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction.md",
         "task": "tasks/tasks-1102-coordinator-symphony-aligned-control-request-predispatch-shell-extraction.md",
@@ -5555,7 +5579,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1101-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction.md",
         "task": "tasks/tasks-1101-coordinator-symphony-aligned-control-request-route-dispatch-shell-extraction.md",
@@ -5571,7 +5595,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1100-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
         "task": "tasks/tasks-1100-coordinator-symphony-aligned-linear-webhook-branch-shell-extraction.md",
@@ -5587,7 +5611,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1099-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
         "task": "tasks/tasks-1099-coordinator-symphony-aligned-standalone-review-structured-scope-path-rendering-boundary.md",
@@ -5603,7 +5627,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1098-coordinator-symphony-aligned-standalone-review-canonical-scope-summary-boundary.md",
         "task": "tasks/tasks-1098-coordinator-symphony-aligned-standalone-review-canonical-scope-summary-boundary.md",
@@ -5619,7 +5643,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary.md",
         "task": "tasks/tasks-1097-coordinator-symphony-aligned-standalone-review-audit-task-context-boundary.md",
@@ -5635,7 +5659,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1096-coordinator-symphony-aligned-authenticated-route-branch-shell-extraction.md",
         "task": "tasks/tasks-1096-coordinator-symphony-aligned-authenticated-route-branch-shell-extraction.md",
@@ -5651,7 +5675,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
         "task": "tasks/tasks-1095-coordinator-symphony-aligned-standalone-review-audit-supporting-evidence-parity.md",
@@ -5667,7 +5691,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md",
         "task": "tasks/tasks-1094-coordinator-symphony-aligned-standalone-review-self-containment-boundary.md",
@@ -5683,7 +5707,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-03-10",
       "paths": {
         "spec": "tasks/specs/1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",
         "task": "tasks/tasks-1093-coordinator-symphony-aligned-standalone-review-diff-audit-surface-split.md",

@@ -276,39 +276,18 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_BOOT_TIMEOUT);
 
   it('prints usage for unknown commands and exits non-zero', async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-unknown-command-'));
-    const stdoutPath = join(tempDir, 'stdout.txt');
-    const stderrPath = join(tempDir, 'stderr.txt');
-    const exitCodePath = join(tempDir, 'exit-code.txt');
-
-    await execFileAsync(
-      '/bin/sh',
-      [
-        '-c',
-        '"$NODE_BIN" --loader ts-node/esm "$CLI_ENTRY_PATH" unknown-command >"$CLI_STDOUT_PATH" 2>"$CLI_STDERR_PATH"; printf "%s" "$?" >"$CLI_EXIT_CODE_PATH"'
-      ],
-      {
-        env: {
-          ...buildCliEnv(),
-          NODE_BIN: process.execPath,
-          CLI_ENTRY_PATH: CLI_ENTRY,
-          CLI_STDOUT_PATH: stdoutPath,
-          CLI_STDERR_PATH: stderrPath,
-          CLI_EXIT_CODE_PATH: exitCodePath
-        },
-        timeout: CLI_BOOT_TIMEOUT
+    try {
+      await runCliSubprocess(['unknown-command'], undefined, CLI_BINARY_SHELL_TIMEOUT);
+      throw new Error('Expected unknown command to fail.');
+    } catch (error) {
+      const parsed = parseCliFailure(error);
+      expect(parsed.exitCode).not.toBe(0);
+      if (parsed.stderr.trim().length > 0) {
+        expect(parsed.stderr).toMatch(/Unknown command: unknown-command|Command failed:/);
       }
-    );
-
-    const stdout = await readFile(stdoutPath, 'utf8');
-    const stderr = await readFile(stderrPath, 'utf8');
-    const exitCode = Number((await readFile(exitCodePath, 'utf8')).trim());
-    expect(exitCode).not.toBe(0);
-    if (stderr.trim().length > 0) {
-      expect(stderr).toMatch(/Unknown command: unknown-command|Command failed:/);
+      expect(parsed.stdout).toContain('Usage: codex-orchestrator <command> [options]');
     }
-    expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('falls back to exec failure message detail when stderr is empty', () => {
     const parsed = parseCliFailure({
