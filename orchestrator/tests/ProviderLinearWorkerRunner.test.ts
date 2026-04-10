@@ -1543,7 +1543,8 @@ describe('provider linear worker runner', () => {
         CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
         CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3',
-        CODEX_CLI_BIN: 'codex'
+        CODEX_CLI_BIN: 'codex',
+        CODEX_HOME: tempRoot ?? undefined
       },
       {
         readTrackedIssue,

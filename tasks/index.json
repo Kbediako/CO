@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260409-linear-da009c42-d0fc-4834-be72-f977a778693c",
+      "title": "CO-102: recover active In Progress worker claims when control-host refresh path times out repeatedly under live PR completion pressure",
+      "relates_to": "tasks/tasks-linear-da009c42-d0fc-4834-be72-f977a778693c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-09",
+          "manifest": ".runs/linear-da009c42-d0fc-4834-be72-f977a778693c-co-119-docs-review/cli/2026-04-09T08-34-19-507Z-042c1cf5/manifest.json",
+          "override_reason": "A 2026-04-10 docs-review rerun in the resumed provider-worker turn passed delegation guard, spec-guard --dry-run, and docs:check, then failed only on the unrelated repo-wide docs:freshness baseline (`stale docs: 119`; Task Packet stale=85, Task Mirror stale=17, Report Only stale=17). The CO-119 packet remained fully registered, so the rerun is recorded as truthful repo-baseline fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-da009c42-d0fc-4834-be72-f977a778693c.md",
+        "task": "tasks/tasks-linear-da009c42-d0fc-4834-be72-f977a778693c.md",
+        "agent_task": ".agent/task/linear-da009c42-d0fc-4834-be72-f977a778693c.md",
+        "docs": "docs/TECH_SPEC-linear-da009c42-d0fc-4834-be72-f977a778693c.md"
+      }
+    },
+    {
       "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
       "title": "CO: automate truthful In Review -> Merging promotion after clean review handoff",
       "relates_to": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
