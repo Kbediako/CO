@@ -49,6 +49,7 @@ import {
   shouldUseProviderLinearWorkerTerminalProofForSelectedRun
 } from './providerLinearWorkerTruth.js';
 
+const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const SYNTHETIC_LINEAR_PARENT_TASK_ID_PATTERN =
   /^linear-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -269,10 +270,17 @@ function buildProjectionContextFromParts(
     return null;
   }
   const { manifestRecord, taskId, runId } = snapshot;
+  const issueProvider = snapshot.issueProvider ?? providerClaim?.provider ?? null;
+  const allowTrackedIssueFallbackIdentityRebinding =
+    issueProvider === 'linear' ||
+    readStringValue(manifestRecord, 'pipeline_title', 'pipelineTitle') ===
+      PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
+    parts.providerLinearWorkerProof != null;
   const { issueIdentifier, issueId, lookupAliases } = resolveProjectionIssueIdentity(
     snapshot,
     parts.trackedIssue,
-    providerClaim
+    providerClaim,
+    allowTrackedIssueFallbackIdentityRebinding
   );
   const control = parts.control;
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
@@ -371,7 +379,7 @@ function buildProjectionContextFromParts(
         : null;
 
   return {
-    issueProvider: snapshot.issueProvider ?? providerClaim?.provider ?? null,
+    issueProvider,
     issueIdentifier,
     issueId,
     taskId,
@@ -405,7 +413,8 @@ function buildProjectionContextFromParts(
 function resolveProjectionIssueIdentity(
   snapshot: Pick<SelectedRunManifestSnapshot, 'issueIdentifier' | 'issueId' | 'taskId' | 'runId' | 'lookupAliases'>,
   trackedIssue: LiveLinearTrackedIssue | null,
-  providerClaim: ProviderIntakeClaimRecord | null
+  providerClaim: ProviderIntakeClaimRecord | null,
+  allowTrackedIssueFallbackIdentityRebinding: boolean
 ): {
   issueIdentifier: string;
   issueId: string | null;
@@ -419,12 +428,12 @@ function resolveProjectionIssueIdentity(
     : snapshot.issueId;
   const issueIdentifier =
     manifestIssueIdentifier ??
-    trackedIssue?.identifier ??
+    (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.identifier : null) ??
     providerClaim?.issue_identifier ??
     snapshot.issueIdentifier;
   const issueId =
     manifestIssueId ??
-    trackedIssue?.id ??
+    (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.id : null) ??
     providerClaim?.issue_id ??
     snapshot.issueId;
 
