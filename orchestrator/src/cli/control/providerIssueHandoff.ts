@@ -50,6 +50,10 @@ import {
 import { createProviderIssueRetryQueue } from './providerIssueRetryQueue.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
+  normalizeProviderWorkerHostName,
+  selectProviderWorkerHost
+} from './providerWorkerHosts.js';
+import {
   runProviderTerminalCleanup,
   type ProviderTerminalCleanupConfig
 } from './providerTerminalCleanup.js';
@@ -68,6 +72,7 @@ export interface ProviderIssueLauncher {
     issueId: string;
     issueIdentifier: string;
     issueUpdatedAt: string | null;
+    workerHost?: string | null;
     workspaceId?: string | null;
     teamId?: string | null;
     projectId?: string | null;
@@ -78,6 +83,7 @@ export interface ProviderIssueLauncher {
     runId: string;
     actor: string;
     reason: string;
+    workerHost?: string | null;
     launchToken: string;
   }): Promise<void>;
 }
@@ -122,6 +128,8 @@ interface ProviderIssueRunRecord {
   issueUpdatedAt: string | null;
   startedAt: string | null;
   updatedAt: string | null;
+  hasFreshWorkerHostContext: boolean;
+  workerHost: string | null;
   residentSessionSeed: ProviderLinearResidentSessionSeed | null;
 }
 
@@ -133,7 +141,30 @@ interface ProviderLinearWorkerProofRecord {
   owner_status?: unknown;
   end_reason?: unknown;
   updated_at?: unknown;
+  worker_host?: unknown;
   resident_session?: unknown;
+}
+
+function resolveRehydratedActiveRunWorkerHost(
+  run: ProviderIssueRunRecord,
+  claim:
+    | Pick<ProviderIntakeClaimRecord, 'run_id' | 'run_manifest_path' | 'worker_host'>
+    | null
+    | undefined
+): string | null {
+  if (run.workerHost) {
+    return run.workerHost;
+  }
+  if (run.hasFreshWorkerHostContext) {
+    return null;
+  }
+  const claimWorkerHost = normalizeProviderWorkerHostName(claim?.worker_host);
+  if (!claimWorkerHost) {
+    return null;
+  }
+  return claim?.run_id === run.runId || claim?.run_manifest_path === run.manifestPath
+    ? claimWorkerHost
+    : null;
 }
 
 export interface ProviderIssueHandoffService {
@@ -538,6 +569,50 @@ export function createProviderIssueHandoffService(
         PROVIDER_LINEAR_WORKER_AUDIT_FILENAME
       )
     };
+  };
+
+  const resolveConfiguredWorkerHosts = async () => {
+    if (options.providerWorkflowConfigStore) {
+      await options.providerWorkflowConfigStore.refresh();
+    }
+    return options.providerWorkflowConfigStore?.snapshot().worker_hosts ?? [];
+  };
+
+  const resolvePreferredStartWorkerHost = (input: {
+    claimWorkerHost?: string | null;
+    previousRun?: Pick<ProviderIssueRunRecord, 'workerHost'> | null;
+  }): string | null => {
+    if (input.previousRun) {
+      return normalizeProviderWorkerHostName(input.previousRun.workerHost ?? null);
+    }
+    return normalizeProviderWorkerHostName(input.claimWorkerHost ?? null);
+  };
+
+  const selectLaunchWorkerHost = async (input: {
+    claim: Pick<ProviderIntakeClaimRecord, 'provider_key'> & {
+      worker_host?: string | null;
+    };
+    previousRun?: ProviderIssueRunRecord | null;
+  }): Promise<string | null> => {
+    const preferredHost = resolvePreferredStartWorkerHost({
+      claimWorkerHost: input.claim.worker_host ?? null,
+      previousRun: input.previousRun ?? null
+    });
+    const selection = selectProviderWorkerHost({
+      hosts: await resolveConfiguredWorkerHosts(),
+      claims: options.state.claims,
+      currentProviderKey: input.claim.provider_key,
+      preferredHost
+    });
+    if (selection.kind === 'local') {
+      return null;
+    }
+    if (selection.kind === 'exhausted') {
+      throw new Error(
+        'Configured provider worker hosts are at capacity; retry later or raise per-host max_concurrent_agents.'
+      );
+    }
+    return selection.host.name;
   };
 
   const persistRecoveredActiveRunMergeCloseout = async (input: {
@@ -951,6 +1026,7 @@ export function createProviderIssueHandoffService(
     launcherReason?: string;
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<void> => {
+    const workerHost = resolveRehydratedActiveRunWorkerHost(input.run, input.claim);
     const launchToken = createProviderLaunchToken();
     await upsertProviderClaimAndPersist({
       ...input.claim,
@@ -960,6 +1036,7 @@ export function createProviderIssueHandoffService(
       reason: input.reason,
       run_id: input.run.runId,
       run_manifest_path: input.run.manifestPath,
+      worker_host: workerHost,
       launch_source: PROVIDER_LAUNCH_SOURCE,
       launch_token: launchToken,
       review_promotion: null,
@@ -976,6 +1053,7 @@ export function createProviderIssueHandoffService(
         runId: input.run.runId,
         actor: 'control-host',
         reason: input.launcherReason ?? 'provider-refresh',
+        workerHost,
         launchToken
       });
     } catch (error) {
@@ -988,6 +1066,7 @@ export function createProviderIssueHandoffService(
         reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
         run_id: input.run.runId,
         run_manifest_path: input.run.manifestPath,
+        worker_host: workerHost,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
         review_promotion: null,
@@ -1015,6 +1094,43 @@ export function createProviderIssueHandoffService(
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<ProviderIssueHandoffResult> => {
     const taskId = buildProviderFallbackTaskId(input.trackedIssue);
+    const preferredWorkerHost = resolvePreferredStartWorkerHost({
+      claimWorkerHost: input.claim.worker_host ?? null,
+      previousRun: input.previousRun ?? null
+    });
+    let workerHost: string | null = preferredWorkerHost;
+    try {
+      workerHost = await selectLaunchWorkerHost({
+        claim: input.claim,
+        previousRun: input.previousRun ?? null
+      });
+    } catch (error) {
+      const failureReason = input.failureReason ?? 'provider_issue_refresh_start_failed';
+      await upsertProviderClaimAndPersist({
+        ...input.claim,
+        ...buildTrackedIssueClaimFields(input.trackedIssue),
+        task_id: taskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'handoff_failed',
+        reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
+        run_id: null,
+        run_manifest_path: null,
+        worker_host: workerHost,
+        launch_source: PROVIDER_LAUNCH_SOURCE,
+        launch_token: null,
+        review_promotion: null,
+        merge_closeout: null,
+        ...buildQueuedProviderRetryFields({
+          claim: input.claim,
+          previousRun: input.previousRun ?? null,
+          error: (error as Error)?.message ?? String(error),
+          preserveCurrentAttempt: input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+          seedInitialAttemptWithoutPreviousRun: true,
+          delayType: 'failure'
+        })
+      }, { rollbackOnPersistFailure: false });
+      throw error;
+    }
     const launchToken = createProviderLaunchToken();
     await upsertProviderClaimAndPersist({
       ...input.claim,
@@ -1025,6 +1141,7 @@ export function createProviderIssueHandoffService(
       reason: input.reason,
       run_id: null,
       run_manifest_path: null,
+      worker_host: workerHost,
       launch_source: PROVIDER_LAUNCH_SOURCE,
       launch_token: launchToken,
       review_promotion: null,
@@ -1045,6 +1162,7 @@ export function createProviderIssueHandoffService(
         issueId: input.trackedIssue.id,
         issueIdentifier: input.trackedIssue.identifier,
         issueUpdatedAt: input.trackedIssue.updated_at,
+        workerHost,
         workspaceId: input.trackedIssue.workspace_id,
         teamId: input.trackedIssue.team_id,
         projectId: input.trackedIssue.project_id,
@@ -1062,6 +1180,7 @@ export function createProviderIssueHandoffService(
         reason: `${failureReason}:${(error as Error)?.message ?? String(error)}`,
         run_id: null,
         run_manifest_path: null,
+        worker_host: workerHost,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
         review_promotion: null,
@@ -1086,6 +1205,7 @@ export function createProviderIssueHandoffService(
           reason: input.reason,
           run_id: startedRun.runId,
           run_manifest_path: startedRun.manifestPath,
+          worker_host: workerHost,
           launch_source: PROVIDER_LAUNCH_SOURCE,
           launch_token: launchToken,
           review_promotion: null,
@@ -1317,6 +1437,7 @@ export function createProviderIssueHandoffService(
 
       const activeRun = attachableClaimRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
+        const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
         const preserveMergeCloseoutClaim =
           isProviderMergeCloseoutWatchingClaim(claim) || isTerminalProviderMergeCloseoutClaim(claim);
         const freshTrackedIssue = input?.refreshTrackedIssueMetadata
@@ -1350,6 +1471,7 @@ export function createProviderIssueHandoffService(
           task_id: activeRun.taskId,
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          worker_host: workerHost,
           ...buildActiveRunRetryFields(claim),
           ...reactivatedMergeCloseoutReset
         });
@@ -1363,6 +1485,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_rehydrated_active_run',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          worker_host: workerHost,
           ...buildActiveRunRetryFields(claim),
           ...reactivatedMergeCloseoutReset,
           updated_at: now
@@ -1824,6 +1947,9 @@ export function createProviderIssueHandoffService(
       reason: input.reason ?? 'provider_issue_handoff_owned',
       run_id: input.run?.runId ?? input.claim.run_id,
       run_manifest_path: input.run?.manifestPath ?? input.claim.run_manifest_path,
+      worker_host: input.run
+        ? resolveRehydratedActiveRunWorkerHost(input.run, input.claim)
+        : input.claim.worker_host,
     });
 
   const resolveRetryDispatchResolution = async (
@@ -2291,6 +2417,7 @@ export function createProviderIssueHandoffService(
             existing.reason === 'provider_issue_rehydrated_active_run'
               ? {}
               : { review_promotion: null, merge_closeout: null };
+          const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, existing);
           const claim = await upsertProviderClaimAndPersist({
             ...existing,
             ...trackedIssueFields,
@@ -2301,6 +2428,7 @@ export function createProviderIssueHandoffService(
             reason: 'provider_issue_rehydrated_active_run',
             run_id: activeRun.runId,
             run_manifest_path: activeRun.manifestPath,
+            worker_host: workerHost,
             accepted_at: existing.accepted_at,
             last_delivery_id: input.deliveryId,
             last_event: input.event,
@@ -2350,6 +2478,7 @@ export function createProviderIssueHandoffService(
       > = latestExisting ?? clearProviderRetryFields();
       const activeRun = attachableDiscoveredRuns.find((run) => run.status === 'in_progress');
       if (activeRun) {
+        const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, latestExisting);
         const trackedIssueFreshEnoughForLatestClaim =
           latestExisting ? isTrackedIssueFreshEnoughForClaim(latestExisting, input.trackedIssue) : true;
         const preserveRecoveredMergeCloseoutClaim =
@@ -2397,6 +2526,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_run_already_active',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          worker_host: workerHost,
           ...buildActiveRunRetryFields(latestRetryStateBase),
           ...reactivatedMergeCloseoutReset
         });
@@ -2542,6 +2672,45 @@ export function createProviderIssueHandoffService(
         }
       }
 
+      const preferredWorkerHost = resolvePreferredStartWorkerHost({
+        claimWorkerHost: latestExisting?.worker_host ?? null,
+        previousRun: latestRun ?? null
+      });
+      let workerHost: string | null = preferredWorkerHost;
+      try {
+        workerHost = await selectLaunchWorkerHost({
+          claim: {
+            provider_key: providerKey,
+            worker_host: preferredWorkerHost
+          },
+          previousRun: latestRun
+        });
+      } catch (error) {
+        const claim = await upsertProviderClaimAndPersist({
+          ...latestClaimBase,
+          task_id: taskId,
+          mapping_source: mappingSource,
+          state: 'handoff_failed',
+          reason: `provider_issue_start_failed:${(error as Error)?.message ?? String(error)}`,
+          run_id: null,
+          run_manifest_path: null,
+          worker_host: workerHost,
+          launch_source: PROVIDER_LAUNCH_SOURCE,
+          launch_token: null,
+          review_promotion: null,
+          merge_closeout: null,
+          ...buildQueuedProviderRetryFields({
+            claim: latestRetryStateBase,
+            previousRun: latestRun,
+            error: (error as Error)?.message ?? String(error),
+            preserveCurrentAttempt: latestExisting?.retry_queued === true,
+            seedInitialAttemptWithoutPreviousRun: true,
+            delayType: 'failure'
+          })
+        }, { rollbackOnPersistFailure: false });
+        throw new Error(`Failed to start provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
+      }
+
       const launchToken = createProviderLaunchToken();
       const inflightClaimSnapshot = captureProviderStateSnapshot();
       const inflightClaim = upsertProviderIntakeClaim(options.state, {
@@ -2552,6 +2721,7 @@ export function createProviderIssueHandoffService(
         reason: 'provider_issue_start_launched',
         run_id: null,
         run_manifest_path: null,
+        worker_host: workerHost,
         launch_source: PROVIDER_LAUNCH_SOURCE,
         launch_token: launchToken,
         review_promotion: null,
@@ -2573,6 +2743,7 @@ export function createProviderIssueHandoffService(
           issueId: input.trackedIssue.id,
           issueIdentifier: input.trackedIssue.identifier,
           issueUpdatedAt: input.trackedIssue.updated_at,
+          workerHost,
           workspaceId: input.trackedIssue.workspace_id,
           teamId: input.trackedIssue.team_id,
           projectId: input.trackedIssue.project_id,
@@ -2588,6 +2759,7 @@ export function createProviderIssueHandoffService(
           reason: `provider_issue_start_failed:${(error as Error)?.message ?? String(error)}`,
           run_id: null,
           run_manifest_path: null,
+          worker_host: workerHost,
           launch_source: PROVIDER_LAUNCH_SOURCE,
           launch_token: launchToken,
           review_promotion: null,
@@ -2611,6 +2783,7 @@ export function createProviderIssueHandoffService(
             reason: 'provider_issue_start_launched',
             run_id: startedRun.runId,
             run_manifest_path: startedRun.manifestPath,
+            worker_host: workerHost,
             launch_source: PROVIDER_LAUNCH_SOURCE,
             launch_token: launchToken,
             review_promotion: null,
@@ -2779,6 +2952,7 @@ export function createProviderIssueHandoffService(
 
           if (resolution.kind === 'owned') {
             if (activeRun) {
+              const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
               const trackedIssueFreshEnoughForClaim = isTrackedIssueFreshEnoughForClaim(
                 claim,
                 resolution.trackedIssue
@@ -2819,6 +2993,7 @@ export function createProviderIssueHandoffService(
                 task_id: activeRun.taskId,
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
+                worker_host: workerHost,
                 ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
@@ -2833,6 +3008,7 @@ export function createProviderIssueHandoffService(
                 reason: 'provider_issue_rehydrated_active_run',
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
+                worker_host: workerHost,
                 ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
@@ -2894,6 +3070,7 @@ export function createProviderIssueHandoffService(
           }
 
           if (activeRun) {
+            const workerHost = resolveRehydratedActiveRunWorkerHost(activeRun, claim);
             const trackedIssueFreshEnoughForClaim = isTrackedIssueFreshEnoughForClaim(
               claim,
               resolution.trackedIssue
@@ -2934,6 +3111,7 @@ export function createProviderIssueHandoffService(
               task_id: activeRun.taskId,
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
+              worker_host: workerHost,
               ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
@@ -2948,6 +3126,7 @@ export function createProviderIssueHandoffService(
               reason: 'provider_issue_rehydrated_active_run',
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
+              worker_host: workerHost,
               ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
@@ -3721,6 +3900,14 @@ export async function discoverProviderIssueRuns(
       const proof = await readBestEffortJsonFile<ProviderLinearWorkerProofRecord>(
         join(cliRoot, runEntry, PROVIDER_LINEAR_WORKER_PROOF_FILENAME)
       );
+      const manifestStartedAt = readStringValue(manifest, 'started_at');
+      const hasFreshWorkerHostContext = Boolean(
+        proof
+        && isProviderLinearWorkerProofFreshForStage(
+          proof as ProviderLinearWorkerProofRecord & Record<string, unknown>,
+          manifestStartedAt
+        )
+      );
       discovered.push({
         provider: issueProvider,
         issueId,
@@ -3735,8 +3922,12 @@ export async function discoverProviderIssueRuns(
         ),
         summary: resolveProviderIssueRunSummary(manifest, proof),
         issueUpdatedAt: readStringValue(manifest, 'issue_updated_at'),
-        startedAt: readStringValue(manifest, 'started_at'),
+        startedAt: manifestStartedAt,
         updatedAt: resolveProviderIssueRunUpdatedAt(manifest, proof),
+        hasFreshWorkerHostContext,
+        workerHost: hasFreshWorkerHostContext
+          ? normalizeProviderWorkerHostName(proof?.worker_host)
+          : null,
         residentSessionSeed: resolveProviderResidentSessionSeed(
           manifest,
           proof,
@@ -4093,6 +4284,7 @@ function buildQueuedProviderRetryFields(input: {
   error: string | null;
   preserveCurrentAttempt?: boolean;
   preserveExistingDueAt?: boolean;
+  seedInitialAttemptWithoutPreviousRun?: boolean;
   delayType: ProviderRetryDelayType;
 }): Pick<
   ProviderIntakeClaimRecord,
@@ -4102,6 +4294,17 @@ function buildQueuedProviderRetryFields(input: {
     ? resolveCurrentProviderRetryAttempt(input.claim, input.previousRun)
     : resolveNextProviderRetryAttempt(input.claim, input.previousRun);
   if (retryAttempt === null) {
+    if (input.seedInitialAttemptWithoutPreviousRun === true) {
+      return {
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at:
+          input.preserveExistingDueAt && isValidProviderRetryTimestamp(input.claim.retry_due_at)
+            ? input.claim.retry_due_at
+            : buildProviderRetryDueAt(input.delayType, 1),
+        retry_error: input.error
+      };
+    }
     return preserveQueuedProviderRetryWithoutAttempt(input);
   }
   return {
@@ -4396,6 +4599,7 @@ function hasProviderClaimTransitioned(
       | 'task_id'
       | 'run_id'
       | 'run_manifest_path'
+      | 'worker_host'
       | 'retry_queued'
       | 'retry_attempt'
       | 'retry_due_at'
@@ -4408,6 +4612,7 @@ function hasProviderClaimTransitioned(
         | 'task_id'
         | 'run_id'
         | 'run_manifest_path'
+        | 'worker_host'
         | 'retry_queued'
         | 'retry_attempt'
         | 'retry_due_at'
@@ -4426,6 +4631,7 @@ function hasProviderClaimTransitioned(
             | 'issue_assignee_id'
             | 'issue_assignee_name'
             | 'issue_blocked_by'
+            | 'worker_host'
           >
         >
     )
@@ -4477,6 +4683,10 @@ function hasProviderClaimTransitioned(
     claim.task_id !== next.task_id ||
     claim.run_id !== next.run_id ||
     claim.run_manifest_path !== next.run_manifest_path ||
+    (
+      next.worker_host !== undefined &&
+      (claim.worker_host ?? null) !== (next.worker_host ?? null)
+    ) ||
     (claim.retry_queued ?? null) !== (next.retry_queued ?? null) ||
     (claim.retry_attempt ?? null) !== (next.retry_attempt ?? null) ||
     (claim.retry_due_at ?? null) !== (next.retry_due_at ?? null) ||
@@ -4622,6 +4832,8 @@ function resolveProviderReleaseRun(
       issueUpdatedAt: claim.issue_updated_at,
       startedAt: null,
       updatedAt: claim.updated_at,
+      hasFreshWorkerHostContext: false,
+      workerHost: claim.worker_host ?? null,
       residentSessionSeed: null
     };
   }

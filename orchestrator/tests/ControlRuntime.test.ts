@@ -165,7 +165,7 @@ async function createSiblingRun(
 
 async function seedProviderLinearWorkerProof(
   paths: Pick<RunPaths, 'runDir'>,
-  overrides: Partial<ProviderLinearWorkerProof> = {}
+  overrides: Partial<ProviderLinearWorkerProof> & Record<string, unknown> = {}
 ): Promise<void> {
   await writeFile(
     join(paths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
@@ -1001,6 +1001,82 @@ describe('ControlRuntime', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('surfaces worker_host from provider proof/debug through selected and compatibility payloads', async () => {
+    const fixture = await createFixture({
+      taskId: 'task-worker-host'
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-worker-host',
+      issue_id: 'issue-worker-host',
+      issue_identifier: 'ISSUE-WORKER-HOST',
+      status: 'in_progress',
+      started_at: '2026-03-07T00:20:00.000Z',
+      updated_at: '2026-03-07T00:21:00.000Z',
+      summary: 'worker host should surface'
+    });
+    await seedProviderLinearWorkerProof(fixture.paths, {
+      issue_id: 'issue-worker-host',
+      issue_identifier: 'ISSUE-WORKER-HOST',
+      pid: '4242',
+      thread_id: 'thread-worker-host',
+      latest_turn_id: 'turn-worker-host',
+      latest_session_id: 'session-worker-host',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      turn_count: 3,
+      last_event: 'turn_running',
+      last_message: 'worker host is present',
+      last_event_at: '2026-03-07T00:21:00.000Z',
+      tokens: {
+        input_tokens: 3,
+        output_tokens: 2,
+        total_tokens: 5
+      },
+      rate_limits: null,
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      workspace_path: '/tmp/worker-host-workspace',
+      end_reason: null,
+      updated_at: '2026-03-07T00:21:00.000Z',
+      worker_host: 'worker-host-01'
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const issueRecord = compatibilityProjection.issues.find(
+      (issue) => issue.issueIdentifier === 'ISSUE-WORKER-HOST'
+    );
+
+    expect(selectedSnapshot.selected?.providerDebugSnapshot?.worker).toMatchObject({
+      worker_host: 'worker-host-01'
+    });
+    expect(compatibilityProjection.selected).toMatchObject({
+      issue_identifier: 'ISSUE-WORKER-HOST',
+      worker_host: 'worker-host-01',
+      provider_debug_snapshot: {
+        worker: {
+          worker_host: 'worker-host-01'
+        }
+      }
+    });
+    expect(compatibilityProjection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'ISSUE-WORKER-HOST',
+        session_id: 'session-worker-host',
+        worker_host: 'worker-host-01'
+      })
+    ]);
+    expect(issueRecord?.payload).toMatchObject({
+      issue_identifier: 'ISSUE-WORKER-HOST',
+      worker_host: 'worker-host-01',
+      provider_debug_snapshot: {
+        worker: {
+          worker_host: 'worker-host-01'
+        }
+      }
+    });
   });
 
   it('does not revive historical in-progress manifests when provider intake state is present but empty', async () => {
