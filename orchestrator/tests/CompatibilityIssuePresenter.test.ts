@@ -211,6 +211,42 @@ describe('CompatibilityIssuePresenter', () => {
     expect(projection.issues).toEqual([]);
   });
 
+  it('does not surface synthetic linear fallback rows from running or retry registration', () => {
+    const runningTaskId = 'linear-lin-issue-1';
+    const retryTaskId = 'linear-lin-issue-2';
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(null),
+      running: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: runningTaskId,
+          issueId: runningTaskId,
+          taskId: runningTaskId,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          completedAt: null,
+          summary: 'fallback-only running source using slug fallback task id'
+        })
+      ],
+      retrying: [
+        buildCompatibilitySource({
+          issueProvider: 'linear',
+          issueIdentifier: retryTaskId,
+          issueId: retryTaskId,
+          taskId: retryTaskId,
+          rawStatus: 'failed',
+          displayStatus: 'retrying',
+          completedAt: null,
+          summary: 'fallback-only retry source using slug fallback task id'
+        })
+      ]
+    });
+
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    expect(projection.issues).toEqual([]);
+  });
+
   it('keeps non-linear selected rows even when their task id matches the synthetic linear pattern', () => {
     const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
     const projection = buildCompatibilityProjectionSnapshot(

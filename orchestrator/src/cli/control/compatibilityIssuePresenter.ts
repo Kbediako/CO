@@ -210,10 +210,14 @@ export function buildCompatibilityIssueIndex<
     });
   }
   snapshot.running.forEach((entry) => {
-    registerIssue(entry, { kind: 'running' });
+    if (!isSyntheticLinearFallbackOnlyIssueSource(entry)) {
+      registerIssue(entry, { kind: 'running' });
+    }
   });
   snapshot.retrying.forEach((entry) => {
-    registerIssue(entry, { kind: 'retry' });
+    if (!isSyntheticLinearFallbackOnlyIssueSource(entry)) {
+      registerIssue(entry, { kind: 'retry' });
+    }
   });
 
   return {

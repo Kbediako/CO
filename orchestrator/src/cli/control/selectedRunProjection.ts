@@ -51,6 +51,8 @@ import {
 } from './providerLinearWorkerTruth.js';
 
 const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
+const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
+  /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
@@ -349,7 +351,13 @@ function buildProjectionContextFromParts(
   });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
-  const compatibilityState = resolveCompatibilityState(parts.trackedIssue, providerClaim);
+  const matchedTrackedIssue = resolveProjectionTrackedIssue(parts.trackedIssue, {
+    issueIdentifier,
+    issueId,
+    taskId,
+    runId
+  });
+  const compatibilityState = resolveCompatibilityState(matchedTrackedIssue, providerClaim);
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
     rawStatus,
     latestAction,
@@ -357,7 +365,7 @@ function buildProjectionContextFromParts(
     compatibilityState,
     terminalMergeCloseoutProgress
   });
-  const tracked = buildTrackedLinearPayload(parts.trackedIssue);
+  const tracked = buildTrackedLinearPayload(matchedTrackedIssue);
   const latestEvent = buildSelectedRunLatestEvent({
     controlAction: control.latest_action ?? null,
     updatedAt,
@@ -454,11 +462,54 @@ function resolveProjectionIssueIdentity(
   };
 }
 
+function resolveProjectionTrackedIssue(
+  trackedIssue: LiveLinearTrackedIssue | null,
+  identity: {
+    issueIdentifier: string;
+    issueId: string | null;
+    taskId: string | null;
+    runId: string | null;
+  }
+): LiveLinearTrackedIssue | null {
+  if (!trackedIssue) {
+    return null;
+  }
+  if (!hasAuthoritativeProjectionIssueIdentity(identity)) {
+    return trackedIssue;
+  }
+  if (identity.issueId && trackedIssue.id === identity.issueId) {
+    return trackedIssue;
+  }
+  if (trackedIssue.identifier === identity.issueIdentifier) {
+    return trackedIssue;
+  }
+  return null;
+}
+
 function isProjectionFallbackIdentityValue(
   value: string | null,
   input: Pick<SelectedRunManifestSnapshot, 'taskId' | 'runId'>
 ): boolean {
-  return value === input.taskId || value === input.runId;
+  if (!value) {
+    return false;
+  }
+  return (
+    isProjectionFallbackIdentityAlias(value, input.taskId) ||
+    isProjectionFallbackIdentityAlias(value, input.runId)
+  );
+}
+
+function isProjectionFallbackIdentityAlias(
+  value: string,
+  candidate: string | null
+): boolean {
+  if (!candidate) {
+    return false;
+  }
+  if (value === candidate) {
+    return true;
+  }
+  return SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(value) && candidate.startsWith(`${value}-`);
 }
 
 function resolveSelectedRunWorkspacePath(input: {
@@ -1293,13 +1344,10 @@ function providerIntakeClaimMatchesSyntheticChildTaskPrefix(
 function hasAuthoritativeProjectionIssueIdentity(
   snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
 ): boolean {
-  const fallbackIdentities = new Set(
-    [snapshot.taskId, snapshot.runId].filter((value): value is string => typeof value === 'string')
-  );
-  if (snapshot.issueIdentifier && !fallbackIdentities.has(snapshot.issueIdentifier)) {
+  if (snapshot.issueIdentifier && !isProjectionFallbackIdentityValue(snapshot.issueIdentifier, snapshot)) {
     return true;
   }
-  if (snapshot.issueId && !fallbackIdentities.has(snapshot.issueId)) {
+  if (snapshot.issueId && !isProjectionFallbackIdentityValue(snapshot.issueId, snapshot)) {
     return true;
   }
   return false;
