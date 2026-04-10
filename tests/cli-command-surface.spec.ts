@@ -20,6 +20,7 @@ const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const CLI_ENTRY_DIST = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
 const TEST_TIMEOUT = 15000;
 const CLI_BOOT_TIMEOUT = 30000;
+const CLI_SOURCE_ENTRY_TIMEOUT = 30000;
 const CLI_EXEC_TIMEOUT_MS = TEST_TIMEOUT;
 const CLI_BINARY_SHELL_TIMEOUT = 60000;
 const FLOW_TARGET_TEST_TIMEOUT = 70000;
@@ -79,6 +80,20 @@ async function runCliSubprocess(
     : ['--loader', 'ts-node/esm', CLI_ENTRY, ...args];
   return await execFileAsync(process.execPath, entryArgs, {
     env: cliEnv,
+    timeout: timeoutMs
+  });
+}
+
+// Keep the CO-136 regressions on the raw source entrypoint so timeout/parsing
+// coverage matches the worker reproduction path instead of the in-process shim.
+async function runCliSourceSubprocess(
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+  timeoutMs: number = CLI_SOURCE_ENTRY_TIMEOUT,
+  explicitProviderOverrideKeys: ReadonlySet<string> = new Set()
+): Promise<{ stdout: string; stderr: string }> {
+  return await execFileAsync(process.execPath, ['--loader', 'ts-node/esm', CLI_ENTRY, ...args], {
+    env: buildCliEnv(env, explicitProviderOverrideKeys),
     timeout: timeoutMs
   });
 }
@@ -1120,17 +1135,17 @@ describe('codex-orchestrator command surface', () => {
 
   it('rejects conflicting multi-agent and collab flag values', async () => {
     await expect(
-      runCli(['rlm', 'write tests', '--multi-agent', 'true', '--collab', 'false'])
+      runCliSourceSubprocess(['rlm', 'write tests', '--multi-agent', 'true', '--collab', 'false'])
     ).rejects.toMatchObject({
       stderr: expect.stringContaining('Conflicting --multi-agent and --collab values.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('requires a goal for rlm runs', async () => {
-    await expect(runCli(['rlm'])).rejects.toMatchObject({
+    await expect(runCliSourceSubprocess(['rlm'])).rejects.toMatchObject({
       stderr: expect.stringContaining('rlm requires a goal. Use: codex-orchestrator rlm "<goal>".')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('prints self-check text output through the binary shell', async () => {
     const { stdout } = await runCliSubprocess(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
@@ -2412,11 +2427,11 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.payload?.outputs?.stdout).toContain('quoted-smoke');
   }, TEST_TIMEOUT);
 
-  it('rejects exec without a command through the binary shell', async () => {
-    await expect(runCli(['exec'])).rejects.toMatchObject({
+  it('rejects exec without a command through the source entrypoint', async () => {
+    await expect(runCliSourceSubprocess(['exec'])).rejects.toMatchObject({
       stderr: expect.stringContaining('exec requires a command to run.')
     });
-  }, TEST_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('preserves backslashes in quoted single-token exec commands', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
@@ -2428,7 +2443,10 @@ describe('codex-orchestrator command surface', () => {
       MCP_RUNNER_TASK_ID: 'cli-surface'
     };
 
-    const { stdout } = await runCli(['exec', 'echo C:\\tmp\\foo', '--json', 'compact'], env);
+    const { stdout } = await runCliSourceSubprocess(
+      ['exec', 'echo C:\\tmp\\foo', '--json', 'compact'],
+      env
+    );
     const lines = stdout
       .split(/\r?\n/u)
       .map((line) => line.trim())
@@ -2438,7 +2456,7 @@ describe('codex-orchestrator command surface', () => {
     };
 
     expect(payload.payload?.command?.argv).toEqual(['echo', 'C:\\tmp\\foo']);
-  }, TEST_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('handles escaped quotes inside quoted single-token exec commands', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-surface-'));
@@ -2450,7 +2468,7 @@ describe('codex-orchestrator command surface', () => {
       MCP_RUNNER_TASK_ID: 'cli-surface'
     };
 
-    const { stdout } = await runCli(
+    const { stdout } = await runCliSourceSubprocess(
       ['exec', 'node -e "console.log(\\\"x y\\\")"', '--json', 'compact'],
       env
     );
@@ -2464,5 +2482,5 @@ describe('codex-orchestrator command surface', () => {
 
     expect(payload.payload?.command?.argv).toEqual(['node', '-e', 'console.log("x y")']);
     expect(payload.payload?.outputs?.stdout).toContain('x y');
-  }, CLI_BOOT_TIMEOUT);
+  }, CLI_SOURCE_ENTRY_TIMEOUT);
 });
