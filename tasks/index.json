@@ -25,6 +25,23 @@
       }
     },
     {
+      "id": "20260410-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58",
+      "title": "CO: stabilize broad timeout-heavy repo test lane so unrelated failures stop blocking narrow issue handoffs",
+      "relates_to": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "task": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "agent_task": ".agent/task/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
+        "docs": "docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md"
+      }
+    },
+    {
       "id": "20260410-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc",
       "title": "CO STATUS: clear stale retry state when active claims rehydrate so one issue cannot appear in both Running and Backoff",
       "relates_to": "tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
