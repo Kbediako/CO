@@ -4,6 +4,7 @@ import {
   buildPrNumberViewArgs,
   buildPrMergeArgs,
   buildPrUpdateBranchArgs,
+  buildAutomaticBranchRecoveryKey,
   buildStatusSnapshot,
   isConflictLikeBranchRecoveryFailureMessage,
   isNoRequiredChecksReportedErrorMessage,
@@ -95,6 +96,23 @@ describe('buildPrUpdateBranchArgs', () => {
       repo: 'CO',
       prNumber: 253
     })).toEqual(['pr', 'update-branch', '253', '--repo', 'Kbediako/CO']);
+  });
+});
+
+describe('buildAutomaticBranchRecoveryKey', () => {
+  it('stays stable for the same head even when GitHub metadata timestamps change', () => {
+    expect(
+      buildAutomaticBranchRecoveryKey(
+        {
+          headOid: 'abc123'
+        },
+        'merge_state=BEHIND'
+      )
+    ).toBe('merge_state=BEHIND|abc123');
+  });
+
+  it('falls back to a stable no-head marker when the snapshot has no head oid', () => {
+    expect(buildAutomaticBranchRecoveryKey(null, 'merge_state=DIRTY')).toBe('merge_state=DIRTY|no-head');
   });
 });
 

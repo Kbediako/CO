@@ -14,7 +14,7 @@
 - Pre-implementation issue-quality review: approved. The bounded seam is shared branch refresh plus provider reuse, not a broader merge-closeout redesign.
 
 ## Milestones & Sequencing
-1. Create the `CO-140` docs packet, checklist mirrors, registry entries, and local workpad source; retry the blocked Linear transition and workpad upsert when shared-budget cooldown allows.
+1. Create the `CO-140` docs packet, checklist mirrors, registry entries, and local workpad source; retry the initially blocked Linear transition and workpad upsert once the shared-budget cooldown clears, then keep the mirrors truthful with the successful retry evidence.
 2. Run audited `linear child-stream --pipeline docs-review`, record the manifest, and resolve any spec ambiguity before code.
 3. Add a shared branch-recovery helper in `pr-watch-merge.js` plus focused watcher tests.
 4. Reuse that helper in review-handoff promotion and deterministic merge closeout, persisting exact recovery-attempt truth and `Rework` fallback metadata.
@@ -50,7 +50,7 @@
 - Risk: conflict failures stay ambiguous.
   - Mitigation: record exact recovery-attempt stderr/stdout and transition explicit conflict-shaped failures into `Rework`.
 - Risk: Linear shared-budget cooldown blocks required issue/workpad mutations during the worker lane.
-  - Mitigation: keep the local workpad source and docs packet current, retry the live mutations before review handoff, and record the budget-blocked status explicitly until the mutation lands.
+  - Mitigation: keep the local workpad source and docs packet current, retry the live mutations before review handoff, and once the cooldown clears replace the temporary blocked wording with the successful retry evidence across the mirrored task packet.
 
 ## Approvals
 - Reviewer: pending `docs-review` child stream

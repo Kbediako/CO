@@ -2,6 +2,7 @@ export interface PrWatchMergeOptions {
   usage?: string;
   defaultAutoMerge?: boolean;
   defaultExitOnActionRequired?: boolean;
+  enableAutomaticBranchRecovery?: boolean;
   readinessMode?: 'merge' | 'review';
 }
 
@@ -101,6 +102,10 @@ export function isHumanReviewActor(
 export function parseGitHubRepoFromRemoteUrl(rawUrl: string): { owner: string; repo: string } | null;
 export function buildPrNumberViewArgs(owner?: string, repo?: string): string[];
 export function buildPrUpdateBranchArgs(options: PrWatchMergeUpdateBranchArgsOptions): string[];
+export function buildAutomaticBranchRecoveryKey(
+  snapshot: Pick<PrWatchMergeSnapshot, 'headOid'> | null | undefined,
+  recoveryReason: string
+): string;
 export function isNoRequiredChecksReportedErrorMessage(value: string | null | undefined): boolean;
 
 export function summarizeRequiredChecks(entries: unknown): PrWatchMergeCheckSummary;

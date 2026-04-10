@@ -1494,11 +1494,10 @@ async function attemptUpdateBranch({ owner, repo, prNumber }) {
   return await runGh(args, { allowFailure: true });
 }
 
-function buildAutomaticBranchRecoveryKey(snapshot, recoveryReason) {
+export function buildAutomaticBranchRecoveryKey(snapshot, recoveryReason) {
   return [
     recoveryReason,
-    snapshot?.headOid || 'no-head',
-    snapshot?.updatedAt || 'no-updated'
+    snapshot?.headOid || 'no-head'
   ].join('|');
 }
 
@@ -1630,6 +1629,10 @@ async function runPrWatchMergeOrThrow(argv, options) {
   const quietMs = Math.round(quietMinutes * 60 * 1000);
   const timeoutMs = Math.round(timeoutMinutes * 60 * 1000);
   const deadline = Date.now() + timeoutMs;
+  const automaticBranchRecoveryEnabled =
+    isReviewMode
+    || autoMerge
+    || Boolean(options.enableAutomaticBranchRecovery);
 
   log(
     isReviewMode
@@ -1706,14 +1709,14 @@ async function runPrWatchMergeOrThrow(argv, options) {
 
     const actionRequiredReasons = resolveActionRequiredReasons(snapshot, { readinessMode });
     const automaticBranchRecoveryReason =
-      (isReviewMode || autoMerge)
+      automaticBranchRecoveryEnabled
         ? resolveAutomaticBranchRecoveryReason(snapshot, {
             readinessMode,
             requireExclusive: true
           })
         : null;
     const shouldAttemptRecovery =
-      (isReviewMode || autoMerge)
+      automaticBranchRecoveryEnabled
       && shouldAttemptAutomaticBranchRecovery(snapshot, { readinessMode });
     const automaticBranchRecoveryKey = automaticBranchRecoveryReason
       ? buildAutomaticBranchRecoveryKey(snapshot, automaticBranchRecoveryReason)

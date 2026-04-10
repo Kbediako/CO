@@ -160,6 +160,7 @@ interface ProviderIssuePullRequestLifecycleLike {
   snapshot?: ProviderIssuePullRequestSnapshotLike | null;
   branch_recovery?: {
     attempted_at?: string | null;
+    head_oid?: string | null;
     recovery_reason?: string | null;
     command?: string | null;
     args?: string[] | null;
@@ -328,6 +329,7 @@ export interface ControlProviderDebugSnapshot {
     merged_at: string | null;
     branch_recovery: {
       attempted_at: string | null;
+      head_oid: string | null;
       recovery_reason: string | null;
       command: string | null;
       args: string[];
@@ -1589,6 +1591,7 @@ function buildProviderDebugPullRequestSnapshot(input: {
     branch_recovery: selectedRecord.branch_recovery
       ? {
           attempted_at: normalizeOptionalString(selectedRecord.branch_recovery.attempted_at),
+          head_oid: normalizeOptionalString(selectedRecord.branch_recovery.head_oid),
           recovery_reason: normalizeOptionalString(selectedRecord.branch_recovery.recovery_reason),
           command: normalizeOptionalString(selectedRecord.branch_recovery.command),
           args: normalizeStringArray(selectedRecord.branch_recovery.args),

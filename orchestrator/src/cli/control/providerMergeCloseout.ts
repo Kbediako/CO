@@ -71,6 +71,7 @@ export interface ProviderMergeCloseoutAttemptRecord {
 
 export interface ProviderBranchRecoveryAttemptRecord {
   attempted_at: string;
+  head_oid: string | null;
   recovery_reason: string;
   command: string;
   args: string[];
@@ -197,6 +198,7 @@ export async function runProviderDeterministicMergeCloseout(
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
     mode?: ProviderMergeCloseoutMode;
+    previousBranchRecovery?: ProviderBranchRecoveryAttemptRecord | null;
     repoRoot: string;
     sourceSetup?: DispatchPilotSourceSetup | null;
     env?: NodeJS.ProcessEnv;
@@ -473,6 +475,7 @@ export async function runProviderDeterministicMergeCloseout(
     branchRecovery = await attemptProviderBranchRecovery({
       pr,
       snapshot,
+      previousBranchRecovery: input.previousBranchRecovery ?? null,
       repoRoot: input.repoRoot,
       now,
       runCommand
@@ -809,6 +812,7 @@ export async function runProviderReviewHandoffPromotion(
     issueState?: string | null;
     issueStateType?: string | null;
     issueUpdatedAt?: string | null;
+    previousBranchRecovery?: ProviderBranchRecoveryAttemptRecord | null;
     repoRoot: string;
     sourceSetup?: DispatchPilotSourceSetup | null;
     env?: NodeJS.ProcessEnv;
@@ -1023,6 +1027,7 @@ export async function runProviderReviewHandoffPromotion(
     branchRecovery = await attemptProviderBranchRecovery({
       pr,
       snapshot,
+      previousBranchRecovery: input.previousBranchRecovery ?? null,
       repoRoot: input.repoRoot,
       now,
       runCommand
@@ -1549,6 +1554,7 @@ function describeProviderBranchRecoveryReason(reason: string): string {
 async function attemptProviderBranchRecovery(input: {
   pr: ProviderMergeCloseoutPullRequestRecord;
   snapshot: ProviderMergeCloseoutSnapshotRecord;
+  previousBranchRecovery?: ProviderBranchRecoveryAttemptRecord | null;
   repoRoot: string;
   now: () => string;
   runCommand: ProviderMergeCloseoutCommandRunner;
@@ -1561,6 +1567,15 @@ async function attemptProviderBranchRecovery(input: {
     || !shouldAttemptAutomaticBranchRecovery(input.snapshot)
   ) {
     return null;
+  }
+  const previousBranchRecovery = input.previousBranchRecovery ?? null;
+  if (
+    previousBranchRecovery?.ok === true
+    && previousBranchRecovery.failure_kind === null
+    && previousBranchRecovery.head_oid === input.snapshot.head_oid
+    && previousBranchRecovery.recovery_reason === recoveryReason
+  ) {
+    return previousBranchRecovery;
   }
   const attemptedAt = input.now();
   const args = buildPrUpdateBranchArgs({
@@ -1576,6 +1591,7 @@ async function attemptProviderBranchRecovery(input: {
   const details = normalizeCommandText(result.stderr) ?? normalizeCommandText(result.stdout);
   return {
     attempted_at: attemptedAt,
+    head_oid: input.snapshot.head_oid,
     recovery_reason: recoveryReason,
     command: 'gh',
     args,
