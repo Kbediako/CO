@@ -1729,6 +1729,10 @@ describe('ControlRuntime', () => {
 
       const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
 
+      expect(compatibilityProjection.selected).toMatchObject({
+        issue_identifier: 'ISSUE-CURRENT',
+        run_id: 'run-1'
+      });
       expect(compatibilityProjection.running.map((entry) => entry.issue_identifier)).toEqual([
         'ISSUE-CURRENT',
         'CO-146'
