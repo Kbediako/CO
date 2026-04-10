@@ -1336,6 +1336,51 @@ describe('SelectedRunProjection', () => {
     );
   });
 
+  it('does not rebind synthetic child task prefixes for non-linear manifests', async () => {
+    const parentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${parentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        status: 'in_progress',
+        issue_provider: 'github',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Non-linear child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Parent issue claim',
+      task_id: parentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
   it('does not rebind non-synthetic child task prefixes to a provider claim', async () => {
     const parentTaskId = 'task-parent';
     const childTaskId = `${parentTaskId}-docs-review`;
