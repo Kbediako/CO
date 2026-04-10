@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -7,16 +6,11 @@ import { describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
-const sourceCliEntrypoint = fileURLToPath(new URL('../../bin/codex-orchestrator.ts', import.meta.url));
-const builtCliEntrypoint = fileURLToPath(new URL('../../dist/bin/codex-orchestrator.js', import.meta.url));
-const cliEntrypoint = existsSync(builtCliEntrypoint) ? builtCliEntrypoint : sourceCliEntrypoint;
+const cliEntrypoint = fileURLToPath(new URL('../../bin/codex-orchestrator.js', import.meta.url));
 const cliHelpTimeoutMs = 90_000;
 
 function buildCliArgs(args: string[]): string[] {
-  if (cliEntrypoint === builtCliEntrypoint) {
-    return [cliEntrypoint, ...args];
-  }
-  return ['--loader', 'ts-node/esm', cliEntrypoint, ...args];
+  return [cliEntrypoint, ...args];
 }
 
 describe('codex-orchestrator CLI monitor alias', () => {
