@@ -26,6 +26,7 @@ import type { QuestionRecord } from './questions.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderIntakeClaimRecord, ProviderIntakeState } from './providerIntakeState.js';
 import {
+  buildProviderFallbackTaskId,
   buildProviderIssueKey,
   hasQueuedProviderIntakeRetry,
   readProviderIntakeClaim,
@@ -50,8 +51,6 @@ import {
 } from './providerLinearWorkerTruth.js';
 
 const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
-const SYNTHETIC_LINEAR_PARENT_TASK_ID_PATTERN =
-  /^linear-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
@@ -1215,13 +1214,13 @@ function providerIntakeClaimMatchesIssueIdentity(
 }
 
 function providerIntakeClaimMatchesSyntheticChildTaskPrefix(
-  claim: Pick<ProviderIntakeClaimRecord, 'task_id'>,
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'task_id'>,
   snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
 ): boolean {
   if (!claim.task_id || !snapshot.taskId) {
     return false;
   }
-  if (!SYNTHETIC_LINEAR_PARENT_TASK_ID_PATTERN.test(claim.task_id)) {
+  if (claim.task_id !== buildProviderFallbackTaskId({ id: claim.issue_id })) {
     return false;
   }
   if (!snapshot.taskId.startsWith(`${claim.task_id}-`)) {

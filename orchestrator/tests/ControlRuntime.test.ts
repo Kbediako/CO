@@ -1534,6 +1534,33 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('suppresses slug-shaped synthetic linear task-id provider-worker rows when no canonical issue identity exists', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const taskId = 'linear-lin-issue-1';
+      const fixture = await createFixture({
+        taskId
+      });
+      await seedManifest(fixture.paths, {
+        task_id: taskId,
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'slug-shaped provider worker fallback manifest without canonical issue identity'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.issues).toEqual([]);
+      expect(compatibilityProjection.selected?.issue_identifier).toBe(taskId);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps non-linear lookalike task ids authoritative when provider-linear-worker provenance is absent', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
@@ -1728,7 +1755,7 @@ describe('ControlRuntime', () => {
         {
           provider: 'linear',
           provider_key: 'linear:lin-issue-146',
-          issue_id: 'lin-issue-146',
+          issue_id: '0b49c08c-53a1-4225-8d09-28457165fbc8',
           issue_identifier: 'CO-146',
           issue_title: 'Claim-backed active issue',
           issue_state: 'In Progress',
