@@ -211,6 +211,13 @@
         "Codex"
       ],
       "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (clean-success)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-7105185a-05da-4f49-89d9-35efbba38f3c-co-147-docs-review-rerun/cli/2026-04-10T16-00-45-369Z-c879ebe1/manifest.json"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
         "task": "tasks/tasks-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
