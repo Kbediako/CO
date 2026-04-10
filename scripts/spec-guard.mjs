@@ -2,7 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
@@ -174,7 +174,7 @@ async function checkSpecFreshness(specFiles) {
       continue;
     }
 
-    if (isArchivedSpecStub(content) || isInactiveSpec(content)) {
+    if (isArchivedSpecStub(file, content) || isInactiveSpec(content)) {
       continue;
     }
 
@@ -230,7 +230,7 @@ function isInactiveSpec(content) {
   return false;
 }
 
-function isArchivedSpecStub(content) {
+function isArchivedSpecStub(file, content) {
   const lines = content.split(/\r?\n/);
   let index = 0;
   while (index < lines.length && lines[index].trim() === '') {
@@ -258,11 +258,23 @@ function isArchivedSpecStub(content) {
   }
 
   const trailingLines = lines.slice(index + 1).map((line) => line.trim());
+  const archivePath =
+    trailingLines
+      .find((line) => line.startsWith('- Archive path:'))
+      ?.slice('- Archive path:'.length)
+      .trim() ?? '';
+  const normalizedArchivePath = normalizeSpecPathForComparison(archivePath);
+  const normalizedFile = normalizeSpecPathForComparison(file);
+
   return (
     trailingLines.some((line) => line.startsWith('> Archived on ')) &&
     trailingLines.some((line) => line.startsWith('- Archive branch:')) &&
-    trailingLines.some((line) => line.startsWith('- Archive path:'))
+    normalizedArchivePath === normalizedFile
   );
+}
+
+function normalizeSpecPathForComparison(value) {
+  return posix.normalize(value.replace(/\\/g, '/'));
 }
 
 async function main() {

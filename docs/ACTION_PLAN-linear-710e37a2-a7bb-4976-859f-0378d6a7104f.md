@@ -12,7 +12,7 @@
   - validation plus representative blocked PR evidence
 - Assumptions:
   - the cohort is truly completed and no longer belongs in active-spec freshness
-  - the repo's archive stub marker is already authoritative enough to distinguish archived specs from active specs
+  - the repo's full archive stub shape is authoritative enough to distinguish archived specs from active specs, including a same-file `Archive path`
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -50,7 +50,7 @@
 - Risk: archiving the cohort without a guard change would only postpone the same failure until the archive stub ages out.
   - Mitigation: use status-based quarantine and archive-stub skip together in the guard so inactive packets stay out of active freshness without extra archive churn.
 - Risk: the guard could skip more than intended.
-  - Mitigation: key the exemption to explicit inactive statuses and the archive stub marker rather than looser path heuristics.
+  - Mitigation: key the exemption to explicit inactive statuses and the full archive stub shape, including a same-file `Archive path`, rather than looser marker-only or path-only heuristics.
 - Risk: the lane drifts into broader docs-freshness cleanup.
   - Mitigation: keep the archive set hard-bounded to `1093` through `1109` and treat other stale baselines as follow-up work only if they materially block this lane.
 
