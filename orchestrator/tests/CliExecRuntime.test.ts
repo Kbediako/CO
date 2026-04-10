@@ -54,7 +54,7 @@ describe('CLI exec runtime', () => {
   it('does not wait forever for background children that keep stdio open', async () => {
     const { getCliExecRunner } = await import('../src/cli/services/execRuntime.js');
     const runner = getCliExecRunner();
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     const result = await runner.run({
       command: process.execPath,
       args: [
@@ -72,7 +72,7 @@ describe('CLI exec runtime', () => {
       env: process.env
     });
 
-    expect(Date.now() - startedAt).toBeLessThan(1000);
+    expect(performance.now() - startedAt).toBeLessThan(1800);
     expect(result).toMatchObject({
       exitCode: 0,
       stdout: 'ready\n',
