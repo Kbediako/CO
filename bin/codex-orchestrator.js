@@ -7,6 +7,8 @@ import { join, normalize } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+const FORWARDABLE_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP']
+
 function main() {
   const packageRoot = resolvePackageRoot()
   const sourceEntry = join(packageRoot, 'bin', 'codex-orchestrator.ts')
@@ -48,13 +50,23 @@ function main() {
     env,
     stdio: 'inherit'
   })
+  let forwardedStopSignal = null
+  const disposeSignalForwarding = installSignalForwarding(child, (signal) => {
+    forwardedStopSignal ??= signal
+  })
   child.once('error', (error) => {
+    disposeSignalForwarding()
     writeWarning(error instanceof Error ? error.message : String(error))
     process.exitCode = 1
   })
   child.once('close', (code, signal) => {
+    disposeSignalForwarding()
+    if (forwardedStopSignal) {
+      reemitSignal(forwardedStopSignal)
+      return
+    }
     if (signal) {
-      process.kill(process.pid, signal)
+      reemitSignal(signal)
       return
     }
     process.exitCode = typeof code === 'number' ? code : 1
@@ -103,6 +115,42 @@ function writeWarning(message) {
     }
   }
   process.stderr.write(line)
+}
+
+function installSignalForwarding(child, onForwardedSignal) {
+  const handlers = new Map()
+  for (const signal of FORWARDABLE_SIGNALS) {
+    const handler = () => {
+      onForwardedSignal(signal)
+      forwardSignal(child, signal)
+    }
+    process.on(signal, handler)
+    handlers.set(signal, handler)
+  }
+  return () => {
+    for (const [signal, handler] of handlers) {
+      process.off(signal, handler)
+    }
+  }
+}
+
+function forwardSignal(child, signal) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return
+  }
+  try {
+    child.kill(signal)
+  } catch {
+    // Ignore forwarding races when the child exits between checks.
+  }
+}
+
+function reemitSignal(signal) {
+  try {
+    process.kill(process.pid, signal)
+  } catch {
+    process.exitCode = 1
+  }
 }
 
 try {
