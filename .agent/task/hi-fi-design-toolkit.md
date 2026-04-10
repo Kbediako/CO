@@ -4,6 +4,7 @@
 - PRD: `docs/design/PRD-hi-fi-design-toolkit.md`
 - Spec: `docs/design/specs/HI_FI_DESIGN_TOOLKIT.md`
 - Summary: Wrap the autonomous hi-fi design starter into an orchestrator pipeline that extracts CSS, emits tokens/style guides, runs reference + self-correction loops, and publishes outputs into `packages/design-system` with full manifest evidence, approvals, and retention controls.
+- Current repo truth after `CO-88`: checked-in `packages/design-system` remains scaffold-level, and its `test:visual` command is placeholder smoke rather than a shipped diff suite. Use this checklist as pipeline history/intent, not proof of a mature current-branch toolkit publication surface.
 
 ### Checklist Convention
 - Export `MCP_RUNNER_TASK_ID=0410-hi-fi-design-toolkit` before invoking diagnostics or guard commands.
@@ -36,7 +37,7 @@
    - [x] Status: `Completed — .runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json`
 4. **Publish integration**
    - Files: `publish.ts`, `packages/design-system/**` updates, CI hook for `npm --prefix packages/design-system run test:visual`.
-   - Acceptance: tokens/components committed with manifest references, tests recorded.
+   - Acceptance: historical pipeline publication path recorded with manifest references; current checked-in package remains scaffold-level and `test:visual` is placeholder smoke.
    - [x] Status: `Completed — .runs/0410-hi-fi-design-toolkit/cli/2025-11-07T03-54-09-660Z-35b0a68c/manifest.json`
 
 ## Guardrails & Evidence

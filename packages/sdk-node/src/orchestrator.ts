@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { createWriteStream, mkdtempSync, type WriteStream } from 'node:fs';
+import { createWriteStream, mkdtempSync, rmSync, type WriteStream } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
@@ -28,12 +28,85 @@ export interface ExecCommandOptions {
 export interface ExecRunResult {
   summary: RunSummaryEvent;
   events: JsonlEvent[];
-  eventsPath: string;
   exitCode: number | null;
   status: 'succeeded' | 'failed';
   manifestPath: string;
-  rawStderr: string[];
+  /** @deprecated Compatibility path to the full JSONL event stream for this run. Call `ExecRunHandle.cleanupArtifacts()` when finished; the files stay available while the associated handle/result is still retained. */
+  eventsPath: string;
+  /** @deprecated Compatibility path to the raw stderr log for this run. Call `ExecRunHandle.cleanupArtifacts()` when finished; the files stay available while the associated handle/result is still retained. */
   stderrPath: string;
+  rawStderr: string[];
+}
+
+const activeArtifactRoots = new Set<string>();
+const artifactCleanupFinalizer = new FinalizationRegistry<ArtifactRetention>((retention) => {
+  retention.releaseCollectedHolder();
+});
+
+process.once('exit', () => {
+  for (const artifactRoot of activeArtifactRoots) {
+    try {
+      rmSync(artifactRoot, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup only.
+    }
+  }
+});
+
+class ArtifactRetention {
+  private holderCount = 0;
+  private cleaned = false;
+  private cleanupPromise: Promise<void> | null = null;
+
+  constructor(private readonly artifactRoot: string) {
+    activeArtifactRoots.add(artifactRoot);
+  }
+
+  registerHolder(target: object, token: object): void {
+    if (this.cleaned) {
+      return;
+    }
+    this.holderCount += 1;
+    artifactCleanupFinalizer.register(target, this, token);
+  }
+
+  unregisterHolder(token: object): void {
+    if (!artifactCleanupFinalizer.unregister(token)) {
+      return;
+    }
+    this.releaseHolder();
+  }
+
+  releaseCollectedHolder(): void {
+    this.releaseHolder();
+  }
+
+  async cleanup(): Promise<void> {
+    if (this.cleanupPromise) {
+      return await this.cleanupPromise;
+    }
+    if (!this.cleaned) {
+      this.cleaned = true;
+      this.holderCount = 0;
+      this.cleanupPromise = rm(this.artifactRoot, { recursive: true, force: true })
+        .catch(() => {})
+        .finally(() => {
+          activeArtifactRoots.delete(this.artifactRoot);
+        })
+        .then(() => undefined);
+    }
+    await this.cleanupPromise;
+  }
+
+  private releaseHolder(): void {
+    if (this.cleaned || this.holderCount === 0) {
+      return;
+    }
+    this.holderCount -= 1;
+    if (this.holderCount === 0) {
+      void this.cleanup();
+    }
+  }
 }
 
 interface InternalExecOptions extends ExecCommandOptions {
@@ -87,11 +160,15 @@ export class ExecRunHandle extends EventEmitter {
   private readonly eventsFilePath: string;
   private readonly stderrFilePath: string;
   private readonly artifactRoot: string;
+  private readonly artifactRetention: ArtifactRetention;
   private readonly maxEventBuffer = 200;
   private readonly maxStderrBuffer = 200;
   private streamsClosed = false;
+  private artifactsCleaned = false;
+  private resultSettled = false;
   private summaryEvent: RunSummaryEvent | null = null;
   private readonly resultPromise: Promise<ExecRunResult>;
+  private resolvedResult: ExecRunResult | null = null;
   private resolveResult!: (value: ExecRunResult) => void;
   private rejectResult!: (reason: unknown) => void;
 
@@ -105,12 +182,15 @@ export class ExecRunHandle extends EventEmitter {
     this.artifactRoot = mkdtempSync(join(tmpdir(), 'codex-exec-'));
     this.eventsFilePath = join(this.artifactRoot, 'events.ndjson');
     this.stderrFilePath = join(this.artifactRoot, 'stderr.log');
+    this.artifactRetention = new ArtifactRetention(this.artifactRoot);
+    this.artifactRetention.registerHolder(this, this);
     this.eventsStream = createWriteStream(this.eventsFilePath, { flags: 'a' });
     this.stderrStream = createWriteStream(this.stderrFilePath, { flags: 'a' });
     this.resultPromise = new Promise<ExecRunResult>((resolve, reject) => {
       this.resolveResult = resolve;
       this.rejectResult = reject;
     });
+    this.artifactRetention.registerHolder(this.resultPromise, this.resultPromise);
 
     const stdout = child.stdout ?? new PassThrough();
     const stderr = child.stderr ?? new PassThrough();
@@ -136,7 +216,6 @@ export class ExecRunHandle extends EventEmitter {
       this.emit('event', parsed);
       if (parsed.type === 'run:summary') {
         this.summaryEvent = parsed as RunSummaryEvent;
-        this.resolveResult(this.buildResult());
         this.emit('summary', this.summaryEvent);
       }
     });
@@ -152,13 +231,23 @@ export class ExecRunHandle extends EventEmitter {
     });
 
     child.once('error', (error) => {
-      this.closeStreams();
-      this.emit('error', error);
-      this.rejectResult(error);
+      if (this.listenerCount('error') > 0) {
+        this.emit('error', error);
+      }
+      this.rejectResultOnce(error);
+      void this.closeStreams({ preserveArtifacts: false }).catch(() => {
+        // Preserve the original child-process failure as the terminal result.
+      });
     });
 
-    child.once('close', (code, signal) => {
-      this.closeStreams();
+    child.once('close', async (code, signal) => {
+      const preserveArtifacts = this.summaryEvent !== null;
+      try {
+        await this.closeStreams({ preserveArtifacts });
+      } catch (error) {
+        this.rejectResultOnce(error);
+        return;
+      }
       this.emit('exit', { code, signal });
       if (!this.summaryEvent) {
         const error = new Error('Exec command exited without emitting a summary event.') as Error & {
@@ -167,8 +256,10 @@ export class ExecRunHandle extends EventEmitter {
         };
         error.exitCode = code ?? null;
         error.signal = signal ?? null;
-        this.rejectResult(error);
+        this.rejectResultOnce(error);
+        return;
       }
+      this.resolveResultOnce(this.buildResult());
     });
   }
 
@@ -201,12 +292,20 @@ export class ExecRunHandle extends EventEmitter {
     return this.client.run(merged);
   }
 
+  async cleanupArtifacts(): Promise<void> {
+    await this.result.catch(() => undefined);
+    await this.removeArtifacts();
+  }
+
   private buildResult(): ExecRunResult {
+    if (this.resolvedResult) {
+      return this.resolvedResult;
+    }
     if (!this.summaryEvent) {
       throw new Error('Summary not available');
     }
     const payload = this.summaryEvent.payload as RunSummaryEventPayload;
-    return {
+    const result: ExecRunResult = {
       summary: this.summaryEvent,
       events: [...this.eventsList],
       eventsPath: this.eventsFilePath,
@@ -216,16 +315,52 @@ export class ExecRunHandle extends EventEmitter {
       rawStderr: [...this.stderrLines],
       stderrPath: this.stderrFilePath
     };
+    this.resolvedResult = result;
+    this.artifactRetention.registerHolder(result, result);
+    return result;
   }
 
-  private closeStreams(): void {
+  private resolveResultOnce(value: ExecRunResult): void {
+    if (this.resultSettled) {
+      return;
+    }
+    this.resultSettled = true;
+    this.resolveResult(value);
+  }
+
+  private rejectResultOnce(reason: unknown): void {
+    if (this.resultSettled) {
+      return;
+    }
+    this.resultSettled = true;
+    this.rejectResult(reason);
+  }
+
+  private async closeStreams(options: { preserveArtifacts: boolean }): Promise<void> {
     if (this.streamsClosed) {
       return;
     }
     this.streamsClosed = true;
-    this.eventsStream.end();
-    this.stderrStream.end();
-    void rm(this.artifactRoot, { recursive: true, force: true }).catch(() => {});
+    await Promise.all([
+      new Promise<void>((resolve) => this.eventsStream.end(resolve)),
+      new Promise<void>((resolve) => this.stderrStream.end(resolve))
+    ]);
+    if (!options.preserveArtifacts) {
+      await this.removeArtifacts();
+    }
+  }
+
+  private async removeArtifacts(): Promise<void> {
+    if (this.artifactsCleaned) {
+      return;
+    }
+    this.artifactsCleaned = true;
+    this.artifactRetention.unregisterHolder(this);
+    this.artifactRetention.unregisterHolder(this.resultPromise);
+    if (this.resolvedResult) {
+      this.artifactRetention.unregisterHolder(this.resolvedResult);
+    }
+    await this.artifactRetention.cleanup();
   }
 }
 

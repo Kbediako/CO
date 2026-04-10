@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-04-10",
+  "generated_at": "2026-04-11",
   "entries": [
     {
       "path": ".agent/task/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md",
@@ -210,6 +210,48 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-10",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-11",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-11",
       "cadence_days": 30
     },
     {
@@ -7416,13 +7458,6 @@
       "cadence_days": 30
     },
     {
-      "path": ".agent/task/ACTION_PLAN_TEMPLATE.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-01",
-      "cadence_days": 90
-    },
-    {
       "path": ".agent/task/design-reference-pipeline.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -7438,20 +7473,6 @@
     },
     {
       "path": ".agent/task/hi-fi-design-toolkit.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-01",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/PRD_TEMPLATE.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-01",
-      "cadence_days": 90
-    },
-    {
-      "path": ".agent/task/TECH_SPEC_TEMPLATE.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-01",
