@@ -879,9 +879,7 @@ export function createProviderIssueHandoffService(
     // claim attachment and issue ownership stay scoped to the current start pipeline.
     const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
     const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
-    const claimStateByProviderKey = new Map(
-      options.state.claims.map((claim) => [claim.provider_key, claim.issue_state ?? null] as const)
-    );
+    const claimStateByProviderKey = new Map<string, string | null>();
 
     for (const claim of options.state.claims) {
       if (
@@ -891,6 +889,7 @@ export function createProviderIssueHandoffService(
       ) {
         continue;
       }
+      claimStateByProviderKey.set(claim.provider_key, claim.issue_state ?? null);
       const activeClaimRun =
         resolveProviderClaimRunIdentity(
           claim,
