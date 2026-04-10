@@ -57,7 +57,7 @@ last_review: 2026-04-10
 ## Technical Requirements
 - Functional requirements:
   - every authoritative active-run rehydrate/upsert path must clear stale retry metadata unless the claim is still genuinely retry-owned
-  - retry-owned `resumable` / `handoff_failed` flows must continue to preserve retry metadata
+  - `resumable` / `handoff_failed` flows must continue to preserve retry metadata
   - the fix must cover the observed `CO-127` shape where stale retry metadata survives an active rehydrate
 - Non-functional requirements (performance, reliability, security):
   - keep the change bounded to claim-state management
