@@ -309,6 +309,195 @@ describe('createProviderIssueHandoffService admission cache', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('uses the lock-time failed-relaunch seed when direct webhook admission waits on the refresh lifecycle lock', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const { createProviderIssueHandoffService } = await import(
+      '../src/cli/control/providerIssueHandoff.js'
+    );
+    const { resolveRunPaths } = await import('../src/cli/run/runPaths.js');
+    const { root, paths } = await createHostPaths();
+    const runsRoot = join(root, '.runs');
+    const state = createProviderIntakeState();
+
+    let persistCallCount = 0;
+    let releaseBlockedPersist: (() => void) | null = null;
+    const persist = vi.fn(async () => {
+      persistCallCount += 1;
+      if (persistCallCount !== 1) {
+        return;
+      }
+      await new Promise<void>((resolve) => {
+        releaseBlockedPersist = resolve;
+      });
+    });
+
+    let resolveFirstStart: ((value: { runId: string; manifestPath: string }) => void) | null = null;
+    const launcher = {
+      start: vi.fn(async ({ issueId }: { issueId: string }) => {
+        if (issueId === 'lin-issue-first') {
+          return await new Promise<{ runId: string; manifestPath: string }>((resolve) => {
+            resolveFirstStart = resolve;
+          });
+        }
+        return {
+          runId: 'run-second',
+          manifestPath: '/tmp/provider-run/second.json'
+        };
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    const firstPromise = service.handleAcceptedTrackedIssue({
+      trackedIssue: {
+        ...createTrackedIssue(),
+        id: 'lin-issue-first',
+        identifier: 'CO-1',
+        updated_at: '2026-03-19T04:32:00.000Z'
+      },
+      deliveryId: 'delivery-first',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_320_000
+    });
+
+    await vi.waitFor(() => {
+      expect(persist).toHaveBeenCalledTimes(1);
+      expect(
+        state.claims.some(
+          (claim) =>
+            claim.provider_key === 'linear:lin-issue-first' && claim.state === 'starting'
+        )
+      ).toBe(true);
+    });
+
+    const baselineRunDiscoveryCalls = readdirSpy.mock.calls.filter(
+      ([path]) => path === runsRoot
+    ).length;
+
+    const secondPromise = service.handleAcceptedTrackedIssue({
+      trackedIssue: {
+        ...createTrackedIssue(),
+        id: 'lin-issue-second',
+        identifier: 'CO-2',
+        updated_at: '2026-03-19T04:32:01.000Z'
+      },
+      deliveryId: 'delivery-second',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_321_000
+    });
+
+    await vi.waitFor(() => {
+      expect(
+        readdirSpy.mock.calls.filter(([path]) => path === runsRoot).length
+      ).toBeGreaterThanOrEqual(baselineRunDiscoveryCalls + 1);
+    });
+
+    const previousRunEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-second-previous'
+    };
+    const previousRunPaths = resolveRunPaths(previousRunEnv, 'run-second-previous');
+    await mkdir(previousRunPaths.runDir, { recursive: true });
+    await writeFile(
+      previousRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-second-previous',
+        task_id: 'task-second-previous',
+        pipeline_id: 'diagnostics',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-second',
+        issue_identifier: 'CO-2',
+        issue_updated_at: '2026-03-19T04:32:01.000Z',
+        updated_at: '2026-03-19T04:32:01.000Z'
+      }),
+      'utf8'
+    );
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-second',
+      issue_id: 'lin-issue-second',
+      issue_identifier: 'CO-2',
+      issue_title: 'Enforce provider max concurrency',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:32:01.000Z',
+      task_id: 'task-second-previous',
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:transient launch failure',
+      accepted_at: '2026-03-19T04:32:01.000Z',
+      updated_at: '2026-03-19T04:32:01.000Z',
+      last_delivery_id: 'delivery-second-previous',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_742_360_321_000,
+      run_id: 'run-second-previous',
+      run_manifest_path: previousRunPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'launch-token-second-previous',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+
+    if (!releaseBlockedPersist) {
+      throw new Error('Expected the first persist to be blocked.');
+    }
+    releaseBlockedPersist();
+
+    await expect(secondPromise).resolves.toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        provider_key: 'linear:lin-issue-second',
+        state: 'starting',
+        run_id: 'run-second',
+        run_manifest_path: '/tmp/provider-run/second.json',
+        retry_queued: false,
+        retry_attempt: 1,
+        retry_due_at: null,
+        retry_error: null
+      }
+    });
+
+    if (!resolveFirstStart) {
+      throw new Error('Expected the first launch to be pending.');
+    }
+    resolveFirstStart({
+      runId: 'run-first',
+      manifestPath: '/tmp/provider-run/first.json'
+    });
+
+    await expect(firstPromise).resolves.toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        provider_key: 'linear:lin-issue-first',
+        state: 'starting',
+        run_id: 'run-first',
+        run_manifest_path: '/tmp/provider-run/first.json'
+      }
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('starts deferred best-effort rehydrate retries with a fresh run-tree discovery snapshot', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));

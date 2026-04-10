@@ -2594,6 +2594,7 @@ export function createProviderIssueHandoffService(
               latestRun: ProviderIssueRunRecord | null;
               latestClaimBase: typeof latestClaimBase;
               latestRetryStateBase: typeof latestRetryStateBase;
+              retryingFailedRelaunch: boolean;
               inflightClaim: ProviderIntakeClaimRecord;
               launchToken: string;
             }
@@ -2607,6 +2608,7 @@ export function createProviderIssueHandoffService(
                 latestRun: ProviderIssueRunRecord | null;
                 latestClaimBase: typeof latestClaimBase;
                 latestRetryStateBase: typeof latestRetryStateBase;
+                retryingFailedRelaunch: boolean;
                 inflightClaim: ProviderIntakeClaimRecord;
                 launchToken: string;
               }
@@ -2762,6 +2764,7 @@ export function createProviderIssueHandoffService(
             latestRun: lockedLatestRun,
             latestClaimBase: lockedLatestClaimBase,
             latestRetryStateBase: lockedLatestRetryStateBase,
+            retryingFailedRelaunch: lockedRetryingFailedRelaunch,
             inflightClaim,
             launchToken
           };
@@ -2779,6 +2782,7 @@ export function createProviderIssueHandoffService(
         latestRun: reservedLatestRun,
         latestClaimBase: reservedLatestClaimBase,
         latestRetryStateBase: reservedLatestRetryStateBase,
+        retryingFailedRelaunch: reservedRetryingFailedRelaunch,
         inflightClaim,
         launchToken
       } = admissionReservation;
@@ -2837,7 +2841,7 @@ export function createProviderIssueHandoffService(
               claim: reservedLatestRetryStateBase,
               previousRun: reservedLatestRun,
               preserveCurrentAttempt: reservedLatestExisting?.retry_queued === true,
-              seedFromPreviousRun: retryingFailedRelaunch
+              seedFromPreviousRun: reservedRetryingFailedRelaunch
             })
           })
         : inflightClaim;
