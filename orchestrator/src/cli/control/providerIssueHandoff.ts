@@ -795,6 +795,72 @@ export function createProviderIssueHandoffService(
     return buildTrackedIssueClaimFields(trackedIssue);
   };
 
+  const createProviderAdmissionGate = async (): Promise<
+    ReturnType<typeof createProviderPollDispatchBudget>
+  > => {
+    const gate = createProviderPollDispatchBudget(options.readFeatureToggles?.() ?? null);
+    const seededOccupancyKeys = new Set<string>();
+    const discoveredRuns = await discoverProviderIssueRuns(options.paths.runDir);
+    // Host-global admission must count every live provider worker, even when
+    // claim attachment and issue ownership stay scoped to the current start pipeline.
+    const activeDiscoveredRuns = discoveredRuns.filter((run) => run.status === 'in_progress');
+    const activeRunsByProviderIssue = groupProviderIssueRuns(activeDiscoveredRuns);
+    const claimStateByProviderKey = new Map(
+      options.state.claims.map((claim) => [claim.provider_key, claim.issue_state ?? null] as const)
+    );
+
+    for (const claim of options.state.claims) {
+      if (
+        claim.state !== 'starting' &&
+        claim.state !== 'resuming' &&
+        claim.state !== 'running'
+      ) {
+        continue;
+      }
+      const activeClaimRun =
+        resolveProviderClaimRunIdentity(
+          claim,
+          activeRunsByProviderIssue.get(claim.provider_key) ?? []
+        ) ??
+        activeRunsByProviderIssue.get(claim.provider_key)?.[0] ??
+        null;
+      const occupancyKey =
+        activeClaimRun?.manifestPath ??
+        activeClaimRun?.runId ??
+        (
+          claim.state === 'running'
+            ? null
+            : claim.run_manifest_path ??
+              claim.run_id ??
+              `claim:${claim.provider_key}:${claim.state}`
+        );
+      if (!occupancyKey) {
+        continue;
+      }
+      if (seededOccupancyKeys.has(occupancyKey)) {
+        continue;
+      }
+      seededOccupancyKeys.add(occupancyKey);
+      gate.noteOccupied({ state: claim.issue_state ?? null });
+    }
+
+    for (const run of activeDiscoveredRuns) {
+      const occupancyKey = run.manifestPath || run.runId;
+      if (seededOccupancyKeys.has(occupancyKey)) {
+        continue;
+      }
+      seededOccupancyKeys.add(occupancyKey);
+      const providerKey = buildProviderIssueKey(run.provider, run.issueId);
+      gate.noteOccupied({ state: claimStateByProviderKey.get(providerKey) ?? null });
+    }
+
+    return gate;
+  };
+
+  const shouldCountProviderAdmissionResultForPollBudget = (
+    result: ProviderIssueHandoffResult
+  ): boolean => result.kind !== 'ignored' || result.claim.retry_queued === true;
+
   const resolveFreshTrackedIssueForActiveClaim = async (
     claim: Pick<ProviderIntakeClaimRecord, 'provider' | 'issue_id' | 'issue_updated_at'>
   ): Promise<{
@@ -864,6 +930,34 @@ export function createProviderIssueHandoffService(
     launcherReason?: string;
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<void> => {
+    const admissionGate = await createProviderAdmissionGate();
+    if (!admissionGate.canDispatch(input.trackedIssue)) {
+      await upsertProviderClaimAndPersist({
+        ...input.claim,
+        ...buildTrackedIssueClaimFields(input.trackedIssue),
+        task_id: input.run.taskId,
+        state: 'resumable',
+        reason: deriveProviderCapacityBlockedReason(input.reason),
+        run_id: input.run.runId,
+        run_manifest_path: input.run.manifestPath,
+        launch_source: null,
+        launch_token: null,
+        review_promotion: null,
+        merge_closeout: null,
+        ...buildQueuedProviderRetryFields({
+          claim: input.claim,
+          previousRun: input.run,
+          error: input.claim.retry_error ?? resolveProviderRetryErrorFromRun(input.run),
+          preserveCurrentAttempt: true,
+          delayType: resolveProviderRetryDelayType({
+            claim: input.claim,
+            previousRun: input.run
+          })
+        })
+      });
+      return;
+    }
+
     const launchToken = createProviderLaunchToken();
     await upsertProviderClaimAndPersist({
       ...input.claim,
@@ -928,6 +1022,39 @@ export function createProviderIssueHandoffService(
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<ProviderIssueHandoffResult> => {
     const taskId = buildProviderFallbackTaskId(input.trackedIssue);
+    const admissionGate = await createProviderAdmissionGate();
+    if (!admissionGate.canDispatch(input.trackedIssue)) {
+      const claim = await upsertProviderClaimAndPersist({
+        ...input.claim,
+        ...buildTrackedIssueClaimFields(input.trackedIssue),
+        task_id: taskId,
+        mapping_source: input.claim.mapping_source,
+        state: 'accepted',
+        reason: deriveProviderCapacityBlockedReason(input.reason),
+        run_id: input.previousRun?.runId ?? input.claim.run_id,
+        run_manifest_path: input.previousRun?.manifestPath ?? input.claim.run_manifest_path,
+        launch_source: null,
+        launch_token: null,
+        review_promotion: null,
+        merge_closeout: null,
+        ...(
+          input.preserveRetryAttempt === true || input.claim.retry_queued === true
+            ? buildQueuedProviderRetryFields({
+                claim: input.claim,
+                previousRun: input.previousRun ?? null,
+                error: input.claim.retry_error ?? resolveProviderRetryErrorFromRun(input.previousRun ?? null),
+                preserveCurrentAttempt: true,
+                delayType: resolveProviderRetryDelayType({
+                  claim: input.claim,
+                  previousRun: input.previousRun ?? null
+                })
+              })
+            : clearProviderRetryFields()
+        )
+      });
+      return { kind: 'ignored', reason: claim.reason ?? deriveProviderCapacityBlockedReason(input.reason), claim };
+    }
+
     const launchToken = createProviderLaunchToken();
     await upsertProviderClaimAndPersist({
       ...input.claim,
@@ -2374,6 +2501,39 @@ export function createProviderIssueHandoffService(
         }
       }
 
+      const admissionGate = await createProviderAdmissionGate();
+      if (!admissionGate.canDispatch(input.trackedIssue)) {
+        const blockedReason = deriveProviderCapacityBlockedReason('provider_issue_start_launched');
+        const claim = await upsertProviderClaimAndPersist({
+          ...latestClaimBase,
+          task_id: taskId,
+          mapping_source: latestExisting?.mapping_source ?? mappingSource,
+          state: 'accepted',
+          reason: blockedReason,
+          run_id: latestRun?.runId ?? latestExisting?.run_id ?? null,
+          run_manifest_path: latestRun?.manifestPath ?? latestExisting?.run_manifest_path ?? null,
+          launch_source: null,
+          launch_token: null,
+          review_promotion: null,
+          merge_closeout: null,
+          ...(
+            latestExisting?.retry_queued === true
+              ? buildQueuedProviderRetryFields({
+                  claim: latestRetryStateBase,
+                  previousRun: latestRun,
+                  error: latestExisting.retry_error ?? resolveProviderRetryErrorFromRun(latestRun),
+                  preserveCurrentAttempt: true,
+                  delayType: resolveProviderRetryDelayType({
+                    claim: latestExisting,
+                    previousRun: latestRun
+                  })
+                })
+              : clearProviderRetryFields()
+          )
+        });
+        return { kind: 'ignored', reason: claim.reason ?? blockedReason, claim };
+      }
+
       const launchToken = createProviderLaunchToken();
       const inflightClaimSnapshot = captureProviderStateSnapshot();
       const inflightClaim = upsertProviderIntakeClaim(options.state, {
@@ -2599,13 +2759,15 @@ export function createProviderIssueHandoffService(
             if (!pollDispatchBudget.canDispatch(resolution.trackedIssue)) {
               continue;
             }
-            await launchStartForTrackedIssue({
+            const handoffResult = await launchStartForTrackedIssue({
               claim,
               trackedIssue: resolution.trackedIssue,
               reason: 'provider_issue_refresh_start_launched',
               previousRun: latestRun
             });
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            }
             continue;
           }
 
@@ -2878,12 +3040,14 @@ export function createProviderIssueHandoffService(
             if (!pollDispatchBudget.canDispatch(resolution.trackedIssue)) {
               continue;
             }
-            await launchStartForTrackedIssue({
+            const handoffResult = await launchStartForTrackedIssue({
               claim: currentClaim,
               trackedIssue: resolution.trackedIssue,
               reason: 'provider_issue_refresh_start_launched'
             });
-            noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
+              noteOccupiedPollDispatchSlot(claimProviderKey, resolution.trackedIssue);
+            }
           }
         } catch (error) {
           logger.warn(
@@ -2919,7 +3083,7 @@ export function createProviderIssueHandoffService(
             action: 'reconcile',
             webhookTimestamp: null
           });
-          if (handoffResult.kind !== 'ignored' || handoffResult.claim.retry_queued === true) {
+          if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
             noteOccupiedPollDispatchSlot(providerKey, trackedIssue);
           }
         } catch (error) {
@@ -2975,6 +3139,13 @@ function hasFailedProviderStartReason(reason: string | null | undefined): boolea
         reason.startsWith(`${PROVIDER_POST_WORKER_EXIT_START_FAILED_REASON}:`)
       )
   );
+}
+
+function deriveProviderCapacityBlockedReason(launchReason: string): string {
+  if (launchReason.endsWith('_launched')) {
+    return `${launchReason.slice(0, -'_launched'.length)}_blocked:max_concurrency`;
+  }
+  return `${launchReason}:blocked:max_concurrency`;
 }
 
 function isTrackedIssueNonIncreasing(input: {
