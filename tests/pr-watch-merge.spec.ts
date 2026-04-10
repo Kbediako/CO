@@ -1,18 +1,24 @@
+import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildPrNumberViewArgs,
   buildPrMergeArgs,
+  buildPrUpdateBranchArgs,
+  buildAutomaticBranchRecoveryKey,
   buildStatusSnapshot,
+  isConflictLikeBranchRecoveryFailureMessage,
   isNoRequiredChecksReportedErrorMessage,
   isHumanReviewActor,
   parseGitHubRepoFromRemoteUrl,
+  resolveAutomaticBranchRecoveryReason,
   resolveActionRequiredReasons,
   resolveLatestBotRereviewRequests,
   resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
   resolveRequiredChecksSummary,
   runPrWatchMerge,
+  shouldAttemptAutomaticBranchRecovery,
   shouldSucceedAfterTimeout,
   summarizeRequiredChecks
 } from '../scripts/lib/pr-watch-merge.js';
@@ -81,6 +87,33 @@ describe('buildPrNumberViewArgs', () => {
       '--repo',
       'Kbediako/CO'
     ]);
+  });
+});
+
+describe('buildPrUpdateBranchArgs', () => {
+  it('includes explicit repo context for gh pr update-branch', () => {
+    expect(buildPrUpdateBranchArgs({
+      owner: 'Kbediako',
+      repo: 'CO',
+      prNumber: 253
+    })).toEqual(['pr', 'update-branch', '253', '--repo', 'Kbediako/CO']);
+  });
+});
+
+describe('buildAutomaticBranchRecoveryKey', () => {
+  it('stays stable for the same head even when GitHub metadata timestamps change', () => {
+    expect(
+      buildAutomaticBranchRecoveryKey(
+        {
+          headOid: 'abc123'
+        },
+        'merge_state=BEHIND'
+      )
+    ).toBe('merge_state=BEHIND|abc123');
+  });
+
+  it('falls back to a stable no-head marker when the snapshot has no head oid', () => {
+    expect(buildAutomaticBranchRecoveryKey(null, 'merge_state=DIRTY')).toBe('merge_state=DIRTY|no-head');
   });
 });
 
@@ -534,6 +567,104 @@ describe('resolveActionRequiredReasons', () => {
   });
 });
 
+describe('resolveAutomaticBranchRecoveryReason', () => {
+  it('picks BEHIND from action-required snapshots', () => {
+    const snapshot = buildStatusSnapshot(
+      makeResponse([], {
+        mergeStateStatus: 'BEHIND'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      }
+    );
+
+    expect(resolveAutomaticBranchRecoveryReason(snapshot)).toBe('merge_state=BEHIND');
+    expect(shouldAttemptAutomaticBranchRecovery(snapshot)).toBe(true);
+  });
+
+  it('ignores non-recovery action-required reasons', () => {
+    const snapshot = buildStatusSnapshot(
+      makeResponse([], {
+        reviewDecision: 'CHANGES_REQUESTED'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      }
+    );
+
+    expect(resolveAutomaticBranchRecoveryReason(snapshot)).toBeNull();
+  });
+
+  it('accepts precomputed action-required reason lists', () => {
+    expect(resolveAutomaticBranchRecoveryReason([
+      'review=CHANGES_REQUESTED',
+      'merge_state=DIRTY'
+    ])).toBe('merge_state=DIRTY');
+  });
+});
+
+describe('shouldAttemptAutomaticBranchRecovery', () => {
+  it('requires BEHIND or DIRTY to be the only action-required blocker', () => {
+    expect(shouldAttemptAutomaticBranchRecovery(['merge_state=BEHIND'])).toBe(true);
+    expect(
+      shouldAttemptAutomaticBranchRecovery(['review=CHANGES_REQUESTED', 'merge_state=BEHIND'])
+    ).toBe(false);
+    expect(
+      shouldAttemptAutomaticBranchRecovery(['merge_state=DIRTY', 'unresolved_threads=2'])
+    ).toBe(false);
+  });
+
+  it('requires the snapshot to be otherwise green before mutating the branch', () => {
+    const snapshot = buildStatusSnapshot(
+      makeResponse([], {
+        mergeStateStatus: 'BEHIND'
+      }),
+      summarizeRequiredChecks([
+        { name: 'corelane', state: 'PENDING', bucket: 'pending', link: 'https://example.com/corelane' }
+      ]),
+      {
+        fetchError: false,
+        unacknowledgedCount: 0
+      }
+    );
+
+    expect(snapshot.gateReasons).toEqual(['required_checks_pending=1', 'merge_state=BEHIND']);
+    expect(resolveActionRequiredReasons(snapshot)).toEqual(['merge_state=BEHIND']);
+    expect(resolveAutomaticBranchRecoveryReason(snapshot)).toBe('merge_state=BEHIND');
+    expect(resolveAutomaticBranchRecoveryReason(snapshot, { requireExclusive: true })).toBeNull();
+    expect(shouldAttemptAutomaticBranchRecovery(snapshot)).toBe(false);
+  });
+});
+
+describe('isConflictLikeBranchRecoveryFailureMessage', () => {
+  it('recognizes GitHub conflict-style update-branch failures', () => {
+    expect(
+      isConflictLikeBranchRecoveryFailureMessage(
+        'GraphQL: This branch cannot be rebased due to conflicts'
+      )
+    ).toBe(true);
+    expect(
+      isConflictLikeBranchRecoveryFailureMessage(
+        'Update failed because of merge conflicts in src/index.ts'
+      )
+    ).toBe(true);
+  });
+
+  it('ignores non-conflict branch refresh failures', () => {
+    expect(
+      isConflictLikeBranchRecoveryFailureMessage('HTTP 502 from GitHub while updating branch')
+    ).toBe(false);
+  });
+});
+
 describe('summarizeRequiredChecks', () => {
   it('maps bucket values to pass/pending/fail buckets conservatively', () => {
     const summary = summarizeRequiredChecks([
@@ -766,6 +897,117 @@ describe('runPrWatchMerge review-mode flag validation', () => {
     expect(errorSpy).toHaveBeenCalledWith(
       'ready-review does not support merge flags: --merge-method'
     );
+  });
+
+  it('does not retry a failed automatic branch recovery for the same head and reason', async () => {
+    vi.resetModules();
+    const snapshotPayloads = [
+      makeResponse([], {
+        mergeStateStatus: 'BEHIND',
+        updatedAt: '2026-02-16T03:00:00.000Z'
+      }),
+      makeResponse([], {
+        mergeStateStatus: 'BEHIND',
+        updatedAt: '2026-02-16T03:01:00.000Z'
+      }),
+      makeResponse([], {
+        state: 'MERGED',
+        mergeStateStatus: 'CLEAN',
+        mergedAt: '2026-02-16T03:02:00.000Z',
+        updatedAt: '2026-02-16T03:02:00.000Z'
+      })
+    ];
+    let snapshotIndex = 0;
+    let updateBranchAttempts = 0;
+    const spawnMock = vi.fn((command: string, args: string[]) => {
+      const stdout = new EventEmitter();
+      const stderr = new EventEmitter();
+      const child = Object.assign(new EventEmitter(), { stdout, stderr });
+      let result: { exitCode: number; stdout: string; stderr: string };
+
+      if (command !== 'gh') {
+        throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+      }
+
+      if (args[0] === 'auth' && args[1] === 'status') {
+        result = { exitCode: 0, stdout: '', stderr: '' };
+      } else if (args[0] === 'api' && args[1] === 'graphql') {
+        const payload = snapshotPayloads[Math.min(snapshotIndex, snapshotPayloads.length - 1)];
+        snapshotIndex += 1;
+        result = { exitCode: 0, stdout: JSON.stringify(payload), stderr: '' };
+      } else if (args[0] === 'pr' && args[1] === 'checks') {
+        result = { exitCode: 0, stdout: '[]', stderr: '' };
+      } else if (args[0] === 'pr' && args[1] === 'update-branch') {
+        updateBranchAttempts += 1;
+        result = {
+          exitCode: 1,
+          stdout: '',
+          stderr: 'HTTP 502 from GitHub while updating branch'
+        };
+      } else if (args[0] === 'api') {
+        result = { exitCode: 0, stdout: '[[]]', stderr: '' };
+      } else {
+        throw new Error(`Unexpected gh args: ${args.join(' ')}`);
+      }
+
+      queueMicrotask(() => {
+        if (result.stdout) {
+          stdout.emit('data', Buffer.from(result.stdout));
+        }
+        if (result.stderr) {
+          stderr.emit('data', Buffer.from(result.stderr));
+        }
+        child.emit('close', result.exitCode);
+      });
+
+      return child as any;
+    });
+    const sleepMock = vi.fn(async () => undefined);
+    vi.doMock('node:child_process', () => ({
+      spawn: spawnMock
+    }));
+    vi.doMock('node:timers/promises', () => ({
+      setTimeout: sleepMock
+    }));
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const { runPrWatchMerge: runPrWatchMergeWithMocks } = await import('../scripts/lib/pr-watch-merge.js');
+
+      await expect(
+        runPrWatchMergeWithMocks(
+          [
+            '--owner',
+            'Kbediako',
+            '--repo',
+            'CO',
+            '--pr',
+            '211',
+            '--interval-seconds',
+            '0.001',
+            '--quiet-minutes',
+            '0.001',
+            '--timeout-minutes',
+            '1',
+            '--no-exit-on-action-required'
+          ],
+          {
+            enableAutomaticBranchRecovery: true
+          }
+        )
+      ).resolves.toBe(0);
+
+      expect(updateBranchAttempts).toBe(1);
+      expect(snapshotIndex).toBe(3);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+      vi.doUnmock('node:child_process');
+      vi.doUnmock('node:timers/promises');
+      vi.resetModules();
+    }
   });
 });
 
