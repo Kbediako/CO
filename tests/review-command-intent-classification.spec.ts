@@ -71,6 +71,25 @@ describe('review command intent classification', () => {
     ).toBeNull();
   });
 
+  it('keeps package-manager test-file selectors inside the validation-suite boundary', () => {
+    expect(
+      classifyCommandIntentCommandLine(`npm test -- --runInBand tests/run-review.spec.ts`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'validation-suite',
+      sample: `npm test -- --runInBand tests/run-review.spec.ts`
+    });
+    expect(
+      classifyCommandIntentCommandLine(`pnpm run test -- tests/review-execution-state.spec.ts`, {
+        allowValidationCommandIntents: false
+      })
+    ).toEqual({
+      kind: 'validation-suite',
+      sample: `pnpm run test -- tests/review-execution-state.spec.ts`
+    });
+  });
+
   it('resolves launcher variants and nested review-orchestration commands', () => {
     expect(
       classifyCommandIntentCommandLine(

@@ -1539,6 +1539,7 @@ export function createProviderIssueHandoffService(
           task_id: activeRun.taskId,
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          ...buildActiveRunRetryFields(claim),
           ...reactivatedMergeCloseoutReset
         });
         upsertProviderIntakeClaim(options.state, {
@@ -1551,6 +1552,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_rehydrated_active_run',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          ...buildActiveRunRetryFields(claim),
           ...reactivatedMergeCloseoutReset,
           updated_at: now
         });
@@ -2495,6 +2497,7 @@ export function createProviderIssueHandoffService(
             last_event: input.event,
             last_action: input.action,
             last_webhook_timestamp: input.webhookTimestamp,
+            ...buildActiveRunRetryFields(existing),
             ...reactivatedMergeCloseoutReset
           });
           return { kind: 'ignored', reason: 'provider_issue_rehydrated_active_run', claim };
@@ -2585,6 +2588,7 @@ export function createProviderIssueHandoffService(
           reason: 'provider_issue_run_already_active',
           run_id: activeRun.runId,
           run_manifest_path: activeRun.manifestPath,
+          ...buildActiveRunRetryFields(latestRetryStateBase),
           ...reactivatedMergeCloseoutReset
         });
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
@@ -3192,6 +3196,7 @@ export function createProviderIssueHandoffService(
                 task_id: activeRun.taskId,
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
+                ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
               const refreshActiveRunSnapshot = captureProviderStateSnapshot();
@@ -3205,6 +3210,7 @@ export function createProviderIssueHandoffService(
                 reason: 'provider_issue_rehydrated_active_run',
                 run_id: activeRun.runId,
                 run_manifest_path: activeRun.manifestPath,
+                ...buildActiveRunRetryFields(claim),
                 ...reactivatedMergeCloseoutReset
               });
               if (transitioned) {
@@ -3305,6 +3311,7 @@ export function createProviderIssueHandoffService(
               task_id: activeRun.taskId,
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
+              ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
             const refreshActiveRunSnapshot = captureProviderStateSnapshot();
@@ -3318,6 +3325,7 @@ export function createProviderIssueHandoffService(
               reason: 'provider_issue_rehydrated_active_run',
               run_id: activeRun.runId,
               run_manifest_path: activeRun.manifestPath,
+              ...buildActiveRunRetryFields(claim),
               ...reactivatedMergeCloseoutReset
             });
             if (transitioned) {
@@ -4435,6 +4443,25 @@ function groupProviderIssueRuns(records: ProviderIssueRunRecord[]): Map<string, 
     grouped.set(key, [record]);
   }
   return grouped;
+}
+
+function buildActiveRunRetryFields(input: Pick<ProviderIntakeClaimRecord, 'retry_attempt'>): Pick<
+  ProviderIntakeClaimRecord,
+  'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+> {
+  const retryAttempt =
+    typeof input.retry_attempt === 'number' && input.retry_attempt > 0
+      ? input.retry_attempt
+      : null;
+  if (retryAttempt === null) {
+    return clearProviderRetryFields();
+  }
+  return {
+    retry_queued: false,
+    retry_attempt: retryAttempt,
+    retry_due_at: null,
+    retry_error: null
+  };
 }
 
 function buildProviderRetryLaunchFields(input: {
