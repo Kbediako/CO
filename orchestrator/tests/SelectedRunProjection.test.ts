@@ -1131,6 +1131,61 @@ describe('SelectedRunProjection', () => {
     expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-146', 'lin-issue-146']));
   });
 
+  it('prefers a matched provider claim over tracked issue state when fallback identity is rebound', async () => {
+    const taskId = 'linear-lin-issue-1';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue and provider claim disagree.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      task_id: taskId,
+      run_id: 'provider-run-1',
+      run_manifest_path: paths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-147',
+      issueId: 'lin-issue-147',
+      taskId,
+      runId: 'provider-run-1'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-147', 'lin-issue-147', taskId, 'provider-run-1'])
+    );
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-146', 'lin-issue-146']));
+  });
+
   it('rebinds fallback-only synthetic child task ids from the parent claim task prefix', async () => {
     const parentTaskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
     const childTaskId = `${parentTaskId}-docs-review`;
@@ -1176,6 +1231,62 @@ describe('SelectedRunProjection', () => {
     expect(selected?.lookupAliases).toEqual(
       expect.arrayContaining(['CO-146', '0b49c08c-53a1-4225-8d09-28457165fbc8', childTaskId, 'run-child'])
     );
+  });
+
+  it('prefers the strongest matching child-task prefix claim when multiple fallback parents overlap', async () => {
+    const shorterParentTaskId = 'linear-lin';
+    const strongerParentTaskId = 'linear-lin-issue-1';
+    const childTaskId = `${strongerParentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, { taskId: childTaskId, runId: 'run-child' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: childTaskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs review run is active.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin',
+      issue_identifier: 'CO-1',
+      issue_title: 'Shorter parent issue claim',
+      task_id: shorterParentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+    providerIntakeState.claims.push({
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Stronger parent issue claim',
+      task_id: strongerParentTaskId
+    });
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-2',
+      issueId: 'lin-issue-1',
+      taskId: childTaskId,
+      runId: 'run-child'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-2', 'lin-issue-1', childTaskId, 'run-child'])
+    );
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-1', 'lin']));
   });
 
   it('rebinds fallback-only slug-shaped synthetic child task ids from the parent claim task prefix', async () => {

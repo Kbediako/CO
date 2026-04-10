@@ -427,13 +427,13 @@ function resolveProjectionIssueIdentity(
     : snapshot.issueId;
   const issueIdentifier =
     manifestIssueIdentifier ??
-    (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.identifier : null) ??
     providerClaim?.issue_identifier ??
+    (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.identifier : null) ??
     snapshot.issueIdentifier;
   const issueId =
     manifestIssueId ??
-    (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.id : null) ??
     providerClaim?.issue_id ??
+    (allowTrackedIssueFallbackIdentityRebinding ? trackedIssue?.id : null) ??
     snapshot.issueId;
 
   return {
@@ -1143,7 +1143,10 @@ function findMatchingProviderIntakeClaim(
   if (issueScopedClaim) {
     return providerIntakeClaimCanFallbackByIssue(issueScopedClaim, snapshot) ? issueScopedClaim : null;
   }
-  return state.claims.find((claim) => providerIntakeClaimMatchesSelectedRun(claim, snapshot)) ?? null;
+  const matchedClaims = state.claims
+    .filter((claim) => providerIntakeClaimMatchesSelectedRun(claim, snapshot))
+    .sort((left, right) => compareProviderIntakeClaimSpecificity(right, left, snapshot));
+  return matchedClaims[0] ?? null;
 }
 
 function findIssueScopedProviderIntakeClaim(
@@ -1185,6 +1188,58 @@ function providerIntakeClaimMatchesSelectedRun(
     return claim.task_id === snapshot.taskId;
   }
   return false;
+}
+
+function compareProviderIntakeClaimSpecificity(
+  left: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  right: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  snapshot: Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+  >
+): number {
+  const leftPriority = scoreProviderIntakeClaimSpecificity(left, snapshot);
+  const rightPriority = scoreProviderIntakeClaimSpecificity(right, snapshot);
+  if (leftPriority !== rightPriority) {
+    return leftPriority - rightPriority;
+  }
+  const leftTaskLength = left.task_id?.length ?? 0;
+  const rightTaskLength = right.task_id?.length ?? 0;
+  if (leftTaskLength !== rightTaskLength) {
+    return leftTaskLength - rightTaskLength;
+  }
+  return (left.issue_identifier ?? '').localeCompare(right.issue_identifier ?? '');
+}
+
+function scoreProviderIntakeClaimSpecificity(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_id' | 'issue_identifier' | 'run_manifest_path' | 'run_id' | 'task_id'
+  >,
+  snapshot: Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+  >
+): number {
+  if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
+    return 4;
+  }
+  if (claim.run_id && snapshot.runId && claim.run_id === snapshot.runId) {
+    return 3;
+  }
+  if (claim.task_id && snapshot.taskId && claim.task_id === snapshot.taskId) {
+    return 2;
+  }
+  if (providerIntakeClaimMatchesSyntheticChildTaskPrefix(claim, snapshot)) {
+    return 1;
+  }
+  return 0;
 }
 
 function providerIntakeClaimCanFallbackByIssue(
