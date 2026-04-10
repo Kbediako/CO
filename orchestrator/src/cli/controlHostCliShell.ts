@@ -323,7 +323,7 @@ export async function runControlHostCliShell(
               env,
               input.runId,
               providerWorkflowConfigStore,
-              input.workerHost ?? null
+              input.workerHost
             );
             await spawnBackgroundCli(launchSpec, cliEntrypoint, [
               'resume',
@@ -713,17 +713,19 @@ async function resolveProviderResumeLaunchSpec(
     typeof manifestRecord.started_at === 'string'
       ? manifestRecord.started_at
       : null;
+  const resolvedWorkerHost = preferredWorkerHost === undefined
+    ? resolveFreshProviderLaunchContextWorkerHost(
+      persistedProofContext,
+      manifestStartedAt
+    )
+    : normalizeProviderWorkerHostName(preferredWorkerHost);
   const launchSpec = buildProviderLaunchSpec(
     env,
     workspacePath,
     configPath,
     resolveConfiguredProviderWorkerHost(
       providerWorkflowConfigStore,
-      normalizeProviderWorkerHostName(preferredWorkerHost)
-        ?? resolveFreshProviderLaunchContextWorkerHost(
-          persistedProofContext,
-          manifestStartedAt
-        ),
+      resolvedWorkerHost,
       { allowMissing: true }
     )
   );
