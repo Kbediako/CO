@@ -1085,7 +1085,7 @@ describe('controlHostSupervision shell helpers', () => {
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
   });
 
-  it('kills descendant pids before escalating the wrapper to SIGKILL after a timeout', async () => {
+  it('kills the detached process group before escalating the wrapper after a timeout', async () => {
     const child = Object.assign(new EventEmitter(), {
       pid: 4200,
       exitCode: null as number | null,
@@ -1100,19 +1100,60 @@ describe('controlHostSupervision shell helpers', () => {
         return true;
       })
     });
+    const listProcessGroupPids = vi.fn().mockResolvedValue([4200, 4201, 4202]);
+    const killProcessGroup = vi.fn();
     const listDescendantPids = vi.fn().mockResolvedValue([4201, 4202]);
     const killProcess = vi.fn();
 
     await terminateChildProcess(child as never, 0, {
+      listProcessGroupPids,
+      killProcessGroup,
       listDescendantPids,
       killProcess
     });
 
+    expect(listProcessGroupPids).toHaveBeenCalledWith(4200);
+    expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
     expect(listDescendantPids).toHaveBeenCalledWith(4200);
     expect(killProcess).toHaveBeenNthCalledWith(1, 4201, 'SIGKILL');
     expect(killProcess).toHaveBeenNthCalledWith(2, 4202, 'SIGKILL');
     expect(child.kill).toHaveBeenNthCalledWith(1, 'SIGTERM');
     expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
+  });
+
+  it('kills the detached process group even when the wrapper exits before the timeout escalation', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: 4200,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        if (signal === 'SIGTERM') {
+          queueMicrotask(() => {
+            child.exitCode = 0;
+            child.signalCode = signal;
+            child.emit('exit', 0, signal);
+          });
+        }
+        return true;
+      })
+    });
+    let processGroupKilled = false;
+    const listProcessGroupPids = vi.fn(async () => (processGroupKilled ? [] : [4202]));
+    const killProcessGroup = vi.fn(() => {
+      processGroupKilled = true;
+    });
+    const listDescendantPids = vi.fn();
+
+    await terminateChildProcess(child as never, 0, {
+      listProcessGroupPids,
+      killProcessGroup,
+      listDescendantPids
+    });
+
+    expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
+    expect(listDescendantPids).not.toHaveBeenCalled();
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
   });
 
   it('disposes sleep waiters before the tick fires', async () => {

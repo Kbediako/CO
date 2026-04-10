@@ -378,6 +378,9 @@ async function runControlHostSupervision(flags: ArgMap): Promise<void> {
   const child = spawn(config.nodePath, controlHostArgs, {
     cwd: config.repoRoot,
     env: childEnv,
+    // Give the supervised host its own process group so timeout cleanup can
+    // kill the whole wrapper->runner tree even if the wrapper exits first.
+    detached: true,
     stdio: 'inherit'
   });
   const { childExitPromise, childErrorPromise } =
@@ -1200,6 +1203,8 @@ async function terminateChildProcess(
   child: ReturnType<typeof spawn>,
   killTimeoutSeconds: number,
   options?: {
+    listProcessGroupPids?: (rootPid: number) => Promise<number[]>;
+    killProcessGroup?: (pid: number, signal: NodeJS.Signals) => void;
     listDescendantPids?: (rootPid: number) => Promise<number[]>;
     killProcess?: (pid: number, signal: NodeJS.Signals) => void;
   }
@@ -1207,6 +1212,7 @@ async function terminateChildProcess(
   if (child.exitCode !== null || child.signalCode !== null) {
     return;
   }
+  const rootPid = normalizeTrackedPid(child.pid);
   const exitPromise = new Promise<void>((resolve) => {
     if (child.exitCode !== null || child.signalCode !== null) {
       resolve();
@@ -1215,18 +1221,24 @@ async function terminateChildProcess(
     child.once('exit', () => resolve());
   });
   child.kill('SIGTERM');
+  const processGroupExitPromise =
+    rootPid === null
+      ? Promise.resolve()
+      : waitForProcessGroupToExit(rootPid, options?.listProcessGroupPids);
   const killWaiter = createSleepWaiter(killTimeoutSeconds * 1_000);
   const timedOut = await Promise.race([
-    exitPromise.then(() => false),
+    Promise.all([exitPromise, processGroupExitPromise]).then(() => false),
     killWaiter.promise.then(() => true)
   ]);
   killWaiter.dispose();
   if (!timedOut) {
     return;
   }
+  if (rootPid !== null) {
+    killTrackedProcessGroup(rootPid, 'SIGKILL', options?.killProcessGroup);
+  }
   if (child.exitCode === null && child.signalCode === null) {
-    const rootPid = child.pid;
-    if (typeof rootPid === 'number' && Number.isInteger(rootPid) && rootPid > 0) {
+    if (rootPid !== null) {
       const descendantPids = await (
         options?.listDescendantPids ?? listDescendantProcessIds
       )(rootPid).catch(() => []);
@@ -1236,6 +1248,22 @@ async function terminateChildProcess(
     }
     child.kill('SIGKILL');
     await exitPromise.catch(() => undefined);
+  }
+}
+
+function normalizeTrackedPid(pid: number | undefined): number | null {
+  return typeof pid === 'number' && Number.isInteger(pid) && pid > 0 ? pid : null;
+}
+
+async function waitForProcessGroupToExit(
+  rootPid: number,
+  listProcessGroupPids: (rootPid: number) => Promise<number[]> = listProcessGroupProcessIds
+): Promise<void> {
+  for (;;) {
+    if ((await listProcessGroupPids(rootPid)).length === 0) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }
 
@@ -1271,6 +1299,30 @@ async function listDescendantProcessIds(rootPid: number): Promise<number[]> {
   return descendants;
 }
 
+async function listProcessGroupProcessIds(rootPid: number): Promise<number[]> {
+  const snapshot = await runCommand('ps', ['-ax', '-o', 'pid=,pgid=']);
+  if (snapshot.exitCode !== 0) {
+    throw new Error(snapshot.stderr || `ps exited with code ${snapshot.exitCode}`);
+  }
+  const processGroupPids: number[] = [];
+  for (const line of snapshot.stdout.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    const [pidToken, processGroupToken] = trimmed.split(/\s+/u, 2);
+    const pid = Number.parseInt(pidToken ?? '', 10);
+    const processGroupId = Number.parseInt(processGroupToken ?? '', 10);
+    if (!Number.isInteger(pid) || !Number.isInteger(processGroupId)) {
+      continue;
+    }
+    if (processGroupId === rootPid) {
+      processGroupPids.push(pid);
+    }
+  }
+  return processGroupPids;
+}
+
 function killTrackedPid(
   pid: number,
   signal: NodeJS.Signals,
@@ -1278,6 +1330,21 @@ function killTrackedPid(
 ): void {
   try {
     killProcess(pid, signal);
+  } catch (error) {
+    if (!isMissingProcessError(error)) {
+      throw error;
+    }
+  }
+}
+
+function killTrackedProcessGroup(
+  pid: number,
+  signal: NodeJS.Signals,
+  killProcessGroup: (pid: number, signal: NodeJS.Signals) => void = (groupPid, nextSignal) =>
+    process.kill(-groupPid, nextSignal)
+): void {
+  try {
+    killProcessGroup(pid, signal);
   } catch (error) {
     if (!isMissingProcessError(error)) {
       throw error;
