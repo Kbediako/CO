@@ -200,9 +200,10 @@ export async function closeControlServerPublicLifecycle(
 
 export function runProviderIssueHandoffRefresh(
   providerIssueHandoff: ProviderIssueHandoffService,
-  options?: { queueIfBusy?: boolean }
+  options?: { queueIfBusy?: boolean; acknowledgeAccepted?: boolean }
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
+  const acknowledgeAccepted = options?.acknowledgeAccepted === true;
   if (state.active) {
     const continueWhileBusy = (): Promise<ProviderIssueHandoffRefreshRequestOutcome> => {
       if (!options?.queueIfBusy) {
@@ -221,21 +222,29 @@ export function runProviderIssueHandoffRefresh(
         preserveActiveMode: true
       });
       if (state.queuedRefresh) {
-        return mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, state.queuedRefresh, {
+        const queuedOutcome: ProviderIssueHandoffRefreshRequestOutcome = {
           queued: true,
           coalesced: true
-        });
+        };
+        return acknowledgeAccepted
+          ? acknowledgeProviderIssueHandoffAccepted(state.queuedRefresh, queuedOutcome)
+          : mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, state.queuedRefresh, queuedOutcome);
       }
-      return mapProviderIssueHandoffRefreshOutcome(
+      const queuedRefresh = queueProviderIssueHandoffRefresh(
         providerIssueHandoff,
-        queueProviderIssueHandoffRefresh(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
-          mode: 'refresh'
-        }),
+        state,
+        () => providerIssueHandoff.refresh(),
         {
-          queued: true,
-          coalesced: false
+          mode: 'refresh'
         }
       );
+      const queuedOutcome: ProviderIssueHandoffRefreshRequestOutcome = {
+        queued: true,
+        coalesced: false
+      };
+      return acknowledgeAccepted
+        ? acknowledgeProviderIssueHandoffAccepted(queuedRefresh, queuedOutcome)
+        : mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, queuedRefresh, queuedOutcome);
     };
     if (isProviderPollingStuck(providerIssueHandoff)) {
       return (async () => {
@@ -254,19 +263,19 @@ export function runProviderIssueHandoffRefresh(
     }
     return continueWhileBusy();
   }
-  return mapProviderIssueHandoffRefreshOutcome(
+  const activeRefresh = waitForProviderIssueHandoffPending(
     providerIssueHandoff,
-    waitForProviderIssueHandoffPending(
-      providerIssueHandoff,
-      startProviderIssueHandoffOperation(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
-        mode: 'refresh'
-      })
-    ),
-    {
-      queued: true,
-      coalesced: false
-    }
+    startProviderIssueHandoffOperation(providerIssueHandoff, state, () => providerIssueHandoff.refresh(), {
+      mode: 'refresh'
+    })
   );
+  const activeOutcome: ProviderIssueHandoffRefreshRequestOutcome = {
+    queued: true,
+    coalesced: false
+  };
+  return acknowledgeAccepted
+    ? acknowledgeProviderIssueHandoffAccepted(activeRefresh, activeOutcome)
+    : mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, activeRefresh, activeOutcome);
 }
 
 export function runProviderIssueHandoffRehydrate(
@@ -757,6 +766,17 @@ function mapProviderIssueHandoffRefreshOutcome(
       throw error;
     }
   );
+}
+
+function acknowledgeProviderIssueHandoffAccepted(
+  pending: Promise<void>,
+  successOutcome: ProviderIssueHandoffRefreshRequestOutcome
+): Promise<ProviderIssueHandoffRefreshRequestOutcome> {
+  // Public refresh routes return as soon as the lifecycle accepts the work, so
+  // keep the detached refresh promise from surfacing later failures as
+  // unhandled rejections.
+  void pending.catch(() => undefined);
+  return Promise.resolve(successOutcome);
 }
 
 function waitForProviderIssueHandoffPending(
