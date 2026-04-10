@@ -1176,7 +1176,12 @@ function providerIntakeClaimMatchesSelectedRun(
     return true;
   }
   if (!providerIntakeClaimMatchesIssueIdentity(claim, snapshot)) {
-    return providerIntakeClaimMatchesSyntheticChildTaskPrefix(claim, snapshot);
+    if (providerIntakeClaimMatchesSyntheticChildTaskPrefix(claim, snapshot)) {
+      return true;
+    }
+    if (snapshot.issueProvider !== null && snapshot.issueProvider !== 'linear') {
+      return false;
+    }
   }
   if (claim.run_id && snapshot.runId) {
     if (claim.task_id && snapshot.taskId && claim.task_id !== snapshot.taskId) {

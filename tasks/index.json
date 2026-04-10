@@ -83,6 +83,30 @@
       }
     },
     {
+      "id": "20260410-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2",
+      "title": "CO: clear stale merge-closeout action-required claims when issues leave Merging and return to active work",
+      "relates_to": "tasks/tasks-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2-co-138-docs-review/cli/2026-04-10T07-04-13-496Z-80cbb02d/manifest.json",
+          "override_reason": "The audited docs-review child stream passed delegation-guard, spec-guard, and docs:check, then failed only on the pre-existing repo-wide `docs:freshness` stale-doc baseline (`119` stale docs). The newly added CO-138 packet contributed `0` stale entries, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
+        "task": "tasks/tasks-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
+        "agent_task": ".agent/task/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
+        "docs": "docs/TECH_SPEC-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md"
+      }
+    },
+    {
       "id": "20260410-linear-255030bf-bdda-4594-b503-28639a98b9da",
       "title": "CO: shift Linear intake to webhook-first targeted reconcile with slow full recovery sweeps",
       "relates_to": "tasks/tasks-linear-255030bf-bdda-4594-b503-28639a98b9da.md",
