@@ -48,6 +48,29 @@
       }
     },
     {
+      "id": "20260410-linear-63e7f712-d927-43fb-8afa-b357bab40aa2",
+      "title": "CO: Harden hot-suite dist freshness heuristics for transitive CLI/runtime dependencies",
+      "relates_to": "tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator linear child-stream docs-review (rework branch)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2-co-123-docs-review/cli/2026-04-10T07-11-11-313Z-8de3743e/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "task": "tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "agent_task": ".agent/task/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
+        "docs": "docs/TECH_SPEC-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md"
+      }
+    },
+    {
       "id": "20260409-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee",
       "title": "CO: ship installable local control-host supervision instead of host-local co-control-host-supervisor.sh",
       "relates_to": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
