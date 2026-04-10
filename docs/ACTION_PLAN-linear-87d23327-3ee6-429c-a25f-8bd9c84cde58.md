@@ -7,7 +7,17 @@
 - Scope: rework-reset docs-first packet + workpad registration, audited docs-review, fresh full-lane evidence collection on current `origin/main`, bounded owner-seam fix or reporting/classification improvement, focused regressions, and required validation/review gates.
 - Assumptions:
   - `CO-94` captured a real broad blocker on 2026-04-09
-  - the prior closed `CO-132` attempt may already have proven the blocker cleared on older head `2a0e6320c`, but current head `f75e702ea` still needs fresh measurement
+  - the prior closed `CO-132` attempt may already have proven the blocker cleared on older head `2a0e6320c`, but the current branch still needed fresh measurement before a new handoff
+
+## Status Update - 2026-04-10
+- Fresh evidence was recollected under `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T070659Z-baseline-repro/`.
+- The first unconstrained full run was red in four suites, but the implicated suites passed in isolation and as a grouped rerun, so the broad timeout-heavy symptom was load-sensitive rather than a stable suite-level baseline.
+- The smallest truthful fix was:
+  - cap Vitest workers only for `CI` and explicit `CODEX_VITEST_PROGRESS` runs
+  - remove `ProviderIssueHandoff` timer brittleness by injecting a local scheduler seam into the timer-sensitive tests
+  - add regression coverage for the config scope in `tests/vitest-progress-config.spec.ts`
+- The manifest-backed review wrapper ended in `failed-boundary`, so the lane now carries an explicit manual review and elegance fallback at `09-manual-review-and-elegance-fallback.md`.
+- The current remaining work is operational only: publish the replacement PR, attach it to `CO-132`, drain `pr ready-review`, and hand off when checks stay green.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:

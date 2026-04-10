@@ -16,12 +16,12 @@
 - Desired Outcome: collect fresh evidence for the current broad `npm run test` failures on this tree, determine whether they are baseline, environment-sensitive, or recent regressions outside the original `CO-94` diff, and land the smallest truthful fix or gating/reporting improvement that lets narrow issue lanes distinguish unrelated repo-wide failures from local regressions without hiding the red lane.
 
 ## Evidence Update - Rework Reset 2026-04-10
-- The prior `CO-132` attempt is historical context only. Its closed PR `#400` and closed workpad documented a non-reproducing result on older head `2a0e6320c`, but `CO-132` is now in `Rework` and the fresh branch has been reset onto current `origin/main` head `f75e702ea`.
-- Current-head reproduction is intentionally pending. This packet exists to bootstrap the new attempt before any new repo edits and to make the current-head evidence gap explicit instead of silently inheriting the old result.
-- The old attempt is still useful context:
-  - it reported two green full `npm run test` runs on `2a0e6320c`
-  - it argued that later repo changes across previously implicated surfaces had already cleared the earlier `CO-94` blocker family
-  - it was subsequently reset, so that claim must be revalidated on `f75e702ea` before this lane can hand off again
+- The prior `CO-132` attempt remains historical context only. Its closed PR `#400` documented a non-reproducing result on older head `2a0e6320c`, but this rework branch recollected fresh evidence instead of inheriting that claim.
+- Fresh evidence lives under `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T070659Z-baseline-repro/`.
+- The first unconstrained full run stayed red in four suites: `tests/run-review.spec.ts`, `tests/cli-frontend-test.spec.ts`, `tests/cli-command-surface.spec.ts`, and `orchestrator/tests/CodexOrchestratorCli.test.ts`.
+- The implicated suites then passed in isolation and as a grouped rerun, which classified the broad symptom as load-sensitive instead of a stable four-suite baseline.
+- Capping Vitest workers for `CI` and explicit `CODEX_VITEST_PROGRESS` runs removed the timeout-heavy storm and left one deterministic failure in `orchestrator/tests/ProviderIssueHandoff.test.ts`, where the test was asserting on ambient global timer scheduling.
+- The final outcome is truthful and green: `ProviderIssueHandoff` now accepts an optional injected scheduler for the timer-sensitive tests, the config scope is locked by `tests/vitest-progress-config.spec.ts`, and `08-npm-test-after-review-scope-fix.log` records `324/324` passing files and `3316/3316` passing tests.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): finish `CO-132` as a repo-owned follow-up to the `CO-94` blocker by turning broad timeout-heavy `npm run test` noise into an evidence-backed, machine-checkable baseline that no longer forces unrelated narrow lanes to carry ambiguous repo-level failures in their own handoff decisions.
@@ -105,8 +105,7 @@
   - provider-worker workpad / validation handoff expectations
 
 ## Open Questions
-- Does current head `f75e702ea` still reproduce a genuinely red broad lane, or was the `CO-94` failure family already cleared before this rework reset?
-- If the lane remains red, is there one bounded shared owner seam or only a truthful reporting/classification gap that narrow lanes need?
+- No remaining implementation open questions. The remaining work is operational: publish the updated branch as a replacement PR, attach it to `CO-132`, drain `pr ready-review`, and move to review only after checks stay green.
 
 ## Approvals
 - Product: self-approved from the Linear issue scope and acceptance criteria

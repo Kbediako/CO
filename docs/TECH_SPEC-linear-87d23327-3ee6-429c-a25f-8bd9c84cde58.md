@@ -21,11 +21,13 @@ last_review: 2026-04-10
 
 ## Evidence Update - Rework Reset 2026-04-10
 - The prior `CO-132` attempt is historical context, not current-head proof. Its closed PR `#400` documented a non-repro result on older head `2a0e6320c`.
-- This rework packet starts from fresh branch head `f75e702ea` on `origin/main`, so current-head reproduction and classification are pending and must be re-collected before any new handoff.
-- The previous attempt still matters as a comparison point because it suggests the earlier blocker may already have been cleared by later repo changes rather than requiring a new shared fix.
+- This rework packet recollected current-branch evidence under `out/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58/manual/20260410T070659Z-baseline-repro/` instead of inheriting the older result.
+- The first unconstrained full run stayed red in four suites, but the implicated suites passed in isolation and as a grouped rerun, which classified the broad symptom as load-sensitive rather than a stable four-suite baseline.
+- Capping Vitest workers for `CI` and explicit `CODEX_VITEST_PROGRESS` runs removed the timeout-heavy storm and exposed one remaining deterministic owner seam in `orchestrator/tests/ProviderIssueHandoff.test.ts`.
+- The final outcome is a bounded stabilization, not a blanket skip: the timer-sensitive provider handoff tests now use a local scheduler seam, config scope is pinned by `tests/vitest-progress-config.spec.ts`, and the final broad lane passed with `324/324` files and `3316/3316` tests.
 
 ## Summary
-- Objective: remeasure the current broad `npm run test` failure family on `f75e702ea`, classify the exact red suites as baseline, environment-sensitive, or new regressions, and land the smallest truthful fix or reporting/gating improvement that keeps unrelated repo-wide failures from ambiguously blocking narrow review handoffs.
+- Objective: remeasure the current broad `npm run test` failure family on the rework branch, classify the exact red suites as baseline, environment-sensitive, or new regressions, and land the smallest truthful fix or reporting-gating improvement that keeps unrelated repo-wide failures from ambiguously blocking narrow review handoffs.
 - Scope:
   - fresh current-tree reproduction or evidence collection for the broad full-lane failures cited by `CO-94`
   - comparison against the prior closed `CO-132` attempt plus earlier repo-wide instability lanes (`CO-24`, `CO-38`, `CO-57`) so older diagnoses are not assumed blindly
@@ -64,12 +66,12 @@ last_review: 2026-04-10
 - Current truth:
   - `CO-94` recorded a broad non-green `npm run test` blocker on 2026-04-09 with named failures across control-host, provider-handoff, CLI, and guard/reporting suites
   - the prior closed `CO-132` attempt reported two green full-suite runs on `2a0e6320c`, but that result is stale after the rework reset
-  - this workspace is now reset to `f75e702ea`, so current-head truth is pending
+  - this rework branch recollected fresh evidence and showed a load-sensitive full-lane failure shape rather than a stable per-suite red baseline
 - Reference truth:
   - a narrow issue lane should be able to tell whether the broad repo test lane is already red for unrelated reasons
   - if the broad lane is red, the exact affected suites and blocker class should be explicit and current
 - Target truth / intended delta:
-  - the current repo-wide failure set is freshly reproduced or truthfully classified on `f75e702ea`
+  - the current repo-wide failure set is freshly reproduced or truthfully classified on the rework branch
   - narrow lanes gain a concrete shared fix or a machine-checkable classification/reporting path they can cite
   - unrelated baseline failures no longer force ambiguous "maybe my slice broke" handoff decisions
 - Explicitly out-of-scope differences:
@@ -132,7 +134,7 @@ last_review: 2026-04-10
   - preserve exact failing-suite lists and classification notes in the workpad/task packet
 
 ## Open Questions
-- Whether current head still needs a bounded shared fix, or whether the smallest truthful outcome is a refreshed evidence-backed classification that the older blocker family is already cleared.
+- No remaining implementation open questions. The remaining work is operational: publish the replacement PR, attach it to `CO-132`, drain `pr ready-review`, and move to review once checks stay green.
 
 ## Approvals
 - Reviewer: Pending docs-review, fresh reproduction, and implementation validation.

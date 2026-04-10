@@ -38,7 +38,7 @@
           "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58-co-132-docs-review-rework/cli/2026-04-10T06-58-57-866Z-f78281ef/manifest.json",
-          "override_reason": "The audited docs-review child stream passed delegation-guard, spec-guard, and docs:check, then failed only on the then-current repo-wide `docs:freshness` stale-doc baseline (`119` stale docs). The CO-132 packet itself was already registered truthfully; after merging latest origin/main (`CO-143`) and applying the repo-supported `docs:archive-tasks` trim required by the line budget, current-head docs validation passed again via `npm run docs:check` and `npm run docs:freshness`."
+          "override_reason": "The audited docs-review child stream passed delegation-guard, spec-guard, and docs:check, then failed only on the then-current repo-wide `docs:freshness` stale-doc baseline (`119` stale docs). The CO-132 packet itself stayed correctly shaped, so the manifest-backed run is recorded as truthful fallback rather than a packet blocker. The current workspace later revalidated cleanly with `npm run docs:check` and `npm run docs:freshness`."
         }
       },
       "paths": {

@@ -148,6 +148,7 @@ export interface CreateProviderIssueHandoffServiceOptions {
   state: ProviderIntakeState;
   persist: () => Promise<void>;
   launcher: ProviderIssueLauncher;
+  scheduleTimeout?: typeof globalThis.setTimeout;
   startPipelineId?: string;
   publishRuntime?: ((source: string) => void) | null;
   readFeatureToggles?: (() => Record<string, unknown> | null | undefined) | null;
@@ -247,6 +248,7 @@ export function createProviderIssueHandoffService(
   options: CreateProviderIssueHandoffServiceOptions
 ): ProviderIssueHandoffService {
   const startPipelineId = options.startPipelineId ?? 'diagnostics';
+  const scheduleTimeout = options.scheduleTimeout ?? globalThis.setTimeout.bind(globalThis);
   const allowedRunRoots = [resolve(options.paths.runDir, '..', '..', '..')];
   const repoRoot = resolve(options.paths.repoRoot);
   const runTerminalCleanup = options.runTerminalCleanup ?? runProviderTerminalCleanup;
@@ -658,7 +660,7 @@ export function createProviderIssueHandoffService(
     if (bestEffortRehydrateTimer) {
       return;
     }
-    bestEffortRehydrateTimer = globalThis.setTimeout(() => {
+    bestEffortRehydrateTimer = scheduleTimeout(() => {
       bestEffortRehydrateTimer = null;
       void runWithRefreshLifecycleLock(() => rehydrateNow({ refreshTrackedIssueMetadata: true }))
         .then((result) => {

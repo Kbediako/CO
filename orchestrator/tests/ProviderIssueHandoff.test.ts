@@ -3692,18 +3692,16 @@ describe('createProviderIssueHandoffService', () => {
 
   it('keeps a start claim in-flight when the first rehydrate probe finds no child run', async () => {
     const scheduledCallbacks: Array<() => void> = [];
-    vi.spyOn(globalThis, 'setTimeout').mockImplementation(
-      ((callback: TimerHandler) => {
-        if (typeof callback === 'function') {
-          scheduledCallbacks.push(callback as () => void);
+    const scheduleTimeout = ((callback: TimerHandler) => {
+      if (typeof callback === 'function') {
+        scheduledCallbacks.push(callback as () => void);
+      }
+      return {
+        unref() {
+          return this;
         }
-        return {
-          unref() {
-            return this;
-          }
-        } as unknown as ReturnType<typeof setTimeout>;
-      }) as typeof setTimeout
-    );
+      } as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
 
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -3726,7 +3724,8 @@ describe('createProviderIssueHandoffService', () => {
       state,
       persist,
       launcher,
-      publishRuntime
+      publishRuntime,
+      scheduleTimeout
     });
 
     await service.handleAcceptedTrackedIssue({
@@ -3773,18 +3772,16 @@ describe('createProviderIssueHandoffService', () => {
 
   it('keeps queued child runs pending during explicit restart rehydrate', async () => {
     const scheduledCallbacks: Array<() => void> = [];
-    vi.spyOn(globalThis, 'setTimeout').mockImplementation(
-      ((callback: TimerHandler) => {
-        if (typeof callback === 'function') {
-          scheduledCallbacks.push(callback as () => void);
+    const scheduleTimeout = ((callback: TimerHandler) => {
+      if (typeof callback === 'function') {
+        scheduledCallbacks.push(callback as () => void);
+      }
+      return {
+        unref() {
+          return this;
         }
-        return {
-          unref() {
-            return this;
-          }
-        } as unknown as ReturnType<typeof setTimeout>;
-      }) as typeof setTimeout
-    );
+      } as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
 
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -3839,6 +3836,7 @@ describe('createProviderIssueHandoffService', () => {
       paths,
       state,
       persist,
+      scheduleTimeout,
       launcher: {
         start: vi.fn(async () => null),
         resume: vi.fn(async () => undefined)
