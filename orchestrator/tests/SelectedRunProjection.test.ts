@@ -1058,6 +1058,79 @@ describe('SelectedRunProjection', () => {
     );
   });
 
+  it('rebinds fallback-only task-id identity from tracked issue state for null-provider provider-worker manifests', async () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const { paths } = await createHostPaths(undefined, { taskId });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: taskId,
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Tracked issue is active.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-146',
+      issueId: 'lin-issue-146'
+    });
+  });
+
+  it('does not rebind fallback-only task-id identity from tracked issue state for non-linear manifests', async () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const { paths } = await createHostPaths(undefined, { taskId });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: taskId,
+        issue_provider: 'github',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Non-linear task is active.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, undefined);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: taskId,
+      issueId: taskId
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-146', 'lin-issue-146']));
+  });
+
   it('rebinds fallback-only synthetic child task ids from the parent claim task prefix', async () => {
     const parentTaskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
     const childTaskId = `${parentTaskId}-docs-review`;
