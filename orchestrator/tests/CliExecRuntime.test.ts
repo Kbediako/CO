@@ -28,8 +28,18 @@ describe('CLI exec runtime', () => {
     const { getCliExecRunner } = await import('../src/cli/services/execRuntime.js');
     const runner = getCliExecRunner();
     const result = await runner.run({
-      command: 'bash',
-      args: ['-lc', '(sleep 0.005; echo after) & echo before'],
+      command: process.execPath,
+      args: [
+        '-e',
+        [
+          "const { spawn } = require('node:child_process');",
+          "spawn(process.execPath, ['-e', \"setTimeout(() => { process.stdout.write('after\\\\n'); }, 20)\"], {",
+          "  detached: true,",
+          "  stdio: 'inherit'",
+          '}).unref();',
+          "process.stdout.write('before\\n');"
+        ].join('')
+      ],
       cwd: process.cwd(),
       env: process.env
     });
