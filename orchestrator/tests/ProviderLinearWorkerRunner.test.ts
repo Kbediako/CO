@@ -481,7 +481,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(context.workerHost).toBe('worker-host-01');
   });
 
-  it('treats an empty worker_host env value as unset and falls back to the manifest host', async () => {
+  it('treats an empty worker_host env value as an explicit local clear', async () => {
     const { manifestPath } = await createManifestRoot();
     await writeFile(manifestPath, JSON.stringify({
       run_id: 'run-child',
@@ -496,6 +496,25 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
       CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
       CODEX_ORCHESTRATOR_PROVIDER_WORKER_HOST: '   '
+    });
+
+    expect(context.workerHost).toBeNull();
+  });
+
+  it('falls back to the manifest host when no worker_host env override is present', async () => {
+    const { manifestPath } = await createManifestRoot();
+    await writeFile(manifestPath, JSON.stringify({
+      run_id: 'run-child',
+      task_id: 'linear-lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      worker_host: 'worker-host-manifest'
+    }), 'utf8');
+
+    const context = await loadProviderLinearWorkerContext({
+      CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+      CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined
     });
 
     expect(context.workerHost).toBe('worker-host-manifest');

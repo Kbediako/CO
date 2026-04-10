@@ -697,6 +697,13 @@ export async function loadProviderLinearWorkerContext(
       envProviderControlHostTaskId === manifestProviderControlHostTaskId &&
       envProviderControlHostRunId === manifestProviderControlHostRunId
   );
+  const hasExplicitWorkerHostOverride = Object.prototype.hasOwnProperty.call(
+    env,
+    PROVIDER_WORKER_HOST_ENV_KEY
+  );
+  const envWorkerHost = hasExplicitWorkerHostOverride
+    ? normalizeProviderWorkerHostName(env[PROVIDER_WORKER_HOST_ENV_KEY])
+    : undefined;
   return {
     manifest,
     manifestPath,
@@ -718,8 +725,9 @@ export async function loadProviderLinearWorkerContext(
     providerControlHostMatchesManifest,
     workspacePath: normalizedManifestWorkspacePath ?? repoRoot,
     workerHost:
-      normalizeProviderWorkerHostName(env[PROVIDER_WORKER_HOST_ENV_KEY]) ??
-      normalizeProviderWorkerHostName(manifest.worker_host ?? manifest.workerHost),
+      envWorkerHost !== undefined
+        ? envWorkerHost
+        : normalizeProviderWorkerHostName(manifest.worker_host ?? manifest.workerHost),
     sourceSetup: resolveProviderLinearWorkerSourceSetup(env),
     issueId,
     issueIdentifier,
