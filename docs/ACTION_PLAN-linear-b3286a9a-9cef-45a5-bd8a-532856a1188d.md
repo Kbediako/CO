@@ -24,7 +24,7 @@
 2. Completed: proved the supported `run-review` entrypoint posture from `package.json`, current source/tests, and docs. Verdict: no supported symlink-preserved `run-review` entrypoint exists today; repo-local and packaged review both use direct source/dist paths.
 3. Completed: kept the runtime contract strict, exported `isDirectExecution(...)` from `scripts/run-review.ts`, added a concise contract comment, and added focused regression coverage in `tests/run-review.spec.ts` without touching `bin/codex-orchestrator.ts` or the pipe-close subprocess smoke.
 4. Completed with truthful fallback: ran the audited `docs-review` child stream. `docs:check` passed, and `docs:freshness` failed only on unrelated repo-wide stale-doc baseline debt, so the packet records a manifest-backed manual fallback instead of treating the lane as blocked.
-5. In progress: finish the PR feedback sweep by refreshing the single workpad with the supported-path proof, rerun the relevant docs validation for the doc-only follow-up, and only resume ready-review / handoff if those gates finish cleanly.
+5. In progress: the PR feedback sweep is complete and the doc-only follow-up is pushed, but review handoff remains blocked because the post-push `ready-review` rerun still reports `required_checks_failed=1` from the inherited `Core Lane` stale-spec baseline. Keep the issue in `In Progress` until that external gate turns green.
 
 ## Dependencies
 - `package.json`

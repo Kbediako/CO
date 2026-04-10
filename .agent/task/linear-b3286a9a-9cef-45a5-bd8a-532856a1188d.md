@@ -34,8 +34,8 @@
 - [x] `npm run pack:smoke`.
 
 ## Handoff
-- [ ] PR attached to the issue.
+- [x] PR attached to the issue. Evidence: `https://github.com/Kbediako/CO/pull/402`.
 - [ ] Latest `origin/main` merged into the branch before review-state transition.
-- [ ] PR checks green and `pr ready-review` drain clean before review-state transition.
-- [ ] Unresolved actionable review threads: `0` (or explicit waiver plus evidence recorded here before handoff).
+- [ ] PR checks green and `pr ready-review` drain clean before review-state transition. Current blocker: `out/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d/manual/20260410T014809Z-ready-review-postpush-blocker.md`.
+- [x] Unresolved actionable review threads: `0`. Evidence: CodeRabbit threads auto-resolved on commit `407281d60`, and `ready-review` reported `unresolved_threads=0` in `out/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d/manual/20260410T014809Z-ready-review-postpush-blocker.md`.
 - [ ] Issue moved to `Human Review` or `In Review`.
