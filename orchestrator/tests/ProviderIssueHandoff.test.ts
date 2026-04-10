@@ -5862,8 +5862,11 @@ describe('createProviderIssueHandoffService', () => {
       last_event: 'Issue',
       last_action: 'update',
       last_webhook_timestamp: 1_742_360_000_000,
-      run_id: null,
-      run_manifest_path: null
+      run_id: 'run-launch-placeholder',
+      run_manifest_path: '/tmp/provider-run/run-launch-placeholder-manifest.json',
+      worker_host: 'worker-host-02',
+      launch_source: 'control-host',
+      launch_token: 'launch-token-queued'
     });
     const persist = vi.fn(async () => undefined);
 
@@ -5885,7 +5888,10 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_rehydrated_queued_run',
       run_id: 'run-child',
       run_manifest_path: childPaths.manifestPath,
-      task_id: 'task-1303-child'
+      task_id: 'task-1303-child',
+      worker_host: 'worker-host-02',
+      launch_source: null,
+      launch_token: null
     });
     // Webhook-first targeted reconcile may queue an additional follow-up callback,
     // but explicit restart rehydrate still needs at least one retryable wake-up.

@@ -407,6 +407,52 @@ describe('upsertProviderIntakeClaim', () => {
     expect(claim.launch_started_at).toBeNull();
   });
 
+  it('preserves worker_host when the run identity changes and no new worker_host is supplied', () => {
+    const state = createProviderIntakeState();
+
+    upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:00.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: 'run-1',
+      run_manifest_path: '/tmp/run-1/manifest.json',
+      worker_host: 'worker-host-02',
+      launch_source: 'control-host',
+      launch_token: 'launch-token-1'
+    });
+
+    const claim = upsertProviderIntakeClaim(state, {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Autonomous intake handoff',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:00:02.000Z',
+      task_id: 'linear-lin-issue-1',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_rehydrated_queued_run',
+      run_id: 'run-2',
+      run_manifest_path: '/tmp/run-2/manifest.json'
+    });
+
+    expect(claim.worker_host).toBe('worker-host-02');
+    expect(claim.launch_source).toBeNull();
+    expect(claim.launch_token).toBeNull();
+    expect(claim.launch_started_at).toBeNull();
+  });
+
   it('preserves the launch timestamp anchor across a detached release rewrite', () => {
     const state = createProviderIntakeState();
 
