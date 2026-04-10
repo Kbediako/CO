@@ -19,13 +19,17 @@ import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlH
 const {
   assertControlHostSupervisionInstallPaths,
   assertStoredControlHostSupervisionConfig,
+  bootstrapLaunchctlPlist,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
+  classifyControlHostSupervisionRollout,
   captureExistingControlHostSupervisionInstall,
   createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
+  inspectControlHostSupervisionLaunchAgent,
   isIgnorableLaunchctlBootoutFailure,
+  isRetryableLaunchctlBootstrapError,
   loadBootstrapEnvironment,
   parseNulDelimitedEnv,
   probeControlHostHealth,
@@ -110,13 +114,13 @@ describe('controlHostSupervision helpers', () => {
     expect(plist).toContain('<key>ThrottleInterval</key>');
   });
 
-  it('falls back to the package dist entrypoint when the current argv entry is not js', () => {
+  it('pins installs to the packaged bootstrap entrypoint when running from source', () => {
     expect(
       resolveDefaultControlHostSupervisionEntrypoint(
         '/repo/bin/codex-orchestrator.ts',
         '/package/root'
       )
-    ).toBe('/package/root/dist/bin/codex-orchestrator.js');
+    ).toBe('/package/root/bin/codex-orchestrator.js');
   });
 
   it('treats restart_required health payloads as unhealthy', () => {
@@ -245,17 +249,76 @@ describe('controlHostSupervision shell helpers', () => {
         exitCode: 0,
         stdout: `${serviceTarget} = {\n\tactive count = 1\n}\n`,
         stderr: ''
+      },
+      launchAgent: {
+        exists: true,
+        program_arguments: [
+          config.nodePath,
+          config.cliEntrypoint,
+          'control-host',
+          'supervise',
+          'run',
+          '--config',
+          config.paths.configPath
+        ],
+        working_directory: config.repoRoot,
+        detected_program: config.nodePath,
+        classification: 'managed_supervision'
       }
     });
 
     expect(payload.service.loaded).toBe(true);
     expect(payload.service.summary).toBe(`${serviceTarget} = {`);
+    expect(payload.rollout).toEqual({
+      mode: 'managed_supervision',
+      migration_required: false,
+      summary: 'LaunchAgent matches the stored managed supervision config.'
+    });
 
     const rendered = formatControlHostSupervisionStatus(payload);
     expect(rendered).toContain('Control-host supervision: installed');
+    expect(rendered).toContain('Rollout: managed_supervision');
     expect(rendered).toContain(`Service target: ${serviceTarget}`);
+    expect(rendered).toContain(`CLI entrypoint: ${config.cliEntrypoint}`);
     expect(rendered).toContain('Last restart reason: restart_required');
     expect(rendered).toContain(`launchctl: ${serviceTarget} = {`);
+  });
+
+  it('detects the legacy shim LaunchAgent and marks migration as required', () => {
+    const launchAgent = inspectControlHostSupervisionLaunchAgent(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.kbediako.co.control-host</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/tester/.local/bin/co-control-host-supervisor.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/tester/Code/CO</string>
+</dict>
+</plist>`,
+      null
+    );
+
+    expect(launchAgent).toEqual({
+      exists: true,
+      program_arguments: ['/Users/tester/.local/bin/co-control-host-supervisor.sh'],
+      working_directory: '/Users/tester/Code/CO',
+      detected_program: '/Users/tester/.local/bin/co-control-host-supervisor.sh',
+      classification: 'legacy_shim'
+    });
+    expect(
+      classifyControlHostSupervisionRollout({
+        config: null,
+        launchAgent
+      })
+    ).toEqual({
+      mode: 'legacy_shim',
+      migration_required: true,
+      summary: 'LaunchAgent still targets the legacy shim wrapper.'
+    });
   });
 
   it('rejects integer flags with non-numeric suffixes', () => {
@@ -800,6 +863,51 @@ describe('controlHostSupervision shell helpers', () => {
         stderr: 'Boot-out failed: 1: Operation not permitted'
       })
     ).toBe(false);
+  });
+
+  it('retries transient launchctl bootstrap input-output failures', async () => {
+    const bootstrap = vi
+      .fn(async () => undefined)
+      .mockRejectedValueOnce(
+        new Error(
+          'launchctl bootstrap gui/501 /tmp/com.example.control-host.plist failed: Bootstrap failed: 5: Input/output error'
+        )
+      );
+    const sleep = vi.fn(async () => undefined);
+
+    await bootstrapLaunchctlPlist('/tmp/com.example.control-host.plist', {
+      bootstrap,
+      sleep
+    });
+
+    expect(bootstrap).toHaveBeenCalledTimes(2);
+    expect(bootstrap).toHaveBeenNthCalledWith(1, [
+      'bootstrap',
+      `gui/${process.getuid?.()}`,
+      '/tmp/com.example.control-host.plist'
+    ]);
+    expect(sleep).toHaveBeenCalledWith(1_000);
+  });
+
+  it('does not retry non-transient launchctl bootstrap failures', async () => {
+    const bootstrapError = new Error(
+      'launchctl bootstrap gui/501 /tmp/com.example.control-host.plist failed: Bootstrap failed: 37: Operation already in progress'
+    );
+    const bootstrap = vi.fn(async () => {
+      throw bootstrapError;
+    });
+    const sleep = vi.fn(async () => undefined);
+
+    await expect(
+      bootstrapLaunchctlPlist('/tmp/com.example.control-host.plist', {
+        bootstrap,
+        sleep
+      })
+    ).rejects.toThrow(bootstrapError.message);
+
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+    expect(isRetryableLaunchctlBootstrapError(bootstrapError)).toBe(false);
   });
 
   it('clears stale exit and health fields when a new child run starts', () => {

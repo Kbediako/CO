@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260410-linear-dd3f4c83-17cf-4668-afb4-978977beb37d",
+      "title": "CO: roll out the shipped CO-117 control-host supervision path so the live host stops bypassing it",
+      "relates_to": "tasks/tasks-linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-dd3f4c83-17cf-4668-afb4-978977beb37d-co-141-docs-review/cli/2026-04-10T07-01-12-520Z-3922c49d/manifest.json",
+          "override_reason": "The audited docs-review child stream passed spec-guard and docs:check, then failed at docs:freshness on the existing repo-wide stale-doc baseline (`stale docs: 119`). The failure is not specific to the CO-141 packet, so the lane records a truthful manual fallback in out/linear-dd3f4c83-17cf-4668-afb4-978977beb37d/manual/20260410T070112Z-docs-review-fallback.md instead of stalling implementation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
+        "task": "tasks/tasks-linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
+        "agent_task": ".agent/task/linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
+        "docs": "docs/TECH_SPEC-linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md"
+      }
+    },
+    {
       "id": "20260410-linear-d3f1af87-57da-46ab-901d-75a6cc60420e",
       "title": "CO: restore current-main docs:freshness green baseline after CO-134 validation repair",
       "relates_to": "tasks/tasks-linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md",

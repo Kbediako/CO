@@ -63,12 +63,28 @@ interface ControlHostSupervisionStatusPayload {
   };
   config: ControlHostSupervisionConfig | null;
   state: ControlHostSupervisionState | null;
+  launch_agent: ControlHostSupervisionLaunchAgentStatus;
+  rollout: ControlHostSupervisionRolloutStatus;
   service: {
     loaded: boolean;
     exit_code: number;
     summary: string | null;
     stderr: string | null;
   };
+}
+
+interface ControlHostSupervisionLaunchAgentStatus {
+  exists: boolean;
+  program_arguments: string[];
+  working_directory: string | null;
+  detected_program: string | null;
+  classification: 'managed_supervision' | 'legacy_shim' | 'unknown' | 'missing';
+}
+
+interface ControlHostSupervisionRolloutStatus {
+  mode: 'managed_supervision' | 'legacy_shim' | 'mixed' | 'not_installed';
+  migration_required: boolean;
+  summary: string;
 }
 
 interface ExistingControlHostSupervisionInstallSnapshot {
@@ -121,6 +137,8 @@ const execFileAsync = promisify(execFile);
 const COMMAND_BUFFER_MAX_BYTES = 16 * 1024 * 1024;
 const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_CAP_MS = 10_000;
 const CONTROL_HOST_SUPERVISION_PROBE_TIMEOUT_FLOOR_MS = 1_000;
+const CONTROL_HOST_SUPERVISION_LAUNCHCTL_BOOTSTRAP_RETRY_ATTEMPTS = 5;
+const CONTROL_HOST_SUPERVISION_LAUNCHCTL_BOOTSTRAP_RETRY_DELAY_MS = 1_000;
 
 export interface RunControlHostSupervisionCliShellParams {
   positionals: string[];
@@ -193,7 +211,7 @@ async function installControlHostSupervision(flags: ArgMap): Promise<void> {
     );
 
     await bootoutLaunchctlServiceTarget(serviceTarget);
-    await runLaunchctl(['bootstrap', resolveLaunchdDomain(), install.config.paths.plistPath]);
+    await bootstrapLaunchctlPlist(install.config.paths.plistPath);
   } catch (error) {
     const detail = (error as Error).message;
     try {
@@ -248,11 +266,13 @@ async function printControlHostSupervisionStatus(flags: ArgMap): Promise<void> {
   const serviceTarget = resolveControlHostSupervisionServiceTarget(resolved.label);
   const launchctl = await runLaunchctl(['print', serviceTarget], { allowFailure: true });
   const state = await readJsonFileIfExists<ControlHostSupervisionState>(resolved.paths.statePath);
+  const plistContents = await readTextFileIfExists(resolved.paths.plistPath);
   const payload = buildControlHostSupervisionStatusPayload({
     resolved,
     serviceTarget,
     state,
-    launchctl
+    launchctl,
+    launchAgent: inspectControlHostSupervisionLaunchAgent(plistContents, resolved.config)
   });
   emitOutput(format, payload, formatControlHostSupervisionStatus(payload));
 }
@@ -691,6 +711,7 @@ function buildControlHostSupervisionStatusPayload(input: {
   serviceTarget: string;
   state: ControlHostSupervisionState | null;
   launchctl: CommandResult;
+  launchAgent: ControlHostSupervisionLaunchAgentStatus;
 }): ControlHostSupervisionStatusPayload {
   const summarySource =
     input.launchctl.stdout.trim() || input.launchctl.stderr.trim() || null;
@@ -708,6 +729,11 @@ function buildControlHostSupervisionStatusPayload(input: {
     },
     config: input.resolved.config,
     state: input.state,
+    launch_agent: input.launchAgent,
+    rollout: classifyControlHostSupervisionRollout({
+      config: input.resolved.config,
+      launchAgent: input.launchAgent
+    }),
     service: {
       loaded: input.launchctl.exitCode === 0,
       exit_code: input.launchctl.exitCode,
@@ -722,6 +748,8 @@ function formatControlHostSupervisionStatus(
 ): string {
   const lines = [
     `Control-host supervision: ${payload.installed ? 'installed' : 'not installed'}`,
+    `Rollout: ${payload.rollout.mode}`,
+    `Migration required: ${payload.rollout.migration_required ? 'yes' : 'no'}`,
     `Label: ${payload.label}`,
     `Service target: ${payload.service_target}`,
     `launchctl loaded: ${payload.service.loaded ? 'yes' : 'no'}`,
@@ -730,8 +758,13 @@ function formatControlHostSupervisionStatus(
     `State: ${payload.state_path}`,
     `Logs: ${payload.logs.stdout_path} | ${payload.logs.stderr_path}`
   ];
+  lines.push(`Rollout summary: ${payload.rollout.summary}`);
+  if (payload.launch_agent.detected_program) {
+    lines.push(`LaunchAgent program: ${payload.launch_agent.detected_program}`);
+  }
   if (payload.config) {
     lines.push(`Repo root: ${payload.config.repoRoot}`);
+    lines.push(`CLI entrypoint: ${payload.config.cliEntrypoint}`);
     lines.push(
       `Task/run/pipeline: ${payload.config.taskId} / ${payload.config.runId} / ${payload.config.pipelineId}`
     );
@@ -754,6 +787,122 @@ function formatControlHostSupervisionStatus(
     lines.push(`launchctl: ${payload.service.summary}`);
   }
   return lines.join('\n');
+}
+
+function inspectControlHostSupervisionLaunchAgent(
+  plistContents: string | null,
+  config: ControlHostSupervisionConfig | null
+): ControlHostSupervisionLaunchAgentStatus {
+  if (plistContents === null) {
+    return {
+      exists: false,
+      program_arguments: [],
+      working_directory: null,
+      detected_program: null,
+      classification: 'missing'
+    };
+  }
+  const programArguments = extractPlistStringArray(plistContents, 'ProgramArguments');
+  const workingDirectory = extractPlistStringValue(plistContents, 'WorkingDirectory');
+  const detectedProgram = programArguments[0] ?? null;
+  return {
+    exists: true,
+    program_arguments: programArguments,
+    working_directory: workingDirectory,
+    detected_program: detectedProgram,
+    classification: classifyControlHostSupervisionLaunchAgent(programArguments, config)
+  };
+}
+
+function classifyControlHostSupervisionLaunchAgent(
+  programArguments: string[],
+  config: ControlHostSupervisionConfig | null
+): ControlHostSupervisionLaunchAgentStatus['classification'] {
+  const detectedProgram = programArguments[0] ?? null;
+  if (detectedProgram === null) {
+    return 'unknown';
+  }
+  if (detectedProgram.endsWith('/co-control-host-supervisor.sh')) {
+    return 'legacy_shim';
+  }
+  if (
+    config &&
+    arraysEqual(
+      programArguments,
+      buildExpectedControlHostSupervisionProgramArguments(config)
+    )
+  ) {
+    return 'managed_supervision';
+  }
+  return 'unknown';
+}
+
+function buildExpectedControlHostSupervisionProgramArguments(
+  config: ControlHostSupervisionConfig
+): string[] {
+  return [
+    config.nodePath,
+    config.cliEntrypoint,
+    'control-host',
+    'supervise',
+    'run',
+    '--config',
+    config.paths.configPath
+  ];
+}
+
+function classifyControlHostSupervisionRollout(input: {
+  config: ControlHostSupervisionConfig | null;
+  launchAgent: ControlHostSupervisionLaunchAgentStatus;
+}): ControlHostSupervisionRolloutStatus {
+  if (
+    input.config &&
+    input.launchAgent.exists &&
+    input.launchAgent.classification === 'managed_supervision'
+  ) {
+    return {
+      mode: 'managed_supervision',
+      migration_required: false,
+      summary: 'LaunchAgent matches the stored managed supervision config.'
+    };
+  }
+  if (input.launchAgent.classification === 'legacy_shim') {
+    return {
+      mode: input.config ? 'mixed' : 'legacy_shim',
+      migration_required: true,
+      summary: input.config
+        ? 'Stored managed config exists, but the active LaunchAgent still targets the legacy shim.'
+        : 'LaunchAgent still targets the legacy shim wrapper.'
+    };
+  }
+  if (!input.config && !input.launchAgent.exists) {
+    return {
+      mode: 'not_installed',
+      migration_required: false,
+      summary: 'No managed config or LaunchAgent plist is installed.'
+    };
+  }
+  if (input.config && !input.launchAgent.exists) {
+    return {
+      mode: 'mixed',
+      migration_required: true,
+      summary: 'Managed config exists, but the LaunchAgent plist is missing.'
+    };
+  }
+  if (!input.config && input.launchAgent.exists) {
+    return {
+      mode: 'mixed',
+      migration_required: true,
+      summary:
+        'LaunchAgent exists without a matching managed config; inspect the plist before rollout.'
+    };
+  }
+  return {
+    mode: 'mixed',
+    migration_required: true,
+    summary:
+      'Managed config exists, but the LaunchAgent program arguments do not match the packaged supervision runner.'
+  };
 }
 
 function emitOutput(format: OutputFormat, payload: unknown, text: string): void {
@@ -871,6 +1020,47 @@ async function rollbackFailedControlHostSupervisionInstall(
   await remove(paths.logsDir, { recursive: true, force: true });
 }
 
+async function bootstrapLaunchctlPlist(
+  plistPath: string,
+  options?: {
+    bootstrap?: (args: string[]) => Promise<void>;
+    retryAttempts?: number;
+    retryDelayMs?: number;
+    sleep?: (ms: number) => Promise<void>;
+  }
+): Promise<void> {
+  const bootstrap =
+    options?.bootstrap ??
+    (async (args: string[]) => {
+      await runLaunchctl(args);
+    });
+  const retryAttempts =
+    options?.retryAttempts ?? CONTROL_HOST_SUPERVISION_LAUNCHCTL_BOOTSTRAP_RETRY_ATTEMPTS;
+  const retryDelayMs =
+    options?.retryDelayMs ?? CONTROL_HOST_SUPERVISION_LAUNCHCTL_BOOTSTRAP_RETRY_DELAY_MS;
+  const sleep =
+    options?.sleep ??
+    (async (ms: number) => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      });
+    });
+
+  let attemptsRemaining = retryAttempts;
+  for (;;) {
+    try {
+      await bootstrap(['bootstrap', resolveLaunchdDomain(), plistPath]);
+      return;
+    } catch (error) {
+      attemptsRemaining -= 1;
+      if (attemptsRemaining <= 0 || !isRetryableLaunchctlBootstrapError(error)) {
+        throw error;
+      }
+      await sleep(retryDelayMs);
+    }
+  }
+}
+
 async function captureExistingControlHostSupervisionInstall(
   paths: ControlHostSupervisionPaths
 ): Promise<ExistingControlHostSupervisionInstallSnapshot | null> {
@@ -901,11 +1091,6 @@ async function restoreExistingControlHostSupervisionInstall(
   }
 ): Promise<void> {
   const bootout = options?.bootout ?? bootoutLaunchctlServiceTarget;
-  const bootstrap =
-    options?.bootstrap ??
-    (async (args: string[]) => {
-      await runLaunchctl(args);
-    });
   const remove = options?.remove ?? rm;
   const write = options?.write ?? writeFile;
 
@@ -925,11 +1110,9 @@ async function restoreExistingControlHostSupervisionInstall(
     remove
   });
   if (snapshot.plistContents !== null) {
-    await bootstrap([
-      'bootstrap',
-      resolveLaunchdDomain(),
-      snapshot.paths.plistPath
-    ]);
+    await bootstrapLaunchctlPlist(snapshot.paths.plistPath, {
+      bootstrap: options?.bootstrap
+    });
   }
 }
 
@@ -978,6 +1161,16 @@ function createControlHostSupervisionChildEventPromises(
 function isIgnorableLaunchctlBootoutFailure(result: CommandResult): boolean {
   const detail = `${result.stdout}\n${result.stderr}`.toLowerCase();
   return /could not find service|service.*not found|no such process|not loaded/u.test(detail);
+}
+
+function isRetryableLaunchctlBootstrapError(error: unknown): boolean {
+  const detail =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : JSON.stringify(error);
+  return /bootstrap failed:\s*5:\s*input\/output error/ui.test(detail);
 }
 
 function resolveControlHostSupervisionServiceTarget(label: string): string {
@@ -1184,6 +1377,52 @@ function firstNonEmptyLine(value: string): string | null {
     }
   }
   return null;
+}
+
+function extractPlistStringArray(plistContents: string, key: string): string[] {
+  const block = new RegExp(
+    `<key>${escapeRegExp(key)}</key>\\s*<array>([\\s\\S]*?)</array>`,
+    'u'
+  ).exec(plistContents)?.[1];
+  if (!block) {
+    return [];
+  }
+  return [...block.matchAll(/<string>([\s\S]*?)<\/string>/gu)].map((match) =>
+    decodePlistString(match[1] ?? '')
+  );
+}
+
+function extractPlistStringValue(plistContents: string, key: string): string | null {
+  const value = new RegExp(
+    `<key>${escapeRegExp(key)}</key>\\s*<string>([\\s\\S]*?)</string>`,
+    'u'
+  ).exec(plistContents)?.[1];
+  return typeof value === 'string' ? decodePlistString(value) : null;
+}
+
+function decodePlistString(value: string): string {
+  return value
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+function arraysEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (const [index, value] of left.entries()) {
+    if (value !== right[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -1474,13 +1713,17 @@ function createSleepWaiter(ms: number): {
 export const __test__ = {
   assertControlHostSupervisionInstallPaths,
   assertStoredControlHostSupervisionConfig,
+  bootstrapLaunchctlPlist,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
+  classifyControlHostSupervisionRollout,
   captureExistingControlHostSupervisionInstall,
   createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
+  inspectControlHostSupervisionLaunchAgent,
   isIgnorableLaunchctlBootoutFailure,
+  isRetryableLaunchctlBootstrapError,
   loadBootstrapEnvironment,
   parseNulDelimitedEnv,
   probeControlHostHealth,
