@@ -1551,6 +1551,22 @@ function describeProviderBranchRecoveryReason(reason: string): string {
   return 'branch refresh';
 }
 
+function doesProviderBranchRecoveryMatchPullRequest(
+  recovery: ProviderBranchRecoveryAttemptRecord | null | undefined,
+  pr: ProviderMergeCloseoutPullRequestRecord
+): boolean {
+  if (!recovery || recovery.command !== 'gh') {
+    return false;
+  }
+  const expectedRepo = `${pr.owner}/${pr.repo}`;
+  return (
+    recovery.args[0] === 'pr'
+    && recovery.args[1] === 'update-branch'
+    && recovery.args[2] === String(pr.number)
+    && recovery.args.includes(expectedRepo)
+  );
+}
+
 async function attemptProviderBranchRecovery(input: {
   pr: ProviderMergeCloseoutPullRequestRecord;
   snapshot: ProviderMergeCloseoutSnapshotRecord;
@@ -1572,6 +1588,7 @@ async function attemptProviderBranchRecovery(input: {
   if (
     previousBranchRecovery?.ok === true
     && previousBranchRecovery.failure_kind === null
+    && doesProviderBranchRecoveryMatchPullRequest(previousBranchRecovery, input.pr)
     && previousBranchRecovery.head_oid === input.snapshot.head_oid
     && previousBranchRecovery.recovery_reason === recoveryReason
   ) {
