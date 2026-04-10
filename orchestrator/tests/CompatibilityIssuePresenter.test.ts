@@ -210,6 +210,29 @@ describe('CompatibilityIssuePresenter', () => {
     expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
   });
 
+  it('keeps selected rows when optional provider-worker provenance fields are omitted', () => {
+    const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+    const projection = buildCompatibilityProjectionSnapshot(
+      buildCompatibilityRuntime(
+        buildCompatibilitySource({
+          issueProvider: null,
+          issueIdentifier: taskId,
+          issueId: taskId,
+          taskId,
+          pipelineTitle: undefined,
+          providerLinearWorkerProof: undefined,
+          rawStatus: 'in_progress',
+          displayStatus: 'In Progress',
+          updatedAt: '2026-04-06T02:35:00.000Z',
+          completedAt: null,
+          summary: 'generic selected source with omitted provenance helpers'
+        })
+      )
+    );
+
+    expect(projection.issues.map((issue) => issue.issueIdentifier)).toEqual([taskId]);
+  });
+
   it('keeps the projected child-summary message and timestamp when newer proof telemetry is generic', () => {
     const runningEntry = buildCompatibilityRunningEntry(
       buildCompatibilitySource({
