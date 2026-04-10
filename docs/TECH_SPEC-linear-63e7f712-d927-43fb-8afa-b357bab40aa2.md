@@ -62,6 +62,8 @@ last_review: 2026-04-10
   - recurse only through the discovered relative runtime-dependency closure for that suite, so the helper stays bounded to the relevant entrypoint graph
   - ignore type-only edges so runtime-unrelated type edits do not force source-entry fallback
   - fail closed when a tracked relative runtime dependency can no longer be resolved, because stale `dist` should not hide a broken source graph
+  - fail closed when a winning tracked candidate disappears and `dist` is older than the disappearance token derived from that candidate's parent directory change time
+  - keep rebuilt `dist` eligible on the first post-delete probe when its change token is newer than that disappearance token
   - fail closed on unreadable `dist` or root-stat errors
 - Test plan:
   - CLI: reject stale `dist` when a transitive imported dependency outside the entry file is newer
@@ -82,7 +84,7 @@ last_review: 2026-04-10
   - `npm run docs:freshness`
   - `node scripts/diff-budget.mjs`
   - `codex-orchestrator review` or truthful manual fallback
-  - `npm run pack:smoke` because the diff still touches downstream-facing CLI or review-wrapper test surfaces
+  - `npm run pack:smoke` only when the surviving final diff still touches downstream-facing CLI, package, skill, or review-wrapper paths; the current CO-123 rework closeout does not require it because the final diff is limited to the test-local helper and hot-suite tests
 
 ## Approvals
 - Reviewer: `codex-orchestrator linear child-stream docs-review (rework branch)`

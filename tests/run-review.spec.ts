@@ -1474,6 +1474,103 @@ describe('shouldUseFreshDist', () => {
     }
   });
 
+  it('treats dist as stale when the winning runtime source candidate disappears and resolution falls back to an older file', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelperTs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const boundaryHelperJs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.js');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelperTs), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperTs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "ts"; }\n',
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperJs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "js"; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelperTs, fallbackAt, fallbackAt);
+      await utimes(boundaryHelperJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(boundaryHelperJs);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist fresh when the winning runtime source candidate disappears and dist is rebuilt first', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');
+    const boundaryHelperTs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.ts');
+    const boundaryHelperJs = join(tempRoot, 'scripts', 'lib', 'review-execution-boundary-preflight.js');
+    const distEntry = join(tempRoot, 'dist', 'scripts', 'run-review.js');
+
+    try {
+      await mkdir(dirname(sourceEntry), { recursive: true });
+      await mkdir(dirname(boundaryHelperTs), { recursive: true });
+      await mkdir(dirname(distEntry), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { prepareReviewExecutionBoundaryPreflight } from './lib/review-execution-boundary-preflight.js';\n",
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperTs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "ts"; }\n',
+        'utf8'
+      );
+      await writeFile(
+        boundaryHelperJs,
+        'export function prepareReviewExecutionBoundaryPreflight() { return "js"; }\n',
+        'utf8'
+      );
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(boundaryHelperTs, fallbackAt, fallbackAt);
+      await utimes(boundaryHelperJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(boundaryHelperJs);
+
+      const rebuiltDistAt = new Date('2026-01-01T00:00:06.000Z');
+      await utimes(distEntry, rebuiltDistAt, rebuiltDistAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('ignores newer sibling scripts outside the run-review dependency closure', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-fresh-dist-'));
     const sourceEntry = join(tempRoot, 'scripts', 'run-review.ts');

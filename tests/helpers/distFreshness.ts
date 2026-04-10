@@ -17,11 +17,13 @@ type CachedDependencyClosure = {
 type DependencyClosureLookup = {
   cachedClosure: CachedDependencyClosure;
   newestTrackedAppearanceToken: number | null;
+  newestTrackedDisappearanceToken: number | null;
 };
 
 type TrackedFileState = {
   freshnessToken: number | null;
   changeToken: number | null;
+  parentDirectoryChangeToken: number | null;
 };
 
 type TrackedChangeSetEntry = {
@@ -60,14 +62,26 @@ export async function shouldUseFreshDist(sourceEntry: string, distEntry: string)
   }
 
   try {
-    const { cachedClosure, newestTrackedAppearanceToken } = await getDependencyClosureCached(sourceEntry);
+    const {
+      cachedClosure,
+      newestTrackedAppearanceToken,
+      newestTrackedDisappearanceToken
+    } =
+      await getDependencyClosureCached(sourceEntry);
     const { closure, newestClosureFreshnessToken } = cachedClosure;
+    const distChangeToken = getChangeToken(distStats);
     if (closure.hasUnresolvedTrackedDependency) {
       return false;
     }
     if (
+      newestTrackedDisappearanceToken !== null &&
+      distChangeToken < newestTrackedDisappearanceToken
+    ) {
+      return false;
+    }
+    if (
       newestTrackedAppearanceToken !== null &&
-      getChangeToken(distStats) < newestTrackedAppearanceToken
+      distChangeToken < newestTrackedAppearanceToken
     ) {
       return false;
     }
@@ -83,22 +97,28 @@ async function getDependencyClosureCached(sourceEntry: string): Promise<Dependen
   if (!cached) {
     return {
       cachedClosure: await refreshDependencyClosure(cacheKey),
-      newestTrackedAppearanceToken: null
+      newestTrackedAppearanceToken: null,
+      newestTrackedDisappearanceToken: null
     };
   }
   const cachedClosure = await cached;
   const trackedChangeSet = await getTrackedChangeSet(cachedClosure.trackedFileStates);
   if (trackedChangeSet === null) {
-    return { cachedClosure, newestTrackedAppearanceToken: null };
+    return {
+      cachedClosure,
+      newestTrackedAppearanceToken: null,
+      newestTrackedDisappearanceToken: null
+    };
   }
 
   const refreshedClosure = await refreshDependencyClosure(cacheKey);
-  const newestTrackedAppearanceToken = closureChanged(cachedClosure, refreshedClosure)
-    ? getNewestTrackedAppearanceToken(trackedChangeSet)
-    : null;
+  const resolutionChange = closureChanged(cachedClosure, refreshedClosure)
+    ? getResolutionChange(trackedChangeSet)
+    : { newestTrackedAppearanceToken: null, newestTrackedDisappearanceToken: null };
   return {
     cachedClosure: refreshedClosure,
-    newestTrackedAppearanceToken
+    newestTrackedAppearanceToken: resolutionChange.newestTrackedAppearanceToken,
+    newestTrackedDisappearanceToken: resolutionChange.newestTrackedDisappearanceToken
   };
 }
 
@@ -357,17 +377,28 @@ function closureChanged(previous: CachedDependencyClosure, current: CachedDepend
   return false;
 }
 
-function getNewestTrackedAppearanceToken(
+function getResolutionChange(
   trackedChangeSet: ReadonlyMap<string, TrackedChangeSetEntry>
-): number | null {
+): Pick<
+  DependencyClosureLookup,
+  'newestTrackedAppearanceToken' | 'newestTrackedDisappearanceToken'
+> {
   let newestTrackedAppearanceToken: number | null = null;
+  let newestTrackedDisappearanceToken: number | null = null;
   for (const { previousState, currentState } of trackedChangeSet.values()) {
+    if (previousState.freshnessToken !== null && currentState.freshnessToken === null) {
+      newestTrackedDisappearanceToken = Math.max(
+        newestTrackedDisappearanceToken ?? 0,
+        currentState.parentDirectoryChangeToken ?? previousState.changeToken ?? 0
+      );
+      continue;
+    }
     if (previousState.freshnessToken !== null || currentState.changeToken === null) {
       continue;
     }
     newestTrackedAppearanceToken = Math.max(newestTrackedAppearanceToken ?? 0, currentState.changeToken);
   }
-  return newestTrackedAppearanceToken;
+  return { newestTrackedAppearanceToken, newestTrackedDisappearanceToken };
 }
 
 async function readTrackedFileState(file: string): Promise<TrackedFileState> {
@@ -375,11 +406,27 @@ async function readTrackedFileState(file: string): Promise<TrackedFileState> {
     const stats = await stat(file);
     return {
       freshnessToken: getFreshnessToken(stats),
-      changeToken: getChangeToken(stats)
+      changeToken: getChangeToken(stats),
+      parentDirectoryChangeToken: null
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { freshnessToken: null, changeToken: null };
+      return {
+        freshnessToken: null,
+        changeToken: null,
+        parentDirectoryChangeToken: await readParentDirectoryChangeToken(file)
+      };
+    }
+    throw error;
+  }
+}
+
+async function readParentDirectoryChangeToken(file: string): Promise<number | null> {
+  try {
+    return getChangeToken(await stat(dirname(file)));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
     }
     throw error;
   }

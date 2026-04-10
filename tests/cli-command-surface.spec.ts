@@ -270,6 +270,87 @@ describe('shouldUseFreshDist', () => {
     }
   });
 
+  it('treats dist as stale when the winning CLI source candidate disappears and resolution falls back to an older file', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() { return "ts"; }\n', 'utf8');
+      await writeFile(transitiveDependencyJs, 'export function runDoctorCliShell() { return "js"; }\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, fallbackAt, fallbackAt);
+      await utimes(transitiveDependencyJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(transitiveDependencyJs);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(false);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps dist fresh when the winning CLI source candidate disappears and dist is rebuilt first', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
+    const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
+    const transitiveDependencyTs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.ts');
+    const transitiveDependencyJs = join(tempRoot, 'orchestrator', 'src', 'cli', 'doctorCliShell.js');
+    const distEntry = join(tempRoot, 'dist', 'bin', 'codex-orchestrator.js');
+
+    try {
+      await mkdir(join(tempRoot, 'bin'), { recursive: true });
+      await mkdir(join(tempRoot, 'orchestrator', 'src', 'cli'), { recursive: true });
+      await mkdir(join(tempRoot, 'dist', 'bin'), { recursive: true });
+      await writeFile(
+        sourceEntry,
+        "export { runDoctorCliShell } from '../orchestrator/src/cli/doctorCliShell.js';\n",
+        'utf8'
+      );
+      await writeFile(transitiveDependencyTs, 'export function runDoctorCliShell() { return "ts"; }\n', 'utf8');
+      await writeFile(transitiveDependencyJs, 'export function runDoctorCliShell() { return "js"; }\n', 'utf8');
+      await writeFile(distEntry, 'export {};\n', 'utf8');
+
+      const sourceAt = new Date('2026-01-01T00:00:00.000Z');
+      const fallbackAt = new Date('2026-01-01T00:00:00.000Z');
+      const winningAt = new Date('2026-01-01T00:00:01.000Z');
+      const distAt = new Date('2026-01-01T00:00:05.000Z');
+      await utimes(sourceEntry, sourceAt, sourceAt);
+      await utimes(transitiveDependencyTs, fallbackAt, fallbackAt);
+      await utimes(transitiveDependencyJs, winningAt, winningAt);
+      await utimes(distEntry, distAt, distAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+
+      await rm(transitiveDependencyJs);
+
+      const rebuiltDistAt = new Date('2026-01-01T00:00:06.000Z');
+      await utimes(distEntry, rebuiltDistAt, rebuiltDistAt);
+
+      await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('refreshes a cached unresolved dependency when the missing runtime import becomes resolvable', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'cli-fresh-dist-'));
     const sourceEntry = join(tempRoot, 'bin', 'codex-orchestrator.ts');
