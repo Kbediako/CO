@@ -1356,17 +1356,29 @@ function providerIntakeClaimMatchesSyntheticFallbackTaskBinding(
   if (snapshot.taskId === claim.task_id) {
     return !hasAuthoritativeProjectionIssueIdentity(snapshot);
   }
+  const pipelineId = readStringValue(snapshot.manifestRecord, 'pipeline_id', 'pipelineId') ?? null;
   return (
-    isProviderLinearChildPipelineId(
-      readStringValue(snapshot.manifestRecord, 'pipeline_id', 'pipelineId') ?? null
-    ) &&
-    snapshot.taskId.startsWith(`${claim.task_id}-`) &&
+    matchesSyntheticProviderChildTaskId(claim.task_id, snapshot.taskId, pipelineId) &&
     !hasAuthoritativeProjectionIssueIdentity(snapshot)
   );
 }
 
 function isProviderLinearChildPipelineId(pipelineId: string | null): boolean {
   return pipelineId !== null && PROVIDER_LINEAR_CHILD_PIPELINE_IDS.has(pipelineId);
+}
+
+function matchesSyntheticProviderChildTaskId(
+  claimTaskId: string,
+  snapshotTaskId: string,
+  pipelineId: string | null
+): boolean {
+  if (!isProviderLinearChildPipelineId(pipelineId)) {
+    return false;
+  }
+  if (pipelineId === 'provider-linear-child-lane') {
+    return snapshotTaskId.startsWith(`${claimTaskId}-`);
+  }
+  return snapshotTaskId === `${claimTaskId}-${pipelineId}`;
 }
 
 function hasLinearProviderWorkerProjectionProvenance(

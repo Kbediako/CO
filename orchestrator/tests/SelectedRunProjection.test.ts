@@ -1749,6 +1749,56 @@ describe('SelectedRunProjection', () => {
     expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
   });
 
+  it('does not treat a different parent slug as a docs-review child match for a shorter claim task id', async () => {
+    const shorterParentTaskId = 'linear-lin-issue-1';
+    const longerParentTaskId = 'linear-lin-issue-1-2';
+    const childTaskId = `${longerParentTaskId}-docs-review`;
+    const { paths } = await createHostPaths(undefined, {
+      taskId: childTaskId,
+      runId: 'run-child-2'
+    });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child-2',
+        task_id: childTaskId,
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Child docs-review run should not bind the shorter parent issue claim.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      issue_title: 'Shorter parent issue claim',
+      task_id: shorterParentTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: null,
+      run_manifest_path: null
+    };
+
+    const selected = await createProjectionReader(
+      paths,
+      paths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: childTaskId,
+      issueId: childTaskId,
+      taskId: childTaskId,
+      runId: 'run-child-2'
+    });
+    expect(selected?.lookupAliases).not.toEqual(expect.arrayContaining(['CO-2', 'lin-issue-1']));
+  });
+
   it('does not rebind non-synthetic child task prefixes to a provider claim', async () => {
     const parentTaskId = 'task-parent';
     const childTaskId = `${parentTaskId}-docs-review`;
