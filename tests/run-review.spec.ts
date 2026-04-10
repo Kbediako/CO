@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import type { ReviewOutcomeDisposition } from '../scripts/lib/review-execution-telemetry.js';
-import { runReviewCli } from '../scripts/run-review.js';
+import { isDirectExecution, runReviewCli } from '../scripts/run-review.js';
 import { runEntrypointInProcess } from './helpers/inProcessEntrypoint.js';
 
 const execFileAsync = promisify(execFile);
@@ -1447,6 +1448,29 @@ describe('shouldUseFreshDist', () => {
       await utimes(unrelatedSibling, siblingAt, siblingAt);
 
       await expect(shouldUseFreshDist(sourceEntry, distEntry)).resolves.toBe(true);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('isDirectExecution', () => {
+  it('keeps the supported direct path while leaving symlink-preserved entrypoints unsupported', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'run-review-direct-exec-'));
+    const targetEntry = join(tempRoot, 'target.js');
+    const symlinkEntry = join(tempRoot, 'symlink.js');
+
+    try {
+      await writeFile(targetEntry, 'export {};\n', 'utf8');
+      await symlink(targetEntry, symlinkEntry);
+
+      expect(
+        isDirectExecution(targetEntry, pathToFileURL(await realpath(targetEntry)).href)
+      ).toBe(true);
+      expect(
+        isDirectExecution(symlinkEntry, pathToFileURL(await realpath(symlinkEntry)).href)
+      ).toBe(true);
+      expect(isDirectExecution(symlinkEntry, pathToFileURL(symlinkEntry).href)).toBe(false);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

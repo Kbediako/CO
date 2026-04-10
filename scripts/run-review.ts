@@ -627,7 +627,10 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
   }
 }
 
-function isDirectExecution(entryArg = process.argv[1], metaUrl = import.meta.url): boolean {
+// Supported review launchers pass the runner's direct source/dist path. Keep the
+// stricter realpath-first direct-exec contract unless a future lane explicitly
+// widens standalone `run-review` entrypoint support.
+export function isDirectExecution(entryArg = process.argv[1], metaUrl = import.meta.url): boolean {
   if (typeof entryArg !== 'string' || entryArg.length === 0) {
     return false;
   }

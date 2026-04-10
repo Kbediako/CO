@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260410-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d",
+      "title": "CO: harden run-review direct-exec symlink handling without regressing subprocess harnesses",
+      "relates_to": "tasks/tasks-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d-co-127-docs-review/cli/2026-04-10T00-23-13-717Z-acc886f4/manifest.json",
+          "override_reason": "docs:check passed; docs:freshness failed only on repo-wide stale baseline (119); CO-127 packet absent from missing_in_registry, missing_on_disk, invalid_entries, and stale_entries; see out/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d/manual/20260410T002313Z-docs-review-fallback.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
+        "task": "tasks/tasks-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
+        "agent_task": ".agent/task/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
+        "docs": "docs/TECH_SPEC-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md"
+      }
+    },
+    {
       "id": "20260409-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee",
       "title": "CO: ship installable local control-host supervision instead of host-local co-control-host-supervisor.sh",
       "relates_to": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
