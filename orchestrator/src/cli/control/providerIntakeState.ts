@@ -9,6 +9,7 @@ import {
   deriveProviderIntakeClaimFreshness,
   type ProviderIntakeClaimFreshness
 } from './providerIssueObservability.js';
+import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
 
 const PROVIDER_INTAKE_CLAIM_LIMIT = 128;
 
@@ -58,6 +59,7 @@ export interface ProviderIntakeClaimRecord {
   last_webhook_timestamp: number | null;
   run_id: string | null;
   run_manifest_path: string | null;
+  worker_host?: string | null;
   launch_source: ProviderLaunchSource | null;
   launch_token: string | null;
   launch_started_at?: string | null;
@@ -95,6 +97,7 @@ export interface ProviderIntakeSummaryPayload {
   state: ProviderIntakeSummaryState;
   reason: string | null;
   run_id: string | null;
+  worker_host?: string | null;
   freshness: ProviderIntakeClaimFreshness | null;
   rehydrated_at: string | null;
   is_rehydrated: boolean;
@@ -252,6 +255,12 @@ export function upsertProviderIntakeClaim(
     last_webhook_timestamp: input.last_webhook_timestamp ?? null,
     run_id: nextRunId,
     run_manifest_path: nextRunManifestPath,
+    worker_host:
+      input.worker_host === undefined
+        ? runIdentityChanged
+          ? null
+          : existing?.worker_host ?? null
+        : normalizeProviderWorkerHostName(input.worker_host),
     launch_source:
       input.launch_source === undefined
         ? runIdentityChanged
@@ -374,6 +383,7 @@ export function buildProviderIntakeSummary(
     state: deriveProviderIntakeSummaryState(claim),
     reason: claim.reason,
     run_id: claim.run_id,
+    worker_host: claim.worker_host ?? null,
     freshness,
     rehydrated_at: normalizedState.rehydrated_at,
     is_rehydrated: freshness === 'rehydrated',
@@ -455,6 +465,7 @@ function normalizeProviderIntakeClaim(
     run_id: typeof input.run_id === 'string' ? input.run_id : null,
     run_manifest_path:
       typeof input.run_manifest_path === 'string' ? input.run_manifest_path : null,
+    worker_host: normalizeProviderWorkerHostName(input.worker_host),
     launch_source: launchSource,
     launch_token: typeof input.launch_token === 'string' ? input.launch_token : null,
     launch_started_at: launchStartedAt,

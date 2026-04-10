@@ -8,6 +8,7 @@ import type {
   ControlCompatibilityRuntimeSnapshot,
   ControlCompatibilitySourceContext
 } from '../src/cli/control/observabilityReadModel.js';
+import { resolveProviderWorkerHost } from '../src/cli/control/observabilityReadModel.js';
 
 function buildCompatibilitySource(
   overrides: Partial<ControlCompatibilitySourceContext> = {}
@@ -95,6 +96,133 @@ function buildExhaustedLinearPolling() {
 }
 
 describe('CompatibilityIssuePresenter', () => {
+  it('ignores stale proof-derived worker_host values for the current attempt', () => {
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: {
+          issue_id: 'issue-100',
+          issue_identifier: 'CO-100',
+          attempt_started_at: '2026-04-06T02:00:00.000Z',
+          worker_host: 'worker-host-stale'
+        },
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBeNull();
+  });
+
+  it('surfaces worker_host through selected, running, retrying, and issue payloads', () => {
+    const workerHost = 'worker-host-01';
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        pid: '123',
+        latest_session_id: 'session-3',
+        latest_session_id_source: 'derived_from_thread_and_turn',
+        turn_count: 2,
+        last_event: 'turn_running',
+        last_message: 'Provider worker turn is active.',
+        last_event_at: '2026-04-06T02:35:00.000Z',
+        tokens: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0
+        },
+        rate_limits: null,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        workspace_path: '/repo/.workspaces/co-100',
+        linear_audit: null,
+        progress: null,
+        tracked_issue_error: null,
+        end_reason: null,
+        updated_at: '2026-04-06T02:35:00.000Z',
+        worker_host: workerHost
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']> & {
+        worker_host: string;
+      },
+      providerDebugSnapshot: {
+        live_linear_state: {
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        claim: null,
+        worker: {
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          pid: '123',
+          worker_host: workerHost,
+          thread_id: 'thread-1',
+          latest_session_id: 'session-3',
+          turn_count: 2,
+          last_event: 'turn_running',
+          last_event_at: '2026-04-06T02:35:00.000Z',
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        parallelization: null,
+        pull_request: null,
+        progress: null,
+        last_audit_operation: null,
+        last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+        stall_classification: null,
+        stall_reason: null,
+        recovery_recommendation: null
+      } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      selected: source,
+      running: [source],
+      retrying: [source],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null,
+      providerWorkflow: null,
+      polling: null
+    });
+
+    expect(projection.selected).toMatchObject({
+      issue_identifier: 'CO-100',
+      worker_host: workerHost,
+      provider_debug_snapshot: {
+        worker: {
+          worker_host: workerHost
+        }
+      }
+    });
+    expect(projection.running).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-100',
+        worker_host: workerHost
+      })
+    ]);
+    expect(projection.retrying).toEqual([
+      expect.objectContaining({
+        issue_identifier: 'CO-100',
+        worker_host: workerHost
+      })
+    ]);
+    expect(projection.issues[0]?.payload).toMatchObject({
+      issue_identifier: 'CO-100',
+      worker_host: workerHost,
+      provider_debug_snapshot: {
+        worker: {
+          worker_host: workerHost
+        }
+      }
+    });
+  });
+
   it.each([
     {
       displayStatus: 'pending_shared_root_reconciliation',
