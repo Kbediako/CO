@@ -1221,19 +1221,26 @@ async function terminateChildProcess(
     child.once('exit', () => resolve());
   });
   child.kill('SIGTERM');
+  const processGroupExitController = new AbortController();
   const processGroupExitPromise =
     rootPid === null
       ? Promise.resolve()
-      : waitForProcessGroupToExit(rootPid, options?.listProcessGroupPids);
+      : waitForProcessGroupToExit(
+          rootPid,
+          options?.listProcessGroupPids,
+          processGroupExitController.signal
+        );
   const killWaiter = createSleepWaiter(killTimeoutSeconds * 1_000);
   const timedOut = await Promise.race([
     Promise.all([exitPromise, processGroupExitPromise]).then(() => false),
     killWaiter.promise.then(() => true)
-  ]);
-  killWaiter.dispose();
+  ]).finally(() => {
+    killWaiter.dispose();
+  });
   if (!timedOut) {
     return;
   }
+  processGroupExitController.abort();
   if (rootPid !== null) {
     killTrackedProcessGroup(rootPid, 'SIGKILL', options?.killProcessGroup);
   }
@@ -1257,13 +1264,51 @@ function normalizeTrackedPid(pid: number | undefined): number | null {
 
 async function waitForProcessGroupToExit(
   rootPid: number,
-  listProcessGroupPids: (rootPid: number) => Promise<number[]> = listProcessGroupProcessIds
+  listProcessGroupPids: (rootPid: number) => Promise<number[]> = listProcessGroupProcessIds,
+  signal?: AbortSignal
 ): Promise<void> {
   for (;;) {
-    if ((await listProcessGroupPids(rootPid)).length === 0) {
+    if (signal?.aborted) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    const processGroupPids = await listProcessGroupPids(rootPid).catch(() => null);
+    if (processGroupPids !== null && processGroupPids.length === 0) {
+      return;
+    }
+    await waitForAbortableSleep(25, signal);
+  }
+}
+
+async function waitForAbortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return;
+  }
+  const waiter = createSleepWaiter(ms);
+  let abortListener: (() => void) | null = null;
+  try {
+    await Promise.race([
+      waiter.promise,
+      new Promise<void>((resolve) => {
+        if (signal === undefined) {
+          return;
+        }
+        if (signal.aborted) {
+          waiter.dispose();
+          resolve();
+          return;
+        }
+        abortListener = () => {
+          waiter.dispose();
+          resolve();
+        };
+        signal.addEventListener('abort', abortListener, { once: true });
+      })
+    ]);
+  } finally {
+    if (signal !== undefined && abortListener !== null) {
+      signal.removeEventListener('abort', abortListener);
+    }
+    waiter.dispose();
   }
 }
 

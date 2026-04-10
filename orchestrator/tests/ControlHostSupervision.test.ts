@@ -1141,6 +1141,33 @@ describe('controlHostSupervision shell helpers', () => {
     expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
   });
 
+  it('stops polling detached process groups once timeout cleanup returns', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: 4200,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        if (signal === 'SIGKILL') {
+          queueMicrotask(() => {
+            child.signalCode = signal;
+            child.emit('exit', null, signal);
+          });
+        }
+        return true;
+      })
+    });
+    const listProcessGroupPids = vi.fn().mockResolvedValue([4200, 4201]);
+
+    await terminateChildProcess(child as never, 0, {
+      listProcessGroupPids,
+      listDescendantPids: vi.fn().mockResolvedValue([])
+    });
+
+    expect(listProcessGroupPids).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(listProcessGroupPids).toHaveBeenCalledTimes(1);
+  });
+
   it('kills the detached process group even when the wrapper exits before the timeout escalation', async () => {
     const child = Object.assign(new EventEmitter(), {
       pid: 4200,
@@ -1174,6 +1201,38 @@ describe('controlHostSupervision shell helpers', () => {
     expect(listDescendantPids).not.toHaveBeenCalled();
     expect(child.kill).toHaveBeenCalledTimes(1);
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  it('treats process-group lookup failures as pending until timeout escalation runs', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: 4200,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        if (signal === 'SIGKILL') {
+          queueMicrotask(() => {
+            child.signalCode = signal;
+            child.emit('exit', null, signal);
+          });
+        }
+        return true;
+      })
+    });
+    const listProcessGroupPids = vi.fn().mockRejectedValue(new Error('ps failed'));
+    const killProcessGroup = vi.fn();
+
+    await expect(
+      terminateChildProcess(child as never, 0, {
+        listProcessGroupPids,
+        killProcessGroup,
+        listDescendantPids: vi.fn().mockResolvedValue([])
+      })
+    ).resolves.toBeUndefined();
+
+    expect(listProcessGroupPids).toHaveBeenCalledWith(4200);
+    expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
+    expect(child.kill).toHaveBeenNthCalledWith(1, 'SIGTERM');
+    expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
   });
 
   it('disposes sleep waiters before the tick fires', async () => {
