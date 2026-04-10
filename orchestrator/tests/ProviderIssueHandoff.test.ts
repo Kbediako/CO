@@ -397,7 +397,38 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it('selects an available configured worker_host and passes it to the launcher start path', async () => {
-    const { paths } = await createHostPaths();
+    const { root, paths } = await createHostPaths();
+    const occupiedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-occupied-issue'
+    };
+    const occupiedPaths = resolveRunPaths(occupiedEnv, 'run-occupied');
+    await mkdir(occupiedPaths.runDir, { recursive: true });
+    await writeFile(
+      occupiedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-occupied',
+        task_id: 'linear-occupied-issue',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'occupied-issue',
+        issue_identifier: 'CO-occupied',
+        issue_updated_at: '2026-03-19T04:00:00.000Z',
+        updated_at: '2026-03-19T04:01:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(occupiedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:00:00.000Z',
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+
     const state = createProviderIntakeState();
     state.claims.push({
       provider: 'linear',
@@ -419,7 +450,7 @@ describe('createProviderIssueHandoffService', () => {
       last_action: null,
       last_webhook_timestamp: null,
       run_id: 'run-occupied',
-      run_manifest_path: '/repo/.runs/linear-occupied-issue/cli/run-occupied/manifest.json',
+      run_manifest_path: occupiedPaths.manifestPath,
       worker_host: 'worker-host-01',
       launch_source: 'control-host',
       launch_token: 'launch-occupied',
@@ -509,7 +540,38 @@ describe('createProviderIssueHandoffService', () => {
   });
 
   it('fails closed with a queued retry when configured worker_hosts are at capacity', async () => {
-    const { paths } = await createHostPaths();
+    const { root, paths } = await createHostPaths();
+    const occupiedEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-occupied-issue'
+    };
+    const occupiedPaths = resolveRunPaths(occupiedEnv, 'run-occupied');
+    await mkdir(occupiedPaths.runDir, { recursive: true });
+    await writeFile(
+      occupiedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-occupied',
+        task_id: 'linear-occupied-issue',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'occupied-issue',
+        issue_identifier: 'CO-occupied',
+        issue_updated_at: '2026-03-19T04:00:00.000Z',
+        updated_at: '2026-03-19T04:01:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(occupiedPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-19T04:00:00.000Z',
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+
     const state = createProviderIntakeState();
     state.claims.push({
       provider: 'linear',
@@ -531,7 +593,7 @@ describe('createProviderIssueHandoffService', () => {
       last_action: null,
       last_webhook_timestamp: null,
       run_id: 'run-occupied',
-      run_manifest_path: '/repo/.runs/linear-occupied-issue/cli/run-occupied/manifest.json',
+      run_manifest_path: occupiedPaths.manifestPath,
       worker_host: 'worker-host-01',
       launch_source: 'control-host',
       launch_token: 'launch-occupied',
