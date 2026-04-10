@@ -812,22 +812,35 @@ export function createProviderIssueHandoffService(
   };
 
   const buildTrackedIssueMergeCloseoutResetFields = (
-    claim: Pick<ProviderIntakeClaimRecord, 'merge_closeout' | 'issue_updated_at'>,
-    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'updated_at'>
-  ): Partial<Pick<ProviderIntakeClaimRecord, 'merge_closeout'>> =>
-    !isTrackedIssueFreshEnoughForClaim(claim, trackedIssue)
-      ? {}
-      : shouldClearStaleMergeCloseoutForTrackedIssue({
-            claim,
-            trackedIssue
-          })
-        ? { merge_closeout: null }
-        : {};
+    claim: Pick<
+      ProviderIntakeClaimRecord,
+      'merge_closeout' | 'review_promotion' | 'issue_updated_at'
+    >,
+    trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
+  ): Partial<Pick<ProviderIntakeClaimRecord, 'merge_closeout' | 'review_promotion'>> => {
+    if (!isTrackedIssueFreshEnoughForClaim(claim, trackedIssue)) {
+      return {};
+    }
+    const clearMergeCloseout = shouldClearStaleMergeCloseoutForTrackedIssue({
+      claim,
+      trackedIssue
+    });
+    if (!clearMergeCloseout) {
+      return {};
+    }
+    return shouldClearStaleReviewPromotionForTrackedIssue({
+      claim,
+      trackedIssue
+    })
+      ? { merge_closeout: null, review_promotion: null }
+      : { merge_closeout: null };
+  };
 
   const buildFreshTrackedIssueActiveRunFields = (
     claim: Pick<
       ProviderIntakeClaimRecord,
       | 'merge_closeout'
+      | 'review_promotion'
       | 'issue_identifier'
       | 'issue_title'
       | 'issue_state'
@@ -854,6 +867,7 @@ export function createProviderIssueHandoffService(
       | 'issue_assignee_name'
       | 'issue_blocked_by'
       | 'merge_closeout'
+      | 'review_promotion'
     >
   > => ({
     ...buildFreshTrackedIssueClaimFields(claim, trackedIssue),
@@ -863,7 +877,7 @@ export function createProviderIssueHandoffService(
   const resolveFreshTrackedIssueForActiveClaim = async (
     claim: Pick<
       ProviderIntakeClaimRecord,
-      'provider' | 'issue_id' | 'issue_updated_at' | 'merge_closeout'
+      'provider' | 'issue_id' | 'issue_updated_at' | 'merge_closeout' | 'review_promotion'
     >
   ): Promise<{
     trackedIssue: LiveLinearTrackedIssue | null;
@@ -881,6 +895,7 @@ export function createProviderIssueHandoffService(
         | 'issue_assignee_name'
         | 'issue_blocked_by'
         | 'merge_closeout'
+        | 'review_promotion'
       >
     >;
   }> => {
@@ -3361,6 +3376,35 @@ function shouldClearStaleMergeCloseoutForTrackedIssue(input: {
   return (
     compareTrackedIssueUpdatedAt({
       existingIssueUpdatedAt: mergeCloseout.issue_updated_at ?? null,
+      nextIssueUpdatedAt: input.trackedIssue.updated_at
+    }) === 'newer'
+  );
+}
+
+function shouldClearStaleReviewPromotionForTrackedIssue(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'review_promotion'>;
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>;
+}): boolean {
+  const reviewPromotion = input.claim.review_promotion ?? null;
+  if (!reviewPromotion) {
+    return false;
+  }
+  if (!classifyProviderLinearWorkflowState(input.trackedIssue).isActive) {
+    return false;
+  }
+  const reviewPromotionWorkflowState = classifyProviderLinearWorkflowState({
+    state: reviewPromotion.issue_state,
+    state_type: reviewPromotion.issue_state_type
+  });
+  if (
+    !reviewPromotionWorkflowState.isHandoff &&
+    reviewPromotionWorkflowState.normalizedState !== 'merging'
+  ) {
+    return false;
+  }
+  return (
+    compareTrackedIssueUpdatedAt({
+      existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
       nextIssueUpdatedAt: input.trackedIssue.updated_at
     }) === 'newer'
   );

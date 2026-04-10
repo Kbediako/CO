@@ -15230,6 +15230,43 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: childPaths.manifestPath,
       launch_source: null,
       launch_token: null,
+      review_promotion: {
+        recorded_at: '2026-03-19T04:30:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-138',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:30:20.000Z',
+        status: 'promoted',
+        reason: 'promoted_to_merging',
+        summary: 'Review handoff already advanced into Merging.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/357'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/357',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 357
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'CLEAN',
+          ready_to_merge: true,
+          gate_reasons: [],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:30:20.000Z',
+          merged_at: null,
+          head_oid: 'abc123'
+        },
+        linear_transition: null
+      },
       merge_closeout: {
         recorded_at: '2026-03-19T04:30:30.000Z',
         issue_id: 'lin-issue-1',
@@ -15307,6 +15344,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: true
     });
     expect(state.claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(state.claims[0]?.review_promotion ?? null).toBeNull();
     expect(getPersistedState().claims[0]).toMatchObject({
       state: 'completed',
       reason: 'provider_issue_rehydrated_completed_run',
@@ -15314,6 +15352,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: true
     });
     expect(getPersistedState().claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(getPersistedState().claims[0]?.review_promotion ?? null).toBeNull();
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
@@ -16066,6 +16105,43 @@ describe('createProviderIssueHandoffService', () => {
       run_manifest_path: childPaths.manifestPath,
       launch_source: null,
       launch_token: null,
+      review_promotion: {
+        recorded_at: '2026-03-19T04:30:20.000Z',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-138',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-03-19T04:30:20.000Z',
+        status: 'promoted',
+        reason: 'promoted_to_merging',
+        summary: 'Review handoff already advanced into Merging.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/357'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/357',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 357
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'CLEAN',
+          ready_to_merge: true,
+          gate_reasons: [],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-03-19T04:30:20.000Z',
+          merged_at: null,
+          head_oid: 'abc123'
+        },
+        linear_transition: null
+      },
       merge_closeout: {
         recorded_at: '2026-03-19T04:30:30.000Z',
         issue_id: 'lin-issue-1',
@@ -16143,6 +16219,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: true
     });
     expect(state.claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(state.claims[0]?.review_promotion ?? null).toBeNull();
     expect(getPersistedState().claims[0]).toMatchObject({
       state: 'completed',
       reason: 'provider_issue_rehydrated_completed_run',
@@ -16150,6 +16227,7 @@ describe('createProviderIssueHandoffService', () => {
       retry_queued: true
     });
     expect(getPersistedState().claims[0]?.merge_closeout ?? null).toBeNull();
+    expect(getPersistedState().claims[0]?.review_promotion ?? null).toBeNull();
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
