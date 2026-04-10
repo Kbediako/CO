@@ -1235,7 +1235,7 @@ function providerIntakeClaimMatchesSelectedRun(
     return true;
   }
   if (!providerIntakeClaimMatchesIssueIdentity(claim, snapshot)) {
-    return providerIntakeClaimMatchesSyntheticChildTaskPrefix(claim, snapshot);
+    return providerIntakeClaimMatchesSyntheticFallbackTaskBinding(claim, snapshot);
   }
   if (claim.run_id && snapshot.runId) {
     if (claim.task_id && snapshot.taskId && claim.task_id !== snapshot.taskId) {
@@ -1295,7 +1295,7 @@ function scoreProviderIntakeClaimSpecificity(
   if (claim.task_id && snapshot.taskId && claim.task_id === snapshot.taskId) {
     return 2;
   }
-  if (providerIntakeClaimMatchesSyntheticChildTaskPrefix(claim, snapshot)) {
+  if (providerIntakeClaimMatchesSyntheticFallbackTaskBinding(claim, snapshot)) {
     return 1;
   }
   return 0;
@@ -1327,7 +1327,7 @@ function providerIntakeClaimMatchesIssueIdentity(
   );
 }
 
-function providerIntakeClaimMatchesSyntheticChildTaskPrefix(
+function providerIntakeClaimMatchesSyntheticFallbackTaskBinding(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'task_id'>,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
@@ -1348,7 +1348,10 @@ function providerIntakeClaimMatchesSyntheticChildTaskPrefix(
   if (claim.task_id !== buildProviderFallbackTaskId({ id: claim.issue_id })) {
     return false;
   }
-  if (!snapshot.taskId.startsWith(`${claim.task_id}-`)) {
+  if (
+    snapshot.taskId !== claim.task_id &&
+    !snapshot.taskId.startsWith(`${claim.task_id}-`)
+  ) {
     return false;
   }
   return !hasAuthoritativeProjectionIssueIdentity(snapshot);

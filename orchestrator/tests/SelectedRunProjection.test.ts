@@ -1237,6 +1237,54 @@ describe('SelectedRunProjection', () => {
     expect(selected?.tracked).toBeNull();
   });
 
+  it('rebinds fallback-only parent provider-worker task ids from a canonical claim when only task_id matches', async () => {
+    const taskId = 'linear-lin-issue-147';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Parent provider-worker manifest only has fallback task identity.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      task_id: taskId,
+      run_id: null,
+      run_manifest_path: null,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const selected = await createSelectedRunProjectionReader(
+      createProjectionContext(paths, providerIntakeState)
+    ).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-147',
+      issueId: 'lin-issue-147',
+      taskId,
+      runId: 'provider-run-1',
+      compatibilityState: 'Human Review'
+    });
+    expect(selected?.lookupAliases).toEqual(
+      expect.arrayContaining(['CO-147', 'lin-issue-147', taskId, 'provider-run-1'])
+    );
+    expect(selected?.tracked).toBeNull();
+  });
+
   it('lets active run-bound claims outrank stale tracked issue state for compatibility state', async () => {
     const taskId = 'linear-lin-issue-1';
     const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
