@@ -19,13 +19,17 @@ import { __test__ as controlHostSupervisionShellTest } from '../src/cli/controlH
 const {
   assertControlHostSupervisionInstallPaths,
   assertStoredControlHostSupervisionConfig,
+  bootstrapLaunchctlPlist,
   buildNextControlHostSupervisionState,
   buildControlHostSupervisionStatusPayload,
+  classifyControlHostSupervisionRollout,
   captureExistingControlHostSupervisionInstall,
   createSleepWaiter,
   createControlHostSupervisionChildEventPromises,
   formatControlHostSupervisionStatus,
+  inspectControlHostSupervisionLaunchAgent,
   isIgnorableLaunchctlBootoutFailure,
+  isRetryableLaunchctlBootstrapError,
   loadBootstrapEnvironment,
   parseNulDelimitedEnv,
   probeControlHostHealth,
@@ -37,6 +41,7 @@ const {
   rollbackFailedControlHostSupervisionInstall,
   resolveControlHostSupervisionProbeTimeoutMs,
   resolveControlHostSupervisionServiceTarget,
+  terminateChildProcess,
   writeRuntimeStateWithCleanup
 } = controlHostSupervisionShellTest;
 
@@ -110,13 +115,13 @@ describe('controlHostSupervision helpers', () => {
     expect(plist).toContain('<key>ThrottleInterval</key>');
   });
 
-  it('falls back to the package dist entrypoint when the current argv entry is not js', () => {
+  it('pins installs to the packaged bootstrap entrypoint when running from source', () => {
     expect(
       resolveDefaultControlHostSupervisionEntrypoint(
         '/repo/bin/codex-orchestrator.ts',
         '/package/root'
       )
-    ).toBe('/package/root/dist/bin/codex-orchestrator.js');
+    ).toBe('/package/root/bin/codex-orchestrator.js');
   });
 
   it('treats restart_required health payloads as unhealthy', () => {
@@ -245,17 +250,152 @@ describe('controlHostSupervision shell helpers', () => {
         exitCode: 0,
         stdout: `${serviceTarget} = {\n\tactive count = 1\n}\n`,
         stderr: ''
+      },
+      launchAgent: {
+        exists: true,
+        program_arguments: [
+          config.nodePath,
+          config.cliEntrypoint,
+          'control-host',
+          'supervise',
+          'run',
+          '--config',
+          config.paths.configPath
+        ],
+        working_directory: config.repoRoot,
+        detected_program: config.nodePath,
+        classification: 'managed_supervision'
       }
     });
 
     expect(payload.service.loaded).toBe(true);
     expect(payload.service.summary).toBe(`${serviceTarget} = {`);
+    expect(payload.rollout).toEqual({
+      mode: 'managed_supervision',
+      migration_required: false,
+      summary: 'LaunchAgent matches the stored managed supervision config.'
+    });
 
     const rendered = formatControlHostSupervisionStatus(payload);
     expect(rendered).toContain('Control-host supervision: installed');
+    expect(rendered).toContain('Rollout: managed_supervision');
     expect(rendered).toContain(`Service target: ${serviceTarget}`);
+    expect(rendered).toContain(`CLI entrypoint: ${config.cliEntrypoint}`);
     expect(rendered).toContain('Last restart reason: restart_required');
     expect(rendered).toContain(`launchctl: ${serviceTarget} = {`);
+  });
+
+  it('detects the legacy shim LaunchAgent and marks migration as required', () => {
+    const launchAgent = inspectControlHostSupervisionLaunchAgent(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.kbediako.co.control-host</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/tester/.local/bin/co-control-host-supervisor.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/tester/Code/CO</string>
+</dict>
+</plist>`,
+      null
+    );
+
+    expect(launchAgent).toEqual({
+      exists: true,
+      program_arguments: ['/Users/tester/.local/bin/co-control-host-supervisor.sh'],
+      working_directory: '/Users/tester/Code/CO',
+      detected_program: '/Users/tester/.local/bin/co-control-host-supervisor.sh',
+      classification: 'legacy_shim'
+    });
+    expect(
+      classifyControlHostSupervisionRollout({
+        config: null,
+        launchAgent,
+        serviceLoaded: false
+      })
+    ).toEqual({
+      mode: 'legacy_shim',
+      migration_required: true,
+      summary: 'LaunchAgent still targets the legacy shim wrapper.'
+    });
+  });
+
+  it('preserves literal encoded plist entities when decoding string fields', () => {
+    const launchAgent = inspectControlHostSupervisionLaunchAgent(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/tmp/&amp;lt;literal&amp;gt;.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/tmp/&amp;lt;literal&amp;gt;</string>
+</dict>
+</plist>`,
+      null
+    );
+
+    expect(launchAgent.detected_program).toBe('/tmp/&lt;literal&gt;.js');
+    expect(launchAgent.working_directory).toBe('/tmp/&lt;literal&gt;');
+  });
+
+  it('does not report managed rollout when launchctl does not confirm the service is loaded', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      label: 'com.example.control-host',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node',
+      cliEntrypoint: '/opt/codex-orchestrator.js'
+    });
+    const serviceTarget = resolveControlHostSupervisionServiceTarget(config.label);
+
+    const payload = buildControlHostSupervisionStatusPayload({
+      resolved: {
+        label: config.label,
+        paths: config.paths,
+        config
+      },
+      serviceTarget,
+      state: null,
+      launchctl: {
+        exitCode: 113,
+        stdout: '',
+        stderr: `Could not find service ${serviceTarget} in domain gui/501.`
+      },
+      launchAgent: {
+        exists: true,
+        program_arguments: [
+          config.nodePath,
+          config.cliEntrypoint,
+          'control-host',
+          'supervise',
+          'run',
+          '--config',
+          config.paths.configPath
+        ],
+        working_directory: config.repoRoot,
+        detected_program: config.nodePath,
+        classification: 'managed_supervision'
+      }
+    });
+
+    expect(payload.service.loaded).toBe(false);
+    expect(payload.rollout).toEqual({
+      mode: 'mixed',
+      migration_required: true,
+      summary:
+        'Managed LaunchAgent plist exists, but launchctl does not report the managed service target as loaded.'
+    });
+
+    const rendered = formatControlHostSupervisionStatus(payload);
+    expect(rendered).toContain('Rollout: mixed');
+    expect(rendered).toContain('Migration required: yes');
+    expect(rendered).toContain('launchctl loaded: no');
   });
 
   it('rejects integer flags with non-numeric suffixes', () => {
@@ -802,6 +942,51 @@ describe('controlHostSupervision shell helpers', () => {
     ).toBe(false);
   });
 
+  it('retries transient launchctl bootstrap input-output failures', async () => {
+    const bootstrap = vi
+      .fn(async () => undefined)
+      .mockRejectedValueOnce(
+        new Error(
+          'launchctl bootstrap gui/501 /tmp/com.example.control-host.plist failed: Bootstrap failed: 5: Input/output error'
+        )
+      );
+    const sleep = vi.fn(async () => undefined);
+
+    await bootstrapLaunchctlPlist('/tmp/com.example.control-host.plist', {
+      bootstrap,
+      sleep
+    });
+
+    expect(bootstrap).toHaveBeenCalledTimes(2);
+    expect(bootstrap).toHaveBeenNthCalledWith(1, [
+      'bootstrap',
+      `gui/${process.getuid?.()}`,
+      '/tmp/com.example.control-host.plist'
+    ]);
+    expect(sleep).toHaveBeenCalledWith(1_000);
+  });
+
+  it('does not retry non-transient launchctl bootstrap failures', async () => {
+    const bootstrapError = new Error(
+      'launchctl bootstrap gui/501 /tmp/com.example.control-host.plist failed: Bootstrap failed: 37: Operation already in progress'
+    );
+    const bootstrap = vi.fn(async () => {
+      throw bootstrapError;
+    });
+    const sleep = vi.fn(async () => undefined);
+
+    await expect(
+      bootstrapLaunchctlPlist('/tmp/com.example.control-host.plist', {
+        bootstrap,
+        sleep
+      })
+    ).rejects.toThrow(bootstrapError.message);
+
+    expect(bootstrap).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+    expect(isRetryableLaunchctlBootstrapError(bootstrapError)).toBe(false);
+  });
+
   it('clears stale exit and health fields when a new child run starts', () => {
     const config = buildControlHostSupervisionConfig({
       homeDir: '/Users/tester',
@@ -918,6 +1103,136 @@ describe('controlHostSupervision shell helpers', () => {
     ).rejects.toBe(writeError);
     expect(child.kill).toHaveBeenCalledTimes(1);
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  it('kills the detached process group before escalating the wrapper after a timeout', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: 4200,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        if (signal === 'SIGKILL') {
+          queueMicrotask(() => {
+            child.signalCode = signal;
+            child.emit('exit', null, signal);
+          });
+        }
+        return true;
+      })
+    });
+    const listProcessGroupPids = vi.fn().mockResolvedValue([4200, 4201, 4202]);
+    const killProcessGroup = vi.fn();
+    const listDescendantPids = vi.fn().mockResolvedValue([4201, 4202]);
+    const killProcess = vi.fn();
+
+    await terminateChildProcess(child as never, 0, {
+      listProcessGroupPids,
+      killProcessGroup,
+      listDescendantPids,
+      killProcess
+    });
+
+    expect(listProcessGroupPids).toHaveBeenCalledWith(4200);
+    expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
+    expect(listDescendantPids).toHaveBeenCalledWith(4200);
+    expect(killProcess).toHaveBeenNthCalledWith(1, 4201, 'SIGKILL');
+    expect(killProcess).toHaveBeenNthCalledWith(2, 4202, 'SIGKILL');
+    expect(child.kill).toHaveBeenNthCalledWith(1, 'SIGTERM');
+    expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
+  });
+
+  it('stops polling detached process groups once timeout cleanup returns', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: 4200,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        if (signal === 'SIGKILL') {
+          queueMicrotask(() => {
+            child.signalCode = signal;
+            child.emit('exit', null, signal);
+          });
+        }
+        return true;
+      })
+    });
+    const listProcessGroupPids = vi.fn().mockResolvedValue([4200, 4201]);
+
+    await terminateChildProcess(child as never, 0, {
+      listProcessGroupPids,
+      listDescendantPids: vi.fn().mockResolvedValue([])
+    });
+
+    expect(listProcessGroupPids).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(listProcessGroupPids).toHaveBeenCalledTimes(1);
+  });
+
+  it('kills the detached process group even when the wrapper exits before the timeout escalation', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: 4200,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        if (signal === 'SIGTERM') {
+          queueMicrotask(() => {
+            child.exitCode = 0;
+            child.signalCode = signal;
+            child.emit('exit', 0, signal);
+          });
+        }
+        return true;
+      })
+    });
+    let processGroupKilled = false;
+    const listProcessGroupPids = vi.fn(async () => (processGroupKilled ? [] : [4202]));
+    const killProcessGroup = vi.fn(() => {
+      processGroupKilled = true;
+    });
+    const listDescendantPids = vi.fn();
+
+    await terminateChildProcess(child as never, 0, {
+      listProcessGroupPids,
+      killProcessGroup,
+      listDescendantPids
+    });
+
+    expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
+    expect(listDescendantPids).not.toHaveBeenCalled();
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  it('treats process-group lookup failures as pending until timeout escalation runs', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      pid: 4200,
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill: vi.fn((signal: NodeJS.Signals) => {
+        if (signal === 'SIGKILL') {
+          queueMicrotask(() => {
+            child.signalCode = signal;
+            child.emit('exit', null, signal);
+          });
+        }
+        return true;
+      })
+    });
+    const listProcessGroupPids = vi.fn().mockRejectedValue(new Error('ps failed'));
+    const killProcessGroup = vi.fn();
+
+    await expect(
+      terminateChildProcess(child as never, 0, {
+        listProcessGroupPids,
+        killProcessGroup,
+        listDescendantPids: vi.fn().mockResolvedValue([])
+      })
+    ).resolves.toBeUndefined();
+
+    expect(listProcessGroupPids).toHaveBeenCalledWith(4200);
+    expect(killProcessGroup).toHaveBeenCalledWith(4200, 'SIGKILL');
+    expect(child.kill).toHaveBeenNthCalledWith(1, 'SIGTERM');
+    expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
   });
 
   it('disposes sleep waiters before the tick fires', async () => {

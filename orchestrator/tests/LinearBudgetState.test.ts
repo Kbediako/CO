@@ -1350,7 +1350,7 @@ describe('linearBudgetState', () => {
     });
   });
 
-  it('stretches polling more aggressively when the matching endpoint budget is constrained', async () => {
+  it('stretches polling more aggressively when a segmented tracked-issues poll inherits constrained endpoint budget', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'linear-budget-state-'));
     tempDirs.push(codexHome);
     const env = createEnv(codexHome);
@@ -1368,13 +1368,13 @@ describe('linearBudgetState', () => {
     });
 
     const budget = await readSharedLinearBudgetStatus(env, {
-      operation: 'dispatch_source_tracked_issues'
+      operation: 'dispatch_source_tracked_issues:recovery_sweep'
     });
     const schedule = resolveLinearPollingInterval({
       budget,
       default_interval_ms: 15_000,
       nowMs,
-      operation: 'dispatch_source_tracked_issues'
+      operation: 'dispatch_source_tracked_issues:recovery_sweep'
     });
 
     expect(schedule.reason).toBe('linear_budget_endpoint_requests_low');

@@ -84,6 +84,34 @@ describe('checked-in CLI bootstrap', () => {
     }
   });
 
+  it('forwards termination signals to the re-execed source entrypoint', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'cli-bootstrap-signal-forwarding-'));
+    await writeFakePackageRoot(tempRoot, {
+      sourceBody: [
+        "import { writeFile } from 'node:fs/promises';",
+        'const keepAlive = setInterval(() => {}, 1_000);',
+        "process.stdout.write('ready\\n');",
+        "process.once('SIGTERM', () => {",
+        '  clearInterval(keepAlive);',
+        "  void writeFile(new URL('../child-signal.txt', import.meta.url), 'SIGTERM\\n', 'utf8').then(() => {",
+        '    process.exit(0);',
+        '  });',
+        '});'
+      ].join('\n'),
+      distBody: 'console.log("dist-runner");\n',
+      withTsNodeLoader: true
+    });
+
+    const result = await runBootstrapInteractive(tempRoot, async ({ child, waitForStdout }) => {
+      await waitForStdout('ready\n');
+      child.kill('SIGTERM');
+    });
+
+    expect(result.stdout).toContain('ready');
+    await expect(readFile(join(tempRoot, 'child-signal.txt'), 'utf8')).resolves.toBe('SIGTERM\n');
+    expect(result.stderr).toBe('');
+  });
+
   it('falls back to dist with an explicit warning when the source runtime is unavailable', async () => {
     tempRoot = await mkdtemp(join(tmpdir(), 'cli-bootstrap-dist-'));
     await writeFakePackageRoot(tempRoot, {
@@ -252,4 +280,84 @@ async function runBootstrap(
       resolve({ exitCode, stdout, stderr });
     });
   });
+}
+
+async function runBootstrapInteractive(
+  packageRoot: string,
+  interact: (helpers: {
+    child: ReturnType<typeof spawn>;
+    waitForStdout: (expected: string) => Promise<void>;
+  }) => Promise<void>,
+  envOverrides: Record<string, string> = {},
+  options: { nodeArgs?: string[]; entryArgs?: string[]; cwd?: string } = {}
+): Promise<{ exitCode: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string }> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        ...(options.nodeArgs ?? []),
+        join(packageRoot, 'bin', 'codex-orchestrator.js'),
+        ...(options.entryArgs ?? [])
+      ],
+      {
+        cwd: options.cwd ?? packageRoot,
+        env: {
+          ...process.env,
+          ...envOverrides
+        },
+        stdio: ['ignore', 'pipe', 'pipe']
+      }
+    );
+
+    let settled = false;
+    let stdout = '';
+    let stderr = '';
+    child.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    const rejectOnce = (error: unknown) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGKILL');
+      }
+      reject(error);
+    };
+
+    child.once('error', rejectOnce);
+    child.once('close', (exitCode, signal) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve({
+        exitCode,
+        signal: typeof signal === 'string' ? signal : null,
+        stdout,
+        stderr
+      });
+    });
+
+    void interact({
+      child,
+      waitForStdout: (expected) => waitForOutput(() => stdout, expected)
+    }).catch(rejectOnce);
+  });
+}
+
+async function waitForOutput(readOutput: () => string, expected: string): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if (readOutput().includes(expected)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Timed out waiting for output: ${expected}`);
 }

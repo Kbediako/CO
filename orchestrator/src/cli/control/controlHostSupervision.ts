@@ -104,14 +104,15 @@ export function resolveDefaultControlHostSupervisionEntrypoint(
   currentArgvEntry: string | null | undefined,
   packageRoot: string
 ): string {
+  const bootstrapEntrypoint = join(packageRoot, 'bin', 'codex-orchestrator.js');
   const currentEntry =
     typeof currentArgvEntry === 'string' && currentArgvEntry.trim().length > 0
       ? resolve(currentArgvEntry)
       : null;
-  if (currentEntry && currentEntry.endsWith('.js')) {
+  if (currentEntry === bootstrapEntrypoint) {
     return currentEntry;
   }
-  return join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js');
+  return bootstrapEntrypoint;
 }
 
 export function resolveControlHostSupervisionPaths(input?: {

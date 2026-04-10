@@ -42,6 +42,30 @@
       }
     },
     {
+      "id": "20260410-linear-dd3f4c83-17cf-4668-afb4-978977beb37d",
+      "title": "CO: roll out the shipped CO-117 control-host supervision path so the live host stops bypassing it",
+      "relates_to": "tasks/tasks-linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-dd3f4c83-17cf-4668-afb4-978977beb37d-co-141-docs-review/cli/2026-04-10T07-01-12-520Z-3922c49d/manifest.json",
+          "override_reason": "The audited docs-review child stream passed spec-guard and docs:check, then failed at docs:freshness on the existing repo-wide stale-doc baseline (`stale docs: 119`). The failure is not specific to the CO-141 packet, so the lane records a truthful manual fallback in out/linear-dd3f4c83-17cf-4668-afb4-978977beb37d/manual/20260410T070112Z-docs-review-fallback.md instead of stalling implementation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
+        "task": "tasks/tasks-linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
+        "agent_task": ".agent/task/linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
+        "docs": "docs/TECH_SPEC-linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md"
+      }
+    },
+    {
       "id": "20260410-linear-d3f1af87-57da-46ab-901d-75a6cc60420e",
       "title": "CO: restore current-main docs:freshness green baseline after CO-134 validation repair",
       "relates_to": "tasks/tasks-linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md",
@@ -63,6 +87,30 @@
         "task": "tasks/tasks-linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md",
         "agent_task": ".agent/task/linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md",
         "docs": "docs/TECH_SPEC-linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md"
+      }
+    },
+    {
+      "id": "20260410-linear-255030bf-bdda-4594-b503-28639a98b9da",
+      "title": "CO: shift Linear intake to webhook-first targeted reconcile with slow full recovery sweeps",
+      "relates_to": "tasks/tasks-linear-255030bf-bdda-4594-b503-28639a98b9da.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-10",
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
+          "date": "2026-04-10",
+          "manifest": ".runs/linear-255030bf-bdda-4594-b503-28639a98b9da-co-144-docs-review/cli/2026-04-10T05-40-04-360Z-3844b2a8/manifest.json",
+          "override_reason": "The first audited docs-review child stream surfaced a packet-shape issue in `docs/docs-freshness-registry.json` because the CO-144 packet entries were duplicated. After removing the duplicate registry block, the rerun passed spec-guard and docs:check, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 119`; Task Packet stale=85, Task Mirror stale=17, Report Only stale=17). The CO-144 packet is registered and absent from the rerun stale-entry failures, so the manifest-backed rerun is recorded as truthful manual fallback rather than a packet-shape blocker."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-255030bf-bdda-4594-b503-28639a98b9da.md",
+        "task": "tasks/tasks-linear-255030bf-bdda-4594-b503-28639a98b9da.md",
+        "agent_task": ".agent/task/linear-255030bf-bdda-4594-b503-28639a98b9da.md",
+        "docs": "docs/TECH_SPEC-linear-255030bf-bdda-4594-b503-28639a98b9da.md"
       }
     },
     {
