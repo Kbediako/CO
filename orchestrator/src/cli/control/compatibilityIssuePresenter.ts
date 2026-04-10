@@ -1172,12 +1172,13 @@ function hasSyntheticLinearFallbackProvenance(
   }
   return (
     source.pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
-    source.pipelineId === 'docs-review' ||
-    source.pipelineId === 'implementation-gate' ||
-    source.pipelineId === 'docs-relevance-advisory' ||
-    source.pipelineId === 'provider-linear-child-lane' ||
     source.pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
-    source.providerLinearWorkerProof != null
+    source.providerLinearWorkerProof != null ||
+    (source.issueProvider === 'linear' &&
+      (source.pipelineId === 'docs-review' ||
+        source.pipelineId === 'implementation-gate' ||
+        source.pipelineId === 'docs-relevance-advisory' ||
+        source.pipelineId === 'provider-linear-child-lane'))
   );
 }
 

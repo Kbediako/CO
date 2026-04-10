@@ -878,12 +878,13 @@ function hasSyntheticLinearFallbackProvenance(
   }
   return (
     source.pipelineId === 'provider-linear-worker' ||
-    source.pipelineId === 'docs-review' ||
-    source.pipelineId === 'implementation-gate' ||
-    source.pipelineId === 'docs-relevance-advisory' ||
-    source.pipelineId === 'provider-linear-child-lane' ||
     source.pipelineTitle === 'Provider Linear Worker' ||
-    source.providerLinearWorkerProof != null
+    source.providerLinearWorkerProof != null ||
+    (source.issueProvider === 'linear' &&
+      (source.pipelineId === 'docs-review' ||
+        source.pipelineId === 'implementation-gate' ||
+        source.pipelineId === 'docs-relevance-advisory' ||
+        source.pipelineId === 'provider-linear-child-lane'))
   );
 }
 

@@ -1397,9 +1397,9 @@ function hasProviderLinearClaimBindingProvenance(
     readStringValue(snapshot.manifestRecord, 'pipeline_title', 'pipelineTitle') ?? null;
   return (
     pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
-    isProviderLinearChildPipelineId(pipelineId) ||
     pipelineTitle === PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
-    providerLinearWorkerProof != null
+    providerLinearWorkerProof != null ||
+    (snapshot.issueProvider === 'linear' && isProviderLinearChildPipelineId(pipelineId))
   );
 }
 
