@@ -1019,7 +1019,7 @@ describe('SelectedRunProjection', () => {
     });
   });
 
-  it('rebinds fallback-only task-id identity from tracked issue state when manifest identity is missing', async () => {
+  it('rebinds fallback-only task-id identity from tracked issue state for provider-worker manifests when manifest identity is missing', async () => {
     const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
     const { paths } = await createHostPaths(undefined, { taskId });
     await writeFile(
@@ -1027,6 +1027,7 @@ describe('SelectedRunProjection', () => {
       JSON.stringify({
         run_id: 'control-host',
         task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
         status: 'in_progress',
         issue_provider: 'linear',
         updated_at: '2026-03-20T01:15:28.970Z',
@@ -1289,6 +1290,50 @@ describe('SelectedRunProjection', () => {
     );
   });
 
+  it('does not rebind fallback-only linear-tagged custom runs from tracked issue state', async () => {
+    const taskId = 'linear-lin-issue-146';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'custom-background-pipeline',
+        pipeline_title: 'Custom Background Pipeline',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Linear-tagged custom run should keep its fallback task identity.'
+      }),
+      'utf8'
+    );
+
+    const projectionContext = createProjectionContext(paths, createProviderIntakeState(paths.manifestPath));
+    projectionContext.providerIntakeState = undefined;
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-146',
+        identifier: 'CO-146',
+        title: 'Tracked issue is active.',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:15:28.970Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: taskId,
+      issueId: taskId,
+      taskId,
+      runId: 'provider-run-1'
+    });
+    expect(selected?.lookupAliases).not.toEqual(
+      expect.arrayContaining(['CO-146', 'lin-issue-146'])
+    );
+  });
+
   it('rebinds fallback-only parent provider-worker task ids from a canonical claim when only task_id matches', async () => {
     const taskId = 'linear-lin-issue-147';
     const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
@@ -1392,6 +1437,65 @@ describe('SelectedRunProjection', () => {
     expect(selected?.tracked?.linear).toMatchObject({
       identifier: 'CO-147',
       state: 'In Progress'
+    });
+  });
+
+  it('prefers fresher tracked issue state over stale rehydrated active claim state', async () => {
+    const taskId = 'linear-lin-issue-147';
+    const { paths } = await createHostPaths(undefined, { taskId, runId: 'provider-run-1' });
+    await writeFile(
+      paths.manifestPath,
+      JSON.stringify({
+        run_id: 'provider-run-1',
+        task_id: taskId,
+        pipeline_id: 'provider-linear-worker',
+        issue_provider: 'linear',
+        status: 'in_progress',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'Tracked issue and provider claim refer to the same issue with different freshness.'
+      }),
+      'utf8'
+    );
+
+    const providerIntakeState = createProviderIntakeState(paths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      issue_id: 'lin-issue-147',
+      issue_identifier: 'CO-147',
+      issue_title: 'Claim-backed issue',
+      issue_state: 'Human Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-20T01:15:00.000Z',
+      task_id: taskId,
+      run_id: 'provider-run-1',
+      run_manifest_path: paths.manifestPath,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run'
+    };
+
+    const projectionContext = createProjectionContext(paths, providerIntakeState);
+    projectionContext.linearAdvisoryState = {
+      tracked_issue: {
+        id: 'lin-issue-147',
+        identifier: 'CO-147',
+        title: 'Tracked issue has already advanced.',
+        state: 'Merging',
+        state_type: 'started',
+        updated_at: '2026-03-20T01:16:30.000Z'
+      } as never
+    };
+
+    const selected = await createSelectedRunProjectionReader(projectionContext).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-147',
+      issueId: 'lin-issue-147',
+      compatibilityState: 'Merging',
+      displayStatus: 'Merging'
+    });
+    expect(selected?.tracked?.linear).toMatchObject({
+      identifier: 'CO-147',
+      state: 'Merging'
     });
   });
 

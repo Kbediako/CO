@@ -295,13 +295,10 @@ function buildProjectionContextFromParts(
   }
   const { manifestRecord, taskId, runId } = snapshot;
   const issueProvider = snapshot.issueProvider ?? providerClaim?.provider ?? null;
-  const allowTrackedIssueFallbackIdentityRebinding =
-    issueProvider === 'linear' ||
-    readStringValue(manifestRecord, 'pipeline_id', 'pipelineId') ===
-      PROVIDER_LINEAR_WORKER_PIPELINE_ID ||
-    readStringValue(manifestRecord, 'pipeline_title', 'pipelineTitle') ===
-      PROVIDER_LINEAR_WORKER_PIPELINE_TITLE ||
-    parts.providerLinearWorkerProof != null;
+  const allowTrackedIssueFallbackIdentityRebinding = hasProviderLinearClaimBindingProvenance(
+    snapshot,
+    parts.providerLinearWorkerProof
+  );
   const { issueIdentifier, issueId, lookupAliases } = resolveProjectionIssueIdentity(
     snapshot,
     parts.trackedIssue,
@@ -383,7 +380,9 @@ function buildProjectionContextFromParts(
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
   const compatibilityState = resolveCompatibilityState(
-    providerClaim?.reason === 'provider_issue_rehydrated_active_run' ? null : matchedTrackedIssue,
+    shouldPreferTrackedIssueCompatibilityState(matchedTrackedIssue, providerClaim)
+      ? matchedTrackedIssue
+      : null,
     providerClaim
   );
   const { displayStatus, statusReason } = resolveSelectedRunDisplayStatus({
@@ -578,6 +577,27 @@ function resolveCompatibilityState(
     state,
     stateType
   };
+}
+
+function shouldPreferTrackedIssueCompatibilityState(
+  trackedIssue: LiveLinearTrackedIssue | null,
+  providerClaim: ProviderIntakeClaimRecord | null
+): boolean {
+  if (!trackedIssue) {
+    return false;
+  }
+  if (providerClaim?.reason !== 'provider_issue_rehydrated_active_run') {
+    return true;
+  }
+  const trackedUpdatedAt = trackedIssue.updated_at ?? null;
+  const claimUpdatedAt = providerClaim.issue_updated_at ?? null;
+  if (!claimUpdatedAt) {
+    return true;
+  }
+  if (!trackedUpdatedAt) {
+    return false;
+  }
+  return compareIsoTimestamp(trackedUpdatedAt, claimUpdatedAt) > 0;
 }
 
 function isCliRunManifestPathWithinRunsRoot(manifestPath: string, runsRoot: string): boolean {
