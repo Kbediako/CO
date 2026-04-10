@@ -796,15 +796,17 @@ export function createProviderIssueHandoffService(
   };
 
   const buildTrackedIssueMergeCloseoutResetFields = (
-    claim: Pick<ProviderIntakeClaimRecord, 'merge_closeout'>,
+    claim: Pick<ProviderIntakeClaimRecord, 'merge_closeout' | 'issue_updated_at'>,
     trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'updated_at'>
   ): Partial<Pick<ProviderIntakeClaimRecord, 'merge_closeout'>> =>
-    shouldClearStaleMergeCloseoutForTrackedIssue({
-      claim,
-      trackedIssue
-    })
-      ? { merge_closeout: null }
-      : {};
+    !isTrackedIssueFreshEnoughForClaim(claim, trackedIssue)
+      ? {}
+      : shouldClearStaleMergeCloseoutForTrackedIssue({
+            claim,
+            trackedIssue
+          })
+        ? { merge_closeout: null }
+        : {};
 
   const resolveFreshTrackedIssueForActiveClaim = async (
     claim: Pick<
@@ -2871,7 +2873,7 @@ export function createProviderIssueHandoffService(
 
           if (latestRun?.status === 'succeeded') {
             const trackedIssueClaimFields = {
-              ...buildTrackedIssueClaimFields(resolution.trackedIssue),
+              ...buildFreshTrackedIssueClaimFields(currentClaim, resolution.trackedIssue),
               ...buildTrackedIssueMergeCloseoutResetFields(currentClaim, resolution.trackedIssue)
             };
             const completedState = buildProviderCompletedRunRehydrateState({
