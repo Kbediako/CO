@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { access } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -40,10 +41,11 @@ describe('ExecClient artifact retention', () => {
     `);
   }, 30_000);
 
-  it('reclaims compatibility artifact files after the handle/result become unreachable', async () => {
-    await runGcProbe(`
-      import { access } from 'node:fs/promises';
-      import { setTimeout as delay } from 'node:timers/promises';
+  it('reclaims compatibility artifact files when the probe process exits after releasing references', async () => {
+    const { retainedEventsPath, retainedStderrPath } = await runGcProbeJson<{
+      retainedEventsPath: string;
+      retainedStderrPath: string;
+    }>(`
       import { ExecClient } from ${JSON.stringify(sdkModuleUrl)};
 
       const { retainedEventsPath, retainedStderrPath } = await (async () => {
@@ -63,26 +65,11 @@ describe('ExecClient artifact retention', () => {
         };
       })();
 
-      let cleaned = false;
-      let eventsStillExist = true;
-      let stderrStillExist = true;
-      for (let attempt = 0; attempt < 50; attempt += 1) {
-        global.gc();
-        await delay(20);
-        eventsStillExist = await access(retainedEventsPath).then(() => true, () => false);
-        stderrStillExist = await access(retainedStderrPath).then(() => true, () => false);
-        if (!eventsStillExist && !stderrStillExist) {
-          cleaned = true;
-          break;
-        }
-      }
-
-      if (!cleaned) {
-        throw new Error(
-          \`compatibility artifact paths were not reclaimed after references were released: events=\${eventsStillExist} stderr=\${stderrStillExist}\`
-        );
-      }
+      console.log(JSON.stringify({ retainedEventsPath, retainedStderrPath }));
     `);
+
+    await expect(access(retainedEventsPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(access(retainedStderrPath)).rejects.toMatchObject({ code: 'ENOENT' });
   }, 30_000);
 });
 
@@ -94,4 +81,13 @@ async function runGcProbe(script: string): Promise<void> {
       { cwd: workspaceRoot }
     )
   ).resolves.toBeDefined();
+}
+
+async function runGcProbeJson<T>(script: string): Promise<T> {
+  const result = await execFileAsync(
+    process.execPath,
+    ['--expose-gc', '--loader', 'ts-node/esm', '--input-type=module', '--eval', script],
+    { cwd: workspaceRoot }
+  );
+  return JSON.parse(result.stdout.trim()) as T;
 }
