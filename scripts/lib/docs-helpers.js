@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { access, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -64,6 +65,28 @@ export async function collectDocFiles(repoRoot) {
 
   results.sort();
   return results;
+}
+
+export function listTrackedFiles(repoRoot, pathspecs = []) {
+  const args = ['-C', repoRoot, 'ls-files'];
+  if (Array.isArray(pathspecs) && pathspecs.length > 0) {
+    args.push('--', ...pathspecs);
+  }
+
+  const git = spawnSync('git', args, {
+    encoding: 'utf8'
+  });
+
+  if (git.status !== 0) {
+    throw new Error(`git ls-files failed while collecting tracked files: ${git.stderr || git.stdout}`);
+  }
+
+  return git.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => toPosixPath(line))
+    .sort();
 }
 
 function normalizeSlashPath(value) {
