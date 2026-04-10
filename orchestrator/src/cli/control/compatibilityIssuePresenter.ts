@@ -11,6 +11,7 @@ import type {
 } from './observabilityReadModel.js';
 import {
   buildProjectionSelectedPayload,
+  resolveProviderWorkerHost,
   buildTrackedPayloadEnvelope,
   buildSelectedRunLatestEventPayload
 } from './observabilityReadModel.js';
@@ -290,6 +291,11 @@ export function buildCompatibilityRunningEntry(
   polling: ControlPollingHealthPayload | null = null
 ): ControlRunningPayload {
   const proof = selected.providerLinearWorkerProof ?? null;
+  const workerHost = resolveProviderWorkerHost({
+    providerLinearWorkerProof: proof,
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    stageStartedAt: selected.startedAt
+  });
   const proofCurrentTurnActivity = proof?.current_turn_activity ?? null;
   const proofCanonicalEvent = normalizeCompatibilityMessage(proofCurrentTurnActivity?.event);
   const proofCanonicalMessage = normalizeCompatibilityMessage(
@@ -410,6 +416,7 @@ export function buildCompatibilityRunningEntry(
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
     pid: selected.providerLinearWorkerProof?.pid ?? null,
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     session_id: useLegacyProofFallback
       ? normalizeCompatibilityMessage(proof?.latest_session_id)
       : proofCanonicalSessionId,
@@ -430,6 +437,11 @@ export function buildCompatibilityRunningEntry(
 export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourceContext): ControlRetryPayload {
   const retryState = selected.providerRetryState ?? null;
   const proof = selected.providerLinearWorkerProof ?? null;
+  const workerHost = resolveProviderWorkerHost({
+    providerLinearWorkerProof: proof,
+    providerDebugSnapshot: selected.providerDebugSnapshot,
+    stageStartedAt: selected.startedAt
+  });
   return {
     issue_id: selected.issueId,
     issue_identifier: selected.issueIdentifier,
@@ -439,6 +451,7 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
     display_state: selected.displayStatus,
     status_reason: selected.statusReason,
     session_id: proof?.latest_session_id ?? null,
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     thread_id: proof?.thread_id ?? null,
     turn_count: proof?.turn_count ?? null,
     workspace_path: selected.workspacePath,
@@ -461,6 +474,11 @@ export function buildCompatibilityIssuePayload(input: {
   const selectedPayload = buildProjectionSelectedPayload(input.source);
   const latestEvent = buildSelectedRunLatestEventPayload(input.source.latestEvent);
   const recentEvents = latestEvent ? [latestEvent] : [];
+  const workerHost = resolveProviderWorkerHost({
+    providerLinearWorkerProof: input.source.providerLinearWorkerProof,
+    providerDebugSnapshot: input.source.providerDebugSnapshot,
+    stageStartedAt: input.source.startedAt
+  });
 
   return {
     issue_identifier: input.source.issueIdentifier,
@@ -474,6 +492,7 @@ export function buildCompatibilityIssuePayload(input: {
     workspace: {
       path: input.source.workspacePath ?? input.source.providerLinearWorkerProof?.workspace_path ?? null
     },
+    ...(workerHost !== null ? { worker_host: workerHost } : {}),
     attempts: buildCompatibilityIssueAttempts(input.source, input.retry),
     running: input.running,
     retry: input.retry,

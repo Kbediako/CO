@@ -14,6 +14,10 @@ import {
   resolveProviderTerminalCleanupConfig,
   type ProviderTerminalCleanupResult
 } from './providerTerminalCleanup.js';
+import {
+  cloneProviderWorkerHostConfigs,
+  resolveProviderWorkerHostConfig
+} from './providerWorkerHosts.js';
 import type {
   ControlProviderTerminalCleanupLastResultPayload,
   ControlProviderWorkflowPayload
@@ -60,7 +64,8 @@ export function createProviderWorkflowConfigStore(
     last_success_at: null,
     last_error_at: null,
     last_error: null,
-    terminal_cleanup: buildDefaultTerminalCleanupPayload()
+    terminal_cleanup: buildDefaultTerminalCleanupPayload(),
+    worker_hosts: []
   };
 
   async function snapshotIsUsable(path: string | null): Promise<boolean> {
@@ -73,7 +78,12 @@ export function createProviderWorkflowConfigStore(
       }
       const raw = await readFile(path, 'utf8');
       const config = parseUserConfigRaw(raw, 'repo');
-      return Boolean(config && findPipeline(config, createOptions.pipelineId));
+      const pipeline = config ? findPipeline(config, createOptions.pipelineId) : null;
+      if (!pipeline) {
+        return false;
+      }
+      buildWorkerHostsPayload(pipeline.metadata);
+      return true;
     } catch {
       return false;
     }
@@ -169,6 +179,11 @@ export function createProviderWorkflowConfigStore(
 
       const raw = await readFile(sourcePath, 'utf8');
       const pipeline = parseRequiredPipelineFromRaw(raw, sourcePath, createOptions.pipelineId);
+      const nextTerminalCleanup = buildTerminalCleanupPayload(
+        pipeline.metadata,
+        state.terminal_cleanup?.last_result ?? null
+      );
+      const nextWorkerHosts = buildWorkerHostsPayload(pipeline.metadata);
 
       await mkdir(dirname(snapshotPath), { recursive: true });
       await replaceSnapshotAtomically(raw);
@@ -183,10 +198,8 @@ export function createProviderWorkflowConfigStore(
         last_success_at: attemptedAt,
         last_error_at: null,
         last_error: null,
-        terminal_cleanup: buildTerminalCleanupPayload(
-          pipeline.metadata,
-          state.terminal_cleanup?.last_result ?? null
-        )
+        terminal_cleanup: nextTerminalCleanup,
+        worker_hosts: nextWorkerHosts
       };
       if (!reloadOptions.startup && previousStatus === 'reload_failed') {
         logger.info(
@@ -221,7 +234,8 @@ export function createProviderWorkflowConfigStore(
           terminal_cleanup: buildTerminalCleanupPayload(
             pipeline.metadata,
             state.terminal_cleanup?.last_result ?? null
-          )
+          ),
+          worker_hosts: buildWorkerHostsPayload(pipeline.metadata)
         };
         return state;
       }
@@ -347,4 +361,8 @@ function cloneTerminalCleanupLastResult(
     matching_open_pr_urls: [...result.matching_open_pr_urls],
     closed_pr_urls: [...result.closed_pr_urls]
   };
+}
+
+function buildWorkerHostsPayload(metadata: unknown): ControlProviderWorkflowPayload['worker_hosts'] {
+  return cloneProviderWorkerHostConfigs(resolveProviderWorkerHostConfig(metadata));
 }
