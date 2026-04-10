@@ -1169,7 +1169,7 @@ function providerIntakeClaimMatchesSelectedRun(
   >,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'runId' | 'taskId'
   >
 ): boolean {
   if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
@@ -1201,7 +1201,7 @@ function compareProviderIntakeClaimSpecificity(
   >,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'runId' | 'taskId'
   >
 ): number {
   const leftPriority = scoreProviderIntakeClaimSpecificity(left, snapshot);
@@ -1224,7 +1224,7 @@ function scoreProviderIntakeClaimSpecificity(
   >,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'runId' | 'taskId'
   >
 ): number {
   if (claim.run_manifest_path && claim.run_manifest_path === snapshot.manifestPath) {
@@ -1249,7 +1249,7 @@ function providerIntakeClaimCanFallbackByIssue(
   >,
   snapshot: Pick<
     SelectedRunManifestSnapshot,
-    'issueId' | 'issueIdentifier' | 'manifestPath' | 'runId' | 'taskId'
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'manifestPath' | 'runId' | 'taskId'
   >
 ): boolean {
   return (
@@ -1270,9 +1270,15 @@ function providerIntakeClaimMatchesIssueIdentity(
 
 function providerIntakeClaimMatchesSyntheticChildTaskPrefix(
   claim: Pick<ProviderIntakeClaimRecord, 'issue_id' | 'task_id'>,
-  snapshot: Pick<SelectedRunManifestSnapshot, 'issueId' | 'issueIdentifier' | 'taskId' | 'runId'>
+  snapshot: Pick<
+    SelectedRunManifestSnapshot,
+    'issueId' | 'issueIdentifier' | 'issueProvider' | 'taskId' | 'runId'
+  >
 ): boolean {
   if (!claim.task_id || !snapshot.taskId) {
+    return false;
+  }
+  if (snapshot.issueProvider !== null && snapshot.issueProvider !== 'linear') {
     return false;
   }
   if (claim.task_id !== buildProviderFallbackTaskId({ id: claim.issue_id })) {
